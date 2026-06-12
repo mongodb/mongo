@@ -17,7 +17,9 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
     }
 
     // Basic tests.
-    assert.commandWorked(coll.insert({name: "Point1", geoField: {type: "Point", coordinates: [1, 1]}}));
+    assert.commandWorked(
+        coll.insert({name: "Point1", geoField: {type: "Point", coordinates: [1, 1]}}),
+    );
     assert.commandWorked(
         coll.insert({
             name: "LineString1",
@@ -49,7 +51,10 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
 
     // The second parameter of $centerSphere is in radian and the angle between [1, 1] and [2,2]
     // is about 0.0246 radian, much less than 1.
-    testGeoWithinCenterSphere([[1, 1], 1], [{name: "LineString1"}, {name: "Point1"}, {name: "Polygon1"}]);
+    testGeoWithinCenterSphere(
+        [[1, 1], 1],
+        [{name: "LineString1"}, {name: "Point1"}, {name: "Polygon1"}],
+    );
 
     let geoDoc = {
         "name": "LineString2",
@@ -70,7 +75,10 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
     );
 
     // Test for a LineString intersecting with geowithin sphere (should not return a match).
-    testGeoWithinCenterSphere([[151.09822404831158, -33.85109290503663], 0.0013568277575574095], []);
+    testGeoWithinCenterSphere(
+        [[151.09822404831158, -33.85109290503663], 0.0013568277575574095],
+        [],
+    );
 
     geoDoc = {
         "name": "LineString3",
@@ -97,7 +105,10 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
     testGeoWithinCenterSphere([[174.75689891704758, -36.8998373317427], 0.0005315628331256537], []);
 
     // Test for a LineString outside of geowithin sphere (should not return a match).
-    testGeoWithinCenterSphere([[174.8099591465865, -36.89409450096385], 0.00027296698925637807], []);
+    testGeoWithinCenterSphere(
+        [[174.8099591465865, -36.89409450096385], 0.00027296698925637807],
+        [],
+    );
 
     // Test for a Polygon within a geowithin sphere.
     geoDoc = {
@@ -119,7 +130,10 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
     assert.commandWorked(coll.insert(geoDoc));
 
     // Test for a Polygon within a geowithin sphere.
-    testGeoWithinCenterSphere([[174.78536621904806, -41.30510816038769], 0.0009483659386360411], [{name: "Polygon2"}]);
+    testGeoWithinCenterSphere(
+        [[174.78536621904806, -41.30510816038769], 0.0009483659386360411],
+        [{name: "Polygon2"}],
+    );
 
     // Test for an empty query cap (radius 0) inside of a polygon that covers the centerSphere
     // (should not return a match).
@@ -129,7 +143,10 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
     testGeoWithinCenterSphere([[174.7599527533759, -41.27137819591382], 0.0011247013153526434], []);
 
     // Test for a Polygon outside of geowithin sphere (should not return a match).
-    testGeoWithinCenterSphere([[174.80008799649448, -41.201484845543426], 0.0007748581633291528], []);
+    testGeoWithinCenterSphere(
+        [[174.80008799649448, -41.201484845543426], 0.0007748581633291528],
+        [],
+    );
 
     geoDoc = {
         "name": "MultiPolygon1",
@@ -169,7 +186,10 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
 
     // Verify that only one of the polygons of a MultiPolygon in the $centerSphere does not
     // match
-    testGeoWithinCenterSphere([[151.20438542915883, -33.89006380099829], 0.0006390286437185907], []);
+    testGeoWithinCenterSphere(
+        [[151.20438542915883, -33.89006380099829], 0.0006390286437185907],
+        [],
+    );
 
     geoDoc = {
         "name": "MultiPolygon2",
@@ -221,11 +241,17 @@ function testGeoWithinCenterSphereLinePolygon(coll) {
 
     // Test for a MultiPolygon with holes intersecting with geowithin sphere (should not return
     // a match).
-    testGeoWithinCenterSphere([[151.21028000820485, -33.87067923462358], 0.00013138775245714733], []);
+    testGeoWithinCenterSphere(
+        [[151.21028000820485, -33.87067923462358], 0.00013138775245714733],
+        [],
+    );
 
     // Test for a MultiPolygon with holes with geowithin sphere inside the hole (should not
     // return a match).
-    testGeoWithinCenterSphere([[151.21093787887645, -33.87533330567804], 0.000016565456776516003], []);
+    testGeoWithinCenterSphere(
+        [[151.21093787887645, -33.87533330567804], 0.000016565456776516003],
+        [],
+    );
 
     coll.drop();
 

@@ -126,7 +126,14 @@ stageExplain = explainStage(nestedUnionWithStage, "$unionWith");
 assert.eq(stageExplain.nReturned, 6, stageExplain);
 
 // Shard the outer collection.
-st.shardColl(outerColl.getName(), {_id: 1} /* shard key */, {_id: 2} /* split at */, {_id: 3} /* move */, dbName, true);
+st.shardColl(
+    outerColl.getName(),
+    {_id: 1} /* shard key */,
+    {_id: 2} /* split at */,
+    {_id: 3} /* move */,
+    dbName,
+    true,
+);
 
 // A variant of 'explainStage()' when the stage is expected to appear twice because it runs on
 // two shards.

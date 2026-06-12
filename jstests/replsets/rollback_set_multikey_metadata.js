@@ -55,8 +55,15 @@ const CommonOps = (node) => {
     );
 
     const localDb = node.getDB("local");
-    const preExisting = localDb.oplog.rs.find({op: "c", "o.setMultikeyMetadata": {$exists: true}}).toArray();
-    assert.eq(0, preExisting.length, "no setMultikeyMetadata entries should exist pre-RollbackOps", {preExisting});
+    const preExisting = localDb.oplog.rs
+        .find({op: "c", "o.setMultikeyMetadata": {$exists: true}})
+        .toArray();
+    assert.eq(
+        0,
+        preExisting.length,
+        "no setMultikeyMetadata entries should exist pre-RollbackOps",
+        {preExisting},
+    );
 };
 
 const RollbackOps = (node) => {
@@ -74,21 +81,36 @@ const RollbackOps = (node) => {
     session.endSession();
 
     const localDb = node.getDB("local");
-    const preRollbackEntries = localDb.oplog.rs.find({op: "c", "o.setMultikeyMetadata": {$exists: true}}).toArray();
-    assert.eq(2, preRollbackEntries.length, "expected one setMultikeyMetadata entry per index pre-rollback", {
-        preRollbackEntries,
-    });
+    const preRollbackEntries = localDb.oplog.rs
+        .find({op: "c", "o.setMultikeyMetadata": {$exists: true}})
+        .toArray();
+    assert.eq(
+        2,
+        preRollbackEntries.length,
+        "expected one setMultikeyMetadata entry per index pre-rollback",
+        {
+            preRollbackEntries,
+        },
+    );
 
     const indexes = preRollbackEntries.map((e) => e.o.idxName).sort();
     assert.eq(["$**_1", "a.b_1"], indexes, "expected entries for both indexes", {indexes});
 
     const testDb = node.getDB(dbName);
     const btreeIdx = getCatalogIndex(testDb, btreeCollName, "a.b_1");
-    assert(btreeIdx.multikey, "btree catalog must show multikey=true after side-txn commit pre-rollback", {btreeIdx});
+    assert(
+        btreeIdx.multikey,
+        "btree catalog must show multikey=true after side-txn commit pre-rollback",
+        {btreeIdx},
+    );
     const wildcardIdx = getCatalogIndex(testDb, wildcardCollName, "$**_1");
-    assert(wildcardIdx.multikey, "wildcard catalog must show multikey=true after side-txn commit pre-rollback", {
-        wildcardIdx,
-    });
+    assert(
+        wildcardIdx.multikey,
+        "wildcard catalog must show multikey=true after side-txn commit pre-rollback",
+        {
+            wildcardIdx,
+        },
+    );
 };
 
 const rollbackTest = new RollbackTest(testName);
@@ -104,17 +126,32 @@ rollbackTest.transitionToSteadyStateOperations();
 for (const node of rollbackTest.getTestFixture().nodes) {
     const testDb = node.getDB(dbName);
 
-    assert.eq(0, testDb[btreeCollName].countDocuments({}), "btree collection has rolled-back docs", {host: node.host});
-    assert.eq(0, testDb[wildcardCollName].countDocuments({}), "wildcard collection has rolled-back docs", {
-        host: node.host,
-    });
+    assert.eq(
+        0,
+        testDb[btreeCollName].countDocuments({}),
+        "btree collection has rolled-back docs",
+        {host: node.host},
+    );
+    assert.eq(
+        0,
+        testDb[wildcardCollName].countDocuments({}),
+        "wildcard collection has rolled-back docs",
+        {
+            host: node.host,
+        },
+    );
 
     const localDb = node.getDB("local");
-    const orphans = localDb.oplog.rs.find({op: "c", "o.setMultikeyMetadata": {$exists: true}}).toArray();
+    const orphans = localDb.oplog.rs
+        .find({op: "c", "o.setMultikeyMetadata": {$exists: true}})
+        .toArray();
     assert.eq(0, orphans.length, "orphan setMultikeyMetadata entries", {host: node.host, orphans});
 
     const btreeIdx = getCatalogIndex(testDb, btreeCollName, "a.b_1");
-    assert(!btreeIdx.multikey, "btree catalog must show multikey=false post-rollback", {host: node.host, btreeIdx});
+    assert(!btreeIdx.multikey, "btree catalog must show multikey=false post-rollback", {
+        host: node.host,
+        btreeIdx,
+    });
     const wildcardIdx = getCatalogIndex(testDb, wildcardCollName, "$**_1");
     assert(!wildcardIdx.multikey, "wildcard catalog must show multikey=false post-rollback", {
         host: node.host,

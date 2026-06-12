@@ -46,7 +46,9 @@ export const $config = (function () {
             const fullNs = coll.getFullName();
 
             jsTestLog("Executing create state: " + fullNs);
-            assert.commandWorked(db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}),
+            );
         },
         drop: function (db, collName, connCache) {
             db = this.getRandomDb(db);
@@ -64,11 +66,14 @@ export const $config = (function () {
             const destCollName = destCollNS.split(".")[1];
 
             jsTestLog("Executing rename state:" + srcCollName + " to " + destCollNS);
-            assert.commandWorkedOrFailedWithCode(srcColl.renameCollection(destCollName, true /* dropTarget */), [
-                ErrorCodes.NamespaceNotFound,
-                ErrorCodes.ConflictingOperationInProgress,
-                ErrorCodes.IllegalOperation,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                srcColl.renameCollection(destCollName, true /* dropTarget */),
+                [
+                    ErrorCodes.NamespaceNotFound,
+                    ErrorCodes.ConflictingOperationInProgress,
+                    ErrorCodes.IllegalOperation,
+                ],
+            );
         },
         movePrimary: function (db, collName, connCache) {
             db = this.getRandomDb(db);
@@ -83,10 +88,10 @@ export const $config = (function () {
             const coll = this.getRandomCollection(db);
 
             jsTestLog("Executing collMod state: " + coll.getFullName());
-            assert.commandWorkedOrFailedWithCode(db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}), [
-                ErrorCodes.NamespaceNotFound,
-                ErrorCodes.ConflictingOperationInProgress,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}),
+                [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress],
+            );
         },
         checkDatabaseMetadataConsistency: function (db, collName, connCache) {
             db = this.getRandomDb(db);
@@ -97,13 +102,19 @@ export const $config = (function () {
         checkCollectionMetadataConsistency: function (db, collName, connCache) {
             db = this.getRandomDb(db);
             const coll = this.getRandomCollection(db);
-            jsTestLog("Executing checkMetadataConsistency state for collection: " + coll.getFullName());
+            jsTestLog(
+                "Executing checkMetadataConsistency state for collection: " + coll.getFullName(),
+            );
             const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             // SERVER-111231 Remove early exit when untrackUnshardedCollection is re-enabled.
-            if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns || TestData.killShards) {
+            if (
+                TestData.runningWithConfigStepdowns ||
+                TestData.runningWithShardStepdowns ||
+                TestData.killShards
+            ) {
                 jsTestLog("Skipping untrackUnshardedCollection as stepdowns are enabled");
                 return;
             }
@@ -132,14 +143,17 @@ export const $config = (function () {
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
             // Note this command will behave as no-op in case the collection is not tracked.
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
-                // Handles the case where the collection is not located on its primary
-                ErrorCodes.OperationFailed,
-                // Handles the case where the collection is sharded
-                ErrorCodes.InvalidNamespace,
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}),
+                [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                ],
+            );
             jsTestLog(`Untrack collection completed`);
         },
     };
@@ -158,7 +172,9 @@ export const $config = (function () {
         // Allow some grace time for operations issued by background hooks (or the balancer) that might still be inflight.
         assert.soon(
             () => {
-                return configDB.collections.countDocuments({allowMigrations: {$exists: true}}) === 0;
+                return (
+                    configDB.collections.countDocuments({allowMigrations: {$exists: true}}) === 0
+                );
             },
             `Found unexpected "allowMigration" field on one or more tracked collections ${tojson(configDB.collections.findOne({allowMigrations: {$exists: true}}))}`,
         );

@@ -61,7 +61,10 @@ function testMigrationFailsAndWritesAreNotBlocked() {
 
     // Expect the migration to fail due to being unable to acquire the locks in time.
     // Note: Donor fails with LockTimeout; recipient fails with CommandFailed.
-    assert.commandFailedWithCode(moveChunkResult, [ErrorCodes.LockTimeout, ErrorCodes.CommandFailed]);
+    assert.commandFailedWithCode(moveChunkResult, [
+        ErrorCodes.LockTimeout,
+        ErrorCodes.CommandFailed,
+    ]);
 }
 
 const st = new ShardingTest({
@@ -80,8 +83,17 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 
 // Move one chunk to each shard.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -1}, to: st.shard0.shardName, _waitForDelete: true}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: ns,
+        find: {x: -1},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName, _waitForDelete: true}),
+);
 
 // Insert test data
 assert.commandWorked(coll.insertMany([{x: -2}, {x: -1}, {x: 1}, {x: 2}]));
@@ -102,7 +114,14 @@ const sessionColl = session.getDatabase(dbName)[collName];
 }
 
 // Return the chunk to shard0.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -1}, to: st.shard0.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: ns,
+        find: {x: -1},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Test that the migration donor correctly applies the migrationLockAcquisitionMaxWaitMS timeout for strong lock acquisition.
 {

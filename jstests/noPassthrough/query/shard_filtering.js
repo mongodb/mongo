@@ -17,13 +17,19 @@ const mongosDb = st.s.getDB("test");
 const mongosColl = st.s.getCollection(collName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard1.name}));
-assert.commandWorked(st.s.adminCommand({shardCollection: collName, key: {a: 1, "b.c": 1, "d.e.f": 1}}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: collName, key: {a: 1, "b.c": 1, "d.e.f": 1}}),
+);
 
 // Put a chunk with no data onto shard0 in order to make sure that both shards get targeted.
 assert.commandWorked(st.s.adminCommand({split: collName, middle: {a: 20, "b.c": 0, "d.e.f": 0}}));
 assert.commandWorked(st.s.adminCommand({split: collName, middle: {a: 30, "b.c": 0, "d.e.f": 0}}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: collName, find: {a: 25, "b.c": 0, "d.e.f": 0}, to: st.shard0.shardName}),
+    st.s.adminCommand({
+        moveChunk: collName,
+        find: {a: 25, "b.c": 0, "d.e.f": 0},
+        to: st.shard0.shardName,
+    }),
 );
 
 // Shard the collection and insert some docs.
@@ -87,7 +93,13 @@ assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER
 assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
 assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
 
-assert.sameMembers(mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1}).toArray(), [{a: 1}, {a: 1}, {a: 1}, {a: 1}, {a: 1}]);
+assert.sameMembers(mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1}).toArray(), [
+    {a: 1},
+    {a: 1},
+    {a: 1},
+    {a: 1},
+    {a: 1},
+]);
 
 // Drop the collection and shard it by a new key that has no dotted fields. Again, make sure that
 // shard0 has an empty chunk.
@@ -96,7 +108,11 @@ assert.commandWorked(st.s.adminCommand({shardCollection: collName, key: {a: 1, b
 assert.commandWorked(st.s.adminCommand({split: collName, middle: {a: 20, b: 0, c: 0, d: 0}}));
 assert.commandWorked(st.s.adminCommand({split: collName, middle: {a: 30, b: 0, c: 0, d: 0}}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: collName, find: {a: 25, b: 0, c: 0, d: 0}, to: st.shard0.shardName}),
+    st.s.adminCommand({
+        moveChunk: collName,
+        find: {a: 25, b: 0, c: 0, d: 0},
+        to: st.shard0.shardName,
+    }),
 );
 
 // Insert some data via mongos, and also insert some documents directly to shard0 to produce an

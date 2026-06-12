@@ -18,7 +18,10 @@
  */
 
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {accumulateServerStatusMetric, assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
+import {
+    accumulateServerStatusMetric,
+    assertReleaseMemoryFailedWithCode,
+} from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getServerParameter(knob) {
@@ -37,8 +40,11 @@ const sortMemoryLimitKnob = "internalQueryMaxBlockingSortMemoryUsageBytes";
 
 db.dropDatabase();
 const coll = db[jsTestName()];
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
-const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}),
+);
+const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries
+    .bucketMaxSpanSeconds;
 
 const start = new Date();
 const kMetaCount = 10;
@@ -70,7 +76,9 @@ function assertCursorSortedByTime(cursor) {
 // Some background queries can use $group and classic $group uses sorter to spill, so this
 // background spills can affect server status metrics.
 const classicGroupIncreasedSpillingKnob = "internalQueryEnableAggressiveSpillsInGroup";
-const classicGroupIncreasedSpillingInitialValue = getServerParameter(classicGroupIncreasedSpillingKnob);
+const classicGroupIncreasedSpillingInitialValue = getServerParameter(
+    classicGroupIncreasedSpillingKnob,
+);
 setServerParameter(classicGroupIncreasedSpillingKnob, false);
 
 const pipeline = [{$sort: {time: 1}}];

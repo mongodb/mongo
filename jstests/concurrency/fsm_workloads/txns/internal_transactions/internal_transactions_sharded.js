@@ -40,11 +40,20 @@ export const $config = extendWorkload($extendedBaseConfig, function ($config, $s
         }
         assert.neq(partition, null);
         if (isLowerChunkDoc) {
-            doc[this.defaultShardKeyField] = this.generateRandomInt(partition.lower, partition.mid - 1);
+            doc[this.defaultShardKeyField] = this.generateRandomInt(
+                partition.lower,
+                partition.mid - 1,
+            );
         } else if (isUpperChunkDoc) {
-            doc[this.defaultShardKeyField] = this.generateRandomInt(partition.mid, partition.upper - 1);
+            doc[this.defaultShardKeyField] = this.generateRandomInt(
+                partition.mid,
+                partition.upper - 1,
+            );
         } else {
-            doc[this.defaultShardKeyField] = this.generateRandomInt(partition.lower, partition.upper - 1);
+            doc[this.defaultShardKeyField] = this.generateRandomInt(
+                partition.lower,
+                partition.upper - 1,
+            );
         }
         return doc;
     };

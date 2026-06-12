@@ -29,7 +29,10 @@ function updateProfilingFilterGlobally(db, {oldFilter, newFilter}) {
 (function testQueryKnobMustBeEnabledToUseCommand() {
     // First make sure we can't run the command with the query knob turned off.
     const conn = MongoRunner.runMongod({});
-    assert.commandFailedWithCode(conn.adminCommand({setProfilingFilterGlobally: 1, filter: "unset"}), 7283301);
+    assert.commandFailedWithCode(
+        conn.adminCommand({setProfilingFilterGlobally: 1, filter: "unset"}),
+        7283301,
+    );
     MongoRunner.stopMongod(conn);
 })();
 
@@ -149,14 +152,24 @@ function runCorrectnessTests(conn) {
     }
 
     // Error cases (invalid filters or parameters).
-    assert.commandFailedWithCode(db.runCommand({setProfilingFilterGlobally: 1, filter: null}), ErrorCodes.BadValue);
-    assert.commandFailedWithCode(db.runCommand({setProfilingFilterGlobally: 1, filter: {noSuchField: 1}}), 4910200);
+    assert.commandFailedWithCode(
+        db.runCommand({setProfilingFilterGlobally: 1, filter: null}),
+        ErrorCodes.BadValue,
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({setProfilingFilterGlobally: 1, filter: {noSuchField: 1}}),
+        4910200,
+    );
     assert.commandFailedWithCode(
         db.runCommand({setProfilingFilterGlobally: 1, filter: {}, writeConcern: {w: "majority"}}),
         ErrorCodes.InvalidOptions,
     );
     assert.commandFailedWithCode(
-        db.runCommand({setProfilingFilterGlobally: 1, filter: {}, readConcern: {level: "majority"}}),
+        db.runCommand({
+            setProfilingFilterGlobally: 1,
+            filter: {},
+            readConcern: {level: "majority"},
+        }),
         ErrorCodes.InvalidOptions,
     );
 
@@ -200,11 +213,15 @@ function runCorrectnessTests(conn) {
 
     (function testGlobalFilterSettingOverridesDatabaseSpecificSettings() {
         let result = assert.commandWorked(
-            db.getSiblingDB("db1").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
+            db
+                .getSiblingDB("db1")
+                .runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
         );
         assert(!result.filter);
         result = assert.commandWorked(
-            db.getSiblingDB("db2").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter2.filter}),
+            db
+                .getSiblingDB("db2")
+                .runCommand({profile: isMongos ? 0 : 1, filter: profileFilter2.filter}),
         );
         assert(!result.filter);
         verify({
@@ -223,7 +240,9 @@ function runCorrectnessTests(conn) {
 
     (function testGlobalFilterSettingOverridesDatabaseSpecificSettingsEvenWhenNoop() {
         let result = assert.commandWorked(
-            db.getSiblingDB("db1").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
+            db
+                .getSiblingDB("db1")
+                .runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
         );
         assert.eq(result.filter, profileFilter2.filter);
         verify({
@@ -232,7 +251,10 @@ function runCorrectnessTests(conn) {
             dbFilters: {db1: profileFilter1},
         });
 
-        updateProfilingFilterGlobally(db, {oldFilter: profileFilter2.filter, newFilter: profileFilter2.filter});
+        updateProfilingFilterGlobally(db, {
+            oldFilter: profileFilter2.filter,
+            newFilter: profileFilter2.filter,
+        });
         verify({
             desc: "setting the global filter overrides database specific settings even when a noop",
             globalFilter: profileFilter2,
@@ -242,11 +264,15 @@ function runCorrectnessTests(conn) {
 
     (function testGlobalFilterUnsetOverridesDatabaseSpecificSettings() {
         let result = assert.commandWorked(
-            db.getSiblingDB("db1").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
+            db
+                .getSiblingDB("db1")
+                .runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
         );
         assert.eq(result.filter, profileFilter2.filter);
         result = assert.commandWorked(
-            db.getSiblingDB("db3").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter2.filter}),
+            db
+                .getSiblingDB("db3")
+                .runCommand({profile: isMongos ? 0 : 1, filter: profileFilter2.filter}),
         );
         assert.eq(result.filter, profileFilter2.filter);
         verify({

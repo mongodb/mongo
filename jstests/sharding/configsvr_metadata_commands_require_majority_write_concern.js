@@ -30,7 +30,10 @@ const unacceptableWCsForConfig = [
 ];
 
 // Only write concern majority can be sent to the config server.
-const acceptableWCsForConfig = [{writeConcern: {w: "majority"}}, {writeConcern: {w: "majority", wtimeout: 15000}}];
+const acceptableWCsForConfig = [
+    {writeConcern: {w: "majority"}},
+    {writeConcern: {w: "majority", wtimeout: 15000}},
+];
 
 // Any write concern can be sent to a mongos, because mongos will upconvert it to majority.
 const unacceptableWCsForMongos = [];
@@ -72,7 +75,15 @@ const cleanupFuncs = {
     },
 };
 
-function checkCommand(conn, command, unacceptableWCs, acceptableWCs, adminCommand, setupFunc, cleanupFunc) {
+function checkCommand(
+    conn,
+    command,
+    unacceptableWCs,
+    acceptableWCs,
+    adminCommand,
+    setupFunc,
+    cleanupFunc,
+) {
     unacceptableWCs.forEach(function (writeConcern) {
         jsTest.log(
             "testing " +
@@ -87,9 +98,15 @@ function checkCommand(conn, command, unacceptableWCs, acceptableWCs, adminComman
         let commandWithWriteConcern = {};
         Object.assign(commandWithWriteConcern, command, writeConcern);
         if (adminCommand) {
-            assert.commandFailedWithCode(conn.adminCommand(commandWithWriteConcern), ErrorCodes.InvalidOptions);
+            assert.commandFailedWithCode(
+                conn.adminCommand(commandWithWriteConcern),
+                ErrorCodes.InvalidOptions,
+            );
         } else {
-            assert.commandFailedWithCode(conn.runCommand(commandWithWriteConcern), ErrorCodes.InvalidOptions);
+            assert.commandFailedWithCode(
+                conn.runCommand(commandWithWriteConcern),
+                ErrorCodes.InvalidOptions,
+            );
         }
         cleanupFunc();
     });
@@ -117,7 +134,15 @@ function checkCommand(conn, command, unacceptableWCs, acceptableWCs, adminComman
 }
 
 function checkCommandMongos(command, setupFunc, cleanupFunc) {
-    checkCommand(st.s, command, unacceptableWCsForMongos, acceptableWCsForMongos, true, setupFunc, cleanupFunc);
+    checkCommand(
+        st.s,
+        command,
+        unacceptableWCsForMongos,
+        acceptableWCsForMongos,
+        true,
+        setupFunc,
+        cleanupFunc,
+    );
 }
 
 function checkCommandConfigSvr(command, setupFunc, cleanupFunc) {
@@ -155,7 +180,11 @@ checkCommandMongos(
 );
 
 // shardCollection
-checkCommandMongos({shardCollection: ns, key: {_id: 1}}, setupFuncs.enableSharding, cleanupFuncs.dropDatabase);
+checkCommandMongos(
+    {shardCollection: ns, key: {_id: 1}},
+    setupFuncs.enableSharding,
+    cleanupFuncs.dropDatabase,
+);
 
 // createDatabase
 // Don't check createDatabase against mongos: there is no createDatabase command exposed on
@@ -179,8 +208,16 @@ checkCommandConfigSvr(
 );
 
 // removeShard
-checkCommandMongos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.removeShardIfExists);
-checkCommandConfigSvr({_configsvrRemoveShard: newShardName}, setupFuncs.addShard, cleanupFuncs.removeShardIfExists);
+checkCommandMongos(
+    {removeShard: newShardName},
+    setupFuncs.addShard,
+    cleanupFuncs.removeShardIfExists,
+);
+checkCommandConfigSvr(
+    {_configsvrRemoveShard: newShardName},
+    setupFuncs.addShard,
+    cleanupFuncs.removeShardIfExists,
+);
 
 // dropCollection
 // We can't use the checkCommandMongos wrapper because it calls adminCommand and dropping admin

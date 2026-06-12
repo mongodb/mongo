@@ -40,19 +40,46 @@ function buildCommands({dbName, collName, shards, shardingType, nonEmpty}) {
     if (nonEmpty) {
         commands.push(new InsertDocCommand({dbName, collName, collectionCtx: ctx}));
         ctx = {exists: true, nonEmpty: true, shardKeySpec: null, isUnsplittable: false};
-        commands.push(new CreateIndexCommand({dbName, collName, shardSet: shards, indexSpec: shardKey}));
+        commands.push(
+            new CreateIndexCommand({dbName, collName, shardSet: shards, indexSpec: shardKey}),
+        );
     }
 
-    commands.push(new ShardCollectionCommand({dbName, collName, shardSet: shards, collectionCtx: ctx, shardKey}));
+    commands.push(
+        new ShardCollectionCommand({
+            dbName,
+            collName,
+            shardSet: shards,
+            collectionCtx: ctx,
+            shardKey,
+        }),
+    );
 
     const shardedCtx = {exists: true, nonEmpty, shardKeySpec: shardKey, isUnsplittable: false};
-    commands.push(new MoveChunkCommand({dbName, collName, shardSet: shards, collectionCtx: shardedCtx}));
-    commands.push(new UnshardCollectionCommand({dbName, collName, shardSet: shards, collectionCtx: shardedCtx}));
+    commands.push(
+        new MoveChunkCommand({dbName, collName, shardSet: shards, collectionCtx: shardedCtx}),
+    );
+    commands.push(
+        new UnshardCollectionCommand({
+            dbName,
+            collName,
+            shardSet: shards,
+            collectionCtx: shardedCtx,
+        }),
+    );
 
     return commands;
 }
 
-function runMoveChunkTest({mongos, shards, dbName, collName, shardingType, nonEmpty, expectedTypes}) {
+function runMoveChunkTest({
+    mongos,
+    shards,
+    dbName,
+    collName,
+    shardingType,
+    nonEmpty,
+    expectedTypes,
+}) {
     const db = mongos.getDB(dbName);
     assert.commandWorked(db.dropDatabase());
 
@@ -75,7 +102,11 @@ function runMoveChunkTest({mongos, shards, dbName, collName, shardingType, nonEm
     const actualTypes = events.map((e) => e.operationType);
     jsTest.log.info("Collected events", {shardingType, nonEmpty, types: actualTypes});
 
-    assert.eq(actualTypes, expectedTypes, `Event mismatch for ${shardingType} (nonEmpty=${nonEmpty})`);
+    assert.eq(
+        actualTypes,
+        expectedTypes,
+        `Event mismatch for ${shardingType} (nonEmpty=${nonEmpty})`,
+    );
     csTest.assertNoChange(cursor);
 
     csTest.cleanUp();

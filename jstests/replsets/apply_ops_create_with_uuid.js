@@ -16,7 +16,11 @@ let ops = ((uuid) =>
 function checkUUID(coll, uuid) {
     const cmd = {listCollections: 1, filter: {name: coll}};
     const res = assert.commandWorked(db.runCommand(cmd), tojson(cmd));
-    assert.eq(res.cursor.firstBatch[0].info.uuid, uuid, tojson(cmd) + " did not return expected uuid: " + tojson(res));
+    assert.eq(
+        res.cursor.firstBatch[0].info.uuid,
+        uuid,
+        tojson(cmd) + " did not return expected uuid: " + tojson(res),
+    );
 }
 
 jsTestLog("Create a test.foo collection with uuid " + uuid + " through applyOps.");
@@ -47,5 +51,9 @@ assert.eq(
 jsTestLog("Check that test.bar has UUID " + uuid);
 checkUUID("bar", uuid);
 jsTestLog("Check that test.foo no longer exists");
-assert.eq(db.getCollectionInfos({name: "foo"}).length, 0, "expected foo collection to no longer exist");
+assert.eq(
+    db.getCollectionInfos({name: "foo"}).length,
+    0,
+    "expected foo collection to no longer exist",
+);
 replTest.stopSet();

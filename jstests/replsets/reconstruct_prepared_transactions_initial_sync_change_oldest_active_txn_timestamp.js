@@ -28,7 +28,11 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 const dbName = "test";
@@ -56,7 +60,9 @@ secondary = replTest.start(
     {
         startClean: true,
         setParameter: {
-            "failpoint.initialSyncHangAfterGettingBeginFetchingTimestamp": tojson({mode: "alwaysOn"}),
+            "failpoint.initialSyncHangAfterGettingBeginFetchingTimestamp": tojson({
+                mode: "alwaysOn",
+            }),
             "numInitialSyncAttempts": 1,
         },
     },
@@ -88,7 +94,10 @@ assert.commandWorked(testColl.insert({_id: 2}));
 jsTestLog("Resuming initial sync");
 
 assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp", mode: "off"}),
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp",
+        mode: "off",
+    }),
 );
 
 // Wait for the secondary to complete initial sync.

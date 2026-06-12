@@ -26,13 +26,19 @@ let xFieldValShard1 = splitPoint; // monotonically increasing x field value targ
 let yFieldVal = 0; // monotonically increasing y field value.
 
 // Shard collection
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Create a sharded collection sharded on the "x" field and move one of the chunks to another shard.
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedCollNsMultiShard, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: shardedCollNsMultiShard, middle: {x: splitPoint}}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: shardedCollNsMultiShard, find: {x: splitPoint}, to: st.shard1.shardName}),
+    st.s.adminCommand({
+        moveChunk: shardedCollNsMultiShard,
+        find: {x: splitPoint},
+        to: st.shard1.shardName,
+    }),
 );
 
 // Create a sharded collection sharded on the "x" field and keep both chunks on the same shard.

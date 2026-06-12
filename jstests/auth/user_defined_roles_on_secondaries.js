@@ -46,7 +46,9 @@ function assertListContainsRole(list, role, msg) {
     for (i = 0; i < list.length; ++i) {
         if (list[i].role == role.role && list[i].db == role.db) return;
     }
-    doassert("Could not find value " + tojson(role) + " in " + tojson(list) + (msg ? ": " + msg : ""));
+    doassert(
+        "Could not find value " + tojson(role) + " in " + tojson(list) + (msg ? ": " + msg : ""),
+    );
 }
 
 //
@@ -166,7 +168,9 @@ assert.commandWorked(
                         role: "s1",
                         db: "db1",
                         roles: [{role: "read", db: "db1"}],
-                        privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: "db1", collection: "system.users"}, actions: ["find"]},
+                        ],
                     },
                 },
                 {
@@ -177,7 +181,9 @@ assert.commandWorked(
                         role: "s2",
                         db: "db1",
                         roles: [{role: "read", db: "db1"}],
-                        privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}],
+                        privileges: [
+                            {resource: {db: "db1", collection: "log"}, actions: ["insert"]},
+                        ],
                     },
                 },
                 {op: "c", ns: "admin.$cmd", o: {drop: "system.roles"}},
@@ -190,7 +196,9 @@ assert.commandWorked(
                         role: "t1",
                         db: "db1",
                         roles: [{role: "read", db: "db1"}],
-                        privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: "db1", collection: "system.users"}, actions: ["find"]},
+                        ],
                     },
                 },
                 {
@@ -201,7 +209,9 @@ assert.commandWorked(
                         role: "t2",
                         db: "db1",
                         roles: [],
-                        privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}],
+                        privileges: [
+                            {resource: {db: "db1", collection: "log"}, actions: ["insert"]},
+                        ],
                     },
                 },
                 {

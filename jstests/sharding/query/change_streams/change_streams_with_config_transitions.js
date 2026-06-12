@@ -22,7 +22,10 @@ const kTransitionType = Object.freeze({
 });
 
 // Enum for the types of collection that may defined on test setup.
-const kCollSetupType = Object.freeze({unsharded: "unsharded collection", sharded: "sharded collection"});
+const kCollSetupType = Object.freeze({
+    unsharded: "unsharded collection",
+    sharded: "sharded collection",
+});
 
 // Initial cluster topology.
 const st = new ShardingTest({
@@ -33,7 +36,8 @@ const st = new ShardingTest({
 });
 
 const configShardName = "config";
-const otherShardName = st.shard0.shardName === configShardName ? st.shard1.shardName : st.shard0.shardName;
+const otherShardName =
+    st.shard0.shardName === configShardName ? st.shard1.shardName : st.shard0.shardName;
 
 function runTransitionTestCases(transitionType, watchMode, collSetupType) {
     jsTest.log(
@@ -48,8 +52,11 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
 
     const db = st.s.getDB(dbName);
     assert.commandWorked(db.dropDatabase());
-    const primaryShardId = transitionType === kTransitionType.toDedicatedConfigServer ? "config" : otherShardName;
-    assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: primaryShardId}));
+    const primaryShardId =
+        transitionType === kTransitionType.toDedicatedConfigServer ? "config" : otherShardName;
+    assert.commandWorked(
+        db.adminCommand({enableSharding: db.getName(), primaryShard: primaryShardId}),
+    );
 
     const coll = assertDropAndRecreateCollection(db, collName);
     if (collSetupType === kCollSetupType.sharded) {
@@ -110,7 +117,10 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
     assert.commandWorked(bulk.execute({w: "majority"}));
 
     // Ensure that all the events occurred before and after the transition can be collected.
-    let observedEvents = cst.assertNextChangesEqualUnordered({cursor: csCursor, expectedChanges: expectedEvents});
+    let observedEvents = cst.assertNextChangesEqualUnordered({
+        cursor: csCursor,
+        expectedChanges: expectedEvents,
+    });
 
     // Test case 2: verify the expected output of a change stream resumed at a PIT that precedes
     // the transition (we use the first event by the previous test case as resume point).
@@ -119,13 +129,18 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
     const resumeId = observedEvents[0].fullDocument._id;
 
     try {
-        csCursor = cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: resumePoint});
+        csCursor = cst.getChangeStream({
+            watchMode: watchMode,
+            coll: coll,
+            resumeAfter: resumePoint,
+        });
     } catch (err) {
         // A "resume change stream before a transition to dedicated config server" request is
         // expected to be rejected, due to the execution of a removeShard() behind the scenes that
         // makes part of the events potentially inaccessible.
         assert(
-            transitionType === kTransitionType.toDedicatedConfigServer && ErrorCodes.ChangeStreamHistoryLost,
+            transitionType === kTransitionType.toDedicatedConfigServer &&
+                ErrorCodes.ChangeStreamHistoryLost,
             `Unexpected error ${tojson(err)} while attempting to resume a change stream`,
         );
         cst.cleanUp();

@@ -13,7 +13,10 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
+import {
+    assertVoteCount,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 {
     jsTestLog("Testing reconfig from PA set to PSA set fails");
@@ -138,7 +141,9 @@ import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jst
     const newConfig = rst.getReplSetConfig();
     config.members = newConfig.members;
     config.version += 1;
-    jsTestLog(`Reconfiguring set to add a secondary with {votes: 1: priority: 0. New config: ${tojson(config)}`);
+    jsTestLog(
+        `Reconfiguring set to add a secondary with {votes: 1: priority: 0. New config: ${tojson(config)}`,
+    );
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
     waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2 /* memberIndex */);
 
@@ -154,7 +159,9 @@ import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jst
     config = rst.getReplSetConfigFromNode();
     config.members[1].priority = 1;
     config.version += 1;
-    jsTestLog(`Reconfiguring set to give the secondary a positive priority. New config: ${tojson(config)}`);
+    jsTestLog(
+        `Reconfiguring set to give the secondary a positive priority. New config: ${tojson(config)}`,
+    );
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
     assertVoteCount(primary, {

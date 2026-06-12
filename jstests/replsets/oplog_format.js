@@ -130,21 +130,31 @@ assertLastOplog({"$v": 2, "diff": {"i": {"c": [18]}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice";
 coll.save({_id: 1, a: {b: [18]}});
-res = assert.commandWorked(coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [1, 2], $slice: -2}}}));
+res = assert.commandWorked(
+    coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [1, 2], $slice: -2}}}),
+);
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [1, 2]}}, coll.findOne({}), msg);
 assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [1, 2]}}}}, {_id: 1}, msg);
 
 var msg = "bad array $push $sort ($slice -100)";
 coll.save({_id: 1, a: {b: [{c: 2}, {c: 1}]}});
-res = assert.commandWorked(coll.update({}, {$push: {"a.b": {$each: [{c: -1}], $sort: {c: 1}, $slice: -100}}}));
+res = assert.commandWorked(
+    coll.update({}, {$push: {"a.b": {$each: [{c: -1}], $sort: {c: 1}, $slice: -100}}}),
+);
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: -1}, {c: 1}, {c: 2}]}}, coll.findOne({}), msg);
-assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [{"c": -1}, {"c": 1}, {"c": 2}]}}}}, {_id: 1}, msg);
+assertLastOplog(
+    {"$v": 2, "diff": {"sa": {"u": {"b": [{"c": -1}, {"c": 1}, {"c": 2}]}}}},
+    {_id: 1},
+    msg,
+);
 
 var msg = "bad array $push $slice $sort";
 coll.save({_id: 1, a: [{b: 2}, {b: 1}]});
-res = assert.commandWorked(coll.update({_id: {$gt: 0}}, {$push: {a: {$each: [{b: -1}], $slice: -2, $sort: {b: 1}}}}));
+res = assert.commandWorked(
+    coll.update({_id: {$gt: 0}}, {$push: {a: {$each: [{b: -1}], $slice: -2, $sort: {b: 1}}}}),
+);
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [{b: 1}, {b: 2}]}, coll.findOne({}), msg);
 assertLastOplog({"$v": 2, "diff": {"u": {"a": [{"b": 1}, {"b": 2}]}}}, {_id: 1}, msg);

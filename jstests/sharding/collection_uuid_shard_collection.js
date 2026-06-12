@@ -29,13 +29,23 @@ const uuid = function () {
 resetColl();
 
 // The command succeeds when the correct UUID is provided.
-assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}, collectionUUID: uuid()}));
+assert.commandWorked(
+    mongos.adminCommand({
+        shardCollection: coll.getFullName(),
+        key: {_id: 1},
+        collectionUUID: uuid(),
+    }),
+);
 
 // The command fails when the provided UUID does not correspond to an existing collection.
 resetColl();
 const nonexistentUUID = UUID();
 let res = assert.commandFailedWithCode(
-    mongos.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}, collectionUUID: nonexistentUUID}),
+    mongos.adminCommand({
+        shardCollection: coll.getFullName(),
+        key: {_id: 1},
+        collectionUUID: nonexistentUUID,
+    }),
     ErrorCodes.CollectionUUIDMismatch,
 );
 assert.eq(res.db, db.getName());
@@ -47,7 +57,11 @@ assert.eq(res.actualCollection, null);
 const coll2 = db["coll_2"];
 assert.commandWorked(coll2.insert({_id: 1}));
 res = assert.commandFailedWithCode(
-    mongos.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
+    mongos.adminCommand({
+        shardCollection: coll2.getFullName(),
+        key: {_id: 1},
+        collectionUUID: uuid(),
+    }),
     ErrorCodes.CollectionUUIDMismatch,
 );
 assert.eq(res.db, db.getName());
@@ -77,7 +91,11 @@ assert.eq(res.actualCollection, null);
 // different collection.
 assert.commandWorked(mongos.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}));
 res = assert.commandFailedWithCode(
-    mongos.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
+    mongos.adminCommand({
+        shardCollection: coll2.getFullName(),
+        key: {_id: 1},
+        collectionUUID: uuid(),
+    }),
     ErrorCodes.CollectionUUIDMismatch,
 );
 assert.eq(res.db, db.getName());
@@ -89,7 +107,11 @@ assert.eq(res.actualCollection, coll.getName());
 // provided namespace does not exist.
 coll2.drop();
 res = assert.commandFailedWithCode(
-    mongos.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
+    mongos.adminCommand({
+        shardCollection: coll2.getFullName(),
+        key: {_id: 1},
+        collectionUUID: uuid(),
+    }),
     ErrorCodes.CollectionUUIDMismatch,
 );
 assert.eq(res.db, db.getName());

@@ -57,10 +57,14 @@ function killopOnFailpoint(rst, metricsDir, failpointName, collName) {
     IndexBuildTest.resumeIndexBuilds(primary);
 
     // Index build should be present in the config.system.indexBuilds collection if not primary driven.
-    const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+    const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {
+        includeBuildUUIDs: true,
+    });
     const indexBuildUUID = indexMap["a_1"].buildUUID;
     if (FeatureFlagUtil.isPresentAndEnabled(primary.getDB("config"), "PrimaryDrivenIndexBuilds")) {
-        assert.isnull(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
+        assert.isnull(
+            primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}),
+        );
     } else {
         assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
     }
@@ -71,7 +75,11 @@ function killopOnFailpoint(rst, metricsDir, failpointName, collName) {
     fp.off();
 
     const exitCode = createIdx({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being terminated");
+    assert.neq(
+        0,
+        exitCode,
+        "expected shell to exit abnormally due to index build being terminated",
+    );
 
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.
@@ -87,7 +95,10 @@ function killopOnFailpoint(rst, metricsDir, failpointName, collName) {
 
     // Index build should be removed from the config.system.indexBuilds collection.
     assert.soon(() => {
-        return primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}) == null;
+        return (
+            primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}) ==
+            null
+        );
     });
 
     waitForIndexStatusMetrics(
@@ -126,6 +137,11 @@ killopOnFailpoint(rst, metricsDir, "hangAfterIndexBuildFirstDrain", "beforeVoteC
 
 // Kill the build after it has voted for commit.
 jsTestLog("killOp index build on primary after vote for commit readiness");
-killopOnFailpoint(rst, metricsDir, "hangIndexBuildAfterSignalPrimaryForCommitReadiness", "afterVoteCommit");
+killopOnFailpoint(
+    rst,
+    metricsDir,
+    "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+    "afterVoteCommit",
+);
 
 rst.stopSet();

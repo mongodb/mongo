@@ -43,7 +43,9 @@ let commandObj = {
 // Destination has an extra index.
 assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandFailed);
 
-let destIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(destColl.getIndexes());
+let destIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(
+    destColl.getIndexes(),
+);
 commandObj.indexes = destIndexes;
 jsTestLog("Testing against destination collection with indexes: " + tojson(commandObj.indexes));
 assert.commandWorked(adminDB.runCommand(commandObj));
@@ -56,7 +58,9 @@ assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandF
 
 destColl.drop();
 
-assert.commandWorked(destDB.runCommand({"create": destColl.getName(), capped: true, size: 256, max: 2}));
+assert.commandWorked(
+    destDB.runCommand({"create": destColl.getName(), capped: true, size: 256, max: 2}),
+);
 destIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(
     destDB.getCollection(destColl.getName()).getIndexes(),
 );

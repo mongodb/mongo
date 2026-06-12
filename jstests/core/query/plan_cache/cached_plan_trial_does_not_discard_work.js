@@ -74,7 +74,9 @@ function runTestQuery(comment) {
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDb.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDb.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 let lastComment;
@@ -86,7 +88,10 @@ for (let i = 0; i < 3; i++) {
 
 // Get the profile entry for the third execution, which should have bypassed the multiplanner and
 // used a cached plan.
-const profileEntry = getLatestProfilerEntry(testDb, {"command.find": coll.getName(), "command.comment": lastComment});
+const profileEntry = getLatestProfilerEntry(testDb, {
+    "command.find": coll.getName(),
+    "command.comment": lastComment,
+});
 assert(!profileEntry.fromMultiPlanner, profileEntry);
 assert("planCacheKey" in profileEntry, profileEntry);
 
@@ -98,7 +103,9 @@ assert("planCacheKey" in profileEntry, profileEntry);
 assert.eq(profileEntry.execStats.opens, 1, profileEntry);
 
 const planCacheEntry = (() => {
-    const planCache = coll.getPlanCache().list([{$match: {planCacheKey: profileEntry.planCacheKey}}]);
+    const planCache = coll
+        .getPlanCache()
+        .list([{$match: {planCacheKey: profileEntry.planCacheKey}}]);
     assert.eq(planCache.length, 1, planCache);
     return planCache[0];
 })();

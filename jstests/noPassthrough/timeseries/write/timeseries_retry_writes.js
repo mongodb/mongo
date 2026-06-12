@@ -55,7 +55,9 @@ const runTest = function (docsInsert, docsUpdateA, docsUpdateB) {
             tojson(docsUpdateB),
     );
 
-    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     // For retryable writes, the server uses 'txnNumber' as the key to look up previously executed
     // operations in the sesssion.
@@ -138,7 +140,11 @@ const runTest = function (docsInsert, docsUpdateA, docsUpdateB) {
     }
 
     // Check buckets.
-    const bucketDocs = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(testDB, coll)
+        .find()
+        .rawData()
+        .sort({_id: 1})
+        .toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
 
     const bucketDoc = bucketDocs[0];

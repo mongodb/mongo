@@ -39,7 +39,11 @@ function setLastVoteDoc(conn, term, candidate) {
 function assertNodeHasLastVote(node, term, candidate) {
     let lastVoteDoc = getLastVoteDoc(node);
     assert.eq(lastVoteDoc.term, term, node.host + " had wrong last vote term.");
-    assert.eq(lastVoteDoc.candidateIndex, rst.getNodeId(candidate), node.host + " had wrong last vote candidate.");
+    assert.eq(
+        lastVoteDoc.candidateIndex,
+        rst.getNodeId(candidate),
+        node.host + " had wrong last vote candidate.",
+    );
 }
 
 function assertCurrentTerm(node, term) {
@@ -105,7 +109,13 @@ jsTestLog("Restarting node 0 as a standalone");
 let node0 = rst.restart(0, {noReplSet: true}); // Restart as a standalone node.
 jsTestLog("Stopping node 1");
 rst.stop(1); // Stop node 1 so that node 0 controls the term by itself.
-jsTestLog("Setting the lastVote on node 0 to term: " + term + " candidate: " + rst.nodes[0].host + ", index: 0");
+jsTestLog(
+    "Setting the lastVote on node 0 to term: " +
+        term +
+        " candidate: " +
+        rst.nodes[0].host +
+        ", index: 0",
+);
 setLastVoteDoc(node0, term, rst.nodes[0]);
 
 jsTestLog("Restarting node 0 in replica set mode");
@@ -117,7 +127,10 @@ assert.soonNoExcept(function () {
     return true;
 });
 
-jsTestLog("Manually sending node 0 a dryRun replSetRequestVotes command, " + "expecting failure in old term");
+jsTestLog(
+    "Manually sending node 0 a dryRun replSetRequestVotes command, " +
+        "expecting failure in old term",
+);
 let response = assert.commandWorked(
     node0.adminCommand({
         replSetRequestVotes: 1,
@@ -129,8 +142,15 @@ let response = assert.commandWorked(
         lastAppliedOpTime: getLatestOp(node0),
     }),
 );
-assert.eq(response.term, term, "replSetRequestVotes response had the wrong term: " + tojson(response));
-assert(!response.voteGranted, "node granted vote in term before last vote doc: " + tojson(response));
+assert.eq(
+    response.term,
+    term,
+    "replSetRequestVotes response had the wrong term: " + tojson(response),
+);
+assert(
+    !response.voteGranted,
+    "node granted vote in term before last vote doc: " + tojson(response),
+);
 assertNodeHasLastVote(node0, term, rst.nodes[0]);
 assertCurrentTerm(node0, term);
 
@@ -149,9 +169,20 @@ response = assert.commandWorked(
         lastAppliedOpTime: getLatestOp(node0),
     }),
 );
-assert.eq(response.term, term, "replSetRequestVotes response had the wrong term: " + tojson(response));
-assert(response.voteGranted, "node failed to grant dryRun vote in term equal to last vote doc: " + tojson(response));
-assert.eq(response.reason, "", "replSetRequestVotes response had the wrong reason: " + tojson(response));
+assert.eq(
+    response.term,
+    term,
+    "replSetRequestVotes response had the wrong term: " + tojson(response),
+);
+assert(
+    response.voteGranted,
+    "node failed to grant dryRun vote in term equal to last vote doc: " + tojson(response),
+);
+assert.eq(
+    response.reason,
+    "",
+    "replSetRequestVotes response had the wrong reason: " + tojson(response),
+);
 assertNodeHasLastVote(node0, term, rst.nodes[0]);
 assertCurrentTerm(node0, term);
 
@@ -167,7 +198,11 @@ response = assert.commandWorked(
         lastAppliedOpTime: getLatestOp(node0),
     }),
 );
-assert.eq(response.term, term, "replSetRequestVotes response had the wrong term: " + tojson(response));
+assert.eq(
+    response.term,
+    term,
+    "replSetRequestVotes response had the wrong term: " + tojson(response),
+);
 assert(!response.voteGranted, "node granted vote in term of last vote doc: " + tojson(response));
 assertNodeHasLastVote(node0, term, rst.nodes[0]);
 assertCurrentTerm(node0, term);
@@ -187,9 +222,20 @@ response = assert.commandWorked(
         lastAppliedOpTime: getLatestOp(node0),
     }),
 );
-assert.eq(response.term, term + 1, "replSetRequestVotes response had the wrong term: " + tojson(response));
-assert(response.voteGranted, "node failed to grant vote in term greater than last vote doc: " + tojson(response));
-assert.eq(response.reason, "", "replSetRequestVotes response had the wrong reason: " + tojson(response));
+assert.eq(
+    response.term,
+    term + 1,
+    "replSetRequestVotes response had the wrong term: " + tojson(response),
+);
+assert(
+    response.voteGranted,
+    "node failed to grant vote in term greater than last vote doc: " + tojson(response),
+);
+assert.eq(
+    response.reason,
+    "",
+    "replSetRequestVotes response had the wrong reason: " + tojson(response),
+);
 assertNodeHasLastVote(node0, term + 1, rst.nodes[1]);
 assertCurrentTerm(node0, term + 1);
 
@@ -208,9 +254,20 @@ response = assert.commandWorked(
         lastAppliedOpTime: getLatestOp(node0),
     }),
 );
-assert.eq(response.term, term + 2, "replSetRequestVotes response had the wrong term: " + tojson(response));
-assert(response.voteGranted, "node failed to grant vote in term greater than last vote doc: " + tojson(response));
-assert.eq(response.reason, "", "replSetRequestVotes response had the wrong reason: " + tojson(response));
+assert.eq(
+    response.term,
+    term + 2,
+    "replSetRequestVotes response had the wrong term: " + tojson(response),
+);
+assert(
+    response.voteGranted,
+    "node failed to grant vote in term greater than last vote doc: " + tojson(response),
+);
+assert.eq(
+    response.reason,
+    "",
+    "replSetRequestVotes response had the wrong reason: " + tojson(response),
+);
 assertNodeHasLastVote(node0, term + 1, rst.nodes[1]);
 assertCurrentTerm(node0, term + 2);
 

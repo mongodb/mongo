@@ -24,7 +24,10 @@ t.drop();
         IndexUtils.assertIndexes(t, [{_id: 1}, {a: 1}, {b: 1}, {c: 1}]);
         assert(IndexUtils.indexExists(t, {a: 1}, {unique: undefined}), t.getIndexes());
         assert(IndexUtils.indexExists(t, {b: 1}, {unique: true}), t.getIndexes());
-        assert(IndexUtils.indexExists(t, {c: 1}, {unique: undefined, name: "cIndex"}), t.getIndexes());
+        assert(
+            IndexUtils.indexExists(t, {c: 1}, {unique: undefined, name: "cIndex"}),
+            t.getIndexes(),
+        );
     };
 
     checkIndexUniqueness();

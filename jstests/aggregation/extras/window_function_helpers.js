@@ -10,9 +10,13 @@ const peakTrackedMemBytesProp = "peakTrackedMemBytes";
  */
 export function seedWithTickerData(coll, docsPerTicker) {
     for (let i = 0; i < docsPerTicker; i++) {
-        assert.commandWorked(coll.insert({_id: i, partIndex: i, ticker: "T1", price: 500 - i * 10}));
+        assert.commandWorked(
+            coll.insert({_id: i, partIndex: i, ticker: "T1", price: 500 - i * 10}),
+        );
 
-        assert.commandWorked(coll.insert({_id: i + docsPerTicker, partIndex: i, ticker: "T2", price: 400 + i * 10}));
+        assert.commandWorked(
+            coll.insert({_id: i + docsPerTicker, partIndex: i, ticker: "T2", price: 400 + i * 10}),
+        );
     }
 }
 
@@ -92,7 +96,14 @@ export function forEachDocumentBoundsCombo(callback) {
  * Note that this function assumes that the data in 'coll' has been seeded with the documents from
  * the seedWithTickerData() method above.
  */
-export function computeAsGroup({coll, partitionKey, accumSpec, bounds, indexInPartition, defaultValue = null}) {
+export function computeAsGroup({
+    coll,
+    partitionKey,
+    accumSpec,
+    bounds,
+    indexInPartition,
+    defaultValue = null,
+}) {
     const skip = calculateSkip(bounds[0], indexInPartition);
     const limit = calculateLimit(bounds[0], bounds[1], indexInPartition);
     if (skip < 0 || limit <= 0) return defaultValue;
@@ -102,7 +113,9 @@ export function computeAsGroup({coll, partitionKey, accumSpec, bounds, indexInPa
     // implies an infinite limit.
     if (limit != "unbounded") prefixPipe = prefixPipe.concat([{$limit: limit}]);
 
-    const result = coll.aggregate(prefixPipe.concat([{$group: {_id: null, res: accumSpec}}])).toArray();
+    const result = coll
+        .aggregate(prefixPipe.concat([{$group: {_id: null, res: accumSpec}}]))
+        .toArray();
     // If the window is completely off the edge of the right side of the partition, return null.
     if (result.length == 0) {
         return defaultValue;
@@ -148,7 +161,8 @@ export function calculateLimit(lowerBound, upperBound, indexInPartition) {
             if (Math.abs(lowerBound) > indexInPartition) {
                 // Either take all documents we've seen if our right bound is also negative, or only
                 // do look ahead.
-                limitValueToUse = upperBound <= 0 ? indexInPartition : indexInPartition + upperBound + 1;
+                limitValueToUse =
+                    upperBound <= 0 ? indexInPartition : indexInPartition + upperBound + 1;
             } else {
                 limitValueToUse = Math.abs(lowerBound) + upperBound + 1;
             }
@@ -189,7 +203,12 @@ export function assertResultsEqual(wfRes, index, groupRes, accum) {
                 "\nexpected:\n " +
                 tojson(groupRes),
         );
-    } else assert.eq(groupRes, wfRes.res, "Window function result for index " + index + ": " + tojson(wfRes));
+    } else
+        assert.eq(
+            groupRes,
+            wfRes.res,
+            "Window function result for index " + index + ": " + tojson(wfRes),
+        );
 }
 
 export function assertExplainResult(explainResult) {
@@ -200,7 +219,11 @@ export function assertExplainResult(explainResult) {
         assert(stage.hasOwnProperty("maxFunctionMemoryUsageBytes"), stage);
         const maxFunctionMemUsages = stage["maxFunctionMemoryUsageBytes"];
         for (let field of Object.keys(maxFunctionMemUsages)) {
-            assert.gte(maxFunctionMemUsages[field], 0, "invalid memory usage for '" + field + "': " + tojson(stage));
+            assert.gte(
+                maxFunctionMemUsages[field],
+                0,
+                "invalid memory usage for '" + field + "': " + tojson(stage),
+            );
         }
 
         let totalMemoryUsage = getTotalMemoryUsageFromStageExplainOutput(stage);
@@ -208,7 +231,11 @@ export function assertExplainResult(explainResult) {
 
         // No test should be using more than 1GB of memory. This is mostly a sanity check that
         // integer underflow doesn't occur.
-        assert.lt(totalMemoryUsage, 1 * 1024 * 1024 * 1024, "Incorrect total mem usage: " + tojson(stage));
+        assert.lt(
+            totalMemoryUsage,
+            1 * 1024 * 1024 * 1024,
+            "Incorrect total mem usage: " + tojson(stage),
+        );
     }
 }
 
@@ -232,7 +259,10 @@ export function getTotalMemoryUsageFromStageExplainOutput(stage) {
 
 export function assertExplainMemoryTracking(stage) {
     // Only maxTotalMemoryUsageBytes or peakTrackedMemBytes could be present, not both.
-    const queryMemoryTrackingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
+    const queryMemoryTrackingEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        db,
+        "QueryMemoryTracking",
+    );
     if (stage.hasOwnProperty(maxTotalMemoryUsageBytesProp)) {
         assert(
             !queryMemoryTrackingEnabled,
@@ -275,7 +305,11 @@ export function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs
             Object.assign(outputSpec, accumSpec);
             const pipeline = [
                 {
-                    $setWindowFields: {partitionBy: partition, sortBy: {_id: 1}, output: {res: outputSpec}},
+                    $setWindowFields: {
+                        partitionBy: partition,
+                        sortBy: {_id: 1},
+                        output: {res: outputSpec},
+                    },
                 },
             ];
             const wfResults = coll.aggregate(pipeline, {allowDiskUse: true}).toArray();
@@ -309,7 +343,9 @@ export function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs
 
             // Run the same pipeline with explain verbosity "executionStats" and verify that the
             // reported metrics are sensible.
-            assertExplainResult(coll.explain("executionStats").aggregate(pipeline, {allowDiskUse: true}));
+            assertExplainResult(
+                coll.explain("executionStats").aggregate(pipeline, {allowDiskUse: true}),
+            );
 
             jsTestLog("Done");
         });
@@ -319,7 +355,10 @@ export function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs
         // a fuzz test so no need to check results.
         forEachDocumentBoundsCombo(function (arrayOfBounds) {
             jsTestLog(
-                "Testing accumulator " + tojson(accumSpec) + " against multiple bounds: " + tojson(arrayOfBounds),
+                "Testing accumulator " +
+                    tojson(accumSpec) +
+                    " against multiple bounds: " +
+                    tojson(arrayOfBounds),
             );
             let baseSpec = {
                 partitionBy: partition,
@@ -332,7 +371,9 @@ export function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs
                 outputFields["res" + index] = outputSpec;
             });
             let specWithOutput = Object.merge(baseSpec, {output: outputFields});
-            const wfResults = coll.aggregate([{$setWindowFields: specWithOutput}], {allowDiskUse: true}).toArray();
+            const wfResults = coll
+                .aggregate([{$setWindowFields: specWithOutput}], {allowDiskUse: true})
+                .toArray();
             assert.gt(wfResults.length, 0);
             jsTestLog("Done");
         });

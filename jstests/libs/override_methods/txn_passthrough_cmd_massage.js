@@ -4,7 +4,14 @@
  */
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
-function runCommandInMultiStmtTxnPassthrough(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandInMultiStmtTxnPassthrough(
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
@@ -58,6 +65,8 @@ function runCommandInMultiStmtTxnPassthrough(conn, dbName, commandName, commandO
     return func.apply(conn, makeFuncArgs(massagedCmd));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/txn_passthrough_cmd_massage.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandInMultiStmtTxnPassthrough);

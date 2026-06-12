@@ -52,7 +52,11 @@ for (let i = 0; i < versions.length; i++) {
     let conn = MongoRunner.runMongod(mongodOptions);
     let port = conn.port;
 
-    assert.neq(null, conn, "mongod was unable able to start with version " + tojson(version.binVersion));
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable able to start with version " + tojson(version.binVersion),
+    );
 
     // Set up a collection on an old binary version node with one document and an index, and
     // then shut it down.
@@ -81,12 +85,14 @@ for (let i = 0; i < versions.length; i++) {
     assert.eq(
         1,
         testDB[version.testCollection].count(),
-        `data from ${version.testCollection} should be available; options: ` + tojson(mongodOptions),
+        `data from ${version.testCollection} should be available; options: ` +
+            tojson(mongodOptions),
     );
     assert.neq(
         null,
         IndexCatalogHelpers.findByKeyPattern(testDB[version.testCollection].getIndexes(), {a: 1}),
-        `index from ${version.testCollection} should be available; options: ` + tojson(mongodOptions),
+        `index from ${version.testCollection} should be available; options: ` +
+            tojson(mongodOptions),
     );
 
     MongoRunner.stopMongod(conn);

@@ -33,7 +33,9 @@ function queryIncrementalFeatureFlagViaServerStatus(flagName) {
     assert("incrementalRollout" in serverStatus, serverStatus);
     assert(Array.isArray(serverStatus.incrementalRollout.featureFlags), serverStatus);
 
-    const matchingStatuses = serverStatus.incrementalRollout.featureFlags.filter((status) => status.name == flagName);
+    const matchingStatuses = serverStatus.incrementalRollout.featureFlags.filter(
+        (status) => status.name == flagName,
+    );
     assert.eq(matchingStatuses.length, 1, serverStatus.incrementalRollout);
     return matchingStatuses[0];
 }
@@ -45,7 +47,9 @@ const initialFeatureFlagInDevelopmentForTestValue = queryIncrementalFeatureFlagV
 
 // Check that the "dish" feature flag gets reported by the "serverStatus" command and indicates the
 // same value we got from the "getParameter" command.
-const initialDishStatus = queryIncrementalFeatureFlagViaServerStatus("featureFlagInDevelopmentForTest");
+const initialDishStatus = queryIncrementalFeatureFlagViaServerStatus(
+    "featureFlagInDevelopmentForTest",
+);
 
 assert.eq(initialDishStatus.value, initialFeatureFlagInDevelopmentForTestValue, initialDishStatus);
 assert("falseChecks" in initialDishStatus, initialDishStatus);
@@ -55,7 +59,10 @@ assert("numToggles" in initialDishStatus, initialDishStatus);
 // Check that it's possible to change the feature flag's value at runtime.
 const newFeatureFlagInDevelopmentForTestValue = !initialFeatureFlagInDevelopmentForTestValue;
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue}),
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue,
+    }),
 );
 assert.eq(
     queryIncrementalFeatureFlagViaGetParameter("featureFlagInDevelopmentForTest"),
@@ -88,7 +95,9 @@ assert.eq(
 
 // Check that changing the value of the feature flag increments its "numToggles" count but not the
 // "falseChecks" or "trueChecks" counts.
-const updatedDishStatus = queryIncrementalFeatureFlagViaServerStatus("featureFlagInDevelopmentForTest");
+const updatedDishStatus = queryIncrementalFeatureFlagViaServerStatus(
+    "featureFlagInDevelopmentForTest",
+);
 assert.docEq(
     Object.assign({}, initialDishStatus, {
         value: newFeatureFlagInDevelopmentForTestValue,
@@ -100,15 +109,24 @@ assert.docEq(
 // Check that a no-op "setParameter" command that sets the flag to its existing value does not
 // increment its "numToggles" count.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue}),
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue,
+    }),
 );
-assert.docEq(queryIncrementalFeatureFlagViaServerStatus("featureFlagInDevelopmentForTest"), updatedDishStatus);
+assert.docEq(
+    queryIncrementalFeatureFlagViaServerStatus("featureFlagInDevelopmentForTest"),
+    updatedDishStatus,
+);
 
 // Check that the featureFlagInDevelopmentForTest "details" include the correct rollout phase.
 const featureFlagInDevelopmentDetails = assert.commandWorked(
     db.adminCommand({getParameter: {showDetails: true}, featureFlagInDevelopmentForTest: 1}),
 );
-assert("featureFlagInDevelopmentForTest" in featureFlagInDevelopmentDetails, featureFlagInDevelopmentDetails);
+assert(
+    "featureFlagInDevelopmentForTest" in featureFlagInDevelopmentDetails,
+    featureFlagInDevelopmentDetails,
+);
 assert.eq(
     featureFlagInDevelopmentDetails.featureFlagInDevelopmentForTest.incrementalFeatureRolloutPhase,
     "inDevelopment",
@@ -128,7 +146,9 @@ assert.eq(
 
 // Check that it's possible to query the list of IFR parameters.
 const allIFRParams = assert.commandWorked(
-    db.adminCommand({getParameter: {allParameters: true, forIncrementalFeatureRollout: true, showDetails: true}}),
+    db.adminCommand({
+        getParameter: {allParameters: true, forIncrementalFeatureRollout: true, showDetails: true},
+    }),
 );
 delete allIFRParams.ok;
 delete allIFRParams.operationTime;

@@ -27,7 +27,9 @@ const acceptableErrorsDuringShutdown = [
 let overrideMaxAwaitTimeMS = {"mode": "alwaysOn", "data": {maxAwaitTimeMS: 1000}};
 const st = new ShardingTest({
     config: 1,
-    mongos: {s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": tojson(overrideMaxAwaitTimeMS)}}},
+    mongos: {
+        s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": tojson(overrideMaxAwaitTimeMS)}},
+    },
     shards: 1,
 });
 
@@ -60,7 +62,9 @@ function assertContainRetryableErrorLabel(res) {
 }
 
 function enableFailCommand(node, isWCError, errorCode, commands) {
-    jsTestLog("Enabling failCommand fail point for " + commands + " with writeConcern error " + isWCError);
+    jsTestLog(
+        "Enabling failCommand fail point for " + commands + " with writeConcern error " + isWCError,
+    );
     // Sharding tests require {failInternalCommands: true},
     // s appears to mongod to be an internal client.
     let failCommandData = {failInternalCommands: true, failCommands: commands};
@@ -84,7 +88,9 @@ function testMongodError(errorCode, isWCError) {
     jsTestLog(`Testing with errorCode: ${errorCode}, isWCError: ${isWCError}`);
 
     // Test retryable writes.
-    jsTestLog("Retryable write should return error " + errorCode + " without RetryableWriteError label");
+    jsTestLog(
+        "Retryable write should return error " + errorCode + " without RetryableWriteError label",
+    );
     let res = testDB.runCommand({
         insert: collName,
         documents: [{a: errorCode, b: "retryable"}],
@@ -94,15 +100,23 @@ function testMongodError(errorCode, isWCError) {
     assertNotContainErrorLabels(res);
 
     // Test non-retryable writes.
-    jsTestLog("Non-retryable write should return error " + errorCode + " without RetryableWriteError label");
+    jsTestLog(
+        "Non-retryable write should return error " +
+            errorCode +
+            " without RetryableWriteError label",
+    );
     res = testDB.runCommand({insert: collName, documents: [{a: errorCode, b: "non-retryable"}]});
     checkErrorCode(res, [errorCode], isWCError);
     assertNotContainErrorLabels(res);
 
     insertFailPoint.off();
-    let commitTxnFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, ["commitTransaction"]);
+    let commitTxnFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, [
+        "commitTransaction",
+    ]);
     // Test commitTransaction command in a transaction.
-    jsTestLog("commitTransaction should return error " + errorCode + " without RetryableWriteError label");
+    jsTestLog(
+        "commitTransaction should return error " + errorCode + " without RetryableWriteError label",
+    );
     withAbortAndRetryOnTransientTxnError(session, () => {
         session.startTransaction();
         assert.commandWorked(sessionColl.update({}, {$inc: {x: 1}}));
@@ -121,9 +135,13 @@ function testMongodError(errorCode, isWCError) {
 
     commitTxnFailPoint.off();
     // Test abortTransaction command in a transaction.
-    let abortTransactionFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, ["abortTransaction"]);
+    let abortTransactionFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, [
+        "abortTransaction",
+    ]);
 
-    jsTestLog("abortTransaction should return error " + errorCode + " without RetryableWriteError label");
+    jsTestLog(
+        "abortTransaction should return error " + errorCode + " without RetryableWriteError label",
+    );
     withAbortAndRetryOnTransientTxnError(session, () => {
         session.startTransaction();
         assert.commandWorked(sessionColl.update({}, {$inc: {x: 1}}));
@@ -137,7 +155,10 @@ function testMongodError(errorCode, isWCError) {
     assertNotContainErrorLabels(res);
 
     abortTransactionFailPoint.off();
-    assert.commandWorkedOrFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandWorkedOrFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
     session.endSession();
 }
 
@@ -157,7 +178,9 @@ function testMongosError() {
     let insertFailPoint;
     withRetryOnTransientTxnError(
         () => {
-            insertFailPoint = configureFailPoint(shard0Primary, "hangAfterCollectionInserts", {collectionNS: ns});
+            insertFailPoint = configureFailPoint(shard0Primary, "hangAfterCollectionInserts", {
+                collectionNS: ns,
+            });
             const retryableInsertThread = new Thread(
                 (mongosHost, dbName, collName) => {
                     const mongos = new Mongo(mongosHost);
@@ -179,7 +202,11 @@ function testMongosError() {
             MongoRunner.stopMongos(st.s);
             try {
                 const retryableInsertRes = retryableInsertThread.returnData();
-                checkErrorCode(retryableInsertRes, acceptableErrorsDuringShutdown, false /* isWCError */);
+                checkErrorCode(
+                    retryableInsertRes,
+                    acceptableErrorsDuringShutdown,
+                    false /* isWCError */,
+                );
                 assertContainRetryableErrorLabel(retryableInsertRes);
             } catch (e) {
                 if (!isNetworkError(e)) {
@@ -197,8 +224,12 @@ function testMongosError() {
     );
 
     // Test non-retryable writes.
-    jsTestLog("Non-retryable write should return mongos shutdown error without RetryableWriteError label");
-    insertFailPoint = configureFailPoint(shard0Primary, "hangAfterCollectionInserts", {collectionNs: ns});
+    jsTestLog(
+        "Non-retryable write should return mongos shutdown error without RetryableWriteError label",
+    );
+    insertFailPoint = configureFailPoint(shard0Primary, "hangAfterCollectionInserts", {
+        collectionNs: ns,
+    });
     const nonRetryableInsertThread = new Thread(
         (mongosHost, dbName, collName) => {
             const mongos = new Mongo(mongosHost);
@@ -217,7 +248,11 @@ function testMongosError() {
     MongoRunner.stopMongos(st.s);
     try {
         const nonRetryableInsertRes = nonRetryableInsertThread.returnData();
-        checkErrorCode(nonRetryableInsertRes, acceptableErrorsDuringShutdown, false /* isWCError */);
+        checkErrorCode(
+            nonRetryableInsertRes,
+            acceptableErrorsDuringShutdown,
+            false /* isWCError */,
+        );
         assertNotContainErrorLabels(nonRetryableInsertRes);
     } catch (e) {
         if (!isNetworkError(e)) {
@@ -229,7 +264,9 @@ function testMongosError() {
     st.s = MongoRunner.runMongos(st.s);
 
     // Test commitTransaction command.
-    jsTestLog("commitTransaction should return mongos shutdown error with RetryableWriteError label");
+    jsTestLog(
+        "commitTransaction should return mongos shutdown error with RetryableWriteError label",
+    );
     const mongosConn = new Mongo(st.s.host);
     const session = mongosConn.startSession();
     let commitTxnFailPoint = assert.commandWorked(
@@ -253,7 +290,9 @@ function testMongosError() {
             );
             MongoRunner.stopMongos(mongos);
             assert.commandWorked(
-                primary.getDB("admin").runCommand({configureFailPoint: "hangBeforeCommitingTxn", mode: "off"}),
+                primary
+                    .getDB("admin")
+                    .runCommand({configureFailPoint: "hangBeforeCommitingTxn", mode: "off"}),
             );
         },
         st.s,
@@ -294,7 +333,9 @@ function testMongosError() {
     st.s = MongoRunner.runMongos(st.s);
 
     // Test abortTransaction command.
-    jsTestLog("abortTransaction should return mongos shutdown error with RetryableWriteError label");
+    jsTestLog(
+        "abortTransaction should return mongos shutdown error with RetryableWriteError label",
+    );
     let abortTxnFailPoint;
     withRetryOnTransientTxnError(
         () => {

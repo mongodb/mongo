@@ -42,8 +42,9 @@ const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), "a_
 IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 
 // Extract the index build UUID.
-const buildUUID = IndexBuildTest.assertIndexesSoon(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true})["a_1"]
-    .buildUUID;
+const buildUUID = IndexBuildTest.assertIndexesSoon(coll, 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+})["a_1"].buildUUID;
 
 const abortReason = jsTestName();
 

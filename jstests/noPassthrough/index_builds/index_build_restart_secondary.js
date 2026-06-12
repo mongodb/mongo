@@ -32,7 +32,11 @@ const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const primaryDB = primary.getDB("test");
@@ -76,11 +80,22 @@ replTest.start(
 );
 
 // Verify that we do not wait for the index build to complete on startup.
-IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collectionName), 4, ["_id_"], ["i_1", "x_1", "y_1"], {
-    includeBuildUUIDs: true,
-});
+IndexBuildTest.assertIndexesSoon(
+    secondaryDB.getCollection(collectionName),
+    4,
+    ["_id_"],
+    ["i_1", "x_1", "y_1"],
+    {
+        includeBuildUUIDs: true,
+    },
+);
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked",
+        mode: "off",
+    }),
+);
 
 // Let index build complete on primary, which replicates a commitIndexBuild to the secondary.
 IndexBuildTest.resumeIndexBuilds(primaryDB);
@@ -95,7 +110,9 @@ indexy();
 if (!FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds")) {
     let completedBuilds;
     assert.soon(() => {
-        completedBuilds = checkLog.getFilteredLogMessages(secondary, 20663, {namespace: coll.getFullName()});
+        completedBuilds = checkLog.getFilteredLogMessages(secondary, 20663, {
+            namespace: coll.getFullName(),
+        });
         return completedBuilds.length >= 3;
     }, "Did not observe 3 build-completion logs on the secondary");
     for (const entry of completedBuilds) {

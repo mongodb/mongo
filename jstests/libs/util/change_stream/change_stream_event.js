@@ -56,7 +56,10 @@ class ChangeEventMatcher {
         if (this.cursorClosed !== cursorClosed) {
             return false;
         }
-        const actualFiltered = ChangeEventMatcher.eventModifier(Object.assign({}, event), this.event);
+        const actualFiltered = ChangeEventMatcher.eventModifier(
+            Object.assign({}, event),
+            this.event,
+        );
         // Use bsonUnorderedFieldsCompare to ignore field order (returns 0 if equal)
         return bsonUnorderedFieldsCompare(actualFiltered, this.event) === 0;
     }

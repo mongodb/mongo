@@ -63,7 +63,9 @@ assert.commandWorked(localColl.insert(Array.from({length: 10}, (_, i) => ({a: i,
 const foreignCollName = `${collName}-foreign`;
 assertDropAndRecreateCollection(db, foreignCollName);
 const foreignColl = db[foreignCollName];
-assert.commandWorked(foreignColl.insert(Array.from({length: 10}, (_, i) => ({b: i, side: "foreign"}))));
+assert.commandWorked(
+    foreignColl.insert(Array.from({length: 10}, (_, i) => ({b: i, side: "foreign"}))),
+);
 
 function getExplainWithLookupOnShards(pipeline) {
     let explain;
@@ -145,9 +147,17 @@ function getExplainWithLookupOnShards(pipeline) {
     planStages.forEach(assertPlanIsEOF);
 
     const queryResults = localColl.aggregate(query).toArray();
-    assert.eq(queryResults.length, 10, `Expected to have one record output for each document from ${localCollName}`);
+    assert.eq(
+        queryResults.length,
+        10,
+        `Expected to have one record output for each document from ${localCollName}`,
+    );
     queryResults.forEach((outputElement) =>
-        assert.eq(outputElement.foreignSide.length, 0, "foreign branch is always false. Expected empty nested results"),
+        assert.eq(
+            outputElement.foreignSide.length,
+            0,
+            "foreign branch is always false. Expected empty nested results",
+        ),
     );
 }
 
@@ -155,7 +165,15 @@ function getExplainWithLookupOnShards(pipeline) {
     jsTestLog(
         "Testing trivially false optimization with $lookup stages. Always false foreign branch. Not specified lookup condition",
     );
-    const query = [{$lookup: {from: foreignCollName, pipeline: [{$match: {$alwaysFalse: 1}}], as: "foreignSide"}}];
+    const query = [
+        {
+            $lookup: {
+                from: foreignCollName,
+                pipeline: [{$match: {$alwaysFalse: 1}}],
+                as: "foreignSide",
+            },
+        },
+    ];
     const explain = getExplainWithLookupOnShards(query);
 
     const planStages = getAggPlanStages(explain, "$lookup");
@@ -164,14 +182,24 @@ function getExplainWithLookupOnShards(pipeline) {
     planStages.forEach(assertPlanIsEOF);
 
     const queryResults = localColl.aggregate(query).toArray();
-    assert.eq(queryResults.length, 10, `Expected to have one record output for each document from ${localCollName}`);
+    assert.eq(
+        queryResults.length,
+        10,
+        `Expected to have one record output for each document from ${localCollName}`,
+    );
     queryResults.forEach((outputElement) =>
-        assert.eq(outputElement.foreignSide.length, 0, "foreign branch is always false. Expected empty nested results"),
+        assert.eq(
+            outputElement.foreignSide.length,
+            0,
+            "foreign branch is always false. Expected empty nested results",
+        ),
     );
 }
 
 {
-    jsTestLog("Testing trivially false optimization with $unionWith stages. AlwaysFalse both parts.");
+    jsTestLog(
+        "Testing trivially false optimization with $unionWith stages. AlwaysFalse both parts.",
+    );
     const query = [
         {$match: {$alwaysFalse: 1}},
         {$unionWith: {coll: foreignCollName, pipeline: [{$match: {$alwaysFalse: 1}}]}},
@@ -180,17 +208,27 @@ function getExplainWithLookupOnShards(pipeline) {
     assertUnionOfPlans(explain, "EOF", "EOF");
 
     const queryResults = localColl.aggregate(query).toArray();
-    assert.eq(queryResults.length, 0, "Expected empty resultset since both parts of the union are trivially false");
+    assert.eq(
+        queryResults.length,
+        0,
+        "Expected empty resultset since both parts of the union are trivially false",
+    );
 }
 
 {
-    jsTestLog("Testing trivially false optimization with $unionWith stages. AlwaysFalse first part.");
+    jsTestLog(
+        "Testing trivially false optimization with $unionWith stages. AlwaysFalse first part.",
+    );
     const query = [{$match: {$alwaysFalse: 1}}, {$unionWith: {coll: foreignCollName}}];
     const explain = localColl.explain().aggregate(query);
     assertUnionOfPlans(explain, "EOF", "COLLSCAN");
 
     const queryResults = localColl.aggregate(query).toArray();
-    assert.eq(queryResults.length, 10, `Expected one result doc for every doc on ${foreignCollName} collection`);
+    assert.eq(
+        queryResults.length,
+        10,
+        `Expected one result doc for every doc on ${foreignCollName} collection`,
+    );
     queryResults.forEach((outputRecord) =>
         assert.eq(
             outputRecord.side,
@@ -201,13 +239,19 @@ function getExplainWithLookupOnShards(pipeline) {
 }
 
 {
-    jsTestLog("Testing trivially false optimization with $unionWith stages. AlwaysFalse second part.");
+    jsTestLog(
+        "Testing trivially false optimization with $unionWith stages. AlwaysFalse second part.",
+    );
     const query = [{$unionWith: {coll: foreignCollName, pipeline: [{$match: {$alwaysFalse: 1}}]}}];
     const explain = localColl.explain().aggregate(query);
     assertUnionOfPlans(explain, "COLLSCAN", "EOF");
 
     const queryResults = localColl.aggregate(query).toArray();
-    assert.eq(queryResults.length, 10, `Expected one result doc for every doc on ${localCollName} collection`);
+    assert.eq(
+        queryResults.length,
+        10,
+        `Expected one result doc for every doc on ${localCollName} collection`,
+    );
     queryResults.forEach((outputRecord) =>
         assert.eq(
             outputRecord.side,
@@ -315,14 +359,25 @@ function getCollScanFilter(explain) {
 // {$not: $alwaysFalse} is rewritten to $alwaysTrue, there is no parsing failure
 // and the query is simpler.
 {
-    const q1 = [{$addFields: {t: 0}}, {$match: {$or: [{b: 13, t: 42}], t: {$elemMatch: {$not: {$in: []}}}}}];
+    const q1 = [
+        {$addFields: {t: 0}},
+        {$match: {$or: [{b: 13, t: 42}], t: {$elemMatch: {$not: {$in: []}}}}},
+    ];
     const explainResult = localColl.explain().aggregate(q1);
     const collScanFilter = getCollScanFilter(explainResult);
-    assert.docEq(collScanFilter, {b: {$eq: 13}}, "Winning plan filter should match expected filter");
+    assert.docEq(
+        collScanFilter,
+        {b: {$eq: 13}},
+        "Winning plan filter should match expected filter",
+    );
 
     const matchFilter = getMatchFilter(explainResult);
     const expectedMatchCondition = {$and: [{t: {$elemMatch: {}}}, {t: {$eq: 42}}]};
-    assert.docEq(matchFilter, expectedMatchCondition, "$match/MATCH stage should have the expected structure");
+    assert.docEq(
+        matchFilter,
+        expectedMatchCondition,
+        "$match/MATCH stage should have the expected structure",
+    );
 }
 
 // Simple cases
@@ -330,7 +385,11 @@ function getCollScanFilter(explain) {
     const q2 = [{$match: {t: {$elemMatch: {$not: {$in: []}}}}}];
     const explainResult = localColl.explain().aggregate(q2);
     const collScanFilter = getCollScanFilter(explainResult);
-    assert.docEq(collScanFilter, {t: {"$elemMatch": {}}}, "Winning plan filter should match expected filter");
+    assert.docEq(
+        collScanFilter,
+        {t: {"$elemMatch": {}}},
+        "Winning plan filter should match expected filter",
+    );
 }
 {
     const q3 = [{$match: {t: {$not: {$in: []}}}}];

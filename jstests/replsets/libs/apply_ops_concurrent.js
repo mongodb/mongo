@@ -56,7 +56,10 @@ export var ApplyOpsConcurrentTest = function (options) {
     function applyOpsInsert(coll, numOps, id) {
         const ops = generateInsertOps(coll, numOps, id);
         const mydb = coll.getDB();
-        assert.commandWorked(mydb.runCommand({applyOps: ops}), "failed to insert documents into " + coll.getFullName());
+        assert.commandWorked(
+            mydb.runCommand({applyOps: ops}),
+            "failed to insert documents into " + coll.getFullName(),
+        );
     }
 
     /**
@@ -87,7 +90,9 @@ export var ApplyOpsConcurrentTest = function (options) {
 
         testLog("Starting to apply " + numOps + " operations in collection " + coll.getFullName());
         applyOpsInsert(coll, numOps, id);
-        testLog("Successfully applied " + numOps + " operations in collection " + coll.getFullName());
+        testLog(
+            "Successfully applied " + numOps + " operations in collection " + coll.getFullName(),
+        );
     }
 
     /**
@@ -128,7 +133,9 @@ export var ApplyOpsConcurrentTest = function (options) {
      * Returns number of insert operations recorded on the oplog for the targeted collections.
      */
     function getInsertOpCount(primary, targetedCollections) {
-        return primary.getCollection("local.oplog.rs").countDocuments({op: "i", "ns": {$in: targetedCollections}});
+        return primary
+            .getCollection("local.oplog.rs")
+            .countDocuments({op: "i", "ns": {$in: targetedCollections}});
     }
 
     /**
@@ -159,17 +166,32 @@ export var ApplyOpsConcurrentTest = function (options) {
 
         // Enable fail point to pause applyOps between operations.
         assert.commandWorked(
-            primary.adminCommand({configureFailPoint: "applyOpsPauseBetweenOperations", mode: "alwaysOn"}),
+            primary.adminCommand({
+                configureFailPoint: "applyOpsPauseBetweenOperations",
+                mode: "alwaysOn",
+            }),
         );
 
         // This logs each operation being applied.
-        const previousLogLevel = assert.commandWorked(primary.setLogLevel(3, "replication")).was.replication.verbosity;
+        const previousLogLevel = assert.commandWorked(primary.setLogLevel(3, "replication")).was
+            .replication.verbosity;
 
-        testLog("Applying operations in collections " + coll1.getFullName() + " and " + coll2.getFullName());
+        testLog(
+            "Applying operations in collections " +
+                coll1.getFullName() +
+                " and " +
+                coll2.getFullName(),
+        );
 
         const numOps = 100;
-        const insertProcess1 = startParallelShell(createInsertFunction(coll1, numOps, 0), replTest.getPort(0));
-        const insertProcess2 = startParallelShell(createInsertFunction(coll2, numOps, 1), replTest.getPort(0));
+        const insertProcess1 = startParallelShell(
+            createInsertFunction(coll1, numOps, 0),
+            replTest.getPort(0),
+        );
+        const insertProcess2 = startParallelShell(
+            createInsertFunction(coll2, numOps, 1),
+            replTest.getPort(0),
+        );
 
         // The fail point will prevent applyOps from advancing past the first operation in each
         // batch of operations. If applyOps is applying both sets of operations concurrently without
@@ -182,7 +204,10 @@ export var ApplyOpsConcurrentTest = function (options) {
             assert.soon(
                 function () {
                     const serverStatus = adminDb.serverStatus();
-                    insertOpCount = getInsertOpCount(primary, [coll1.getFullName(), coll2.getFullName()]);
+                    insertOpCount = getInsertOpCount(primary, [
+                        coll1.getFullName(),
+                        coll2.getFullName(),
+                    ]);
                     // This assertion may fail if the fail point is not implemented correctly within
                     // applyOps. This allows us to fail fast instead of waiting for the
                     // assert.soon() function to time out.
@@ -204,7 +229,10 @@ export var ApplyOpsConcurrentTest = function (options) {
             );
         } finally {
             assert.commandWorked(
-                primary.adminCommand({configureFailPoint: "applyOpsPauseBetweenOperations", mode: "off"}),
+                primary.adminCommand({
+                    configureFailPoint: "applyOpsPauseBetweenOperations",
+                    mode: "off",
+                }),
             );
         }
 
@@ -212,7 +240,10 @@ export var ApplyOpsConcurrentTest = function (options) {
         insertProcess2();
 
         testLog(
-            "Successfully applied operations in collections " + coll1.getFullName() + " and " + coll2.getFullName(),
+            "Successfully applied operations in collections " +
+                coll1.getFullName() +
+                " and " +
+                coll2.getFullName(),
         );
 
         // Reset log level.
@@ -224,7 +255,8 @@ export var ApplyOpsConcurrentTest = function (options) {
         assert.eq(
             expectedOpCount,
             getInsertOpCount(primary, [coll1.getFullName(), coll2.getFullName()]),
-            "incorrect number of insert operations in server status after applyOps: " + tojson(serverStatus),
+            "incorrect number of insert operations in server status after applyOps: " +
+                tojson(serverStatus),
         );
 
         replTest.stopSet();

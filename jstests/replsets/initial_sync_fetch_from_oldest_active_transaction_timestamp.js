@@ -35,7 +35,11 @@ let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const dbName = "test";
@@ -159,12 +163,19 @@ jsTestLog("Running operations while collection cloning is paused");
 // sure that the beginApplyingTimestamp and the stopTimestamp in initial sync are different. The
 // stopTimestamp is the timestamp of the oplog entry that was last applied on the sync source
 // when the oplog application phase of initial sync begins.
-const stopTimestamp = assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 4}]})).operationTime;
+const stopTimestamp = assert.commandWorked(
+    testColl.runCommand("insert", {documents: [{_id: 4}]}),
+).operationTime;
 
 jsTestLog("stopTimestamp: " + tojson(stopTimestamp));
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangDuringCollectionClone",
+        mode: "off",
+    }),
+);
 
 jsTestLog("Initial sync resumed");
 
@@ -208,7 +219,11 @@ assert.eq(testColl.find({_id: 1}).toArray(), [{_id: 1}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 

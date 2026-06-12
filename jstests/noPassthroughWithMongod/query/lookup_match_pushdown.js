@@ -9,7 +9,9 @@ coll.drop();
 const other = db.lookup_match_pushdown_other;
 other.drop();
 
-assert.commandWorked(db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}));
+assert.commandWorked(
+    db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}),
+);
 
 assert.commandWorked(
     coll.insertMany([

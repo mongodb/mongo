@@ -48,7 +48,11 @@ function restartCluster() {
 // mongod and mongos nodes in the cluster, returning an array according to the defined mapping.
 function mapOnEachNode(func) {
     const fromMongos = st._mongos.map((connection) => connection.getDB(db.getName())).map(func);
-    const fromShards = FixtureHelpers.mapOnEachShardNode({func, db: st.s.getDB(db.getName()), primaryNodeOnly: false});
+    const fromShards = FixtureHelpers.mapOnEachShardNode({
+        func,
+        db: st.s.getDB(db.getName()),
+        primaryNodeOnly: false,
+    });
     return fromMongos.concat(fromShards);
 }
 
@@ -66,9 +70,10 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
     // introduced by the `setQuerySettings` command have been correctly propagated throughout the
     // whole cluster.
     st.forEachMongos((connection) =>
-        new QuerySettingsUtils(connection.getDB(db.getName()), collName).assertQueryShapeConfiguration(
-            expectedQueryShapeConfiguration,
-        ),
+        new QuerySettingsUtils(
+            connection.getDB(db.getName()),
+            collName,
+        ).assertQueryShapeConfiguration(expectedQueryShapeConfiguration),
     );
 
     // Ensure that each node emits the exact same query settings metrics. Some nodes might be slower
@@ -100,9 +105,21 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
 runTest({
     expectedQueryShapeConfiguration: [],
     assertionFunc: ({count, size, rejectCount}) => {
-        assert.eq(count, 0, "`querySettings.count` server status should be 0 if no query settings are present");
-        assert.eq(size, 0, "`querySettings.size` server status should be 0 if no query settings are present");
-        assert.eq(rejectCount, 0, "`querySettings.rejectCount` should be zero before any reject settings are applied.");
+        assert.eq(
+            count,
+            0,
+            "`querySettings.count` server status should be 0 if no query settings are present",
+        );
+        assert.eq(
+            size,
+            0,
+            "`querySettings.size` server status should be 0 if no query settings are present",
+        );
+        assert.eq(
+            rejectCount,
+            0,
+            "`querySettings.rejectCount` should be zero before any reject settings are applied.",
+        );
     },
 });
 
@@ -113,7 +130,9 @@ let lastSize;
 // greater than 0.
 st.adminCommand({setQuerySettings: query, settings: biggerQuerySettings});
 runTest({
-    expectedQueryShapeConfiguration: [primaryQSU.makeQueryShapeConfiguration(biggerQuerySettings, query)],
+    expectedQueryShapeConfiguration: [
+        primaryQSU.makeQueryShapeConfiguration(biggerQuerySettings, query),
+    ],
     assertionFunc: ({count, size}) => {
         assert.eq(count, 1, "`querySettings.count` server status failed to increase on addition.");
         assert.gt(size, 0, "`querySettings.size` server status failed to increase on addition.");
@@ -125,10 +144,20 @@ runTest({
 // count remains unchanged.
 st.adminCommand({setQuerySettings: query, settings: smallerQuerySettings});
 runTest({
-    expectedQueryShapeConfiguration: [primaryQSU.makeQueryShapeConfiguration(smallerQuerySettings, query)],
+    expectedQueryShapeConfiguration: [
+        primaryQSU.makeQueryShapeConfiguration(smallerQuerySettings, query),
+    ],
     assertionFunc: ({count, size}) => {
-        assert.eq(count, 1, "`querySettings.count` server status should remain unchanged on replacements.");
-        assert.lt(size, lastSize, "`querySettings.size` server status failed to decrease on a smaller replacement.");
+        assert.eq(
+            count,
+            1,
+            "`querySettings.count` server status should remain unchanged on replacements.",
+        );
+        assert.lt(
+            size,
+            lastSize,
+            "`querySettings.size` server status failed to decrease on a smaller replacement.",
+        );
         lastSize = size;
     },
 });
@@ -136,10 +165,20 @@ runTest({
 // Restart the cluster and ensure that the metrics remain unchanged.
 restartCluster();
 runTest({
-    expectedQueryShapeConfiguration: [primaryQSU.makeQueryShapeConfiguration(smallerQuerySettings, query)],
+    expectedQueryShapeConfiguration: [
+        primaryQSU.makeQueryShapeConfiguration(smallerQuerySettings, query),
+    ],
     assertionFunc: ({count, size}) => {
-        assert.eq(count, 1, "`querySettings.count` server status should remain unchanged between restarts.");
-        assert.eq(size, lastSize, "`querySettings.size` server status should remain unchanged between restarts.");
+        assert.eq(
+            count,
+            1,
+            "`querySettings.count` server status should remain unchanged between restarts.",
+        );
+        assert.eq(
+            size,
+            lastSize,
+            "`querySettings.size` server status should remain unchanged between restarts.",
+        );
         lastSize = size;
     },
 });
@@ -152,7 +191,11 @@ runTest({
     expectedQueryShapeConfiguration: [],
     assertionFunc: ({count, size}) => {
         assert.eq(count, 0, "`querySettings.count` server status failed to decrease on deletion.");
-        assert.lt(size, lastSize, "`querySettings.size` server status failed to decrease on deletion.");
+        assert.lt(
+            size,
+            lastSize,
+            "`querySettings.size` server status failed to decrease on deletion.",
+        );
     },
 });
 
@@ -191,7 +234,11 @@ st.adminCommand({removeQuerySettings: query});
 runTest({
     expectedQueryShapeConfiguration: [],
     assertionFunc: ({rejectCount}) => {
-        assert.eq(rejectCount, 0, "`querySettings.rejectCount` should be zero after settings are removed.");
+        assert.eq(
+            rejectCount,
+            0,
+            "`querySettings.rejectCount` should be zero after settings are removed.",
+        );
     },
 });
 

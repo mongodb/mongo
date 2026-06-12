@@ -19,7 +19,8 @@ try {
     let errorWithCode = "Code: " + e.code + ", Message: " + e;
     if (CheckShardFilteringMetadataHelpers.isTransientError(e)) {
         jsTest.log(
-            "Aborted filtering metadata check due to retriable error during topology discovery: " + errorWithCode,
+            "Aborted filtering metadata check due to retriable error during topology discovery: " +
+                errorWithCode,
         );
         quit();
     } else {
@@ -29,7 +30,10 @@ try {
 }
 
 if (topology.type !== Topology.kShardedCluster) {
-    throw new Error("Filtering metadata check can only be run against a sharded cluster, but got: " + tojson(topology));
+    throw new Error(
+        "Filtering metadata check can only be run against a sharded cluster, but got: " +
+            tojson(topology),
+    );
 }
 
 try {

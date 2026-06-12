@@ -54,8 +54,18 @@ let getMongosFromConnStrings = (connStrings) => {
     return mongos;
 };
 
-let generateFailpoints = (failpointName, failpointNodeType, reshardingTest, toplogy, failpointMode = "alwaysOn") => {
-    const failpointTargetConnStrings = getConnStringsFromNodeType(failpointNodeType, reshardingTest, toplogy);
+let generateFailpoints = (
+    failpointName,
+    failpointNodeType,
+    reshardingTest,
+    toplogy,
+    failpointMode = "alwaysOn",
+) => {
+    const failpointTargetConnStrings = getConnStringsFromNodeType(
+        failpointNodeType,
+        reshardingTest,
+        toplogy,
+    );
     const failpointHosts = getMongosFromConnStrings(failpointTargetConnStrings);
 
     let failpoints = [];
@@ -73,7 +83,10 @@ let generateAbortThread = (mongosConnString, ns, expectedErrorCodes) => {
             if (expectedErrorCodes == ErrorCodes.OK) {
                 assert.commandWorked(mongos.adminCommand({abortReshardCollection: ns}));
             } else {
-                assert.commandFailedWithCode(mongos.adminCommand({abortReshardCollection: ns}), expectedErrorCodes);
+                assert.commandFailedWithCode(
+                    mongos.adminCommand({abortReshardCollection: ns}),
+                    expectedErrorCodes,
+                );
             }
         },
         mongosConnString,
@@ -142,9 +155,13 @@ let triggerPostDecisionPersistedAbort = (mongos, abortThread) => {
         // or will have been completely deleted. Await any of these conditions
         // in order to test the abort command's inability to abort after a
         // persisted decision.
-        const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: originalCollectionNs});
+        const coordinatorDoc = mongos
+            .getCollection("config.reshardingOperations")
+            .findOne({ns: originalCollectionNs});
         return (
-            coordinatorDoc == null || coordinatorDoc.state === "decision-persisted" || coordinatorDoc.state === "done"
+            coordinatorDoc == null ||
+            coordinatorDoc.state === "decision-persisted" ||
+            coordinatorDoc.state === "done"
         );
     });
 
@@ -163,7 +180,11 @@ const runAbortWithFailpoint = (
         executeAfterAbortingFn = null,
     } = {},
 ) => {
-    const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+    const reshardingTest = new ReshardingTest({
+        numDonors: 2,
+        numRecipients: 2,
+        reshardInPlace: true,
+    });
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;
@@ -189,11 +210,18 @@ const runAbortWithFailpoint = (
     // resharding operation will have finished without error, and that the abort itself will
     // error.
     if (abortLocation == abortLocationEnum.AFTER_DECISION_PERSISTED) {
-        expectedAbortErrorCodes = [ErrorCodes.ReshardCollectionCommitted, ErrorCodes.NoSuchReshardCollection];
+        expectedAbortErrorCodes = [
+            ErrorCodes.ReshardCollectionCommitted,
+            ErrorCodes.NoSuchReshardCollection,
+        ];
         expectedReshardingErrorCode = ErrorCodes.OK;
     }
 
-    const abortThread = generateAbortThread(topology.mongos.nodes[0], originalCollectionNs, expectedAbortErrorCodes);
+    const abortThread = generateAbortThread(
+        topology.mongos.nodes[0],
+        originalCollectionNs,
+        expectedAbortErrorCodes,
+    );
 
     if (executeBeforeReshardingStartsFn) {
         jsTestLog(`Executing the before-resharding-starts fn`);
@@ -216,7 +244,12 @@ const runAbortWithFailpoint = (
         () => {
             if (executeAtStartOfReshardingFn) {
                 jsTestLog(`Executing the start-of-resharding fn`);
-                executeAtStartOfReshardingFn(reshardingTest, topology, mongos, originalCollectionNs);
+                executeAtStartOfReshardingFn(
+                    reshardingTest,
+                    topology,
+                    mongos,
+                    originalCollectionNs,
+                );
             }
 
             if (abortLocation == abortLocationEnum.BEFORE_STEADY_STATE) {
@@ -262,7 +295,8 @@ const runAbortWithFailpoint = (
         },
     );
 
-    const reshardingMetrics = configsvr.getDB("admin").serverStatus({}).shardingStatistics.resharding;
+    const reshardingMetrics = configsvr.getDB("admin").serverStatus({})
+        .shardingStatistics.resharding;
 
     let reshardingOperationsFinalCount = reshardingMetrics.countStarted;
     let reshardingSuccessesFinalCount = reshardingMetrics.countSucceeded;
@@ -314,7 +348,9 @@ runAbortWithFailpoint(
 
 function waitForAllRecipientsToReachApplying(mongos, ns) {
     assert.soon(() => {
-        const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
+        const coordinatorDoc = mongos
+            .getCollection("config.reshardingOperations")
+            .findOne({ns: ns});
 
         if (
             coordinatorDoc === null ||
@@ -336,21 +372,35 @@ function waitForAllRecipientsToReachApplying(mongos, ns) {
 
 // Rely on the resharding_test_fixture's built-in failpoint that hangs before switching to
 // the blocking writes state.
-runAbortWithFailpoint(null, nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL, abortLocationEnum.BEFORE_STEADY_STATE, {
-    executeAtStartOfReshardingFn: (reshardingTest, topology, mongos, ns) => {
-        waitForAllRecipientsToReachApplying(mongos, ns);
+runAbortWithFailpoint(
+    null,
+    nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL,
+    abortLocationEnum.BEFORE_STEADY_STATE,
+    {
+        executeAtStartOfReshardingFn: (reshardingTest, topology, mongos, ns) => {
+            waitForAllRecipientsToReachApplying(mongos, ns);
+        },
     },
-});
+);
 
 // Test that the resharding operation can successfully be aborted even when the commit monitor won't
 // ever signal to the coordinator the resharding operation is ready to commit.
-runAbortWithFailpoint("hangBeforeQueryingRecipients", nodeTypeEnum.COORDINATOR, abortLocationEnum.BEFORE_STEADY_STATE, {
-    executeAtStartOfReshardingFn: (reshardingTest, topology, mongos, ns) => {
-        waitForAllRecipientsToReachApplying(mongos, ns);
+runAbortWithFailpoint(
+    "hangBeforeQueryingRecipients",
+    nodeTypeEnum.COORDINATOR,
+    abortLocationEnum.BEFORE_STEADY_STATE,
+    {
+        executeAtStartOfReshardingFn: (reshardingTest, topology, mongos, ns) => {
+            waitForAllRecipientsToReachApplying(mongos, ns);
+        },
     },
-});
+);
 
-runAbortWithFailpoint(null, nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL, abortLocationEnum.AFTER_DECISION_PERSISTED);
+runAbortWithFailpoint(
+    null,
+    nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL,
+    abortLocationEnum.AFTER_DECISION_PERSISTED,
+);
 
 // The resharding test fixture uses its own set of coordinator failpoints for resharding
 // checkpoints. It may not be possible to insert documents once the second checkpoint is reached.
@@ -362,42 +412,49 @@ runAbortWithFailpoint(null, nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL, abortLoca
 // 2).
 
 let recipientFailpoints = [];
-runAbortWithFailpoint(null, nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL, abortLocationEnum.BEFORE_DECISION_PERSISTED, {
-    executeBeforeReshardingStartsFn: (reshardingTest, topology) => {
-        recipientFailpoints = generateFailpoints(
-            "reshardingPauseRecipientDuringOplogApplication",
-            nodeTypeEnum.RECIPIENT,
-            reshardingTest,
-            topology,
-        );
-    },
-    executeAtStartOfReshardingFn: (reshardingTest, topology, mongos, ns) => {
-        for (let failpoint of recipientFailpoints) {
-            failpoint.wait();
-        }
-        assert.commandWorked(
-            mongos.getCollection(ns).insert([
-                {_id: 4, oldKey: -10, newKey: -10},
-                {_id: 5, oldKey: 10, newKey: -10},
-                {_id: 6, oldKey: -10, newKey: 10},
-                {_id: 7, oldKey: 10, newKey: 10},
-            ]),
-        );
-    },
-    executeAfterWaitingOnFailpointsFn: (reshardingTest, topology, mongos, ns) => {
-        assert.soon(() => {
-            for (let donor of reshardingTest.donorShardNames) {
-                const donorConn = new Mongo(topology.shards[donor].primary);
-                const donorDoc = donorConn.getCollection("config.localReshardingOperations.donor").findOne({
-                    ns: ns,
-                });
-                return donorDoc != null && donorDoc.mutableState.state === "blocking-writes";
+runAbortWithFailpoint(
+    null,
+    nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL,
+    abortLocationEnum.BEFORE_DECISION_PERSISTED,
+    {
+        executeBeforeReshardingStartsFn: (reshardingTest, topology) => {
+            recipientFailpoints = generateFailpoints(
+                "reshardingPauseRecipientDuringOplogApplication",
+                nodeTypeEnum.RECIPIENT,
+                reshardingTest,
+                topology,
+            );
+        },
+        executeAtStartOfReshardingFn: (reshardingTest, topology, mongos, ns) => {
+            for (let failpoint of recipientFailpoints) {
+                failpoint.wait();
             }
-        });
+            assert.commandWorked(
+                mongos.getCollection(ns).insert([
+                    {_id: 4, oldKey: -10, newKey: -10},
+                    {_id: 5, oldKey: 10, newKey: -10},
+                    {_id: 6, oldKey: -10, newKey: 10},
+                    {_id: 7, oldKey: 10, newKey: 10},
+                ]),
+            );
+        },
+        executeAfterWaitingOnFailpointsFn: (reshardingTest, topology, mongos, ns) => {
+            assert.soon(() => {
+                for (let donor of reshardingTest.donorShardNames) {
+                    const donorConn = new Mongo(topology.shards[donor].primary);
+                    const donorDoc = donorConn
+                        .getCollection("config.localReshardingOperations.donor")
+                        .findOne({
+                            ns: ns,
+                        });
+                    return donorDoc != null && donorDoc.mutableState.state === "blocking-writes";
+                }
+            });
+        },
+        executeAfterAbortingFn: () => {
+            for (let failpoint of recipientFailpoints) {
+                failpoint.off();
+            }
+        },
     },
-    executeAfterAbortingFn: () => {
-        for (let failpoint of recipientFailpoints) {
-            failpoint.off();
-        }
-    },
-});
+);

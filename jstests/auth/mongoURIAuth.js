@@ -34,7 +34,11 @@ const runURIAuthTest = function (userMech, uriMech, authMechanism, regexMechanis
     let uri;
 
     if (uriMech) {
-        uri = "mongodb://user:password@localhost:" + conn.port + "/admin?authMechanism=" + authMechanism;
+        uri =
+            "mongodb://user:password@localhost:" +
+            conn.port +
+            "/admin?authMechanism=" +
+            authMechanism;
     } else {
         uri = "mongodb://user:password@localhost:" + conn.port;
     }

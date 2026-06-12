@@ -17,7 +17,9 @@ let st = new ShardingTest({shards: 2, enableBalancer: true});
 
 const dbName = "test";
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 let db = st.s.getDB(dbName);
 let coll1 = db["coll1"];
@@ -135,11 +137,15 @@ let coll1 = db["coll1"];
 // Test that if addShard/removeShard fails after having blocked new DDL coordinators, it will
 // unblock them.
 {
-    jsTest.log("Testing that the addOrRemoveShardInProgress is reset after a crash during add/removeShard");
+    jsTest.log(
+        "Testing that the addOrRemoveShardInProgress is reset after a crash during add/removeShard",
+    );
 
     function getAddOrRemoveShardInProgressParamValue() {
         return assert.commandWorked(
-            st.configRS.getPrimary().adminCommand({getClusterParameter: "addOrRemoveShardInProgress"}),
+            st.configRS
+                .getPrimary()
+                .adminCommand({getClusterParameter: "addOrRemoveShardInProgress"}),
         ).clusterParameters[0].inProgress;
     }
 
@@ -205,7 +211,10 @@ let coll1 = db["coll1"];
         // Turn off the failpoint for the coordinator case where the command is still stuck
         st.configRS.nodes.forEach((conn) => {
             sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-                return conn.adminCommand({configureFailPoint: "hangRemoveShardAfterDrainingDDL", mode: "off"});
+                return conn.adminCommand({
+                    configureFailPoint: "hangRemoveShardAfterDrainingDDL",
+                    mode: "off",
+                });
             }, "Timed out disabling fail point " + "hangRemoveShardAfterDrainingDDL");
         });
 
@@ -240,7 +249,12 @@ let coll1 = db["coll1"];
     }
 
     test("killOp");
-    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB("admin"), "UseTopologyChangeCoordinators")) {
+    if (
+        FeatureFlagUtil.isPresentAndEnabled(
+            st.shard0.getDB("admin"),
+            "UseTopologyChangeCoordinators",
+        )
+    ) {
         // Test step up rather than stop because stopping the primary will hang due to the
         // coordinator waiting for the failpoint. Only run this test if we have some secondary to
         // step up (auto bootstrap runs with a single CSRS node).

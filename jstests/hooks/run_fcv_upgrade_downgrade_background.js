@@ -9,7 +9,9 @@ import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers
 import {assertTimeseriesConsistentWithViewlessFlag} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 if (typeof db === "undefined") {
-    throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
+    throw new Error(
+        "Expected mongo shell to be connected a server, but global 'db' object isn't defined",
+    );
 }
 
 // Disable implicit sessions so FSM workloads that kill random sessions won't interrupt the

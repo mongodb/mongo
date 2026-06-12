@@ -34,7 +34,9 @@ assert.eq(2, coll.aggregate([{$sortByCount: "$str2"}], diacriticInsensitive).itc
 
 // Ensure that equality of groups inside $facet stage respects the inherited collation.
 results = coll
-    .aggregate([{$facet: {facetStr: [{$group: {_id: "$str"}}], facetStr2: [{$group: {_id: "$str2"}}]}}])
+    .aggregate([
+        {$facet: {facetStr: [{$group: {_id: "$str"}}], facetStr2: [{$group: {_id: "$str2"}}]}},
+    ])
     .toArray();
 assert.eq(1, results.length);
 assert.eq(2, results[0].facetStr.length);
@@ -46,7 +48,9 @@ assert.eq(1, results.length);
 assert.eq(2, results[0].set.length);
 
 // Test that the $addToSet accumulator respects an explicit collation.
-results = coll.aggregate([{$group: {_id: null, set: {$addToSet: "$str2"}}}], diacriticInsensitive).toArray();
+results = coll
+    .aggregate([{$group: {_id: null, set: {$addToSet: "$str2"}}}], diacriticInsensitive)
+    .toArray();
 assert.eq(1, results.length);
 assert.eq(2, results[0].set.length);
 

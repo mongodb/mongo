@@ -44,7 +44,11 @@ function runUpdate(update, expected, documents = docs) {
     assert.commandWorked(db.runCommand(command));
 
     const collContents = coll.find().sort({_id: 1}).toArray();
-    assert.eq(collContents.length, expected.length, "Expected result and actual result do not have the same length.");
+    assert.eq(
+        collContents.length,
+        expected.length,
+        "Expected result and actual result do not have the same length.",
+    );
     for (let i = 0; i < collContents.length; i++) {
         assert(
             documentEq(collContents[i], expected[i]),
@@ -71,7 +75,9 @@ function runUpdate(update, expected, documents = docs) {
 // after the last element, so this will replace [undefined, 1] with null. We need to use $expr here.
 runUpdate(
     {
-        updates: [{q: {$expr: {$eq: [{$type: "$a"}, "undefined"]}}, u: {$set: {"a": null}}, multi: true}],
+        updates: [
+            {q: {$expr: {$eq: [{$type: "$a"}, "undefined"]}}, u: {$set: {"a": null}}, multi: true},
+        ],
     },
     [
         {_id: 0, a: 1},
@@ -99,7 +105,13 @@ runUpdate(
 // We can do the same thing with dotted paths. As above, this does not do implicit array traversal.
 runUpdate(
     {
-        updates: [{q: {$expr: {$eq: [{$type: "$a.b"}, "undefined"]}}, u: {$set: {"a.b": null}}, multi: true}],
+        updates: [
+            {
+                q: {$expr: {$eq: [{$type: "$a.b"}, "undefined"]}},
+                u: {$set: {"a.b": null}},
+                multi: true,
+            },
+        ],
     },
     [
         {_id: 0, a: 1},
@@ -214,7 +226,12 @@ runUpdate(
                                                         input: {$objectToArray: "$a"},
                                                         in: {
                                                             $cond: {
-                                                                if: {$eq: [{$type: "$$this.v"}, "undefined"]},
+                                                                if: {
+                                                                    $eq: [
+                                                                        {$type: "$$this.v"},
+                                                                        "undefined",
+                                                                    ],
+                                                                },
                                                                 then: {k: "$$this.k", v: null},
                                                                 else: "$$this",
                                                             },

@@ -33,7 +33,9 @@ conn = MongoRunner.runMongod({});
 
 // The default for time-series collections is zstd.
 const timeFieldName = "time";
-assert.commandWorked(conn.getDB("db").createCollection("a", {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(
+    conn.getDB("db").createCollection("a", {timeseries: {timeField: timeFieldName}}),
+);
 stats = conn.getDB("db").getCollection("a").stats();
 assert(stats["wiredTiger"]["creationString"].search("block_compressor=zstd") > -1);
 
@@ -43,7 +45,9 @@ jsTestLog("Scenario 2b: testing the globally configured compressor for time-seri
 conn = MongoRunner.runMongod({wiredTigerCollectionBlockCompressor: "none"});
 
 // Time-series collections ignore the globally configured compressor
-assert.commandWorked(conn.getDB("db").createCollection("a", {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(
+    conn.getDB("db").createCollection("a", {timeseries: {timeField: timeFieldName}}),
+);
 stats = conn.getDB("db").getCollection("a").stats();
 assert(stats["wiredTiger"]["creationString"].search("block_compressor=zstd") > -1);
 
@@ -54,7 +58,9 @@ jsTestLog("Scenario 3: testing the compressor passed into the 'create' command")
 // The globally configured compressor will be ignored.
 conn = MongoRunner.runMongod({wiredTigerCollectionBlockCompressor: "none"});
 assert.commandWorked(
-    conn.getDB("db").createCollection("a", {storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}}}),
+    conn.getDB("db").createCollection("a", {
+        storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}},
+    }),
 );
 assert.commandWorked(
     conn.getDB("db").createCollection("b", {

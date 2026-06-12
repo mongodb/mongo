@@ -43,7 +43,11 @@ if (TestData.configShard) {
 }
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Even though implicitDefaultWC is set to w:1, addShard will work as CWWC is set.
@@ -61,7 +65,10 @@ testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 // - A sharding enabled database
 // - A sharded local collection.
 assert.commandWorked(
-    st.s.getDB("test").runCommand({createIndexes: "local", indexes: [{name: "foreignKey_1", key: {foreignKey: 1}}]}),
+    st.s.getDB("test").runCommand({
+        createIndexes: "local",
+        indexes: [{name: "foreignKey_1", key: {foreignKey: 1}}],
+    }),
 );
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.local", key: {foreignKey: 1}}));
 testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);

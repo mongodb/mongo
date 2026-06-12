@@ -4,7 +4,10 @@
  * @tags: [featureFlagQueryStatsInsert]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {getQueryShapeHashFromSlowLogs, getQueryShapeHashSetFromSlowLogs} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryShapeHashFromSlowLogs,
+    getQueryShapeHashSetFromSlowLogs,
+} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("Query Shape Hash in mongod slow query logs for insert commands", function () {
@@ -22,7 +25,10 @@ describe("Query Shape Hash in mongod slow query logs for insert commands", funct
 
         this.dbName = jsTestName();
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         this.routerDB = this.st.s.getDB(this.dbName);
@@ -87,7 +93,11 @@ describe("Query Shape Hash in mongod slow query logs for insert commands", funct
                 queryComment: comment,
                 options: {commandType: "insert"},
             });
-            assert.neq(hash, null, "queryShapeHash should be present in mongod slow log for insert");
+            assert.neq(
+                hash,
+                null,
+                "queryShapeHash should be present in mongod slow log for insert",
+            );
         });
 
         it("multi-doc insert should log queryShapeHash on mongod", function () {
@@ -106,7 +116,11 @@ describe("Query Shape Hash in mongod slow query logs for insert commands", funct
                 queryComment: comment,
                 options: {commandType: "insert"},
             });
-            assert.neq(hash, null, "queryShapeHash should be present in mongod slow log for multi-doc insert");
+            assert.neq(
+                hash,
+                null,
+                "queryShapeHash should be present in mongod slow log for multi-doc insert",
+            );
         });
     });
 
@@ -127,7 +141,11 @@ describe("Query Shape Hash in mongod slow query logs for insert commands", funct
                 queryComment: comment,
                 options: {commandType: "insert"},
             });
-            assert.neq(hash, null, "queryShapeHash should be present on shard0 for targeted insert");
+            assert.neq(
+                hash,
+                null,
+                "queryShapeHash should be present on shard0 for targeted insert",
+            );
         });
 
         it("insert targeting shard1 should log queryShapeHash on shard1", function () {
@@ -146,7 +164,11 @@ describe("Query Shape Hash in mongod slow query logs for insert commands", funct
                 queryComment: comment,
                 options: {commandType: "insert"},
             });
-            assert.neq(hash, null, "queryShapeHash should be present on shard1 for targeted insert");
+            assert.neq(
+                hash,
+                null,
+                "queryShapeHash should be present on shard1 for targeted insert",
+            );
         });
 
         it("insert spanning both shards should log queryShapeHash on both shards", function () {

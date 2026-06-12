@@ -37,7 +37,11 @@ export function getPersistentSamplesConfig(db) {
 
 export function setPersistentSamplesConfig(
     db,
-    {internalQueryDisablePlanCache, internalQuerySamplingCEMethod, internalQuerySamplingBySequentialScan},
+    {
+        internalQueryDisablePlanCache,
+        internalQuerySamplingCEMethod,
+        internalQuerySamplingBySequentialScan,
+    },
 ) {
     assert.commandWorked(
         db.adminCommand({
@@ -52,7 +56,10 @@ export function setPersistentSamplesConfig(
 // Get the default sample size based on query knobs so the test stays correct if knob values change
 export function defaultSampleSize(db) {
     const knobValues = getSampleSizeRelatedKnobs(db);
-    return calculateSampleSize(knobValues.kSamplingConfidenceInterval, knobValues.kSamplingMarginOfError);
+    return calculateSampleSize(
+        knobValues.kSamplingConfidenceInterval,
+        knobValues.kSamplingMarginOfError,
+    );
 }
 
 // Get the default num chunks based on query knobs so the test stays correct if knob values change
@@ -84,10 +91,20 @@ export function dropSamplesColl(db) {
 // Returns the expected full _id for a sample document.
 // samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
 // numChunks is included in the _id only for chunk mode.
-export function getExpectedId(uuid, samplingType, sampleSize, expectedSchemaVersion, numChunks = null) {
+export function getExpectedId(
+    uuid,
+    samplingType,
+    sampleSize,
+    expectedSchemaVersion,
+    numChunks = null,
+) {
     let samplingTypeStr = samplingType;
     if (numChunks !== null) {
-        assert.eq("chunk", samplingType, `numChunks should only be passed for chunk sampling; got ${samplingType}`);
+        assert.eq(
+            "chunk",
+            samplingType,
+            `numChunks should only be passed for chunk sampling; got ${samplingType}`,
+        );
         samplingTypeStr += numChunks;
     }
     return `${uuid}_${samplingTypeStr}_${sampleSize}_v${expectedSchemaVersion}`;
@@ -96,7 +113,11 @@ export function getExpectedId(uuid, samplingType, sampleSize, expectedSchemaVers
 // Returns a sample document in system.stats.samples for the test collection.
 export function getSampleDoc(samplesColl, expectedId) {
     const results = samplesColl.find({_id: expectedId}).toArray();
-    assert.eq(results.length, 1, `Expected exactly 1 sample doc with _id=${expectedId}; got ${results.length}`);
+    assert.eq(
+        results.length,
+        1,
+        `Expected exactly 1 sample doc with _id=${expectedId}; got ${results.length}`,
+    );
     return results[0];
 }
 

@@ -72,8 +72,14 @@ for (let fields = 1; fields < maxFields; fields++) {
         box[1][1] += y == 1 ? 50 : 0;
 
         // Now only half of each result comes back
-        assert.eq(totalPts / (4 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count());
-        assert.eq(totalPts / (4 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount());
+        assert.eq(
+            totalPts / (4 * 2),
+            coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count(),
+        );
+        assert.eq(
+            totalPts / (4 * 2),
+            coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount(),
+        );
     }
 
     // Check that half of points in each half
@@ -85,8 +91,14 @@ for (let fields = 1; fields < maxFields; fields++) {
         box[0][0] += i == 1 ? 50 : 0;
         box[1][0] += i == 1 ? 50 : 0;
 
-        assert.eq(totalPts / (2 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count());
-        assert.eq(totalPts / (2 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount());
+        assert.eq(
+            totalPts / (2 * 2),
+            coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count(),
+        );
+        assert.eq(
+            totalPts / (2 * 2),
+            coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount(),
+        );
     }
 
     // Check that all but corner set of points in radius

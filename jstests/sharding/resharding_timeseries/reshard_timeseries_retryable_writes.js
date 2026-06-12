@@ -49,7 +49,10 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         shardCollOptions: {timeseries: timeseriesInfo},
     });
     // In viewful timeseries (FCV < 9.0), DDL operations use the system.buckets namespace.
-    const sourceNs = getTimeseriesCollForDDLOps(sourceCollection.getDB(), sourceCollection).getFullName();
+    const sourceNs = getTimeseriesCollForDDLOps(
+        sourceCollection.getDB(),
+        sourceCollection,
+    ).getFullName();
 
     // Test batched insert with multiple batches on shard 0, let it be one batch on shard 1.
     const rst0 = reshardingTest.getReplSetForShard(donorShardNames[0]);
@@ -62,7 +65,10 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     const insertSessionCollection = insertSession
         .getDatabase(sourceCollection.getDB().getName())
         .getCollection(sourceCollection.getName());
-    const insertDuringReshardingSession = mongos.startSession({causalConsistency: false, retryWrites: false});
+    const insertDuringReshardingSession = mongos.startSession({
+        causalConsistency: false,
+        retryWrites: false,
+    });
     const insertDuringReshardingSessionCollection = insertDuringReshardingSession
         .getDatabase(sourceCollection.getDB().getName())
         .getCollection(sourceCollection.getName());
@@ -70,14 +76,44 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     const insertCommand = {
         insert: sourceCollection.getName(),
         documents: [
-            {_id: "ins_stays_on_shard0_0", ts: new Date(), sensorId: {x: -20, y: -20}, tag: "before"},
-            {_id: "ins_stays_on_shard0_1", ts: new Date(), sensorId: {x: -20, y: -20}, tag: "before"},
-            {_id: "ins_moves_to_shard1_0", ts: new Date(), sensorId: {x: -20, y: 20}, tag: "before"},
-            {_id: "ins_moves_to_shard1_1", ts: new Date(), sensorId: {x: -20, y: 20}, tag: "before"},
+            {
+                _id: "ins_stays_on_shard0_0",
+                ts: new Date(),
+                sensorId: {x: -20, y: -20},
+                tag: "before",
+            },
+            {
+                _id: "ins_stays_on_shard0_1",
+                ts: new Date(),
+                sensorId: {x: -20, y: -20},
+                tag: "before",
+            },
+            {
+                _id: "ins_moves_to_shard1_0",
+                ts: new Date(),
+                sensorId: {x: -20, y: 20},
+                tag: "before",
+            },
+            {
+                _id: "ins_moves_to_shard1_1",
+                ts: new Date(),
+                sensorId: {x: -20, y: 20},
+                tag: "before",
+            },
             {_id: "ins_stays_on_shard1_0", ts: new Date(), sensorId: {x: 20, y: 20}, tag: "before"},
             {_id: "ins_stays_on_shard1_1", ts: new Date(), sensorId: {x: 20, y: 20}, tag: "before"},
-            {_id: "ins_moves_to_shard0_0", ts: new Date(), sensorId: {x: 20, y: -20}, tag: "before"},
-            {_id: "ins_moves_to_shard0_1", ts: new Date(), sensorId: {x: 20, y: -20}, tag: "before"},
+            {
+                _id: "ins_moves_to_shard0_0",
+                ts: new Date(),
+                sensorId: {x: 20, y: -20},
+                tag: "before",
+            },
+            {
+                _id: "ins_moves_to_shard0_1",
+                ts: new Date(),
+                sensorId: {x: 20, y: -20},
+                tag: "before",
+            },
         ],
         txnNumber: NumberLong(1),
     };
@@ -85,21 +121,65 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     const insertDuringReshardingCommand = {
         insert: sourceCollection.getName(),
         documents: [
-            {_id: "ins_dur_stays_on_shard0_0", ts: new Date(), sensorId: {x: -20, y: -20}, tag: "during"},
-            {_id: "ins_dur_stays_on_shard0_1", ts: new Date(), sensorId: {x: -20, y: -20}, tag: "during"},
-            {_id: "ins_dur_moves_to_shard1_0", ts: new Date(), sensorId: {x: -20, y: 20}, tag: "during"},
-            {_id: "ins_dur_moves_to_shard1_1", ts: new Date(), sensorId: {x: -20, y: 20}, tag: "during"},
-            {_id: "ins_dur_stays_on_shard1_0", ts: new Date(), sensorId: {x: 20, y: 20}, tag: "during"},
-            {_id: "ins_dur_stays_on_shard1_1", ts: new Date(), sensorId: {x: 20, y: 20}, tag: "during"},
-            {_id: "ins_dur_moves_to_shard0_0", ts: new Date(), sensorId: {x: 20, y: -20}, tag: "during"},
-            {_id: "ins_dur_moves_to_shard0_1", ts: new Date(), sensorId: {x: 20, y: -20}, tag: "during"},
+            {
+                _id: "ins_dur_stays_on_shard0_0",
+                ts: new Date(),
+                sensorId: {x: -20, y: -20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_stays_on_shard0_1",
+                ts: new Date(),
+                sensorId: {x: -20, y: -20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_moves_to_shard1_0",
+                ts: new Date(),
+                sensorId: {x: -20, y: 20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_moves_to_shard1_1",
+                ts: new Date(),
+                sensorId: {x: -20, y: 20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_stays_on_shard1_0",
+                ts: new Date(),
+                sensorId: {x: 20, y: 20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_stays_on_shard1_1",
+                ts: new Date(),
+                sensorId: {x: 20, y: 20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_moves_to_shard0_0",
+                ts: new Date(),
+                sensorId: {x: 20, y: -20},
+                tag: "during",
+            },
+            {
+                _id: "ins_dur_moves_to_shard0_1",
+                ts: new Date(),
+                sensorId: {x: 20, y: -20},
+                tag: "during",
+            },
         ],
         txnNumber: NumberLong(2),
     };
 
     function runRetryableWrites(phase, expectedInsertErrorCode = ErrorCodes.OK) {
         // If an insert runs more than once, we'll get a DuplicateKeyError.
-        RetryableWritesUtil.runRetryableWrite(insertSessionCollection, insertCommand, expectedInsertErrorCode);
+        RetryableWritesUtil.runRetryableWrite(
+            insertSessionCollection,
+            insertCommand,
+            expectedInsertErrorCode,
+        );
         const insertDocs = sourceCollection.find({tag: "before"}).toArray();
         assert.eq(8, insertDocs.length, {insertDocs});
 

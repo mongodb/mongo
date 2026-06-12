@@ -100,7 +100,11 @@ function checkActualMatchesAnExpected(actual) {
 }
 
 // Check behavior with and without a hint.
-checkActualMatchesAnExpected(coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}]).toArray());
 checkActualMatchesAnExpected(
-    coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}], {hint: {a: 1, b: 1}}).toArray(),
+    coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}]).toArray(),
+);
+checkActualMatchesAnExpected(
+    coll
+        .aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}], {hint: {a: 1, b: 1}})
+        .toArray(),
 );

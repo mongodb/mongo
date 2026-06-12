@@ -22,7 +22,9 @@ describe("DISTINCT_SCAN fetch-yield retry", function () {
         conn = MongoRunner.runMongod({});
         assert.neq(null, conn, "mongod failed to start");
         db = conn.getDB(jsTestName());
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        );
     });
 
     after(function () {
@@ -52,7 +54,9 @@ describe("DISTINCT_SCAN fetch-yield retry", function () {
         }
         assert.commandWorked(coll.insertMany(docs));
 
-        const pipeline = [{$group: {_id: "$a", first: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}];
+        const pipeline = [
+            {$group: {_id: "$a", first: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}},
+        ];
 
         assert.commandWorked(
             db.adminCommand({
@@ -75,13 +79,24 @@ describe("DISTINCT_SCAN fetch-yield retry", function () {
                     byId[r._id] = r.first;
                 }
                 for (let a = 0; a < 10; ++a) {
-                    assert(byId.hasOwnProperty(a), {iteration: i, msg: `Missing group a=${a}`, byId});
-                    assert.eq(a, byId[a], {iteration: i, msg: `Wrong $top output for a=${a}`, byId});
+                    assert(byId.hasOwnProperty(a), {
+                        iteration: i,
+                        msg: `Missing group a=${a}`,
+                        byId,
+                    });
+                    assert.eq(a, byId[a], {
+                        iteration: i,
+                        msg: `Wrong $top output for a=${a}`,
+                        byId,
+                    });
                 }
             }
         } finally {
             assert.commandWorked(
-                db.adminCommand({configureFailPoint: "WTWriteConflictExceptionForReads", mode: "off"}),
+                db.adminCommand({
+                    configureFailPoint: "WTWriteConflictExceptionForReads",
+                    mode: "off",
+                }),
             );
         }
     });
@@ -121,13 +136,24 @@ describe("DISTINCT_SCAN fetch-yield retry", function () {
                     byId[r._id] = r.val;
                 }
                 for (let a = 0; a < 10; ++a) {
-                    assert(byId.hasOwnProperty(a), {iteration: i, msg: `Missing group a=${a}`, byId});
-                    assert.eq(a * 2, byId[a], {iteration: i, msg: `Wrong $first value for a=${a}`, byId});
+                    assert(byId.hasOwnProperty(a), {
+                        iteration: i,
+                        msg: `Missing group a=${a}`,
+                        byId,
+                    });
+                    assert.eq(a * 2, byId[a], {
+                        iteration: i,
+                        msg: `Wrong $first value for a=${a}`,
+                        byId,
+                    });
                 }
             }
         } finally {
             assert.commandWorked(
-                db.adminCommand({configureFailPoint: "WTWriteConflictExceptionForReads", mode: "off"}),
+                db.adminCommand({
+                    configureFailPoint: "WTWriteConflictExceptionForReads",
+                    mode: "off",
+                }),
             );
         }
     });

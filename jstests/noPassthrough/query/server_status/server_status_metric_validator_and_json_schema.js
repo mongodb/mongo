@@ -45,7 +45,11 @@ function runTests(db, collName, collCount) {
     collCount++;
     assert.commandWorked(db[collName].createIndex({a: 1}));
     runCommandAndCheckValidatorCount({
-        cmdToRun: () => db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, expireAfterSeconds: 3600}}),
+        cmdToRun: () =>
+            db.runCommand({
+                collMod: collName,
+                index: {keyPattern: {a: 1}, expireAfterSeconds: 3600},
+            }),
         cmdName: "collMod",
         countDict: {failed: NumberLong(0), jsonSchema: NumberLong(0), total: NumberLong(0)},
         error: false,
@@ -169,7 +173,9 @@ MongoRunner.stopMongod(conn);
 
 //  Sharded cluster
 const st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}),
+);
 db = st.rs0.getPrimary().getDB(jsTestName());
 collCount = 0;
 runTests(db, collName, collCount);

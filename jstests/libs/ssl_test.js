@@ -75,7 +75,9 @@ TLSTest.prototype.connectWorked = function () {
         // Don't run the hang analyzer because we don't expect connectWorked() to always succeed.
         assert.soon(
             function () {
-                return checkProgram(serverPID).alive && 0 === _runMongoProgram.apply(null, clientArgv);
+                return (
+                    checkProgram(serverPID).alive && 0 === _runMongoProgram.apply(null, clientArgv)
+                );
             },
             "connect failed",
             connectTimeoutMillis,
@@ -112,7 +114,10 @@ TLSTest.prototype.connectFails = function () {
     // Wait until we can connect to mongod using the working client args
     assert.soon(
         function () {
-            return checkProgram(serverPID).alive && 0 === _runMongoProgram.apply(null, workingClientArgv);
+            return (
+                checkProgram(serverPID).alive &&
+                0 === _runMongoProgram.apply(null, workingClientArgv)
+            );
         },
         "connect failed",
         connectTimeoutMillis,

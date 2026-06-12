@@ -23,7 +23,9 @@ function runTest(conn, sharded = false) {
             timeseries: timeseriesOptions,
         });
     } else {
-        assert.commandWorked(testDB.createCollection(collectionName, {timeseries: timeseriesOptions}));
+        assert.commandWorked(
+            testDB.createCollection(collectionName, {timeseries: timeseriesOptions}),
+        );
     }
     const parameterDB = sharded ? conn.shard0 : testDB;
     const spillParameter = parameterDB.adminCommand({
@@ -45,7 +47,10 @@ function runTest(conn, sharded = false) {
     if (!sharded) {
         // This ensures that the collectionType was correct.
         queryStats = getQueryStats(testDB, {
-            extraMatch: {"key.collectionType": collectionType, "key.queryShape.cmdNs.coll": collectionName},
+            extraMatch: {
+                "key.collectionType": collectionType,
+                "key.queryShape.cmdNs.coll": collectionName,
+            },
         });
     } else {
         queryStats = getQueryStats(testDB, {
@@ -55,7 +60,8 @@ function runTest(conn, sharded = false) {
     assert.eq(
         4,
         queryStats.length,
-        "Expected all four commands (find, aggregate, count, distinct) to have query stats: " + queryStats,
+        "Expected all four commands (find, aggregate, count, distinct) to have query stats: " +
+            queryStats,
     );
 
     // Aggregate - Ensures the hash was correct.
@@ -66,7 +72,11 @@ function runTest(conn, sharded = false) {
             queryShapeHash: "6EAA1CF28496A4023CA7C4A624109C2E9065D9B8C2E74193FC16F57C96C56875",
         },
     });
-    assert.eq(1, queryStatsPerQuery.length, "Expected the aggregate hash to match expected" + tojson(queryStats));
+    assert.eq(
+        1,
+        queryStatsPerQuery.length,
+        "Expected the aggregate hash to match expected" + tojson(queryStats),
+    );
     assert.eq(
         1,
         queryStatsPerQuery[0].key.queryShape.pipeline.length,
@@ -99,7 +109,11 @@ function runTest(conn, sharded = false) {
             queryShapeHash: "9588ADDD5A1D8B65C48617883FDB0C764AE3F36965DA6615D9409424E9E24935",
         },
     });
-    assert.eq(1, queryStatsPerQuery.length, "Expected the count hash to match expected" + tojson(queryStats));
+    assert.eq(
+        1,
+        queryStatsPerQuery.length,
+        "Expected the count hash to match expected" + tojson(queryStats),
+    );
     // Ensure correct metrics.
     assertAggregatedMetricsSingleExec(queryStatsPerQuery[0], {
         keysExamined: 0,
@@ -129,7 +143,11 @@ function runTest(conn, sharded = false) {
             queryShapeHash: "28E320CE6D5B70EED846BD71772ABC5F3FC363B2B21D0371DE353D353A6EFD22",
         },
     });
-    assert.eq(1, queryStatsPerQuery.length, "Expected the distinct hash to match expected" + tojson(queryStats));
+    assert.eq(
+        1,
+        queryStatsPerQuery.length,
+        "Expected the distinct hash to match expected" + tojson(queryStats),
+    );
     // Ensure correct metrics.
     assertAggregatedMetricsSingleExec(queryStatsPerQuery[0], {
         keysExamined: 0,
@@ -157,7 +175,11 @@ function runTest(conn, sharded = false) {
             queryShapeHash: "B168ABE3917F52922BC07512C28E81E40C963EB822423731D63786927942061F",
         },
     });
-    assert.eq(1, queryStatsPerQuery.length, "Expected the find hash to match expected" + tojson(queryStats));
+    assert.eq(
+        1,
+        queryStatsPerQuery.length,
+        "Expected the find hash to match expected" + tojson(queryStats),
+    );
     // Ensure correct metrics.
     assertAggregatedMetricsSingleExec(queryStatsPerQuery[0], {
         keysExamined: 0,

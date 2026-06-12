@@ -27,7 +27,11 @@ assert.commandWorked(s.s0.adminCommand({split: "test.data", middle: {_id: 66}}))
 
 // Migrate the middle chunk to another shard
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.data", find: {_id: 50}, to: s.getOther(s.getPrimaryShard("test")).name}),
+    s.s0.adminCommand({
+        movechunk: "test.data",
+        find: {_id: 50},
+        to: s.getOther(s.getPrimaryShard("test")).name,
+    }),
 );
 
 // Check that we get results rather than an error

@@ -77,4 +77,10 @@ const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, ls
     }
 };
 
-runTests(initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);
+runTests(
+    initFunc,
+    stopReplProducerOnDocumentFunc,
+    opsFunc,
+    stmtMajorityCommittedFunc,
+    validateFunc,
+);

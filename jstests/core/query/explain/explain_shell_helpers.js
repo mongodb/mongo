@@ -234,7 +234,9 @@ assert.commandWorked(results[0]);
 // optimizations with '$_internalInhibitOptimization' stage.
 //
 
-explain = t.explain().aggregate([{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}]);
+explain = t
+    .explain()
+    .aggregate([{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}]);
 assert.commandWorked(explain);
 explain = getSingleNodeExplain(explain);
 assert.eq(4, explain.stages.length);
@@ -247,7 +249,9 @@ explain = getSingleNodeExplain(explain);
 assert.eq(3, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
-explain = t.explain().aggregate({$_internalInhibitOptimization: {}}, {$project: {a: 3}}, {$group: {_id: null}});
+explain = t
+    .explain()
+    .aggregate({$_internalInhibitOptimization: {}}, {$project: {a: 3}}, {$group: {_id: null}});
 assert.commandWorked(explain);
 explain = getSingleNodeExplain(explain);
 assert.eq(4, explain.stages.length);
@@ -256,7 +260,9 @@ assert("queryPlanner" in explain.stages[0].$cursor);
 // Options already provided.
 explain = t
     .explain()
-    .aggregate([{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}], {allowDiskUse: true});
+    .aggregate([{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}], {
+        allowDiskUse: true,
+    });
 assert.commandWorked(explain);
 explain = getSingleNodeExplain(explain);
 assert.eq(4, explain.stages.length);
@@ -436,7 +442,9 @@ assert.eq(1, explain.executionStats.totalDocsExamined);
 assert.eq(10, t.count());
 
 // findAndModify with upsert flag set that should do an insert.
-explain = t.explain("executionStats").findAndModify({query: {a: 15}, update: {$set: {b: 3}}, upsert: true});
+explain = t
+    .explain("executionStats")
+    .findAndModify({query: {a: 15}, update: {$set: {b: 3}}, upsert: true});
 assert.commandWorked(explain);
 stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {

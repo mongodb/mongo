@@ -32,13 +32,20 @@ let sendLinearizableReadOnFailpoint = function () {
         // In lock free reads this will error with NotWritablePrimary. Without lock free reads we
         // timeout because we can't acquire the RSTL.
         assert.commandFailedWithCode(
-            coll.runCommand({"find": "foo", readConcern: {level: "linearizable"}, maxTimeMS: 10000}),
+            coll.runCommand({
+                "find": "foo",
+                readConcern: {level: "linearizable"},
+                maxTimeMS: 10000,
+            }),
             [ErrorCodes.NotWritablePrimary, ErrorCodes.MaxTimeMSExpired],
         );
     } finally {
         // Turn off fail point so we can cleanup.
         assert.commandWorked(
-            db.getMongo().adminCommand({configureFailPoint: "hangAfterReconfigOnDrainComplete", mode: "off"}),
+            db.getMongo().adminCommand({
+                configureFailPoint: "hangAfterReconfigOnDrainComplete",
+                mode: "off",
+            }),
         );
     }
 };
@@ -66,15 +73,23 @@ let secondaries = replTest.getSecondaries();
 assert.commandWorked(
     primary
         .getDB("test")
-        .foo.insert({"number": 7}, {"writeConcern": {"w": num_nodes, "wtimeout": ReplSetTest.kDefaultTimeoutMS}}),
+        .foo.insert(
+            {"number": 7},
+            {"writeConcern": {"w": num_nodes, "wtimeout": ReplSetTest.kDefaultTimeoutMS}},
+        ),
 );
 
 let newPrimary = secondaries[0];
 
-jsTestLog("Set failpoint so we hang during stepup when drain mode is complete but before we are writable.");
+jsTestLog(
+    "Set failpoint so we hang during stepup when drain mode is complete but before we are writable.",
+);
 
 assert.commandWorked(
-    newPrimary.adminCommand({configureFailPoint: "hangAfterReconfigOnDrainComplete", mode: "alwaysOn"}),
+    newPrimary.adminCommand({
+        configureFailPoint: "hangAfterReconfigOnDrainComplete",
+        mode: "alwaysOn",
+    }),
 );
 
 jsTestLog("Starting parallel reader");

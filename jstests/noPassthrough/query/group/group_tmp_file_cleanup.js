@@ -21,7 +21,10 @@ for (let i = 0; i < memoryLimitMb + 1; ++i)
     assert.commandWorked(testDb.largeColl.insert({x: i, largeStr: largeStr + i}));
 
 // Inhibit optimization so that $group runs in the classic engine.
-let pipeline = [{$_internalInhibitOptimization: {}}, {$group: {_id: "$largeStr", minId: {$min: "$_id"}}}];
+let pipeline = [
+    {$_internalInhibitOptimization: {}},
+    {$group: {_id: "$largeStr", minId: {$min: "$_id"}}},
+];
 
 // Make sure that the pipeline needs to spill to disk.
 assert.throwsWithCode(

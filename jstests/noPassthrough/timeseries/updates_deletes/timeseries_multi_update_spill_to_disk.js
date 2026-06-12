@@ -18,7 +18,9 @@ const coll = db.getCollection(jsTestName());
 
 function setUpCollectionForTest() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}),
+    );
 
     let docs = [];
     for (const bucket of buckets) {
@@ -38,8 +40,16 @@ function verifySpillingStats(
 ) {
     const execStages = getExecutionStages(explain);
     assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
-    assert.eq("TS_MODIFY", execStages[0].stage, `TS_MODIFY stage not found in executionStages: ${tojson(explain)}`);
-    assert.eq("SPOOL", execStages[0].inputStage.stage, `SPOOL stage not found in executionStages: ${tojson(explain)}`);
+    assert.eq(
+        "TS_MODIFY",
+        execStages[0].stage,
+        `TS_MODIFY stage not found in executionStages: ${tojson(explain)}`,
+    );
+    assert.eq(
+        "SPOOL",
+        execStages[0].inputStage.stage,
+        `SPOOL stage not found in executionStages: ${tojson(explain)}`,
+    );
     const spoolStage = execStages[0].inputStage;
     assert.eq(spoolStage.memLimit, expectedMemoryLimitBytes, tojson(explain));
     assert.eq(spoolStage.diskLimit, expectedDiskLimitBytes, tojson(explain));
@@ -49,7 +59,11 @@ function verifySpillingStats(
         assert(spoolStage.usedDisk, tojson(explain));
         assert.gt(spoolStage.spilledUncompressedDataSize, 0, tojson(explain));
         assert.gt(spoolStage.spilledDataStorageSize, 0, tojson(explain));
-        assert.gte(spoolStage.totalDataSizeSpooled, spoolStage.spilledDataStorageSize, tojson(explain));
+        assert.gte(
+            spoolStage.totalDataSizeSpooled,
+            spoolStage.spilledDataStorageSize,
+            tojson(explain),
+        );
     } else {
         assert(!spoolStage.usedDisk, tojson(explain));
         assert.eq(spoolStage.spilledDataStorageSize, 0, tojson(explain));
@@ -59,10 +73,14 @@ function verifySpillingStats(
 }
 
 function runTest({memoryLimitBytes, expectedSpills, expectedSpilledRecords}) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: memoryLimitBytes}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: memoryLimitBytes}),
+    );
 
     const diskLimitBytes = 10 * memoryLimitBytes;
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: diskLimitBytes}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: diskLimitBytes}),
+    );
     assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
 
     setUpCollectionForTest();
@@ -73,14 +91,26 @@ function runTest({memoryLimitBytes, expectedSpills, expectedSpilledRecords}) {
     };
 
     // First run an explain and verify the spilling stats.
-    const explain = assert.commandWorked(db.runCommand({explain: updateCommand, verbosity: "executionStats"}));
-    verifySpillingStats(explain, expectedSpills, expectedSpilledRecords, memoryLimitBytes, diskLimitBytes);
+    const explain = assert.commandWorked(
+        db.runCommand({explain: updateCommand, verbosity: "executionStats"}),
+    );
+    verifySpillingStats(
+        explain,
+        expectedSpills,
+        expectedSpilledRecords,
+        memoryLimitBytes,
+        diskLimitBytes,
+    );
 
     // Now run the actual command and verify the results.
     const res = assert.commandWorked(db.runCommand(updateCommand));
     // We'll update exactly half the records.
     const expectedNUpdated = (buckets.length * numDocsPerBucket) / 2;
-    assert.eq(expectedNUpdated, res.n, "Update did not report the correct number of records update");
+    assert.eq(
+        expectedNUpdated,
+        res.n,
+        "Update did not report the correct number of records update",
+    );
     assert.eq(
         coll.find({str: "even"}).toArray().length,
         0,
@@ -113,7 +143,9 @@ function runTest({memoryLimitBytes, expectedSpills, expectedSpilledRecords}) {
 })();
 
 (function maxDiskUseExceeded() {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: 1}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: 1}),
+    );
     setUpCollectionForTest();
     assert.commandFailedWithCode(
         db.runCommand({

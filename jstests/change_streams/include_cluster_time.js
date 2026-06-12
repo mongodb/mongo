@@ -12,7 +12,9 @@ const coll = assertDropAndRecreateCollection(db, "include_cluster_time");
 
 const changeStream = coll.watch();
 
-const insertClusterTime = assert.commandWorked(coll.runCommand("insert", {documents: [{_id: 0}]})).operationTime;
+const insertClusterTime = assert.commandWorked(
+    coll.runCommand("insert", {documents: [{_id: 0}]}),
+).operationTime;
 
 const updateClusterTime = assert.commandWorked(
     coll.runCommand("update", {updates: [{q: {_id: 0}, u: {$set: {updated: true}}}]}),

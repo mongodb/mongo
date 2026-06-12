@@ -17,12 +17,16 @@ assert.commandFailedWithCode(
 // User can still rename system.views (or to system.views) via applyOps command.
 assert.commandWorked(
     db.adminCommand({
-        applyOps: [{op: "c", ns: "test.$cmd", o: {renameCollection: "test.system.views", to: "test.b"}}],
+        applyOps: [
+            {op: "c", ns: "test.$cmd", o: {renameCollection: "test.system.views", to: "test.b"}},
+        ],
     }),
 );
 
 assert.commandWorked(
     db.adminCommand({
-        applyOps: [{op: "c", ns: "test.$cmd", o: {renameCollection: "test.b", to: "test.system.views"}}],
+        applyOps: [
+            {op: "c", ns: "test.$cmd", o: {renameCollection: "test.b", to: "test.system.views"}},
+        ],
     }),
 );

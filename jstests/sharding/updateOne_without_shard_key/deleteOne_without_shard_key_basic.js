@@ -36,7 +36,8 @@ WriteWithoutShardKeyTestUtil.setupShardedCollection(
 
 const testCases = [
     {
-        logMessage: "Running single deleteOne without shard key for documents " + "on different shards.",
+        logMessage:
+            "Running single deleteOne without shard key for documents " + "on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal},
@@ -51,7 +52,8 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running multiple deleteOnes without shard key for " + "documents on different shards.",
+        logMessage:
+            "Running multiple deleteOnes without shard key for " + "documents on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal},
@@ -91,7 +93,8 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running single deleteOne without shard key for documents " + "on the same shard.",
+        logMessage:
+            "Running single deleteOne without shard key for documents " + "on the same shard.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard0_2, y: yFieldVal},
@@ -107,7 +110,8 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running multiple deleteOnes without shard key for " + "documents on the same shard.",
+        logMessage:
+            "Running multiple deleteOnes without shard key for " + "documents on the same shard.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard0_2, y: yFieldVal},

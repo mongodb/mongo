@@ -53,7 +53,9 @@ let runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
         let mongodConn = MongoRunner.runMongod(options);
         waitForPrimary(mongodConn);
 
-        let res = mongodConn.getDB("admin").system.version.update({_id: "shardIdentity"}, shardIdentityDoc);
+        let res = mongodConn
+            .getDB("admin")
+            .system.version.update({_id: "shardIdentity"}, shardIdentityDoc);
         assert.eq(1, res.nModified);
 
         MongoRunner.stopMongod(mongodConn);
@@ -70,7 +72,8 @@ let runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
         assert.soon(
             () =>
-                shardIdentityDoc.configsvrConnectionString == mongodConn.adminCommand({shardingState: 1}).configServer,
+                shardIdentityDoc.configsvrConnectionString ==
+                mongodConn.adminCommand({shardingState: 1}).configServer,
         );
 
         return mongodConn;
@@ -97,10 +100,15 @@ let runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
     assert.soon(
-        () => shardIdentityDoc.configsvrConnectionString == mongodConn.adminCommand({shardingState: 1}).configServer,
+        () =>
+            shardIdentityDoc.configsvrConnectionString ==
+            mongodConn.adminCommand({shardingState: 1}).configServer,
     );
     // Should not be allowed to remove the shardIdentity document
-    assert.writeErrorWithCode(mongodConn.getDB("admin").system.version.remove({_id: "shardIdentity"}), 40070);
+    assert.writeErrorWithCode(
+        mongodConn.getDB("admin").system.version.remove({_id: "shardIdentity"}),
+        40070,
+    );
 
     //
     // Test normal startup
@@ -123,7 +131,9 @@ let runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
     assert.soon(
-        () => shardIdentityDoc.configsvrConnectionString == mongodConn.adminCommand({shardingState: 1}).configServer,
+        () =>
+            shardIdentityDoc.configsvrConnectionString ==
+            mongodConn.adminCommand({shardingState: 1}).configServer,
     );
 
     //

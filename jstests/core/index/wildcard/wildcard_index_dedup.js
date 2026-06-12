@@ -22,7 +22,9 @@ const compoundKeyPattern = {
 };
 assert.commandWorked(coll.createIndex(compoundKeyPattern));
 
-assert.commandWorked(coll.insert({a: {b: 1, c: {f: 1, g: 1}, h: [1, 2, 3]}, d: {e: [1, 2, 3]}, post: 1}));
+assert.commandWorked(
+    coll.insert({a: {b: 1, c: {f: 1, g: 1}, h: [1, 2, 3]}, d: {e: [1, 2, 3]}, post: 1}),
+);
 
 // An $exists that matches multiple $** index paths from nested objects does not return
 // duplicates of the same object.

@@ -82,7 +82,11 @@ replTest.awaitReplication();
     assert(errors.hasNext(), "expected error, found none");
 
     const error = errors.next();
-    assert.eq(false, error.data.success, "expected failure, found success. log entry: " + tojson(error));
+    assert.eq(
+        false,
+        error.data.success,
+        "expected failure, found success. log entry: " + tojson(error),
+    );
     assert(
         error.data.error.includes("SnapshotTooOld"),
         "expected to find SnapshotTooOld error. log entry: " + tojson(error),

@@ -61,7 +61,12 @@ APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(testDb, setWindowFieldsPi
     ErrorCodes.OperationNotSupportedInTransaction,
 ]);
 
-APIVersionHelpers.assertViewSucceedsWithAPIStrict(testDb, setWindowFieldsPipeline, viewName, collName);
+APIVersionHelpers.assertViewSucceedsWithAPIStrict(
+    testDb,
+    setWindowFieldsPipeline,
+    viewName,
+    collName,
+);
 
 // Creating a collection with dotted paths is allowed with apiStrict:true.
 

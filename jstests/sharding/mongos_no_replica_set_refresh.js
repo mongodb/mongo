@@ -42,12 +42,19 @@ let checkNumHosts = function (expectedNumHosts) {
             return numHostsSeenByShard === expectedNumHosts;
         },
         function () {
-            return "Expected shard to see " + expectedNumHosts + " hosts but found " + numHostsSeenByShard;
+            return (
+                "Expected shard to see " +
+                expectedNumHosts +
+                " hosts but found " +
+                numHostsSeenByShard
+            );
         },
         five_minutes,
     );
 
-    jsTest.log("Waiting for the mongos to discover that the shard now has " + expectedNumHosts + " hosts.");
+    jsTest.log(
+        "Waiting for the mongos to discover that the shard now has " + expectedNumHosts + " hosts.",
+    );
     let numHostsSeenByMongos;
 
     // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
@@ -58,7 +65,12 @@ let checkNumHosts = function (expectedNumHosts) {
             return numHostsSeenByMongos === expectedNumHosts;
         },
         function () {
-            return "Expected mongos to see " + expectedNumHosts + " hosts on shard but found " + numHostsSeenByMongos;
+            return (
+                "Expected mongos to see " +
+                expectedNumHosts +
+                " hosts on shard but found " +
+                numHostsSeenByMongos
+            );
         },
         five_minutes,
     );
@@ -109,7 +121,12 @@ assert.soon(
         return configServerURL().indexOf(removedNode.host) < 0;
     },
     function () {
-        return removedNode.host + " was removed from " + rsObj.name + ", but is still seen in config.shards";
+        return (
+            removedNode.host +
+            " was removed from " +
+            rsObj.name +
+            ", but is still seen in config.shards"
+        );
     },
 );
 
@@ -130,7 +147,12 @@ assert.soon(
         return configServerURL().indexOf(removedNode.host) >= 0;
     },
     function () {
-        return removedNode.host + " was re-added to " + rsObj.name + ", but is not seen in config.shards";
+        return (
+            removedNode.host +
+            " was re-added to " +
+            rsObj.name +
+            ", but is not seen in config.shards"
+        );
     },
 );
 

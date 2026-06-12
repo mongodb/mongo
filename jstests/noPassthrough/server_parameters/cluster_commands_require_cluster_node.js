@@ -83,7 +83,11 @@ function runTestCaseExpectSuccess(conn, testCase) {
     shardsvrRst.initiate();
 
     for (let testCase of clusterCommandsCases) {
-        runTestCaseExpectFail(shardsvrRst.getPrimary(), testCase, ErrorCodes.ShardingStateNotInitialized);
+        runTestCaseExpectFail(
+            shardsvrRst.getPrimary(),
+            testCase,
+            ErrorCodes.ShardingStateNotInitialized,
+        );
     }
 
     shardsvrRst.stopSet();

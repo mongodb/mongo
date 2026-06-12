@@ -9,7 +9,14 @@ const kReadPreferenceSecondary = {
 
 const {defaultReadPreference: kReadPreferenceToUse = kReadPreferenceSecondary} = TestData;
 
-const kCommandsSupportingReadPreference = new Set(["aggregate", "collStats", "count", "dbStats", "distinct", "find"]);
+const kCommandsSupportingReadPreference = new Set([
+    "aggregate",
+    "collStats",
+    "count",
+    "dbStats",
+    "distinct",
+    "find",
+]);
 const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 
 // This list of cursor-generating commands is incomplete. For example, both "listCollections" and
@@ -36,7 +43,14 @@ const CursorTracker = (function () {
     };
 })();
 
-function runCommandWithReadPreferenceSecondary(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithReadPreferenceSecondary(
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
@@ -163,6 +177,8 @@ function runCommandWithReadPreferenceSecondary(conn, dbName, commandName, comman
     return serverResponse;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_read_preference_secondary.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/set_read_preference_secondary.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithReadPreferenceSecondary);

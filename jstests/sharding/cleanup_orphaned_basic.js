@@ -33,7 +33,9 @@ let dbName = "foo";
 let collectionName = "bar";
 let ns = dbName + "." + collectionName;
 
-assert.commandWorked(mongosAdmin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosAdmin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 let coll = mongos.getCollection(ns);
 
 // cleanupOrphaned fails against mongos ('no such command'): it must be run
@@ -72,24 +74,37 @@ function testBadStartingFromKeys(shardAdmin) {
 
     // startingFromKey doesn't match number of fields in shard key.
     assert.commandFailed(
-        shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: "someValue", someOtherKey: 1}}),
+        shardAdmin.runCommand({
+            cleanupOrphaned: ns,
+            startingFromKey: {someKey: "someValue", someOtherKey: 1},
+        }),
     );
 
     // startingFromKey matches number of fields in shard key but not field names.
-    assert.commandFailed(shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: "someValue"}}));
+    assert.commandFailed(
+        shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: "someValue"}}),
+    );
 
     let coll2 = mongos.getCollection("foo.baz");
 
-    assert.commandWorked(mongosAdmin.runCommand({shardCollection: coll2.getFullName(), key: {a: 1, b: 1}}));
+    assert.commandWorked(
+        mongosAdmin.runCommand({shardCollection: coll2.getFullName(), key: {a: 1, b: 1}}),
+    );
 
     // startingFromKey doesn't match number of fields in shard key.
     assert.commandFailed(
-        shardAdmin.runCommand({cleanupOrphaned: coll2.getFullName(), startingFromKey: {someKey: "someValue"}}),
+        shardAdmin.runCommand({
+            cleanupOrphaned: coll2.getFullName(),
+            startingFromKey: {someKey: "someValue"},
+        }),
     );
 
     // startingFromKey matches number of fields in shard key but not field names.
     assert.commandFailed(
-        shardAdmin.runCommand({cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: "someValue", c: 1}}),
+        shardAdmin.runCommand({
+            cleanupOrphaned: coll2.getFullName(),
+            startingFromKey: {a: "someValue", c: 1},
+        }),
     );
 }
 

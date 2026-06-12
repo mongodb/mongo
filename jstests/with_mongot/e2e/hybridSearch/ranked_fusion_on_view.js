@@ -47,7 +47,13 @@ export function createRankFusionPipeline(inputPipelines, viewPipeline = null) {
  *     search or vectorSearch stage). Use this to determine whether to compare explain results since
  *     they will otherwise differ if $rankFusion has a hybrid search input pipeline.
  */
-const runRankFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorrectness, isMongotPipeline = false) => {
+const runRankFusionViewTest = (
+    testName,
+    inputPipelines,
+    viewPipeline,
+    checkCorrectness,
+    isMongotPipeline = false,
+) => {
     runHybridSearchViewTest(
         testName,
         inputPipelines,
@@ -283,7 +289,10 @@ const runRankFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorr
         b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
     };
 
-    testHybridSearchViewWithSubsequentUnionOnSameView(rankFusionInputPipelines, createRankFusionPipeline);
+    testHybridSearchViewWithSubsequentUnionOnSameView(
+        rankFusionInputPipelines,
+        createRankFusionPipeline,
+    );
 })();
 
 // Test a $unionWith following a $rankFusion to verify that the $rankFusion desugaring doesn't
@@ -293,7 +302,10 @@ const runRankFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorr
         a: [{$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
         b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
     };
-    testHybridSearchViewWithSubsequentUnionOnDifferentView(rankFusionInputPipelines, createRankFusionPipeline);
+    testHybridSearchViewWithSubsequentUnionOnDifferentView(
+        rankFusionInputPipelines,
+        createRankFusionPipeline,
+    );
 })();
 
 // $rankFusion with an empty input pipeline should trigger the correct error.

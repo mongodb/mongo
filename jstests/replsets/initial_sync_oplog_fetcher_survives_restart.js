@@ -50,7 +50,9 @@ rst.stop(primary, null, null, {forRestart: true, waitPid: true});
 
 jsTestLog("Releasing the oplog fetcher failpoint.");
 assert.commandWorked(
-    secondary.getDB("test").adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+    secondary
+        .getDB("test")
+        .adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
 );
 
 // Wait for retries to happen while the sync source is down.
@@ -64,7 +66,9 @@ primary = rst.start(primary, options, true /* restart */);
 
 jsTestLog("Releasing the after data cloning failpoint.");
 assert.commandWorked(
-    secondary.getDB("test").adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+    secondary
+        .getDB("test")
+        .adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
 );
 
 jsTestLog("Waiting for initial sync to complete.");

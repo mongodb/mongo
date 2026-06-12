@@ -51,9 +51,14 @@ export const $config = (function () {
      * operation.
      */
     function mutexLock(db, tid, collName) {
-        jsTestLog("Trying to acquire mutexLock for resource tid:" + tid + " collection:" + collName);
+        jsTestLog(
+            "Trying to acquire mutexLock for resource tid:" + tid + " collection:" + collName,
+        );
         assert.soon(() => {
-            let doc = db[data.CRUDMutex].findAndModify({query: {tid: tid}, update: {$set: {mutex: 1}}});
+            let doc = db[data.CRUDMutex].findAndModify({
+                query: {tid: tid},
+                update: {$set: {mutex: 1}},
+            });
             return doc.mutex === 0;
         });
         jsTestLog("Acquired mutexLock for tid:" + tid + " collection:" + collName);
@@ -77,7 +82,14 @@ export const $config = (function () {
             const targetThreadColl = threadCollectionName(collName, tid);
             const coll = db[targetThreadColl];
             const fullNs = coll.getFullName();
-            jsTestLog("create state tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl);
+            jsTestLog(
+                "create state tid:" +
+                    tid +
+                    " currentTid:" +
+                    this.tid +
+                    " collection:" +
+                    targetThreadColl,
+            );
             // Add necessary indexes for resharding.
             assert.commandWorked(
                 db.adminCommand({
@@ -91,7 +103,11 @@ export const $config = (function () {
             );
             try {
                 assert.commandWorked(
-                    db.adminCommand({shardCollection: fullNs, key: {[`tid_${tid}_0`]: 1}, unique: false}),
+                    db.adminCommand({
+                        shardCollection: fullNs,
+                        key: {[`tid_${tid}_0`]: 1},
+                        unique: false,
+                    }),
                 );
             } catch (e) {
                 const exceptionCode = e.code;
@@ -121,7 +137,14 @@ export const $config = (function () {
 
             const targetThreadColl = threadCollectionName(collName, tid);
 
-            jsTestLog("drop state tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl);
+            jsTestLog(
+                "drop state tid:" +
+                    tid +
+                    " currentTid:" +
+                    this.tid +
+                    " collection:" +
+                    targetThreadColl,
+            );
             mutexLock(db, tid, targetThreadColl);
             try {
                 assert.eq(db[targetThreadColl].drop(), true);
@@ -137,7 +160,10 @@ export const $config = (function () {
             const srcCollName = threadCollectionName(collName, tid);
             const srcColl = db[srcCollName];
             // Rename collection
-            const destCollName = threadCollectionName(collName, tid + "_" + extractUUIDFromObject(UUID()));
+            const destCollName = threadCollectionName(
+                collName,
+                tid + "_" + extractUUIDFromObject(UUID()),
+            );
             try {
                 jsTestLog(
                     "rename state tid:" +
@@ -209,7 +235,11 @@ export const $config = (function () {
                         newKey,
                 );
                 assert.commandWorked(
-                    db.adminCommand({reshardCollection: fullNs, key: {[`${newKey}`]: 1}, numInitialChunks: 1}),
+                    db.adminCommand({
+                        reshardCollection: fullNs,
+                        key: {[`${newKey}`]: 1},
+                        numInitialChunks: 1,
+                    }),
                 );
             } catch (e) {
                 const exceptionCode = e.code;
@@ -272,14 +302,17 @@ export const $config = (function () {
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
             // Note this command will behave as no-op in case the collection is not tracked.
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
-                // Handles the case where the collection is not located on its primary
-                ErrorCodes.OperationFailed,
-                // Handles the case where the collection is sharded
-                ErrorCodes.InvalidNamespace,
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}),
+                [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                ],
+            );
             jsTestLog(`Untrack collection completed`);
         },
         CRUD: function (db, collName, connCache) {
@@ -288,7 +321,8 @@ export const $config = (function () {
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
             const targetThreadColl = threadCollectionName(collName, tid);
-            const threadInfos = "tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl;
+            const threadInfos =
+                "tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl;
             jsTestLog("CRUD state " + threadInfos);
             const coll = db[targetThreadColl];
 
@@ -300,7 +334,12 @@ export const $config = (function () {
 
             let insertBulkOp = coll.initializeUnorderedBulkOp();
             for (let i = 0; i < numDocs; ++i) {
-                insertBulkOp.insert({generation: generation, count: i, [`tid_${tid}_0`]: i, [`tid_${tid}_1`]: i});
+                insertBulkOp.insert({
+                    generation: generation,
+                    count: i,
+                    [`tid_${tid}_0`]: i,
+                    [`tid_${tid}_1`]: i,
+                });
             }
 
             try {

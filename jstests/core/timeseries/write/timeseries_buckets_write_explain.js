@@ -25,7 +25,9 @@ const metaField = "m";
 const time = new Date("2024-01-01T00:00:00Z");
 
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 
 // TODO(SERVER-114324): Remove this test exclusion
 // The two phase write protocol may throw NamespaceNotSharded error on explain of sharded timeseries concurrent with viewless timeseries upgrade/downgrade
@@ -78,7 +80,10 @@ assertExplain(
         }),
     "findAndModify",
 );
-assertExplain(getTimeseriesCollForRawOps(coll).explain().remove({"control.count": 2}, kRawOperationSpec), "delete");
+assertExplain(
+    getTimeseriesCollForRawOps(coll).explain().remove({"control.count": 2}, kRawOperationSpec),
+    "delete",
+);
 assertExplain(
     getTimeseriesCollForRawOps(coll)
         .explain()

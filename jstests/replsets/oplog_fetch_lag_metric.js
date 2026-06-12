@@ -70,7 +70,11 @@ const lagWithHang = getoplogFetcherLagSeconds();
 
 // Release the hang to let test continue
 hangAfterMetric.off();
-assert.gte(lagWithHang, 2, "Expected to observe fetch lag of at least 2 seconds, got: " + lagWithHang);
+assert.gte(
+    lagWithHang,
+    2,
+    "Expected to observe fetch lag of at least 2 seconds, got: " + lagWithHang,
+);
 
 // Verify lag returns to ~0 after catching up.
 rst.awaitReplication(60000);

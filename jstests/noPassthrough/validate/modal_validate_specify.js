@@ -21,7 +21,12 @@ function setupCollections(db) {
 }
 
 function generateResults(dbpath, opts, validateCommand = {validate: ""}) {
-    MongoRunner.runMongod({dbpath: dbpath, ...validateCommand, setParameter: opts, noCleanData: true});
+    MongoRunner.runMongod({
+        dbpath: dbpath,
+        ...validateCommand,
+        setParameter: opts,
+        noCleanData: true,
+    });
     return parseValidateOutputsFromLogs();
 }
 
@@ -53,7 +58,14 @@ describe("Modal Validate can specify target Databases and Collections", () => {
             const validateLogs = generateResults(dbpath, {}, validateCommand);
             jsTest.log.info("Validate logs", {validateLogs});
             const validatedNss = new Set(validateLogs.map((log) => log.attr.results.ns));
-            for (const ns of ["test.ham", "test.cheese", "admin.ham", "admin.cheese", "test2.ham", "test2.cheese"]) {
+            for (const ns of [
+                "test.ham",
+                "test.cheese",
+                "admin.ham",
+                "admin.cheese",
+                "test2.ham",
+                "test2.cheese",
+            ]) {
                 assert(validatedNss.has(ns), `Expected ${ns} to be validated`, {validatedNss});
             }
         });
@@ -72,7 +84,10 @@ describe("Modal Validate can specify target Databases and Collections", () => {
     }
 
     it("Command validates everything in the specified collection", () => {
-        const validateLogs = generateResults(dbpath, {validateDbName: "test", validateCollectionName: "ham"});
+        const validateLogs = generateResults(dbpath, {
+            validateDbName: "test",
+            validateCollectionName: "ham",
+        });
         jsTest.log.info(validateLogs);
         assert.eq(1, validateLogs.length);
         const validateResult = validateLogs[0].attr.results;

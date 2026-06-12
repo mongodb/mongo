@@ -49,7 +49,9 @@ ShardingTest.prototype.checkShardFilteringMetadata = function () {
                 const shardName = shardDoc._id;
                 const shardConn = getConn(shardDoc.host);
                 if (shardConn === null) {
-                    jsTest.log("CheckShardFilteringMetadata: Skipping check on shard" + shardDoc.host);
+                    jsTest.log(
+                        "CheckShardFilteringMetadata: Skipping check on shard" + shardDoc.host,
+                    );
                     return;
                 }
                 shardConn.fullOptions = Object.merge(this.s.fullOptions, {});
@@ -70,13 +72,19 @@ ShardingTest.prototype.checkShardFilteringMetadata = function () {
                 shardNodesHosts.forEach((host) => {
                     const shardNodeConn = getConn(host);
                     if (shardNodeConn === null) {
-                        jsTest.log("CheckShardFilteringMetadata: Skipping check on node" + shardDoc.host);
+                        jsTest.log(
+                            "CheckShardFilteringMetadata: Skipping check on node" + shardDoc.host,
+                        );
                         return;
                     }
                     shardNodeConn.fullOptions = Object.merge(this.s.fullOptions, {});
 
                     executeAuthenticatedIfNeeded(shardNodeConn, () => {
-                        CheckShardFilteringMetadataHelpers.run(mongosConn, shardNodeConn, shardName);
+                        CheckShardFilteringMetadataHelpers.run(
+                            mongosConn,
+                            shardNodeConn,
+                            shardName,
+                        );
                     });
                 });
             });

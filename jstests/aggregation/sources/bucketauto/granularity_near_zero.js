@@ -9,7 +9,11 @@ const res = coll
         {
             $bucketAuto: {
                 groupBy: {
-                    $reduce: {input: [], initialValue: 4.940656484124654e-324, in: {$size: ["$$value"]}},
+                    $reduce: {
+                        input: [],
+                        initialValue: 4.940656484124654e-324,
+                        in: {$size: ["$$value"]},
+                    },
                 },
                 buckets: NumberLong("8"),
                 granularity: "R80",

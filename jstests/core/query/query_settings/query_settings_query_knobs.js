@@ -14,7 +14,10 @@
  * ]
  */
 
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {after, describe, it} from "jstests/libs/mochalite.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
@@ -66,7 +69,10 @@ describe("setQuerySettings with queryKnobs", function () {
                 return qsutils.getQuerySettings({filter: {representativeQuery}});
             })
             .at(0)?.settings?.queryKnobs;
-        assert(bsonWoCompare(roundTrippedSettings, queryKnobs) === 0, {roundTrippedSettings, queryKnobs});
+        assert(bsonWoCompare(roundTrippedSettings, queryKnobs) === 0, {
+            roundTrippedSettings,
+            queryKnobs,
+        });
     });
 
     it("Should coexist with other settings", function () {
@@ -79,6 +85,9 @@ describe("setQuerySettings with queryKnobs", function () {
                 return qsutils.getQuerySettings({filter: {representativeQuery}});
             })
             .at(0)?.settings;
-        assert(bsonWoCompare(roundTrippedSettings, settings) === 0, {roundTrippedSettings, settings});
+        assert(bsonWoCompare(roundTrippedSettings, settings) === 0, {
+            roundTrippedSettings,
+            settings,
+        });
     });
 });

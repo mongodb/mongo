@@ -49,7 +49,12 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
     conn._setDummyDefaultSession();
     let configDB = conn.getDB("config");
     assert.commandFailed(configDB.transactions.remove({"_id.id": session.getSessionId().id}));
-    assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id}, {$set: {extraField: 1}}));
+    assert.commandFailed(
+        configDB.transactions.update(
+            {"_id.id": session.getSessionId().id},
+            {$set: {extraField: 1}},
+        ),
+    );
 }
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));

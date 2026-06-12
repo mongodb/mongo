@@ -102,7 +102,11 @@ A_test.createRole({
     roles: [],
     privileges: [{resource: {db: "test", collection: ""}, actions: ["dbStats"]}],
 });
-A_test.createUser({user: "spencer", pwd: "pwd", roles: ["myRole", {role: "replStatusRole", db: "admin"}]});
+A_test.createUser({
+    user: "spencer",
+    pwd: "pwd",
+    roles: ["myRole", {role: "replStatusRole", db: "admin"}],
+});
 
 A_admin.logout();
 B_admin.logout();
@@ -145,7 +149,11 @@ B_test.logout();
 
 // Modify the the user and role in a way that will be rolled back.
 assert(B_admin.auth("admin", "pwd"));
-B_test.grantPrivilegesToRole("myRole", [{resource: {db: "test", collection: "foo"}, actions: ["collStats"]}], {}); // Default write concern will wait for majority, which will time out.
+B_test.grantPrivilegesToRole(
+    "myRole",
+    [{resource: {db: "test", collection: "foo"}, actions: ["collStats"]}],
+    {},
+); // Default write concern will wait for majority, which will time out.
 B_test.createRole(
     {
         role: "temporaryRole",
@@ -195,7 +203,11 @@ jsTestLog("Doing writes that should persist after the rollback");
 A_admin.auth("userAdmin", "pwd");
 // Default write concern will wait for majority, which would time out
 // so we override it with an empty write concern
-A_test.grantPrivilegesToRole("myRole", [{resource: {db: "test", collection: "baz"}, actions: ["collStats"]}], {});
+A_test.grantPrivilegesToRole(
+    "myRole",
+    [{resource: {db: "test", collection: "baz"}, actions: ["collStats"]}],
+    {},
+);
 
 A_test.createRole(
     {

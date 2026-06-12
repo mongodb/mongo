@@ -51,7 +51,8 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
     // Setting index filters on idhack query is no-op for index filter command, but is a failure
     // for query settings command, therefore avoid specifying query settings and return success.
     const explain = assert.commandWorked(db.runCommand(getExplainCommand(queryInstance)));
-    const isIdHackQuery = explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+    const isIdHackQuery =
+        explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {
         return {ok: 1};
     }
@@ -98,7 +99,9 @@ function planCacheClearFiltersToRemoveAllQuerySettings(conn, cmdObj) {
         .aggregate(pipeline)
         .toArray()
         .forEach((queryShapeConfig, _) => {
-            assert.commandWorked(adminDb.runCommand({removeQuerySettings: queryShapeConfig.queryShapeHash}));
+            assert.commandWorked(
+                adminDb.runCommand({removeQuerySettings: queryShapeConfig.queryShapeHash}),
+            );
         });
     return {ok: 1};
 }
@@ -121,7 +124,8 @@ function planCacheListFiltersToDollarQuerySettings(conn, cmdObj) {
             query: queryShapeConfig.representativeQuery.filter,
             // Remove the previously added '$natural' hints to ensure that the results match the
             // expected output.
-            indexes: queryShapeConfig.settings.indexHints[0].allowedIndexes.filter(isNotNaturalHint),
+            indexes:
+                queryShapeConfig.settings.indexHints[0].allowedIndexes.filter(isNotNaturalHint),
         };
         addOptionalQueryFields(queryShapeConfig.representativeQuery, indexFilter);
         return indexFilter;
@@ -137,7 +141,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         case "drop": {
             // Remove all query settings associated with that collection upon collection drop. This
             // is the semantics of index filters.
-            planCacheClearFiltersToRemoveAllQuerySettings(conn, {planCacheClearFilters: cmdObj.drop});
+            planCacheClearFiltersToRemoveAllQuerySettings(conn, {
+                planCacheClearFilters: cmdObj.drop,
+            });
 
             // Drop the collection.
             return clientFunction.apply(conn, makeFuncArgs(cmdObj));

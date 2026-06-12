@@ -194,9 +194,13 @@ if (checkSbeFullyEnabled(db)) {
             .explain();
         const limitStage = getPlanStage(getWinningPlanFromExplain(explain), "LIMIT");
         assert.neq(limitStage, null, "expected a LIMIT stage", {explain});
-        assert(limitStage.hasOwnProperty("cardinalityEstimate"), "LIMIT stage missing CE", {limitStage});
+        assert(limitStage.hasOwnProperty("cardinalityEstimate"), "LIMIT stage missing CE", {
+            limitStage,
+        });
         const childStage = limitStage.inputStage;
-        assert(childStage.hasOwnProperty("cardinalityEstimate"), "child stage missing CE", {childStage});
+        assert(childStage.hasOwnProperty("cardinalityEstimate"), "child stage missing CE", {
+            childStage,
+        });
 
         // A LIMIT node cannot produce more rows than its input. Compare exactly, not via the fuzzy
         // ceEqual(): before the fix the LIMIT estimate (112) exceeds its child (≈111.979) by less

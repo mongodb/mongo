@@ -42,7 +42,12 @@ function testRetryExecutedWrite(rst) {
     const originalRes = assert.commandWorked(db.runCommand(originalCmdObj));
     assert.eq(originalRes.n, 1, originalRes);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 
     // Retry deleteOp0 with the same sampleId but batched with the new deleteOp1.
     const retryCmdObj0 = Object.assign({}, originalCmdObj);
@@ -50,13 +55,20 @@ function testRetryExecutedWrite(rst) {
     expectedSampledQueryDocs.push({
         sampleId: deleteOp1.sampleId,
         cmdName: "delete",
-        cmdObj: Object.assign(QuerySamplingUtil.makeCmdObjIgnoreSessionInfo(retryCmdObj0), {deletes: [deleteOp1]}),
+        cmdObj: Object.assign(QuerySamplingUtil.makeCmdObjIgnoreSessionInfo(retryCmdObj0), {
+            deletes: [deleteOp1],
+        }),
     });
 
     const retryRes0 = assert.commandWorked(db.runCommand(retryCmdObj0));
     assert.eq(retryRes0.n, 2, retryRes0);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 
     // Retry both deleteOp0 and deleteOp1 different sampleIds.
     const retryCmdObj1 = Object.assign({}, retryCmdObj0);
@@ -71,7 +83,12 @@ function testRetryExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 }
 
 function testRetryUnExecutedWrite(rst) {
@@ -103,7 +120,12 @@ function testRetryUnExecutedWrite(rst) {
     // The delete fails after it has been added to the sample buffer.
     assert.commandFailedWithCode(db.runCommand(originalCmdObj), ErrorCodes.InternalError);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 
     fp.off();
 
@@ -115,7 +137,12 @@ function testRetryUnExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 }
 
 const st = new ShardingTest({

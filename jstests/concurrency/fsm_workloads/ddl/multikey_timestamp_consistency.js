@@ -110,7 +110,10 @@ export const $config = (function () {
     // when there was no leftover transaction (e.g. for non-txn states).
     function tolerateCollDropError(state, e) {
         if (!isCollDropError(e)) return false;
-        assert.commandWorkedOrFailedWithCode(state.session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandWorkedOrFailedWithCode(
+            state.session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
         return true;
     }
     const IndexType = Object.freeze({REGULAR: "regular", WILDCARD: "wildcard"});
@@ -179,7 +182,8 @@ export const $config = (function () {
             // SBE wraps the QuerySolutionNode tree under a 'queryPlan' field; recurse into it.
             function findWcIxscan(plan) {
                 if (!plan) return null;
-                if (plan.stage === "IXSCAN" && plan.keyPattern && plan.keyPattern["$_path"]) return plan;
+                if (plan.stage === "IXSCAN" && plan.keyPattern && plan.keyPattern["$_path"])
+                    return plan;
                 if (plan.queryPlan) {
                     const r = findWcIxscan(plan.queryPlan);
                     if (r) return r;
@@ -195,7 +199,9 @@ export const $config = (function () {
             }
             const ixscan = findWcIxscan(explain.queryPlanner.winningPlan);
             if (!ixscan) return [];
-            return ixscan.multiKeyPaths && ixscan.multiKeyPaths[fieldName] ? ixscan.multiKeyPaths[fieldName] : [];
+            return ixscan.multiKeyPaths && ixscan.multiKeyPaths[fieldName]
+                ? ixscan.multiKeyPaths[fieldName]
+                : [];
         } catch (e) {
             return undefined;
         }
@@ -299,7 +305,12 @@ export const $config = (function () {
                     assert.eq(
                         pIdx.multikey,
                         sIdx.multikey,
-                        "Index multikey flag mismatch at ts " + tojson(ts) + " for " + collName + " field " + fieldName,
+                        "Index multikey flag mismatch at ts " +
+                            tojson(ts) +
+                            " for " +
+                            collName +
+                            " field " +
+                            fieldName,
                     );
                     continue;
                 }
@@ -318,8 +329,22 @@ export const $config = (function () {
                             fieldName,
                     );
                 } else {
-                    const pPaths = getWildcardMultikeyPaths(primary, dbName, collName, ts, wildcardHint, fieldName);
-                    const sPaths = getWildcardMultikeyPaths(secondary, dbName, collName, ts, wildcardHint, fieldName);
+                    const pPaths = getWildcardMultikeyPaths(
+                        primary,
+                        dbName,
+                        collName,
+                        ts,
+                        wildcardHint,
+                        fieldName,
+                    );
+                    const sPaths = getWildcardMultikeyPaths(
+                        secondary,
+                        dbName,
+                        collName,
+                        ts,
+                        wildcardHint,
+                        fieldName,
+                    );
                     if (pPaths === undefined || sPaths === undefined) continue;
                     assert.sameMembers(
                         pPaths,
@@ -356,7 +381,15 @@ export const $config = (function () {
     // After a transaction commits, locates the applyOps oplog entry matching `oplogElemMatch`,
     // computes the prior timestamp, and asserts multikey consistency between primary and
     // secondary at both timestamps for the given fields.
-    function verifyTxnMultikey(state, db, myCollName, oplogElemMatch, indexType, wildcardHint, fields) {
+    function verifyTxnMultikey(
+        state,
+        db,
+        myCollName,
+        oplogElemMatch,
+        indexType,
+        wildcardHint,
+        fields,
+    ) {
         const primary = db.getMongo();
         const dbName = db.getName();
         const txnEntry = findTxnOplogEntry(primary, oplogElemMatch);
@@ -380,7 +413,16 @@ export const $config = (function () {
     // After a sequence of non-transactional ops, locates the first and last oplog entries
     // matching `firstMatch` / `lastMatch`, computes the prior timestamp, and asserts multikey
     // consistency between primary and secondary.
-    function verifyDirectMultikey(state, db, myCollName, firstMatch, lastMatch, indexType, wildcardHint, fields) {
+    function verifyDirectMultikey(
+        state,
+        db,
+        myCollName,
+        firstMatch,
+        lastMatch,
+        indexType,
+        wildcardHint,
+        fields,
+    ) {
         const primary = db.getMongo();
         const dbName = db.getName();
         const firstEntry = findOplogEntry(primary, firstMatch);
@@ -417,7 +459,10 @@ export const $config = (function () {
 
         // --- Transactional states (timestamp-consistent, assert on mismatch) ---
 
-        createCollAndInsertWildcardMkInTxn: function createCollAndInsertWildcardMkInTxn(db, collName) {
+        createCollAndInsertWildcardMkInTxn: function createCollAndInsertWildcardMkInTxn(
+            db,
+            collName,
+        ) {
             const myCollName = collPrefix + "wc_txn_" + this.tid + "_" + this.insertCount;
             this.insertCount++;
 
@@ -429,17 +474,30 @@ export const $config = (function () {
                 assert.commandWorked(this.session.commitTransaction_forTesting());
             } catch (e) {
                 this.session.abortTransaction_forTesting();
-                if (e.hasOwnProperty("errorLabels") && e.errorLabels.includes("TransientTransactionError")) return;
+                if (
+                    e.hasOwnProperty("errorLabels") &&
+                    e.errorLabels.includes("TransientTransactionError")
+                )
+                    return;
                 throw e;
             }
 
             const dbName = db.getName();
-            verifyTxnMultikey(this, db, myCollName, {ns: dbName + "." + myCollName}, IndexType.WILDCARD, {"$**": 1}, [
-                "a",
-            ]);
+            verifyTxnMultikey(
+                this,
+                db,
+                myCollName,
+                {ns: dbName + "." + myCollName},
+                IndexType.WILDCARD,
+                {"$**": 1},
+                ["a"],
+            );
         },
 
-        createCollAndInsertRegularMkInTxn: function createCollAndInsertRegularMkInTxn(db, collName) {
+        createCollAndInsertRegularMkInTxn: function createCollAndInsertRegularMkInTxn(
+            db,
+            collName,
+        ) {
             const myCollName = collPrefix + "reg_txn_" + this.tid + "_" + this.insertCount;
             this.insertCount++;
 
@@ -451,15 +509,30 @@ export const $config = (function () {
                 assert.commandWorked(this.session.commitTransaction_forTesting());
             } catch (e) {
                 this.session.abortTransaction_forTesting();
-                if (e.hasOwnProperty("errorLabels") && e.errorLabels.includes("TransientTransactionError")) return;
+                if (
+                    e.hasOwnProperty("errorLabels") &&
+                    e.errorLabels.includes("TransientTransactionError")
+                )
+                    return;
                 throw e;
             }
 
             const dbName = db.getName();
-            verifyTxnMultikey(this, db, myCollName, {ns: dbName + "." + myCollName}, IndexType.REGULAR, null, ["a"]);
+            verifyTxnMultikey(
+                this,
+                db,
+                myCollName,
+                {ns: dbName + "." + myCollName},
+                IndexType.REGULAR,
+                null,
+                ["a"],
+            );
         },
 
-        createCollAndUpdateWildcardMkInTxn: function createCollAndUpdateWildcardMkInTxn(db, collName) {
+        createCollAndUpdateWildcardMkInTxn: function createCollAndUpdateWildcardMkInTxn(
+            db,
+            collName,
+        ) {
             const myCollName = collPrefix + "wc_txn_upd_" + this.tid + "_" + this.insertCount;
             this.insertCount++;
 
@@ -468,21 +541,36 @@ export const $config = (function () {
                 assert.commandWorked(this.sessionDb.createCollection(myCollName));
                 assert.commandWorked(this.sessionDb[myCollName].createIndex({"$**": 1}));
                 assert.commandWorked(this.sessionDb[myCollName].insert({_id: 1, a: 1}));
-                assert.commandWorked(this.sessionDb[myCollName].update({_id: 1}, {$set: {a: [1, 2]}}));
+                assert.commandWorked(
+                    this.sessionDb[myCollName].update({_id: 1}, {$set: {a: [1, 2]}}),
+                );
                 assert.commandWorked(this.session.commitTransaction_forTesting());
             } catch (e) {
                 this.session.abortTransaction_forTesting();
-                if (e.hasOwnProperty("errorLabels") && e.errorLabels.includes("TransientTransactionError")) return;
+                if (
+                    e.hasOwnProperty("errorLabels") &&
+                    e.errorLabels.includes("TransientTransactionError")
+                )
+                    return;
                 throw e;
             }
 
             const dbName = db.getName();
-            verifyTxnMultikey(this, db, myCollName, {ns: dbName + "." + myCollName}, IndexType.WILDCARD, {"$**": 1}, [
-                "a",
-            ]);
+            verifyTxnMultikey(
+                this,
+                db,
+                myCollName,
+                {ns: dbName + "." + myCollName},
+                IndexType.WILDCARD,
+                {"$**": 1},
+                ["a"],
+            );
         },
 
-        createCollAndUpdateRegularMkInTxn: function createCollAndUpdateRegularMkInTxn(db, collName) {
+        createCollAndUpdateRegularMkInTxn: function createCollAndUpdateRegularMkInTxn(
+            db,
+            collName,
+        ) {
             const myCollName = collPrefix + "reg_txn_upd_" + this.tid + "_" + this.insertCount;
             this.insertCount++;
 
@@ -491,16 +579,30 @@ export const $config = (function () {
                 assert.commandWorked(this.sessionDb.createCollection(myCollName));
                 assert.commandWorked(this.sessionDb[myCollName].createIndex({a: 1}));
                 assert.commandWorked(this.sessionDb[myCollName].insert({_id: 1, a: 1}));
-                assert.commandWorked(this.sessionDb[myCollName].update({_id: 1}, {$set: {a: [1, 2]}}));
+                assert.commandWorked(
+                    this.sessionDb[myCollName].update({_id: 1}, {$set: {a: [1, 2]}}),
+                );
                 assert.commandWorked(this.session.commitTransaction_forTesting());
             } catch (e) {
                 this.session.abortTransaction_forTesting();
-                if (e.hasOwnProperty("errorLabels") && e.errorLabels.includes("TransientTransactionError")) return;
+                if (
+                    e.hasOwnProperty("errorLabels") &&
+                    e.errorLabels.includes("TransientTransactionError")
+                )
+                    return;
                 throw e;
             }
 
             const dbName = db.getName();
-            verifyTxnMultikey(this, db, myCollName, {ns: dbName + "." + myCollName}, IndexType.REGULAR, null, ["a"]);
+            verifyTxnMultikey(
+                this,
+                db,
+                myCollName,
+                {ns: dbName + "." + myCollName},
+                IndexType.REGULAR,
+                null,
+                ["a"],
+            );
         },
 
         insertWildcardMkInTxn: function insertWildcardMkInTxn(db, collName) {
@@ -514,7 +616,10 @@ export const $config = (function () {
                     () => {
                         for (let i = 0; i < fields.length; i++) {
                             assert.commandWorked(
-                                this.sessionDb[myCollName].insert({[fields[i]]: [1, 2], _marker: markers[i]}),
+                                this.sessionDb[myCollName].insert({
+                                    [fields[i]]: [1, 2],
+                                    _marker: markers[i],
+                                }),
                             );
                         }
                     },
@@ -551,7 +656,10 @@ export const $config = (function () {
                     () => {
                         for (let i = 0; i < fields.length; i++) {
                             assert.commandWorked(
-                                this.sessionDb[myCollName].insert({[fields[i]]: [1, 2], _marker: markers[i]}),
+                                this.sessionDb[myCollName].insert({
+                                    [fields[i]]: [1, 2],
+                                    _marker: markers[i],
+                                }),
                             );
                         }
                     },
@@ -597,7 +705,10 @@ export const $config = (function () {
                     () => {
                         for (let i = 0; i < fields.length; i++) {
                             assert.commandWorked(
-                                this.sessionDb[myCollName].update({_id: docIds[i]}, {$set: {[fields[i]]: [1, 2]}}),
+                                this.sessionDb[myCollName].update(
+                                    {_id: docIds[i]},
+                                    {$set: {[fields[i]]: [1, 2]}},
+                                ),
                             );
                         }
                     },
@@ -643,7 +754,10 @@ export const $config = (function () {
                     () => {
                         for (let i = 0; i < fields.length; i++) {
                             assert.commandWorked(
-                                this.sessionDb[myCollName].update({_id: docIds[i]}, {$set: {[fields[i]]: [1, 2]}}),
+                                this.sessionDb[myCollName].update(
+                                    {_id: docIds[i]},
+                                    {$set: {[fields[i]]: [1, 2]}},
+                                ),
                             );
                         }
                     },
@@ -678,7 +792,9 @@ export const $config = (function () {
 
             try {
                 for (let i = 0; i < fields.length; i++) {
-                    assert.commandWorked(db[myCollName].insert({[fields[i]]: [1, 2], _marker: markers[i]}));
+                    assert.commandWorked(
+                        db[myCollName].insert({[fields[i]]: [1, 2], _marker: markers[i]}),
+                    );
                 }
             } catch (e) {
                 if (tolerateCollDropError(this, e)) return;
@@ -705,7 +821,9 @@ export const $config = (function () {
 
             try {
                 for (let i = 0; i < fields.length; i++) {
-                    assert.commandWorked(db[myCollName].insert({[fields[i]]: [1, 2], _marker: markers[i]}));
+                    assert.commandWorked(
+                        db[myCollName].insert({[fields[i]]: [1, 2], _marker: markers[i]}),
+                    );
                 }
             } catch (e) {
                 if (tolerateCollDropError(this, e)) return;
@@ -735,7 +853,9 @@ export const $config = (function () {
                     assert.commandWorked(db[myCollName].insert({_id: docIds[i], [fields[i]]: 1}));
                 }
                 for (let i = 0; i < fields.length; i++) {
-                    assert.commandWorked(db[myCollName].update({_id: docIds[i]}, {$set: {[fields[i]]: [1, 2]}}));
+                    assert.commandWorked(
+                        db[myCollName].update({_id: docIds[i]}, {$set: {[fields[i]]: [1, 2]}}),
+                    );
                 }
             } catch (e) {
                 if (tolerateCollDropError(this, e)) return;
@@ -765,7 +885,9 @@ export const $config = (function () {
                     assert.commandWorked(db[myCollName].insert({_id: docIds[i], [fields[i]]: 1}));
                 }
                 for (let i = 0; i < fields.length; i++) {
-                    assert.commandWorked(db[myCollName].update({_id: docIds[i]}, {$set: {[fields[i]]: [1, 2]}}));
+                    assert.commandWorked(
+                        db[myCollName].update({_id: docIds[i]}, {$set: {[fields[i]]: [1, 2]}}),
+                    );
                 }
             } catch (e) {
                 if (tolerateCollDropError(this, e)) return;
@@ -794,7 +916,10 @@ export const $config = (function () {
 
             // Tolerate IndexBuildAborted: another thread may drop the coll again while these
             // index builds are running.
-            assert.commandWorkedOrFailedWithCode(db[myCollName].createIndex({"$**": 1}), ErrorCodes.IndexBuildAborted);
+            assert.commandWorkedOrFailedWithCode(
+                db[myCollName].createIndex({"$**": 1}),
+                ErrorCodes.IndexBuildAborted,
+            );
             for (const f of REGULAR_INDEX_FIELDS) {
                 assert.commandWorkedOrFailedWithCode(
                     db[myCollName].createIndex({[f]: 1}),
@@ -820,12 +945,17 @@ export const $config = (function () {
                 ErrorCodes.IndexNotFound,
                 ErrorCodes.NamespaceNotFound,
             ]);
-            assert.commandWorkedOrFailedWithCode(db[myCollName].createIndex(target), ErrorCodes.IndexBuildAborted);
+            assert.commandWorkedOrFailedWithCode(
+                db[myCollName].createIndex(target),
+                ErrorCodes.IndexBuildAborted,
+            );
         },
 
         // Batch pressure.
         insertNoise: function insertNoise(db, collName) {
-            assert.commandWorked(db["padding_noise"].insert({noise: Random.randInt(100000), tid: this.tid}));
+            assert.commandWorked(
+                db["padding_noise"].insert({noise: Random.randInt(100000), tid: this.tid}),
+            );
         },
     };
 

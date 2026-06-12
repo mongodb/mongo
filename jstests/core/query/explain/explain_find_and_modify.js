@@ -83,7 +83,12 @@ assert.commandWorked(res);
 assert.eq(t.findOne(), onlyDoc, "Explaining an update should not update any documents.");
 
 // Explaining an upsert should not insert anything.
-let matchingUpsertCmd = {findAndModify: cName, update: {x: "x"}, query: {_id: "non-match"}, upsert: true};
+let matchingUpsertCmd = {
+    findAndModify: cName,
+    update: {x: "x"},
+    query: {_id: "non-match"},
+    upsert: true,
+};
 var res = db.runCommand({explain: matchingUpsertCmd});
 assert.commandWorked(res);
 assert.eq(t.find().itcount(), 1, "Explaining an upsert should not insert any documents.");
@@ -270,11 +275,20 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
         let totalFieldName = isRootLevel ? key : currentPath + "." + key;
         assert(
             explainOut.hasOwnProperty(key),
-            preMsg + "Explain's output does not have a value for " + key + "\n" + tojson(explainOut),
+            preMsg +
+                "Explain's output does not have a value for " +
+                key +
+                "\n" +
+                tojson(explainOut),
         );
         if (typeof expectedMatches[key] === "object") {
             // Sub-doc, recurse to match on it's fields
-            assertExplainResultsMatch(explainOut[key], expectedMatches[key], preMsg, totalFieldName);
+            assertExplainResultsMatch(
+                explainOut[key],
+                expectedMatches[key],
+                preMsg,
+                totalFieldName,
+            );
         } else if (key == "stage" && expectedMatches[key] == "UPDATE") {
             // Express handles update-by-id post 8.0
             let want = [expectedMatches[key], "EXPRESS_UPDATE"];
@@ -355,7 +369,11 @@ function assertExplainMatchedAllVerbosities(findAndModifyArgs, expectedResult) {
 }
 
 function assertDBDoesNotExist(db, msg) {
-    assert.eq(db.getMongo().getDBNames().indexOf(db.getName()), -1, msg + "db " + db.getName() + " exists.");
+    assert.eq(
+        db.getMongo().getDBNames().indexOf(db.getName()),
+        -1,
+        msg + "db " + db.getName() + " exists.",
+    );
 }
 
 function assertCollDoesNotExist(cName, msg) {

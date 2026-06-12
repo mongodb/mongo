@@ -31,7 +31,9 @@ export const $config = (function () {
             const targetFCV = fcvValues[Random.randInt(2)];
             jsTest.log.info("Executing FCV state, setting to:" + targetFCV);
             try {
-                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+                assert.commandWorked(
+                    db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+                );
             } catch (e) {
                 if (handleRandomSetFCVErrors(e, targetFCV)) return;
                 throw e;
@@ -71,7 +73,9 @@ export const $config = (function () {
 
     const setup = function (db, collName, cluster) {
         db[collName].drop();
-        assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+        assert.commandWorked(
+            db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+        );
         assert.commandWorked(db[collName].insert({t: new Date(), temp: 42}));
     };
     const teardown = function (db, collName, cluster) {
@@ -85,7 +89,9 @@ export const $config = (function () {
             10778001,
         );
 
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
 
     return {

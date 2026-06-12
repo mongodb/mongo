@@ -15,7 +15,10 @@ const bucketsCollName = "system.buckets." + tsCollName;
 
 const newViewName = "newView";
 assert.commandWorked(testDB.runCommand({drop: newViewName}));
-assert.commandFailedWithCode(testDB.createView(newViewName, bucketsCollName, []), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(
+    testDB.createView(newViewName, bucketsCollName, []),
+    ErrorCodes.InvalidNamespace,
+);
 
 const existingViewName = "existingView";
 assert.commandWorked(testDB.runCommand({drop: existingViewName}));

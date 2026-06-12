@@ -51,7 +51,10 @@ function getAllChunks(configDB, ns, keyPattern) {
         while (chunksCursor.objsLeftInBatch()) {
             chunkArray.push(chunksCursor.next());
         }
-        chunksCursor = findChunksUtil.findChunksByNs(configDB, ns).sort(keyPattern).skip(chunkArray.length);
+        chunksCursor = findChunksUtil
+            .findChunksByNs(configDB, ns)
+            .sort(keyPattern)
+            .skip(chunkArray.length);
     }
     return chunkArray;
 }
@@ -79,8 +82,13 @@ export const $config = (function () {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
             const configDB = randomDB.getSiblingDB("config");
-            const chunksJoinClause = findChunksUtil.getChunksJoinClause(configDB, randomColl.getFullName());
-            const randomChunk = configDB.chunks.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}]).next();
+            const chunksJoinClause = findChunksUtil.getChunksJoinClause(
+                configDB,
+                randomColl.getFullName(),
+            );
+            const randomChunk = configDB.chunks
+                .aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
+                .next();
             const fromShard = randomChunk.shard;
             const bounds = [randomChunk.min, randomChunk.max];
             const zoneForChunk = defragmentationUtil.getZoneForRange(
@@ -96,7 +104,10 @@ export const $config = (function () {
             if (zoneForChunk !== null) {
                 shardFilter["tag"] = zoneForChunk;
             }
-            const shardCursor = configDB.shards.aggregate([{$match: shardFilter}, {$sample: {size: 1}}]);
+            const shardCursor = configDB.shards.aggregate([
+                {$match: shardFilter},
+                {$sample: {size: 1}},
+            ]);
             if (!shardCursor.hasNext()) {
                 return;
             }
@@ -105,7 +116,12 @@ export const $config = (function () {
             // Issue a moveChunk command.
             try {
                 ChunkHelper.moveChunk(randomDB, randomColl.getName(), bounds, toShard["_id"], true);
-                jsTest.log("Manual move chunk of chunk " + tojson(randomChunk) + " to shard " + toShard["_id"]);
+                jsTest.log(
+                    "Manual move chunk of chunk " +
+                        tojson(randomChunk) +
+                        " to shard " +
+                        toShard["_id"],
+                );
             } catch (e) {
                 jsTest.log("Ignoring manual move chunk error: " + tojson(e));
             }
@@ -169,12 +185,17 @@ export const $config = (function () {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
             const configDB = randomDB.getSiblingDB("config");
-            const chunksJoinClause = findChunksUtil.getChunksJoinClause(configDB, randomColl.getFullName());
+            const chunksJoinClause = findChunksUtil.getChunksJoinClause(
+                configDB,
+                randomColl.getFullName(),
+            );
             const randomChunk = configDB.chunks
                 .aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
                 .toArray()[0];
             try {
-                assert.commandWorked(db.adminCommand({split: randomColl.getFullName(), find: randomChunk.min}));
+                assert.commandWorked(
+                    db.adminCommand({split: randomColl.getFullName(), find: randomChunk.min}),
+                );
                 jsTest.log("Manual split chunk of chunk " + tojson(randomChunk));
             } catch (e) {
                 jsTest.log("Ignoring manual split chunk error: " + tojson(e));
@@ -185,11 +206,17 @@ export const $config = (function () {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
             const configDB = randomDB.getSiblingDB("config");
-            const extendedShardKey = getExtendedCollectionShardKey(configDB, randomColl.getFullName());
+            const extendedShardKey = getExtendedCollectionShardKey(
+                configDB,
+                randomColl.getFullName(),
+            );
             try {
                 assert.commandWorked(randomColl.createIndex(extendedShardKey));
                 assert.commandWorked(
-                    randomDB.adminCommand({refineCollectionShardKey: randomColl.getFullName(), key: extendedShardKey}),
+                    randomDB.adminCommand({
+                        refineCollectionShardKey: randomColl.getFullName(),
+                        key: extendedShardKey,
+                    }),
                 );
                 jsTest.log(
                     "Manual refine shard key for collection " +
@@ -227,7 +254,10 @@ export const $config = (function () {
             // balancer taking correct decisions.
             if (defaultBalancerShouldReturnRandomMigrations === 1) {
                 assert.commandWorked(
-                    db.adminCommand({configureFailPoint: "balancerShouldReturnRandomMigrations", mode: "off"}),
+                    db.adminCommand({
+                        configureFailPoint: "balancerShouldReturnRandomMigrations",
+                        mode: "off",
+                    }),
                 );
             }
         });
@@ -275,7 +305,9 @@ export const $config = (function () {
                 }),
             )["balancerMigrationsThrottlingMs"];
 
-            assert.commandWorked(db.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 100}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 100}),
+            );
         });
 
         for (let i = 0; i < dbCount; i++) {
@@ -286,12 +318,16 @@ export const $config = (function () {
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
                 // Enable balancing and wait for balanced
                 assert.commandWorked(
-                    mongos.getDB("config").collections.update({_id: fullNs}, {$set: {"noBalance": false}}),
+                    mongos
+                        .getDB("config")
+                        .collections.update({_id: fullNs}, {$set: {"noBalance": false}}),
                 );
                 sh.awaitCollectionBalance(mongos.getCollection(fullNs), 300000 /* 5 minutes */);
                 // Re-disable balancing
                 assert.commandWorked(
-                    mongos.getDB("config").collections.update({_id: fullNs}, {$set: {"noBalance": true}}),
+                    mongos
+                        .getDB("config")
+                        .collections.update({_id: fullNs}, {$set: {"noBalance": true}}),
                 );
                 // Begin defragmentation again
                 assert.commandWorked(
@@ -315,7 +351,8 @@ export const $config = (function () {
                     assert.commandWorked(
                         db.adminCommand({
                             setParameter: 1,
-                            chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS,
+                            chunkDefragmentationThrottlingMS:
+                                defaultChunkDefragmentationThrottlingMS,
                         }),
                     );
                 });

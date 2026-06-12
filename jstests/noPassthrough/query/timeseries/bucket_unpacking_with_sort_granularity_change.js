@@ -23,7 +23,10 @@ const off = "off";
 
 function setAggHang(mode) {
     assert.commandWorked(
-        adminDB.adminCommand({configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}),
+        adminDB.adminCommand({
+            configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch",
+            mode: mode,
+        }),
     );
 }
 

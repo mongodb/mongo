@@ -40,11 +40,17 @@ function checkSlowLogTimeFieldsWithUserCacheAttrs(conn, command, userCacheAttrs)
     }
 
     let messagesOrig = checkLog.getFilteredLogMessages(conn, slowLogID, expectedLog, null, true);
-    assert.eq(messagesOrig.length, 1, "We should get one matched slow log with filter :" + tojson(expectedLog));
+    assert.eq(
+        messagesOrig.length,
+        1,
+        "We should get one matched slow log with filter :" + tojson(expectedLog),
+    );
 
     let message = messagesOrig[0];
     assert(message.attr.authorization.hasOwnProperty("userCacheWaitTimeMicros"));
-    let userCacheWaitTimeMillis = Math.floor(message.attr.authorization.userCacheWaitTimeMicros / 1000);
+    let userCacheWaitTimeMillis = Math.floor(
+        message.attr.authorization.userCacheWaitTimeMicros / 1000,
+    );
     let durationMillis = message.attr.durationMillis;
     let workingMillis = message.attr.workingMillis;
 
@@ -101,7 +107,9 @@ function runTest(conn, mode) {
         testDB.setProfilingLevel(2);
     }
 
-    assert.commandWorked(testDB.runCommand({createUser: "testUser", pwd: "pwd", roles: ["readWrite", "userAdmin"]}));
+    assert.commandWorked(
+        testDB.runCommand({createUser: "testUser", pwd: "pwd", roles: ["readWrite", "userAdmin"]}),
+    );
 
     // Launch a parallel shell to perform an insert operation while authenticated as 'testUser'.
     let awaitOps = startParallelShell(function () {
@@ -121,7 +129,11 @@ function runTest(conn, mode) {
             }),
         );
         assert.commandWorked(
-            testDB.runCommand({grantRolesToUser: "testUser", roles: ["read"], writeConcern: {w: "majority"}}),
+            testDB.runCommand({
+                grantRolesToUser: "testUser",
+                roles: ["read"],
+                writeConcern: {w: "majority"},
+            }),
         );
         assert.commandWorked(testDB.runCommand({find: "coll"}));
     }, conn.port);
@@ -150,7 +162,11 @@ function runTest(conn, mode) {
     // Check that there's a log for the successful find command that had to access to the user
     // cache.
     hasCommandLogEntry(conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
-    checkSlowLogTimeFieldsWithUserCacheAttrs(conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
+    checkSlowLogTimeFieldsWithUserCacheAttrs(
+        conn,
+        expectedFindCommandLog,
+        expectedCommandWithUserCacheAttrs,
+    );
 
     // Check that there is also a document for the successful find command with authorization stats
     // in system.profile when profiling is enabled on standalones.

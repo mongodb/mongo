@@ -67,12 +67,18 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
         // shard0: [-inf, 0)
         // shard1: [0, 10)
         // shard2: [10, +inf)
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: participant0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: participant0.shardName}),
+        );
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}),
+        );
 
         flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -95,7 +101,11 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
         clearRawMongoProgramOutput();
     };
 
-    const testCommitProtocol = function (makeAParticipantAbort, failpointData, expectAbortResponse) {
+    const testCommitProtocol = function (
+        makeAParticipantAbort,
+        failpointData,
+        expectAbortResponse,
+    ) {
         jsTest.log(
             "Testing commit protocol with sameNodeStepsUpAfterFailover: " +
                 sameNodeStepsUpAfterFailover +
@@ -149,10 +159,15 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
         }
         commitThread.start();
 
-        waitForFailpoint("Hit " + failpointData.failpoint + " failpoint", failpointData.numTimesShouldBeHit);
+        waitForFailpoint(
+            "Hit " + failpointData.failpoint + " failpoint",
+            failpointData.numTimesShouldBeHit,
+        );
 
         // Induce the coordinator primary to step down.
-        assert.commandWorked(coordPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            coordPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
         assert.commandWorked(coordPrimary.adminCommand({replSetFreeze: 0}));
         assert.commandWorked(coordPrimary.adminCommand({replSetStepUp: 1}));
 
@@ -212,7 +227,11 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
         cleanUp();
     };
 
-    const testCommitProtocolWithRetry = function (makeAParticipantAbort, failpointData, expectAbortResponse) {
+    const testCommitProtocolWithRetry = function (
+        makeAParticipantAbort,
+        failpointData,
+        expectAbortResponse,
+    ) {
         const maxIterations = 5;
         let numIterations = 0;
 
@@ -221,7 +240,10 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
                 testCommitProtocol(makeAParticipantAbort, failpointData, expectAbortResponse);
                 break;
             } catch (err) {
-                if (numIterations == maxIterations - 1 || !TxnUtil.isTransientTransactionError(err)) {
+                if (
+                    numIterations == maxIterations - 1 ||
+                    !TxnUtil.isTransientTransactionError(err)
+                ) {
                     throw err;
                 }
 
@@ -229,7 +251,9 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
                 numIterations += 1;
             }
 
-            jsTest.log("Received an error with label TransientTransactionError. Retry: " + numIterations);
+            jsTest.log(
+                "Received an error with label TransientTransactionError. Retry: " + numIterations,
+            );
         }
     };
 
@@ -258,7 +282,11 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
             failpointData.failpoint == "hangBeforeWritingParticipantList" ||
             (failpointData.failpoint == "hangWhileTargetingLocalHost" &&
                 failpointData.data.twoPhaseCommitStage == "prepare");
-        testCommitProtocolWithRetry(false /* make a participant abort */, failpointData, expectAbort);
+        testCommitProtocolWithRetry(
+            false /* make a participant abort */,
+            failpointData,
+            expectAbort,
+        );
     });
     st.stop();
 };

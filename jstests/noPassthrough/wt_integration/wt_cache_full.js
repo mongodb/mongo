@@ -34,7 +34,11 @@ const coll = mydb.getCollection("t");
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const numDocs = 2;
@@ -56,11 +60,17 @@ const batchOpsLimit = assert.commandWorked(
     secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}),
 ).replBatchLimitOperations;
 jsTestLog(
-    "Oplog application on secondary " + secondary.host + " is limited to " + batchOpsLimit + " operations per batch.",
+    "Oplog application on secondary " +
+        secondary.host +
+        " is limited to " +
+        batchOpsLimit +
+        " operations per batch.",
 );
 
 jsTestLog("Buffering " + numUpdates + " updates to " + numDocs + " documents on secondary.");
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}),
+);
 for (let i = 0; i < numDocs; ++i) {
     for (let j = 0; j < numUpdates; ++j) {
         assert.commandWorked(coll.update({_id: i}, {$inc: {i: 1}}));

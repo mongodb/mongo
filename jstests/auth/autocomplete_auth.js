@@ -26,7 +26,9 @@ admin.getSiblingDB(testName).createRole({
     roles: [],
 });
 
-admin.getSiblingDB(testName).createUser({user: "coachPassenger", pwd: "password", roles: ["coachTicket"]});
+admin
+    .getSiblingDB(testName)
+    .createUser({user: "coachPassenger", pwd: "password", roles: ["coachTicket"]});
 
 const testDB = conn.getDB(testName);
 testDB.coachClass.insertOne({});
@@ -40,7 +42,10 @@ assert.commandFailedWithCode(db.runCommand({listCollections: 1}), authzErrorCode
 assert.commandWorked(db.runCommand({find: "coachClass"}));
 assert.commandFailedWithCode(db.runCommand({find: "businessClass"}), authzErrorCode);
 shellAutocomplete("db.");
-assert(__autocomplete__.includes("db.coachClass"), `Completions should include 'coachClass': ${__autocomplete__}`);
+assert(
+    __autocomplete__.includes("db.coachClass"),
+    `Completions should include 'coachClass': ${__autocomplete__}`,
+);
 assert(
     !__autocomplete__.includes("db.businessClass"),
     `Completions should NOT include 'businessClass': ${__autocomplete__}`,

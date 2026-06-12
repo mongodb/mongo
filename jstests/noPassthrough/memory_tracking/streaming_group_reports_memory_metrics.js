@@ -31,12 +31,16 @@ const collName = jsTestName();
 const ts = db[collName];
 ts.drop();
 
-assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "m"}}),
+);
 
 // The tests expect that memory metrics appear right after memory is used. Decrease the threshold
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
 // limit.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
+);
 
 const numTimes = 10;
 const numSymbols = 10;
@@ -100,7 +104,9 @@ const pipeline = [
     {$sort: {_id: 1}},
 ];
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 {
     jsTest.log.info("Running basic pipeline test : " + tojson(pipeline));
@@ -164,7 +170,10 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
     jsTest.log.info("Running basic pipeline test with spilling: " + tojson(pipeline));
     const lowMaxMemoryLimit = 100;
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: lowMaxMemoryLimit}),
+        db.adminCommand({
+            setParameter: 1,
+            internalDocumentSourceGroupMaxMemoryBytes: lowMaxMemoryLimit,
+        }),
     );
 
     runMemoryStatsTest({

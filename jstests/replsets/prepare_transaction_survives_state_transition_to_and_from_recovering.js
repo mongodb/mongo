@@ -49,7 +49,9 @@ jsTest.log.info("Putting secondary in maintenance mode so it will transition to 
 assert.commandWorked(secondary.adminCommand({replSetMaintenance: 1}));
 replSet.waitForState(secondary, ReplSetTest.State.RECOVERING);
 
-jsTest.log.info("Committing the second prepared transaction while a node is in the RECOVERING state");
+jsTest.log.info(
+    "Committing the second prepared transaction while a node is in the RECOVERING state",
+);
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
 replSet.awaitReplication();
@@ -78,7 +80,11 @@ assert.sameMembers(newPrimaryDB.getCollection(collName).find().toArray(), [{_id:
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    newPrimaryDB.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 1}}}], maxTimeMS: 5 * 1000}),
+    newPrimaryDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: {$set: {a: 1}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 

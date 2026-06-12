@@ -18,7 +18,12 @@ function setup_users(granter) {
         admin.runCommand({
             createUser: "admin",
             pwd: "admin",
-            roles: ["userAdminAnyDatabase", "dbAdminAnyDatabase", "clusterAdmin", "readWriteAnyDatabase"],
+            roles: [
+                "userAdminAnyDatabase",
+                "dbAdminAnyDatabase",
+                "clusterAdmin",
+                "readWriteAnyDatabase",
+            ],
         }),
     );
 
@@ -250,7 +255,12 @@ const keyfile = "jstests/libs/key1";
 
 {
     print("--- replica set test ---");
-    const rst = new ReplSetTest({name: "testset", nodes: 2, nodeOptions: {"auth": null}, keyFile: keyfile});
+    const rst = new ReplSetTest({
+        name: "testset",
+        nodes: 2,
+        nodeOptions: {"auth": null},
+        keyFile: keyfile,
+    });
 
     rst.startSet();
     rst.initiate();

@@ -27,7 +27,12 @@ let fullShard = st.getShard(coll, {_id: 1});
 let emptyShard = st.getShard(coll, {_id: -1});
 
 assert.commandWorked(
-    st.s0.adminCommand({moveChunk: "" + coll, find: {_id: -1}, to: fullShard.shardName, _waitForDelete: true}),
+    st.s0.adminCommand({
+        moveChunk: "" + coll,
+        find: {_id: -1},
+        to: fullShard.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 jsTestLog("Resetting shard version via first mongos...");

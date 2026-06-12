@@ -74,7 +74,9 @@ assertLastOplog({_id: 1}, null, "insert -- setup");
     const msg = "Implicitly versioned v1 entry: $set";
     const res = assert.commandWorked(
         primary.adminCommand({
-            "applyOps": [{"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$set": {"b": 1}}}],
+            "applyOps": [
+                {"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$set": {"b": 1}}},
+            ],
         }),
     );
     assert.eq(res.results, [true], msg);
@@ -85,7 +87,9 @@ assertLastOplog({_id: 1}, null, "insert -- setup");
     const msg = "Implicitly versioned v1 entry: $unset";
     const res = assert.commandWorked(
         primary.adminCommand({
-            "applyOps": [{"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$unset": {"b": ""}}}],
+            "applyOps": [
+                {"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$unset": {"b": ""}}},
+            ],
         }),
     );
     assert.eq(res.results, [true], msg);

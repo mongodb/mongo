@@ -35,8 +35,12 @@ assert.commandWorked(
     ]),
 );
 let viewName = "bestActressAwardsAfter1979";
-const bestActressViewPipeline = [{"$match": {"$expr": {"$and": [{"$gt": ["$year", 1979]}, {"$lt": ["$year", 1997]}]}}}];
-assert.commandWorked(testDb.createView(viewName, bestActressColl.getName(), bestActressViewPipeline));
+const bestActressViewPipeline = [
+    {"$match": {"$expr": {"$and": [{"$gt": ["$year", 1979]}, {"$lt": ["$year", 1997]}]}}},
+];
+assert.commandWorked(
+    testDb.createView(viewName, bestActressColl.getName(), bestActressViewPipeline),
+);
 const bestActressView = testDb[viewName];
 
 assert.commandWorked(
@@ -55,7 +59,9 @@ viewName = "bestPictureAwardsWithRottenTomatoScore";
 const bestPicturesViewPipeline = [
     {"$addFields": {rotten_tomatoes_score: {$ifNull: ["$rotten_tomatoes_score", "62%"]}}},
 ];
-assert.commandWorked(testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline));
+assert.commandWorked(
+    testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline),
+);
 const bestPictureView = testDb[viewName];
 
 assert.commandWorked(
@@ -71,7 +77,9 @@ assert.commandWorked(
     ]),
 );
 viewName = "bestActorAwardsBefore1979";
-const bestActorViewPipeline = [{"$match": {"$expr": {"$and": [{"$gt": ["$year", 1970]}, {"$lt": ["$year", 1979]}]}}}];
+const bestActorViewPipeline = [
+    {"$match": {"$expr": {"$and": [{"$gt": ["$year", 1970]}, {"$lt": ["$year", 1979]}]}}},
+];
 assert.commandWorked(testDb.createView(viewName, bestActorColl.getName(), bestActorViewPipeline));
 const bestActorView = testDb[viewName];
 
@@ -96,7 +104,9 @@ viewName = "bestDirectorAwardsWithBestOriginalScreenplay";
 const bestDirectorViewPipeline = [
     {"$addFields": {best_original_screenplay: {$ifNull: ["$best_original_screenplay", false]}}},
 ];
-assert.commandWorked(testDb.createView(viewName, bestDirectorColl.getName(), bestDirectorViewPipeline));
+assert.commandWorked(
+    testDb.createView(viewName, bestDirectorColl.getName(), bestDirectorViewPipeline),
+);
 const bestDirectorView = testDb[viewName];
 
 // Create search indexes for all views.
@@ -175,7 +185,9 @@ const unionWithNestedDeepTestCases = (isStoredSource) => {
                                                         },
                                                         {
                                                             $set: {
-                                                                source: bestDirectorView.getName() + "_inner",
+                                                                source:
+                                                                    bestDirectorView.getName() +
+                                                                    "_inner",
                                                             },
                                                         },
                                                     ],
@@ -239,15 +251,21 @@ const unionWithNestedDeepTestCases = (isStoredSource) => {
         },
     ];
 
-    validateSearchExplain(bestActressView, pipeline, isStoredSource, bestActressViewPipeline, (explain) => {
-        assertUnionWithSearchSubPipelineAppliedViews(
-            explain,
-            bestPictureColl,
-            bestPictureView.getName(),
-            bestPicturesViewPipeline,
-            isStoredSource,
-        );
-    });
+    validateSearchExplain(
+        bestActressView,
+        pipeline,
+        isStoredSource,
+        bestActressViewPipeline,
+        (explain) => {
+            assertUnionWithSearchSubPipelineAppliedViews(
+                explain,
+                bestPictureColl,
+                bestPictureView.getName(),
+                bestPicturesViewPipeline,
+                isStoredSource,
+            );
+        },
+    );
 
     const results = bestActressView.aggregate(pipeline).toArray();
     assertArrayEq({actual: results, expected: expectedResults});

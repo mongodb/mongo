@@ -80,7 +80,10 @@ while (1) {
         }
         let ex = t.find({i: 100}).limit(-1).explain("executionStats");
         printjson(ex);
-        assert(ex.executionStats.totalKeysExamined < 1000, "took too long to find 100: " + tojson(ex));
+        assert(
+            ex.executionStats.totalKeysExamined < 1000,
+            "took too long to find 100: " + tojson(ex),
+        );
 
         assert.commandWorked(t.remove({i: 40}, true)); // table scan
         assert.commandWorked(t.update({i: 10}, {i: -10})); // should scan 10

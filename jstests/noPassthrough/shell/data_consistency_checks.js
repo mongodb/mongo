@@ -23,7 +23,10 @@ function regexForValidateAndDBHashSlowQuery() {
 }
 
 function makePatternForDBHash(dbName) {
-    return new RegExp(`Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"db[Hh]ash`, "g");
+    return new RegExp(
+        `Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"db[Hh]ash`,
+        "g",
+    );
 }
 
 function makePatternForValidate(dbName, collName) {
@@ -210,13 +213,17 @@ function runDataConsistencyChecks(testCase) {
     assert.eq(
         2,
         countMatches(pattern, output),
-        "expected to find " + tojson(pattern) + " from each replica set shard node in the log output",
+        "expected to find " +
+            tojson(pattern) +
+            " from each replica set shard node in the log output",
     );
 
     pattern = makePatternForValidate("test", "mycoll");
     assert.eq(
         2,
         countMatches(pattern, output),
-        "expected to find " + tojson(pattern) + " from each replica set shard node in the log output",
+        "expected to find " +
+            tojson(pattern) +
+            " from each replica set shard node in the log output",
     );
 })();

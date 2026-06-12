@@ -32,12 +32,16 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDB
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 // Executes query0 and gets the corresponding system.profile entry.
@@ -46,7 +50,10 @@ assert.eq(
     coll.find({a: 1, b: 1}, {a: 1}).sort({a: -1}).comment("Query0 find command").itcount(),
     "unexpected document count",
 );
-const profileObj0 = getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query0 find command"});
+const profileObj0 = getLatestProfilerEntry(testDB, {
+    op: "query",
+    "command.comment": "Query0 find command",
+});
 assert(profileObj0.hasOwnProperty("planCacheKey"), tojson(profileObj0));
 
 // Executes query1 and gets the corresponding system.profile entry.
@@ -55,20 +62,35 @@ assert.eq(
     coll.find({a: 2, b: 1}, {a: 1}).sort({a: -1}).comment("Query1 find command").itcount(),
     "unexpected document count",
 );
-const profileObj1 = getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query1 find command"});
+const profileObj1 = getLatestProfilerEntry(testDB, {
+    op: "query",
+    "command.comment": "Query1 find command",
+});
 assert(profileObj1.hasOwnProperty("planCacheKey"), tojson(profileObj1));
 
 // Check that the query shapes are the same.
-assert.eq(profileObj0.planCacheKey, profileObj1.planCacheKey, "unexpected not matching query hashes");
+assert.eq(
+    profileObj0.planCacheKey,
+    profileObj1.planCacheKey,
+    "unexpected not matching query hashes",
+);
 
 // Test that the planCacheKey is the same in explain output for query0 and query1 as it was
 // in system.profile output.
 const explainQuery0 = assert.commandWorked(
-    coll.find({a: 1, b: 1}, {a: 1}).sort({a: -1}).comment("Query0 find command").explain("queryPlanner"),
+    coll
+        .find({a: 1, b: 1}, {a: 1})
+        .sort({a: -1})
+        .comment("Query0 find command")
+        .explain("queryPlanner"),
 );
 assert.eq(explainQuery0.queryPlanner.planCacheKey, profileObj0.planCacheKey, explainQuery0);
 const explainQuery1 = assert.commandWorked(
-    coll.find({a: 2, b: 1}, {a: 1}).sort({a: -1}).comment("Query1 find command").explain("queryPlanner"),
+    coll
+        .find({a: 2, b: 1}, {a: 1})
+        .sort({a: -1})
+        .comment("Query1 find command")
+        .explain("queryPlanner"),
 );
 assert.eq(explainQuery1.queryPlanner.planCacheKey, profileObj0.planCacheKey, explainQuery1);
 
@@ -76,8 +98,15 @@ assert.eq(explainQuery1.queryPlanner.planCacheKey, profileObj0.planCacheKey, exp
 assert.eq(explainQuery0.queryPlanner.planCacheKey, explainQuery1.queryPlanner.planCacheKey);
 
 // Executes query2 and gets the corresponding system.profile entry.
-assert.eq(0, coll.find({a: 12000, b: 1}).comment("Query2 find command").itcount(), "unexpected document count");
-const profileObj2 = getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query2 find command"});
+assert.eq(
+    0,
+    coll.find({a: 12000, b: 1}).comment("Query2 find command").itcount(),
+    "unexpected document count",
+);
+const profileObj2 = getLatestProfilerEntry(testDB, {
+    op: "query",
+    "command.comment": "Query2 find command",
+});
 assert(profileObj2.hasOwnProperty("planCacheKey"), tojson(profileObj2));
 
 // Query0 and query1 should both have the same query hash for the given indexes. Whereas, query2
@@ -103,4 +132,7 @@ assert.eq(
     getPlanCacheShapeHashFromExplain(explainQuery2),
     getPlanCacheShapeHashFromExplain(explainQuery2PostCatalogChange),
 );
-assert.neq(explainQuery2.queryPlanner.planCacheKey, explainQuery2PostCatalogChange.queryPlanner.planCacheKey);
+assert.neq(
+    explainQuery2.queryPlanner.planCacheKey,
+    explainQuery2PostCatalogChange.queryPlanner.planCacheKey,
+);

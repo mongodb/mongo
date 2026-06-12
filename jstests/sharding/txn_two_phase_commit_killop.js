@@ -8,7 +8,10 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {getCoordinatorFailpoints, waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {
+    getCoordinatorFailpoints,
+    waitForFailpoint,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {
     checkDecisionIs,
     runCommitThroughMongosInParallelThread,
@@ -33,12 +36,18 @@ const setUp = function () {
     // shard0: [-inf, 0)
     // shard1: [0, 10)
     // shard2: [10, +inf)
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}),
+    );
 
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
@@ -101,13 +110,21 @@ const testCommitProtocol = function (shouldCommit, failpointData) {
     if (shouldCommit) {
         commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     } else {
-        commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
+        commitThread = runCommitThroughMongosInParallelThread(
+            lsid,
+            txnNumber,
+            st.s.host,
+            ErrorCodes.NoSuchTransaction,
+        );
     }
     commitThread.start();
 
     // Deliver killOp once the failpoint has been hit.
 
-    waitForFailpoint("Hit " + failpointData.failpoint + " failpoint", failpointData.numTimesShouldBeHit);
+    waitForFailpoint(
+        "Hit " + failpointData.failpoint + " failpoint",
+        failpointData.numTimesShouldBeHit,
+    );
 
     jsTest.log("Going to find coordinator opCtx ids");
     let coordinatorOpsToKill = [];
@@ -133,7 +150,10 @@ const testCommitProtocol = function (shouldCommit, failpointData) {
 
             for (let x = 0; x < coordinatorOpsToKill.length; x++) {
                 if (!coordinatorOpsToKill[x].opid) {
-                    print("Retrying currentOp because op doesn't have opId: " + tojson(coordinatorOpsToKill[x]));
+                    print(
+                        "Retrying currentOp because op doesn't have opId: " +
+                            tojson(coordinatorOpsToKill[x]),
+                    );
                     return false;
                 }
             }
@@ -196,7 +216,9 @@ const testCommitProtocol = function (shouldCommit, failpointData) {
 
     // If deleting the coordinator doc was not robust to killOp, the document would still exist.
     // Deletion is done asynchronously, so we might have to wait.
-    assert.soon(() => coordinator.getDB("config").getCollection("transaction_coordinators").count() == 0);
+    assert.soon(
+        () => coordinator.getDB("config").getCollection("transaction_coordinators").count() == 0,
+    );
 
     // Check that the transaction committed or aborted as expected.
     if (!shouldCommit) {

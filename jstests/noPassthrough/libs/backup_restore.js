@@ -94,7 +94,11 @@ export const BackupRestoreTest = function (options) {
                         // 20% of the operations: update docs.
                         let updateOpts = {upsert: true, multi: true, writeConcern: writeConcern};
                         assert.commandWorked(
-                            coll.update({x: {$gte: match}}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts),
+                            coll.update(
+                                {x: {$gte: match}},
+                                {$inc: {x: baseNum}, $set: {n: "hello"}},
+                                updateOpts,
+                            ),
                         );
                     } else if (op < 0.9) {
                         // 50% of the operations: find matchings docs.
@@ -102,7 +106,9 @@ export const BackupRestoreTest = function (options) {
                         coll.find({x: {$gte: match}}).itcount();
                     } else {
                         // 10% of the operations: remove matching docs.
-                        assert.commandWorked(coll.remove({x: {$gte: match}}, {writeConcern: writeConcern}));
+                        assert.commandWorked(
+                            coll.remove({x: {$gte: match}}, {writeConcern: writeConcern}),
+                        );
                     }
                 } catch (e) {
                     if (e instanceof ReferenceError || e instanceof TypeError) {
@@ -118,7 +124,15 @@ export const BackupRestoreTest = function (options) {
         return startMongoProgramNoConnect(
             shellPath,
             "--eval",
-            "(" + crudClientCmds + ')("' + dbName + '", "' + collectionName + '", ' + numNodes + ")",
+            "(" +
+                crudClientCmds +
+                ')("' +
+                dbName +
+                '", "' +
+                collectionName +
+                '", ' +
+                numNodes +
+                ")",
             host,
         );
     }
@@ -168,7 +182,10 @@ export const BackupRestoreTest = function (options) {
         assert.contains(
             options.backup,
             allowedBackupKeys,
-            "invalid option: " + tojson(options.backup) + "; valid options are: " + tojson(allowedBackupKeys),
+            "invalid option: " +
+                tojson(options.backup) +
+                "; valid options are: " +
+                tojson(allowedBackupKeys),
         );
 
         // Number of nodes in initial replica set (default 3)
@@ -268,7 +285,10 @@ export const BackupRestoreTest = function (options) {
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
             assert.gt(copiedFiles.length, 0, testName + " no files copied");
-            assert.commandWorked(secondary.getDB("admin").fsyncUnlock(), testName + " failed to fsyncUnlock");
+            assert.commandWorked(
+                secondary.getDB("admin").fsyncUnlock(),
+                testName + " failed to fsyncUnlock",
+            );
         } else if (options.backup == "rolling") {
             let rsyncCmd = "rsync -aKkz --del " + sourcePath + " " + destPath;
             // Simulate a rolling rsync, do it 3 times before stopping process
@@ -321,7 +341,9 @@ export const BackupRestoreTest = function (options) {
         let crudStatus = checkProgram(crudPid);
         assert(
             crudStatus.alive,
-            testName + " CRUD client was not running at end of test and exited with code: " + crudStatus.exitCode,
+            testName +
+                " CRUD client was not running at end of test and exited with code: " +
+                crudStatus.exitCode,
         );
         stopMongoProgramByPid(crudPid);
 
@@ -341,12 +363,15 @@ export const BackupRestoreTest = function (options) {
                 // stopMongoProgramByPid returns -SIGINT. See SERVER-67390 and SERVER-72449.
                 assert(
                     exitCode == 130 || exitCode == -kSIGINT || exitCode == kSIGINT,
-                    "expected resmoke.py to exit due to being interrupted, but exited with code: " + exitCode,
+                    "expected resmoke.py to exit due to being interrupted, but exited with code: " +
+                        exitCode,
                 );
             }
         } else {
             jsTestLog(
-                testName + " FSM client was not running at end of test and exited with code: " + fsmStatus.exitCode,
+                testName +
+                    " FSM client was not running at end of test and exited with code: " +
+                    fsmStatus.exitCode,
             );
         }
 
@@ -362,12 +387,18 @@ export const BackupRestoreTest = function (options) {
         const databases = result.databases.map((dbs) => dbs.name);
         databases.forEach((dbName) => {
             assert.commandWorked(
-                primary.getDB(dbName).afterClientKills.insert({"a": 1}, {writeConcern: {w: "majority"}}),
+                primary
+                    .getDB(dbName)
+                    .afterClientKills.insert({"a": 1}, {writeConcern: {w: "majority"}}),
             );
         });
 
         // Add the new hidden node to replSetTest.
-        jsTestLog("Starting new hidden node (but do not add to replica set) with dbpath " + hiddenDbpath + ".");
+        jsTestLog(
+            "Starting new hidden node (but do not add to replica set) with dbpath " +
+                hiddenDbpath +
+                ".",
+        );
         let nodesBeforeAddingHiddenMember = rst.nodes.slice();
         // ReplSetTest.add() will use default values for --oplogSize and --replSet consistent with
         // existing nodes.
@@ -391,7 +422,11 @@ export const BackupRestoreTest = function (options) {
         );
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
-        jsTestLog("CRUD and FSM clients stopped. Waiting for hidden node " + hiddenHost + " to become SECONDARY");
+        jsTestLog(
+            "CRUD and FSM clients stopped. Waiting for hidden node " +
+                hiddenHost +
+                " to become SECONDARY",
+        );
         rst.awaitSecondaryNodes(null, [hiddenNode]);
 
         // Wait for secondaries to finish catching up before shutting down.
@@ -412,16 +447,24 @@ export const BackupRestoreTest = function (options) {
         primary = rst.getPrimary();
 
         jsTestLog(
-            "Inserting single document into primary " + primary.host + " with writeConcern w:" + rst.nodes.length,
+            "Inserting single document into primary " +
+                primary.host +
+                " with writeConcern w:" +
+                rst.nodes.length,
         );
         let writeResult = assert.commandWorked(
             primary
                 .getDB("test")
-                .foo.insert({}, {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+                .foo.insert(
+                    {},
+                    {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+                ),
         );
 
         // Stop set.
-        jsTestLog("Insert operation successful: " + tojson(writeResult) + ". Stopping replica set.");
+        jsTestLog(
+            "Insert operation successful: " + tojson(writeResult) + ". Stopping replica set.",
+        );
         rst.stopSet();
 
         // Cleanup the files from the test

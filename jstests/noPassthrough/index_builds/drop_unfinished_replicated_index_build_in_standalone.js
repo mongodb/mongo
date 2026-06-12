@@ -42,8 +42,12 @@ if (!FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds"
 }
 
 // Waiting for secondary to register the indexes in durable catalog.
-IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
-IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
+IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
 
 jsTestLog("Shutting down secondary");
 rst.stop(secondary);
@@ -59,14 +63,18 @@ const mongod = MongoRunner.runMongod({dbpath: secondaryDbpath, noReplSet: true, 
 secondaryDB = mongod.getDB(dbName);
 
 // Confirm that the secondary node leaves the index on coll1 as unfinished.
-IndexBuildTest.assertIndexes(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexes(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
 
 jsTestLog("Dropping collection from secondary");
 assert.commandWorked(secondaryDB.runCommand({drop: collName1}));
 
 // Confirm that the secondary node leaves the index on coll2 as unfinished so we can check that
 // dropping database is also able to drop collections and indexes.
-IndexBuildTest.assertIndexes(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexes(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
 
 jsTestLog("Dropping database from secondary");
 assert.commandWorked(secondaryDB.dropDatabase());

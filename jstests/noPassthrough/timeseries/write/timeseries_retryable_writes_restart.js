@@ -23,7 +23,9 @@ function testRetryableRestart(ordered) {
     const coll = testDB[jsTestName()];
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     function setupRetryableWritesForCollection(collName) {

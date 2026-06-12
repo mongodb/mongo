@@ -131,7 +131,9 @@ const caseInsensitiveCollation = {
     strength: 1,
 };
 coll.drop();
-assert.commandWorked(testDB.createCollection(coll.getName(), {collation: caseInsensitiveCollation}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {collation: caseInsensitiveCollation}),
+);
 assert.commandWorked(coll.insert({a: "str"}));
 assert.commandWorked(coll.insert({a: ["STR", "sTr"]}));
 assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
@@ -179,12 +181,18 @@ assert.commandWorked(
 assert.eq(2, testDB.seniorCitizens.find().itcount());
 
 // Test that $jsonSchema can be used in the listCollections filter.
-res = testDB.runCommand({listCollections: 1, filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}}});
+res = testDB.runCommand({
+    listCollections: 1,
+    filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}},
+});
 assert.commandWorked(res);
 assert.eq(1, res.cursor.firstBatch.length);
 
 // Test that $jsonSchema can be used in the listDatabases filter.
-res = testDB.adminCommand({listDatabases: 1, filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}}});
+res = testDB.adminCommand({
+    listDatabases: 1,
+    filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}},
+});
 assert.commandWorked(res);
 assert.eq(1, res.databases.length);
 
@@ -228,7 +236,10 @@ assert.eq(2, res.deletedCount);
 assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
 
 // Test that $jsonSchema does not respect the collation specified in a delete command.
-res = coll.deleteMany({$jsonSchema: {properties: {a: {enum: ["STR"]}}}}, {collation: caseInsensitiveCollation});
+res = coll.deleteMany(
+    {$jsonSchema: {properties: {a: {enum: ["STR"]}}}},
+    {collation: caseInsensitiveCollation},
+);
 assert.eq(0, res.deletedCount);
 
 // Test that $jsonSchema is legal in an update command.
@@ -262,7 +273,10 @@ assert.commandWorked(coll.insert({_id: 3, a: "temp text test"}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(3, coll.find({$jsonSchema: {}}).itcount());
 assert.eq(2, coll.find({$jsonSchema: {properties: {a: {type: "number"}}}}).itcount());
-assert.eq(2, coll.find({$jsonSchema: {required: ["a"], properties: {a: {type: "number"}}}}).itcount());
+assert.eq(
+    2,
+    coll.find({$jsonSchema: {required: ["a"], properties: {a: {type: "number"}}}}).itcount(),
+);
 assert.eq(2, coll.find({$or: [{$jsonSchema: {properties: {a: {minimum: 2}}}}, {b: 2}]}).itcount());
 
 // Test that $jsonSchema works correctly in the presence of a geo index.
@@ -312,5 +326,8 @@ assert.commandWorked(coll.createIndex({a: "text"}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(3, coll.find({$jsonSchema: {properties: {a: {minLength: 5}}}}).itcount());
 assert.eq(1, coll.find({$jsonSchema: {required: ["a"]}, $text: {$search: "test"}}).itcount());
-assert.eq(3, coll.find({$or: [{$jsonSchema: {required: ["a"]}}, {$text: {$search: "TEST"}}]}).itcount());
+assert.eq(
+    3,
+    coll.find({$or: [{$jsonSchema: {required: ["a"]}}, {$text: {$search: "TEST"}}]}).itcount(),
+);
 assert.eq(1, coll.find({$and: [{$jsonSchema: {}}, {$text: {$search: "TEST"}}]}).itcount());

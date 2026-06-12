@@ -40,7 +40,9 @@ function setup() {
     testColl.dropIndex({a: 1});
     testDB.runCommand({drop: "create_collection", writeConcern: {w: "majority"}});
     testDB.runCommand({drop: "drop_collection", writeConcern: {w: "majority"}});
-    assert.commandWorked(testDB.createCollection("drop_collection", {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testDB.createCollection("drop_collection", {writeConcern: {w: "majority"}}),
+    );
 }
 
 function testCommand(command) {
@@ -105,7 +107,11 @@ function testCommand(command) {
 
     res = assert.commandFailedWithCode(
         sessionDb.runCommand(
-            Object.assign({}, command, {txnNumber: NumberLong(txnNumber), stmtId: NumberInt(1), autocommit: false}),
+            Object.assign({}, command, {
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(1),
+                autocommit: false,
+            }),
         ),
         ErrorCodes.OperationNotSupportedInTransaction,
     );

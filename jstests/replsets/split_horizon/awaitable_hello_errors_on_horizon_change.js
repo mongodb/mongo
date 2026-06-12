@@ -70,8 +70,10 @@ function runTest(cmd) {
     secondaryFailPoint.wait();
 
     // Each node has one hello/isMaster request waiting on a topology change.
-    let numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
-    let numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnPrimary =
+        primaryDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnSecondary =
+        secondaryDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(1, numAwaitingTopologyChangeOnPrimary);
     assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
@@ -90,13 +92,17 @@ function runTest(cmd) {
     awaitCmdHorizonChangeOnSecondary();
 
     // All hello/isMaster requests should have been responded to after the reconfig.
-    numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary =
+        primaryDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(0, numAwaitingTopologyChangeOnPrimary);
     assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
     const primaryRespAfterHorizonChange = assert.commandWorked(primaryDB.runCommand({[cmd]: 1}));
-    const secondaryRespAfterHorizonChange = assert.commandWorked(secondaryDB.runCommand({[cmd]: 1}));
+    const secondaryRespAfterHorizonChange = assert.commandWorked(
+        secondaryDB.runCommand({[cmd]: 1}),
+    );
     const primaryTopVersionAfterHorizonChange = primaryRespAfterHorizonChange.topologyVersion;
     const secondaryTopVersionAfterHorizonChange = secondaryRespAfterHorizonChange.topologyVersion;
 

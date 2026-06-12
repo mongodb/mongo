@@ -75,7 +75,8 @@ function logicalPartitioningProperty(getQuery, testHelpers) {
             if (missingFromUnion.length > 0) {
                 return {
                     passed: false,
-                    message: "The union of pred and $nor(pred) does not cover all documents in the collection.",
+                    message:
+                        "The union of pred and $nor(pred) does not cover all documents in the collection.",
                     pred,
                     missingFromUnion,
                     posExplain: experimentColl.explain().aggregate([{$match: pred}]),

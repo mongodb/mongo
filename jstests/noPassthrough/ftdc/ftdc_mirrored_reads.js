@@ -46,12 +46,17 @@ function getMirroredReadsProcessedAsSecondary() {
 function waitForPrimaryToSendMirroredReads(expectedReadsSeen, expectedReadsSent) {
     assert.soon(() => {
         jsTestLog("Verifying reads were seen and sent by the maestro");
-        jsTestLog("ExpectedReadsSent :" + expectedReadsSent + ", ExpectedReadsSeen:" + expectedReadsSeen);
+        jsTestLog(
+            "ExpectedReadsSent :" + expectedReadsSent + ", ExpectedReadsSeen:" + expectedReadsSeen,
+        );
         const afterPrimaryReadStats = getDiagnosticData(primary);
         const actualMirrorableReadsSeen = afterPrimaryReadStats.seen;
         const actualMirroredReadsSent = afterPrimaryReadStats.sent;
         jsTestLog("Primary metrics after reads: " + tojson(afterPrimaryReadStats));
-        return expectedReadsSeen <= actualMirrorableReadsSeen && expectedReadsSent == actualMirroredReadsSent;
+        return (
+            expectedReadsSeen <= actualMirrorableReadsSeen &&
+            expectedReadsSent == actualMirroredReadsSent
+        );
     });
 }
 
@@ -166,7 +171,9 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
             jsTestLog("Verifying diagnostic collection for mirrored reads on secondaries");
             let mirroredReadsSucceeded = getDiagnosticData(primary).succeeded;
             let mirroredReadsProcessedAfter = getMirroredReadsProcessedAsSecondary();
-            return mirroredReadsSucceeded == mirroredReadsProcessedAfter - mirroredReadsProcessedBefore;
+            return (
+                mirroredReadsSucceeded == mirroredReadsProcessedAfter - mirroredReadsProcessedBefore
+            );
         },
         "Failed to wait for secondary mirrored reads stats to converge",
         30000,

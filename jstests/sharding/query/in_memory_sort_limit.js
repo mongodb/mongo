@@ -9,7 +9,9 @@ let st = new ShardingTest({
         rsOptions: {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}},
     },
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.skip", key: {_id: "hashed"}}));
 
 let mongosCol = st.s.getDB("test").getCollection("skip");

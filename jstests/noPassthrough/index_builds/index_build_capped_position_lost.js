@@ -18,7 +18,9 @@ const db = conn.getDB(dbName);
 // This test relies on the index build yielding during the collection scan
 // phase, so set internalQueryExecYieldIterations to always yield.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-assert.commandWorked(db.createCollection(collName, {capped: true, size: 1024 * 1024 * 1024, max: 5}));
+assert.commandWorked(
+    db.createCollection(collName, {capped: true, size: 1024 * 1024 * 1024, max: 5}),
+);
 
 const coll = db.getCollection(collName);
 
@@ -27,7 +29,9 @@ for (let i = 0; i < 5; i++) {
 }
 
 // Hang the collection scan phase of the index build when it's halfway finished.
-let fp = configureFailPoint(conn, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {fieldsToMatch: {a: 3}});
+let fp = configureFailPoint(conn, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {
+    fieldsToMatch: {a: 3},
+});
 
 const awaitCreateIndex = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: 1});
 fp.wait();

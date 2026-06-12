@@ -43,7 +43,9 @@ assert.commandWorked(coll.insert({x: 0}));
 IndexBuildTest.pauseIndexBuilds(primary);
 
 // Start the index build and wait for it to start.
-const awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), indexSpec, {name: indexName});
+const awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), indexSpec, {
+    name: indexName,
+});
 IndexBuildTest.waitForIndexBuildToStart(db, collName, indexName);
 
 // Construct a ~16 MB string and perform a large write while the index build is in progress.

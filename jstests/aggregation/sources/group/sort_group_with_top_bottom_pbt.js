@@ -73,7 +73,9 @@ const testCaseArb = indexSpecArb.chain((indexSpec) => {
     // Generate a single flip factor (1 or -1) applied uniformly to all non-group-key fields.
     // This ensures sortBy directions are either all-same or all-opposite relative to the index
     const remainingFields = fields.slice(1);
-    const sortByDirsArb = directionArb.map((flip) => remainingFields.map((f) => indexSpec[f] * flip));
+    const sortByDirsArb = directionArb.map((flip) =>
+        remainingFields.map((f) => indexSpec[f] * flip),
+    );
 
     // Generate numDocs documents with guaranteed tie-free sort keys.
     const docsArb = fc.integer({min: 20, max: 40}).chain((numDocs) => {
@@ -85,28 +87,39 @@ const testCaseArb = indexSpecArb.chain((indexSpec) => {
         });
 
         // Small domain for group key so each group gets several documents.
-        const groupKeyValsArb = fc.array(fc.oneof(fc.integer({min: 1, max: 3}), fc.constant(null)), {
-            minLength: numDocs,
-            maxLength: numDocs,
-        });
+        const groupKeyValsArb = fc.array(
+            fc.oneof(fc.integer({min: 1, max: 3}), fc.constant(null)),
+            {
+                minLength: numDocs,
+                maxLength: numDocs,
+            },
+        );
 
         // Moderate domain for every field not yet assigned (extra sort field + non-index fields).
-        const extraFieldVal = fc.oneof(fc.integer({min: 1, max: 10}), fc.constantFrom("x", "y", "z"));
+        const extraFieldVal = fc.oneof(
+            fc.integer({min: 1, max: 10}),
+            fc.constantFrom("x", "y", "z"),
+        );
         const extraFieldsArb = allDocFields
             .filter((f) => f !== groupKey && f !== firstSortField)
             .reduce((acc, f) => {
                 acc[f] = extraFieldVal;
                 return acc;
             }, {});
-        const extraDocsArb = fc.array(fc.record(extraFieldsArb), {minLength: numDocs, maxLength: numDocs});
+        const extraDocsArb = fc.array(fc.record(extraFieldsArb), {
+            minLength: numDocs,
+            maxLength: numDocs,
+        });
 
-        return fc.tuple(uniqueSortValsArb, groupKeyValsArb, extraDocsArb).map(([sortVals, gkVals, extraDocs]) =>
-            sortVals.map((sv, i) => ({
-                [groupKey]: gkVals[i],
-                [firstSortField]: sv,
-                ...extraDocs[i],
-            })),
-        );
+        return fc
+            .tuple(uniqueSortValsArb, groupKeyValsArb, extraDocsArb)
+            .map(([sortVals, gkVals, extraDocs]) =>
+                sortVals.map((sv, i) => ({
+                    [groupKey]: gkVals[i],
+                    [firstSortField]: sv,
+                    ...extraDocs[i],
+                })),
+            );
     });
 
     return fc.tuple(fc.constant(indexSpec), accumTypeArb, sortByDirsArb, docsArb);

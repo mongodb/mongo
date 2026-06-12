@@ -10,7 +10,10 @@
  * ]
  */
 
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -31,10 +34,14 @@ describe("$expr/$or with dotted paths, $sort, and $group with filter-to-ixscan o
             {$sort: {"a.b": 1}},
             {$group: {_id: null, first: {$first: "$a.b"}}},
         ];
-        runWithParamsAllNonConfigNodes(db, {internalQueryPlannerPushdownFilterToIxscanForSort: true}, () => {
-            const ixResults = this.coll.aggregate(pipeline).toArray();
-            const csResults = this.coll.aggregate(pipeline, {hint: {$natural: 1}}).toArray();
-            assert.sameMembers(ixResults, csResults);
-        });
+        runWithParamsAllNonConfigNodes(
+            db,
+            {internalQueryPlannerPushdownFilterToIxscanForSort: true},
+            () => {
+                const ixResults = this.coll.aggregate(pipeline).toArray();
+                const csResults = this.coll.aggregate(pipeline, {hint: {$natural: 1}}).toArray();
+                assert.sameMembers(ixResults, csResults);
+            },
+        );
     });
 });

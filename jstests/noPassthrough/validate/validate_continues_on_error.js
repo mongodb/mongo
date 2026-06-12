@@ -32,7 +32,9 @@ for (let i = 5; i < 8; i++) {
 }
 
 // Test index entry out-of-order detection still continues to do missing key validation
-assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}));
+assert.commandWorked(
+    conn.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}),
+);
 let res = assert.commandWorked(coll.validate());
 jsTestLog(res);
 assert(!res.valid);
@@ -47,7 +49,9 @@ assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexKeyOrderin
 
 // Force a failed index traversal for one index, but verify that other indexes are still checked for
 // inconsistencies
-assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexTraversal", mode: {times: 1}}));
+assert.commandWorked(
+    conn.adminCommand({configureFailPoint: "failIndexTraversal", mode: {times: 1}}),
+);
 res = assert.commandWorked(coll.validate());
 jsTestLog(res);
 assert(!res.valid);

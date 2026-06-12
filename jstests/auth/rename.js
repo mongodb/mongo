@@ -23,19 +23,27 @@ assert.eq(db1.a.count(), 1);
 admin.logout();
 
 // can't run same db w/o auth
-assert.commandFailed(admin.runCommand({renameCollection: db1.a.getFullName(), to: db1.b.getFullName()}));
+assert.commandFailed(
+    admin.runCommand({renameCollection: db1.a.getFullName(), to: db1.b.getFullName()}),
+);
 
 // can run same db with auth
 assert(db1.auth("foo", "bar"));
-assert.commandWorked(admin.runCommand({renameCollection: db1.a.getFullName(), to: db1.b.getFullName()}));
+assert.commandWorked(
+    admin.runCommand({renameCollection: db1.a.getFullName(), to: db1.b.getFullName()}),
+);
 
 // can't run diff db w/o auth
-assert.commandFailed(admin.runCommand({renameCollection: db1.b.getFullName(), to: db2.a.getFullName()}));
+assert.commandFailed(
+    admin.runCommand({renameCollection: db1.b.getFullName(), to: db2.a.getFullName()}),
+);
 db1.logout();
 
 // can run diff db with auth
 assert(db2.auth("bar", "foo"));
-assert.commandWorked(admin.runCommand({renameCollection: db1.b.getFullName(), to: db2.a.getFullName()}));
+assert.commandWorked(
+    admin.runCommand({renameCollection: db1.b.getFullName(), to: db2.a.getFullName()}),
+);
 
 // test post conditions
 assert.eq(db1.a.count(), 0);

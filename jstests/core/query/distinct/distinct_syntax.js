@@ -27,7 +27,10 @@ assert.throws(function () {
 });
 
 // from command interface
-assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a", "query": "a"}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    t.runCommand("distinct", {"key": "a", "query": "a"}),
+    ErrorCodes.TypeMismatch,
+);
 
 // empty query clause should not cause error
 

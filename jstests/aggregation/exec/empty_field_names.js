@@ -10,6 +10,12 @@ for (let i = 0; i < 50; ++i) {
 }
 
 assert.eq(
-    coll.aggregate([{$sort: {sortField: 1}}, {$addFields: {"m": {$meta: "sortKey"}}}, {$match: {"b": 456}}]).itcount(),
+    coll
+        .aggregate([
+            {$sort: {sortField: 1}},
+            {$addFields: {"m": {$meta: "sortKey"}}},
+            {$match: {"b": 456}},
+        ])
+        .itcount(),
     kNumDocs,
 );

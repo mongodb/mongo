@@ -71,7 +71,12 @@ pipeline = {
         maxDepth: 2.3,
     },
 };
-assertErrorCode(local, pipeline, [40102, 12109309], "maxDepth must be representable as a long long");
+assertErrorCode(
+    local,
+    pipeline,
+    [40102, 12109309],
+    "maxDepth must be representable as a long long",
+);
 
 pipeline = {
     $graphLookup: {
@@ -227,12 +232,22 @@ pipeline = {
 assertErrorCode(local, pipeline, kMissingFieldErrorCodes, "startWith was not specified");
 
 pipeline = {
-    $graphLookup: {from: "foreign", startWith: {$literal: 0}, connectToField: "a", connectFromField: "b"},
+    $graphLookup: {
+        from: "foreign",
+        startWith: {$literal: 0},
+        connectToField: "a",
+        connectFromField: "b",
+    },
 };
 assertErrorCode(local, pipeline, kMissingFieldErrorCodes, "as was not specified");
 
 pipeline = {
-    $graphLookup: {startWith: {$literal: 0}, connectToField: "a", connectFromField: "b", as: "output"},
+    $graphLookup: {
+        startWith: {$literal: 0},
+        connectToField: "a",
+        connectFromField: "b",
+        as: "output",
+    },
 };
 assertErrorCode(local, pipeline, ErrorCodes.FailedToParse, "from was not specified");
 
@@ -309,7 +324,11 @@ pipeline = {
         },
     },
 };
-assert.throws(() => local.aggregate(pipeline), [], "cannot use $near inside $graphLookup at any depth");
+assert.throws(
+    () => local.aggregate(pipeline),
+    [],
+    "cannot use $near inside $graphLookup at any depth",
+);
 
 // let foreign = db.foreign;
 foreign.drop();

@@ -4,7 +4,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let s = new ShardingTest({
     shards: 2,
     other: {
-        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+        mongosOptions: {
+            setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        },
     },
 });
 var db = s.getDB("test");

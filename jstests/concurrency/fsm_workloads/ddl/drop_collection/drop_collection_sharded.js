@@ -35,7 +35,9 @@ export const $config = (function () {
         function create(db, collName) {
             const coll = getRandomCollection(db);
             jsTestLog("Executing create state on: " + coll.getFullName());
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
         }
 
         function drop(db, collName) {

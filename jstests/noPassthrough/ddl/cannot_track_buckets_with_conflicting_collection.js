@@ -11,7 +11,9 @@ const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
 
 skipTestIfViewlessTimeseriesEnabled(db, () => st.stop());
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}),
+);
 
 const coll = db.getCollection("coll");
 const bucketsColl = db.getCollection("system.buckets.coll");

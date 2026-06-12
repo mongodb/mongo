@@ -11,7 +11,10 @@
  * ]
  */
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {createIndexAndCRUDInTxn, indexSpecs} from "jstests/libs/index_builds/create_index_txn_helpers.js";
+import {
+    createIndexAndCRUDInTxn,
+    indexSpecs,
+} from "jstests/libs/index_builds/create_index_txn_helpers.js";
 import {createCollAndCRUDInTxn} from "jstests/libs/txns/create_collection_txn_helpers.js";
 
 const session = db.getMongo().startSession();
@@ -40,7 +43,12 @@ jsTest.log("Testing createIndexes in a transaction with local readConcern");
 withTxnAndAutoRetryOnMongos(
     session,
     () => {
-        createIndexAndCRUDInTxn(sessionDB, collName, false /*explicitCollCreate*/, false /*multikeyIndex*/);
+        createIndexAndCRUDInTxn(
+            sessionDB,
+            collName,
+            false /*explicitCollCreate*/,
+            false /*multikeyIndex*/,
+        );
     },
     {readConcern: {level: "local"}, writeConcern: {w: "majority"}},
 );
@@ -53,7 +61,8 @@ assert.commandWorked(otherColl.insert({a: 1}, {writeConcern: {w: "majority"}}));
 assert.eq(otherColl.find({}).itcount(), 1);
 
 jsTest.log(
-    "Testing createCollection in a transaction with local readConcern, with other " + "operations preceeding it",
+    "Testing createCollection in a transaction with local readConcern, with other " +
+        "operations preceeding it",
 );
 withTxnAndAutoRetryOnMongos(
     session,
@@ -70,12 +79,20 @@ otherColl.drop({writeConcern: {w: "majority"}});
 assert.commandWorked(otherColl.insert({a: 1}, {writeConcern: {w: "majority"}}));
 assert.eq(otherColl.find({}).itcount(), 1);
 
-jsTest.log("Testing createIndexes in a transaction with local readConcern, with other " + "operations preceeding it");
+jsTest.log(
+    "Testing createIndexes in a transaction with local readConcern, with other " +
+        "operations preceeding it",
+);
 withTxnAndAutoRetryOnMongos(
     session,
     () => {
         assert.eq(otherColl.find({a: 1}).itcount(), 1);
-        createIndexAndCRUDInTxn(sessionDB, collName, false /*explicitCollCreate*/, false /*multikeyIndex*/);
+        createIndexAndCRUDInTxn(
+            sessionDB,
+            collName,
+            false /*explicitCollCreate*/,
+            false /*multikeyIndex*/,
+        );
     },
     {readConcern: {level: "local"}, writeConcern: {w: "majority"}},
 );

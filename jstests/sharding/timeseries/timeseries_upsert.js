@@ -84,7 +84,11 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, updateShardKey =
     const resultDocs = coll.find().toArray();
     assert.eq(resultDocs.length, documents.length);
 
-    assert.sameMembers(resultDocs, documents, "Collection contents did not match expected after upsert");
+    assert.sameMembers(
+        resultDocs,
+        documents,
+        "Collection contents did not match expected after upsert",
+    );
 }
 
 //
@@ -199,7 +203,10 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, updateShardKey =
         collConfig: metaSubFieldShardKey,
         updateOp: {
             q: {[metaFieldName + ".a"]: -1},
-            u: [{$set: {[metaFieldName + ".b"]: 10, [timeFieldName]: dateTime, f: 15}}, {$unset: metaFieldName + ".a"}],
+            u: [
+                {$set: {[metaFieldName + ".b"]: 10, [timeFieldName]: dateTime, f: 15}},
+                {$unset: metaFieldName + ".a"},
+            ],
             multi: true,
             upsert: true,
         },
@@ -253,7 +260,12 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, updateShardKey =
 (function testSingleUpdateNoShardKey() {
     runTest({
         collConfig: metaShardKey,
-        updateOp: {q: {f: 1000}, u: {$set: {[timeFieldName]: dateTime}}, multi: false, upsert: true},
+        updateOp: {
+            q: {f: 1000},
+            u: {$set: {[timeFieldName]: dateTime}},
+            multi: false,
+            upsert: true,
+        },
         upsertedDoc: {f: 1000, [timeFieldName]: dateTime},
     });
 })();

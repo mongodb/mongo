@@ -154,7 +154,12 @@ describe("collection v2 strict whitebox", function () {
         awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
             [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 1),
         });
-        assertOpenCursors(st, [st.shard0.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [st.shard0.shardName],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
     });
 
     it("collection does not exist - DbAbsent to DbPresent transition", function () {
@@ -185,7 +190,12 @@ describe("collection v2 strict whitebox", function () {
         awaitLogMessageCodes(st.s, [kDbAbsentEvent], () => csTest.assertNoChange(csCursor), {
             [kDbAbsentEvent]: (attr) => assertExpectedShardsInLog(attr, 1),
         });
-        assertOpenCursors(st, [st.shard2.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [st.shard2.shardName],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
     });
 
     it("moveChunk lifecycle - partial, expansion, full drain", function () {
@@ -215,9 +225,18 @@ describe("collection v2 strict whitebox", function () {
 
         awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
             [kInitStrictMode]: (attr) =>
-                assert.eq(attr.shards.length, 1, `Expected 1 shard, got ${tojsononeline(attr.shards)}`),
+                assert.eq(
+                    attr.shards.length,
+                    1,
+                    `Expected 1 shard, got ${tojsononeline(attr.shards)}`,
+                ),
         });
-        assertOpenCursors(st, [st.shard0.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [st.shard0.shardName],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
 
         // Step 1: Move [10, MaxKey) to shard1 - partial, shard0 still has 2 chunks.
         assert.commandWorked(
@@ -304,11 +323,21 @@ describe("collection v2 strict whitebox", function () {
         awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
             [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 1),
         });
-        assertOpenCursors(st, [originalShardId], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [originalShardId],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
 
         new MovePrimaryCommand({dbName, collName, targetShard: targetShardId}).execute(st.s);
         awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
-        assertOpenCursors(st, [targetShardId], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [targetShardId],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
     });
 
     it("reshardCollection - cursor placement updates after NamespacePlacementChanged", function () {

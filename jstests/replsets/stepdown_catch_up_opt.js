@@ -17,7 +17,11 @@ let secondary = replTest.getSecondary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Error codes we expect to see.
@@ -42,7 +46,8 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     primary.getDB("admin").runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 20}),
     stepDownPeriodTooShortCode,
-    "Expected replSetStepDown to fail given a stepdown time shorter than" + " secondaryCatchUpPeriodSecs",
+    "Expected replSetStepDown to fail given a stepdown time shorter than" +
+        " secondaryCatchUpPeriodSecs",
 );
 
 jsTestLog("Stop secondary syncing.");
@@ -71,7 +76,11 @@ try {
 
     // Ensure it took at least 2 second to time out. Adjust the timeout a little bit
     // for the precision issue of clock on Windows 2K8.
-    assert.lte(1.95, (endTime - startTime) / 1000, "Expected replSetStepDown command to fail after 2 seconds.");
+    assert.lte(
+        1.95,
+        (endTime - startTime) / 1000,
+        "Expected replSetStepDown command to fail after 2 seconds.",
+    );
 } catch (err) {
     disableFailPoint();
     throw err;
@@ -82,6 +91,10 @@ disableFailPoint();
 // Make sure the primary hasn't changed, since all stepdowns should have failed.
 let primaryStatus = primary.getDB("admin").runCommand({replSetGetStatus: 1});
 assert.commandWorked(primaryStatus, "replSetGetStatus failed.");
-assert.eq(primaryStatus.myState, ReplSetTest.State.PRIMARY, "Expected original primary node to still be primary");
+assert.eq(
+    primaryStatus.myState,
+    ReplSetTest.State.PRIMARY,
+    "Expected original primary node to still be primary",
+);
 
 replTest.stopSet();

@@ -54,10 +54,15 @@ function validateDifferentHiddenIndexesBehaviour() {
     assert.commandWorked(coll.unhideIndex({skey: 1}));
 
     // Check that is possible to hide a shard key index using its name
-    assert.commandWorked(testDb.runCommand({"collMod": coll.getName(), "index": {"name": "skey_1", "hidden": true}}));
+    assert.commandWorked(
+        testDb.runCommand({"collMod": coll.getName(), "index": {"name": "skey_1", "hidden": true}}),
+    );
 
     assert.commandFailedWithCode(
-        testDb.runCommand({"collMod": coll.getName(), "index": {"name": "skey_1_anotherkey_1", "hidden": true}}),
+        testDb.runCommand({
+            "collMod": coll.getName(),
+            "index": {"name": "skey_1_anotherkey_1", "hidden": true},
+        }),
         ErrorCodes.InvalidOptions,
     );
 
@@ -74,7 +79,9 @@ const coll = testDb.getCollection("foo");
 assert.commandWorked(st.s.adminCommand({enableSharding: testDb.getName()}));
 
 // Crate a new shard key
-assert.commandWorked(st.s.adminCommand({shardcollection: testDb.getName() + "." + coll.getName(), key: {skey: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({shardcollection: testDb.getName() + "." + coll.getName(), key: {skey: 1}}),
+);
 
 validateHiddenIndexBehaviour();
 validateOneShardKeyHiddenIndexBehaviour();

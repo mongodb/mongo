@@ -82,7 +82,8 @@ export var ReshardingTest = class {
         /** @private */
         this._logComponentVerbosity = logComponentVerbosity;
         this._oplogSize = oplogSize;
-        this._maxNumberOfTransactionOperationsInSingleOplogEntry = maxNumberOfTransactionOperationsInSingleOplogEntry;
+        this._maxNumberOfTransactionOperationsInSingleOplogEntry =
+            maxNumberOfTransactionOperationsInSingleOplogEntry;
         this._configShard = configShard || jsTestOptions().configShard;
         this._wiredTigerConcurrentWriteTransactions = wiredTigerConcurrentWriteTransactions;
         this._reshardingOplogBatchTaskCount = reshardingOplogBatchTaskCount;
@@ -170,17 +171,20 @@ export var ReshardingTest = class {
             // sharded collection is guaranteed to exist in the collection catalog at the
             // cloneTimestamp and tests involving elections do not run operations which would bump
             // the minimum visible timestamp (e.g. creating or dropping indexes).
-            rsOptions.setParameter["failpoint.setMinVisibleForAllCollectionsToOldestOnStartup"] = tojson({
-                mode: {"times": 1},
-            });
+            rsOptions.setParameter["failpoint.setMinVisibleForAllCollectionsToOldestOnStartup"] =
+                tojson({
+                    mode: {"times": 1},
+                });
         }
 
         if (this._minimumOperationDurationMS !== undefined) {
-            configOptions.setParameter.reshardingMinimumOperationDurationMillis = this._minimumOperationDurationMS;
+            configOptions.setParameter.reshardingMinimumOperationDurationMillis =
+                this._minimumOperationDurationMS;
         }
 
         if (this._criticalSectionTimeoutMS !== -1) {
-            configOptions.setParameter.reshardingCriticalSectionTimeoutMillis = this._criticalSectionTimeoutMS;
+            configOptions.setParameter.reshardingCriticalSectionTimeoutMillis =
+                this._criticalSectionTimeoutMS;
         }
 
         if (this._periodicNoopIntervalSecs !== undefined) {
@@ -205,17 +209,26 @@ export var ReshardingTest = class {
         if (this._configShard) {
             // ShardingTest does not currently support deep merging of options, so merge the set
             // parameters for config and replica sets here.
-            rsOptions.setParameter = Object.merge(rsOptions.setParameter, configOptions.setParameter);
-            configOptions.setParameter = Object.merge(configOptions.setParameter, rsOptions.setParameter);
+            rsOptions.setParameter = Object.merge(
+                rsOptions.setParameter,
+                configOptions.setParameter,
+            );
+            configOptions.setParameter = Object.merge(
+                configOptions.setParameter,
+                rsOptions.setParameter,
+            );
         }
 
         if (this._wiredTigerConcurrentWriteTransactions !== undefined) {
-            rsOptions.setParameter.storageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
-            rsOptions.setParameter.wiredTigerConcurrentWriteTransactions = this._wiredTigerConcurrentWriteTransactions;
+            rsOptions.setParameter.storageEngineConcurrencyAdjustmentAlgorithm =
+                "fixedConcurrentTransactions";
+            rsOptions.setParameter.wiredTigerConcurrentWriteTransactions =
+                this._wiredTigerConcurrentWriteTransactions;
         }
 
         if (this._reshardingOplogBatchTaskCount !== undefined) {
-            rsOptions.setParameter.reshardingOplogBatchTaskCount = this._reshardingOplogBatchTaskCount;
+            rsOptions.setParameter.reshardingOplogBatchTaskCount =
+                this._reshardingOplogBatchTaskCount;
         }
 
         if (this._ttlMonitorSleepSecs !== undefined) {
@@ -257,10 +270,14 @@ export var ReshardingTest = class {
 
             const shard = this._st[`shard${i}`];
             if (this._configShard && i == 0) {
-                assert.commandWorked(this._st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
+                assert.commandWorked(
+                    this._st.s.adminCommand({transitionFromDedicatedConfigServer: 1}),
+                );
                 shard.shardName = "config";
             } else {
-                const res = assert.commandWorked(this._st.s.adminCommand({addShard: shard.host, name: shardName}));
+                const res = assert.commandWorked(
+                    this._st.s.adminCommand({addShard: shard.host, name: shardName}),
+                );
                 shard.shardName = res.shardAdded;
             }
         }
@@ -269,7 +286,9 @@ export var ReshardingTest = class {
         const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes("-fsanitize");
 
         if (isSanitizerEnabled) {
-            assert.commandWorked(this._st.s.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
+            assert.commandWorked(
+                this._st.s.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}),
+            );
         }
 
         // In order to enable random failovers, initialize Random's seed if it has not already been
@@ -325,8 +344,12 @@ export var ReshardingTest = class {
         this._currentShardKey = Object.assign({_id: 1});
         const [dbName, collName] = getDBNameAndCollNameFromFullNamespace(ns);
 
-        assert.commandWorked(this._st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
-        assert.commandWorked(this._st.s.getDB(dbName).runCommand(Object.merge({create: collName}, collOptions)));
+        assert.commandWorked(
+            this._st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}),
+        );
+        assert.commandWorked(
+            this._st.s.getDB(dbName).runCommand(Object.merge({create: collName}, collOptions)),
+        );
 
         const sourceCollection = this._st.s.getCollection(ns);
         const sourceDB = sourceCollection.getDB();
@@ -368,12 +391,17 @@ export var ReshardingTest = class {
         // for the database so mongos still ends up routing operations to a shard which owns the
         // temporary resharding collection.
         assert.commandWorked(
-            sourceDB.adminCommand({enableSharding: sourceDB.getName(), primaryShard: primaryShardName}),
+            sourceDB.adminCommand({
+                enableSharding: sourceDB.getName(),
+                primaryShard: primaryShardName,
+            }),
         );
         this._primaryShardName = primaryShardName;
 
         if (Object.keys(createCollOptions).length > 0) {
-            assert.commandWorked(sourceDB.createCollection(sourceCollection.getName(), createCollOptions));
+            assert.commandWorked(
+                sourceDB.createCollection(sourceCollection.getName(), createCollOptions),
+            );
         }
 
         CreateShardedCollectionUtil.shardCollectionWithChunks(
@@ -383,7 +411,11 @@ export var ReshardingTest = class {
             shardCollOptions,
         );
 
-        const tempCollNamePrefix = this._setupTimeseriesState(sourceDB, sourceCollection.getName(), shardCollOptions);
+        const tempCollNamePrefix = this._setupTimeseriesState(
+            sourceDB,
+            sourceCollection.getName(),
+            shardCollOptions,
+        );
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
         this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 
@@ -396,12 +428,20 @@ export var ReshardingTest = class {
     }
 
     get presetReshardedChunks() {
-        assert.neq(undefined, this._presetReshardedChunks, "createShardedCollection must be called first");
+        assert.neq(
+            undefined,
+            this._presetReshardedChunks,
+            "createShardedCollection must be called first",
+        );
         return this._presetReshardedChunks;
     }
 
     get sourceCollectionUUID() {
-        assert.neq(undefined, this._sourceCollectionUUID, "createShardedCollection must be called first");
+        assert.neq(
+            undefined,
+            this._sourceCollectionUUID,
+            "createShardedCollection must be called first",
+        );
         return this._sourceCollectionUUID;
     }
 
@@ -430,15 +470,28 @@ export var ReshardingTest = class {
      * @deprecated prefer using the withReshardingInBackground() method instead.
      */
     startReshardingInBackground({newShardKeyPattern, newChunks}) {
-        this._startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks}, ErrorCodes.OK);
+        this._startReshardingInBackgroundAndAllowCommandFailure(
+            {newShardKeyPattern, newChunks},
+            ErrorCodes.OK,
+        );
     }
 
     /** @private */
     _startReshardingInBackgroundAndAllowCommandFailure(
-        {newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID, toShard, performVerification},
+        {
+            newShardKeyPattern,
+            newChunks,
+            forceRedistribution,
+            reshardingUUID,
+            toShard,
+            performVerification,
+        },
         expectedErrorCode,
     ) {
-        for (let disallowedErrorCode of [ErrorCodes.FailedToSatisfyReadPreference, ErrorCodes.HostUnreachable]) {
+        for (let disallowedErrorCode of [
+            ErrorCodes.FailedToSatisfyReadPreference,
+            ErrorCodes.HostUnreachable,
+        ]) {
             assert.neq(
                 expectedErrorCode,
                 disallowedErrorCode,
@@ -451,7 +504,11 @@ export var ReshardingTest = class {
         this._newShardKey = Object.assign({}, newShardKeyPattern);
 
         if (toShard === undefined) {
-            newChunks = newChunks.map((chunk) => ({min: chunk.min, max: chunk.max, recipientShardId: chunk.shard}));
+            newChunks = newChunks.map((chunk) => ({
+                min: chunk.min,
+                max: chunk.max,
+                recipientShardId: chunk.shard,
+            }));
             this._presetReshardedChunks = newChunks;
         }
 
@@ -463,7 +520,10 @@ export var ReshardingTest = class {
                 configureFailPoint(configServer, "reshardingPauseCoordinatorBeforeBlockingWrites"),
             );
             this._pauseCoordinatorBeforeDecisionPersistedFailpoints.push(
-                configureFailPoint(configServer, "reshardingPauseCoordinatorBeforeDecisionPersisted"),
+                configureFailPoint(
+                    configServer,
+                    "reshardingPauseCoordinatorBeforeDecisionPersisted",
+                ),
             );
             this._pauseCoordinatorBeforeCompletionFailpoints.push(
                 configureFailPoint(configServer, "reshardingPauseCoordinatorBeforeCompletion", {
@@ -578,7 +638,12 @@ export var ReshardingTest = class {
      * See _withOperationInBackground for duringReshardingFn and options documentation.
      */
     withMoveCollectionInBackground(operationArgs, duringReshardingFn, options = {}) {
-        this._withOperationInBackground("moveCollection", operationArgs, duringReshardingFn, options);
+        this._withOperationInBackground(
+            "moveCollection",
+            operationArgs,
+            duringReshardingFn,
+            options,
+        );
     }
 
     /**
@@ -587,7 +652,12 @@ export var ReshardingTest = class {
      * See _withOperationInBackground for duringReshardingFn and options documentation.
      */
     withUnshardCollectionInBackground(operationArgs, duringReshardingFn, options = {}) {
-        this._withOperationInBackground("unshardCollection", operationArgs, duringReshardingFn, options);
+        this._withOperationInBackground(
+            "unshardCollection",
+            operationArgs,
+            duringReshardingFn,
+            options,
+        );
     }
 
     /**
@@ -597,7 +667,12 @@ export var ReshardingTest = class {
      * See _withOperationInBackground for duringReshardingFn and options documentation.
      */
     withRewriteCollectionInBackground(operationArgs, duringReshardingFn, options = {}) {
-        this._withOperationInBackground("rewriteCollection", operationArgs, duringReshardingFn, options);
+        this._withOperationInBackground(
+            "rewriteCollection",
+            operationArgs,
+            duringReshardingFn,
+            options,
+        );
     }
 
     /**
@@ -612,7 +687,12 @@ export var ReshardingTest = class {
      * See _withOperationInBackground for duringReshardingFn and options documentation.
      */
     withReshardingInBackground(operationArgs, duringReshardingFn, options = {}) {
-        this._withOperationInBackground("reshardCollection", operationArgs, duringReshardingFn, options);
+        this._withOperationInBackground(
+            "reshardCollection",
+            operationArgs,
+            duringReshardingFn,
+            options,
+        );
     }
 
     /**
@@ -770,7 +850,10 @@ export var ReshardingTest = class {
                     )}`,
                 );
 
-                print("The mongo shell is expected to abort due to the resharding thread being" + " left unjoined");
+                print(
+                    "The mongo shell is expected to abort due to the resharding thread being" +
+                        " left unjoined",
+                );
             }
 
             throw duringReshardingError;
@@ -811,7 +894,10 @@ export var ReshardingTest = class {
                     return true;
                 }
 
-                if (completionFailpoint !== fp && completionFailpoint.waitWithTimeout(fpWaitTimeout)) {
+                if (
+                    completionFailpoint !== fp &&
+                    completionFailpoint.waitWithTimeout(fpWaitTimeout)
+                ) {
                     completionFailpoint.off();
                 }
 
@@ -857,7 +943,11 @@ export var ReshardingTest = class {
                 // reshardingPauseCoordinatorBeforeDecisionPersisted failpoint to wait for all of
                 // the recipient shards to have applied through all of the oplog entries from all of
                 // the donor shards.
-                if (!this._waitForFailPoint(this._pauseCoordinatorBeforeBlockingWritesFailpoints[primaryIdx])) {
+                if (
+                    !this._waitForFailPoint(
+                        this._pauseCoordinatorBeforeBlockingWritesFailpoints[primaryIdx],
+                    )
+                ) {
                     performCorrectnessChecks = false;
                 }
                 this._pauseCoordinatorBeforeBlockingWritesFailpoints.forEach((fp) => fp.off());
@@ -866,7 +956,11 @@ export var ReshardingTest = class {
                 // Persisted" failpoint. If the command has returned, don't require that the
                 // failpoint was entered. This ensures that following up by joining the
                 // `_reshardingThread` will succeed.
-                if (!this._waitForFailPoint(this._pauseCoordinatorBeforeDecisionPersistedFailpoints[primaryIdx])) {
+                if (
+                    !this._waitForFailPoint(
+                        this._pauseCoordinatorBeforeDecisionPersistedFailpoints[primaryIdx],
+                    )
+                ) {
                     performCorrectnessChecks = false;
                 }
 
@@ -894,7 +988,9 @@ export var ReshardingTest = class {
                 );
 
                 postDecisionPersistedFn();
-                this._pauseCoordinatorBeforeCompletionFailpoints.forEach((fp) => this.retryOnceOnNetworkError(fp.off));
+                this._pauseCoordinatorBeforeCompletionFailpoints.forEach((fp) =>
+                    this.retryOnceOnNetworkError(fp.off),
+                );
             });
         }
 
@@ -936,10 +1032,12 @@ export var ReshardingTest = class {
 
         const diff = ((diff) => {
             return {
-                docsWithDifferentContents: diff.docsWithDifferentContents.map(({first, second}) => ({
-                    original: first,
-                    resharded: second,
-                })),
+                docsWithDifferentContents: diff.docsWithDifferentContents.map(
+                    ({first, second}) => ({
+                        original: first,
+                        resharded: second,
+                    }),
+                ),
                 docsExtraAfterResharding: diff.docsMissingOnFirst,
                 docsMissingAfterResharding: diff.docsMissingOnSecond,
             };
@@ -968,14 +1066,20 @@ export var ReshardingTest = class {
         // shard would appear as extra documents.
         const tempColl = this._st.s.getCollection(this._tempNs);
         const localReadCursor = tempColl.find().rawData().sort({_id: 1});
-        const availableReadCursor = tempColl.find().rawData().readConcern("available").sort({_id: 1});
+        const availableReadCursor = tempColl
+            .find()
+            .rawData()
+            .readConcern("available")
+            .sort({_id: 1});
 
         const diff = ((diff) => {
             return {
-                docsWithDifferentContents: diff.docsWithDifferentContents.map(({first, second}) => ({
-                    local: first,
-                    available: second,
-                })),
+                docsWithDifferentContents: diff.docsWithDifferentContents.map(
+                    ({first, second}) => ({
+                        local: first,
+                        available: second,
+                    }),
+                ),
                 docsFoundUnownedWithReadAvailable: diff.docsMissingOnFirst,
                 docsNotFoundWithReadAvailable: diff.docsMissingOnSecond,
             };
@@ -1016,7 +1120,10 @@ export var ReshardingTest = class {
 
         // TODO SERVER-101784 simplify once only viewless timeseries collections exist.
         if (collOptions.timeseries !== undefined && !areViewlessTimeseriesEnabled(this._st.s)) {
-            let bucketUUID = getUUIDFromListCollections(sourceDB, getTimeseriesBucketsColl(collName));
+            let bucketUUID = getUUIDFromListCollections(
+                sourceDB,
+                getTimeseriesBucketsColl(collName),
+            );
 
             assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
 
@@ -1086,17 +1193,23 @@ export var ReshardingTest = class {
         assert.eq(
             [],
             this._st.config.collections.find({_id: this._tempNs}).toArray(),
-            "expected there to not be a config.collections entry for the temporary" + " resharding collection",
+            "expected there to not be a config.collections entry for the temporary" +
+                " resharding collection",
         );
 
         assert.eq(
             [],
             this._st.config.chunks.find({ns: this._tempNs}).toArray(),
-            "expected there to not be any config.chunks entry for the temporary" + " resharding collection",
+            "expected there to not be any config.chunks entry for the temporary" +
+                " resharding collection",
         );
 
         const collEntry = this._st.config.collections.findOne({_id: this._underlyingSourceNs});
-        assert.neq(null, collEntry, `didn't find config.collections entry for ${this._underlyingSourceNs}`);
+        assert.neq(
+            null,
+            collEntry,
+            `didn't find config.collections entry for ${this._underlyingSourceNs}`,
+        );
 
         if (expectedErrorCode === ErrorCodes.OK) {
             const expectedShardKey = this._translateTimeseriesShardKey(this._newShardKey);
@@ -1146,24 +1259,37 @@ export var ReshardingTest = class {
                 `collection UUID didn't change on ${recipient.shardName} despite resharding having succeeded`,
             );
         } else if (expectedErrorCode !== ErrorCodes.OK && !isAlsoDonor) {
-            assert.eq(null, collInfo, `collection exists on ${recipient.shardName} despite resharding having failed`);
+            assert.eq(
+                null,
+                collInfo,
+                `collection exists on ${recipient.shardName} despite resharding having failed`,
+            );
         }
 
         assert.eq(
             [],
-            recipient.getCollection(`config.localReshardingOperations.recipient.progress_fetcher`).find().toArray(),
+            recipient
+                .getCollection(`config.localReshardingOperations.recipient.progress_fetcher`)
+                .find()
+                .toArray(),
             `config.localReshardingOperations.recipient.progress_fetcher wasn't cleaned up on ${recipient.shardName}`,
         );
 
         assert.eq(
             [],
-            recipient.getCollection(`config.localReshardingOperations.recipient.progress_applier`).find().toArray(),
+            recipient
+                .getCollection(`config.localReshardingOperations.recipient.progress_applier`)
+                .find()
+                .toArray(),
             `config.localReshardingOperations.recipient.progress_applier wasn't cleaned up on ${recipient.shardName}`,
         );
 
         assert.eq(
             [],
-            recipient.getCollection(`config.localReshardingOperations.recipient.progress_txn_cloner`).find().toArray(),
+            recipient
+                .getCollection(`config.localReshardingOperations.recipient.progress_txn_cloner`)
+                .find()
+                .toArray(),
             `config.localReshardingOperations.recipient.progress_txn_cloner wasn't cleaned up on ${
                 recipient.shardName
             }`,
@@ -1174,7 +1300,9 @@ export var ReshardingTest = class {
             assert.eq(
                 null,
                 recipient
-                    .getCollection(`config.localReshardingOplogBuffer.${sourceCollectionUUIDString}.${donor.shardName}`)
+                    .getCollection(
+                        `config.localReshardingOplogBuffer.${sourceCollectionUUIDString}.${donor.shardName}`,
+                    )
                     .exists(),
                 `expected config.localReshardingOplogBuffer.${sourceCollectionUUIDString}.${
                     donor.shardName
@@ -1201,16 +1329,21 @@ export var ReshardingTest = class {
                 res = recipient.getCollection(localRecipientOpsNs).find().toArray();
                 return res.length === 0;
             },
-            () => `${localRecipientOpsNs} document wasn't cleaned up on ${recipient.shardName}: ${tojson(res)}`,
+            () =>
+                `${localRecipientOpsNs} document wasn't cleaned up on ${recipient.shardName}: ${tojson(res)}`,
         );
     }
 
     /** @private */
     _checkDonorPostState(donor, expectedErrorCode) {
         const collInfo = donor.getCollection(this._underlyingSourceNs).exists();
-        const isAlsoRecipient = this._recipientShards().includes(donor) || donor.shardName === this._primaryShardName;
+        const isAlsoRecipient =
+            this._recipientShards().includes(donor) || donor.shardName === this._primaryShardName;
         if (expectedErrorCode === ErrorCodes.OK && !isAlsoRecipient) {
-            assert(collInfo == null, `collection exists on ${donor.shardName} despite resharding having succeeded`);
+            assert(
+                collInfo == null,
+                `collection exists on ${donor.shardName} despite resharding having succeeded`,
+            );
         } else if (expectedErrorCode !== ErrorCodes.OK) {
             assert.neq(
                 null,
@@ -1231,7 +1364,8 @@ export var ReshardingTest = class {
                 res = donor.getCollection(localDonorOpsNs).find().toArray();
                 return res.length === 0;
             },
-            () => `${localDonorOpsNs} document wasn't cleaned up on ${donor.shardName}: ${tojson(res)}`,
+            () =>
+                `${localDonorOpsNs} document wasn't cleaned up on ${donor.shardName}: ${tojson(res)}`,
         );
     }
 
@@ -1295,7 +1429,11 @@ export var ReshardingTest = class {
 
                     assert.eq(newPrimary, replSet.getPrimary());
                     this._st.getAllNodes().forEach((conn) => {
-                        awaitRSClientHosts(conn, {host: newPrimary.host}, {ok: true, ismaster: true});
+                        awaitRSClientHosts(
+                            conn,
+                            {host: newPrimary.host},
+                            {ok: true, ismaster: true},
+                        );
                     });
                     return;
                 } else {
@@ -1311,7 +1449,10 @@ export var ReshardingTest = class {
             secondaries.splice(newPrimaryIdx, 1);
         }
 
-        jsTest.log(`ReshardingTestFixture failed to step up secondaries, trying to step` + ` original primary back up`);
+        jsTest.log(
+            `ReshardingTestFixture failed to step up secondaries, trying to step` +
+                ` original primary back up`,
+        );
         replSet.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
     }
 
@@ -1328,7 +1469,9 @@ export var ReshardingTest = class {
     }
 
     shutdownAndRestartPrimaryOnShard(shardName) {
-        jsTest.log(`ReshardingTestFixture shutting down and restarting primary on shard ${shardName}`);
+        jsTest.log(
+            `ReshardingTestFixture shutting down and restarting primary on shard ${shardName}`,
+        );
         const replSet = this.getReplSetForShard(shardName);
 
         this._st.shutdownAndRestartPrimaryOnShard(shardName, replSet);
@@ -1360,7 +1503,9 @@ export var ReshardingTest = class {
         let cloneTimestamp;
 
         assert.soon(() => {
-            const coordinatorDoc = this._st.config.reshardingOperations.findOne({ns: this._underlyingSourceNs});
+            const coordinatorDoc = this._st.config.reshardingOperations.findOne({
+                ns: this._underlyingSourceNs,
+            });
             cloneTimestamp = coordinatorDoc !== null ? coordinatorDoc.cloneTimestamp : undefined;
             return cloneTimestamp !== undefined;
         });

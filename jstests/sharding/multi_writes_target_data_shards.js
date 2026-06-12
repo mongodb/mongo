@@ -41,7 +41,9 @@ function setupDataDistribution() {
 
     db.dropDatabase();
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(mongos.adminCommand({shardCollection: kNs, key: {x: 1}}));
 
@@ -150,7 +152,11 @@ jsTest.log("deleteMany targeting one shard should not delete orphans");
 
     // Verify orphans were not deleted
     const orphanCountAfter = shard2DB[kCollName].countDocuments({isOrphan: true});
-    assert.eq(orphanCountBefore, orphanCountAfter, "Orphan count changed unexpectedly during single-shard delete");
+    assert.eq(
+        orphanCountBefore,
+        orphanCountAfter,
+        "Orphan count changed unexpectedly during single-shard delete",
+    );
 
     // Restore data for subsequent tests
     setupDataDistribution();
@@ -172,7 +178,11 @@ jsTest.log("deleteMany targeting multiple shards should delete orphans");
 
     // Verify orphans were deleted
     const orphanCountAfter = shard2DB[kCollName].countDocuments({isOrphan: true});
-    assert.eq(0, orphanCountAfter, "Expected all orphans to be deleted, but found " + orphanCountAfter);
+    assert.eq(
+        0,
+        orphanCountAfter,
+        "Expected all orphans to be deleted, but found " + orphanCountAfter,
+    );
 
     // Restore data for subsequent tests
     setupDataDistribution();
@@ -180,10 +190,14 @@ jsTest.log("deleteMany targeting multiple shards should delete orphans");
 
 jsTest.log("Enabling onlyTargetDataOwningShardsForMultiWrites feature");
 assert.commandWorked(
-    st.s.adminCommand({setClusterParameter: {onlyTargetDataOwningShardsForMultiWrites: {enabled: true}}}),
+    st.s.adminCommand({
+        setClusterParameter: {onlyTargetDataOwningShardsForMultiWrites: {enabled: true}},
+    }),
 );
 
-assert.commandWorked(st.s.adminCommand({getClusterParameter: "onlyTargetDataOwningShardsForMultiWrites"}));
+assert.commandWorked(
+    st.s.adminCommand({getClusterParameter: "onlyTargetDataOwningShardsForMultiWrites"}),
+);
 
 jsTest.log("With onlyTargetDataOwningShardsForMultiWrites, updateMany should not touch orphans");
 {
@@ -223,7 +237,9 @@ jsTest.log("With onlyTargetDataOwningShardsForMultiWrites, deleteMany should not
         "Expected orphans to remain with onlyTargetDataOwningShardsForMultiWrites enabled",
     );
 
-    jsTest.log("Test passed: orphans were not deleted with onlyTargetDataOwningShardsForMultiWrites enabled");
+    jsTest.log(
+        "Test passed: orphans were not deleted with onlyTargetDataOwningShardsForMultiWrites enabled",
+    );
 }
 
 st.stop();

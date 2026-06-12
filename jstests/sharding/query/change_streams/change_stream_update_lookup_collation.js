@@ -23,7 +23,9 @@ const st = new ShardingTest({
 
 const mongosDB = st.s0.getDB(jsTestName());
 // Ensure the test db primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 const mongosColl = mongosDB[jsTestName()];
 
@@ -31,7 +33,9 @@ const caseInsensitive = {
     locale: "en_US",
     strength: 2,
 };
-assert.commandWorked(mongosDB.runCommand({create: mongosColl.getName(), collation: caseInsensitive}));
+assert.commandWorked(
+    mongosDB.runCommand({create: mongosColl.getName(), collation: caseInsensitive}),
+);
 
 // Shard the test collection on 'shardKey'. The shard key must use the simple collation.
 assert.commandWorked(
@@ -45,11 +49,17 @@ assert.commandWorked(
 // Split the collection into 2 chunks: [MinKey, "aBC"), ["aBC", MaxKey). Note that there will be
 // documents in each chunk that will have the same shard key according to the collection's
 // default collation, but not according to the simple collation (e.g. "abc" and "ABC").
-assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: "aBC"}}));
+assert.commandWorked(
+    mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: "aBC"}}),
+);
 
 // Move the [MinKey, 'aBC') chunk to st.shard1.shardName.
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {shardKey: "ABC"}, to: st.rs1.getURL()}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {shardKey: "ABC"},
+        to: st.rs1.getURL(),
+    }),
 );
 
 // Make sure that "ABC" and "abc" go to different shards - we rely on that to make sure the _ids

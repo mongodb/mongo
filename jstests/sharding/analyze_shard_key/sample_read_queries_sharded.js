@@ -41,7 +41,9 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shar
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.name}));
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}),
+);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];

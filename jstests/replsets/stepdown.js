@@ -28,7 +28,11 @@ let primary = replTest.getPrimary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // do a write
@@ -165,7 +169,9 @@ try {
     );
 
     jsTestLog("Do stepdown of primary " + primary + " that should work");
-    assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}));
+    assert.commandWorked(
+        primary.adminCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}),
+    );
 
     // Check that the 'total' fields of 'replSetStepDown' and 'replSetStepDownWithForce' have been
     // incremented in serverStatus and that their 'failed' fields have not been incremented.
@@ -218,7 +224,9 @@ try {
     // Stepdown should fail because the node is no longer primary
     jsTestLog("Do stepdown of primary " + primary + " that should not work");
     assert.commandFailedWithCode(
-        primary.getDB("admin").runCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}),
+        primary
+            .getDB("admin")
+            .runCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}),
         ErrorCodes.NotWritablePrimary,
     );
 

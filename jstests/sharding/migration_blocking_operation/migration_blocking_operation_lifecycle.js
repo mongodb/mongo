@@ -53,7 +53,12 @@ for (const command of [kBeginCommand, kEndCommand]) {
     // Verify _shardsvrCoordinateMultiUpdate only runs on shard servers.
     assertCommandReturns(st.rs0.getSecondary(), command, uuid, ErrorCodes.NotWritablePrimary);
     assertCommandReturns(st.s, command, uuid, ErrorCodes.CommandNotFound);
-    assertCommandReturns(replicaSet.getPrimary(), command, uuid, ErrorCodes.ShardingStateNotInitialized);
+    assertCommandReturns(
+        replicaSet.getPrimary(),
+        command,
+        uuid,
+        ErrorCodes.ShardingStateNotInitialized,
+    );
 }
 
 assert(migrationsAreAllowed(db, collName));

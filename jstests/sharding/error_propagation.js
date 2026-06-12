@@ -9,11 +9,19 @@ db.setSecondaryOk();
 
 assert.commandWorked(db.foo.insert({a: 1}, {writeConcern: {w: 3}}));
 assert.commandWorked(
-    db.runCommand({aggregate: "foo", pipeline: [{$project: {total: {"$add": ["$a", 1]}}}], cursor: {}}),
+    db.runCommand({
+        aggregate: "foo",
+        pipeline: [{$project: {total: {"$add": ["$a", 1]}}}],
+        cursor: {},
+    }),
 );
 
 assert.commandWorked(db.foo.insert({a: [1, 2]}, {writeConcern: {w: 3}}));
 
-let res = db.runCommand({aggregate: "foo", pipeline: [{$project: {total: {"$add": ["$a", 1]}}}], cursor: {}});
+let res = db.runCommand({
+    aggregate: "foo",
+    pipeline: [{$project: {total: {"$add": ["$a", 1]}}}],
+    cursor: {},
+});
 assert.commandFailedWithCode(res, [16554, ErrorCodes.TypeMismatch]);
 st.stop();

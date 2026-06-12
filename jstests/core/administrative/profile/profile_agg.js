@@ -22,12 +22,16 @@ const coll = testDB.getCollection(collName);
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDB
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 //
@@ -122,7 +126,10 @@ for (let i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
-assert.eq(1, coll.aggregate([{$match: {a: 3, b: 3}}, {$addFields: {c: 1}}], {hint: {_id: 1}}).itcount());
+assert.eq(
+    1,
+    coll.aggregate([{$match: {a: 3, b: 3}}, {$addFields: {c: 1}}], {hint: {_id: 1}}).itcount(),
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.command.hint, {_id: 1}, tojson(profileObj));
 
@@ -136,7 +143,12 @@ for (let i = 0; i < 501; i++) {
     matchPredicate[i] = "a".repeat(150);
 }
 
-assert.eq(coll.aggregate([{$match: matchPredicate}, {$addFields: {c: 1}}], {comment: "profile_agg"}).itcount(), 0);
+assert.eq(
+    coll
+        .aggregate([{$match: matchPredicate}, {$addFields: {c: 1}}], {comment: "profile_agg"})
+        .itcount(),
+    0,
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(typeof profileObj.command.$truncated, "string", tojson(profileObj));
 assert.eq(profileObj.command.comment, "profile_agg", tojson(profileObj));

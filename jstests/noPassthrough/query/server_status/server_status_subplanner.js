@@ -23,7 +23,9 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
 // Force classic engine since the metric only tracks classic subplanner invocations.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 function getSubPlannerMetrics() {
     return db.serverStatus().metrics.query.subPlanner;
@@ -62,7 +64,8 @@ function getSubPlannerMetrics() {
 // Verify FTDC includes subplanner metrics.
 assert.soon(
     () => {
-        const subPlannerFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.subPlanner;
+        const subPlannerFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics
+            .query.subPlanner;
 
         if (subPlannerFtdc.classicChoseWinningPlan != 2) {
             return false;

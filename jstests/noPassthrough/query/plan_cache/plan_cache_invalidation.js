@@ -102,7 +102,9 @@ class TestCollection {
     const test = new TestCollection(collectionName);
     const initialPlanCacheSize = getPlanCacheSize(db);
 
-    assert.commandWorked(db.runCommand({collMod: collectionName, validator: {text: {$type: "string"}}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collectionName, validator: {text: {$type: "string"}}}),
+    );
 
     assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertCollectionCacheEntriesNotRemoved();
@@ -151,7 +153,9 @@ class TestCollection {
     assert.eq(numberOfCacheEntries + 1, getPlanCacheNumEntries(db));
     const planCacheSize = getPlanCacheSize(db);
 
-    assert.commandWorked(db.runCommand({planCacheClear: collectionName, query: {a: 1, b: 2, c: 3, d: 4}}));
+    assert.commandWorked(
+        db.runCommand({planCacheClear: collectionName, query: {a: 1, b: 2, c: 3, d: 4}}),
+    );
     assert.lt(getPlanCacheSize(db), planCacheSize);
     assert.eq(numberOfCacheEntries, getPlanCacheNumEntries(db));
 })();

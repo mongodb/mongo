@@ -41,7 +41,9 @@ const fieldNameSize = 8;
 let maxFields = Math.trunc(maxMeasurementSize / (meanArbitrarySize + fieldNameSize));
 
 let counter = 0;
-const uniquePaddedHexFieldNameArb = fc.constant(null).map(() => (counter++).toString(16).padStart(fieldNameSize, "0"));
+const uniquePaddedHexFieldNameArb = fc
+    .constant(null)
+    .map(() => (counter++).toString(16).padStart(fieldNameSize, "0"));
 const programArb = makeTimeseriesCommandSequenceArb(
     /* minCommands   */ 1,
     /* maxCommands   */ 30,
@@ -60,4 +62,7 @@ const programArb = makeTimeseriesCommandSequenceArb(
     /* replayPath    */ fcParams.replayPath, // replace this value with the replay path to replicate a failure
 );
 
-fixture.run(programArb, "keeps tsColl and ctrlColl in sync under batch inserts that have many fields");
+fixture.run(
+    programArb,
+    "keeps tsColl and ctrlColl in sync under batch inserts that have many fields",
+);

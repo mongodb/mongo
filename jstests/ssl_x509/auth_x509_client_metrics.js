@@ -41,7 +41,8 @@ st.configRS.getSecondaries().forEach((conn) => {
         }),
         `X.509 auth failed on secondary ${conn.host} before running serverStatus`,
     );
-    const stats = assert.commandWorked(external.runCommand({serverStatus: 1})).security.authentication;
+    const stats = assert.commandWorked(external.runCommand({serverStatus: 1})).security
+        .authentication;
     jsTest.log.info("Authn stats: " + tojson(stats));
     assert.gt(stats.totalEgressAuthenticationTimeMicros, 0);
     const mechStats = stats.mechanisms;
@@ -59,7 +60,8 @@ st.configRS.getSecondaries().forEach((conn) => {
             assert.eq(
                 egressAuthSuccesses,
                 stats.egress.authenticate.total,
-                "MONGODB-X509 egress authenticate successful count should equal total on " + conn.host,
+                "MONGODB-X509 egress authenticate successful count should equal total on " +
+                    conn.host,
             );
             assert.eq(
                 stats.egress.speculativeAuthenticate.total,
@@ -70,28 +72,43 @@ st.configRS.getSecondaries().forEach((conn) => {
             assert.eq(
                 stats.egress.authenticate.total,
                 0,
-                "Mechanism " + mech + " should have no egress authenticate attempts on " + conn.host,
+                "Mechanism " +
+                    mech +
+                    " should have no egress authenticate attempts on " +
+                    conn.host,
             );
             assert.eq(
                 stats.egress.speculativeAuthenticate.total,
                 0,
-                "Mechanism " + mech + " should have no egress speculativeAuthenticate attempts on " + conn.host,
+                "Mechanism " +
+                    mech +
+                    " should have no egress speculativeAuthenticate attempts on " +
+                    conn.host,
             );
             if (stats.hasOwnProperty("ingress")) {
                 assert.eq(
                     stats.ingress.authenticate.total,
                     0,
-                    "Mechanism " + mech + " should have no ingress authenticate attempts on " + conn.host,
+                    "Mechanism " +
+                        mech +
+                        " should have no ingress authenticate attempts on " +
+                        conn.host,
                 );
                 assert.eq(
                     stats.ingress.speculativeAuthenticate.total,
                     0,
-                    "Mechanism " + mech + " should have no ingress speculativeAuthenticate attempts on " + conn.host,
+                    "Mechanism " +
+                        mech +
+                        " should have no ingress speculativeAuthenticate attempts on " +
+                        conn.host,
                 );
                 assert.eq(
                     stats.ingress.clusterAuthenticate.total,
                     0,
-                    "Mechanism " + mech + " should have no ingress clusterAuthenticate attempts on " + conn.host,
+                    "Mechanism " +
+                        mech +
+                        " should have no ingress clusterAuthenticate attempts on " +
+                        conn.host,
                 );
             }
         }
@@ -119,7 +136,8 @@ st.configRS.getSecondaries().forEach((conn) => {
     assert.lte(
         Math.abs(successMessages.length - egressAuthSuccesses),
         2,
-        "X.509 success log message count should be roughly egress auth success count on " + conn.host,
+        "X.509 success log message count should be roughly egress auth success count on " +
+            conn.host,
     );
 });
 

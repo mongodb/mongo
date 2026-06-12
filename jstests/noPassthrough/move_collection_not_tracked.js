@@ -21,7 +21,10 @@ const testCases = [
                     createRole: "testRole",
                     privileges: [
                         {resource: {db: "roleDb1", collection: ""}, actions: ["find", "update"]},
-                        {resource: {db: "roleDb2", collection: "foo"}, actions: ["insert", "remove"]},
+                        {
+                            resource: {db: "roleDb2", collection: "foo"},
+                            actions: ["insert", "remove"],
+                        },
                     ],
                     roles: [],
                 }),
@@ -32,7 +35,9 @@ const testCases = [
     {
         name: "systemUsers",
         setup: (st) => {
-            assert.commandWorked(st.s.adminCommand({createUser: "testUser", pwd: "pwd", roles: []}));
+            assert.commandWorked(
+                st.s.adminCommand({createUser: "testUser", pwd: "pwd", roles: []}),
+            );
         },
         tasks: [{nsToMove: "admin.system.users"}],
     },
@@ -40,7 +45,9 @@ const testCases = [
         name: "systemJS",
         setup: (st) => {
             const dbName = "testDbWithSystemJS";
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             assert.commandWorked(
                 st.s
                     .getDB(dbName)
@@ -61,10 +68,16 @@ const testCases = [
             const dbName = "testDbWithView";
             const collName = "testColl";
             const testDB = st.s.getDB(dbName);
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             assert.commandWorked(testDB.getCollection(collName).insert({x: 1}));
             assert.commandWorked(
-                testDB.runCommand({create: "testCollView", viewOn: collName, pipeline: [{$match: {}}]}),
+                testDB.runCommand({
+                    create: "testCollView",
+                    viewOn: collName,
+                    pipeline: [{$match: {}}],
+                }),
             );
         },
         tasks: [
@@ -78,7 +91,9 @@ const testCases = [
         shouldSkip: () => !buildInfo().modules.includes("enterprise"),
         setup: (st) => {
             const dbName = "testDbWithFLE";
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             const encryptedClient = new EncryptedClient(st.s, dbName);
             // Make sure that the internal esc and ecoc collections get created
             assert.commandWorked(
@@ -86,13 +101,17 @@ const testCases = [
                     encryptedFields: {
                         escCollection: "enxcol_.testColl.esc",
                         ecocCollection: "enxcol_.testColl.ecoc",
-                        "fields": [{"path": "x", "bsonType": "int", "queries": {"queryType": "equality"}}],
+                        "fields": [
+                            {"path": "x", "bsonType": "int", "queries": {"queryType": "equality"}},
+                        ],
                     },
                 }),
             );
             // Explicitly create dummy instances of the ecoc.compact collection
             encryptedClient.runEncryptionOperation(() => {
-                assert.commandWorked(encryptedClient.getDB().createCollection("enxcol_.testColl.ecoc.compact"));
+                assert.commandWorked(
+                    encryptedClient.getDB().createCollection("enxcol_.testColl.ecoc.compact"),
+                );
             });
         },
         tasks: [
@@ -106,7 +125,9 @@ const testCases = [
         setup: (st) => {
             const dbName = "testDbWithSystemResharding";
             const testDB = st.s.getDB(dbName);
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             // Create a dummy instance of a reshard collection
             assert.commandWorked(testDB.createCollection("system.resharding.testColl"));
         },
@@ -119,14 +140,19 @@ const testCases = [
     },
     {
         name: "systemReshardingTimeseries",
-        shouldSkip: (conn) => !areViewlessTimeseriesEnabled(conn.getDB("testDbWithSystemReshardingTimeseries")),
+        shouldSkip: (conn) =>
+            !areViewlessTimeseriesEnabled(conn.getDB("testDbWithSystemReshardingTimeseries")),
         setup: (st) => {
             const dbName = "testDbWithSystemReshardingTimeseries";
             const testDB = st.s.getDB(dbName);
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             // Create a dummy instance of a temporary timeseries reshard collection
             assert.commandWorked(
-                testDB.createCollection("system.resharding.testColl", {timeseries: {timeField: "x", metaField: "y"}}),
+                testDB.createCollection("system.resharding.testColl", {
+                    timeseries: {timeField: "x", metaField: "y"},
+                }),
             );
         },
         tasks: [{nsToMove: "testDbWithSystemReshardingTimeseries.system.resharding.testColl"}],
@@ -139,11 +165,14 @@ const testCases = [
     {
         // TODO(SERVER-101595): Completely remove this test case
         name: "systemBucketsResharding",
-        shouldSkip: (conn) => areViewlessTimeseriesEnabled(conn.getDB("testDbWithSystemBucketsResharding")),
+        shouldSkip: (conn) =>
+            areViewlessTimeseriesEnabled(conn.getDB("testDbWithSystemBucketsResharding")),
         setup: (st) => {
             const dbName = "testDbWithSystemBucketsResharding";
             const testDB = st.s.getDB(dbName);
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             // Create a dummy instance of a temporary legacy timeseries buckets reshard collection
             assert.commandWorked(
                 testDB.createCollection("system.buckets.resharding.testColl", {
@@ -195,8 +224,13 @@ function runTest(configShard) {
                 return;
             }
             const expectedError = task.expectedError || ErrorCodes.IllegalOperation;
-            jsTest.log("Running task: " + tojsononeline(task) + ", expectedError: " + expectedError);
-            const moveRes = st.s.adminCommand({moveCollection: task.nsToMove, toShard: st.shard1.shardName});
+            jsTest.log(
+                "Running task: " + tojsononeline(task) + ", expectedError: " + expectedError,
+            );
+            const moveRes = st.s.adminCommand({
+                moveCollection: task.nsToMove,
+                toShard: st.shard1.shardName,
+            });
             assert.commandFailedWithCode(moveRes, expectedError);
             const collectionsAfterMove = configDB["collections"].find().toArray();
             assert.eq(bsonUnorderedFieldsCompare(collectionsInitial, collectionsAfterMove), 0, {

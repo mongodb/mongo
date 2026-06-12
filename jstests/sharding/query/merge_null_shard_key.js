@@ -26,9 +26,16 @@ st.shardColl(
 );
 
 assert.commandWorked(
-    inputColl.insertMany([{shard: {key: null}, a: 1}, {shard: {}, b: 2}, {c: 3}, {shard: "scalar", d: 4}]),
+    inputColl.insertMany([
+        {shard: {key: null}, a: 1},
+        {shard: {}, b: 2},
+        {c: 3},
+        {shard: "scalar", d: 4},
+    ]),
 );
-assert.doesNotThrow(() => inputColl.aggregate([{$addFields: {_id: 1}}, {$merge: {into: outputColl.getName()}}]));
+assert.doesNotThrow(() =>
+    inputColl.aggregate([{$addFields: {_id: 1}}, {$merge: {into: outputColl.getName()}}]),
+);
 assert.eq(sortDoc(outputColl.findOne({}, {shard: 0})), {_id: 1, a: 1, b: 2, c: 3, d: 4});
 
 st.stop();

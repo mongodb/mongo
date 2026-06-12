@@ -16,7 +16,11 @@ function assertCollectionCounts(db, qe, fle1) {
     const cs = db.serverStatus().catalogStats;
 
     assert.eq(cs.csfle, fle1, "Mismatch in actual vs expected for csfle1 collections");
-    assert.eq(cs.queryableEncryption, qe, "Mismatch in actual vs expected for queryableEncryption collections");
+    assert.eq(
+        cs.queryableEncryption,
+        qe,
+        "Mismatch in actual vs expected for queryableEncryption collections",
+    );
 }
 
 function runTest(conn) {

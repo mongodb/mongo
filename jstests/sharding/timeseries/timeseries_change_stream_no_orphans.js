@@ -71,7 +71,9 @@ let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDele
 // Creates a sharded timeseries collection having both a key field and a non-key field.
 // The key is the metaField of the timeseries collection.
 jsTest.log(`Shard a timeseries collection: ${collNS} with shard key: {tag: 1}`);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const db = st.s.getDB(dbName);
 db[collName].drop();
 assert.commandWorked(db.createCollection(collName, {timeseries: timeseriesOpt}));
@@ -94,7 +96,10 @@ assert.commandWorked(mongosColl.insert({_id: 8, tag: 3, time: ISODate(), f: 60})
 // buckets are not deleted because the range deletion is suspended and they are buckets with
 // tag = [0, 3].
 assert.commandWorked(
-    st.s.adminCommand({split: getTimeseriesCollForDDLOps(db, mongosColl).getFullName(), middle: {meta: 0}}),
+    st.s.adminCommand({
+        split: getTimeseriesCollForDDLOps(db, mongosColl).getFullName(),
+        middle: {meta: 0},
+    }),
 );
 assert.commandWorked(
     st.s.adminCommand({
@@ -147,7 +152,9 @@ const shard0Coll = shard0DB.getCollection(collName);
     // The orphaned bucket on the first shard have been updated since two measurements ({f: 30})
     // has been removed from the bucket and only the measurement with {_id: 4, f: 40} stays in
     // the bucket.
-    const actualBucket = getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 0});
+    const actualBucket = getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({
+        meta: 0,
+    });
 
     TimeseriesTest.decompressBucket(actualBucket);
 
@@ -169,7 +176,9 @@ const shard0Coll = shard0DB.getCollection(collName);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 (function testBroadcastedDeleteOnOrphanedBuckets() {
-    jsTest.log("A broadcasted delete of a single measurement generates a replace event of a bucket");
+    jsTest.log(
+        "A broadcasted delete of a single measurement generates a replace event of a bucket",
+    );
 
     // Sends a broadcasted delete (query on non-shardkey field) on a single measurement to all the
     // shards.
@@ -185,7 +194,9 @@ const shard0Coll = shard0DB.getCollection(collName);
 
     // The orphaned bucket on the first shard have not been updated, unlike the mongos collection.
     assert.eq(null, mongosColl.findOne({_id: 4}), mongosColl.find().toArray());
-    const shard0Bucket = getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 0});
+    const shard0Bucket = getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({
+        meta: 0,
+    });
 
     TimeseriesTest.decompressBucket(shard0Bucket);
 
@@ -215,7 +226,9 @@ const shard0Coll = shard0DB.getCollection(collName);
     // The orphaned bucket on first shard have not been removed, unlike the mongos collection.
     assert.eq(null, mongosColl.findOne({_id: 6}), mongosColl.find().toArray());
     assert.eq(null, mongosColl.findOne({_id: 7}), mongosColl.find().toArray());
-    const shard0Bucket = getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 2});
+    const shard0Bucket = getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({
+        meta: 2,
+    });
     TimeseriesTest.decompressBucket(shard0Bucket);
     assert.eq(2, shard0Bucket.meta, shard0Bucket);
     assert.eq(6, shard0Bucket.control.min._id, shard0Bucket);

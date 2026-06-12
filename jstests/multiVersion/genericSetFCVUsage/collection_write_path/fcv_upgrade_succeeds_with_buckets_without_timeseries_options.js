@@ -31,9 +31,21 @@ function testUpgradeFromFCV(conn, fromFCV) {
             if (FixtureHelpers.isMongos(conn.getDB("admin"))) {
                 continue;
             }
-            assert.commandWorked(conn.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: skip}));
-            configureFailPoint(conn, "skipCreateTimeseriesBucketsWithoutOptionsCheck", {}, skip ? "alwaysOn" : "off");
-            configureFailPoint(conn, "skipCreateTimeseriesVersionMismatchCheck", {}, skip ? "alwaysOn" : "off");
+            assert.commandWorked(
+                conn.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: skip}),
+            );
+            configureFailPoint(
+                conn,
+                "skipCreateTimeseriesBucketsWithoutOptionsCheck",
+                {},
+                skip ? "alwaysOn" : "off",
+            );
+            configureFailPoint(
+                conn,
+                "skipCreateTimeseriesVersionMismatchCheck",
+                {},
+                skip ? "alwaysOn" : "off",
+            );
         }
     }
 
@@ -43,7 +55,9 @@ function testUpgradeFromFCV(conn, fromFCV) {
     disableSystemBucketsCreationGuardrails(false);
 
     // Upgrade succeeds even though we have an invalid bucket collection
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // verify collection still exists after upgrade
     assert.eq(1, db.getCollectionInfos({name: bucketCollName}).length);

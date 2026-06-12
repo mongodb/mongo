@@ -13,15 +13,37 @@ const timeFieldName = "time";
 const metaFieldName = "metaField";
 const rawMetaFieldName = "meta";
 
-function testTargetingRespectsNormalizedMetadata(shardingKey, valueToSplitAt, chunk1, chunk2, measurementsToInsert) {
+function testTargetingRespectsNormalizedMetadata(
+    shardingKey,
+    valueToSplitAt,
+    chunk1,
+    chunk2,
+    measurementsToInsert,
+) {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: shardingKey}));
-    assert.commandWorked(st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), valueToSplitAt));
-    assert.commandWorked(st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(), chunk1, st.shard0.shardName));
-    assert.commandWorked(st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(), chunk2, st.shard1.shardName));
+    assert.commandWorked(
+        st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), valueToSplitAt),
+    );
+    assert.commandWorked(
+        st.moveChunk(
+            getTimeseriesCollForDDLOps(db, coll).getFullName(),
+            chunk1,
+            st.shard0.shardName,
+        ),
+    );
+    assert.commandWorked(
+        st.moveChunk(
+            getTimeseriesCollForDDLOps(db, coll).getFullName(),
+            chunk2,
+            st.shard1.shardName,
+        ),
+    );
 
     for (let i = 0; i < measurementsToInsert.length; i++) {
         assert.commandWorked(coll.insert(measurementsToInsert[i]));

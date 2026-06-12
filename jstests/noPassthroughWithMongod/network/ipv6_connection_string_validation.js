@@ -147,12 +147,29 @@ let testBad = function (i, connectionString, errorRegex, errorCode) {
         }
     }
     if (gotCorrectErrorText || gotCorrectErrorCode) {
-        print("Bad connection string " + i + ' ("' + connectionString + '") correctly rejected:\n' + tojson(exception));
+        print(
+            "Bad connection string " +
+                i +
+                ' ("' +
+                connectionString +
+                '") correctly rejected:\n' +
+                tojson(exception),
+        );
         return;
     }
-    let message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
+    let message =
+        "FAILED to generate correct exception for badString " +
+        i +
+        ' ("' +
+        connectionString +
+        '"): ';
     if (gotException) {
-        message += 'exception was "' + tojson(exception) + '", it should have matched "' + errorRegex.toString() + '"';
+        message +=
+            'exception was "' +
+            tojson(exception) +
+            '", it should have matched "' +
+            errorRegex.toString() +
+            '"';
     } else {
         message += "no exception was thrown";
     }

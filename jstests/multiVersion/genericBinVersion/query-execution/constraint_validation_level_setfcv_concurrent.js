@@ -24,7 +24,9 @@ const testDB = primary.getDB("constraint_validation_level_setfcv_concurrent");
 const validator = {a: {$exists: true}};
 const collName = "coll";
 
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 assert.commandWorked(testDB.createCollection(collName, {validator, validationLevel: "strict"}));
 
 // Pause the downgrade after the FCV document has moved to kDowngrading but before the collection
@@ -35,7 +37,9 @@ const hangFP = configureFailPoint(primary, "hangWhileDowngrading");
 const downgradeThread = new Thread(
     (host, lastLTSFCV) => {
         const conn = new Mongo(host);
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
     },
     primary.host,
     lastLTSFCV,

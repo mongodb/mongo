@@ -20,7 +20,9 @@ describe("Tests for priority port usage within JS test replica set helper", func
     before(function () {
         // Check that each node has the priority port and the corresponding unix socket set and listening
         this.checkPriorityPortSetAndListening = (conn, rs) => {
-            jsTest.log.info(`Checking priority port and corresponding unix socket are set and listening`);
+            jsTest.log.info(
+                `Checking priority port and corresponding unix socket are set and listening`,
+            );
             // Checking connection through TCP
             const connToPriorityPort = rs
                 ? rs.getNewConnectionToPriorityPort(conn)
@@ -82,7 +84,10 @@ describe("Tests for priority port usage within JS test replica set helper", func
             // we are not triggering any thread sanitizer race condition while avoiding port exhaustion)
             const numThreadsPerPort = 4;
             for (let i = 0; i < numThreadsPerPort; i++) {
-                workers.push({portName: "main", thread: this.spawnThreadForParallelConnections(host, conn.port)});
+                workers.push({
+                    portName: "main",
+                    thread: this.spawnThreadForParallelConnections(host, conn.port),
+                });
             }
             for (let i = 0; i < numThreadsPerPort; i++) {
                 workers.push({
@@ -149,7 +154,9 @@ describe("Tests for priority port usage within JS test replica set helper", func
 
         assert.eq(countFoundPorts, 1);
 
-        jsTest.log.info("Testing parallel connections to priority port on the node that has it set");
+        jsTest.log.info(
+            "Testing parallel connections to priority port on the node that has it set",
+        );
         this.runParallelConnections(rs.nodes[1], rs);
 
         rs.stopSet();

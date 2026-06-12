@@ -53,7 +53,9 @@ function runSingleInputPipelineScoreFusion(
     let query = {
         $scoreFusion: {
             input: {
-                pipelines: {pipeline1: [{$score: {score: scoreSpec, normalization: scoreNormalization}}]},
+                pipelines: {
+                    pipeline1: [{$score: {score: scoreSpec, normalization: scoreNormalization}}],
+                },
                 normalization: scoreFusionNormalization,
             },
             combination: combinationSpec,
@@ -70,7 +72,13 @@ for (const [
     scoreNormalization,
     combinationMethod,
     scoreSpec,
-] of crossProduct(normalizationOptions, weights, normalizationOptions, combinationMethods, scoreSpecs)) {
+] of crossProduct(
+    normalizationOptions,
+    weights,
+    normalizationOptions,
+    combinationMethods,
+    scoreSpecs,
+)) {
     runSingleInputPipelineScoreFusion(
         scoreFusionNormalization,
         firstPipelineWeight,
@@ -106,7 +114,9 @@ function runMultipleInputPipelineScoreFusion(
         $scoreFusion: {
             input: {
                 pipelines: {
-                    pipeline1: [{$score: {score: firstScoreSpec, normalization: firstScoreNormalization}}],
+                    pipeline1: [
+                        {$score: {score: firstScoreSpec, normalization: firstScoreNormalization}},
+                    ],
                     pipeline2: [
                         {$match: {single: {$gt: 5}}},
                         {$score: {score: secondScoreSpec, normalization: secondScoreNormalization}},

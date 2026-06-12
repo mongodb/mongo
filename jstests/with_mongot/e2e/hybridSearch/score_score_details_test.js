@@ -87,7 +87,10 @@ testScoreDetails("none", 0.5, expectedScoreResults);
 
 // Testcase: normalization is "sigmoid" and weight is 0.2.
 expectedScoreResults = coll
-    .aggregate([{$project: {expectedScore: {$sigmoid: {$add: ["$single", "$double"]}}}}, {$sort: {_id: 1}}])
+    .aggregate([
+        {$project: {expectedScore: {$sigmoid: {$add: ["$single", "$double"]}}}},
+        {$sort: {_id: 1}},
+    ])
     .toArray();
 testScoreDetails("sigmoid", 0.2, expectedScoreResults);
 
@@ -162,7 +165,9 @@ testScoreDetails("minMaxScaler", "unspecified", expectedScoreResults);
             // calculation of the second $score stage (without normalization).
             let expectedResultsPipeline = [];
             if (firstScoreNormalization === "none") {
-                expectedResultsPipeline.push({$addFields: {expected_raw_score: {$add: ["$single", 10]}}});
+                expectedResultsPipeline.push({
+                    $addFields: {expected_raw_score: {$add: ["$single", 10]}},
+                });
             } else if (firstScoreNormalization === "minMaxScaler") {
                 expectedResultsPipeline.push({
                     $setWindowFields: {
@@ -179,14 +184,18 @@ testScoreDetails("minMaxScaler", "unspecified", expectedScoreResults);
                     $addFields: {expected_raw_score: {$add: ["$normalized_first_score", 10]}},
                 });
             } else if (firstScoreNormalization === "sigmoid") {
-                expectedResultsPipeline.push({$addFields: {expected_raw_score: {$add: [{$sigmoid: "$single"}, 10]}}});
+                expectedResultsPipeline.push({
+                    $addFields: {expected_raw_score: {$add: [{$sigmoid: "$single"}, 10]}},
+                });
             }
 
             // Determine the stage specification to calculate the final score in scoreDetails. It is
             // calculated by taking the raw score output from the second $score and running it
             // through the normalization function of the second $score.
             if (secondScoreNormalization === "none") {
-                expectedResultsPipeline.push({$addFields: {expected_final_score: "$expected_raw_score"}});
+                expectedResultsPipeline.push({
+                    $addFields: {expected_final_score: "$expected_raw_score"},
+                });
             } else if (secondScoreNormalization === "minMaxScaler") {
                 expectedResultsPipeline.push({
                     $setWindowFields: {
@@ -200,7 +209,9 @@ testScoreDetails("minMaxScaler", "unspecified", expectedScoreResults);
                     },
                 });
             } else if (secondScoreNormalization === "sigmoid") {
-                expectedResultsPipeline.push({$addFields: {expected_final_score: {$sigmoid: "$expected_raw_score"}}});
+                expectedResultsPipeline.push({
+                    $addFields: {expected_final_score: {$sigmoid: "$expected_raw_score"}},
+                });
             }
 
             // $project the fields we want in the expected results.

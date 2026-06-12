@@ -40,7 +40,10 @@ let assertChunkSizes = function (splitVec, numDocs, maxChunkSize, msg) {
         // need to be exactly a multiple of maxChunkSize.
         if (i < splitVec.length - 2) {
             // We are within one object of the correct chunk size.
-            assert.lt(Math.abs(maxChunkSize - size), avgObjSize, "Assertion failed", {msg: msg + "b", chunk: "A" + i});
+            assert.lt(Math.abs(maxChunkSize - size), avgObjSize, "Assertion failed", {
+                msg: msg + "b",
+                chunk: "A" + i,
+            });
         } else {
             assert.gt(maxChunkSize, size, "Assertion failed", {msg: msg + "b", chunk: "A" + i});
         }
@@ -98,19 +101,29 @@ resetCollection();
 // Case 1: missing parameters
 
 assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector"}).ok, "1a");
-assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector", maxChunkSize: 1}).ok, "1b");
+assert.eq(
+    false,
+    db.runCommand({splitVector: "test.jstests_splitvector", maxChunkSize: 1}).ok,
+    "1b",
+);
 
 // -------------------------
 // Case 2: missing index
 
-assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1}).ok, "2");
+assert.eq(
+    false,
+    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
+        .ok,
+    "2",
+);
 
 // -------------------------
 // Case 3: empty collection
 f.createIndex({x: 1});
 assert.eq(
     [],
-    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1}).splitKeys,
+    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
+        .splitKeys,
     "3",
 );
 
@@ -132,14 +145,23 @@ let case4 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     let numDocs = 4500;
     bulkInsertDocs(f, numDocs - 1, filler); // 1 document was already inserted.
-    let res = db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
+    let res = db.runCommand({
+        splitVector: "test.jstests_splitvector",
+        keyPattern: {x: 1},
+        maxChunkSize: 1,
+    });
 
     // splitVector aims at getting half-full chunks after split
     let factor = 0.5;
 
     assert.eq(true, res.ok, "4b");
 
-    assert.close((numDocs * docSize) / ((1 << 20) * factor), res.splitKeys.length, "num split keys", -1);
+    assert.close(
+        (numDocs * docSize) / ((1 << 20) * factor),
+        res.splitKeys.length,
+        "num split keys",
+        -1,
+    );
     assertChunkSizes(res.splitKeys, numDocs, (1 << 20) * factor, "4d");
     for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
@@ -206,7 +228,11 @@ let case7 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocsFixedX(f, 2099, filler, 1);
     bulkInsertDocsFixedX(f, 9, filler, 2);
-    let res = db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
+    let res = db.runCommand({
+        splitVector: "test.jstests_splitvector",
+        keyPattern: {x: 1},
+        maxChunkSize: 1,
+    });
 
     assert.eq(true, res.ok, "7a");
     assert.eq(2, res.splitKeys[0].x, "7b");
@@ -227,7 +253,11 @@ let case8 = function () {
     bulkInsertDocsFixedX(f, 9, filler, 1);
     bulkInsertDocsFixedX(f, 2099, filler, 2);
     bulkInsertDocsFixedX(f, 9, filler, 3);
-    let res = db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
+    let res = db.runCommand({
+        splitVector: "test.jstests_splitvector",
+        keyPattern: {x: 1},
+        maxChunkSize: 1,
+    });
 
     assert.eq(true, res.ok, "8a");
     assert.eq(2, res.splitKeys.length, "8b");
@@ -262,7 +292,11 @@ let case9 = function () {
 
     // TODO SERVER-87574 remove !TestData.testingReplicaSetEndpoint
     if (db.runCommand("hello").msg != "isdbgrid" && !TestData.testingReplicaSetEndpoint) {
-        res = db.adminCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, force: true});
+        res = db.adminCommand({
+            splitVector: "test.jstests_splitvector",
+            keyPattern: {x: 1},
+            force: true,
+        });
 
         assert.eq(true, res.ok, "9a: " + tojson(res));
         assert.eq(1, res.splitKeys.length, "9b: " + tojson(res));

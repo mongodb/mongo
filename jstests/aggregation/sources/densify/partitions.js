@@ -130,7 +130,11 @@ function testThree() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
+            $densify: {
+                field: "val",
+                partitionByFields: ["part"],
+                range: {step: 1, bounds: "partition"},
+            },
         },
     ]);
     const resultArray = result.toArray();
@@ -160,7 +164,11 @@ function testFour() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
+            $densify: {
+                field: "val",
+                partitionByFields: ["part"],
+                range: {step: 1, bounds: "partition"},
+            },
         },
     ]);
     const resultArray = result.toArray();
@@ -278,7 +286,11 @@ function fullTestTwo(stepVal = 2) {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", range: {step: stepVal, bounds: "full"}, partitionByFields: ["part"]},
+            $densify: {
+                field: "val",
+                range: {step: stepVal, bounds: "full"},
+                partitionByFields: ["part"],
+            },
         },
         {$sort: {val: 1, part: 1}},
     ]);
@@ -342,7 +354,11 @@ function fullTestThree(stepVal = 2) {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", range: {step: stepVal, bounds: "full"}, partitionByFields: ["part"]},
+            $densify: {
+                field: "val",
+                range: {step: stepVal, bounds: "full"},
+                partitionByFields: ["part"],
+            },
         },
         {$sort: {val: 1, part: 1}},
     ]);
@@ -370,7 +386,11 @@ function rangeTestOne() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", partitionByFields: ["partition"], range: {step: 1, bounds: [2, 3]}},
+            $densify: {
+                field: "val",
+                partitionByFields: ["partition"],
+                range: {step: 1, bounds: [2, 3]},
+            },
         },
     ]);
     const resultArray = result.toArray();
@@ -400,7 +420,11 @@ function rangeTestThree() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", partitionByFields: ["partition"], range: {step: 2, bounds: [2, 5]}},
+            $densify: {
+                field: "val",
+                partitionByFields: ["partition"],
+                range: {step: 2, bounds: [2, 5]},
+            },
         },
     ]);
     const resultArray = result.toArray();
@@ -504,7 +528,11 @@ function testPartitionsWithBoundsInsideFullRange() {
     // Total range is [-2995, 3000] so [-399, -19] is within that.
     let pipeline = [
         {
-            $densify: {field: "val", range: {step: 17, bounds: [-399, -19]}, partitionByFields: ["part"]},
+            $densify: {
+                field: "val",
+                range: {step: 17, bounds: [-399, -19]},
+                partitionByFields: ["part"],
+            },
         },
         {$sort: {part: 1, val: 1}},
     ];
@@ -552,7 +580,11 @@ function singleDocumentTest() {
     result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify: {field: "val", range: {step: 1, bounds: "partition"}, partitionByFields: ["part"]},
+            $densify: {
+                field: "val",
+                range: {step: 1, bounds: "partition"},
+                partitionByFields: ["part"],
+            },
         },
     ]);
     resultArray = result.toArray();

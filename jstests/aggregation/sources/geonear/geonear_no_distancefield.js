@@ -31,10 +31,14 @@ const furthest = {
     coll.drop();
 
     // Create the desired index type and populate the collection.
-    assert.commandWorked(coll.createIndex({pt: geoType}, add2dsphereVersionIfNeededForSpec({pt: geoType})));
+    assert.commandWorked(
+        coll.createIndex({pt: geoType}, add2dsphereVersionIfNeededForSpec({pt: geoType})),
+    );
     [origin, near, far, furthest].forEach((doc) => {
         doc.distFromOrigin =
-            geoType === "2dsphere" ? Geo.sphereDistance(doc.pt, origin.pt) : Geo.distance(doc.pt, origin.pt);
+            geoType === "2dsphere"
+                ? Geo.sphereDistance(doc.pt, origin.pt)
+                : Geo.distance(doc.pt, origin.pt);
         assert.commandWorked(coll.insert(doc));
     });
 
@@ -48,7 +52,11 @@ const furthest = {
             $geoNear: {near: point, spherical: geoType === "2dsphere"},
         };
         const res = coll.aggregate([geoNearStage, projStage]).toArray();
-        assert.eq(res, expected, () => `Unexpected results from ${tojson(geoNearStage)} using a ${geoType} index`);
+        assert.eq(
+            res,
+            expected,
+            () => `Unexpected results from ${tojson(geoNearStage)} using a ${geoType} index`,
+        );
     }
 
     assertGeoNearResults(origin.pt, [origin, near, far, furthest]);

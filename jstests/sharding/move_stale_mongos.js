@@ -19,7 +19,9 @@ for (let i = 0; i < 100; i += 10) {
     let nextShardIndex = (curShardIndex + 1) % 2;
     let toShard = nextShardIndex == 0 ? st.shard0.name : st.shard1.name;
     assert.commandWorked(
-        st.s1.getDB("admin").runCommand({moveChunk: testNs, find: {_id: i + 5}, to: toShard, _waitForDelete: true}),
+        st.s1
+            .getDB("admin")
+            .runCommand({moveChunk: testNs, find: {_id: i + 5}, to: toShard, _waitForDelete: true}),
     );
     curShardIndex = nextShardIndex;
     st.configRS.awaitLastOpCommitted(); // Ensure that other mongos sees the move

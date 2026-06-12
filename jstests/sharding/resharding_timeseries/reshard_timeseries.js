@@ -39,7 +39,9 @@ const coll = reshardingTest.createShardedCollection({
 const st = reshardingTest._st;
 const db = coll.getDB();
 
-let timeseriesCollDoc = st.config.collections.findOne({_id: getTimeseriesCollForDDLOps(db, coll).getFullName()});
+let timeseriesCollDoc = st.config.collections.findOne({
+    _id: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+});
 assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesInfo.timeField);
 assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesInfo.metaField);
 assert.eq(timeseriesCollDoc.key, {"meta.x": 1});
@@ -58,31 +60,31 @@ assert.commandWorked(
 
 assert.eq(
     2,
-    getTimeseriesCollForRawOps(db, st.rs0.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs0.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     2,
-    getTimeseriesCollForRawOps(db, st.rs1.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs1.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     0,
-    getTimeseriesCollForRawOps(db, st.rs2.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs2.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     0,
-    getTimeseriesCollForRawOps(db, st.rs3.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs3.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(6, coll.countDocuments({}));
 
@@ -117,31 +119,31 @@ assert.eq(timeseriesCollDocPostResharding.key, {"meta.y": 1});
 
 assert.eq(
     0,
-    getTimeseriesCollForRawOps(db, st.rs0.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs0.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     0,
-    getTimeseriesCollForRawOps(db, st.rs1.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs1.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     3,
-    getTimeseriesCollForRawOps(db, st.rs2.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs2.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     2,
-    getTimeseriesCollForRawOps(db, st.rs3.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs3.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(8, coll.countDocuments({}));
 

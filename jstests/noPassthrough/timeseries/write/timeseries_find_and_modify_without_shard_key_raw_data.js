@@ -56,7 +56,9 @@ coll.insertMany([
     {[timeFieldName]: ISODate(), [metaFieldName]: 4, data: 4},
 ]);
 
-assert.commandWorked(db.adminCommand({split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: {meta: 2}}));
+assert.commandWorked(
+    db.adminCommand({split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: {meta: 2}}),
+);
 
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);

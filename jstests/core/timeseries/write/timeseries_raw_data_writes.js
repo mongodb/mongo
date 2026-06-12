@@ -10,7 +10,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 
 // Set up some testing buckets to work with
 const timeField = "t";
@@ -19,7 +22,9 @@ const t = new Date("2002-05-29T00:00:00Z");
 
 const coll = db[jsTestName()];
 
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 assert.commandWorked(
     coll.insertMany([
         {[timeField]: t, [metaField]: "1", v: "replacement"},
@@ -51,17 +56,28 @@ function crudTest(fn, addStartingMeasurements = true) {
 
 // remove()
 crudTest(() => {
-    assert.eq(getTimeseriesCollForRawOps(coll).remove({"control.count": 2}, kRawOperationSpec).nRemoved, 1);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).remove({"control.count": 2}, kRawOperationSpec).nRemoved,
+        1,
+    );
 });
 
 // deleteOne()
 crudTest(() => {
-    assert.eq(getTimeseriesCollForRawOps(coll).deleteOne({"control.count": 2}, kRawOperationSpec).deletedCount, 1);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).deleteOne({"control.count": 2}, kRawOperationSpec)
+            .deletedCount,
+        1,
+    );
 });
 
 // deleteMany()
 crudTest(() => {
-    assert.eq(getTimeseriesCollForRawOps(coll).deleteMany({"control.version": 2}, kRawOperationSpec).deletedCount, 2);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).deleteMany({"control.version": 2}, kRawOperationSpec)
+            .deletedCount,
+        2,
+    );
 });
 
 // findAndModify()
@@ -77,7 +93,10 @@ crudTest(() => {
 
 // findOneAndDelete()
 crudTest(() => {
-    const deletedBucket = getTimeseriesCollForRawOps(coll).findOneAndDelete({"control.count": 2}, kRawOperationSpec);
+    const deletedBucket = getTimeseriesCollForRawOps(coll).findOneAndDelete(
+        {"control.count": 2},
+        kRawOperationSpec,
+    );
     assert.eq(deletedBucket.control.count, 2);
     assert.eq(getTimeseriesCollForRawOps(coll).count({"control.count": 2}, kRawOperationSpec), 0);
 });
@@ -100,7 +119,14 @@ crudTest(() => {
     );
     assert.eq(replacedBucket.meta, "1");
     assert.eq(
-        getTimeseriesCollForRawOps(coll).findOne({"control.count": 2}, null, null, null, null, true /* rawData */).meta,
+        getTimeseriesCollForRawOps(coll).findOne(
+            {"control.count": 2},
+            null,
+            null,
+            null,
+            null,
+            true /* rawData */,
+        ).meta,
         "3",
     );
 });
@@ -114,7 +140,14 @@ crudTest(() => {
     );
     assert.eq(updatedBucket.meta, "1");
     assert.eq(
-        getTimeseriesCollForRawOps(coll).findOne({"control.count": 2}, null, null, null, null, true /* rawData */).meta,
+        getTimeseriesCollForRawOps(coll).findOne(
+            {"control.count": 2},
+            null,
+            null,
+            null,
+            null,
+            true /* rawData */,
+        ).meta,
         "3",
     );
 });
@@ -122,13 +155,19 @@ crudTest(() => {
 // insert()
 crudTest(() => {
     getTimeseriesCollForRawOps(coll).insert(insertBucket, kRawOperationSpec);
-    assert.eq(getTimeseriesCollForRawOps(coll).findOne({}, null, null, null, null, true /* rawData */), insertBucket);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).findOne({}, null, null, null, null, true /* rawData */),
+        insertBucket,
+    );
 }, false);
 
 // insertOne()
 crudTest(() => {
     getTimeseriesCollForRawOps(coll).insertOne(insertBucket, kRawOperationSpec);
-    assert.eq(getTimeseriesCollForRawOps(coll).findOne({}, null, null, null, null, true /* rawData */), insertBucket);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).findOne({}, null, null, null, null, true /* rawData */),
+        insertBucket,
+    );
     assert.eq(getTimeseriesCollForRawOps(coll).find().rawData().length(), 1);
 }, false);
 
@@ -141,7 +180,11 @@ crudTest(() => {
 // update()
 crudTest(() => {
     assert.eq(
-        getTimeseriesCollForRawOps(coll).update({"control.count": 2}, {$set: {meta: "3"}}, kRawOperationSpec).nModified,
+        getTimeseriesCollForRawOps(coll).update(
+            {"control.count": 2},
+            {$set: {meta: "3"}},
+            kRawOperationSpec,
+        ).nModified,
         1,
     );
     assert.eq(getTimeseriesCollForRawOps(coll).find({"control.count": 2}).rawData().length(), 1);
@@ -151,8 +194,11 @@ crudTest(() => {
 // updateOne()
 crudTest(() => {
     assert.eq(
-        getTimeseriesCollForRawOps(coll).updateOne({"control.count": 2}, {$set: {meta: "3"}}, kRawOperationSpec)
-            .modifiedCount,
+        getTimeseriesCollForRawOps(coll).updateOne(
+            {"control.count": 2},
+            {$set: {meta: "3"}},
+            kRawOperationSpec,
+        ).modifiedCount,
         1,
     );
     assert.eq(getTimeseriesCollForRawOps(coll).find({"control.count": 2}).rawData().length(), 1);
@@ -162,8 +208,11 @@ crudTest(() => {
 // updateMany()
 crudTest(() => {
     assert.eq(
-        getTimeseriesCollForRawOps(coll).updateMany({"control.version": 2}, {$set: {meta: "3"}}, kRawOperationSpec)
-            .modifiedCount,
+        getTimeseriesCollForRawOps(coll).updateMany(
+            {"control.version": 2},
+            {$set: {meta: "3"}},
+            kRawOperationSpec,
+        ).modifiedCount,
         2,
     );
     assert.eq(getTimeseriesCollForRawOps(coll).find({"meta": "3"}).rawData().length(), 2);
@@ -174,11 +223,17 @@ crudTest(() => {
 delete replaceOneBucket["_id"];
 crudTest(() => {
     assert.eq(
-        getTimeseriesCollForRawOps(coll).replaceOne({"control.count": 2}, replaceOneBucket, kRawOperationSpec)
-            .modifiedCount,
+        getTimeseriesCollForRawOps(coll).replaceOne(
+            {"control.count": 2},
+            replaceOneBucket,
+            kRawOperationSpec,
+        ).modifiedCount,
         1,
     );
     assert.eq(getTimeseriesCollForRawOps(coll).find({"meta": "1"}).rawData().length(), 1);
     assert.eq(getTimeseriesCollForRawOps(coll).find({"meta": "1"}).rawData()[0].meta, "1");
-    assert.eq(getTimeseriesCollForRawOps(coll).find({"control.max.v": "replacement"}).rawData().length(), 1);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).find({"control.max.v": "replacement"}).rawData().length(),
+        1,
+    );
 });

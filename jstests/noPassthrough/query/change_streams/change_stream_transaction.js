@@ -34,7 +34,13 @@ function assertWriteVisible(cursor, operationType, documentKey) {
  * Asserts that the expected operation type and documentKey are found on the change stream
  * cursor. Pushes the corresponding resume token and change stream document to an array.
  */
-function assertWriteVisibleWithCapture(cursor, operationType, documentKey, changeList, expectedCommitTimestamp = null) {
+function assertWriteVisibleWithCapture(
+    cursor,
+    operationType,
+    documentKey,
+    changeList,
+    expectedCommitTimestamp = null,
+) {
     const changeDoc = assertWriteVisible(cursor, operationType, documentKey);
     if (expectedCommitTimestamp !== null) {
         assert(changeDoc.hasOwnProperty("commitTimestamp"), changeDoc);
@@ -51,7 +57,8 @@ function runTest(conn) {
     const unwatchedColl = db.getCollection(collName + "_unwatched");
 
     const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    const is81OrHigher = MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0;
+    const is81OrHigher =
+        MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0;
 
     // This function will return null for all versions < 8.1, because these won't emit the
     // "commitTimestamp" as part of the events of prepared transactions.
@@ -94,7 +101,10 @@ function runTest(conn) {
     session3.startTransaction({readConcern: {level: "majority"}});
 
     // Open a change stream on the test collection.
-    const changeStreamCursor = coll.watch([], {showExpandedEvents: true, showCommitTimestamp: true});
+    const changeStreamCursor = coll.watch([], {
+        showExpandedEvents: true,
+        showCommitTimestamp: true,
+    });
     const resumeToken = changeStreamCursor.getResumeToken();
 
     // Insert a document and confirm that the change stream has it.
@@ -116,20 +126,28 @@ function runTest(conn) {
 
     // Update and then remove the second doc under each transaction and confirm no change stream
     // events are seen.
-    assert.commandWorked(sessionColl1.update({_id: "txn1-doc-2"}, {$set: {"update-before-delete": 1}}));
-    assert.commandWorked(sessionColl2.update({_id: "txn2-doc-2"}, {$set: {"update-before-delete": 1}}));
+    assert.commandWorked(
+        sessionColl1.update({_id: "txn1-doc-2"}, {$set: {"update-before-delete": 1}}),
+    );
+    assert.commandWorked(
+        sessionColl2.update({_id: "txn2-doc-2"}, {$set: {"update-before-delete": 1}}),
+    );
     assert.commandWorked(sessionColl1.remove({_id: "txn1-doc-2"}));
     assert.commandWorked(sessionColl2.remove({_id: "txn2-doc-2"}));
 
     // Perform a write to the 'session1' transaction in a collection that is not being watched
     // by 'changeStreamCursor'. We do not expect to see this write in the change stream either
     // now or on commit.
-    assert.commandWorked(sessionDb1[unwatchedColl.getName()].insert({_id: "txn1-doc-unwatched-collection"}));
+    assert.commandWorked(
+        sessionDb1[unwatchedColl.getName()].insert({_id: "txn1-doc-unwatched-collection"}),
+    );
 
     // Perform a write to the 'session3' transaction in a collection that is not being watched
     // by 'changeStreamCursor'. We do not expect to see this write in the change stream either
     // now or on commit.
-    assert.commandWorked(sessionDb3[unwatchedColl.getName()].insert({_id: "txn3-doc-unwatched-collection"}));
+    assert.commandWorked(
+        sessionDb3[unwatchedColl.getName()].insert({_id: "txn3-doc-unwatched-collection"}),
+    );
     assertNoChanges(changeStreamCursor);
 
     // Perform a write outside of a transaction and confirm that the change stream sees only
@@ -273,7 +291,11 @@ function runTest(conn) {
 }
 
 let replSetTestDescription = {nodes: 1};
-if (!jsTest.options().setParameters.hasOwnProperty("maxNumberOfTransactionOperationsInSingleOplogEntry")) {
+if (
+    !jsTest
+        .options()
+        .setParameters.hasOwnProperty("maxNumberOfTransactionOperationsInSingleOplogEntry")
+) {
     // Configure the replica set to use our value for maxOpsInOplogEntry.
     replSetTestDescription.nodeOptions = {
         setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: maxOpsInOplogEntry},

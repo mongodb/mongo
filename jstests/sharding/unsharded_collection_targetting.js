@@ -15,7 +15,9 @@ const testName = "test";
 const mongosDB = st.s0.getDB(testName);
 
 // Ensure that shard1 is the primary shard.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs1.getURL()}),
+);
 
 // Before moving the collection, issue a write through mongos2 to make it aware
 // about the location of the collection before the move.

@@ -42,7 +42,9 @@ TimeseriesTest.run((insert) => {
         );
 
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         let docs = docsBucketA.concat(docsBucketB);
@@ -56,7 +58,11 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check buckets.
-        const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
+            .find()
+            .rawData()
+            .sort({"control.min._id": 1})
+            .toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.
@@ -178,12 +184,32 @@ TimeseriesTest.run((insert) => {
     runTest(
         // Metadata field contains a nested array.
         [
-            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: {a: [{b: 1, c: 0}, [{e: 1, f: 0}]]}, x: 0},
-            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: {a: [{c: 0, b: 1}, [{f: 0, e: 1}]]}, x: 10},
+            {
+                _id: 0,
+                [timeFieldName]: t[0],
+                [metaFieldName]: {a: [{b: 1, c: 0}, [{e: 1, f: 0}]]},
+                x: 0,
+            },
+            {
+                _id: 1,
+                [timeFieldName]: t[1],
+                [metaFieldName]: {a: [{c: 0, b: 1}, [{f: 0, e: 1}]]},
+                x: 10,
+            },
         ],
         [
-            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: {a: [[{e: 1, f: 0}], {b: 1, c: 0}]}, x: 20},
-            {_id: 3, [timeFieldName]: t[3], [metaFieldName]: {a: [[{f: 0, e: 1}], {c: 0, b: 1}]}, x: 30},
+            {
+                _id: 2,
+                [timeFieldName]: t[2],
+                [metaFieldName]: {a: [[{e: 1, f: 0}], {b: 1, c: 0}]},
+                x: 20,
+            },
+            {
+                _id: 3,
+                [timeFieldName]: t[3],
+                [metaFieldName]: {a: [[{f: 0, e: 1}], {c: 0, b: 1}]},
+                x: 30,
+            },
         ],
     );
 

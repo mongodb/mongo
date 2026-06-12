@@ -5,7 +5,10 @@
  * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
-import {assertErrMsgContains, assertErrMsgDoesNotContain} from "jstests/aggregation/extras/utils.js";
+import {
+    assertErrMsgContains,
+    assertErrMsgDoesNotContain,
+} from "jstests/aggregation/extras/utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];

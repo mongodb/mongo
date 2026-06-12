@@ -20,8 +20,14 @@ const defaultLongitudeMax = 180;
  * @returns {fc.Arbitrary<Object>} an arbitrary to generate a GeoJSON point
  */
 export function makeLongLatArb(ranges = {}) {
-    const longitudeRange = ranges?.longitudeRange ?? {min: defaultLongitudeMin, max: defaultLongitudeMax};
-    const latitudeRange = ranges?.latitudeRange ?? {min: defaultLatitudeMin, max: defaultLatitudeMax};
+    const longitudeRange = ranges?.longitudeRange ?? {
+        min: defaultLongitudeMin,
+        max: defaultLongitudeMax,
+    };
+    const latitudeRange = ranges?.latitudeRange ?? {
+        min: defaultLatitudeMin,
+        max: defaultLatitudeMax,
+    };
     return fc.tuple(
         normalDistRealArb(longitudeRange.min, longitudeRange.max),
         normalDistRealArb(latitudeRange.min, latitudeRange.max),

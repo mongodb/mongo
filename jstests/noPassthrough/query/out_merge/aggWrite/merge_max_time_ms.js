@@ -57,7 +57,9 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
 
     // Make sure we don't run out of time on either of the involved nodes before the failpoint is
     // hit.
-    const maxTimeFailPoints = [conn, maxTimeMsConn].map((conn) => configureFailPoint(conn, "maxTimeNeverTimeOut"));
+    const maxTimeFailPoints = [conn, maxTimeMsConn].map((conn) =>
+        configureFailPoint(conn, "maxTimeNeverTimeOut"),
+    );
 
     // Build the parallel shell function.
     let shellStr = `const testDB = db.getSiblingDB('${kDBName}');`;
@@ -70,11 +72,18 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     const runAggregate = function () {
         const pipeline = [
             {
-                $merge: {into: destColl.getName(), whenMatched: whenMatched, whenNotMatched: whenNotMatched},
+                $merge: {
+                    into: destColl.getName(),
+                    whenMatched: whenMatched,
+                    whenNotMatched: whenNotMatched,
+                },
             },
         ];
         const err = assert.throws(() =>
-            sourceColl.aggregate(pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}),
+            sourceColl.aggregate(pipeline, {
+                maxTimeMS: maxTimeMS,
+                $readPreference: {mode: "secondary"},
+            }),
         );
         assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
@@ -106,7 +115,12 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
  * the batch being built on 'conn'.
  */
 function runUnshardedTest(whenMatched, whenNotMatched, conn, primaryConn, maxTimeMsConn) {
-    jsTestLog("Running unsharded test in whenMatched: " + whenMatched + " whenNotMatched: " + whenNotMatched);
+    jsTestLog(
+        "Running unsharded test in whenMatched: " +
+            whenMatched +
+            " whenNotMatched: " +
+            whenNotMatched,
+    );
     // The target collection will always be empty so we do not test the setting that will cause
     // only failure.
     if (whenNotMatched == "fail") {
@@ -123,7 +137,11 @@ function runUnshardedTest(whenMatched, whenNotMatched, conn, primaryConn, maxTim
         const maxTimeMS = 1000 * 600;
         const pipeline = [
             {
-                $merge: {into: destColl.getName(), whenMatched: whenMatched, whenNotMatched: whenNotMatched},
+                $merge: {
+                    into: destColl.getName(),
+                    whenMatched: whenMatched,
+                    whenNotMatched: whenNotMatched,
+                },
             },
         ];
         assert.doesNotThrow(() => sourceColl.aggregate(pipeline, {maxTimeMS: maxTimeMS}));
@@ -162,7 +180,9 @@ function runUnshardedTest(whenMatched, whenNotMatched, conn, primaryConn, maxTim
     const conn = MongoRunner.runMongod({});
     assert.neq(null, conn, "mongod was unable to start up");
     insertDocs(conn.getDB(kDBName)[kSourceCollName]);
-    withEachMergeMode((mode) => runUnshardedTest(mode.whenMatchedMode, mode.whenNotMatchedMode, conn, conn, conn));
+    withEachMergeMode((mode) =>
+        runUnshardedTest(mode.whenMatchedMode, mode.whenNotMatchedMode, conn, conn, conn),
+    );
     MongoRunner.stopMongod(conn);
 })();
 
@@ -191,7 +211,12 @@ function runUnshardedTest(whenMatched, whenNotMatched, conn, primaryConn, maxTim
 // reaching the shard, we instead set a very large timeout and verify that the command sent to
 // mongod includes the maxTimeMS.
 function runShardedTest(whenMatched, whenNotMatched, mongosConn, mongodConn, comment) {
-    jsTestLog("Running sharded test in whenMatched: " + whenMatched + " whenNotMatched: " + whenNotMatched);
+    jsTestLog(
+        "Running sharded test in whenMatched: " +
+            whenMatched +
+            " whenNotMatched: " +
+            whenNotMatched,
+    );
     // The target collection will always be empty so we do not test the setting that will cause
     // only failure.
     if (whenNotMatched == "fail") {
@@ -207,13 +232,19 @@ function runShardedTest(whenMatched, whenNotMatched, mongosConn, mongodConn, com
 
     // Make sure we don't timeout in mongos before even reaching the shards.
     assert.commandWorked(
-        mongosConn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
+        mongosConn
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
     );
 
     const cursor = sourceColl.aggregate(
         [
             {
-                $merge: {into: destColl.getName(), whenMatched: whenMatched, whenNotMatched: whenNotMatched},
+                $merge: {
+                    into: destColl.getName(),
+                    whenMatched: whenMatched,
+                    whenNotMatched: whenNotMatched,
+                },
             },
         ],
         {maxTimeMS: maxTimeMS, comment: comment},
@@ -238,7 +269,9 @@ function runShardedTest(whenMatched, whenNotMatched, mongosConn, mongodConn, com
     });
 
     assert.commandWorked(
-        mongosConn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
+        mongosConn
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
     );
 }
 
@@ -248,7 +281,9 @@ function runShardedTest(whenMatched, whenNotMatched, mongosConn, mongodConn, com
 
     // Ensure shard 0 is the primary shard. This is so that the $merge stage is guaranteed to
     // run on it.
-    assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: kDBName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        st.s.getDB("admin").runCommand({enableSharding: kDBName, primaryShard: st.shard0.name}),
+    );
 
     // Set up the source collection to be sharded in a way such that each node will have some
     // documents for the remainder of the test.
@@ -269,7 +304,13 @@ function runShardedTest(whenMatched, whenNotMatched, mongosConn, mongodConn, com
 
     // // Run the test with 'destColl' unsharded.
     withEachMergeMode((mode) =>
-        runShardedTest(mode.whenMatchedMode, mode.whenNotMatchedMode, st.s, st.shard0, tojson(mode) + "_unshardedDest"),
+        runShardedTest(
+            mode.whenMatchedMode,
+            mode.whenNotMatchedMode,
+            st.s,
+            st.shard0,
+            tojson(mode) + "_unshardedDest",
+        ),
     );
 
     // Run the test with 'destColl' sharded. This means that writes will be sent to both

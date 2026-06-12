@@ -154,7 +154,12 @@ function testGraphLookupToFromField(foreignDocs, fromField, toField, expectedDoc
 
     // Mix numeric and regular fields.
     testGraphLookupStartsWith("$a.2.b.1", {a: {"2": {b: {"1": 3}}}}, true, ["a", "2", "b", "1"]);
-    testGraphLookupStartsWith("$a.2.b.1", {a: [{}, {b: [2]}, {b: [1, 3]}]}, false, ["a", "2", "b", "1"]);
+    testGraphLookupStartsWith("$a.2.b.1", {a: [{}, {b: [2]}, {b: [1, 3]}]}, false, [
+        "a",
+        "2",
+        "b",
+        "1",
+    ]);
 
     testGraphLookupStartsWith("$a.00", {a: {"00": 3}}, true, ["a", "00"]);
     testGraphLookupStartsWith("$a.00", {a: [{"00": 3}]}, true, ["a", "00"]);
@@ -254,21 +259,37 @@ const toSpecs = [
 ];
 for (const spec of toSpecs) {
     // "00"-type fields should act as field names.
-    testGraphLookupToFromField([{_id: 1, to: {[spec.doubleField]: 0}}], "from", "to." + spec.doubleField, [
-        {_id: 1, to: {[spec.doubleField]: 0}},
-    ]);
+    testGraphLookupToFromField(
+        [{_id: 1, to: {[spec.doubleField]: 0}}],
+        "from",
+        "to." + spec.doubleField,
+        [{_id: 1, to: {[spec.doubleField]: 0}}],
+    );
     // "00"-type fields should not act as an index into an array.
     testGraphLookupToFromField([{_id: 1, to: spec.array}], "from", "to." + spec.doubleField, []);
     // Regular numeric fields should not match "00"-type fields.
-    testGraphLookupToFromField([{_id: 1, to: {[spec.doubleField]: 0}}], "from", "to." + spec.singleField, []);
+    testGraphLookupToFromField(
+        [{_id: 1, to: {[spec.doubleField]: 0}}],
+        "from",
+        "to." + spec.singleField,
+        [],
+    );
     // Regular numeric fields can act as an array index.
     testGraphLookupToFromField([{_id: 1, to: spec.array}], "from", "to." + spec.singleField, [
         {_id: 1, to: spec.array},
     ]);
     // "00"-type fields should not match "0"-type field names.
-    testGraphLookupToFromField([{_id: 1, to: {[spec.singleField]: 0}}], "from", "to." + spec.doubleField, []);
+    testGraphLookupToFromField(
+        [{_id: 1, to: {[spec.singleField]: 0}}],
+        "from",
+        "to." + spec.doubleField,
+        [],
+    );
     // Regular numeric fields can match themselves as field names.
-    testGraphLookupToFromField([{_id: 1, to: {[spec.singleField]: 0}}], "from", "to." + spec.singleField, [
-        {_id: 1, to: {[spec.singleField]: 0}},
-    ]);
+    testGraphLookupToFromField(
+        [{_id: 1, to: {[spec.singleField]: 0}}],
+        "from",
+        "to." + spec.singleField,
+        [{_id: 1, to: {[spec.singleField]: 0}}],
+    );
 }

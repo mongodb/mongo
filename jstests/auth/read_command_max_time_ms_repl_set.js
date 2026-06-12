@@ -43,16 +43,24 @@ assert(regularUserConn.auth("regularUser", "password"), "Auth failed");
 const regularUserDB = regularUserConn.getSiblingDB(dbName);
 
 // A long running query without maxTimeMS specified will succeed.
-assert.commandWorked(regularUserDB.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}}));
+assert.commandWorked(
+    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}}),
+);
 
 // A long running query with a small maxTimeMS specified will fail.
 assert.commandFailedWithCode(
-    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}, maxTimeMS: 1}),
+    regularUserDB.runCommand({
+        find: collName,
+        filter: {$where: "sleep(1000); return true;"},
+        maxTimeMS: 1,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
 // Sets the default maxTimeMS for read operations with a small value.
-assert.commandWorked(adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 1}}}));
+assert.commandWorked(
+    adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 1}}}),
+);
 
 // The read command fails even without specifying a maxTimeMS option.
 assert.commandFailedWithCode(
@@ -63,7 +71,11 @@ assert.commandFailedWithCode(
 // The read command will succeed if specifying a large maxTimeMS option. In this case, it's chosen
 // over the default value.
 assert.commandWorked(
-    regularUserDB.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}, maxTimeMS: 50000}),
+    regularUserDB.runCommand({
+        find: collName,
+        filter: {$where: "sleep(1000); return true;"},
+        maxTimeMS: 50000,
+    }),
 );
 
 // The default read MaxTimeMS value doesn't affect write commands.
@@ -82,7 +94,10 @@ rst.getSecondaries().forEach((secondary) => {
     const regularUserDBSecondary = regularUserConnSecondary.getDB(dbName);
     // The read command fails even without specifying a maxTimeMS option.
     assert.commandFailedWithCode(
-        regularUserDBSecondary.runCommand({find: collName, filter: {$where: "sleep(1000); return true;"}}),
+        regularUserDBSecondary.runCommand({
+            find: collName,
+            filter: {$where: "sleep(1000); return true;"},
+        }),
         ErrorCodes.MaxTimeMSExpired,
     );
 
@@ -98,7 +113,9 @@ rst.getSecondaries().forEach((secondary) => {
 });
 
 // Unsets the default MaxTimeMS to make queries not to time out in the following code.
-assert.commandWorked(adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 0}}}));
+assert.commandWorked(
+    adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 0}}}),
+);
 
 adminDB.logout();
 regularUserDB.logout();

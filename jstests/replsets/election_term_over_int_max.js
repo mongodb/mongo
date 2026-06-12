@@ -17,7 +17,9 @@ const dbName = jsTestName();
 const collName = "coll";
 
 // Do a majority write so we have something in the oplog.
-assert.commandWorked(primary.getDB(dbName)[collName].insert({x: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.getDB(dbName)[collName].insert({x: 1}, {writeConcern: {w: "majority"}}),
+);
 
 jsTest.log.info("Stopping the replica set with forRestart=true");
 rst.stopSet(/* signal */ null, /* forRestart */ true);
@@ -33,7 +35,11 @@ assert.neq(null, standalone, "failed to start standalone mongod");
 
 // Sanity check: data is visible in standalone.
 let standaloneDB = standalone.getDB(dbName);
-assert.eq(1, standaloneDB[collName].find().itcount(), "expected to see document written before stopping replset");
+assert.eq(
+    1,
+    standaloneDB[collName].find().itcount(),
+    "expected to see document written before stopping replset",
+);
 
 // Set the election term to > int max
 jsTest.log.info("Updating local.replset.election.term while standalone");
@@ -56,7 +62,10 @@ rst.startSet({restart: true, noCleanData: true});
 primary = rst.getPrimary();
 
 // The term we set to + 1 should be the new term when the replset restarts.
-assert.eq(NumberLong("18014398509482013"), primary.getDB("local").getCollection("replset.election").findOne({}).term);
+assert.eq(
+    NumberLong("18014398509482013"),
+    primary.getDB("local").getCollection("replset.election").findOne({}).term,
+);
 
 const secondaries = rst.getSecondaries();
 

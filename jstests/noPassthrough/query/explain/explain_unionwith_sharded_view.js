@@ -1,7 +1,10 @@
 /**
  * Test that explain of $unionWith resolves views on sharded collections correctly.
  */
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {getAllNodeExplains} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -104,7 +107,10 @@ const testViews = [
 
 // Single $unionWith on a sharded view.
 for (const viewName of testViews) {
-    testPipeline([{$match: {a: "foo", b: "bar"}}, {$unionWith: {coll: viewName, pipeline: [{$match: {a: 1, b: 5}}]}}]);
+    testPipeline([
+        {$match: {a: "foo", b: "bar"}},
+        {$unionWith: {coll: viewName, pipeline: [{$match: {a: 1, b: 5}}]}},
+    ]);
 }
 
 // Multiple $unionWith stages on sharded views.

@@ -3,7 +3,10 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -22,7 +25,12 @@ function runTest(conn) {
     // This role has all of the privileges required to make toast from the bread collection.
     db.createRole({
         role: "makeToast",
-        privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["find", "listIndexes"]}],
+        privileges: [
+            {
+                resource: {db: db.getName(), collection: coll.getName()},
+                actions: ["find", "listIndexes"],
+            },
+        ],
         roles: [],
     });
     // This role is allowed to read from the bread collection, but cannot make toast.
@@ -60,10 +68,14 @@ function runTest(conn) {
     }
 }
 
-const toasterExtensionOptions = {"libtoaster_mongo_extension.so": {maxToasterHeat: 500.0, allowBagels: true}};
+const toasterExtensionOptions = {
+    "libtoaster_mongo_extension.so": {maxToasterHeat: 500.0, allowBagels: true},
+};
 
 // Standalone and sharded need different configuration setups to enable auth, so we run them separately.
 
 withExtensions(toasterExtensionOptions, runTest, ["standalone"], {}, {auth: ""});
 
-withExtensions(toasterExtensionOptions, runTest, ["sharded"], {other: {keyFile: "jstests/libs/key1"}});
+withExtensions(toasterExtensionOptions, runTest, ["sharded"], {
+    other: {keyFile: "jstests/libs/key1"},
+});

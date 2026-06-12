@@ -29,12 +29,17 @@ export const rangeShardingCompoundTestCases = (() => {
                     {name: fieldName0, type: fieldType0, order: orderType0.name},
                     {name: fieldName1, type: fieldType1, order: orderType1.name},
                 ],
-                expected: orderType0.name == "constant" ? orderType1.monotonicity : orderType0.monotonicity,
+                expected:
+                    orderType0.name == "constant"
+                        ? orderType1.monotonicity
+                        : orderType0.monotonicity,
             });
 
             for (let orderType2 of kOrderTypes) {
                 const fieldName2 = AnalyzeShardKeyUtil.getRandomFieldName("c");
-                const fieldType2 = AnalyzeShardKeyUtil.getRandomElement(orderType2.supportedFieldTypes);
+                const fieldType2 = AnalyzeShardKeyUtil.getRandomElement(
+                    orderType2.supportedFieldTypes,
+                );
 
                 // Test compound shard key with a compound shard key prefixed index.
                 testCases.push({
@@ -45,7 +50,10 @@ export const rangeShardingCompoundTestCases = (() => {
                         {name: fieldName1, type: fieldType1, order: orderType1.name},
                         {name: fieldName2, type: fieldType2, order: orderType2.name},
                     ],
-                    expected: orderType0.name == "constant" ? orderType1.monotonicity : orderType0.monotonicity,
+                    expected:
+                        orderType0.name == "constant"
+                            ? orderType1.monotonicity
+                            : orderType0.monotonicity,
                 });
             }
         }

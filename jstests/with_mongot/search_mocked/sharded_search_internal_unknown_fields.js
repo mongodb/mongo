@@ -49,7 +49,9 @@ const testDb = mongos.getDB(dbName);
 const coll = testDb.getCollection(collName);
 const collNS = coll.getFullName();
 
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 // Shard the test collection.
 const splitPoint = 5;
 const docList = [];
@@ -133,7 +135,9 @@ function runAndAssertMongodIgnoresUnknownFieldInSearch(shardDB, expectedDocs, ex
 
     for (let thisCursorTopLevel of cursorArray) {
         let thisCursor = thisCursorTopLevel.cursor;
-        const getMoreRes = assert.commandWorked(shardDB.runCommand({getMore: thisCursor.id, collection: collName}));
+        const getMoreRes = assert.commandWorked(
+            shardDB.runCommand({getMore: thisCursor.id, collection: collName}),
+        );
 
         // Verify the results cursor's contents.
         const getMoreResults = getMoreRes.cursor.nextBatch;
@@ -162,7 +166,11 @@ const expectedMetaResultsOnShardZero = [{metaVal: 1}, {metaVal: 2}, {metaVal: 3}
 const shardZeroConn = makeInternalConn(st.rs0.getPrimary());
 const shardZeroDB = shardZeroConn.getDB(dbName);
 mockShardZero();
-runAndAssertMongodIgnoresUnknownFieldInSearch(shardZeroDB, expectedDocsOnShardZero, expectedMetaResultsOnShardZero);
+runAndAssertMongodIgnoresUnknownFieldInSearch(
+    shardZeroDB,
+    expectedDocsOnShardZero,
+    expectedMetaResultsOnShardZero,
+);
 
 // Repeat for the second shard.
 const expectedDocsOnShardOne = [
@@ -174,6 +182,10 @@ const expectedMetaResultsOnShardOne = [{metaVal: 10}, {metaVal: 11}, {metaVal: 1
 const shardOneConn = makeInternalConn(st.rs1.getPrimary());
 const shardOneDB = shardOneConn.getDB(dbName);
 mockShardOne();
-runAndAssertMongodIgnoresUnknownFieldInSearch(shardOneDB, expectedDocsOnShardOne, expectedMetaResultsOnShardOne);
+runAndAssertMongodIgnoresUnknownFieldInSearch(
+    shardOneDB,
+    expectedDocsOnShardOne,
+    expectedMetaResultsOnShardOne,
+);
 
 stWithMock.stop();

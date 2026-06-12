@@ -13,7 +13,10 @@ let results = coll
             $setWindowFields: {
                 sortBy: {ts: 1},
                 output: {
-                    defaultStdDev: {$stdDevPop: "$noField", window: {documents: ["unbounded", "current"]}},
+                    defaultStdDev: {
+                        $stdDevPop: "$noField",
+                        window: {documents: ["unbounded", "current"]},
+                    },
                     defaultSum: {$sum: "$noField", window: {documents: ["unbounded", "current"]}},
                     defaultAvg: {$avg: "$noField", window: {documents: ["unbounded", "current"]}},
                     defaultMin: {$min: "$noField", window: {documents: ["unbounded", "current"]}},

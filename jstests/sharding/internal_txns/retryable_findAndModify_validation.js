@@ -57,7 +57,10 @@ const lsid = {
             stmtId: NumberInt(stmtId++),
             autocommit: false,
         });
-        assert.commandFailedWithCode(mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054001);
+        assert.commandFailedWithCode(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)),
+            6054001,
+        );
     });
 }
 
@@ -77,7 +80,9 @@ const lsid = {
             };
         };
 
-        mongosTestDB.runCommand(Object.assign(makeInsertCmdObj({_id: -100, x: 100}), {startTransaction: true}));
+        mongosTestDB.runCommand(
+            Object.assign(makeInsertCmdObj({_id: -100, x: 100}), {startTransaction: true}),
+        );
         // findAndModify with pre-image.
         mongosTestDB.runCommand({
             findAndModify: kCollName,
@@ -100,7 +105,10 @@ const lsid = {
             stmtId: NumberInt(stmtId++),
             autocommit: false,
         });
-        assert.commandFailedWithCode(mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054002);
+        assert.commandFailedWithCode(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)),
+            6054002,
+        );
     });
 }
 

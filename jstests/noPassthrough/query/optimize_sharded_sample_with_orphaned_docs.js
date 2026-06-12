@@ -24,7 +24,9 @@ const configDB = mongos.getDB("config");
 
 const mongosDB = mongos.getDB(jsTestName());
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.name}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.name}),
+);
 
 const mongosColl = mongosDB.test;
 
@@ -42,10 +44,15 @@ const shardNames = [st.rs0.name, st.rs1.name];
 // verifies that the expected optimized or unoptimized $sample stage ran on each shard.
 function runSampleAndConfirmResults({sampleSize, comment, expectedPlanSummaries}) {
     // Run the aggregation via mongoS with the given 'comment' parameter.
-    assert.eq(mongosColl.aggregate([{$sample: {size: sampleSize}}], {comment: comment}).itcount(), sampleSize);
+    assert.eq(
+        mongosColl.aggregate([{$sample: {size: sampleSize}}], {comment: comment}).itcount(),
+        sampleSize,
+    );
 
     // Obtain the explain output for the aggregation.
-    const explainOut = assert.commandWorked(mongosColl.explain().aggregate([{$sample: {size: sampleSize}}]));
+    const explainOut = assert.commandWorked(
+        mongosColl.explain().aggregate([{$sample: {size: sampleSize}}]),
+    );
 
     // Verify that the expected $sample stage, optimized or unoptimized, ran on each shard.
     for (let idx in expectedPlanSummaries) {
@@ -113,7 +120,12 @@ assert.eq(configDB.chunks.count({max: {_id: 0}, shard: `${jsTestName()}-rs1`}), 
 
 // Move the lower chunk back to shard0.
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: -1}, to: shard0.name, waitForDelete: true}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: -1},
+        to: shard0.name,
+        waitForDelete: true,
+    }),
 );
 
 // Write 1 legitimate document and 100 orphans directly to shard1, which owns the upper chunk.

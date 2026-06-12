@@ -10,7 +10,9 @@ import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 if (checkSbeRestrictedOrFullyEnabled(db)) {
-    jsTest.log.info("Skipping test because $count queries don't use the emptyDocuments cursor in SBE");
+    jsTest.log.info(
+        "Skipping test because $count queries don't use the emptyDocuments cursor in SBE",
+    );
     quit();
 }
 
@@ -27,12 +29,17 @@ function getCursorType(explainOutput) {
     const cursorStage = getAggPlanStage(explainOutput, "$cursor");
     assert.neq(null, cursorStage, "No $cursor stage present");
     assert(cursorStage.$cursor.hasOwnProperty("queryPlanner"), "No $cursor.queryPlanner present");
-    assert(cursorStage.$cursor.queryPlanner.hasOwnProperty("cursorType"), "No $cursor.queryPlanner.cursorType present");
+    assert(
+        cursorStage.$cursor.queryPlanner.hasOwnProperty("cursorType"),
+        "No $cursor.queryPlanner.cursorType present",
+    );
     return cursorStage.$cursor.queryPlanner.cursorType;
 }
 
 // Normal aggregation queries should use the regular cursor.
-const groupExplain = coll.explain().aggregate([{$match: {b: 1}}, {$group: {_id: "$a", count: {$sum: 1}}}]);
+const groupExplain = coll
+    .explain()
+    .aggregate([{$match: {b: 1}}, {$group: {_id: "$a", count: {$sum: 1}}}]);
 assert.eq("regular", getCursorType(groupExplain));
 
 const multiStageExplain = coll

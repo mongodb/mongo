@@ -36,9 +36,15 @@ assert.commandWorked(
 // Log cache pressure metrics.
 function logCacheStatus() {
     const status = db.serverStatus();
-    jsTestLog(`Cache pressue wait time threshold exceeded: ${status.metrics.cachePressure.waitTimeThresholdExceeded}`);
-    jsTestLog(`Cache pressue cache updates threshold exceeded: ${status.metrics.cachePressure.cacheUpdatesThreshold}`);
-    jsTestLog(`Cache pressue cache dirty threshold exceeded: ${status.metrics.cachePressure.cacheDirtyThreshold}`);
+    jsTestLog(
+        `Cache pressue wait time threshold exceeded: ${status.metrics.cachePressure.waitTimeThresholdExceeded}`,
+    );
+    jsTestLog(
+        `Cache pressue cache updates threshold exceeded: ${status.metrics.cachePressure.cacheUpdatesThreshold}`,
+    );
+    jsTestLog(
+        `Cache pressue cache dirty threshold exceeded: ${status.metrics.cachePressure.cacheDirtyThreshold}`,
+    );
 }
 
 // Create a large document to pin dirty data in WiredTiger.
@@ -64,7 +70,9 @@ while (true) {
     let session = db.getMongo().startSession();
     session.startTransaction();
     try {
-        assert.commandWorked(session.getDatabase("test").runCommand({"insert": "c", documents: [largeDoc]}));
+        assert.commandWorked(
+            session.getDatabase("test").runCommand({"insert": "c", documents: [largeDoc]}),
+        );
         if (firstPreparedTxn) {
             firstPreparedTxn = false;
             PrepareHelpers.prepareTransaction(session);
@@ -89,7 +97,11 @@ while (true) {
 
 // Check we did not abort the prepared transaction.
 let res = assert.commandWorked(db.adminCommand({serverStatus: 1}));
-assert.eq(res.transactions.totalPreparedThenAborted, 0, "Prepared transaction was aborted unexpectedly");
+assert.eq(
+    res.transactions.totalPreparedThenAborted,
+    0,
+    "Prepared transaction was aborted unexpectedly",
+);
 
 jsTestLog("Aborting remaining transactions...");
 

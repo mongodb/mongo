@@ -61,7 +61,11 @@ function testFAMFailed(insert, cmdObj) {
 //
 
 // Simple query that uses an inclusion projection.
-testFAMWorked({_id: 42, a: [1, 2], b: 3}, {query: {_id: 42}, fields: {_id: 0, b: 1}, remove: true}, {b: 3});
+testFAMWorked(
+    {_id: 42, a: [1, 2], b: 3},
+    {query: {_id: 42}, fields: {_id: 0, b: 1}, remove: true},
+    {b: 3},
+);
 
 // Simple query that uses an exclusion projection.
 testFAMWorked(
@@ -85,7 +89,11 @@ testFAMWorked(
 );
 
 // Query on an array of values while using a positional projection.
-testFAMWorked({_id: 42, a: [1, 2]}, {query: {a: 2}, fields: {"a.$": 1}, remove: true}, {_id: 42, a: [2]});
+testFAMWorked(
+    {_id: 42, a: [1, 2]},
+    {query: {a: 2}, fields: {"a.$": 1}, remove: true},
+    {_id: 42, a: [2]},
+);
 
 // Query on an array of objects while using a positional projection.
 testFAMWorked(
@@ -308,7 +316,10 @@ testFAMWorked(
 );
 
 // Query on an array of values while using a positional projection.
-testFAMFailed({_id: 42, a: [1, 2]}, {query: {a: 2}, fields: {"a.$": 1}, update: {$set: {"b.kind": "xyz"}}, new: true});
+testFAMFailed(
+    {_id: 42, a: [1, 2]},
+    {query: {a: 2}, fields: {"a.$": 1}, update: {$set: {"b.kind": "xyz"}}, new: true},
+);
 
 // Query on an array of objects while using a positional projection.
 testFAMFailed(

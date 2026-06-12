@@ -9,14 +9,21 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropagated, sleepUntilUserDataRefreshed) {
+function testConnection(
+    conn,
+    eventuallyConsistentConn,
+    sleepUntilUserDataPropagated,
+    sleepUntilUserDataRefreshed,
+) {
     // Create a session which observes an eventually consistent view of user data
     const eventualDb = eventuallyConsistentConn.getDB("admin");
 
     // Create a session for modifying user data during the life of the test
     const adminSession = new Mongo("localhost:" + conn.port);
     const admin = adminSession.getDB("admin");
-    assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}));
+    assert.commandWorked(
+        admin.runCommand({createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}),
+    );
     assert(admin.auth("admin", "admin"));
     admin.logout();
 
@@ -46,7 +53,10 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
     );
     assert.commandWorked(adminDB.runCommand({createUser: "user3", pwd: "user", roles: []}));
     assert.commandWorked(
-        adminDB.runCommand({updateUser: "user3", authenticationRestrictions: [{serverAddress: ["127.0.0.1"]}]}),
+        adminDB.runCommand({
+            updateUser: "user3",
+            authenticationRestrictions: [{serverAddress: ["127.0.0.1"]}],
+        }),
     );
 
     print("=== User creation tests");
@@ -54,34 +64,81 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
         "When a client creates users with empty authenticationRestrictions, the operation succeeds, though it has no effect",
     );
     assert.commandWorked(
-        adminDB.runCommand({createUser: "user4", pwd: "user", roles: [], authenticationRestrictions: []}),
+        adminDB.runCommand({
+            createUser: "user4",
+            pwd: "user",
+            roles: [],
+            authenticationRestrictions: [],
+        }),
     );
-    assert(!Object.keys(adminDB.system.users.findOne({user: "user4"})).includes("authenticationRestrictions"));
+    assert(
+        !Object.keys(adminDB.system.users.findOne({user: "user4"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
 
     print(
         "When a client updates a user's authenticationRestrictions to be empty, the operation succeeds, and removes the authenticationRestrictions field",
     );
     assert.commandWorked(adminDB.runCommand({createUser: "user5", pwd: "user", roles: []}));
     assert.commandWorked(adminDB.runCommand({updateUser: "user5", authenticationRestrictions: []}));
-    assert(!Object.keys(adminDB.system.users.findOne({user: "user5"})).includes("authenticationRestrictions"));
-    assert.commandWorked(
-        adminDB.runCommand({updateUser: "user5", authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]}),
+    assert(
+        !Object.keys(adminDB.system.users.findOne({user: "user5"})).includes(
+            "authenticationRestrictions",
+        ),
     );
-    assert(Object.keys(adminDB.system.users.findOne({user: "user5"})).includes("authenticationRestrictions"));
+    assert.commandWorked(
+        adminDB.runCommand({
+            updateUser: "user5",
+            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}],
+        }),
+    );
+    assert(
+        Object.keys(adminDB.system.users.findOne({user: "user5"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandWorked(adminDB.runCommand({updateUser: "user5", authenticationRestrictions: []}));
-    assert(!Object.keys(adminDB.system.users.findOne({user: "user5"})).includes("authenticationRestrictions"));
-
-    print("When a client updates a user's authenticationRestrictions to be null or undefined, the operation fails");
-    assert.commandWorked(
-        adminDB.runCommand({updateUser: "user5", authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]}),
+    assert(
+        !Object.keys(adminDB.system.users.findOne({user: "user5"})).includes(
+            "authenticationRestrictions",
+        ),
     );
-    assert(Object.keys(adminDB.system.users.findOne({user: "user5"})).includes("authenticationRestrictions"));
-    assert.commandFailed(adminDB.runCommand({updateUser: "user5", authenticationRestrictions: null}));
-    assert(Object.keys(adminDB.system.users.findOne({user: "user5"})).includes("authenticationRestrictions"));
-    assert.commandFailed(adminDB.runCommand({updateUser: "user5", authenticationRestrictions: undefined}));
-    assert(Object.keys(adminDB.system.users.findOne({user: "user5"})).includes("authenticationRestrictions"));
 
-    print("When a client creates users, it may use clientSource and serverAddress authenticationRestrictions");
+    print(
+        "When a client updates a user's authenticationRestrictions to be null or undefined, the operation fails",
+    );
+    assert.commandWorked(
+        adminDB.runCommand({
+            updateUser: "user5",
+            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}],
+        }),
+    );
+    assert(
+        Object.keys(adminDB.system.users.findOne({user: "user5"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
+    assert.commandFailed(
+        adminDB.runCommand({updateUser: "user5", authenticationRestrictions: null}),
+    );
+    assert(
+        Object.keys(adminDB.system.users.findOne({user: "user5"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
+    assert.commandFailed(
+        adminDB.runCommand({updateUser: "user5", authenticationRestrictions: undefined}),
+    );
+    assert(
+        Object.keys(adminDB.system.users.findOne({user: "user5"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
+
+    print(
+        "When a client creates users, it may use clientSource and serverAddress authenticationRestrictions",
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createUser: "user6",
@@ -103,7 +160,9 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
             createUser: "user8",
             pwd: "user",
             roles: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]}],
+            authenticationRestrictions: [
+                {clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]},
+            ],
         }),
     );
     assert.commandWorked(
@@ -111,7 +170,10 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
             createUser: "user9",
             pwd: "user",
             roles: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}, {serverAddress: ["127.0.0.1"]}],
+            authenticationRestrictions: [
+                {clientSource: ["127.0.0.1"]},
+                {serverAddress: ["127.0.0.1"]},
+            ],
         }),
     );
     assert.commandFailed(
@@ -169,11 +231,15 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
 
     print("=== Localhost access tests");
 
-    print('When a client on the loopback authenticates to a user with {clientSource: "127.0.0.1"}, it will succeed');
+    print(
+        'When a client on the loopback authenticates to a user with {clientSource: "127.0.0.1"}, it will succeed',
+    );
     assert(db.auth("user6", "user"));
     db.logout();
 
-    print('When a client on the loopback authenticates to a user with {serverAddress: "127.0.0.1"}, it will succeed');
+    print(
+        'When a client on the loopback authenticates to a user with {serverAddress: "127.0.0.1"}, it will succeed',
+    );
     assert(db.auth("user7", "user"));
     db.logout();
 
@@ -200,23 +266,35 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
     assert(!externalDb.auth("user8", "user"));
 
     print("=== Invalidation tests");
-    print("When a client removes all authenticationRestrictions from a user, authentication will succeed");
+    print(
+        "When a client removes all authenticationRestrictions from a user, authentication will succeed",
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createUser: "user11",
             pwd: "user",
             roles: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]}],
+            authenticationRestrictions: [
+                {clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]},
+            ],
         }),
     );
     assert(!externalDb.auth("user11", "user"));
-    assert.commandWorked(adminDB.runCommand({updateUser: "user11", authenticationRestrictions: []}));
+    assert.commandWorked(
+        adminDB.runCommand({updateUser: "user11", authenticationRestrictions: []}),
+    );
     assert(externalDb.auth("user11", "user"));
     externalDb.logout();
 
-    print("When a client sets authenticationRestrictions on a user, authorization privileges are revoked");
+    print(
+        "When a client sets authenticationRestrictions on a user, authorization privileges are revoked",
+    );
     assert.commandWorked(
-        adminDB.runCommand({createUser: "user12", pwd: "user", roles: [{role: "readWrite", db: "test"}]}),
+        adminDB.runCommand({
+            createUser: "user12",
+            pwd: "user",
+            roles: [{role: "readWrite", db: "test"}],
+        }),
     );
 
     assert(db.auth("user12", "user"));
@@ -228,7 +306,10 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
     assert.commandWorked(eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
 
     assert.commandWorked(
-        adminDB.runCommand({updateUser: "user12", authenticationRestrictions: [{clientSource: ["192.0.2.0"]}]}),
+        adminDB.runCommand({
+            updateUser: "user12",
+            authenticationRestrictions: [{clientSource: ["192.0.2.0"]}],
+        }),
     );
 
     assert(!db.auth("user12", "user"));

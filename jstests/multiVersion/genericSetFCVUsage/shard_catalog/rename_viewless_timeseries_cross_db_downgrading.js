@@ -24,7 +24,9 @@ function runTest(db, failpointConn) {
 
     // Fail setFCV while downgrading to viewful timeseries.
     const fp = configureFailPoint(failpointConn, "failDowngrading");
-    assert.commandFailed(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandFailed(
+        db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     // Cross-DB rename must fail while downgrading.
     assert.commandFailedWithCode(
@@ -33,10 +35,14 @@ function runTest(db, failpointConn) {
     );
 
     fp.off();
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // If viewless timeseries is re-enabled, cross-DB rename works.
-    assert.commandWorked(db.adminCommand({renameCollection: src.getFullName(), to: dst.getFullName()}));
+    assert.commandWorked(
+        db.adminCommand({renameCollection: src.getFullName(), to: dst.getFullName()}),
+    );
 }
 
 // Replica set.

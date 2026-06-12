@@ -27,13 +27,19 @@ primaryDB = primary.getDB("test");
 primaryDB.setLogLevel(5, "assert");
 
 let oldAssertCounts = primaryDB.serverStatus().asserts;
-jsTestLog("Before running aggregation: Assert counts reported by db.serverStatus(): " + tojson(oldAssertCounts));
+jsTestLog(
+    "Before running aggregation: Assert counts reported by db.serverStatus(): " +
+        tojson(oldAssertCounts),
+);
 try {
     assert.eq(0, primaryDB.system.profile.count());
     assert.eq([{_id: 1}], primaryDB.foo.aggregate([]).toArray());
 
     let newAssertCounts = primaryDB.serverStatus().asserts;
-    jsTestLog("After running aggregation: Assert counts reported by db.serverStatus(): " + tojson(newAssertCounts));
+    jsTestLog(
+        "After running aggregation: Assert counts reported by db.serverStatus(): " +
+            tojson(newAssertCounts),
+    );
     assert.eq(oldAssertCounts, newAssertCounts);
     // Should have 2 entries, one for the count command and one for the aggregate command.
     assert.eq(2, primaryDB.system.profile.count());

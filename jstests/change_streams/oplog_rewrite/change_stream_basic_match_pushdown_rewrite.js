@@ -157,12 +157,16 @@ assert.commandWorked(session.commitTransaction_forTesting());
 
 // This change stream targets transactions from this session but filters out the first transaction.
 const txnStatsAfterEvent1 = () =>
-    coll
-        .explain("executionStats")
-        .aggregate([
-            {$changeStream: {resumeAfter: event1._id}},
-            {$match: {operationType: "insert", lsid: event3.lsid, txnNumber: {$ne: event3.txnNumber}}},
-        ]);
+    coll.explain("executionStats").aggregate([
+        {$changeStream: {resumeAfter: event1._id}},
+        {
+            $match: {
+                operationType: "insert",
+                lsid: event3.lsid,
+                txnNumber: {$ne: event3.txnNumber},
+            },
+        },
+    ]);
 
 // The "lsid" and "txnNumber" filters should get pushed all the way to the initial oplog query
 // in the $cursor stage, meaning that every oplog entry gets filtered out except the
@@ -177,10 +181,18 @@ if (!FeatureFlagUtil.isEnabled(db, "EndOfTransactionChangeEvent")) {
     assert.soon(
         () => {
             const stats = txnStatsAfterEvent1();
-            const oplogEventsOnShard0 = getExecutionStatsForShard(stats, st.shard0.shardName).nReturned;
-            const oplogEventsOnShard1 = getExecutionStatsForShard(stats, st.shard1.shardName).nReturned;
+            const oplogEventsOnShard0 = getExecutionStatsForShard(
+                stats,
+                st.shard0.shardName,
+            ).nReturned;
+            const oplogEventsOnShard1 = getExecutionStatsForShard(
+                stats,
+                st.shard1.shardName,
+            ).nReturned;
             return (
-                oplogEventsOnShard0 > 0 && oplogEventsOnShard1 > 0 && oplogEventsOnShard0 + oplogEventsOnShard1 === 3
+                oplogEventsOnShard0 > 0 &&
+                oplogEventsOnShard1 > 0 &&
+                oplogEventsOnShard0 + oplogEventsOnShard1 === 3
             );
         },
         () =>

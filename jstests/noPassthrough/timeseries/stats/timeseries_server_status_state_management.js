@@ -21,14 +21,18 @@ const metaFieldName = "mm";
 const resetCollection = () => {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(jsTestName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 };
 
 const dropUnrelatedCollection = () => {
     const unrelated = db.getCollection(jsTestName() + "_foo");
     assert.commandWorked(
-        db.createCollection(unrelated.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(unrelated.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     unrelated.drop();
 };
@@ -40,7 +44,8 @@ const expected = {
     trackedClearOperations: 0,
 };
 const checkServerStatus = function () {
-    const actual = assert.commandWorked(db.runCommand({serverStatus: 1})).bucketCatalog.stateManagement;
+    const actual = assert.commandWorked(db.runCommand({serverStatus: 1})).bucketCatalog
+        .stateManagement;
     assert.eq(expected.bucketsManaged, actual.bucketsManaged);
     assert.eq(expected.currentEra, actual.currentEra);
     assert.eq(expected.erasWithRemainingBuckets, actual.erasWithRemainingBuckets);

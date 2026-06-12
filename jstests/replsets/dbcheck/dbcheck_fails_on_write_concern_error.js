@@ -7,7 +7,10 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 import {
     checkHealthLog,
     clearHealthLog,
@@ -29,7 +32,10 @@ function runTest(validateMode, writeConcern) {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     rst.startSet();
@@ -54,9 +60,15 @@ function runTest(validateMode, writeConcern) {
     assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs);
     clearHealthLog(rst);
 
-    const hangBeforeProcessingDbCheckRunFp = configureFailPoint(primary, "hangBeforeProcessingDbCheckRun");
+    const hangBeforeProcessingDbCheckRunFp = configureFailPoint(
+        primary,
+        "hangBeforeProcessingDbCheckRun",
+    );
 
-    const hangBeforeAddingDBCheckBatchToOplogFp = configureFailPoint(primary, "hangBeforeAddingDBCheckBatchToOplog");
+    const hangBeforeAddingDBCheckBatchToOplogFp = configureFailPoint(
+        primary,
+        "hangBeforeAddingDBCheckBatchToOplog",
+    );
 
     if (validateMode == "dataConsistencyAndMissingIndexKeysCheck") {
         jsTestLog("Running dbCheck dataConsistencyAndMissingIndexKeysCheck");

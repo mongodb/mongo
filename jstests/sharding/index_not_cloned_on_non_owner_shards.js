@@ -48,7 +48,12 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: 
 function verifyIndexesOnlyOnOwnerShards(testCollName, customIndexSpecs, shardsWithIndexes) {
     // Verify primary shard does NOT have custom indexes
     for (const indexSpec of customIndexSpecs) {
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(primaryShard, dbName, testCollName, indexSpec);
+        ShardedIndexUtil.assertIndexDoesNotExistOnShard(
+            primaryShard,
+            dbName,
+            testCollName,
+            indexSpec,
+        );
     }
 
     // Verify owner shards DO have the indexes
@@ -84,7 +89,9 @@ function verifyIndexesOnlyOnOwnerShards(testCollName, customIndexSpecs, shardsWi
     assert.commandWorked(coll.createIndex({z: -1}));
 
     // Get the original collection UUID for comparison after resharding
-    const collInfosBeforeResharding = primaryShard.getDB(dbName).getCollectionInfos({name: collName});
+    const collInfosBeforeResharding = primaryShard
+        .getDB(dbName)
+        .getCollectionInfos({name: collName});
     assert.eq(
         1,
         collInfosBeforeResharding.length,
@@ -122,11 +129,20 @@ function verifyIndexesOnlyOnOwnerShards(testCollName, customIndexSpecs, shardsWi
         bsonWoCompare(originalUUID, reshardedUUID),
         "Resharded collection should have a different UUID than the original",
     );
-    jsTest.log("Original UUID: " + tojson(originalUUID) + ", Resharded UUID: " + tojson(reshardedUUID));
+    jsTest.log(
+        "Original UUID: " + tojson(originalUUID) + ", Resharded UUID: " + tojson(reshardedUUID),
+    );
 
     // Verify primary shard has no chunks after resharding
-    const chunks = mongos.getDB("config").chunks.find({uuid: reshardedUUID, shard: primaryShardName}).toArray();
-    assert.eq(0, chunks.length, "Primary shard should not own any chunks. Chunks: " + tojson(chunks));
+    const chunks = mongos
+        .getDB("config")
+        .chunks.find({uuid: reshardedUUID, shard: primaryShardName})
+        .toArray();
+    assert.eq(
+        0,
+        chunks.length,
+        "Primary shard should not own any chunks. Chunks: " + tojson(chunks),
+    );
 
     // Verify old custom index {z: -1} not on primary and new shard key index {y: 1} on data shards
     verifyIndexesOnlyOnOwnerShards(collName, [{z: -1}], []); // Old index should not be anywhere on primary
@@ -188,8 +204,12 @@ function verifyIndexesOnlyOnOwnerShards(testCollName, customIndexSpecs, shardsWi
 
     // Distribute chunks to shard1 and shard2, excluding primary shard
     assert.commandWorked(mongos.adminCommand({split: unshardNs, middle: {k: 0}}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: unshardNs, find: {k: -10}, to: dataShard1Name}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: unshardNs, find: {k: 10}, to: dataShard2Name}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: unshardNs, find: {k: -10}, to: dataShard1Name}),
+    );
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: unshardNs, find: {k: 10}, to: dataShard2Name}),
+    );
 
     // Unshard the collection to dataShard1
     assert.commandWorked(
@@ -208,6 +228,8 @@ function verifyIndexesOnlyOnOwnerShards(testCollName, customIndexSpecs, shardsWi
     ShardedIndexUtil.assertIndexExistsOnShard(dataShard1, dbName, unshardCollName, {n: 1});
 }
 
-jsTest.log("Tests passed: primary shard correctly does not build custom indexes when it doesn't own chunks");
+jsTest.log(
+    "Tests passed: primary shard correctly does not build custom indexes when it doesn't own chunks",
+);
 
 st.stop();

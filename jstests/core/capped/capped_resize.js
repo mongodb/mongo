@@ -90,9 +90,13 @@ let verifyLimitUpdate = function (updates) {
     // We expect the resizing of a capped collection to fail when maxSize <= 0 and maxSize >
     // maxSizeCeiling.
     const negativeSize = -1 * maxSize;
-    assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: maxSizeCeiling + 1}));
+    assert.commandFailed(
+        testDB.runCommand({collMod: cappedColl.getName(), cappedSize: maxSizeCeiling + 1}),
+    );
     assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: 0}));
-    assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: negativeSize}));
+    assert.commandFailed(
+        testDB.runCommand({collMod: cappedColl.getName(), cappedSize: negativeSize}),
+    );
 
     // The maximum size can be a non-multiple of 256 bytes.
     // We modify the collection to have a size multiple of 256, then

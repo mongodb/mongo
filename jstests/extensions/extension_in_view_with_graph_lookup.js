@@ -61,24 +61,35 @@ function runGraphLookup(fromViewName, fromViewPipeline, source = collName) {
 
     // Verify the results are the same members as the users minus Henry.
     const expectedUsers = users.filter((u) => u._id !== 7);
-    assert.sameMembers(results.connections.map((c) => c.name).sort(), expectedUsers.map((u) => u.name).sort(), results);
+    assert.sameMembers(
+        results.connections.map((c) => c.name).sort(),
+        expectedUsers.map((u) => u.name).sort(),
+        results,
+    );
 
     assert.commandWorked(coll.getDB().runCommand({drop: fromViewName}));
 }
 
 describe("$graphLookup with extension stages in view definition", function () {
     it("should run $graphLookup on a view with a desugar/source stage in definition", function () {
-        runGraphLookup(collName + "_read_n_docs_view", [{$readNDocuments: {numDocs: expectedUsersInView}}]);
+        runGraphLookup(collName + "_read_n_docs_view", [
+            {$readNDocuments: {numDocs: expectedUsersInView}},
+        ]);
     });
 
     it("should run $graphLookup on a view with a 'transform' stage in definition", function () {
-        runGraphLookup(collName + "_extension_limit_view", [{$sort: {_id: 1}}, {$extensionLimit: expectedUsersInView}]);
+        runGraphLookup(collName + "_extension_limit_view", [
+            {$sort: {_id: 1}},
+            {$extensionLimit: expectedUsersInView},
+        ]);
     });
 
     it("should run $graphLookup on a nested view with extension stage in inner view definition", function () {
         const nestedViewName = collName + "_nested_extension_view";
         assert.commandWorked(
-            db.createView(nestedViewName, collName, [{$readNDocuments: {numDocs: expectedUsersInView}}]),
+            db.createView(nestedViewName, collName, [
+                {$readNDocuments: {numDocs: expectedUsersInView}},
+            ]),
         );
         runGraphLookup(collName + "_nested_view", [], nestedViewName);
         assert.commandWorked(coll.getDB().runCommand({drop: nestedViewName}));
@@ -115,7 +126,9 @@ describe("$graphLookup with $unionWith and extension stages", function () {
     it("should run $graphLookup on a nested view with extension stage in subpipeline", function () {
         const nestedViewName = collName + "_nested_extension_view";
         assert.commandWorked(
-            db.createView(nestedViewName, collName, [{$readNDocuments: {numDocs: expectedUsersInView}}]),
+            db.createView(nestedViewName, collName, [
+                {$readNDocuments: {numDocs: expectedUsersInView}},
+            ]),
         );
         runGraphLookup(collName + "_union_with_nested_view", [
             // Skip all users to only return the $unionWith results.

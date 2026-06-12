@@ -15,7 +15,9 @@ assert.commandWorked(st.s.adminCommand({split: "test.user", middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.name}));
 
 let lowerTxnTimeout = (conn) => {
-    assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, transactionLifetimeLimitSeconds: 10}));
+    assert.commandWorked(
+        conn.getDB("admin").runCommand({setParameter: 1, transactionLifetimeLimitSeconds: 10}),
+    );
 };
 
 st.rs0.nodes.forEach(lowerTxnTimeout);
@@ -24,7 +26,13 @@ st.rs1.nodes.forEach(lowerTxnTimeout);
 let testDB = st.s.getDB("test");
 
 // Create the collections in the shards outside the transactions.
-assert.commandWorked(testDB.runCommand({insert: "user", documents: [{x: -1}, {x: 1}], writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testDB.runCommand({
+        insert: "user",
+        documents: [{x: -1}, {x: 1}],
+        writeConcern: {w: "majority"},
+    }),
+);
 
 const session = st.s.startSession();
 const sessionDb = session.getDatabase("test");

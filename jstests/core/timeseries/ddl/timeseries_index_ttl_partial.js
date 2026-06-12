@@ -54,7 +54,9 @@ const resetTsColl = function (extraOptions = {}) {
 
     // Creating a TTL index on time, with a partial filter expression on the metaField should
     // succeed.
-    assert.commandWorked(coll.createIndex(timeSpec, Object.merge(options, {expireAfterSeconds: expireAfterSeconds})));
+    assert.commandWorked(
+        coll.createIndex(timeSpec, Object.merge(options, {expireAfterSeconds: expireAfterSeconds})),
+    );
     let indexes = coll.getIndexes().filter((ix) => ix.name === indexName);
     assert.eq(1, indexes.length, tojson(indexes));
 
@@ -106,14 +108,23 @@ const resetTsColl = function (extraOptions = {}) {
     // These cases have a valid index specs on the time field but invalid partialFilterExpressions.
     {
         // A TTL index on time requires partial indexes to be on the metadata field.
-        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnData), ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(
+            coll.createIndex(timeSpec, filterOnData),
+            ErrorCodes.InvalidOptions,
+        );
 
         // A TTL index on time requires partial indexes on the metadata field only, no compound
         // expressions.
-        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnMetaAndData), ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(
+            coll.createIndex(timeSpec, filterOnMetaAndData),
+            ErrorCodes.InvalidOptions,
+        );
 
         // Partial indexes are not allowed to be on the timeField.
-        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnTime), ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(
+            coll.createIndex(timeSpec, filterOnTime),
+            ErrorCodes.InvalidOptions,
+        );
     }
 
     const timeAndMetaSpec = Object.merge(timeSpec, metaSpec);
@@ -121,12 +132,24 @@ const resetTsColl = function (extraOptions = {}) {
     // These cases have valid partialFilterExpressions but invalid index specs.
     {
         // TTL indexes are only allowed on the time field.
-        assert.commandFailedWithCode(coll.createIndex(metaSpec, filterOnMeta), ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(coll.createIndex(dataSpec, filterOnMeta), ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(
+            coll.createIndex(metaSpec, filterOnMeta),
+            ErrorCodes.InvalidOptions,
+        );
+        assert.commandFailedWithCode(
+            coll.createIndex(dataSpec, filterOnMeta),
+            ErrorCodes.InvalidOptions,
+        );
 
         // TTL indexes are not allowed on compound indexes (even if a time field exists in the
         // spec).
-        assert.commandFailedWithCode(coll.createIndex(timeAndMetaSpec, filterOnMeta), ErrorCodes.CannotCreateIndex);
-        assert.commandFailedWithCode(coll.createIndex(timeAndDataSpec, filterOnMeta), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(
+            coll.createIndex(timeAndMetaSpec, filterOnMeta),
+            ErrorCodes.CannotCreateIndex,
+        );
+        assert.commandFailedWithCode(
+            coll.createIndex(timeAndDataSpec, filterOnMeta),
+            ErrorCodes.CannotCreateIndex,
+        );
     }
 })();

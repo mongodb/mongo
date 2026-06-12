@@ -18,7 +18,9 @@ const testDB = db.getSiblingDB(dbName);
 const testColl = testDB.getCollection(collName);
 
 testColl.drop({writeConcern: {w: "majority"}});
-assert.commandWorked(testDB.runCommand({create: testColl.getName(), writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testDB.runCommand({create: testColl.getName(), writeConcern: {w: "majority"}}),
+);
 
 const apiParamCombos = [
     {},
@@ -68,7 +70,10 @@ for (const txnInitiatingParams of apiParamCombos) {
                     session.startTransaction();
                     assert.commandWorked(
                         sessionDb.runCommand(
-                            addApiParams({insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams),
+                            addApiParams(
+                                {insert: collName, documents: [{}, {}, {}]},
+                                txnInitiatingParams,
+                            ),
                         ),
                     );
 
@@ -87,7 +92,10 @@ for (const txnInitiatingParams of apiParamCombos) {
              */
             let txnEndingCmd = {};
             txnEndingCmd[txnEndingCmdName] = 1;
-            Object.assign(txnEndingCmd, {txnNumber: session.getTxnNumber_forTesting(), autocommit: false});
+            Object.assign(txnEndingCmd, {
+                txnNumber: session.getTxnNumber_forTesting(),
+                autocommit: false,
+            });
 
             checkCommand(session.getDatabase("admin"), txnEndingCmd);
 

@@ -16,7 +16,10 @@ for (let i = 0; i < 10; i++) {
     t.insert({_id: i, a: i});
 }
 
-var explain = db.runCommand({explain: {find: collName, filter: {a: {$lte: 2}}}, verbosity: "executionStats"});
+var explain = db.runCommand({
+    explain: {find: collName, filter: {a: {$lte: 2}}},
+    verbosity: "executionStats",
+});
 assert.commandWorked(explain);
 assert.eq(3, explain.executionStats.nReturned);
 
@@ -43,7 +46,10 @@ if ((serverVer[0] == 7 && serverVer[1] >= 3) || serverVer[0] > 7) {
     // Starting in 7.3 running explain() against a non-existent database should result in
     // an EOF plan against mongos or mongod.
     let dbdne = db.getSiblingDB("does_not_exist_hopefully");
-    var explain = dbdne.runCommand({explain: {find: collName, filter: {a: {$lte: 2}}}, verbosity: "executionStats"});
+    var explain = dbdne.runCommand({
+        explain: {find: collName, filter: {a: {$lte: 2}}},
+        verbosity: "executionStats",
+    });
     assert.commandWorked(explain);
 
     // Explain output differs slightly under SBE versus classic engine

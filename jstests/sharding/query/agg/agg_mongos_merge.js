@@ -31,10 +31,14 @@ const nonOwningShardDB = st.shard1.getDB(jsTestName());
 
 assert.commandWorked(mongosDB.dropDatabase());
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Shard the test collection on _id.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // We will need to test $geoNear on this collection, so create a 2dsphere index.
 assert.commandWorked(mongosColl.createIndex({geo: "2dsphere"}));
@@ -49,10 +53,18 @@ assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), mid
 
 // Move the [0, 100) and [100, MaxKey) chunks to shard1.
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 50},
+        to: st.shard1.shardName,
+    }),
 );
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 150},
+        to: st.shard1.shardName,
+    }),
 );
 
 // Create a random geo co-ord generator for testing.
@@ -61,7 +73,14 @@ let georng = new GeoNearRandomTest(mongosColl, mongosDB);
 // Write 400 documents across the 4 chunks.
 for (let i = -200; i < 200; i++) {
     assert.commandWorked(
-        mongosColl.insert({_id: i, a: [i], b: {redactThisDoc: true}, c: true, geo: georng.mkPt(), text: "txt"}),
+        mongosColl.insert({
+            _id: i,
+            a: [i],
+            b: {redactThisDoc: true},
+            c: true,
+            geo: georng.mkPt(),
+            text: "txt",
+        }),
     );
     assert.commandWorked(unshardedColl.insert({_id: i, x: i}));
 }
@@ -83,7 +102,14 @@ function startProfiling() {
  * - The number of documents returned by the aggregation matches 'expectedCount'.
  * - The merge was performed on a router if 'mergeType' is 'router', and on a shard otherwise.
  */
-function assertMergeBehaviour({testName, pipeline, mergeType, batchSize, allowDiskUse, expectedCount}) {
+function assertMergeBehaviour({
+    testName,
+    pipeline,
+    mergeType,
+    batchSize,
+    allowDiskUse,
+    expectedCount,
+}) {
     // Ensure that this test has a unique name.
     assert(!testNameHistory.has(testName));
     testNameHistory.add(testName);
@@ -100,7 +126,8 @@ function assertMergeBehaviour({testName, pipeline, mergeType, batchSize, allowDi
 
     // Verify that the explain() output's 'mergeType' field matches our expectation.
     assert.eq(
-        assert.commandWorked(mongosColl.explain().aggregate(pipeline, Object.extend({}, opts))).mergeType,
+        assert.commandWorked(mongosColl.explain().aggregate(pipeline, Object.extend({}, opts)))
+            .mergeType,
         mergeType,
     );
 
@@ -133,7 +160,10 @@ function assertMergeBehaviour({testName, pipeline, mergeType, batchSize, allowDi
             "Expected merge on router, but " + foundMessage(),
         );
     } else {
-        assert(mergeType === "anyShard" || mergeType === "specificShard", "unknown merge type: " + mergeType);
+        assert(
+            mergeType === "anyShard" || mergeType === "specificShard",
+            "unknown merge type: " + mergeType,
+        );
         assert.eq(
             owningShardMergeCount + nonPrimaryShardMergeCount,
             1,
@@ -161,7 +191,14 @@ function assertMergeOnRouter({testName, pipeline, batchSize, allowDiskUse, expec
  * Throws an assertion if the aggregation specified by 'pipeline' does not produce
  * 'expectedCount' results, or if the merge phase was not performed on a shard.
  */
-function assertMergeOnMongoD({testName, pipeline, mergeType, batchSize, allowDiskUse, expectedCount}) {
+function assertMergeOnMongoD({
+    testName,
+    pipeline,
+    mergeType,
+    batchSize,
+    allowDiskUse,
+    expectedCount,
+}) {
     assertMergeBehaviour({
         testName: testName,
         pipeline: pipeline,
@@ -221,7 +258,10 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
     // Test that $geoNear is merged on router.
     assertMergeOnRouter({
         testName: "agg_mongos_merge_geo_near",
-        pipeline: [{$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}}, {$limit: 300}],
+        pipeline: [
+            {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},
+            {$limit: 300},
+        ],
         allowDiskUse: allowDiskUse,
         expectedCount: 300,
     });
@@ -274,7 +314,8 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
     // merging shard. Here, the inner collection of the $lookup in the second facet pipeline is
     // unsplittable, so the $lookup will request to merge on the shard which owns said collection.
     assertMergeOnMongoD({
-        testName: "agg_mongod_merge_facet_pipe_needs_specific_shard_merger_disk_use_" + allowDiskUse,
+        testName:
+            "agg_mongod_merge_facet_pipe_needs_specific_shard_merger_disk_use_" + allowDiskUse,
         pipeline: [
             {$match: {_id: {$gte: -200, $lte: 200}}},
             {
@@ -320,7 +361,10 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
     // regardless of 'allowDiskUse'.
     assertMergeOnMongoD({
         testName: "agg_mongos_merge_owning_shard_disk_use_" + allowDiskUse,
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$_internalSplitPipeline: {mergeType: "anyShard"}}],
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {$_internalSplitPipeline: {mergeType: "anyShard"}},
+        ],
         mergeType: "anyShard",
         allowDiskUse: allowDiskUse,
         expectedCount: 400,
@@ -383,7 +427,10 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
     // Test that $group is only merged on mongoS if 'allowDiskUse' is not set.
     assertMergeOnMongoX({
         testName: "agg_mongos_merge_group_allow_disk_use",
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$group: {_id: {$mod: ["$_id", 150]}}}],
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {$group: {_id: {$mod: ["$_id", 150]}}},
+        ],
         allowDiskUse: allowDiskUse,
         expectedCount: 299,
     });
@@ -405,7 +452,11 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
     // Test that a blocking $sample is only merged on mongoS if 'allowDiskUse' is not set.
     assertMergeOnMongoX({
         testName: "agg_mongos_merge_blocking_sample_allow_disk_use",
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sample: {size: 300}}, {$sample: {size: 200}}],
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {$sample: {size: 300}},
+            {$sample: {size: 200}},
+        ],
         allowDiskUse: allowDiskUse,
         expectedCount: 200,
     });
@@ -430,7 +481,10 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
     // Test that $bucketAuto is only merged on mongoS if 'allowDiskUse' is not set.
     assertMergeOnMongoX({
         testName: "agg_mongos_merge_bucket_auto_allow_disk_use",
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$bucketAuto: {groupBy: "$_id", buckets: 10}}],
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {$bucketAuto: {groupBy: "$_id", buckets: 10}},
+        ],
         allowDiskUse: allowDiskUse,
         expectedCount: 10,
     });
@@ -522,7 +576,9 @@ assertMergeOnRouter({
         {$unwind: "$facetPipe"},
         {$replaceRoot: {newRoot: "$facetPipe"}},
         {
-            $redact: {$cond: {if: {$eq: ["$redactThisDoc", true]}, then: "$$PRUNE", else: "$$DESCEND"}},
+            $redact: {
+                $cond: {if: {$eq: ["$redactThisDoc", true]}, then: "$$PRUNE", else: "$$DESCEND"},
+            },
         },
         {
             $match: {
@@ -551,7 +607,8 @@ const metaDataTests = [
     {pipeline: [{$sample: {size: 300}}], verifyNoMetaData: (doc) => assert.isnull(doc.$randVal)},
     {
         pipeline: [{$match: {$text: {$search: "txt"}}}, {$sort: {text: 1}}],
-        verifyNoMetaData: (doc) => assert.docEq([undefined, undefined], [doc.$textScore, doc.$sortKey]),
+        verifyNoMetaData: (doc) =>
+            assert.docEq([undefined, undefined], [doc.$textScore, doc.$sortKey]),
     },
 ];
 

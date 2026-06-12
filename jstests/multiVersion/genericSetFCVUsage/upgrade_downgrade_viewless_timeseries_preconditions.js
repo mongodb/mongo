@@ -24,7 +24,9 @@ const dbName = jsTestName();
 const db = st.s.getDB(dbName);
 const adminDB = st.s.getDB("admin");
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 /**
  * Tests preconditions for the downgrade path (downgradeToLegacy).
@@ -67,7 +69,9 @@ function testDowngradeErrors() {
 function testUpgradeErrors() {
     jsTest.log.info("=== Testing Upgrade Error Scenarios ===");
 
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     const regularCollName = "regularCollUpgrade";
     assert.commandWorked(db.createCollection(regularCollName));
@@ -75,7 +79,9 @@ function testUpgradeErrors() {
     const tsCollName = "tsCollUpgrade";
     assert.commandWorked(db.createCollection(tsCollName, {timeseries: {timeField: "t"}}));
 
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     {
         jsTest.log.info("Upgrade: Non-existent namespace should fail with NamespaceNotFound");

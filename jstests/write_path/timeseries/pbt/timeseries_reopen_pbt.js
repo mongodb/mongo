@@ -23,8 +23,14 @@ import {
     makeBatchInsertCommandArb,
     makeInsertOldBucketCommandArb,
 } from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
-import {assertCollectionValid, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
-import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
+import {
+    assertCollectionValid,
+    assertCollectionsMatch,
+} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {
+    getFcParams,
+    getFcAssertArgs,
+} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const fcParams = getFcParams();
@@ -80,7 +86,14 @@ describe("PBT exercising bucket reopening via InsertOldBucketCommand", () => {
 
         // Bias 5:1 towards batch inserts so buckets accumulate before reopening attempts.
         const programArb = fc.commands(
-            [batchInsertArb, batchInsertArb, batchInsertArb, batchInsertArb, batchInsertArb, insertOldBucketArb],
+            [
+                batchInsertArb,
+                batchInsertArb,
+                batchInsertArb,
+                batchInsertArb,
+                batchInsertArb,
+                insertOldBucketArb,
+            ],
             {
                 maxCommands: fcParams.maxCommands || 100, // maxCommands
             },

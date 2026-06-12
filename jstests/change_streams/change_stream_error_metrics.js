@@ -11,7 +11,10 @@
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {ServerStatusMetrics} from "jstests/change_streams/change_stream_metrics_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
@@ -31,9 +34,21 @@ describe("change stream error counters are present in serverStatus", function ()
         const err = ServerStatusMetrics.getCsErrorMetrics(db);
 
         // Counters are Int64 in BSON; use >= 0 rather than typeof == "number".
-        assert.gte(err.nonRetriable.changeStreamHistoryLost, 0, "missing nonRetriable.changeStreamHistoryLost");
-        assert.gte(err.nonRetriable.changeStreamFatalError, 0, "missing nonRetriable.changeStreamFatalError");
-        assert.gte(err.nonRetriable.bsonObjectTooLarge, 0, "missing nonRetriable.bsonObjectTooLarge");
+        assert.gte(
+            err.nonRetriable.changeStreamHistoryLost,
+            0,
+            "missing nonRetriable.changeStreamHistoryLost",
+        );
+        assert.gte(
+            err.nonRetriable.changeStreamFatalError,
+            0,
+            "missing nonRetriable.changeStreamFatalError",
+        );
+        assert.gte(
+            err.nonRetriable.bsonObjectTooLarge,
+            0,
+            "missing nonRetriable.bsonObjectTooLarge",
+        );
         assert.gte(err.nonRetriable.other, 0, "missing nonRetriable.other");
         assert.gte(
             err.retriable.interruptedDueToReplStateChange,
@@ -53,7 +68,10 @@ describe("non-retriable change stream error counters", function () {
         const csCursor = testColl.watch([{$project: {_id: 0}}]);
         assert.commandWorked(testColl.insertOne({a: 1}));
         assert.throws(() =>
-            assert.soon(() => csCursor.hasNext(), "expected change stream to throw ChangeStreamFatalError"),
+            assert.soon(
+                () => csCursor.hasNext(),
+                "expected change stream to throw ChangeStreamFatalError",
+            ),
         );
 
         const errAfter = ServerStatusMetrics.getCsErrorMetrics(db);
@@ -83,7 +101,10 @@ describe("non-retriable change stream error counters", function () {
 
         assert.commandWorked(largeColl.insertOne({_id: "x", a: "y".repeat(kLargeStringLen)}));
 
-        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.BSONObjectTooLarge);
+        assert.throwsWithCode(
+            () => assert.soon(() => csCursor.hasNext()),
+            ErrorCodes.BSONObjectTooLarge,
+        );
 
         assertDropCollection(testDB, largeColl.getName());
 
@@ -154,17 +175,25 @@ describe("non-retriable change stream error counters", function () {
             "unexpected increment",
             {errBefore, errAfter},
         );
-        assert.eq(errBefore.nonRetriable.other, errAfter.nonRetriable.other, "unexpected increment", {
-            errBefore,
-            errAfter,
-        });
+        assert.eq(
+            errBefore.nonRetriable.other,
+            errAfter.nonRetriable.other,
+            "unexpected increment",
+            {
+                errBefore,
+                errAfter,
+            },
+        );
         assert.eq(
             errBefore.retriable.interruptedDueToReplStateChange,
             errAfter.retriable.interruptedDueToReplStateChange,
             "unexpected increment",
             {errBefore, errAfter},
         );
-        assert.eq(errBefore.retriable.other, errAfter.retriable.other, "unexpected increment", {errBefore, errAfter});
+        assert.eq(errBefore.retriable.other, errAfter.retriable.other, "unexpected increment", {
+            errBefore,
+            errAfter,
+        });
     });
 });
 
@@ -200,9 +229,14 @@ describe("retriable change stream error counters", function () {
 
         const errBefore = ServerStatusMetrics.getCsErrorMetrics(db);
 
-        const fp = configureFailPoint(db, "throwErrorBeforeGetNext", {code: ErrorCodes.NetworkTimeout});
+        const fp = configureFailPoint(db, "throwErrorBeforeGetNext", {
+            code: ErrorCodes.NetworkTimeout,
+        });
         try {
-            assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.NetworkTimeout);
+            assert.throwsWithCode(
+                () => assert.soon(() => csCursor.hasNext()),
+                ErrorCodes.NetworkTimeout,
+            );
         } finally {
             fp.off();
         }

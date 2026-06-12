@@ -7,7 +7,12 @@
 // Bad namespace at runtime
 // Missing collection
 
-import {getParameter, setParameter, verifyGetDiagnosticData, waitFailedToStart} from "jstests/libs/ftdc.js";
+import {
+    getParameter,
+    setParameter,
+    verifyGetDiagnosticData,
+    waitFailedToStart,
+} from "jstests/libs/ftdc.js";
 
 // Validate we fail at startup on bad input
 let startFailed = MongoRunner.runMongod({
@@ -16,7 +21,9 @@ let startFailed = MongoRunner.runMongod({
 });
 waitFailedToStart(startFailed.pid, 2);
 
-let m = MongoRunner.runMongod({setParameter: "diagnosticDataCollectionStatsNamespaces=local.startup_log"});
+let m = MongoRunner.runMongod({
+    setParameter: "diagnosticDataCollectionStatsNamespaces=local.startup_log",
+});
 let adminDb = m.getDB("admin");
 
 assert.eq(getParameter(adminDb, "diagnosticDataCollectionStatsNamespaces"), ["local.startup_log"]);

@@ -24,7 +24,9 @@ const metaField = "m";
 // Create a timeseries collection and insert two measurements with known values, this gives us a valid
 // bucket to base the test on.
 const sourceColl = db.source;
-assert.commandWorked(db.createCollection(sourceColl.getName(), {timeseries: {timeField, metaField}}));
+assert.commandWorked(
+    db.createCollection(sourceColl.getName(), {timeseries: {timeField, metaField}}),
+);
 
 const measurements = [
     {[timeField]: ISODate("2024-01-16T20:48:00.000Z"), [metaField]: "sensor1", a: 10},
@@ -48,7 +50,8 @@ const verifyResult = db.runCommand({
 });
 assert(
     verifyResult.writeErrors && verifyResult.writeErrors.length > 0,
-    "Expected strict validation to reject bucket with mismatched OID timestamp: " + tojson(verifyResult),
+    "Expected strict validation to reject bucket with mismatched OID timestamp: " +
+        tojson(verifyResult),
 );
 
 // Insert the invalid bucket into a regular (non-timeseries) collection. Regular collections

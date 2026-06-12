@@ -60,9 +60,9 @@ const pipeline = [{$sample: {size: sampleSize}}, {$match: {a: {$gte: 0}}}];
     assert.commandWorked(testDB.runCommand({setClusterParameter: clusterParameter}));
 
     // Make sure this cluster parameter holds the correct value.
-    const getClusterVal = assert.commandWorked(testDB.runCommand({getClusterParameter: clusterParameterName}))[
-        "clusterParameters"
-    ][0].sampleCutoff;
+    const getClusterVal = assert.commandWorked(
+        testDB.runCommand({getClusterParameter: clusterParameterName}),
+    )["clusterParameters"][0].sampleCutoff;
     assert.eq(getClusterVal, 0.07);
 
     // Verify that our pipeline uses $sample push down, since the sample size is less than 7% of the
@@ -77,9 +77,9 @@ const pipeline = [{$sample: {size: sampleSize}}, {$match: {a: {$gte: 0}}}];
     assert.commandWorked(testDB.runCommand({setClusterParameter: clusterParameter1}));
 
     // Make sure this cluster parameter holds the correct value.
-    const getClusterVal1 = assert.commandWorked(testDB.runCommand({getClusterParameter: clusterParameterName1}))[
-        "clusterParameters"
-    ][0].sampleCutoff;
+    const getClusterVal1 = assert.commandWorked(
+        testDB.runCommand({getClusterParameter: clusterParameterName1}),
+    )["clusterParameters"][0].sampleCutoff;
     assert.eq(getClusterVal1, 0.01);
 
     // Verify that our pipeline does not use $sample push down, since the sample size is more than

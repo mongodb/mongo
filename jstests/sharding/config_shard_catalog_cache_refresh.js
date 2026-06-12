@@ -31,7 +31,11 @@ function forceReadPreferenceNearestToTargetPrimary(replSet) {
         // defaultLocalThresholdMillis in a single iteration.
         hosts[sec.host] = kDelayMicros;
     });
-    const monitorDelayFailPoint = configureFailPoint(replSet.getPrimary(), "serverPingMonitorSetRTT", hosts);
+    const monitorDelayFailPoint = configureFailPoint(
+        replSet.getPrimary(),
+        "serverPingMonitorSetRTT",
+        hosts,
+    );
     // Wait for a refresh on each node.
     monitorDelayFailPoint.wait({timesEntered: 3});
 
@@ -100,7 +104,11 @@ let parallelShellArr = collections.map((coll) => {
                 // Use a $unionWith to cause the shard to perform some routing internally. Otherwise
                 // there is no need for a refresh on the shard.
                 assert.commandWorked(
-                    testDB.runCommand({aggregate: collName, pipeline: [{$unionWith: {coll: collName}}], cursor: {}}),
+                    testDB.runCommand({
+                        aggregate: collName,
+                        pipeline: [{$unionWith: {coll: collName}}],
+                        cursor: {},
+                    }),
                 );
                 jsTestLog("Finished query for " + collName);
             },

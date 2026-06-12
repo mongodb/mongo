@@ -28,7 +28,9 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -132,7 +134,13 @@ function testBasicCase(shard0Conn, shard1Conn) {
         {_id: 1, x: "ow"},
     ];
 
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 
     assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -192,7 +200,13 @@ function testErrorCase(shard0Conn, shard1Conn) {
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
 
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 
     const err = assert.throws(() => testColl.aggregate(pipeline).toArray());
     assert.commandFailedWithCode(err, ErrorCodes.InternalError);
@@ -264,7 +278,13 @@ function testUnevenResultDistributionCase(shard0Conn, shard1Conn) {
         {_id: 14, x: "cow", y: "lorem ipsum"},
     ];
 
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 
     assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -332,7 +352,13 @@ function testMisbehavingMongot(shard0Conn, shard1Conn) {
         {_id: 1, x: "ow"},
     ];
 
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 
     const res = testColl.aggregate(pipeline).toArray();
 
@@ -403,7 +429,13 @@ function testSearchFollowedBySortOnDifferentKey(shard0Conn, shard1Conn) {
         {_id: 14, x: "cow", y: "lorem ipsum"},
     ];
 
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
     assert.eq(testColl.aggregate(pipeline.concat([{$sort: {_id: 1}}])).toArray(), expectedDocs);
 }
 runTestOnPrimaries(testSearchFollowedBySortOnDifferentKey);

@@ -38,8 +38,20 @@ assert.commandWorked(
 const largeStr = "x".repeat(9 * 1024 * 1024);
 assert.commandWorked(
     inputCollection.insert([
-        {_id: 10, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: -10, pad: largeStr},
-        {_id: 11, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: -10, pad: largeStr},
+        {
+            _id: 10,
+            info: `moves from ${donorShardNames[0]}`,
+            oldKey: -10,
+            newKey: -10,
+            pad: largeStr,
+        },
+        {
+            _id: 11,
+            info: `moves from ${donorShardNames[0]}`,
+            oldKey: -10,
+            newKey: -10,
+            pad: largeStr,
+        },
         {_id: 20, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10, pad: largeStr},
         {_id: 21, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10, pad: largeStr},
     ]),

@@ -53,8 +53,12 @@ function assertLookupRunsOnShards(explain) {
                             $expr: {
                                 $let: {
                                     vars: {
-                                        min: {$map: {input: {$objectToArray: "$_id"}, in: "$$this.v"}},
-                                        max: {$map: {input: {$objectToArray: "$max"}, in: "$$this.v"}},
+                                        min: {
+                                            $map: {input: {$objectToArray: "$_id"}, in: "$$this.v"},
+                                        },
+                                        max: {
+                                            $map: {input: {$objectToArray: "$max"}, in: "$$this.v"},
+                                        },
                                     },
                                     in: {
                                         $and: [
@@ -66,7 +70,12 @@ function assertLookupRunsOnShards(explain) {
                                                             {
                                                                 $map: {
                                                                     input: "$$max",
-                                                                    in: {$eq: [{$type: "$$this"}, "maxKey"]},
+                                                                    in: {
+                                                                        $eq: [
+                                                                            {$type: "$$this"},
+                                                                            "maxKey",
+                                                                        ],
+                                                                    },
                                                                 },
                                                             },
                                                         ],

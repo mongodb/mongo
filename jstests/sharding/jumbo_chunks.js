@@ -26,13 +26,17 @@ function setGlobalChunkSize(configDB, chunkSizeMBytes) {
 }
 
 function setCollectionChunkSize(st, ns, chunkSizeMBytes) {
-    assert.commandWorked(st.s.adminCommand({configureCollectionBalancing: ns, chunkSize: chunkSizeMBytes}));
+    assert.commandWorked(
+        st.s.adminCommand({configureCollectionBalancing: ns, chunkSize: chunkSizeMBytes}),
+    );
 }
 
 // Test setup
 let st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
-assert.commandWorked(st.s.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneShard0"}));
 
 // Use retriable writes when writing to the config server since these are not automatically retried.
@@ -45,7 +49,12 @@ const configDB = mongosSession.getDatabase("config");
     // balancer will be forced to attempt to move it out.
     assert.commandWorked(st.s.adminCommand({shardcollection: "test.foo", key: {x: 1}}));
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: "test.foo", min: {x: 0}, max: {x: MaxKey}, zone: "zoneShard0"}),
+        st.s.adminCommand({
+            updateZoneKeyRange: "test.foo",
+            min: {x: 0},
+            max: {x: MaxKey},
+            zone: "zoneShard0",
+        }),
     );
 
     let db = st.getDB("test");
@@ -107,10 +116,16 @@ const configDB = mongosSession.getDatabase("config");
     st.awaitCollectionBalance(coll);
     st.stopBalancer();
 
-    const chunk = findChunksUtil.findOneChunkByNs(configDB, coll.getFullName(), {min: {x: splitPoint}});
+    const chunk = findChunksUtil.findOneChunkByNs(configDB, coll.getFullName(), {
+        min: {x: splitPoint},
+    });
 
     // Verify chunk has been moved to shard0
-    assert.eq(st.shard0.shardName, chunk.shard, `${tojson(chunk)} was not moved to ${tojson(st.shard0.shardName)}`);
+    assert.eq(
+        st.shard0.shardName,
+        chunk.shard,
+        `${tojson(chunk)} was not moved to ${tojson(st.shard0.shardName)}`,
+    );
     assertNumJumboChunks(configDB, coll.getFullName(), 0);
 
     coll.drop();
@@ -144,7 +159,9 @@ const configDB = mongosSession.getDatabase("config");
     st.startBalancer();
 
     assert.soon(() => {
-        const chunk = findChunksUtil.findOneChunkByNs(configDB, coll.getFullName(), {min: {x: splitPoint}});
+        const chunk = findChunksUtil.findOneChunkByNs(configDB, coll.getFullName(), {
+            min: {x: splitPoint},
+        });
         if (chunk == null) {
             // Balancer hasn't run and enforce the zone boundaries yet.
             return false;
@@ -155,10 +172,16 @@ const configDB = mongosSession.getDatabase("config");
 
     st.stopBalancer();
 
-    const chunk = findChunksUtil.findOneChunkByNs(configDB, coll.getFullName(), {min: {x: splitPoint}});
+    const chunk = findChunksUtil.findOneChunkByNs(configDB, coll.getFullName(), {
+        min: {x: splitPoint},
+    });
 
     // Verify chunk hasn't been moved to shard0 and it's jumbo
-    assert.eq(st.shard1.shardName, chunk.shard, `${tojson(chunk)} was moved to ${tojson(st.shard0.shardName)}`);
+    assert.eq(
+        st.shard1.shardName,
+        chunk.shard,
+        `${tojson(chunk)} was moved to ${tojson(st.shard0.shardName)}`,
+    );
     assertNumJumboChunks(configDB, coll.getFullName(), 1);
 
     coll.drop();

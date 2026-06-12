@@ -75,7 +75,11 @@ function verifySlowLogsIndicateMirroredReads(rst, cmd) {
     verifySlowLogsIndicateMirroredReads(rst, {find: kCollName, filter: {}});
     verifySlowLogsIndicateMirroredReads(rst, {count: kCollName, query: {}});
     verifySlowLogsIndicateMirroredReads(rst, {distinct: kCollName, key: "x"});
-    verifySlowLogsIndicateMirroredReads(rst, {findAndModify: kCollName, query: {}, update: {"$inc": {x: 1}}});
+    verifySlowLogsIndicateMirroredReads(rst, {
+        findAndModify: kCollName,
+        query: {},
+        update: {"$inc": {x: 1}},
+    });
     verifySlowLogsIndicateMirroredReads(rst, {
         update: kCollName,
         updates: [{q: {_id: 1}, u: {"$inc": {x: 1}}}],

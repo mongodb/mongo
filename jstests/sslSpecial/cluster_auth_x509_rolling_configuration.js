@@ -157,7 +157,9 @@ rolloverConfig({
     tlsClusterAuthX509Attributes: fooTitleDNAttributes,
 });
 
-jsTestLog("SUCCESS - certificate rotation from DC/O/OU certs to custom subject DN attribute-based certs");
+jsTestLog(
+    "SUCCESS - certificate rotation from DC/O/OU certs to custom subject DN attribute-based certs",
+);
 
 // Scenario 2: From tlsClusterAuthX509Attributes: 'title=foo' to tlsClusterAuthX509Attributes:
 // 'title=bar'
@@ -238,7 +240,9 @@ rolloverConfig({
     tlsClusterAuthX509ExtensionValue: "foo",
 });
 
-jsTestLog("SUCCESS - certificate rotation from custom subject DN attributes to custom extension value");
+jsTestLog(
+    "SUCCESS - certificate rotation from custom subject DN attributes to custom extension value",
+);
 
 // Scenario 4: From tlsClusterAuthX509ExtensionValue: 'foo' to tlsClusterAuthX509ExtensionValue:
 // 'bar'

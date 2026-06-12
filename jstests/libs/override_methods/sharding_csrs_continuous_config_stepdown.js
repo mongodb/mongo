@@ -1,7 +1,13 @@
 import {ContinuousStepdown} from "jstests/libs/override_methods/continuous_stepdown.js";
 import "jstests/libs/override_methods/implicitly_retry_on_config_stepdowns.js";
-import {kOverrideConstructor as kOverrideConstructorForRST, ReplSetTest} from "jstests/libs/replsettest.js";
-import {kOverrideConstructor as kOverrideConstructorForST, ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    kOverrideConstructor as kOverrideConstructorForRST,
+    ReplSetTest,
+} from "jstests/libs/replsettest.js";
+import {
+    kOverrideConstructor as kOverrideConstructorForST,
+    ShardingTest,
+} from "jstests/libs/shardingtest.js";
 
 const stepdownIntervalMS = 8 * 1000;
 
@@ -33,7 +39,9 @@ ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailov
      * server is still stabilizing during startup.
      */
     _stopBalancerForInit() {
-        retryOnRetryableError(() => this.stopBalancer(10000), 10, 2000, [ErrorCodes.FailedToSatisfyReadPreference]);
+        retryOnRetryableError(() => this.stopBalancer(10000), 10, 2000, [
+            ErrorCodes.FailedToSatisfyReadPreference,
+        ]);
     }
 
     constructor(params) {

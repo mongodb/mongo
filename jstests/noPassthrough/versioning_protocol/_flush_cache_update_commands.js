@@ -12,7 +12,12 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function checkTimestampConsistencyInPersistentMetadata(dbName, nss, dbTimestampInConfig, collTimestampInConfig) {
+function checkTimestampConsistencyInPersistentMetadata(
+    dbName,
+    nss,
+    dbTimestampInConfig,
+    collTimestampInConfig,
+) {
     // Checking consistency on shard catalog.
     function getDbMetadata() {
         const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
@@ -32,7 +37,9 @@ function checkTimestampConsistencyInPersistentMetadata(dbName, nss, dbTimestampI
 
     // Checking consistency on local shard collection: config.cache.collections
     st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nss, syncFromConfig: true});
-    let collTimestampInShard = st.shard0.getDB("config").cache.collections.findOne({_id: nss}).timestamp;
+    let collTimestampInShard = st.shard0
+        .getDB("config")
+        .cache.collections.findOne({_id: nss}).timestamp;
     assert.neq(null, collTimestampInShard);
     assert.eq(timestampCmp(collTimestampInConfig, collTimestampInShard), 0);
 }
@@ -59,7 +66,12 @@ let coll = configDB.collections.findOne({_id: kNs});
 let collTimestampAfterCreate = coll.timestamp;
 assert.neq(null, collTimestampAfterCreate);
 
-checkTimestampConsistencyInPersistentMetadata(kDbName, kNs, dbTimestampAfterCreate, collTimestampAfterCreate);
+checkTimestampConsistencyInPersistentMetadata(
+    kDbName,
+    kNs,
+    dbTimestampAfterCreate,
+    collTimestampAfterCreate,
+);
 
 // Drop the database and implicitly its collections. Create again both and check their timestamps.
 st.s.getDB(kDbName).dropDatabase();
@@ -76,7 +88,12 @@ let collTimestampAfterDropDB = coll.timestamp;
 assert.neq(null, collTimestampAfterDropDB);
 assert.eq(timestampCmp(collTimestampAfterDropDB, collTimestampAfterCreate), 1);
 
-checkTimestampConsistencyInPersistentMetadata(kDbName, kNs, dbTimestampAfterDropDB, collTimestampAfterDropDB);
+checkTimestampConsistencyInPersistentMetadata(
+    kDbName,
+    kNs,
+    dbTimestampAfterDropDB,
+    collTimestampAfterDropDB,
+);
 
 // Drop the collection and create it again. Collection timestamp should then be updated.
 st.s.getDB(kDbName).coll.drop();
@@ -92,7 +109,12 @@ let collTimestampAfterDropColl = coll.timestamp;
 assert.neq(null, collTimestampAfterDropColl);
 assert.eq(timestampCmp(collTimestampAfterDropColl, collTimestampAfterCreate), 1);
 
-checkTimestampConsistencyInPersistentMetadata(kDbName, kNs, dbTimestampAfterDropColl, collTimestampAfterDropColl);
+checkTimestampConsistencyInPersistentMetadata(
+    kDbName,
+    kNs,
+    dbTimestampAfterDropColl,
+    collTimestampAfterDropColl,
+);
 
 // Refine sharding key. Collection timestamp should then be updated.
 assert.commandWorked(st.s.getCollection(kNs).createIndex({x: 1, y: 1}));
@@ -108,6 +130,11 @@ let collTimestampAfterRefine = coll.timestamp;
 assert.neq(null, collTimestampAfterRefine);
 assert.eq(timestampCmp(collTimestampAfterRefine, collTimestampAfterDropColl), 1);
 
-checkTimestampConsistencyInPersistentMetadata(kDbName, kNs, dbTimestampAfterRefine, collTimestampAfterRefine);
+checkTimestampConsistencyInPersistentMetadata(
+    kDbName,
+    kNs,
+    dbTimestampAfterRefine,
+    collTimestampAfterRefine,
+);
 
 st.stop();

@@ -47,7 +47,9 @@ function checkIndexFilterSet(explain, shouldBeSet) {
 // Now create an index filter on a query with no collation specified. The index filter does not
 // inherit the collection's default collation.
 assert.commandWorked(coll.createIndexes([{x: 1}, {x: 1, y: 1}]));
-assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}),
+);
 
 const listFilters = assert.commandWorked(db.runCommand({planCacheListFilters: collName}));
 assert.eq(listFilters.filters.length, 1);
@@ -102,7 +104,10 @@ assert(
 
 // The other should not have any collation, and allow the index {x: 1, y: 1}.
 assert(
-    res.filters.some((filter) => !filter.hasOwnProperty("collation") && friendlyEqual(filter.indexes, [{x: 1, y: 1}])),
+    res.filters.some(
+        (filter) =>
+            !filter.hasOwnProperty("collation") && friendlyEqual(filter.indexes, [{x: 1, y: 1}]),
+    ),
 );
 
 function assertIsIxScanOnIndex(winningPlan, keyPattern) {

@@ -25,10 +25,15 @@ runReadOnlyTest(
 
                 // Create also a timeseries collection to validate that listCollections still works.
                 assert.commandWorked(
-                    db.createCollection(this.tsCollectionName, {timeseries: {timeField: "time", metaField: "meta"}}),
+                    db.createCollection(this.tsCollectionName, {
+                        timeseries: {timeField: "time", metaField: "meta"},
+                    }),
                 );
 
-                this.collectionNames.push(this.tsCollectionName, getTimeseriesCollForDDLOps(db, this.tsCollectionName));
+                this.collectionNames.push(
+                    this.tsCollectionName,
+                    getTimeseriesCollForDDLOps(db, this.tsCollectionName),
+                );
 
                 // Create some indexes so we can verify that listIndexes works in read-only mode.
                 for (let indexSpec of this.indexSpecs) {
@@ -46,7 +51,9 @@ runReadOnlyTest(
                 // Check that listCollections and $listClusterCatalog are working and prints collection
                 // information with readOnly true.
                 const collectionsFromListCollections = db.getCollectionInfos();
-                const collectionsFromListClusterCatalog = db.aggregate([{$listClusterCatalog: {}}]).toArray();
+                const collectionsFromListClusterCatalog = db
+                    .aggregate([{$listClusterCatalog: {}}])
+                    .toArray();
 
                 this.collectionNames.forEach((expectedCollectionName) => {
                     const outputColl = collectionsFromListCollections.find(
@@ -87,7 +94,9 @@ runReadOnlyTest(
                 });
 
                 // Check that create fails.
-                assert.commandFailedWithCode(db.runCommand({create: "quux"}), [ErrorCodes.IllegalOperation]);
+                assert.commandFailedWithCode(db.runCommand({create: "quux"}), [
+                    ErrorCodes.IllegalOperation,
+                ]);
 
                 // Check that implicit create fails.
                 assert.commandFailedWithCode(db.quux.insert({a: 1}), [ErrorCodes.IllegalOperation]);
@@ -96,14 +105,21 @@ runReadOnlyTest(
                 ]);
 
                 // Check that drop fails.
-                assert.commandFailedWithCode(db.runCommand({drop: "foo"}), [ErrorCodes.IllegalOperation]);
+                assert.commandFailedWithCode(db.runCommand({drop: "foo"}), [
+                    ErrorCodes.IllegalOperation,
+                ]);
 
                 // Check that dropDatabase fails.
-                assert.commandFailedWithCode(db.runCommand({dropDatabase: 1}), [ErrorCodes.IllegalOperation]);
+                assert.commandFailedWithCode(db.runCommand({dropDatabase: 1}), [
+                    ErrorCodes.IllegalOperation,
+                ]);
 
                 // Check that renameCollection fails
                 assert.commandFailedWithCode(
-                    db.adminCommand({renameCollection: db.getName() + ".foo", to: db.getName() + ".foo2"}),
+                    db.adminCommand({
+                        renameCollection: db.getName() + ".foo",
+                        to: db.getName() + ".foo2",
+                    }),
                     [ErrorCodes.IllegalOperation],
                 );
 
@@ -118,14 +134,18 @@ runReadOnlyTest(
 
                 // Check that createIndexes fails.
                 assert.commandFailedWithCode(
-                    db.runCommand({createIndexes: this.name, indexes: [{key: {d: 1}, name: "foo"}]}),
+                    db.runCommand({
+                        createIndexes: this.name,
+                        indexes: [{key: {d: 1}, name: "foo"}],
+                    }),
                     [ErrorCodes.IllegalOperation],
                 );
 
                 // Check that dropIndexes fails.
-                assert.commandFailedWithCode(db.runCommand({dropIndexes: this.name, index: {a: 1}}), [
-                    ErrorCodes.IllegalOperation,
-                ]);
+                assert.commandFailedWithCode(
+                    db.runCommand({dropIndexes: this.name, index: {a: 1}}),
+                    [ErrorCodes.IllegalOperation],
+                );
             },
         };
     })(),

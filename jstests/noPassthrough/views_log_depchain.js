@@ -51,7 +51,9 @@ assert.commandWorked(db.createCollection("base"));
 assert.commandWorked(db.createView("a_view", "base", [{$project: {"aa": 0}}, {$sort: {"a": 1}}]));
 assert.commandWorked(db.createView("b_view", "base", [{$project: {"bb": 0}}]));
 assert.commandWorked(
-    db.createView("c_view", "a_view", [{$lookup: {from: "b_view", localField: "x", foreignField: "x", as: "y"}}]),
+    db.createView("c_view", "a_view", [
+        {$lookup: {from: "b_view", localField: "x", foreignField: "x", as: "y"}},
+    ]),
 );
 
 // Run a simple query against the top view.
@@ -80,7 +82,9 @@ checkProfilerLog(db);
 // If a view is modified, the logs should reflect that.
 assert.commandWorked(db.runCommand({drop: "c_view"}));
 assert.commandWorked(
-    db.createView("c_view", "b_view", [{$lookup: {from: "a_view", localField: "x", foreignField: "x", as: "y"}}]),
+    db.createView("c_view", "b_view", [
+        {$lookup: {from: "a_view", localField: "x", foreignField: "x", as: "y"}},
+    ]),
 );
 resetProfiler(db);
 assert.commandWorked(db.runCommand({find: "c_view", filter: {}}));

@@ -18,7 +18,10 @@ describe("_configsvr commit chunk operations are idempotent", function () {
         this.config = this.st.configRS.getPrimary().getDB("config");
 
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         this.setAllowMigrations = (ns, allow) => {
@@ -41,7 +44,8 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             );
         };
 
-        this.countChunks = (ns) => findChunksUtil.findChunksByNs(this.st.s.getDB("config"), ns).itcount();
+        this.countChunks = (ns) =>
+            findChunksUtil.findChunksByNs(this.st.s.getDB("config"), ns).itcount();
 
         this.checkSplitChunk = (setAllowFn) => {
             const command = {
@@ -58,7 +62,10 @@ describe("_configsvr commit chunk operations are idempotent", function () {
 
             setAllowFn.call(this, this.ns, false);
 
-            assert.commandFailedWithCode(this.config.adminCommand(command), ErrorCodes.ConflictingOperationInProgress);
+            assert.commandFailedWithCode(
+                this.config.adminCommand(command),
+                ErrorCodes.ConflictingOperationInProgress,
+            );
             assert.eq(1, this.countChunks(this.ns), "split must not have committed");
 
             // After re-enabling migrations the same split must succeed, proving the failure was
@@ -79,7 +86,12 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             assert.eq(1, this.countChunks(this.ns));
 
             assert.commandWorked(
-                this.config.adminCommand({...command, min: {x: MinKey}, max: {x: MaxKey}, splitPoints: [{x: 0}]}),
+                this.config.adminCommand({
+                    ...command,
+                    min: {x: MinKey},
+                    max: {x: MaxKey},
+                    splitPoints: [{x: 0}],
+                }),
             );
             assert.eq(2, this.countChunks(this.ns));
 
@@ -87,13 +99,23 @@ describe("_configsvr commit chunk operations are idempotent", function () {
 
             // The same split operation under allowChunkOperations = false returns OK.
             assert.commandWorked(
-                this.config.adminCommand({...command, min: {x: MinKey}, max: {x: MaxKey}, splitPoints: [{x: 0}]}),
+                this.config.adminCommand({
+                    ...command,
+                    min: {x: MinKey},
+                    max: {x: MaxKey},
+                    splitPoints: [{x: 0}],
+                }),
             );
             assert.eq(2, this.countChunks(this.ns));
 
             // A different split still fails.
             assert.commandFailedWithCode(
-                this.config.adminCommand({...command, min: {x: 0}, max: {x: MaxKey}, splitPoints: [{x: 10}]}),
+                this.config.adminCommand({
+                    ...command,
+                    min: {x: 0},
+                    max: {x: MaxKey},
+                    splitPoints: [{x: 10}],
+                }),
                 ErrorCodes.ConflictingOperationInProgress,
             );
             assert.eq(2, this.countChunks(this.ns), "split must not have committed");
@@ -118,7 +140,10 @@ describe("_configsvr commit chunk operations are idempotent", function () {
 
             setAllowFn.call(this, this.ns, false);
 
-            assert.commandFailedWithCode(this.config.adminCommand(command), ErrorCodes.ConflictingOperationInProgress);
+            assert.commandFailedWithCode(
+                this.config.adminCommand(command),
+                ErrorCodes.ConflictingOperationInProgress,
+            );
             assert.eq(3, this.countChunks(this.ns), "mergeChunks must not have committed");
 
             setAllowFn.call(this, this.ns, true);
@@ -140,18 +165,31 @@ describe("_configsvr commit chunk operations are idempotent", function () {
             assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 10}}));
             assert.eq(3, this.countChunks(this.ns));
 
-            assert.commandWorked(this.config.adminCommand({...command, chunkRange: {min: {x: MinKey}, max: {x: 10}}}));
+            assert.commandWorked(
+                this.config.adminCommand({
+                    ...command,
+                    chunkRange: {min: {x: MinKey}, max: {x: 10}},
+                }),
+            );
             assert.eq(2, this.countChunks(this.ns));
 
             setAllowFn.call(this, this.ns, false);
 
             // The same merge operation under allowChunkOperations = false returns OK.
-            assert.commandWorked(this.config.adminCommand({...command, chunkRange: {min: {x: MinKey}, max: {x: 10}}}));
+            assert.commandWorked(
+                this.config.adminCommand({
+                    ...command,
+                    chunkRange: {min: {x: MinKey}, max: {x: 10}},
+                }),
+            );
             assert.eq(2, this.countChunks(this.ns));
 
             // A different merge still fails.
             assert.commandFailedWithCode(
-                this.config.adminCommand({...command, chunkRange: {min: {x: MinKey}, max: {x: MaxKey}}}),
+                this.config.adminCommand({
+                    ...command,
+                    chunkRange: {min: {x: MinKey}, max: {x: MaxKey}},
+                }),
                 ErrorCodes.ConflictingOperationInProgress,
             );
             assert.eq(2, this.countChunks(this.ns), "mergeChunks must not have committed");
@@ -169,7 +207,10 @@ describe("_configsvr commit chunk operations are idempotent", function () {
         this.collName = "coll_" + new ObjectId().str;
         this.ns = this.dbName + "." + this.collName;
         assert.commandWorked(this.st.s.adminCommand({shardCollection: this.ns, key: {x: 1}}));
-        const collectionEntries = this.st.s.getDB("config").collections.find({_id: this.ns}).toArray();
+        const collectionEntries = this.st.s
+            .getDB("config")
+            .collections.find({_id: this.ns})
+            .toArray();
         assert.eq(collectionEntries.length, 1);
         this.collEpoch = collectionEntries[0].lastmodEpoch;
         this.collTimestamp = collectionEntries[0].timestamp;

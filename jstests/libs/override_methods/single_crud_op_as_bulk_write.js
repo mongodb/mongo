@@ -39,7 +39,14 @@ function getAdditionalParameters(cmdObj) {
     return cmdCopy;
 }
 
-function runCommandSingleOpBulkWriteOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+function runCommandSingleOpBulkWriteOverride(
+    conn,
+    dbName,
+    cmdName,
+    cmdObj,
+    originalRunCommand,
+    makeRunCommandArgs,
+) {
     let cmdNameLower = cmdName.toLowerCase();
     if (BulkWriteUtils.canProcessAsBulkWrite(cmdNameLower)) {
         BulkWriteUtils.processCRUDOp(dbName, cmdNameLower, cmdObj);
@@ -87,5 +94,7 @@ function runCommandSingleOpBulkWriteOverride(conn, dbName, cmdName, cmdObj, orig
 
 TestData.runningWithBulkWriteOverride = true; // See update_metrics.js.
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/single_crud_op_as_bulk_write.js",
+);
 OverrideHelpers.overrideRunCommand(runCommandSingleOpBulkWriteOverride);

@@ -26,7 +26,9 @@ let testDB = st.s.getDB(dbName);
 // For startParallelOps to write its state.
 let staticMongod = MongoRunner.runMongod({});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: "hashed"}}));
 
 jsTest.log("Test 'insert'");
@@ -37,7 +39,9 @@ let hash = convertShardKeyToHashed(doc.x);
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: hash}}));
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
-let shardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {x: hash});
+let shardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {
+    x: hash,
+});
 let fromShard = shardBoundsPair.shard;
 let toShard = st.getOther(fromShard);
 runCommandDuringTransferMods(
@@ -73,7 +77,9 @@ let shards = [];
 let docChunkBounds = [];
 for (let doc of docs) {
     let hash = convertShardKeyToHashed(doc.x);
-    let shardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {x: hash});
+    let shardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {
+        x: hash,
+    });
     assert.eq(1, shardBoundsPair.shard.getCollection(ns).find(doc).count());
     shards.push(shardBoundsPair.shard);
     docChunkBounds.push(shardBoundsPair.bounds);
@@ -99,7 +105,9 @@ runCommandDuringTransferMods(
     () => {
         runCommandInTxn((session) => {
             let sessionColl = session.getDatabase(dbName).getCollection(collName);
-            assert.commandWorked(sessionColl.update({x: -1}, {$set: {updated: true}}, {multi: true}));
+            assert.commandWorked(
+                sessionColl.update({x: -1}, {$set: {updated: true}}, {multi: true}),
+            );
         });
     },
 );
@@ -126,7 +134,11 @@ runCommandDuringTransferMods(
         runCommandInTxn((session) => {
             let sessionDB = session.getDatabase(dbName);
             assert.commandWorked(
-                sessionDB.runCommand({findAndModify: collName, query: {x: -1}, update: {$set: {y: 1}}}),
+                sessionDB.runCommand({
+                    findAndModify: collName,
+                    query: {x: -1},
+                    update: {$set: {y: 1}},
+                }),
             );
         });
     },

@@ -47,7 +47,9 @@ const coll = db[jsTestName()];
                 $scoreFusion: {
                     input: {
                         pipelines: {
-                            negativeScore: [{$score: {score: "$negative_score", normalization: "sigmoid"}}],
+                            negativeScore: [
+                                {$score: {score: "$negative_score", normalization: "sigmoid"}},
+                            ],
                         },
                         normalization: "sigmoid",
                     },
@@ -276,7 +278,10 @@ const coll = db[jsTestName()];
                     score_10: 1,
                     score_50: 1,
                     score: {
-                        $avg: [{$sigmoid: {$sigmoid: "$score_10"}}, {$sigmoid: {$sigmoid: "$score_50"}}],
+                        $avg: [
+                            {$sigmoid: {$sigmoid: "$score_10"}},
+                            {$sigmoid: {$sigmoid: "$score_50"}},
+                        ],
                     },
                 },
             },

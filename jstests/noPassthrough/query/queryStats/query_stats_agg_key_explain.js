@@ -3,7 +3,10 @@
  * and none are missing when running an explain query.
  * @tags: [requires_fcv_72]
  */
-import {runCommandAndValidateQueryStats, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
+import {
+    runCommandAndValidateQueryStats,
+    withQueryStatsEnabled,
+} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 
@@ -26,7 +29,14 @@ const aggregateCommandObj = {
     apiStrict: false,
 };
 
-const queryShapeAggregateFields = ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
+const queryShapeAggregateFields = [
+    "cmdNs",
+    "command",
+    "pipeline",
+    "allowDiskUse",
+    "collation",
+    "let",
+];
 
 // The outer fields not nested inside queryShape.
 const queryStatsAggregateKeyFields = [
@@ -53,7 +63,9 @@ aggregateCommandObjExplainFalse.explain = false;
 
 // Setting the explain flag to 'false' has the same behavior as having no explain flag at all,
 // making it not appear on the key.
-const queryStatsAggregateKeyFieldsExplainFalse = queryStatsAggregateKeyFields.filter((e) => e !== "explain");
+const queryStatsAggregateKeyFieldsExplainFalse = queryStatsAggregateKeyFields.filter(
+    (e) => e !== "explain",
+);
 
 withQueryStatsEnabled(collName, (coll) => {
     // Create an index for hint not to fail.

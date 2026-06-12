@@ -48,10 +48,17 @@ function runMatchSortPipelineTest(conn, coll) {
     const expectedDocs = 4;
 
     const shape = {
-        pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}],
+        pipeline: [
+            {$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}},
+            {$sort: {v: 1}},
+        ],
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -83,7 +90,11 @@ function runMatchPipelineTest(conn, coll) {
     const expectedDocs = 4;
 
     const shape = {pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]};
-    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -121,10 +132,17 @@ function runViewPipelineTest(conn, coll) {
 
     const expectedDocs = 3;
     const shape = {
-        pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}],
+        pipeline: [
+            {$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}},
+            {$sort: {v: 1}},
+        ],
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: view.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, view);
@@ -164,7 +182,11 @@ function runCollStatsPipelineTest(conn, coll) {
     const pipeline = [{$collStats: {}}, {$sort: {ns: 1}}];
     const shape = {pipeline: pipeline};
 
-    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);

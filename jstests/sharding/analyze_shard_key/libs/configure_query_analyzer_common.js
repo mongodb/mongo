@@ -48,7 +48,11 @@ export function testExistingCollection(writeConn, testCases, dbName) {
         );
 
         // Can set 'samplesPerSecond' to > 0.
-        const basicRes = testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 0.1});
+        const basicRes = testCase.conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: "full",
+            samplesPerSecond: 0.1,
+        });
         if (testCase.expectedErrorCode) {
             assert.commandFailedWithCode(basicRes, testCase.expectedErrorCode);
             // There is no need to test the remaining cases.
@@ -56,15 +60,27 @@ export function testExistingCollection(writeConn, testCases, dbName) {
         }
         assert.commandWorked(basicRes);
         assert.commandWorked(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}),
+            testCase.conn.adminCommand({
+                configureQueryAnalyzer: ns,
+                mode: "full",
+                samplesPerSecond: 1,
+            }),
         );
         assert.commandWorked(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 50}),
+            testCase.conn.adminCommand({
+                configureQueryAnalyzer: ns,
+                mode: "full",
+                samplesPerSecond: 50,
+            }),
         );
 
         // Cannot set 'samplesPerSecond' to 0.
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 0}),
+            testCase.conn.adminCommand({
+                configureQueryAnalyzer: ns,
+                mode: "full",
+                samplesPerSecond: 0,
+            }),
             ErrorCodes.InvalidOptions,
         );
 
@@ -74,14 +90,22 @@ export function testExistingCollection(writeConn, testCases, dbName) {
         if (!testCase.isCoreTest) {
             // Cannot set 'samplesPerSecond' to larger than 50.
             assert.commandFailedWithCode(
-                testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 51}),
+                testCase.conn.adminCommand({
+                    configureQueryAnalyzer: ns,
+                    mode: "full",
+                    samplesPerSecond: 51,
+                }),
                 ErrorCodes.InvalidOptions,
             );
         }
 
         // Cannot specify 'samplesPerSecond' when 'mode' is "off".
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off", samplesPerSecond: 1}),
+            testCase.conn.adminCommand({
+                configureQueryAnalyzer: ns,
+                mode: "off",
+                samplesPerSecond: 1,
+            }),
             ErrorCodes.InvalidOptions,
         );
         assert.commandWorked(testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
@@ -111,7 +135,15 @@ export function testExistingCollection(writeConn, testCases, dbName) {
 /**
  * Asserts that the query analyzer config doc matches what is expected.
  */
-function assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode, samplesPerSecond, startTime, stopTime) {
+function assertQueryAnalyzerConfigDoc(
+    conn,
+    ns,
+    collUuid,
+    mode,
+    samplesPerSecond,
+    startTime,
+    stopTime,
+) {
     const doc = conn.getCollection("config.queryAnalyzers").findOne({_id: ns});
     assert.eq(doc.collUuid, collUuid, doc);
     assert.eq(doc.mode, mode, doc);
@@ -154,7 +186,9 @@ function assertConfigQueryAnalyzerResponse(res, newConfig, oldConfig) {
 function setUpCollection(conn, {isShardedColl, isShardedCluster, shardNames}) {
     const dbName = "configure-query-analyzer" + extractUUIDFromObject(UUID());
     if (isShardedCluster) {
-        assert.commandWorked(conn.adminCommand({enableSharding: dbName, primaryShard: shardNames[0]}));
+        assert.commandWorked(
+            conn.adminCommand({enableSharding: dbName, primaryShard: shardNames[0]}),
+        );
     }
     const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
     const ns = dbName + "." + collName;
@@ -180,11 +214,13 @@ export function testPersistingConfiguration(conn) {
     let collUuid = QuerySamplingUtil.getCollectionUuid(db, collName);
 
     jsTest.log(
-        `Testing that the configureQueryAnalyzer command persists the configuration correctly ${tojson({
-            dbName,
-            collName,
-            collUuid,
-        })}`,
+        `Testing that the configureQueryAnalyzer command persists the configuration correctly ${tojson(
+            {
+                dbName,
+                collName,
+                collUuid,
+            },
+        )}`,
     );
 
     // Run a configureQueryAnalyzer command to disable query sampling. Verify that the command
@@ -198,17 +234,28 @@ export function testPersistingConfiguration(conn) {
     const mode1 = "full";
     const samplesPerSecond1 = 50;
     const res1 = assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: mode1, samplesPerSecond: samplesPerSecond1}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: mode1,
+            samplesPerSecond: samplesPerSecond1,
+        }),
     );
     const doc1 = assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode1, samplesPerSecond1);
-    assertConfigQueryAnalyzerResponse(res1, {mode: mode1, samplesPerSecond: samplesPerSecond1} /* newConfig */);
+    assertConfigQueryAnalyzerResponse(
+        res1,
+        {mode: mode1, samplesPerSecond: samplesPerSecond1} /* newConfig */,
+    );
 
     // Run a configureQueryAnalyzer command to modify the sample rate. Verify that the 'startTime'
     // remains the same.
     const mode2 = "full";
     const samplesPerSecond2 = 0.2;
     const res2 = assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: mode2, samplesPerSecond: samplesPerSecond2}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: mode2,
+            samplesPerSecond: samplesPerSecond2,
+        }),
     );
     assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode2, samplesPerSecond2, doc1.startTime);
     assertConfigQueryAnalyzerResponse(
@@ -232,7 +279,11 @@ export function testPersistingConfiguration(conn) {
     const mode4 = "full";
     const samplesPerSecond4 = 1;
     const res4 = assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: mode4, samplesPerSecond: samplesPerSecond4}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: mode4,
+            samplesPerSecond: samplesPerSecond4,
+        }),
     );
     const doc4 = assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode4, samplesPerSecond4);
     assert.gt(doc4.startTime, doc1.startTime, doc4);
@@ -245,7 +296,11 @@ export function testPersistingConfiguration(conn) {
     // Retry the previous configureQueryAnalyzer command. Verify that the 'startTime' remains the
     // same.
     const res4Retry = assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: mode4, samplesPerSecond: samplesPerSecond4}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: mode4,
+            samplesPerSecond: samplesPerSecond4,
+        }),
     );
     assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode4, samplesPerSecond4, doc4.startTime);
     assertConfigQueryAnalyzerResponse(
@@ -263,17 +318,31 @@ export function testPersistingConfiguration(conn) {
     const mode5 = "full";
     const samplesPerSecond5 = 0.1;
     const res5 = assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: mode5, samplesPerSecond: samplesPerSecond5}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: mode5,
+            samplesPerSecond: samplesPerSecond5,
+        }),
     );
     const doc5 = assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode5, samplesPerSecond5);
     assert.gt(doc5.startTime, doc4.startTime, doc5);
-    assertConfigQueryAnalyzerResponse(res5, {mode: mode5, samplesPerSecond: samplesPerSecond5} /* newConfig */);
+    assertConfigQueryAnalyzerResponse(
+        res5,
+        {mode: mode5, samplesPerSecond: samplesPerSecond5} /* newConfig */,
+    );
 
     // Run a configureQueryAnalyzer command to disable query sampling. Verify that the
     // 'samplesPerSecond' doesn't get unset.
     const mode6 = "off";
     const res6 = assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: mode6}));
-    const doc6 = assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode6, samplesPerSecond5, doc5.startTime);
+    const doc6 = assertQueryAnalyzerConfigDoc(
+        conn,
+        ns,
+        collUuid,
+        mode6,
+        samplesPerSecond5,
+        doc5.startTime,
+    );
     assertConfigQueryAnalyzerResponse(
         res6,
         {mode: mode6} /* newConfig */,
@@ -283,21 +352,36 @@ export function testPersistingConfiguration(conn) {
     // Retry the previous configureQueryAnalyzer command. Verify that the retry does not fail and
     // that the 'stopTime' remains the same.
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: mode6}));
-    assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode6, samplesPerSecond5, doc5.startTime, doc6.stopTime);
+    assertQueryAnalyzerConfigDoc(
+        conn,
+        ns,
+        collUuid,
+        mode6,
+        samplesPerSecond5,
+        doc5.startTime,
+        doc6.stopTime,
+    );
 }
 
 /**
  * Tests that the config document is deleted when the collection being analyzed is dropped.
  */
-export function testConfigurationDeletionDropCollection(conn, {isShardedColl, isShardedCluster, shardNames}) {
+export function testConfigurationDeletionDropCollection(
+    conn,
+    {isShardedColl, isShardedCluster, shardNames},
+) {
     const {dbName, collName} = setUpCollection(conn, {isShardedColl, isShardedCluster, shardNames});
     const ns = dbName + "." + collName;
     const collUuid = QuerySamplingUtil.getCollectionUuid(conn.getDB(dbName), collName);
-    jsTest.log(`Testing configuration deletion upon dropCollection ${tojson({dbName, collName, isShardedColl})}`);
+    jsTest.log(
+        `Testing configuration deletion upon dropCollection ${tojson({dbName, collName, isShardedColl})}`,
+    );
 
     const mode = "full";
     const samplesPerSecond = 0.5;
-    const res = assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond}));
+    const res = assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond}),
+    );
     assertConfigQueryAnalyzerResponse(res, {mode, samplesPerSecond});
     assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode, samplesPerSecond);
 
@@ -315,15 +399,22 @@ export function testConfigurationDeletionDropCollection(conn, {isShardedColl, is
  * Tests that the config document is deleted when the database for the collection being analyzed is
  * dropped.
  */
-export function testConfigurationDeletionDropDatabase(conn, {isShardedColl, isShardedCluster, shardNames}) {
+export function testConfigurationDeletionDropDatabase(
+    conn,
+    {isShardedColl, isShardedCluster, shardNames},
+) {
     const {dbName, collName} = setUpCollection(conn, {isShardedColl, isShardedCluster, shardNames});
     const ns = dbName + "." + collName;
     const collUuid = QuerySamplingUtil.getCollectionUuid(conn.getDB(dbName), collName);
-    jsTest.log(`Testing configuration deletion upon dropDatabase ${tojson({dbName, collName, isShardedColl})}`);
+    jsTest.log(
+        `Testing configuration deletion upon dropDatabase ${tojson({dbName, collName, isShardedColl})}`,
+    );
 
     const mode = "full";
     const samplesPerSecond = 0.5;
-    const res = assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond}));
+    const res = assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond}),
+    );
     assertConfigQueryAnalyzerResponse(res, {mode, samplesPerSecond});
     assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode, samplesPerSecond);
 
@@ -344,7 +435,12 @@ export function testConfigurationDeletionRenameCollection(
     conn,
     {isShardedColl, isShardedCluster, shardNames, sameDatabase},
 ) {
-    const {dbName, collName} = setUpCollection(conn, {isShardedColl, isShardedCluster, shardNames, sameDatabase});
+    const {dbName, collName} = setUpCollection(conn, {
+        isShardedColl,
+        isShardedCluster,
+        shardNames,
+        sameDatabase,
+    });
 
     const srcDbName = dbName;
     const srcCollName = collName;
@@ -359,7 +455,10 @@ export function testConfigurationDeletionRenameCollection(
     assert.commandWorked(dstDb.createCollection(dstCollName));
     if (!sameDatabase && isShardedCluster) {
         // On a sharded cluster, the src and dst collections must be on same shard.
-        moveDatabaseAndUnshardedColls(conn.getDB(dstDbName), getPrimaryShardIdForDatabase(conn, srcDbName));
+        moveDatabaseAndUnshardedColls(
+            conn.getDB(dstDbName),
+            getPrimaryShardIdForDatabase(conn, srcDbName),
+        );
     }
     const dstCollUuid = QuerySamplingUtil.getCollectionUuid(dstDb, dstCollName);
 
@@ -377,11 +476,15 @@ export function testConfigurationDeletionRenameCollection(
     const mode = "full";
     const samplesPerSecond = 0.5;
 
-    const srcRes = assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: srcNs, mode, samplesPerSecond}));
+    const srcRes = assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: srcNs, mode, samplesPerSecond}),
+    );
     assertConfigQueryAnalyzerResponse(srcRes, {mode, samplesPerSecond});
     assertQueryAnalyzerConfigDoc(conn, srcNs, srcCollUuid, mode, samplesPerSecond);
 
-    const dstRes = assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: dstNs, mode, samplesPerSecond}));
+    const dstRes = assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: dstNs, mode, samplesPerSecond}),
+    );
     assertConfigQueryAnalyzerResponse(dstRes, {mode, samplesPerSecond});
     assertQueryAnalyzerConfigDoc(conn, dstNs, dstCollUuid, mode, samplesPerSecond);
 

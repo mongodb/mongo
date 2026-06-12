@@ -110,14 +110,24 @@ function awaitOperations(getOperationsFunction) {
 
             // Also explicitly check that each shard appears no more than once in the list of
             // operations.
-            const distinctShardNames = new Set(operations.map((op) => ("shard" in op ? op.shard : "")));
+            const distinctShardNames = new Set(
+                operations.map((op) => ("shard" in op ? op.shard : "")),
+            );
             assert.eq(operations.length, distinctShardNames.size, {operations, numShards});
 
             if (operations.length < numShards) {
-                print(`Found ${operations.length} operation(s); waiting until there are ${numShards} operation(s)`);
+                print(
+                    `Found ${operations.length} operation(s); waiting until there are ${numShards} operation(s)`,
+                );
                 return false;
-            } else if (operations.some((op) => op.op !== "getmore" && "cursor" in op && op.cursor.batchSize === 0)) {
-                print(`Found command with empty 'batchSize' value; waiting for getmore: ${tojson(operations)}`);
+            } else if (
+                operations.some(
+                    (op) => op.op !== "getmore" && "cursor" in op && op.cursor.batchSize === 0,
+                )
+            ) {
+                print(
+                    `Found command with empty 'batchSize' value; waiting for getmore: ${tojson(operations)}`,
+                );
                 return false;
             } else if (!operations.every(getCommandFromCurrentOpEntry)) {
                 print(`Waiting until all operations have a command: ${tojson(operations)}`);
@@ -127,7 +137,10 @@ function awaitOperations(getOperationsFunction) {
             return true;
         },
         function () {
-            return "Failed to find parallel shell operation in $currentOp output: " + tojson(db.currentOp());
+            return (
+                "Failed to find parallel shell operation in $currentOp output: " +
+                tojson(db.currentOp())
+            );
         },
     );
 
@@ -137,7 +150,11 @@ function awaitOperations(getOperationsFunction) {
 function getCommandFromCurrentOpEntry(entry) {
     if (entry.op === "command" && "command" in entry) {
         return entry.command;
-    } else if (entry.op === "getmore" && "cursor" in entry && "originatingCommand" in entry.cursor) {
+    } else if (
+        entry.op === "getmore" &&
+        "cursor" in entry &&
+        "originatingCommand" in entry.cursor
+    ) {
         return entry.cursor.originatingCommand;
     } else {
         return null;
@@ -145,7 +162,9 @@ function getCommandFromCurrentOpEntry(entry) {
 }
 
 const comment = "long_running_aggregation";
-const awaitShell = startParallelShell(funWithArgs(startLongRunningAggregation, coll.getName(), comment));
+const awaitShell = startParallelShell(
+    funWithArgs(startLongRunningAggregation, coll.getName(), comment),
+);
 
 const filter = {
     ns: coll.getFullName(),

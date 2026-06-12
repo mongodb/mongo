@@ -46,7 +46,11 @@ export const $config = (function () {
             const dropCmd = {drop: viewName};
             let res = db.runCommand(dropCmd);
             let errorCodes = [ErrorCodes.NamespaceNotFound];
-            assert.commandWorkedOrFailedWithCode(db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(dropCmd)}`);
+            assert.commandWorkedOrFailedWithCode(
+                db.runCommand(dropCmd),
+                errorCodes,
+                () => `cmd: ${tojson(dropCmd)}`,
+            );
 
             res = db.createView(viewName, collName, []);
             errorCodes = [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound];
@@ -77,7 +81,11 @@ export const $config = (function () {
 
     let transitions = {
         remapViewToView: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
-        recreateViewOnCollection: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
+        recreateViewOnCollection: {
+            remapViewToView: 0.5,
+            recreateViewOnCollection: 0.25,
+            readFromView: 0.25,
+        },
         readFromView: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
     };
 

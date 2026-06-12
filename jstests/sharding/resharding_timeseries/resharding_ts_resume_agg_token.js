@@ -23,7 +23,9 @@ const kCollName = "foo";
 const ns = kDbName + "." + kCollName;
 const sDB = st.s.getDB(kDbName);
 
-assert.commandWorked(sDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    sDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 
 const timeFieldName = "time";
 const metaFieldName = "meta";

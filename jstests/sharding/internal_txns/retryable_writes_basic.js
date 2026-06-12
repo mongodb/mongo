@@ -18,7 +18,10 @@ const transactionTest = new RetryableInternalTransactionTest();
         return {id: UUID()};
     };
     const expectRetryToSucceed = false;
-    transactionTest.runInsertUpdateDeleteTests({txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
+    transactionTest.runInsertUpdateDeleteTests({
+        txnOptions: {makeSessionIdFunc},
+        expectRetryToSucceed,
+    });
 }
 
 {
@@ -27,7 +30,10 @@ const transactionTest = new RetryableInternalTransactionTest();
         return {id: UUID(), txnUUID: UUID()};
     };
     const expectRetryToSucceed = false;
-    transactionTest.runInsertUpdateDeleteTests({txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
+    transactionTest.runInsertUpdateDeleteTests({
+        txnOptions: {makeSessionIdFunc},
+        expectRetryToSucceed,
+    });
 }
 
 {
@@ -44,7 +50,9 @@ const transactionTest = new RetryableInternalTransactionTest();
 }
 
 {
-    jsTest.log("Test multi writes with an initialized statement id are rejected in retryable transactions");
+    jsTest.log(
+        "Test multi writes with an initialized statement id are rejected in retryable transactions",
+    );
     transactionTest.testRetryableTxnMultiWrites();
 }
 

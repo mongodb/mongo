@@ -50,7 +50,10 @@ adminTestDB.revokeRolesFromUser("testUser", ["read", "liveRole"]);
 const status = assert.commandWorked(testDB.runCommand({connectionStatus: 1}));
 assert.eq("testUser", status.authInfo.authenticatedUsers[0].user);
 assertFind(false);
-assert.commandFailedWithCode(testDB.runCommand({insert: "foo", documents: [{y: 1}]}), ErrorCodes.Unauthorized);
+assert.commandFailedWithCode(
+    testDB.runCommand({insert: "foo", documents: [{y: 1}]}),
+    ErrorCodes.Unauthorized,
+);
 
 // Dropping a held role revokes its privileges from the live session.
 adminTestDB.grantRolesToUser("testUser", ["liveRole"]);

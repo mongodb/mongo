@@ -15,7 +15,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const collName = jsTestName();
 
-const queryShapeAggregateFields = ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
+const queryShapeAggregateFields = [
+    "cmdNs",
+    "command",
+    "pipeline",
+    "allowDiskUse",
+    "collation",
+    "let",
+];
 
 // The outer fields not nested inside queryShape.
 const queryStatsAggregateKeyFields = [

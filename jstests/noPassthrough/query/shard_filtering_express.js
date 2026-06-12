@@ -20,12 +20,16 @@ const mongosDb = st.s.getDB("test");
 const mongosColl = st.s.getCollection(collName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard1.name}));
-assert.commandWorked(st.s.adminCommand({shardCollection: collName, key: {a: 1, b: 1}, unique: true}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: collName, key: {a: 1, b: 1}, unique: true}),
+);
 
 // shard0 gets small chunk so that we can create orphans on shard1
 assert.commandWorked(st.s.adminCommand({split: collName, middle: {a: 1, b: 10}}));
 assert.commandWorked(st.s.adminCommand({split: collName, middle: {a: 1, b: 20}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: collName, find: {a: 1, b: 15}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: collName, find: {a: 1, b: 15}, to: st.shard0.shardName}),
+);
 
 const orphanDocs = [{_id: 9, a: 1, b: 10}];
 assert.commandWorked(st.shard1.getCollection(collName).insert(orphanDocs));

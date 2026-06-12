@@ -29,9 +29,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 function shouldSkipTest(testDB) {
     const downgradeFCV = binVersionToFCV("last-lts");
     const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(testDB, "CreateSupportsStorageTierOptions");
-    if (flagDoc && flagDoc.version && MongoRunner.compareBinVersions(downgradeFCV, flagDoc.version) >= 0) {
+    if (
+        flagDoc &&
+        flagDoc.version &&
+        MongoRunner.compareBinVersions(downgradeFCV, flagDoc.version) >= 0
+    ) {
         jsTest.log.info(
-            "Skipping test because CreateSupportsStorageTierOptions is enabled at last-lts FCV " + downgradeFCV,
+            "Skipping test because CreateSupportsStorageTierOptions is enabled at last-lts FCV " +
+                downgradeFCV,
         );
         return true;
     }
@@ -64,7 +69,10 @@ function testDowngradeBlockedWithColdCollection(testDB) {
     assert.commandWorked(testDB.createCollection(collName, {storageTier: {collection: "cold"}}));
 
     // Attempt to downgrade FCV - this should fail due to cold collection.
-    const fcvResult = adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true});
+    const fcvResult = adminDB.runCommand({
+        setFeatureCompatibilityVersion: downgradeFCV,
+        confirm: true,
+    });
     assert.commandFailedWithCode(
         fcvResult,
         ErrorCodes.CannotDowngrade,

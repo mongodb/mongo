@@ -24,7 +24,13 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
             ns: ns,
             collectionType: expectedCollType,
         });
-        assert(line, "Failed to find a log line matching the ns " + ns + " and collectionType " + expectedCollType);
+        assert(
+            line,
+            "Failed to find a log line matching the ns " +
+                ns +
+                " and collectionType " +
+                expectedCollType,
+        );
     }
 
     const conn = MongoRunner.runMongod({setParameter: {}});
@@ -52,7 +58,9 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
 
     // Check for timeseries collectionType.
     assert.commandWorked(
-        db.createCollection("timeseries_coll", {timeseries: {timeField: "timestamp", metaField: "metadata"}}),
+        db.createCollection("timeseries_coll", {
+            timeseries: {timeField: "timestamp", metaField: "metadata"},
+        }),
     );
     assert.commandWorked(
         db.timeseries_coll.insert({
@@ -65,7 +73,9 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
 
     // Check for timeseries collectionType with raw operations over buckets.
     assert.commandWorked(
-        db.createCollection("timeseries_coll_rawops", {timeseries: {timeField: "timestamp", metaField: "metadata"}}),
+        db.createCollection("timeseries_coll_rawops", {
+            timeseries: {timeField: "timestamp", metaField: "metadata"},
+        }),
     );
     assert.commandWorked(
         db.timeseries_coll_rawops.insert({
@@ -74,9 +84,15 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
         }),
     );
 
-    getTimeseriesCollForRawOps(db, db.test.timeseries_coll_rawops).aggregate(pipeline, getRawOperationSpec(db));
+    getTimeseriesCollForRawOps(db, db.test.timeseries_coll_rawops).aggregate(
+        pipeline,
+        getRawOperationSpec(db),
+    );
     let tsCollNs = "test." + getTimeseriesCollForDDLOps(db, "timeseries_coll_rawops");
-    checkLogForCollectionType(tsCollNs, areViewlessTimeseriesEnabled(db) ? "normal" : "timeseriesBuckets");
+    checkLogForCollectionType(
+        tsCollNs,
+        areViewlessTimeseriesEnabled(db) ? "normal" : "timeseriesBuckets",
+    );
 
     // Check for view defined on a timeseries collection.
     assert.commandWorked(db.createView("viewOnTsColl", "timeseries_coll", [{$match: {a: 1}}]));

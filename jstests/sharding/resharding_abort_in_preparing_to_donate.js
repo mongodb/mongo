@@ -33,7 +33,10 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseAfterPreparingToDonateFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorAfterPreparingToDonate");
+const pauseAfterPreparingToDonateFP = configureFailPoint(
+    configsvr,
+    "reshardingPauseCoordinatorAfterPreparingToDonate",
+);
 
 let awaitAbort;
 reshardingTest.withReshardingInBackground(

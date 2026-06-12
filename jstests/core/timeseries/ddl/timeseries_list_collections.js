@@ -21,7 +21,8 @@ const metaFieldName = "m";
 const collNamePrefix = jsTestName() + "_";
 let collCount = 0;
 
-const bucketMaxSpanSecondsFromMinutes = TimeseriesTest.getBucketMaxSpanSecondsFromGranularity("minutes");
+const bucketMaxSpanSecondsFromMinutes =
+    TimeseriesTest.getBucketMaxSpanSecondsFromGranularity("minutes");
 
 const testOptions = function (options) {
     const coll = testDB.getCollection(collNamePrefix + collCount++);
@@ -35,7 +36,9 @@ const testOptions = function (options) {
     }
     if (!options.timeseries.hasOwnProperty("bucketMaxSpanSeconds")) {
         Object.assign(options.timeseries, {
-            bucketMaxSpanSeconds: TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(options.timeseries.granularity),
+            bucketMaxSpanSeconds: TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(
+                options.timeseries.granularity,
+            ),
         });
     }
     // When we are using default 'granularity' values we won't actually set
@@ -58,7 +61,8 @@ const testOptions = function (options) {
         });
     }
 
-    const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
+    const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor
+        .firstBatch;
     jsTestLog("Checking listCollections result: " + tojson(collections));
     if (isViewfulTimeseriesOnlySuite(testDB)) {
         // Expected number of collections >= system.views + 2 * timeseries collections
@@ -72,7 +76,10 @@ const testOptions = function (options) {
     }
 
     const bucketsCollName = getTimeseriesBucketsColl(coll).getName();
-    assertOnlyForViewlessTimeseries(testDB, !collections.some((entry) => entry.name === bucketsCollName));
+    assertOnlyForViewlessTimeseries(
+        testDB,
+        !collections.some((entry) => entry.name === bucketsCollName),
+    );
 
     const collectionDocument = collections.find((entry) => entry.name === coll.getName());
 

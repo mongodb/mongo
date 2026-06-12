@@ -43,7 +43,10 @@ for (const initParams of apiParamCombos) {
         const cursorId = assert.commandWorked(testDB.runCommand(findCmd)).cursor.id;
         const compatibleParams = continueParams === initParams;
 
-        const getMoreCmd = addApiParams({getMore: cursorId, collection: testColl.getName()}, continueParams);
+        const getMoreCmd = addApiParams(
+            {getMore: cursorId, collection: testColl.getName()},
+            continueParams,
+        );
 
         jsTestLog(
             `Initial params: ${tojson(initParams)}, ` +

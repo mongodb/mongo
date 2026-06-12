@@ -42,14 +42,19 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.call(this, db, collName, connCache);
 
-        this.arbitraryDeletesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesDeletesSupport");
+        this.arbitraryDeletesEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            db,
+            "TimeseriesDeletesSupport",
+        );
     };
 
     $config.states.doDelete = function doDelete(db, collName, connCache) {
         // Alternate between filtering on the meta field and filtering on a data field. This will
         // cover both the timeseries batch delete and arbitrary delete paths.
         const filterFieldName =
-            !this.arbitraryDeletesEnabled || Random.randInt(2) == 0 ? "m.tid" + this.tid : "f.tid" + this.tid;
+            !this.arbitraryDeletesEnabled || Random.randInt(2) == 0
+                ? "m.tid" + this.tid
+                : "f.tid" + this.tid;
         const filter = {
             [filterFieldName]: {
                 $gte: Random.randInt($config.data.numMetaCount),

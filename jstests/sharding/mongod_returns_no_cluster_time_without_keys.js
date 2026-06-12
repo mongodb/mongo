@@ -84,7 +84,10 @@ priRSConn.logout();
 // still enabled to guarantee there are no keys.
 for (let i = 0; i < st.configRS.nodes.length; i++) {
     assert.commandWorked(
-        st.configRS.nodes[i].adminCommand({"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}),
+        st.configRS.nodes[i].adminCommand({
+            "configureFailPoint": "disableKeyGeneration",
+            "mode": "alwaysOn",
+        }),
     );
 }
 
@@ -97,7 +100,10 @@ assert(adminDB.system.keys.count() == 0, "expected there to be no keys on the co
 adminDB.logout();
 
 st.configRS.stopSet(null /* signal */, true /* forRestart */);
-st.configRS.startSet({restart: true, setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"}});
+st.configRS.startSet({
+    restart: true,
+    setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"},
+});
 
 // bounce rs0 to clean the key cache
 st.rs0.stopSet(null /* signal */, true /* forRestart */);

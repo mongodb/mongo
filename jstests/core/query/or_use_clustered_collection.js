@@ -30,7 +30,9 @@ assertDropCollection(db, coll.getName());
 const isSbeGroupEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 // Create a clustered collection and create indexes.
-assert.commandWorked(db.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({c: 1}));
 assert.commandWorked(coll.createIndex({b: "text"}));
@@ -85,17 +87,29 @@ assertCorrectResults({query: coll.find({$or: [{_id: 123}, {a: 11}]}), expectedDo
 
 //$or query which uses a clustered collection scan plan and secondary index plan, and each predicate
 // matches some of the documents.
-assertCorrectResults({query: coll.find({$or: [{_id: 9}, {a: {$lte: 3}}]}), expectedDocIds: [0, 1, 2, 3, 9]});
+assertCorrectResults({
+    query: coll.find({$or: [{_id: 9}, {a: {$lte: 3}}]}),
+    expectedDocIds: [0, 1, 2, 3, 9],
+});
 
 // $or query which uses a clustered collection scan plan and secondary index plan, and some
 // documents match both predicates.
-assertCorrectResults({query: coll.find({$or: [{_id: {$lt: 2}}, {a: {$lte: 3}}]}), expectedDocIds: [0, 1, 2, 3]});
+assertCorrectResults({
+    query: coll.find({$or: [{_id: {$lt: 2}}, {a: {$lte: 3}}]}),
+    expectedDocIds: [0, 1, 2, 3],
+});
 
 //  $or query that uses two clustered collection scan plans.
-assertCorrectResults({query: coll.find({$or: [{_id: {$lt: 2}}, {_id: {$gt: 8}}]}), expectedDocIds: [0, 1, 9]});
+assertCorrectResults({
+    query: coll.find({$or: [{_id: {$lt: 2}}, {_id: {$gt: 8}}]}),
+    expectedDocIds: [0, 1, 9],
+});
 
 // $or query that uses two secondary index scan plans.
-assertCorrectResults({query: coll.find({$or: [{a: {$lt: 2}}, {a: {$gt: 8}}]}), expectedDocIds: [0, 1, 9]});
+assertCorrectResults({
+    query: coll.find({$or: [{a: {$lt: 2}}, {a: {$gt: 8}}]}),
+    expectedDocIds: [0, 1, 9],
+});
 
 function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWithCount}) {
     // TODO SERVER-77601 add coll.find(query).sort({_id: 1}) to 'queries'.
@@ -127,7 +141,9 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
             aggregate: true,
         },
         {
-            explainQuery: coll.explain().aggregate([{$match: query}, {$group: {_id: null, count: {$sum: 1}}}]),
+            explainQuery: coll
+                .explain()
+                .aggregate([{$match: query}, {$group: {_id: null, count: {$sum: 1}}}]),
             additionalStages: {"GROUP": 1},
             actualQuery: coll.aggregate([{$match: query}, {$group: {_id: null, count: {$sum: 1}}}]),
             aggregate: true,
@@ -170,7 +186,9 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
         // Validate all the stages appear the correct number of times in the winning plan.
         const expectedStages = Object.assign({}, expectedStageCount, test.additionalStages);
         for (let stage in expectedStages) {
-            let planStages = test.aggregate ? getAggPlanStages(explain, stage) : getPlanStages(explain, stage);
+            let planStages = test.aggregate
+                ? getAggPlanStages(explain, stage)
+                : getPlanStages(explain, stage);
             assert(planStages, tojson(explain));
             if (shardMergeStage || shards) {
                 assert.gte(
@@ -195,7 +213,10 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
             assert.eq(
                 expectedDocIds.length,
                 results,
-                "Expected " + expectedDocIds.length.toString() + " number of docs, but got " + tojson(test.actualQuery),
+                "Expected " +
+                    expectedDocIds.length.toString() +
+                    " number of docs, but got " +
+                    tojson(test.actualQuery),
             );
         } else {
             assertCorrectResults({
@@ -386,5 +407,7 @@ validateQueryOR({
 });
 
 // $or with a text index and an unindexed field should still fail.
-const err = assert.throws(() => coll.find({$or: [{$text: {$search: "foo"}}, {noIndex: 1}]}).toArray());
+const err = assert.throws(() =>
+    coll.find({$or: [{$text: {$search: "foo"}}, {noIndex: 1}]}).toArray(),
+);
 assert.commandFailedWithCode(err, ErrorCodes.NoQueryExecutionPlans);

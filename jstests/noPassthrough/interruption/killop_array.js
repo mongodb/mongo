@@ -34,14 +34,20 @@ function waitForOp(comment) {
             }
             return false;
         },
-        () => "Timed out waiting for op with comment: " + comment + ". currentOp: " + tojson(testDB.currentOp()),
+        () =>
+            "Timed out waiting for op with comment: " +
+            comment +
+            ". currentOp: " +
+            tojson(testDB.currentOp()),
     );
     return opId;
 }
 
 // ---- Test 1: killOp with a single-element array ----
 jsTestLog("Test 1: killOp with a single-element array");
-assert.commandWorked(primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}),
+);
 
 const shell1 = startBlockedFind("single_array_comment");
 const opId1 = waitForOp("single_array_comment");
@@ -53,12 +59,16 @@ assert.commandWorked(res);
 assert.eq(1, res.inprog.length, "expected op to still be in currentOp");
 assert.eq(true, res.inprog[0].killPending, "expected killPending to be set");
 
-assert.commandWorked(primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
+assert.commandWorked(
+    primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}),
+);
 shell1({checkExitSuccess: false});
 
 // ---- Test 2: killOp with a multi-element array kills all listed ops ----
 jsTestLog("Test 2: killOp with a multi-element array");
-assert.commandWorked(primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}),
+);
 
 const shell2 = startBlockedFind("multi_array_comment_a");
 const shell3 = startBlockedFind("multi_array_comment_b");
@@ -74,13 +84,17 @@ for (const op of res.inprog) {
     assert.eq(true, op.killPending, "expected killPending to be set for op: " + tojson(op));
 }
 
-assert.commandWorked(primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
+assert.commandWorked(
+    primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}),
+);
 shell2({checkExitSuccess: false});
 shell3({checkExitSuccess: false});
 
 // ---- Test 3: killOp with a scalar still works ----
 jsTestLog("Test 3: killOp with a scalar opId");
-assert.commandWorked(primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}),
+);
 
 const shell4 = startBlockedFind("scalar_comment");
 const opId4 = waitForOp("scalar_comment");
@@ -92,7 +106,9 @@ assert.commandWorked(res);
 assert.eq(1, res.inprog.length);
 assert.eq(true, res.inprog[0].killPending);
 
-assert.commandWorked(primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
+assert.commandWorked(
+    primary.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}),
+);
 shell4({checkExitSuccess: false});
 
 // ---- Test 4: empty array is rejected ----

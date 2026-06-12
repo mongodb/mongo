@@ -25,12 +25,17 @@ const coll = testDB.getCollection("test");
 assert.commandWorked(coll.insert({a: 1}));
 
 let res = assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangBeforeIndexBuildAbortOnInterrupt", mode: "alwaysOn"}),
+    primary.adminCommand({
+        configureFailPoint: "hangBeforeIndexBuildAbortOnInterrupt",
+        mode: "alwaysOn",
+    }),
 );
 const hangBeforeAbortFailpointTimesEntered = res.count;
 
 IndexBuildTest.pauseIndexBuilds(primary);
-const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {}, [ErrorCodes.Interrupted]);
+const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {}, [
+    ErrorCodes.Interrupted,
+]);
 
 // When the index build starts, find its op id. This will be the op id of the client connection, not
 // the thread pool task managed by IndexBuildsCoordinatorMongod.
@@ -66,7 +71,9 @@ while (
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 30, force: true}));
 
 // Let the command thread try to abort the index build.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "hangBeforeIndexBuildAbortOnInterrupt", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "hangBeforeIndexBuildAbortOnInterrupt", mode: "off"}),
+);
 
 // Unable to abort index build because we are not primary.
 checkLog.containsJson(primary, 20449);

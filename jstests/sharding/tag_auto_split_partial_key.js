@@ -39,9 +39,21 @@ findChunksUtil.findChunksByNs(s.config, "test.foo").forEach(function (chunk) {
 });
 
 // Check chunk mins correspond exactly to tag range boundaries, extended to match shard key
-assert.eq(1, findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: MinKey, a: MinKey}}).itcount());
-assert.eq(1, findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 5, a: MinKey}}).itcount());
-assert.eq(1, findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 10, a: MinKey}}).itcount());
-assert.eq(1, findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 15, a: MinKey}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: MinKey, a: MinKey}}).itcount(),
+);
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 5, a: MinKey}}).itcount(),
+);
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 10, a: MinKey}}).itcount(),
+);
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 15, a: MinKey}}).itcount(),
+);
 
 s.stop();

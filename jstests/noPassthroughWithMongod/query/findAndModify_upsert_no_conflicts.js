@@ -23,7 +23,10 @@ const sleepFunction = function (sleepDB, sleepColl) {
     );
 };
 
-const sleepCommand = startParallelShell(funWithArgs(sleepFunction, "test", collName), testDB.getMongo().port);
+const sleepCommand = startParallelShell(
+    funWithArgs(sleepFunction, "test", collName),
+    testDB.getMongo().port,
+);
 const sleepID = waitForCommand(
     "sleepCmd",
     (op) => op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep",

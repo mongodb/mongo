@@ -30,7 +30,9 @@ stWithMock.start();
 const st = stWithMock.st;
 const mongos = st.s;
 const testDb = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const testColl = testDb.getCollection(collName);
 const collNS = testColl.getFullName();

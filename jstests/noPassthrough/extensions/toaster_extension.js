@@ -6,7 +6,10 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -15,23 +18,33 @@ function validateToasterFunctionality(conn, expectBagels) {
     const coll = db[jsTestName()];
 
     let pipeline = [{$toast: {temp: 3.5}}];
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+    );
 
     pipeline = [{$toast: {temp: 7}}];
     assertErrorCode(coll, pipeline, 11285302);
 
     pipeline = [{$toastBagel: {}}];
     if (expectBagels) {
-        assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+        assert.commandWorked(
+            db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+        );
     } else {
         assertErrorCode(coll, pipeline, 40324);
     }
 }
 
-withExtensions({"libtoaster_mongo_extension.so": {maxToasterHeat: 5, allowBagels: true}}, (conn) => {
-    validateToasterFunctionality(conn, true);
-});
+withExtensions(
+    {"libtoaster_mongo_extension.so": {maxToasterHeat: 5, allowBagels: true}},
+    (conn) => {
+        validateToasterFunctionality(conn, true);
+    },
+);
 
-withExtensions({"libtoaster_mongo_extension.so": {maxToasterHeat: 6, allowBagels: false}}, (conn) => {
-    validateToasterFunctionality(conn, false);
-});
+withExtensions(
+    {"libtoaster_mongo_extension.so": {maxToasterHeat: 6, allowBagels: false}},
+    (conn) => {
+        validateToasterFunctionality(conn, false);
+    },
+);

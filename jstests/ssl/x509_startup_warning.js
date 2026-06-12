@@ -68,7 +68,12 @@ function runTests(checkMongos) {
     runTest(checkMongos, {tlsAllowInvalidHostnames: ""}, false, true);
 
     // Do expect a warning for certificates and hostnames.
-    runTest(checkMongos, {tlsAllowInvalidCertificates: "", tlsAllowInvalidHostnames: ""}, true, true);
+    runTest(
+        checkMongos,
+        {tlsAllowInvalidCertificates: "", tlsAllowInvalidHostnames: ""},
+        true,
+        true,
+    );
 }
 
 // Run tests on mongos

@@ -80,8 +80,12 @@ function runTest(testName, setUpFunc, runCmdFunc) {
     const defaultOptions = {};
     const expandedOptions = {showExpandedEvents: true};
 
-    const collectionChangeStreamCursorDefault = testColl.aggregate([{$changeStream: defaultOptions}]);
-    const collectionChangeStreamCursorExpanded = testColl.aggregate([{$changeStream: expandedOptions}]);
+    const collectionChangeStreamCursorDefault = testColl.aggregate([
+        {$changeStream: defaultOptions},
+    ]);
+    const collectionChangeStreamCursorExpanded = testColl.aggregate([
+        {$changeStream: expandedOptions},
+    ]);
 
     const databaseChangeStreamCursorDefault = testDB.aggregate([{$changeStream: defaultOptions}]);
     const databaseChangeStreamCursorExpanded = testDB.aggregate([{$changeStream: expandedOptions}]);
@@ -98,7 +102,9 @@ function runTest(testName, setUpFunc, runCmdFunc) {
     const collUuidAfter = getCollectionUuid(st.s, testDbName, testCollName);
 
     const newDoc = {_id: UUID(), x: 100, y: 100};
-    const res = assert.commandWorked(testDB.runCommand({insert: testCollName, documents: [newDoc]}));
+    const res = assert.commandWorked(
+        testDB.runCommand({insert: testCollName, documents: [newDoc]}),
+    );
     const insertTs = res.operationTime;
 
     const validateEvents = (events, isExpanded) => {
@@ -176,15 +182,27 @@ const testCases = [];
 //   collection exists as an empty collection on shard0.
 const setUp = (st, testDbName, testCollName) => {
     const testNs = testDbName + "." + testCollName;
-    assert.commandWorked(st.s.adminCommand({enableSharding: testDbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: testDbName, primaryShard: st.shard1.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: testNs, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: testNs, middle: {x: 0}}));
 
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: testNs, find: {x: MinKey}, to: st.shard0.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: testNs,
+            find: {x: MinKey},
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
     );
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: testNs, find: {x: MinKey}, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: testNs,
+            find: {x: MinKey},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 };
 
@@ -207,7 +225,9 @@ const runReshardCollection = (st, testDbName, testCollName) => {
 };
 const runUnshardCollection = (st, testDbName, testCollName) => {
     const testNs = testDbName + "." + testCollName;
-    assert.commandWorked(st.s.adminCommand({unshardCollection: testNs, toShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({unshardCollection: testNs, toShard: st.shard1.shardName}),
+    );
 };
 
 testCases.push({

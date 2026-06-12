@@ -27,7 +27,10 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
     try {
         // Turn on failpoint that parallel shell will hit when blocked on prepare.
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "waitAfterNewStatementBlocksBehindPrepare", mode: "alwaysOn"}),
+            db.adminCommand({
+                configureFailPoint: "waitAfterNewStatementBlocksBehindPrepare",
+                mode: "alwaysOn",
+            }),
         );
 
         function runTransactionOnSession(dbName, collName, lsid) {
@@ -50,12 +53,19 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
             );
 
             assert.commandWorked(
-                db.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+                db.adminCommand({
+                    commitTransaction: 1,
+                    lsid: lsid,
+                    txnNumber: txnNumber,
+                    autocommit: false,
+                }),
             );
         }
         // Launch a parallel shell to start a new transaction, insert a document, and commit. These
         // operations should block behind the previous prepared transaction on the session.
-        awaitShell = startParallelShell(funWithArgs(runTransactionOnSession, dbName, collName, lsid));
+        awaitShell = startParallelShell(
+            funWithArgs(runTransactionOnSession, dbName, collName, lsid),
+        );
 
         // Wait until parallel shell insert is blocked on prepare.
         waitForCurOpByFailPointNoNS(db, "waitAfterNewStatementBlocksBehindPrepare");
@@ -64,7 +74,10 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
         // prepare. This is needed in a finally block so that if something fails we're guaranteed to
         // turn this failpoint off, so that it doesn't cause problems for subsequent tests.
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "waitAfterNewStatementBlocksBehindPrepare", mode: "off"}),
+            db.adminCommand({
+                configureFailPoint: "waitAfterNewStatementBlocksBehindPrepare",
+                mode: "off",
+            }),
         );
     }
 
@@ -131,7 +144,9 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
     // commitTransaction twice, and the second call races with the second transaction the test
     // started.
     assert.commandWorked(
-        session.getDatabase("admin").adminCommand({commitTransaction: 1, commitTimestamp: prepareTimestamp}),
+        session
+            .getDatabase("admin")
+            .adminCommand({commitTransaction: 1, commitTimestamp: prepareTimestamp}),
     );
 
     awaitShell();
@@ -140,7 +155,9 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 })();
 
 (() => {
-    jsTestLog("Test error precedence when executing a malformed command during a prepared transaction.");
+    jsTestLog(
+        "Test error precedence when executing a malformed command during a prepared transaction.",
+    );
 
     const session = testDB.getMongo().startSession();
     const sessionDb = session.getDatabase(dbName);

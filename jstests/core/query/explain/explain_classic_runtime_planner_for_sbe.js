@@ -6,7 +6,11 @@
 //  requires_fcv_80,  # because ClassicRuntimePlanningForSbe was enabled starting in 8.0
 // ]
 
-import {getExecutionStages, getExecutionStats, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {
+    getExecutionStages,
+    getExecutionStats,
+    getRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_classic_runtime_planner_for_sbe;
 coll.drop();

@@ -92,7 +92,13 @@ testSuccessfulConnect(true, `mongodb://${username}@${host}/test`);
 testSuccessfulConnect(true, `mongodb://${username}@${host}/test`, "--password");
 
 testSuccessfulConnect(true, `mongodb://${username}@${host}/test`, "--username", username);
-testSuccessfulConnect(true, `mongodb://${username}@${host}/test`, "--password", "--username", username);
+testSuccessfulConnect(
+    true,
+    `mongodb://${username}@${host}/test`,
+    "--password",
+    "--username",
+    username,
+);
 
 testSuccessfulConnect(
     true,
@@ -124,16 +130,33 @@ testSuccessfulConnect(
     "notTest",
 );
 
-testSuccessfulConnect(true, `mongodb://${host}/test?authSource=notTest`, "--username", usernameNotTest);
+testSuccessfulConnect(
+    true,
+    `mongodb://${host}/test?authSource=notTest`,
+    "--username",
+    usernameNotTest,
+);
 
 testSuccessfulConnect(true, `mongodb://${host}/test`, "--username", username);
 testSuccessfulConnect(true, `mongodb://${host}/test`, "--password", "--username", username);
 
-testSuccessfulConnect(false, `mongodb://${host}/test`, "--password", password, "--username", username);
+testSuccessfulConnect(
+    false,
+    `mongodb://${host}/test`,
+    "--password",
+    password,
+    "--username",
+    username,
+);
 
 testSuccessfulConnect(false, `mongodb://${username}:${password}@${host}/test`);
 testSuccessfulConnect(false, `mongodb://${username}:${password}@${host}/test`, "--password");
-testSuccessfulConnect(false, `mongodb://${username}:${password}@${host}/test`, "--password", password);
+testSuccessfulConnect(
+    false,
+    `mongodb://${username}:${password}@${host}/test`,
+    "--password",
+    password,
+);
 testSuccessfulConnect(false, `mongodb://${username}@${host}/test`, "--password", password);
 
 testSuccessfulConnect(
@@ -213,7 +236,12 @@ testFailedConnect(
     usernameX509,
 );
 
-testFailedConnect(false, `mongodb://${host}/test?authSource=$external`, "--authenticationMechanism", "MONGODB-X509");
+testFailedConnect(
+    false,
+    `mongodb://${host}/test?authSource=$external`,
+    "--authenticationMechanism",
+    "MONGODB-X509",
+);
 testFailedConnect(
     false,
     `mongodb://${host}/test?authSource=$external`,

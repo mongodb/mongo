@@ -46,13 +46,17 @@ const adminDB = st.s.getDB("admin");
 
 // The test only applies when the viewless timeseries feature flag is enabled (i.e. FCV >= 9.0).
 if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections")) {
-    jsTest.log.info("Skipping test: CreateViewlessTimeseriesCollections feature flag is not enabled.");
+    jsTest.log.info(
+        "Skipping test: CreateViewlessTimeseriesCollections feature flag is not enabled.",
+    );
     st.stop();
     quit();
 }
 
 // Place the test database on shard0 so the config server knows where to send commands.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // ---- Test data ----
 
@@ -71,7 +75,9 @@ assert.commandWorked(testDB[tsCollName].insertOne({t: ISODate(), x: 1}));
 assert.eq(
     null,
     testDB["system.buckets." + tsCollName].exists(),
-    "Expected viewless format before downgrade: system.buckets." + tsCollName + " should not exist.",
+    "Expected viewless format before downgrade: system.buckets." +
+        tsCollName +
+        " should not exist.",
 );
 
 // ---- Race condition setup ----
@@ -89,7 +95,9 @@ const awaitSetFCV = startParallelShell(
         // Before the fix this call throws:
         //   CommandNotSupportedOnView (code 166): "Namespace <db>.ts is a view, not a collection"
         // After the fix it succeeds: the race-created plain view is skipped gracefully.
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+        );
     }, lastLTSFCV),
     st.s.port,
 );
@@ -106,7 +114,9 @@ hangFp.wait();
 // After this, the namespace `ts` exists in the local catalog as a view whose timeseries()
 // getter returns false. The coordinator's acquireCollectionWithBucketsLookup() will see a view
 // that is not a timeseries view and throw CommandNotSupportedOnView.
-jsTest.log.info("Dropping viewless timeseries collection and creating a plain view with the same name.");
+jsTest.log.info(
+    "Dropping viewless timeseries collection and creating a plain view with the same name.",
+);
 assert.commandWorked(testDB.runCommand({drop: tsCollName}));
 assert.commandWorked(testDB.createView(tsCollName, otherCollName, []));
 
@@ -136,6 +146,8 @@ assert.eq(1, viewInfoAfter.length, "Expected the plain view to still exist after
 assert.eq("view", viewInfoAfter[0].type, "Expected '" + tsCollName + "' to remain a plain view.");
 
 // Upgrade back to latestFCV so the cluster can shut down cleanly.
-assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 st.stop();

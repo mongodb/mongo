@@ -42,7 +42,10 @@ expectedResult = {
         "replication": {"replSetName": "dummy"},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_shardsvr.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/set_shardingrole_shardsvr.json"},
+    expectedResult,
+);
 
 jsTest.log('Testing "sharding.clusterRole = configsvr" config file option');
 expectedResult = {
@@ -52,4 +55,7 @@ expectedResult = {
         "replication": {"replSetName": "dummy"},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_configsvr.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/set_shardingrole_configsvr.json"},
+    expectedResult,
+);

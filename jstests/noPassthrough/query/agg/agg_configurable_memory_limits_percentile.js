@@ -19,10 +19,16 @@ const coll = db.agg_configurable_memory_limit;
 // forced to spill to disk at both the group and accumulator levels.
 (function testGroupAndAccumulatorSpilling() {
     // Force spill at group level for all tests.
-    runSpillingTestsWithServerParameter({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 1});
+    runSpillingTestsWithServerParameter({
+        setParameter: 1,
+        internalDocumentSourceGroupMaxMemoryBytes: 1,
+    });
 
     // Force spill at accumulator level for all tests (group level spilling will still also occur).
-    runSpillingTestsWithServerParameter({setParameter: 1, internalQueryMaxPercentileAccumulatorBytes: 1});
+    runSpillingTestsWithServerParameter({
+        setParameter: 1,
+        internalQueryMaxPercentileAccumulatorBytes: 1,
+    });
 })();
 
 function runSpillingTestsWithServerParameter(setParameterObject) {
@@ -95,7 +101,12 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
         coll: coll,
         docs: multipleGroupsDocs,
         percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "continuous"}},
-        expectedResult: [/* k:0 */ [1.5], /* k:1 */ [5], /* k:2 */ [Infinity], /* k:"three" */ [15]],
+        expectedResult: [
+            /* k:0 */ [1.5],
+            /* k:1 */ [5],
+            /* k:2 */ [Infinity],
+            /* k:"three" */ [15],
+        ],
         msg: "Percentile should be calculated for each of several groups, ignoring non-numeric data and including infinities.",
     });
 
@@ -120,11 +131,25 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
 
     testLargeUniformDataset(coll, samples, sortedSamples, p, accuracyError, "discrete");
 
-    testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, "discrete");
+    testLargeUniformDataset_WithInfinities(
+        coll,
+        samples,
+        sortedSamples,
+        p,
+        accuracyError,
+        "discrete",
+    );
 
     testLargeUniformDataset(coll, samples, sortedSamples, p, accuracyError, "continuous");
 
-    testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, "continuous");
+    testLargeUniformDataset_WithInfinities(
+        coll,
+        samples,
+        sortedSamples,
+        p,
+        accuracyError,
+        "continuous",
+    );
 }
 
 MongoRunner.stopMongod(conn);

@@ -43,7 +43,9 @@ function insert10MbOfDummyData(coll) {
 
 insert10MbOfDummyData(shardedColl);
 
-jsTest.log("Testing autoSplitVector can correctly suggest to split 10Mb of data given 1Mb of maxChunkSize");
+jsTest.log(
+    "Testing autoSplitVector can correctly suggest to split 10Mb of data given 1Mb of maxChunkSize",
+);
 {
     // shard0: [MinKey,MaxKey]
     // shard1: []
@@ -62,7 +64,12 @@ jsTest.log("Testing autoSplitVector can correctly suggest to split 10Mb of data 
 jsTest.log("Having the range over 2 shards should return InvalidOptions");
 {
     assert.commandWorked(
-        mongos0.adminCommand({moveRange: kNs, toShard: st.shard1.shardName, min: {a: 10}, max: {a: MaxKey}}),
+        mongos0.adminCommand({
+            moveRange: kNs,
+            toShard: st.shard1.shardName,
+            min: {a: 10},
+            max: {a: MaxKey},
+        }),
     );
 
     // shard0: [MinKey,10)
@@ -82,7 +89,12 @@ jsTest.log("Having the range over 2 shards should return InvalidOptions");
 jsTest.log("Having the collection over 2 shards but the range on one shard should work");
 {
     assert.commandWorked(
-        mongos0.adminCommand({moveRange: kNs, toShard: st.shard1.shardName, min: {a: 0}, max: {a: 10}}),
+        mongos0.adminCommand({
+            moveRange: kNs,
+            toShard: st.shard1.shardName,
+            min: {a: 0},
+            max: {a: 10},
+        }),
     );
 
     // shard0: [MinKey,0)
@@ -102,7 +114,12 @@ jsTest.log("Having the collection over 2 shards but the range on one shard shoul
 jsTest.log("Having the range in one shard with a hole should return InvalidOptions");
 {
     assert.commandWorked(
-        mongos0.adminCommand({moveRange: kNs, toShard: st.shard0.shardName, min: {a: 1}, max: {a: 2}}),
+        mongos0.adminCommand({
+            moveRange: kNs,
+            toShard: st.shard0.shardName,
+            min: {a: 1},
+            max: {a: 2},
+        }),
     );
 
     // shard0: [MinKey,0),[1,2)
@@ -138,7 +155,9 @@ jsTest.log("Running on a stale mongos1 should correctly return InvalidOptions");
 let collUnsharded = mongos0.getDB(kDbName).getCollection(kUnshardedCollName);
 insert10MbOfDummyData(collUnsharded);
 
-jsTest.log("Running on an unsharded collection should fail if an index was not found for the queried shard key");
+jsTest.log(
+    "Running on an unsharded collection should fail if an index was not found for the queried shard key",
+);
 {
     assert.commandFailedWithCode(
         db.runCommand({

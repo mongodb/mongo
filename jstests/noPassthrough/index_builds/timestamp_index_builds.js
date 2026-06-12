@@ -43,7 +43,11 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 function getColl(conn) {
@@ -61,7 +65,9 @@ rst.awaitLastOpCommitted();
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
 nodes.forEach((node) =>
-    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+    ),
 );
 
 // This test create indexes with majority of nodes not available for replication. So, setting the
@@ -79,7 +85,9 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
 
     // Bringing up the node as a standalone should only find the `_id` index.
     {
-        jsTestLog("Starting as a standalone. Ensure only the `_id` index exists. Node: " + nodeIdentity);
+        jsTestLog(
+            "Starting as a standalone. Ensure only the `_id` index exists. Node: " + nodeIdentity,
+        );
         let conn = rst.start(nodeIdx, {noReplSet: true, noCleanData: true});
         assert.neq(null, conn, "failed to restart node");
         IndexBuildTest.assertIndexes(getColl(conn), 1, ["_id_"]);

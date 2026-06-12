@@ -12,7 +12,9 @@ const caseInsensitiveCollation = {locale: "en", strength: 1};
 
 db.dropDatabase();
 const outputColl = db[jsTestName() + "_merge_output"];
-assert.commandWorked(outputColl.createIndex({unique: 1}, {unique: true, collation: caseInsensitiveCollation}));
+assert.commandWorked(
+    outputColl.createIndex({unique: 1}, {unique: true, collation: caseInsensitiveCollation}),
+);
 
 function resetCollection() {
     assert.commandWorked(outputColl.deleteMany({}));

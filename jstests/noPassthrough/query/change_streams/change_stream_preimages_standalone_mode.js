@@ -53,7 +53,9 @@ function testStandaloneMode({
     const writeOpsForReplSetMode = () => {
         assert.commandWorked(testColl.insert({a: 1, b: 1}));
         assert.commandWorked(testColl.update({a: 1}, {a: 2, b: 2}));
-        assert.commandWorked(testColl.update({a: 2}, {a: 3, b: 3}, {writeConcern: {w: 1, j: true}}));
+        assert.commandWorked(
+            testColl.update({a: 2}, {a: 3, b: 3}, {writeConcern: {w: 1, j: true}}),
+        );
 
         // Ensure that the last write with j:true write concern has reached the disk, and now fsync
         // will checkpoint that data.
@@ -110,7 +112,8 @@ function testStandaloneMode({
 // Run the test for 'changeStreamPreAndPostImages' option.
 testStandaloneMode({
     collectionOptions: {changeStreamPreAndPostImages: {enabled: true}},
-    assertPreImagesRecordingEnabledFunc: assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
+    assertPreImagesRecordingEnabledFunc:
+        assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
     assertPreImagesRecordedFunc: (db, writerOps) => {
         const writtenPreImages = preImagesForOps(db, writerOps);
         assert.gt(writtenPreImages.length, 0, writtenPreImages);

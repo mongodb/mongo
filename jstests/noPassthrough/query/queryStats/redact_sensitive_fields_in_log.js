@@ -37,7 +37,10 @@ const checkLogForHmacKey = function (conn) {
 
 // Test MongoD
 const testMongoD = function () {
-    const conn = MongoRunner.runMongod({setParameter: {internalQueryStatsRateLimit: -1}, useLogFiles: true});
+    const conn = MongoRunner.runMongod({
+        setParameter: {internalQueryStatsRateLimit: -1},
+        useLogFiles: true,
+    });
     assert.neq(null, conn, "mongod was unable to start up");
 
     checkLogForHmacKey(conn);

@@ -29,7 +29,12 @@ export const $config = (function () {
                     cb();
                     return true;
                 } catch (e) {
-                    jsTest.log("Caught exception performing: " + tojson(cb) + ", exception was: " + tojson(e));
+                    jsTest.log(
+                        "Caught exception performing: " +
+                            tojson(cb) +
+                            ", exception was: " +
+                            tojson(e),
+                    );
                     return false;
                 }
             },
@@ -155,7 +160,9 @@ export const $config = (function () {
             observe: function (db, collName) {
                 // Make sure we never appear to have any privileges,
                 // but that we remain authenticated.
-                const info = assert.commandWorked(db.runCommand({connectionStatus: 1, showPrivileges: true})).authInfo;
+                const info = assert.commandWorked(
+                    db.runCommand({connectionStatus: 1, showPrivileges: true}),
+                ).authInfo;
                 assert.eq(info.authenticatedUsers.length, 1, tojson(info));
                 assert.eq(info.authenticatedUsers[0].user, this.getUserName(), tojson(info));
                 assert.eq(info.authenticatedUserPrivileges.length, 0, tojson(info));
@@ -182,11 +189,17 @@ export const $config = (function () {
 
     function setup(db, collName, cluster) {
         cluster.executeOnMongodNodes(function (db) {
-            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs,
+            });
         });
 
         cluster.executeOnMongosNodes(function (db) {
-            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs,
+            });
         });
 
         db.createUser({user: this.getUserName(), pwd: kTestUserPassword, roles: []});

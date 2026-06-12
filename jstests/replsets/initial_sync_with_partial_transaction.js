@@ -48,9 +48,13 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 jsTest.log("Stop secondary oplog replication before the last operation in the transaction.");
 // The stopReplProducerOnDocument failpoint ensures that secondary stops replicating before
 // accepting the last two operations in the transaction.
-const stopReplProducerOnDocumentFailPoint = configureFailPoint(syncSource, "stopReplProducerOnDocument", {
-    document: {"applyOps.o._id": "next-last in txn"},
-});
+const stopReplProducerOnDocumentFailPoint = configureFailPoint(
+    syncSource,
+    "stopReplProducerOnDocument",
+    {
+        document: {"applyOps.o._id": "next-last in txn"},
+    },
+);
 
 // This will cause us to pause batch application at a critical point, with "first in txn" and
 // "next in txn" in the oplog but not applied.
@@ -76,7 +80,10 @@ pauseBatchApplicationAfterWritingOplogEntriesFailPoint.wait();
 
 jsTestLog("Starting initial sync");
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeChoosingSyncSource", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeChoosingSyncSource",
+        mode: "off",
+    }),
 );
 
 // The bug we're testing for is a race.  The way we fix the race is to wait until it resolves.

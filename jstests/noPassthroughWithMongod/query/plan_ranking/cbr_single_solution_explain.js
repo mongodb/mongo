@@ -1,7 +1,11 @@
 /**
  * Test handling of queries with a single possible solution/plan, under CBR.
  */
-import {getRejectedPlans, getWinningPlanFromExplain, getEngine} from "jstests/libs/query/analyze_plan.js";
+import {
+    getRejectedPlans,
+    getWinningPlanFromExplain,
+    getEngine,
+} from "jstests/libs/query/analyze_plan.js";
 import {assertPlanCosted, getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 

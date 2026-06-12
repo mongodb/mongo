@@ -16,13 +16,19 @@ import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server
 
 const st = new ShardingTest(Object.assign({shards: 2}));
 const testDB = st.s.getDB("test");
-setParameterOnAllNonConfigNodes(testDB.getMongo(), "internalQueryFrameworkControl", "forceClassicEngine");
+setParameterOnAllNonConfigNodes(
+    testDB.getMongo(),
+    "internalQueryFrameworkControl",
+    "forceClassicEngine",
+);
 
 const collName = jsTestName();
 const coll = testDB[collName];
 testDB[collName].drop();
 
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 st.shardColl(coll, {shard: 1}, {shard: 1}, {shard: 1}, testDB.getName(), true);
 

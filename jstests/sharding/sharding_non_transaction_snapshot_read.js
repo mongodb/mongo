@@ -24,7 +24,12 @@ const unshardedCollName = "unshardedColl";
 
 function setUpAllScenarios(st) {
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[shardedCollName] + "", key: {_id: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({
+            shardCollection: st.s.getDB(dbName)[shardedCollName] + "",
+            key: {_id: 1},
+        }),
+    );
 }
 
 let shardingScenarios = {
@@ -62,13 +67,34 @@ let shardingScenarios = {
             assert.commandWorked(st.splitAt(ns, {_id: 4}));
             assert.commandWorked(st.splitAt(ns, {_id: 7}));
 
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}),
+            );
 
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard0.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard1.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard2.shardName,
+                }),
+            );
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -95,12 +121,31 @@ let shardingScenarios = {
 
             // snapshotReadsTest() inserts ids 0-9 and tries snapshot reads on the collection.
             assert.commandWorked(st.splitAt(ns, {_id: 5}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}),
+            );
 
-            assert.eq(0, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
+            assert.eq(
+                0,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard0.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard1.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard2.shardName,
+                }),
+            );
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -115,8 +160,9 @@ for (let [scenarioName, scenario] of Object.entries(shardingScenarios)) {
         let st = scenario.setUp();
         let primaryAdmin = st.rs0.getPrimary().getDB("admin");
         assert.eq(
-            assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-                .minSnapshotHistoryWindowInSeconds,
+            assert.commandWorked(
+                primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}),
+            ).minSnapshotHistoryWindowInSeconds,
             600,
         );
 

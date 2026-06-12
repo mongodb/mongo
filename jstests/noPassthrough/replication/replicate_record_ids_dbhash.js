@@ -28,11 +28,17 @@ const findRecordId = function (testDB, collName, doc) {
 };
 
 const insertDocWithInconsistentRids = function (primaryDB, secondaryDB, docToInsertWithDifRid) {
-    const explicitlySetRecordIdOnInsert = configureFailPoint(secondaryDB, "explicitlySetRecordIdOnInsert", {
-        doc: docToInsertWithDifRid,
-        "rid": 400,
-    });
-    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [docToInsertWithDifRid]}));
+    const explicitlySetRecordIdOnInsert = configureFailPoint(
+        secondaryDB,
+        "explicitlySetRecordIdOnInsert",
+        {
+            doc: docToInsertWithDifRid,
+            "rid": 400,
+        },
+    );
+    assert.commandWorked(
+        primaryDB.runCommand({insert: collName, documents: [docToInsertWithDifRid]}),
+    );
     rst.awaitReplication();
     explicitlySetRecordIdOnInsert.off();
 };
@@ -43,11 +49,17 @@ const runTest = function (replicatedRecordIds) {
 
     if (replicatedRecordIds) {
         assert.commandWorked(
-            primary.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "off"}),
+            primary.adminCommand({
+                configureFailPoint: "overrideRecordIdsReplicatedFalse",
+                mode: "off",
+            }),
         );
     } else {
         assert.commandWorked(
-            primary.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "alwaysOn"}),
+            primary.adminCommand({
+                configureFailPoint: "overrideRecordIdsReplicatedFalse",
+                mode: "alwaysOn",
+            }),
         );
     }
     assertDropAndRecreateCollection(primaryDB, collName, {});

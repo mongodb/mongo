@@ -16,7 +16,10 @@ runReadOnlyTest(
 
                 assert.eq(readableCollection.find({x: {$gt: 3, $lte: 6}}).count(), 3);
                 assert.eq(readableCollection.find({y: {$lte: -1}}).count(), 0);
-                assert.eq(readableCollection.find({$or: [{x: {$lte: 2}}, {y: {$gte: 16}}]}).count(), 5);
+                assert.eq(
+                    readableCollection.find({$or: [{x: {$lte: 2}}, {y: {$gte: 16}}]}).count(),
+                    5,
+                );
             },
         };
     })(),

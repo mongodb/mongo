@@ -62,7 +62,10 @@ function runTest(isRetryableWriteSession, runTxns) {
             insertOp.stmtId = NumberInt(1);
         }
         assert.commandWorked(
-            db.adminCommand({testInternalTransactions: 1, commandInfos: [{dbName: dbName, command: insertOp}]}),
+            db.adminCommand({
+                testInternalTransactions: 1,
+                commandInfos: [{dbName: dbName, command: insertOp}],
+            }),
         );
 
         if (isTxn) {
@@ -73,7 +76,9 @@ function runTest(isRetryableWriteSession, runTxns) {
     }
 
     const endTime = new Date();
-    jsTest.log(`Finished testing with ${tojson({isRetryableWriteSession, timeTaken: endTime - startTime})}`);
+    jsTest.log(
+        `Finished testing with ${tojson({isRetryableWriteSession, timeTaken: endTime - startTime})}`,
+    );
 }
 
 for (let isRetryableWriteSession of [true, false]) {

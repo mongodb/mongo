@@ -15,7 +15,12 @@
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {assertHistogramDiffEq, assertTopDiffEq, getHistogramStats, getTop} from "jstests/libs/stats.js";
+import {
+    assertHistogramDiffEq,
+    assertTopDiffEq,
+    getHistogramStats,
+    getTop,
+} from "jstests/libs/stats.js";
 
 let viewsDB = db.getSiblingDB("views_stats");
 assert.commandWorked(viewsDB.dropDatabase());

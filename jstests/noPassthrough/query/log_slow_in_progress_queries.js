@@ -8,13 +8,19 @@ function assertSlowInProgressQueryLogged(db, comment, expectedPlanSummary) {
     const logLine = findSlowInProgressQueryLogLine(db, comment);
     assert.neq(null, logLine, "Did not find slow in-progress query log line for " + comment);
     const log = JSON.parse(logLine);
-    assert.eq(log.attr.planSummary, expectedPlanSummary, "Unexpected plan summary in log line: " + logLine);
+    assert.eq(
+        log.attr.planSummary,
+        expectedPlanSummary,
+        "Unexpected plan summary in log line: " + logLine,
+    );
 }
 
 const kDocCount = 2048;
 
 // Ensure that we yield often enough to log the "slow" in-progress query.
-const conn = MongoRunner.runMongod({setParameter: {internalQueryExecYieldIterations: kDocCount / 128}});
+const conn = MongoRunner.runMongod({
+    setParameter: {internalQueryExecYieldIterations: kDocCount / 128},
+});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB("log_slow_in_progress_queries");
@@ -43,7 +49,10 @@ const another_db = conn.getDB("log_slow_in_progress_queries_2");
 const another_db_coll = another_db.test;
 setup_coll(another_db_coll);
 
-assert.eq(kDocCount, another_db_coll.find({}).comment("Another Database Collection Scan").itcount());
+assert.eq(
+    kDocCount,
+    another_db_coll.find({}).comment("Another Database Collection Scan").itcount(),
+);
 assert.eq(
     null,
     findSlowInProgressQueryLogLine(another_db, "Another Database Collection Scan"),
@@ -59,12 +68,17 @@ assert.eq(
 );
 assertSlowInProgressQueryLogged(db, "Index Scan", "IXSCAN { a: 1 }");
 
-assert.eq(kDocCount, coll.aggregate([{$match: {a: {$gte: 0}}}], {comment: "Agg Index Scan"}).itcount());
+assert.eq(
+    kDocCount,
+    coll.aggregate([{$match: {a: {$gte: 0}}}], {comment: "Agg Index Scan"}).itcount(),
+);
 assertSlowInProgressQueryLogged(db, "Agg Index Scan", "IXSCAN { a: 1 }");
 
 assert.eq(
     kDocCount,
-    db.aggregate([{$documents: docs}, {$match: {a: {$gte: 0}}}], {comment: "Agg Documents"}).itcount(),
+    db
+        .aggregate([{$documents: docs}, {$match: {a: {$gte: 0}}}], {comment: "Agg Documents"})
+        .itcount(),
 );
 assertSlowInProgressQueryLogged(
     db,
@@ -91,7 +105,9 @@ assert.commandWorked(
 assertSlowInProgressQueryLogged(db, "Delete Index Scan", "IXSCAN { a: 1 }");
 assert.commandWorked(coll.insertMany(docs));
 
-assert.commandWorked(db.setProfilingLevel(2, {slowms: -1, filter: {"command.find": {$exists: true}}}));
+assert.commandWorked(
+    db.setProfilingLevel(2, {slowms: -1, filter: {"command.find": {$exists: true}}}),
+);
 
 assert.eq(
     kDocCount,
@@ -104,7 +120,9 @@ assertSlowInProgressQueryLogged(db, "Find Index Scan With Profile Filter", "IXSC
 
 assert.eq(
     kDocCount,
-    coll.aggregate([{$match: {a: {$gte: 0}}}], {comment: "Agg Index Scan With Profiler Filter"}).itcount(),
+    coll
+        .aggregate([{$match: {a: {$gte: 0}}}], {comment: "Agg Index Scan With Profiler Filter"})
+        .itcount(),
 );
 assert.eq(
     null,

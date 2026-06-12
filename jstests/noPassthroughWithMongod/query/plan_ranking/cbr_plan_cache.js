@@ -135,7 +135,10 @@ function runReplanningTest(isMultiplanning) {
     if (isMultiplanning || strategy === "CBRForNoMultiplanningResults") {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
-    } else if (strategy == "CBRCostBasedRankerChoice" || strategy === "HistogramCEWithHeuristicFallback") {
+    } else if (
+        strategy == "CBRCostBasedRankerChoice" ||
+        strategy === "HistogramCEWithHeuristicFallback"
+    ) {
         // TODO SERVER-116684: Change these assertions.
         assert.eq(entry.creationExecStats.length, 1);
         assert.eq(entry.candidatePlanScores.length, 1);
@@ -205,7 +208,9 @@ const prevSequentialSamplingScan = prevQueryKnobs.internalQuerySamplingBySequent
 let originalLogLevel = assert.commandWorked(db.setLogLevel(2, "query")).was.query.verbosity;
 
 // Use deterministic sampling to avoid plan instability.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+);
 
 try {
     // 1: Run with only MultiPlanning.
@@ -214,7 +219,11 @@ try {
     runReplanningTest(true /* isMultiplanning */);
 
     // 2: Run with CBR fallback strategies.
-    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"});
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "automaticCE",
+    });
 
     const cbrFallbackStrategies = [
         "CBRForNoMultiplanningResults",
@@ -237,7 +246,10 @@ try {
     setCBRConfig(db, prevCBRConfig);
 
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: prevSequentialSamplingScan}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySamplingBySequentialScan: prevSequentialSamplingScan,
+        }),
     );
 
     assert.commandWorked(db.setLogLevel(originalLogLevel, "query"));

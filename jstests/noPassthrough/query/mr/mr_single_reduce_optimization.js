@@ -16,10 +16,14 @@ const reduce = function (key, values) {
     return "reduced value";
 };
 
-let res = assert.commandWorked(testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}));
+let res = assert.commandWorked(
+    testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}),
+);
 assert.eq(res.results[0], {_id: 0, value: "mapped value"});
 assert.commandWorked(coll.insert({x: 2}));
-res = assert.commandWorked(testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}));
+res = assert.commandWorked(
+    testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}),
+);
 assert.eq(res.results[0], {_id: 0, value: "reduced value"});
 
 MongoRunner.stopMongod(conn);

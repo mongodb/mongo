@@ -40,7 +40,11 @@ jsTest.log.info("Testing empty collection");
 const res1 = assert.commandWorked(coll1.validate({collHash: true}));
 const res2 = assert.commandWorked(coll2.validate({collHash: true}));
 assert(res1.metadata, res1);
-assert.eq(res1.metadata, res2.metadata, `Collection1 result: ${tojson(res1)}\nCollection2 result: ${tojson(res2)}`);
+assert.eq(
+    res1.metadata,
+    res2.metadata,
+    `Collection1 result: ${tojson(res1)}\nCollection2 result: ${tojson(res2)}`,
+);
 
 jsTest.log.info("Testing nodes with the same collection contents");
 assert.commandWorked(coll1.insert({_id: "id1", a: 1}));
@@ -81,10 +85,16 @@ const partial2Keys = Object.keys(res2_diff_doc.partial);
 assert.eq(partial1Keys.length, 1, res1_diff_doc);
 assert.eq(partial2Keys.length, 1, res2_diff_doc);
 const res1_reveal = assert.commandWorked(
-    coll1.validate({collHash: true, revealHashedIds: [res1_diff_doc.partial[partial1Keys[0]].hash]}),
+    coll1.validate({
+        collHash: true,
+        revealHashedIds: [res1_diff_doc.partial[partial1Keys[0]].hash],
+    }),
 );
 const res2_reveal = assert.commandWorked(
-    coll2.validate({collHash: true, revealHashedIds: [res2_diff_doc.partial[partial2Keys[0]].hash]}),
+    coll2.validate({
+        collHash: true,
+        revealHashedIds: [res2_diff_doc.partial[partial2Keys[0]].hash],
+    }),
 );
 assert.eq(
     res1_reveal.metadata,

@@ -21,7 +21,9 @@ coll.drop();
 
 assert.commandWorked(coll.insertMany(getMovieData()));
 
-const moviesIndexSpec = getMovieVectorSearchIndexSpec({filterFields: [{"type": "filter", "path": "title"}]});
+const moviesIndexSpec = getMovieVectorSearchIndexSpec({
+    filterFields: [{"type": "filter", "path": "title"}],
+});
 createSearchIndex(coll, moviesIndexSpec);
 
 const testQuery = [

@@ -12,7 +12,14 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0}));
 
 // Test that the 'onError' value is returned when 'dateString' is not a valid date/time.
-for (let inputDate of ["July 4th", "12:50:53", "2017", "60.Monday1770/06:59", "Not even close", "July 4th, 10000"]) {
+for (let inputDate of [
+    "July 4th",
+    "12:50:53",
+    "2017",
+    "60.Monday1770/06:59",
+    "Not even close",
+    "July 4th, 10000",
+]) {
     assert.eq(
         [{_id: 0, date: onErrorValue}],
         coll
@@ -55,7 +62,11 @@ for (let inputFormat of ["%Y", "%Y-%m-%dT%H", "Y-m-d"]) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: "2018-02-06", format: inputFormat, onError: onErrorValue},
+                        $dateFromString: {
+                            dateString: "2018-02-06",
+                            format: inputFormat,
+                            onError: onErrorValue,
+                        },
                     },
                 },
             })
@@ -106,7 +117,9 @@ assert.eq(
     [{_id: 0, date: onErrorValue}],
     coll
         .aggregate({
-            $project: {date: {$dateFromString: {dateString: 5, format: null, onError: onErrorValue}}},
+            $project: {
+                date: {$dateFromString: {dateString: 5, format: null, onError: onErrorValue}},
+            },
         })
         .toArray(),
 );
@@ -115,7 +128,9 @@ assert.eq(
     coll
         .aggregate({
             $project: {
-                date: {$dateFromString: {dateString: 5, timezone: "$missing", onError: onErrorValue}},
+                date: {
+                    $dateFromString: {dateString: 5, timezone: "$missing", onError: onErrorValue},
+                },
             },
         })
         .toArray(),
@@ -129,7 +144,11 @@ assert.eq(
         .aggregate({
             $project: {
                 date: {
-                    $dateFromString: {dateString: "Invalid date string", format: null, onError: onErrorValue},
+                    $dateFromString: {
+                        dateString: "Invalid date string",
+                        format: null,
+                        onError: onErrorValue,
+                    },
                 },
             },
         })
@@ -156,7 +175,11 @@ assert.eq(
 for (let onError of [{}, 5, "Not a date", null, undefined]) {
     assert.eq(
         [{_id: 0, date: onError}],
-        coll.aggregate({$project: {date: {$dateFromString: {dateString: "invalid", onError: onError}}}}).toArray(),
+        coll
+            .aggregate({
+                $project: {date: {$dateFromString: {dateString: "invalid", onError: onError}}},
+            })
+            .toArray(),
     );
 }
 
@@ -164,14 +187,22 @@ for (let onError of [{}, 5, "Not a date", null, undefined]) {
 // stage.
 assert.eq(
     [{_id: 0}],
-    coll.aggregate({$project: {date: {$dateFromString: {dateString: "invalid", onError: "$missing"}}}}).toArray(),
+    coll
+        .aggregate({
+            $project: {date: {$dateFromString: {dateString: "invalid", onError: "$missing"}}},
+        })
+        .toArray(),
 );
 
 // Test that 'onError' is ignored when the 'format' is invalid.
 let res = coll.runCommand("aggregate", {
     pipeline: [
         {
-            $project: {date: {$dateFromString: {dateString: "4/26/1992", format: 5, onError: onErrorValue}}},
+            $project: {
+                date: {
+                    $dateFromString: {dateString: "4/26/1992", format: 5, onError: onErrorValue},
+                },
+            },
         },
     ],
     cursor: {},
@@ -183,7 +214,9 @@ assertErrCodeAndErrMsgContains(
     [
         {
             $project: {
-                date: {$dateFromString: {dateString: "4/26/1992", format: "%n", onError: onErrorValue}},
+                date: {
+                    $dateFromString: {dateString: "4/26/1992", format: "%n", onError: onErrorValue},
+                },
             },
         },
     ],

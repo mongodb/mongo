@@ -51,7 +51,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should be used with local/foreignField syntax and additional filter",
+        description:
+            "Join optimization should be used with local/foreignField syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -125,7 +126,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should be used with let/pipeline syntax and additional filter",
+        description:
+            "Join optimization should be used with let/pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -149,7 +151,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should be used with pipeline: [] syntax and additional filter",
+        description:
+            "Join optimization should be used with pipeline: [] syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -173,7 +176,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should be used with field syntax and pipeline syntax and additional filter",
+        description:
+            "Join optimization should be used with field syntax and pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -220,7 +224,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should be used with multi-predicate sub-pipeline $match and absorbed filter",
+        description:
+            "Join optimization should be used with multi-predicate sub-pipeline $match and absorbed filter",
         coll: baseColl,
         pipeline: [
             {
@@ -320,8 +325,20 @@ try {
             {$project: {_id: 0, "foreignColl1._id": 0, "foreignColl2._id": 0}},
         ],
         expectedResults: [
-            {a: 1, b: 1, d: 1, foreignColl1: {a: 1, c: "bar", d: 2}, foreignColl2: {b: 1, e: "bar", f: 2}},
-            {a: 1, b: 2, d: 2, foreignColl1: {a: 1, c: "bar", d: 2}, foreignColl2: {b: 1, e: "bar", f: 2}},
+            {
+                a: 1,
+                b: 1,
+                d: 1,
+                foreignColl1: {a: 1, c: "bar", d: 2},
+                foreignColl2: {b: 1, e: "bar", f: 2},
+            },
+            {
+                a: 1,
+                b: 2,
+                d: 2,
+                foreignColl1: {a: 1, c: "bar", d: 2},
+                foreignColl2: {b: 1, e: "bar", f: 2},
+            },
         ],
         expectedUsedJoinOptimization: true,
         expectedNumJoinStages: 2,
@@ -417,7 +434,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should absorb a $match placed between two $lookup/$unwind pairs",
+        description:
+            "Join optimization should absorb a $match placed between two $lookup/$unwind pairs",
         coll: baseColl,
         pipeline: [
             {
@@ -472,7 +490,8 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should split a $match with predicates on both base and joined collection",
+        description:
+            "Join optimization should split a $match with predicates on both base and joined collection",
         coll: baseColl,
         pipeline: [
             {

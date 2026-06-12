@@ -65,19 +65,30 @@ assert.throwsWithCode(() => replayWorkloadRecordingFile(), ErrorCodes.FailedToPa
 assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf"), ErrorCodes.FailedToParse);
 
 // Too many arguments
-assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"), ErrorCodes.FailedToParse);
+assert.throwsWithCode(
+    () => replayWorkloadRecordingFile("foo", "bar", "baz"),
+    ErrorCodes.FailedToParse,
+);
 
 // Invalid argument types
 const invalidValues = [1.1, {}, [], null, undefined, MinKey, MaxKey];
 for (let dirName of invalidValues) {
     for (let clusterSpec of invalidValues) {
-        assert.throwsWithCode(() => replayWorkloadRecordingFile(dirName, clusterSpec), ErrorCodes.FailedToParse, [], {
-            dirName,
-            clusterSpec,
-        });
+        assert.throwsWithCode(
+            () => replayWorkloadRecordingFile(dirName, clusterSpec),
+            ErrorCodes.FailedToParse,
+            [],
+            {
+                dirName,
+                clusterSpec,
+            },
+        );
     }
 }
-assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"), ErrorCodes.FailedToParse);
+assert.throwsWithCode(
+    () => replayWorkloadRecordingFile("foo", "bar", "baz"),
+    ErrorCodes.FailedToParse,
+);
 
 // Invalid directory
 assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf", "asdf"), ErrorCodes.FileOpenFailed);
@@ -94,7 +105,11 @@ removeFile(realDirectory);
 
 // ======================================================================================== //
 // Recording
-const initialResults = runInstances("traffic_recording_" + UUID().hex(), "recordings", defaultOperationsLambda);
+const initialResults = runInstances(
+    "traffic_recording_" + UUID().hex(),
+    "recordings",
+    defaultOperationsLambda,
+);
 assert.eq(initialResults.opTypes["serverStatus"], 1);
 assert.eq(initialResults.opTypes["insert"], 201);
 assert.eq(initialResults.opTypes["find"], 2);
@@ -107,16 +122,20 @@ assert.eq(initialResults.opTypes["sessionEnd"], 1);
 
 // ======================================================================================== //
 // Replaying
-const replayResults = runInstances("replayed_recording_" + UUID().hex(), "replayed_recordings", (dbContext) => {
-    const {
-        testDB,
-        coll,
-        serverURI, // uri of the shadow cluster server.
-    } = dbContext;
-    const recordingFilePath = initialResults.recordingFilePath;
-    const replayingFilePath = replayWorkloadLambda(recordingFilePath, serverURI);
-    return replayingFilePath;
-});
+const replayResults = runInstances(
+    "replayed_recording_" + UUID().hex(),
+    "replayed_recordings",
+    (dbContext) => {
+        const {
+            testDB,
+            coll,
+            serverURI, // uri of the shadow cluster server.
+        } = dbContext;
+        const recordingFilePath = initialResults.recordingFilePath;
+        const replayingFilePath = replayWorkloadLambda(recordingFilePath, serverURI);
+        return replayingFilePath;
+    },
+);
 // in order to compute the filepath, we issue a server status inside runInstances, this plus the
 // one recorded will bring total count to 2.
 assert.eq(replayResults.opTypes["serverStatus"], 2);

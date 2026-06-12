@@ -3,11 +3,31 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 export class RollbackResumableIndexBuildTest {
-    static checkCompletedAndDrop(rollbackTest, originalPrimary, dbName, colls, buildUUIDs, indexNames) {
+    static checkCompletedAndDrop(
+        rollbackTest,
+        originalPrimary,
+        dbName,
+        colls,
+        buildUUIDs,
+        indexNames,
+    ) {
         for (let i = 0; i < colls.length; i++) {
-            ResumableIndexBuildTest.assertCompleted(originalPrimary, colls[i], [buildUUIDs[i]], indexNames[i]);
-            ResumableIndexBuildTest.checkIndexes(rollbackTest, dbName, colls[i].getName(), indexNames[i], []);
-            assert.commandWorked(rollbackTest.getPrimary().getDB(dbName).runCommand({drop: colls[i].getName()}));
+            ResumableIndexBuildTest.assertCompleted(
+                originalPrimary,
+                colls[i],
+                [buildUUIDs[i]],
+                indexNames[i],
+            );
+            ResumableIndexBuildTest.checkIndexes(
+                rollbackTest,
+                dbName,
+                colls[i].getName(),
+                indexNames[i],
+                [],
+            );
+            assert.commandWorked(
+                rollbackTest.getPrimary().getDB(dbName).runCommand({drop: colls[i].getName()}),
+            );
         }
     }
 
@@ -88,11 +108,18 @@ export class RollbackResumableIndexBuildTest {
         // Set internalQueryExecYieldIterations to 0, internalIndexBuildBulkLoadYieldIterations to
         // 1, and maxIndexBuildDrainBatchSize to 1 so that the index builds are guaranteed to yield
         // their locks between the rollback end and start failpoints.
-        assert.commandWorked(originalPrimary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 0}));
         assert.commandWorked(
-            originalPrimary.adminCommand({setParameter: 1, internalIndexBuildBulkLoadYieldIterations: 1}),
+            originalPrimary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 0}),
         );
-        assert.commandWorked(originalPrimary.adminCommand({setParameter: 1, maxIndexBuildDrainBatchSize: 1}));
+        assert.commandWorked(
+            originalPrimary.adminCommand({
+                setParameter: 1,
+                internalIndexBuildBulkLoadYieldIterations: 1,
+            }),
+        );
+        assert.commandWorked(
+            originalPrimary.adminCommand({setParameter: 1, maxIndexBuildDrainBatchSize: 1}),
+        );
 
         configureFailPoint(originalPrimary, "hangBeforeBuildingIndexSecond");
 
@@ -101,7 +128,9 @@ export class RollbackResumableIndexBuildTest {
         const buildUUIDs = new Array(indexSpecs.length);
         const colls = new Array(indexSpecs.length);
         for (let i = 0; i < indexSpecs.length; i++) {
-            colls[i] = originalPrimary.getDB(dbName).getCollection(jsTestName() + collNameSuffix + "_" + i);
+            colls[i] = originalPrimary
+                .getDB(dbName)
+                .getCollection(jsTestName() + collNameSuffix + "_" + i);
             assert.commandWorked(colls[i].insert(docs));
 
             awaitCreateIndexes[i] = ResumableIndexBuildTest.createIndexWithSideWrites(
@@ -110,7 +139,12 @@ export class RollbackResumableIndexBuildTest {
                     const {ResumableIndexBuildTest} = await import(
                         "jstests/noPassthrough/libs/index_builds/index_build.js"
                     );
-                    ResumableIndexBuildTest.createIndexesFails(db, collName, indexSpecs, indexNames);
+                    ResumableIndexBuildTest.createIndexesFails(
+                        db,
+                        collName,
+                        indexSpecs,
+                        indexNames,
+                    );
                 },
                 colls[i],
                 indexSpecs[i],
@@ -133,10 +167,18 @@ export class RollbackResumableIndexBuildTest {
         }
 
         for (const rollbackStartFailPoint of rollbackStartFailPoints) {
-            configureFailPoint(originalPrimary, rollbackStartFailPoint.name, rollbackStartFailPoint.data);
+            configureFailPoint(
+                originalPrimary,
+                rollbackStartFailPoint.name,
+                rollbackStartFailPoint.data,
+            );
         }
         for (const rollbackEndFailPoint of rollbackEndFailPoints) {
-            configureFailPoint(originalPrimary, rollbackEndFailPoint.name, rollbackEndFailPoint.data);
+            configureFailPoint(
+                originalPrimary,
+                rollbackEndFailPoint.name,
+                rollbackEndFailPoint.data,
+            );
         }
 
         // Wait until the index builds have completed their last operations that won't be rolled
@@ -155,13 +197,20 @@ export class RollbackResumableIndexBuildTest {
         const locksYieldedFps = new Array(colls.length);
         for (let i = 0; i < colls.length; i++) {
             assert.commandWorked(colls[i].insert(insertsToBeRolledBack));
-            locksYieldedFps[i] = configureFailPoint(originalPrimary, locksYieldedFailPointNames[i], {
-                namespace: colls[i].getFullName(),
-            });
+            locksYieldedFps[i] = configureFailPoint(
+                originalPrimary,
+                locksYieldedFailPointNames[i],
+                {
+                    namespace: colls[i].getFullName(),
+                },
+            );
         }
         for (const rollbackEndFailPoint of rollbackEndFailPoints) {
             assert.commandWorked(
-                originalPrimary.adminCommand({configureFailPoint: rollbackEndFailPoint.name, mode: "off"}),
+                originalPrimary.adminCommand({
+                    configureFailPoint: rollbackEndFailPoint.name,
+                    mode: "off",
+                }),
             );
             delete rollbackEndFailPoint.data;
         }
@@ -178,17 +227,28 @@ export class RollbackResumableIndexBuildTest {
         }
 
         // Wait until the index builds reach the desired starting points for the rollback.
-        ResumableIndexBuildTest.waitForFailPoints(originalPrimary, locksYieldedFailPointNames, rollbackStartFailPoints);
+        ResumableIndexBuildTest.waitForFailPoints(
+            originalPrimary,
+            locksYieldedFailPointNames,
+            rollbackStartFailPoints,
+        );
 
         // Let the index builds yield their locks so that they can be aborted for rollback.
         for (let i = 0; i < colls.length; i++) {
-            locksYieldedFps[i] = configureFailPoint(originalPrimary, locksYieldedFailPointNames[i], {
-                namespace: colls[i].getFullName(),
-            });
+            locksYieldedFps[i] = configureFailPoint(
+                originalPrimary,
+                locksYieldedFailPointNames[i],
+                {
+                    namespace: colls[i].getFullName(),
+                },
+            );
         }
         for (const rollbackStartFailPoint of rollbackStartFailPoints) {
             assert.commandWorked(
-                originalPrimary.adminCommand({configureFailPoint: rollbackStartFailPoint.name, mode: "off"}),
+                originalPrimary.adminCommand({
+                    configureFailPoint: rollbackStartFailPoint.name,
+                    mode: "off",
+                }),
             );
             delete rollbackStartFailPoint.data;
         }
@@ -219,7 +279,10 @@ export class RollbackResumableIndexBuildTest {
 
                         // Disable the failpoint so that the builder thread can exit.
                         assert.commandWorked(
-                            db.adminCommand({configureFailPoint: locksYieldedFailPointName, mode: "off"}),
+                            db.adminCommand({
+                                configureFailPoint: locksYieldedFailPointName,
+                                mode: "off",
+                            }),
                         );
                     },
                     buildUUIDs[i],
@@ -231,7 +294,10 @@ export class RollbackResumableIndexBuildTest {
 
         // Wait until the parallel shells have all started.
         assert.soon(() => {
-            return (rawMongoProgramOutput('"id":5113600').match(/"id":5113600/g) || []).length === buildUUIDs.length;
+            return (
+                (rawMongoProgramOutput('"id":5113600').match(/"id":5113600/g) || []).length ===
+                buildUUIDs.length
+            );
         });
         getLogFp.off();
 
@@ -263,7 +329,12 @@ export class RollbackResumableIndexBuildTest {
             );
         }
 
-        ResumableIndexBuildTest.checkResume(originalPrimary, buildUUIDs, expectedResumePhases, resumeChecks);
+        ResumableIndexBuildTest.checkResume(
+            originalPrimary,
+            buildUUIDs,
+            expectedResumePhases,
+            resumeChecks,
+        );
 
         if (!shouldComplete) {
             return {colls: colls, buildUUIDs: buildUUIDs, indexNames: indexNames};

@@ -27,7 +27,8 @@ const adminDB = db.getSiblingDB("admin");
 const configDB = db.getSiblingDB("config");
 
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 // Test all the combination of specs. Every spec can be true or false. The total number of
 // combinations will be 2^n where n is number of specs.
@@ -86,11 +87,31 @@ function verify(listCollectionEntry, stageEntry, specs) {
     }
 
     // Ensure the stageEntry fields matches the expected ones.
-    assert.eq(listCollectionEntry.options, stageEntry.options, errMsgWithListCollectionEntry("options field mismatch"));
-    assert.eq(listCollectionEntry.info, stageEntry.info, errMsgWithListCollectionEntry("info field mismatch"));
-    assert.eq(listCollectionEntry.idIndex, stageEntry.idIndex, errMsgWithListCollectionEntry("idIndex field mismatch"));
-    assert.eq(listCollectionEntry.type, stageEntry.type, errMsgWithListCollectionEntry("type field mismatch"));
-    assert.eq(listCollectionEntry.db, stageEntry.db, errMsgWithListCollectionEntry("db field mismatch"));
+    assert.eq(
+        listCollectionEntry.options,
+        stageEntry.options,
+        errMsgWithListCollectionEntry("options field mismatch"),
+    );
+    assert.eq(
+        listCollectionEntry.info,
+        stageEntry.info,
+        errMsgWithListCollectionEntry("info field mismatch"),
+    );
+    assert.eq(
+        listCollectionEntry.idIndex,
+        stageEntry.idIndex,
+        errMsgWithListCollectionEntry("idIndex field mismatch"),
+    );
+    assert.eq(
+        listCollectionEntry.type,
+        stageEntry.type,
+        errMsgWithListCollectionEntry("type field mismatch"),
+    );
+    assert.eq(
+        listCollectionEntry.db,
+        stageEntry.db,
+        errMsgWithListCollectionEntry("db field mismatch"),
+    );
     assert.eq(
         listCollectionEntry.db + "." + listCollectionEntry.name,
         stageEntry.ns,
@@ -117,18 +138,37 @@ function verify(listCollectionEntry, stageEntry, specs) {
         assert.eq(undefined, stageEntry.shards, errMsg("shards field should not be present"));
     }
     if (stageEntry.sharded && specs.balancingConfiguration) {
-        assert.neq(undefined, stageEntry.balancingEnabled, errMsg("balancingEnabled field should be present"));
-        assert.neq(undefined, stageEntry.autoMergingEnabled, errMsg("autoMergingEnabled field should be present"));
+        assert.neq(
+            undefined,
+            stageEntry.balancingEnabled,
+            errMsg("balancingEnabled field should be present"),
+        );
+        assert.neq(
+            undefined,
+            stageEntry.autoMergingEnabled,
+            errMsg("autoMergingEnabled field should be present"),
+        );
         assert.neq(undefined, stageEntry.chunkSize, errMsg("chunkSize field should be present"));
     } else {
-        assert.eq(undefined, stageEntry.balancingEnabled, errMsg("balancingEnabled field should not be present"));
-        assert.eq(undefined, stageEntry.autoMergingEnabled, errMsg("autoMergingEnabled field should not be present"));
+        assert.eq(
+            undefined,
+            stageEntry.balancingEnabled,
+            errMsg("balancingEnabled field should not be present"),
+        );
+        assert.eq(
+            undefined,
+            stageEntry.autoMergingEnabled,
+            errMsg("autoMergingEnabled field should not be present"),
+        );
         assert.eq(undefined, stageEntry.chunkSize, errMsg("chunkSize field should not be present"));
     }
 }
 
 function isTempCollection(collectionName) {
-    if (collectionName.startsWith("system.resharding") || collectionName.startsWith("tmp.agg_out")) {
+    if (
+        collectionName.startsWith("system.resharding") ||
+        collectionName.startsWith("tmp.agg_out")
+    ) {
         return true;
     }
     if (!isViewlessTimeseriesOnlySuite(db)) {
@@ -186,7 +226,11 @@ function setupUserCollections(dbTest) {
     assert.commandWorked(dbTest.createCollection("coll1"));
     assert.commandWorked(dbTest.createCollection("coll2"));
     assert.commandWorked(dbTest.createCollection("view", {viewOn: "coll1", pipeline: []}));
-    assert.commandWorked(dbTest.createCollection("timeseries", {timeseries: {metaField: "m", timeField: "timestamp"}}));
+    assert.commandWorked(
+        dbTest.createCollection("timeseries", {
+            timeseries: {metaField: "m", timeField: "timestamp"},
+        }),
+    );
 }
 
 function runListCollectionsOnDbs(db, dbNames) {
@@ -249,7 +293,9 @@ jsTest.log("The stage must return the collection for the specified user db: Usin
 jsTest.log("The stage must return an empty result if the user database doesn't exist.");
 {
     let result = assert.commandWorked(
-        db.getSiblingDB(kNotExistent).runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        db
+            .getSiblingDB(kNotExistent)
+            .runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
     ).cursor.firstBatch;
     assert.eq(0, result.length, result);
 }
@@ -288,7 +334,9 @@ jsTest.log("The stage must return the collections from the 'config' database.");
 {
     assert.soon(() => {
         let listCollectionResult = runListCollectionsOnDbs(db, ["config"]);
-        let stageResultAdmin = adminDB.aggregate([{$listClusterCatalog: {}}, {$match: {db: "config"}}]).toArray();
+        let stageResultAdmin = adminDB
+            .aggregate([{$listClusterCatalog: {}}, {$match: {db: "config"}}])
+            .toArray();
         let stageResultConfig = configDB.aggregate([{$listClusterCatalog: {}}]).toArray();
         if (
             listCollectionResult.length != stageResultAdmin.length ||
@@ -304,7 +352,8 @@ jsTest.log("The stage must return the collections from the 'config' database.");
 
 jsTest.log("The stage must report the correct 'readOnly' field.");
 {
-    const expectedReadOnly = !FixtureHelpers.isMongos(db) && db.serverStatus().storageEngine.readOnly;
+    const expectedReadOnly =
+        !FixtureHelpers.isMongos(db) && db.serverStatus().storageEngine.readOnly;
 
     const stageResult = db
         .getSiblingDB(kDb1)
@@ -321,16 +370,24 @@ jsTest.log("The stage must report the correct 'readOnly' field.");
         assert.neq(
             entry.info.readOnly,
             undefined,
-            "Expected 'info.readOnly' field to be present in $listClusterCatalog entry: " + tojson(entry),
+            "Expected 'info.readOnly' field to be present in $listClusterCatalog entry: " +
+                tojson(entry),
         );
 
         if (entry.type === "view") {
-            assert.eq(true, entry.info.readOnly, "Views must always report readOnly: true. Entry: " + tojson(entry));
+            assert.eq(
+                true,
+                entry.info.readOnly,
+                "Views must always report readOnly: true. Entry: " + tojson(entry),
+            );
         } else {
             assert.eq(
                 expectedReadOnly,
                 entry.info.readOnly,
-                "Expected readOnly to be " + expectedReadOnly + " for non-view collection. Entry: " + tojson(entry),
+                "Expected readOnly to be " +
+                    expectedReadOnly +
+                    " for non-view collection. Entry: " +
+                    tojson(entry),
             );
         }
     }

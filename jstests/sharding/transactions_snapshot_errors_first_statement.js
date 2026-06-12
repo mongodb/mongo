@@ -120,9 +120,16 @@ function runTest(st, collName, numShardsToError, errorCode, isSharded) {
 
         unsetFailCommandOnEachShard(st, numShardsToError);
 
-        assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
+        assertNoSuchTransactionOnAllShards(
+            st,
+            session.getSessionId(),
+            session.getTxnNumber_forTesting(),
+        );
 
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
     }
 }
 
@@ -132,8 +139,12 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 jsTestLog("Unsharded transaction");
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}),
+);
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, 1, errorCode, false /* isSharded */);
@@ -144,12 +155,20 @@ for (let errorCode of kSnapshotErrors) {
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}),
+);
 
 jsTestLog("One shard sharded transaction");
 
-assert.eq(2, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName}));
-assert.eq(0, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard1.shardName}));
+assert.eq(
+    2,
+    findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName}),
+);
+assert.eq(
+    0,
+    findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard1.shardName}),
+);
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, 1, errorCode, true /* isSharded */);
@@ -158,8 +177,14 @@ for (let errorCode of kSnapshotErrors) {
 jsTestLog("Two shard sharded transaction");
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 15}, to: st.shard1.shardName}));
-assert.eq(1, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName}));
-assert.eq(1, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard1.shardName}));
+assert.eq(
+    1,
+    findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName}),
+);
+assert.eq(
+    1,
+    findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard1.shardName}),
+);
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, 2, errorCode, true /* isSharded */);

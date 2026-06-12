@@ -23,7 +23,9 @@ assert.commandWorked(primaryColl.insert([{a: 1}, {b: 2}, {c: 3}]));
 
 rst.awaitReplication();
 
-jsTestLog("Adding new node with unsupportedSyncSource to be the primary and readPreference to be secondary only.");
+jsTestLog(
+    "Adding new node with unsupportedSyncSource to be the primary and readPreference to be secondary only.",
+);
 
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0, votes: 0},
@@ -52,7 +54,10 @@ jsTestLog("Sync source confirmed to be primary.");
 
 // Allow the node to continue copying databases.
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 rst.awaitSecondaryNodes();

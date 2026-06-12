@@ -46,20 +46,44 @@ assert.eq(
 );
 
 // Adding a Decimal128 value to a date value.
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$dateVal", "$decimalVal"]}));
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$decimalVal", "$dateVal"]}));
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$dateVal", "$decimalVal"]}),
+);
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$decimalVal", "$dateVal"]}),
+);
 
 // Adding a double value to a date value.
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$dateVal", "$doubleVal"]}));
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$doubleVal", "$dateVal"]}));
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$dateVal", "$doubleVal"]}),
+);
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$doubleVal", "$dateVal"]}),
+);
 
 // Adding an int64_t value to date value.
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$dateVal", "$int64Val"]}));
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$int64Val", "$dateVal"]}));
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$dateVal", "$int64Val"]}),
+);
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$int64Val", "$dateVal"]}),
+);
 
 // Adding an int32_t value to date value.
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$dateVal", "$int32Val"]}));
-assert.eq(ISODate("2019-01-30T07:30:10.957Z"), getResultOfExpression({$add: ["$int32Val", "$dateVal"]}));
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$dateVal", "$int32Val"]}),
+);
+assert.eq(
+    ISODate("2019-01-30T07:30:10.957Z"),
+    getResultOfExpression({$add: ["$int32Val", "$dateVal"]}),
+);
 
 // Addition with a date and multiple values of differing data types.
 assert.eq(
@@ -77,9 +101,15 @@ assert.eq(
 // The result of an addition must remain in the range of int64_t in order to convert back to a Date;
 // an overflow into the domain of double-precision floating point numbers triggers a query-fatal
 // error.
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDouble"]}), ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble"]}),
+    ErrorCodes.Overflow,
+);
 
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowInt64"]}), ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$overflowInt64"]}),
+    ErrorCodes.Overflow,
+);
 
 assert.throwsWithCode(
     () => getResultOfExpression({$add: ["$dateVal", "$int64Val", "$overflowDouble"]}),
@@ -92,7 +122,10 @@ assert.throwsWithCode(
 );
 
 // An overflow into the domain of Decimal128 results in an overflow exception.
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}), ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
+    ErrorCodes.Overflow,
+);
 assert.throwsWithCode(
     () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
     ErrorCodes.Overflow,
@@ -103,13 +136,25 @@ assert.throwsWithCode(
 );
 
 // Adding a double-typed NaN to a date value.
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDouble"]}), ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$nanDouble"]}),
+    ErrorCodes.Overflow,
+);
 
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDouble", "$dateVal"]}), ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$nanDouble", "$dateVal"]}),
+    ErrorCodes.Overflow,
+);
 
 // An NaN Decimal128 added to date results in an overflow exception.
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}), ErrorCodes.Overflow);
-assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}), ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}),
+    ErrorCodes.Overflow,
+);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}),
+    ErrorCodes.Overflow,
+);
 
 // Addition with a date, a double-typed NaN, and a third value.
 assert.throwsWithCode(
@@ -131,6 +176,11 @@ assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", 1, "$dateV
 assert.eq(
     ISODate("2019-01-30T07:30:10.958Z"),
     getResultOfExpression({
-        $add: ["$dateVal", NumberLong("2397083434877565865"), "$doubleVal", NumberLong("-2397083434877565864")],
+        $add: [
+            "$dateVal",
+            NumberLong("2397083434877565865"),
+            "$doubleVal",
+            NumberLong("-2397083434877565864"),
+        ],
     }),
 );

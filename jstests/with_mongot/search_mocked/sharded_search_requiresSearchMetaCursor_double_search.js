@@ -130,7 +130,13 @@ function mockShards() {
 }
 
 function mockPlanShardedSearchFromMongos() {
-    mockPlanShardedSearchResponse(shardedColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        shardedColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 }
 
 // Mongos will non-deterministically choose a shard to run the sub-pipeline, so we'll mock a
@@ -315,7 +321,12 @@ runRequiresSearchMetaCursorTest({
         {
             $lookup: {
                 from: shardedCollName,
-                pipeline: [{$search: mongotQuery}, {$sort: {y: -1}}, {$limit: 1}, {$project: {_id: 0}}],
+                pipeline: [
+                    {$search: mongotQuery},
+                    {$sort: {y: -1}},
+                    {$limit: 1},
+                    {$project: {_id: 0}},
+                ],
                 as: "out",
             },
         },

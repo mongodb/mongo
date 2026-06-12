@@ -16,11 +16,21 @@ const dbpath = MongoRunner.dataPath + testName;
 
 function runTest(conn, restartDeploymentFn, configureFailPointFn) {
     // Always run the originally downgrading test.
-    conn = transitionFailsDuringIsCleaningServerMetadata(conn, restartDeploymentFn, configureFailPointFn, "downgrade");
+    conn = transitionFailsDuringIsCleaningServerMetadata(
+        conn,
+        restartDeploymentFn,
+        configureFailPointFn,
+        "downgrade",
+    );
 
     // Only run the originally upgrading test if the feature flag is enabled.
     if (FeatureFlagUtil.isPresentAndEnabled(conn, "UpgradingToDowngrading")) {
-        transitionFailsDuringIsCleaningServerMetadata(conn, restartDeploymentFn, configureFailPointFn, "upgrade");
+        transitionFailsDuringIsCleaningServerMetadata(
+            conn,
+            restartDeploymentFn,
+            configureFailPointFn,
+            "upgrade",
+        );
     }
 }
 
@@ -33,10 +43,14 @@ function transitionFailsDuringIsCleaningServerMetadata(
     const isOriginallyDowngradeTest = originalTransitionType === "downgrade";
     const targetFCV = isOriginallyDowngradeTest ? lastLTSFCV : latestFCV;
     const originalFCV = isOriginallyDowngradeTest ? latestFCV : lastLTSFCV;
-    const cannotTransitionDuringMetadataCleanupErrorCode = isOriginallyDowngradeTest ? 7428200 : 10778001;
+    const cannotTransitionDuringMetadataCleanupErrorCode = isOriginallyDowngradeTest
+        ? 7428200
+        : 10778001;
 
     let adminDB = conn.getDB("admin");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}),
+    );
 
     configureFailPointFn("failTransitionDuringIsCleaningServerMetadata", "alwaysOn");
 
@@ -57,7 +71,9 @@ function transitionFailsDuringIsCleaningServerMetadata(
 
     // setFCV resumes from isCleaningServerMetadata so it can't fail at an earlier point.
     const earlierFailPoint = isOriginallyDowngradeTest ? "failDowngrading" : "failUpgrading";
-    jsTestLog(`Test that retrying ${originalTransitionType} can't fail earlier than isCleaningServerMetadata.`);
+    jsTestLog(
+        `Test that retrying ${originalTransitionType} can't fail earlier than isCleaningServerMetadata.`,
+    );
     configureFailPointFn(earlierFailPoint, "alwaysOn");
     assert.commandFailedWithCode(
         adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
@@ -70,7 +86,9 @@ function transitionFailsDuringIsCleaningServerMetadata(
     configureFailPointFn("failTransitionDuringIsCleaningServerMetadata", "off");
 
     fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
-    jsTestLog("2. Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
+    jsTestLog(
+        "2. Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc),
+    );
     checkFCV(adminDB, lastLTSFCV, targetFCV, true /* isCleaningServerMetadata */);
 
     // Assert transition in the opposite direction fails again.
@@ -84,7 +102,9 @@ function transitionFailsDuringIsCleaningServerMetadata(
     adminDB = conn.getDB("admin");
 
     fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
-    jsTestLog("3. Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
+    jsTestLog(
+        "3. Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc),
+    );
     checkFCV(adminDB, lastLTSFCV, targetFCV, true /* isCleaningServerMetadata */);
 
     // Assert transition in the opposite direction still fails after restarting.
@@ -94,11 +114,15 @@ function transitionFailsDuringIsCleaningServerMetadata(
     );
 
     // Ensure the original failing transition can be completed.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+    );
     checkFCV(adminDB, targetFCV);
 
     // Now opposite transition succeeds.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}),
+    );
     checkFCV(adminDB, originalFCV);
 
     return conn;
@@ -107,17 +131,27 @@ function transitionFailsDuringIsCleaningServerMetadata(
 function runStandaloneTest() {
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
 
-    assert.neq(null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable to start up with version=" + latest + " and no data files",
+    );
 
     function restartDeploymentFn() {
         MongoRunner.stopMongod(conn);
         conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-        assert.neq(null, conn, "mongod was unable to start up with version=" + latest + " and existing data files");
+        assert.neq(
+            null,
+            conn,
+            "mongod was unable to start up with version=" + latest + " and existing data files",
+        );
         return conn;
     }
 
     function configureFailPointFn(failPointName, mode) {
-        assert.commandWorked(conn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: mode}));
+        assert.commandWorked(
+            conn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: mode}),
+        );
     }
 
     jsTestLog("Running standalone tests.");
@@ -140,7 +174,10 @@ function runReplicaSetTest() {
 
     function configureFailPointFn(failPointName, mode) {
         assert.commandWorked(
-            rst.getPrimary().getDB("admin").runCommand({configureFailPoint: failPointName, mode: mode}),
+            rst
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({configureFailPoint: failPointName, mode: mode}),
         );
     }
 
@@ -164,13 +201,19 @@ function runShardedClusterTest() {
 
     function configureFailPointOnConfigsvrFn(failPointName, mode) {
         assert.commandWorked(
-            st.configRS.getPrimary().getDB("admin").runCommand({configureFailPoint: failPointName, mode: mode}),
+            st.configRS
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({configureFailPoint: failPointName, mode: mode}),
         );
     }
 
     function configureFailPointOnShard1Fn(failPointName, mode) {
         assert.commandWorked(
-            st.rs1.getPrimary().getDB("admin").runCommand({configureFailPoint: failPointName, mode: mode}),
+            st.rs1
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({configureFailPoint: failPointName, mode: mode}),
         );
     }
 

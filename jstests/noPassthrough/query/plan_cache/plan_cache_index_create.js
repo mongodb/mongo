@@ -74,7 +74,10 @@ function runTest({rst, readDB, writeDB}) {
     const primaryDriven = FeatureFlagUtil.isPresentAndEnabled(readDB, "PrimaryDrivenIndexBuilds");
     const failPointDB = primaryDriven ? writeDB : readDB;
     assert.commandWorked(
-        failPointDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}),
+        failPointDB.adminCommand({
+            configureFailPoint: "hangAfterStartingIndexBuild",
+            mode: "alwaysOn",
+        }),
     );
 
     // Build a "most selective" index in the background.
@@ -111,10 +114,17 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("less_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Disable the hang and wait for the index build to complete.
-    assert.commandWorked(failPointDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        failPointDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}),
+    );
 
     if (primaryDriven) {
-        IndexBuildTest.assertIndexesSoon(readColl, 4, ["_id_", "less_selective", "least_selective", "most_selective"]);
+        IndexBuildTest.assertIndexesSoon(readColl, 4, [
+            "_id_",
+            "less_selective",
+            "least_selective",
+            "most_selective",
+        ]);
     } else {
         IndexBuildTest.waitForIndexBuildToStop(readDB, collName, "most_selective");
     }
@@ -131,7 +141,9 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("most_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Drop the newly created index and confirm that the plan cache has been cleared.
-    assert.commandWorked(writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}),
+    );
 
     rst.awaitReplication();
 
@@ -164,7 +176,9 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("most_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Drop the newly created index and confirm that the plan cache has been cleared.
-    assert.commandWorked(writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}),
+    );
 
     rst.awaitReplication();
 

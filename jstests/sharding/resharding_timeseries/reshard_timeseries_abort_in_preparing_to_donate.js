@@ -39,7 +39,10 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseAfterPreparingToDonateFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorAfterPreparingToDonate");
+const pauseAfterPreparingToDonateFP = configureFailPoint(
+    configsvr,
+    "reshardingPauseCoordinatorAfterPreparingToDonate",
+);
 
 // In legacy timeseries (FCV < 9.0), config.reshardingOperations and abortReshardCollection
 // use the bucket namespace. Compute it once before starting resharding.

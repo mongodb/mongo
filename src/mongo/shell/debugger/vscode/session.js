@@ -67,7 +67,9 @@ class MongoShellDebugSession extends DebugSession {
         try {
             await this.startDebugServer(args.debugPort || 9229);
             this.log(`Waiting for mongo shell to connect on port ${args.debugPort || 9229}...`);
-            this.log("Use resmoke's --jsdbg flag when running a JS test file to stop on breakpoints.");
+            this.log(
+                "Use resmoke's --jsdbg flag when running a JS test file to stop on breakpoints.",
+            );
             this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 1000, `Failed to attach: ${err.message}`);
@@ -202,7 +204,11 @@ class MongoShellDebugSession extends DebugSession {
         for (const {source, breakpoints} of this.breakpoints.values()) {
             const args = {
                 source,
-                breakpoints: breakpoints.map(({line, column, condition}) => ({line, column, condition})),
+                breakpoints: breakpoints.map(({line, column, condition}) => ({
+                    line,
+                    column,
+                    condition,
+                })),
             };
             this.sendCommand("setBreakpoints", args)
                 .then((result) => {
@@ -274,7 +280,9 @@ class MongoShellDebugSession extends DebugSession {
     continueRequest(response) {
         this.sendCommand("continue", {})
             .then(() => this.sendResponse(response))
-            .catch((err) => this.sendErrorResponse(response, 1012, `Continue failed: ${err.message}`));
+            .catch((err) =>
+                this.sendErrorResponse(response, 1012, `Continue failed: ${err.message}`),
+            );
     }
 
     /**
@@ -336,7 +344,9 @@ class MongoShellDebugSession extends DebugSession {
                 response.body = result;
                 this.sendResponse(response);
             })
-            .catch((err) => this.sendErrorResponse(response, 1013, `Stack trace failed: ${err.message}`));
+            .catch((err) =>
+                this.sendErrorResponse(response, 1013, `Stack trace failed: ${err.message}`),
+            );
     }
 
     /**
@@ -351,7 +361,9 @@ class MongoShellDebugSession extends DebugSession {
                 response.body = result;
                 this.sendResponse(response);
             })
-            .catch((err) => this.sendErrorResponse(response, 1014, `Scopes failed: ${err.message}`));
+            .catch((err) =>
+                this.sendErrorResponse(response, 1014, `Scopes failed: ${err.message}`),
+            );
     }
 
     /**
@@ -366,7 +378,9 @@ class MongoShellDebugSession extends DebugSession {
                 response.body = result;
                 this.sendResponse(response);
             })
-            .catch((err) => this.sendErrorResponse(response, 1015, `Variables failed: ${err.message}`));
+            .catch((err) =>
+                this.sendErrorResponse(response, 1015, `Variables failed: ${err.message}`),
+            );
     }
 
     /**

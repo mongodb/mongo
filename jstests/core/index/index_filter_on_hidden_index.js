@@ -22,7 +22,11 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isCollscan,
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "hidden_indexes_remain_visible_in_index_filters";
 db[collName].drop();

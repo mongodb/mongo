@@ -11,12 +11,17 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const rangeDeleterBatchSize = 128;
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 2, setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}}});
+const st = new ShardingTest({
+    shards: 2,
+    rs: {nodes: 2, setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}},
+});
 
 // Setup database
 const dbName = "db";
 const db = st.getDB(dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Setup collection for test with orphans
 const coll = db["test"];
@@ -63,8 +68,12 @@ if (rangeDeletionDocs[0].numOrphanDocs.valueOf() === numDocs) {
 
 // Reorder the tasks on disk to make it more likely they would be submitted out of order
 assert.commandWorked(st.shard0.getDB("config").getCollection("rangeDeletions").deleteMany({}));
-assert.commandWorked(st.shard0.getDB("config").getCollection("rangeDeletions").insert(rangeDeletionDocs[1]));
-assert.commandWorked(st.shard0.getDB("config").getCollection("rangeDeletions").insert(rangeDeletionDocs[0]));
+assert.commandWorked(
+    st.shard0.getDB("config").getCollection("rangeDeletions").insert(rangeDeletionDocs[1]),
+);
+assert.commandWorked(
+    st.shard0.getDB("config").getCollection("rangeDeletions").insert(rangeDeletionDocs[0]),
+);
 
 // Step down
 let newPrimary = st.rs0.getSecondaries()[0];

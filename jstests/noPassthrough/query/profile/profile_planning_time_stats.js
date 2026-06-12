@@ -28,7 +28,13 @@ const viewNs = dbName + ".view";
  * that the profile entries have 'planningTimeMicros' between 'minPlanningTime' and
  * 'maxPlanningTime'. Clears the profile collection between test runs.
  */
-function testProfileEntryContainsPlanningTime(db, testCase, numExpectedEntries, minPlanningTime, maxPlanningTime) {
+function testProfileEntryContainsPlanningTime(
+    db,
+    testCase,
+    numExpectedEntries,
+    minPlanningTime,
+    maxPlanningTime,
+) {
     const primaryDb = FixtureHelpers.getPrimaryForNodeHostingDatabase(db).getDB(db.getName());
 
     const comment = "profile_planning_stats";
@@ -38,9 +44,14 @@ function testProfileEntryContainsPlanningTime(db, testCase, numExpectedEntries, 
     assert.commandWorked(primaryDb.setProfilingLevel(0));
     primaryDb.system.profile.drop();
     assert.commandWorked(primaryDb.setProfilingLevel(2));
-    assert.commandWorked(primaryDb.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
     assert.commandWorked(
-        primaryDb.adminCommand({setParameter: 1, logComponentVerbosity: {command: 5, replication: 5, query: 5}}),
+        primaryDb.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}),
+    );
+    assert.commandWorked(
+        primaryDb.adminCommand({
+            setParameter: 1,
+            logComponentVerbosity: {command: 5, replication: 5, query: 5},
+        }),
     );
 
     runWithFailpoint(db, testCase.failpointName, testCase.failpointOpts, () => {
@@ -61,7 +72,12 @@ function testProfileEntryContainsPlanningTime(db, testCase, numExpectedEntries, 
                 tojson(primaryDb.system.profile.find().toArray()),
         );
         profileEntries.forEach((entry) =>
-            assert.betweenIn(minPlanningTime, entry.planningTimeMicros, maxPlanningTime, tojson(entry)),
+            assert.betweenIn(
+                minPlanningTime,
+                entry.planningTimeMicros,
+                maxPlanningTime,
+                tojson(entry),
+            ),
         );
     });
 }
@@ -184,7 +200,9 @@ jsTestLog("Testing replica set");
 
 (function testShardedCluster() {
     const st = new ShardingTest({shards: 2, mongos: 1, config: 1, other: {enableBalancer: false}});
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     const db = st.s.getDB(dbName);
     try {
         //
@@ -207,13 +225,18 @@ jsTestLog("Testing replica set");
         });
         FixtureHelpers.mapOnEachShardNode({
             db: db.getSiblingDB("admin"),
-            func: (db) => configureFailPoint(db, "migrationRecipientFailPostCommitRefresh", {mode: "alwaysOn"}),
+            func: (db) =>
+                configureFailPoint(db, "migrationRecipientFailPostCommitRefresh", {
+                    mode: "alwaysOn",
+                }),
             primaryNodeOnly: true,
         });
 
         // Shard the collection and create two chunks. These both initially start on shard0.
         assert.commandWorked(
-            st.s.getDB(dbName)[collName].insertMany([{_id: -5}, {_id: 5}], {writeConcern: {w: "majority"}}),
+            st.s
+                .getDB(dbName)
+                [collName].insertMany([{_id: -5}, {_id: 5}], {writeConcern: {w: "majority"}}),
         );
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
@@ -221,9 +244,13 @@ jsTestLog("Testing replica set");
         // Move a chunk from Shard0 to Shard1 through the main mongos, run a query, and then move
         // the chunk back. The end result: the primary is stale but not the router.
         const findCommand = {find: collName, filter: {_id: 5}};
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}),
+        );
         assert.commandWorked(db.runCommand(findCommand));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}),
+        );
 
         // Targets Shard0, which is stale and will need to do a refresh. The query will be retried
         // after the refresh. Assert that the planning time measurement includes exactly one

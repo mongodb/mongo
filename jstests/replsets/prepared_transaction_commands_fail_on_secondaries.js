@@ -42,7 +42,9 @@ rst.awaitReplication();
 jsTestLog("Test that prepare fails on a secondary");
 const txnNumber = NumberLong(priSession.getTxnNumber_forTesting());
 assert.commandFailedWithCode(
-    secSession.getDatabase("admin").adminCommand({prepareTransaction: 1, txnNumber: txnNumber, autocommit: false}),
+    secSession
+        .getDatabase("admin")
+        .adminCommand({prepareTransaction: 1, txnNumber: txnNumber, autocommit: false}),
     ErrorCodes.NotWritablePrimary,
 );
 
@@ -64,7 +66,9 @@ assert.commandFailedWithCode(
 
 jsTestLog("Test that prepared abort fails on a secondary");
 assert.commandFailedWithCode(
-    secSession.getDatabase("admin").adminCommand({abortTransaction: 1, txnNumber: txnNumber, autocommit: false}),
+    secSession
+        .getDatabase("admin")
+        .adminCommand({abortTransaction: 1, txnNumber: txnNumber, autocommit: false}),
     ErrorCodes.NotWritablePrimary,
 );
 

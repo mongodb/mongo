@@ -42,7 +42,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                     ErrorCodes.NoMatchingDocument,
                 ]);
             } else {
-                assert.commandFailedWithCode(res, [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument]);
+                assert.commandFailedWithCode(res, [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                ]);
             }
             print("retrying failed createIndex operation: " + tojson(res));
             return false;

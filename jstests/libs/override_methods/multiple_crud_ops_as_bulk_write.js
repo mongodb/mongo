@@ -66,8 +66,12 @@ function opCompatibleWithCurrentBatch(dbName, collName, cmdObj) {
     // bypassDocumentValidation and the command bypassDocumentValidation are the same we can
     // continue.
     let cmdBypassDocumentValidation =
-        cmdObj.hasOwnProperty("bypassDocumentValidation") && cmdObj.bypassDocumentValidation == true;
-    if (bypassDocumentValidation != null && cmdBypassDocumentValidation != bypassDocumentValidation) {
+        cmdObj.hasOwnProperty("bypassDocumentValidation") &&
+        cmdObj.bypassDocumentValidation == true;
+    if (
+        bypassDocumentValidation != null &&
+        cmdBypassDocumentValidation != bypassDocumentValidation
+    ) {
         return false;
     }
 
@@ -232,7 +236,14 @@ function deepCopy(target, source) {
     return res;
 }
 
-function runCommandMultiOpBulkWriteOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+function runCommandMultiOpBulkWriteOverride(
+    conn,
+    dbName,
+    cmdName,
+    cmdObj,
+    originalRunCommand,
+    makeRunCommandArgs,
+) {
     let cmdCopy = {};
     cmdCopy = deepCopy(cmdCopy, cmdObj);
 
@@ -269,5 +280,7 @@ function runCommandMultiOpBulkWriteOverride(conn, dbName, cmdName, cmdObj, origi
     return normalClusterRunCommand.apply(normalCluster, makeRunCommandArgs(cmdObj, dbName));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js",
+);
 OverrideHelpers.overrideRunCommand(runCommandMultiOpBulkWriteOverride);

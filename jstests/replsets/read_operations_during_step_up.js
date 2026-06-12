@@ -37,8 +37,9 @@ let replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus
 const startingNumNotMasterErrors = replMetrics.network.notPrimaryUnacknowledgedWrites;
 
 // Open a cursor on secondary.
-const cursorIdToBeReadAfterStepUp = assert.commandWorked(secondaryDB.runCommand({"find": collName, batchSize: 0}))
-    .cursor.id;
+const cursorIdToBeReadAfterStepUp = assert.commandWorked(
+    secondaryDB.runCommand({"find": collName, batchSize: 0}),
+).cursor.id;
 
 jsTestLog("2. Start blocking getMore cmd before step up");
 const joinGetMoreThread = startParallelShell(() => {
@@ -52,17 +53,27 @@ const joinGetMoreThread = startParallelShell(() => {
 
     // Enable the fail point for get more cmd.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}),
+        db.adminCommand({
+            configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
+            mode: "alwaysOn",
+        }),
     );
 
     const getMoreRes = assert.commandWorked(
-        secondaryDB.runCommand({"getMore": cursorIdToBeReadDuringStepUp, collection: TestData.collName}),
+        secondaryDB.runCommand({
+            "getMore": cursorIdToBeReadDuringStepUp,
+            collection: TestData.collName,
+        }),
     );
     assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 }, secondary.port);
 
 // Wait for getmore cmd to reach the fail point.
-waitForCurOpByFailPoint(secondaryAdmin, secondaryCollNss, "waitAfterPinningCursorBeforeGetMoreBatch");
+waitForCurOpByFailPoint(
+    secondaryAdmin,
+    secondaryCollNss,
+    "waitAfterPinningCursorBeforeGetMoreBatch",
+);
 
 jsTestLog("2. Start blocking find cmd before step up");
 const joinFindThread = startParallelShell(() => {
@@ -71,7 +82,9 @@ const joinFindThread = startParallelShell(() => {
 
     // Enable the fail point for find cmd. We are in a parallel shell, so we can't use the helper
     // function. Enable the shard variant of the fail point.
-    assert.commandWorked(db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}),
+    );
 
     const findRes = assert.commandWorked(secondaryDB.runCommand({"find": TestData.collName}));
     assert.docEq([{_id: 0}], findRes.cursor.firstBatch);
@@ -97,7 +110,12 @@ configureFailPoint(secondaryAdmin, "waitAfterCommandFinishesExecution", {
 
 jsTestLog("4. Disable fail points");
 configureFailPoint(secondaryAdmin, "waitInFindBeforeMakingBatch", {} /* data */, "off");
-configureFailPoint(secondaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch", {} /* data */, "off");
+configureFailPoint(
+    secondaryAdmin,
+    "waitAfterPinningCursorBeforeGetMoreBatch",
+    {} /* data */,
+    "off",
+);
 
 // Wait until the secondary transitioned to PRIMARY state.
 joinStepUpThread();
@@ -123,7 +141,11 @@ replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1}
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
 // Should account for find and getmore commands issued before step up.
 // TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
-assert.gte(replMetrics.stateTransition.totalOperationsRunning || replMetrics.stateTransition.userOperationsRunning, 2);
+assert.gte(
+    replMetrics.stateTransition.totalOperationsRunning ||
+        replMetrics.stateTransition.userOperationsRunning,
+    2,
+);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, startingNumNotMasterErrors);
 
 rst.stopSet();

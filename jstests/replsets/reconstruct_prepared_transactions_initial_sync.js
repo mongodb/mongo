@@ -34,7 +34,11 @@ let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const dbName = "test";
@@ -154,7 +158,12 @@ const prepareTimestamp5 = PrepareHelpers.prepareTransaction(session5, {w: 1});
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangDuringCollectionClone",
+        mode: "off",
+    }),
+);
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
@@ -231,7 +240,11 @@ assert.eq(testColl.find({_id: 2}).toArray(), [{_id: 2}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 2}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -284,7 +297,11 @@ assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 // Make sure that another write on the same document from the third transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 3}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 3}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -304,7 +321,11 @@ jsTestLog("Aborting the third transaction");
 
 // Make sure we can successfully abort the third transaction after recovery.
 assert.commandWorked(
-    sessionDB3.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber3), autocommit: false}),
+    sessionDB3.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber3),
+        autocommit: false,
+    }),
 );
 assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 

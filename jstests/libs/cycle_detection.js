@@ -54,7 +54,10 @@ export function Graph() {
                 const nodeState = state.get(node);
                 if (nodeState !== State.kNotYetVisited) {
                     throw new Error(
-                        "Found node " + tojsononeline(node) + " unexpectedly in state " + nodeState.toString(),
+                        "Found node " +
+                            tojsononeline(node) +
+                            " unexpectedly in state " +
+                            nodeState.toString(),
                     );
                 }
             }

@@ -21,7 +21,9 @@ function runTest(conn, failPointConn, shardColl) {
 
     coll.drop();
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     if (shardColl) {
         assert.commandWorked(
@@ -43,12 +45,18 @@ function runTest(conn, failPointConn, shardColl) {
     //
     // Test with failPoint which aborts all subsequent write operations of the batch.
     //
-    let fp = configureFailPoint(failPointConn ? failPointConn : conn, "failUnorderedTimeseriesInsert", {
-        metadata: 0,
-        canContinue: false,
-    });
+    let fp = configureFailPoint(
+        failPointConn ? failPointConn : conn,
+        "failUnorderedTimeseriesInsert",
+        {
+            metadata: 0,
+            canContinue: false,
+        },
+    );
 
-    const resWithCannotContinue = assert.commandFailed(coll.insert(docs.slice(1), {ordered: false}));
+    const resWithCannotContinue = assert.commandFailed(
+        coll.insert(docs.slice(1), {ordered: false}),
+    );
 
     jsTestLog("Checking insert result: " + tojson(resWithCannotContinue));
     // We don't guarantee orderedness of inserts based on the metadata value/the order that the
@@ -58,7 +66,10 @@ function runTest(conn, failPointConn, shardColl) {
     // We could have the documents with {meta: 1} be successfully inserted if we have that {meta: 0}
     // documents are committed after the documents with {meta: 1} are inserted.
     assert(resWithCannotContinue.nInserted <= 2);
-    assert.eq(resWithCannotContinue.getWriteErrors().length, docs.length - resWithCannotContinue.nInserted - 1);
+    assert.eq(
+        resWithCannotContinue.getWriteErrors().length,
+        docs.length - resWithCannotContinue.nInserted - 1,
+    );
 
     assert.commandWorked(coll.insert(docs[0]));
 

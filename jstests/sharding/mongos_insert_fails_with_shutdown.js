@@ -30,7 +30,11 @@ const fpData = {
     "cmdName": "insert",
     "ns": dbName + "." + collName,
 };
-const hangBeforeCheckInterruptFailPoint = configureFailPoint(st.s, "hangBeforeCheckingMongosShutdownInterrupt", fpData);
+const hangBeforeCheckInterruptFailPoint = configureFailPoint(
+    st.s,
+    "hangBeforeCheckingMongosShutdownInterrupt",
+    fpData,
+);
 
 const insertThread = new Thread(
     function insertDoc(host, dbName, collName) {

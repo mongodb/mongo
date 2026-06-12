@@ -10,9 +10,15 @@ const queryProjectAddFields = [
     {$addFields: {"array.m2": "what?"}},
 ];
 
-const queryProjectOnly = [{$group: {_id: null, array: {$first: "$array"}}}, {$project: {_id: 0, "array.m1": 1}}];
+const queryProjectOnly = [
+    {$group: {_id: null, array: {$first: "$array"}}},
+    {$project: {_id: 0, "array.m1": 1}},
+];
 
-const queryAddFieldsOnly = [{$group: {_id: null, array: {$first: "$array"}}}, {$addFields: {"array.m2": "what?"}}];
+const queryAddFieldsOnly = [
+    {$group: {_id: null, array: {$first: "$array"}}},
+    {$addFields: {"array.m2": "what?"}},
+];
 
 const queryProjectWithExpression = [
     {$group: {_id: null, array: {$first: "$array"}}},

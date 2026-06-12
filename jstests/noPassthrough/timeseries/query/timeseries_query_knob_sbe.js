@@ -22,11 +22,14 @@ const db = conn.getDB(dbName);
 // We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true and when
 // featureFlagTimeSeriesInSbe is set.
 const sbeEnabled =
-    checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
+    checkSbeRestrictedOrFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
 
 const coll = db.timeseries;
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 // The dataset doesn't matter, as we only care about the choice of the plan to execute the query.
 assert.commandWorked(coll.insert({t: new Date(), m: 1, a: 42, b: 17}));
 
@@ -47,13 +50,19 @@ runTest("UNPACK_TS_BUCKET");
 
 // Set the query knob to true. The unpack stage should not be lowered to SBE.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: true}),
+    db.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: true,
+    }),
 );
 runTest("$_internalUnpackBucket");
 
 // Set the query knob back to false. The unpack stage should be lowered to SBE.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: false}),
+    db.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: false,
+    }),
 );
 runTest("UNPACK_TS_BUCKET");
 

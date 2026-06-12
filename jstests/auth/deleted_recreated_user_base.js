@@ -43,6 +43,10 @@ export function runTest(s0, s1) {
     }
 
     // This should fail due to invalid user session.
-    const thrown = assert.throws(() => admin.mycoll.find({}).toArray(), [], "Able to find after recreate");
+    const thrown = assert.throws(
+        () => admin.mycoll.find({}).toArray(),
+        [],
+        "Able to find after recreate",
+    );
     assert.eq(thrown.code, ErrorCodes.Unauthorized, "Threw something other than unauthorized");
 }

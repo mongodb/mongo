@@ -37,7 +37,9 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -156,7 +158,17 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     ];
     mockMongotShardResponses(mongotQuery, mongot0ResponseBatch, mongot1ResponseBatch);
 
-    const expectedDocs = [{z: 5}, {z: 5}, {z: 6}, {z: 10}, {z: 12}, {z: 15}, {z: 20}, {z: 28}, {z: 30}];
+    const expectedDocs = [
+        {z: 5},
+        {z: 5},
+        {z: 6},
+        {z: 10},
+        {z: 12},
+        {z: 15},
+        {z: 20},
+        {z: 28},
+        {z: 30},
+    ];
 
     assert.eq(
         expectedDocs,
@@ -195,7 +207,17 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     ];
     mockMongotShardResponses(mongotQuery, mongot0ResponseBatch, mongot1ResponseBatch);
 
-    const expectedDocs = [{z: 30}, {z: 28}, {z: 20}, {z: 15}, {z: 12}, {z: 10}, {z: 6}, {z: 5}, {z: 5}];
+    const expectedDocs = [
+        {z: 30},
+        {z: 28},
+        {z: 20},
+        {z: 15},
+        {z: 12},
+        {z: 10},
+        {z: 6},
+        {z: 5},
+        {z: 5},
+    ];
 
     assert.eq(
         expectedDocs,
@@ -249,7 +271,10 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
         {_id: 14, x: "cow", z: 30},
     ];
 
-    assert.eq(expectedDocs, testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 1, x: 1, z: 1}}]).toArray());
+    assert.eq(
+        expectedDocs,
+        testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 1, x: 1, z: 1}}]).toArray(),
+    );
 })();
 
 (function testDottedPathSort() {
@@ -288,7 +313,10 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
         {a: {b: 30}},
     ];
 
-    assert.eq(expectedDocs, testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 0, "a.b": 1}}]).toArray());
+    assert.eq(
+        expectedDocs,
+        testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 0, "a.b": 1}}]).toArray(),
+    );
 })();
 
 (function testMissingValue() {
@@ -329,7 +357,10 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
         {_id: 12, c: 30},
     ];
 
-    assert.eq(expectedDocs, testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 1, c: 1}}]).toArray());
+    assert.eq(
+        expectedDocs,
+        testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 1, c: 1}}]).toArray(),
+    );
 })();
 
 (function testStoredSource() {
@@ -406,7 +437,13 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
 
     assert.eq(
         expectedDocs,
-        testColl.aggregate([{$search: mongotQuery}, {$match: {d: {$ne: null}}}, {$project: {_id: 1, d: 1}}]).toArray(),
+        testColl
+            .aggregate([
+                {$search: mongotQuery},
+                {$match: {d: {$ne: null}}},
+                {$project: {_id: 1, d: 1}},
+            ])
+            .toArray(),
     );
 })();
 
@@ -441,7 +478,13 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
 
     assert.eq(
         expectedDocs,
-        testColl.aggregate([{$search: mongotQuery}, {$match: {e: {$ne: null}}}, {$project: {_id: 1, e: 1}}]).toArray(),
+        testColl
+            .aggregate([
+                {$search: mongotQuery},
+                {$match: {e: {$ne: null}}},
+                {$project: {_id: 1, e: 1}},
+            ])
+            .toArray(),
     );
 })();
 
@@ -555,9 +598,22 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
     s1Mongot.setMockResponses(history1, NumberLong(30));
     s1Mongot.setMockResponses(historyMeta1, NumberLong(40));
 
-    const expectedDocs = [{z: 5}, {z: 5}, {z: 6}, {z: 10}, {z: 12}, {z: 15}, {z: 20}, {z: 28}, {z: 30}];
+    const expectedDocs = [
+        {z: 5},
+        {z: 5},
+        {z: 6},
+        {z: 10},
+        {z: 12},
+        {z: 15},
+        {z: 20},
+        {z: 28},
+        {z: 30},
+    ];
 
-    assert.eq(expectedDocs, testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 0, z: 1}}]).toArray());
+    assert.eq(
+        expectedDocs,
+        testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 0, z: 1}}]).toArray(),
+    );
 })();
 
 (function testSearchScoreSpec() {
@@ -596,7 +652,12 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
 
     assert.eq(
         expectedDocs,
-        testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 1, score: {$meta: "searchScore"}}}]).toArray(),
+        testColl
+            .aggregate([
+                {$search: mongotQuery},
+                {$project: {_id: 1, score: {$meta: "searchScore"}}},
+            ])
+            .toArray(),
     );
 })();
 
@@ -625,7 +686,9 @@ function mockMongotShardResponses(mongotQuery, shard0MockResponse, shard1MockRes
             },
         },
     ];
-    stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(planShardedSearchHistory, cursorId);
+    stWithMock
+        .getMockConnectedToHost(stWithMock.st.s)
+        .setMockResponses(planShardedSearchHistory, cursorId);
 
     const history0 = [
         {

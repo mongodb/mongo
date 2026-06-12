@@ -22,8 +22,14 @@ jsTest.log.info("Test 1: Running _flushShardRegistry on shard server");
     let result = shard0.adminCommand({_flushShardRegistry: 1});
     jsTest.log.debug("Shard0 refresh result: " + tojson(result));
     assert.commandWorked(result);
-    assert(result.hasOwnProperty("cachedTimeBefore"), "Response should contain cachedTimeBefore field");
-    assert(result.hasOwnProperty("cachedTimeAfter"), "Response should contain cachedTimeAfter field");
+    assert(
+        result.hasOwnProperty("cachedTimeBefore"),
+        "Response should contain cachedTimeBefore field",
+    );
+    assert(
+        result.hasOwnProperty("cachedTimeAfter"),
+        "Response should contain cachedTimeAfter field",
+    );
     assert(
         result.hasOwnProperty("forceReloadIncrementBefore"),
         "Response should contain forceReloadIncrementBefore field",
@@ -74,8 +80,14 @@ jsTest.log.info("Test 4: Running _flushShardRegistry on router");
     let result = mongos.adminCommand({_flushShardRegistry: 1});
     jsTest.log.debug("Shard0 refresh result: " + tojson(result));
     assert.commandWorked(result);
-    assert(result.hasOwnProperty("cachedTimeBefore"), "Response should contain cachedTimeBefore field");
-    assert(result.hasOwnProperty("cachedTimeAfter"), "Response should contain cachedTimeAfter field");
+    assert(
+        result.hasOwnProperty("cachedTimeBefore"),
+        "Response should contain cachedTimeBefore field",
+    );
+    assert(
+        result.hasOwnProperty("cachedTimeAfter"),
+        "Response should contain cachedTimeAfter field",
+    );
     assert(
         result.hasOwnProperty("forceReloadIncrementBefore"),
         "Response should contain forceReloadIncrementBefore field",
@@ -153,7 +165,9 @@ jsTest.log.info("Test 7: Query sharded and untracked collections before and afte
     assert.commandWorked(mongos.adminCommand({enableSharding: "testDB7"}));
 
     // Create and shard the first collection
-    assert.commandWorked(mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}),
+    );
 
     // Insert data into sharded collection
     let shardedBulk = shardedColl.initializeUnorderedBulkOp();
@@ -176,10 +190,22 @@ jsTest.log.info("Test 7: Query sharded and untracked collections before and afte
     let shardedSampleBefore = shardedColl.findOne({_id: 10});
     let untrackedSampleBefore = untrackedColl.findOne({_id: 10});
 
-    assert.eq(shardedCountBefore, 50, "Sharded collection should have 50 documents before recovery");
-    assert.eq(untrackedCountBefore, 50, "Untracked collection should have 50 documents before recovery");
+    assert.eq(
+        shardedCountBefore,
+        50,
+        "Sharded collection should have 50 documents before recovery",
+    );
+    assert.eq(
+        untrackedCountBefore,
+        50,
+        "Untracked collection should have 50 documents before recovery",
+    );
     assert.eq(shardedSampleBefore.value, 20, "Sharded collection sample data should be correct");
-    assert.eq(untrackedSampleBefore.value, 30, "Untracked collection sample data should be correct");
+    assert.eq(
+        untrackedSampleBefore.value,
+        30,
+        "Untracked collection sample data should be correct",
+    );
 
     // Run recovery
     jsTest.log.info("Running _flushShardRegistry");
@@ -199,10 +225,22 @@ jsTest.log.info("Test 7: Query sharded and untracked collections before and afte
     let untrackedSampleAfter = untrackedColl.findOne({_id: 10});
 
     // Verify data is unchanged
-    assert.eq(shardedCountAfter, 50, "Sharded collection should still have 50 documents after recovery");
-    assert.eq(untrackedCountAfter, 50, "Untracked collection should still have 50 documents after recovery");
+    assert.eq(
+        shardedCountAfter,
+        50,
+        "Sharded collection should still have 50 documents after recovery",
+    );
+    assert.eq(
+        untrackedCountAfter,
+        50,
+        "Untracked collection should still have 50 documents after recovery",
+    );
     assert.eq(shardedSampleAfter.value, 20, "Sharded collection sample data should be unchanged");
-    assert.eq(untrackedSampleAfter.value, 30, "Untracked collection sample data should be unchanged");
+    assert.eq(
+        untrackedSampleAfter.value,
+        30,
+        "Untracked collection sample data should be unchanged",
+    );
 
     jsTest.log.info("Both sharded and untracked collections accessible before and after recovery");
 

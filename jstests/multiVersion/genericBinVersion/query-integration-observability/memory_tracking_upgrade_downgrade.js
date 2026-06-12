@@ -6,7 +6,10 @@
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {runPipelineAndGetDiagnostics, verifySlowQueryLogMetrics} from "jstests/libs/query/memory_tracking_utils.js";
+import {
+    runPipelineAndGetDiagnostics,
+    verifySlowQueryLogMetrics,
+} from "jstests/libs/query/memory_tracking_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 import {checkCurrentOpMemoryTracking} from "jstests/noPassthrough/memory_tracking/current_op.js";
@@ -84,7 +87,8 @@ function assertMemoryTrackingExplainExecutionStatsMetrics(db, expectMemoryMetric
             assert.gt(
                 stage.peakTrackedMemBytes,
                 0,
-                `Expected peakTrackedMemBytes to be positive in $group stage: ` + tojson(explainRes),
+                `Expected peakTrackedMemBytes to be positive in $group stage: ` +
+                    tojson(explainRes),
             );
         } else {
             assert(
@@ -132,12 +136,14 @@ function setupCollection(primaryConnection, shardingTest = null) {
         assert.eq(
             shardedDataDistribution[0].shards[0].numOwnedDocuments,
             docs.length / 2,
-            `Expected ${docs.length / 2} docs on shard 0 in data distribution` + tojson(shardedDataDistribution),
+            `Expected ${docs.length / 2} docs on shard 0 in data distribution` +
+                tojson(shardedDataDistribution),
         );
         assert.eq(
             shardedDataDistribution[0].shards[1].numOwnedDocuments,
             docs.length / 2,
-            `Expected ${docs.length / 2} docs on shard 1 in data distribution` + tojson(shardedDataDistribution),
+            `Expected ${docs.length / 2} docs on shard 1 in data distribution` +
+                tojson(shardedDataDistribution),
         );
     }
 }
@@ -153,7 +159,14 @@ function assertMemoryTrackingMetricsAppear(primaryConn) {
     assertMemoryTrackingExplainExecutionStatsMetrics(db, true /*expectMemoryMetrics*/);
 
     jsTest.log.info("Checking $currentOp for memory tracking stats...");
-    checkCurrentOpMemoryTracking("group", primaryConn, db, db[collName], pipeline, true /*expectMemoryMetrics*/);
+    checkCurrentOpMemoryTracking(
+        "group",
+        primaryConn,
+        db,
+        db[collName],
+        pipeline,
+        true /*expectMemoryMetrics*/,
+    );
 }
 
 function assertMemoryTrackingMetricsDoNotAppear(primaryConn) {
@@ -167,7 +180,14 @@ function assertMemoryTrackingMetricsDoNotAppear(primaryConn) {
     assertMemoryTrackingExplainExecutionStatsMetrics(db, false /*expectMemoryMetrics*/);
 
     jsTest.log.info("Checking that $currentOp does not have memory tracking stats...");
-    checkCurrentOpMemoryTracking("group", primaryConn, db, db[collName], pipeline, false /*expectMemoryMetrics*/);
+    checkCurrentOpMemoryTracking(
+        "group",
+        primaryConn,
+        db,
+        db[collName],
+        pipeline,
+        false /*expectMemoryMetrics*/,
+    );
 }
 
 function assertMemoryTrackingMetricsAppearOnOneShard(primaryConn) {
@@ -189,10 +209,18 @@ function assertMemoryTrackingMetricsAppearOnOneShard(primaryConn) {
     // Shard 1 (latest):   _id 6-11: Coffee(1), Specialty(2), Tea(2) => 3 groups
     assert.eq(3, stages[0].nReturned);
     assert.eq(3, stages[1].nReturned);
-    const stagesWithMemoryTracking = stages.filter((stage) => stage.hasOwnProperty("peakTrackedMemBytes"));
-    const stagesWithoutMemoryTracking = stages.filter((stage) => !stage.hasOwnProperty("peakTrackedMemBytes"));
+    const stagesWithMemoryTracking = stages.filter((stage) =>
+        stage.hasOwnProperty("peakTrackedMemBytes"),
+    );
+    const stagesWithoutMemoryTracking = stages.filter(
+        (stage) => !stage.hasOwnProperty("peakTrackedMemBytes"),
+    );
 
-    assert.eq(stagesWithMemoryTracking.length, 1, "Expected exactly 1 stage with memory tracking: " + tojson(stages));
+    assert.eq(
+        stagesWithMemoryTracking.length,
+        1,
+        "Expected exactly 1 stage with memory tracking: " + tojson(stages),
+    );
     assert.eq(
         stagesWithoutMemoryTracking.length,
         1,
@@ -205,7 +233,14 @@ function assertMemoryTrackingMetricsAppearOnOneShard(primaryConn) {
     );
 
     // For a mixed version cluster, $currentOp should reflect the mongos binary version.
-    checkCurrentOpMemoryTracking("group", primaryConn, db, db[collName], pipeline, false /*expectMemoryMetrics*/);
+    checkCurrentOpMemoryTracking(
+        "group",
+        primaryConn,
+        db,
+        db[collName],
+        pipeline,
+        false /*expectMemoryMetrics*/,
+    );
 }
 
 function assertMemoryTrackingMetricsAppearInExplainButNotCurOp(primaryConn) {
@@ -219,7 +254,14 @@ function assertMemoryTrackingMetricsAppearInExplainButNotCurOp(primaryConn) {
     assertMemoryTrackingExplainExecutionStatsMetrics(db, true /*expectMemoryMetrics*/);
 
     // For a mixed version cluster, $currentOp should reflect the mongos binary version.
-    checkCurrentOpMemoryTracking("group", primaryConn, db, db[collName], pipeline, false /*expectMemoryMetrics*/);
+    checkCurrentOpMemoryTracking(
+        "group",
+        primaryConn,
+        db,
+        db[collName],
+        pipeline,
+        false /*expectMemoryMetrics*/,
+    );
 }
 
 /**

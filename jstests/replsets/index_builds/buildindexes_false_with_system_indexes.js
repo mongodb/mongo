@@ -10,7 +10,11 @@ const testName = "buildindexes_false_with_system_indexes";
 
 let rst = new ReplSetTest({
     name: testName,
-    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0, hidden: true, buildIndexes: false}}],
+    nodes: [
+        {},
+        {rsConfig: {priority: 0}},
+        {rsConfig: {priority: 0, hidden: true, buildIndexes: false}},
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});

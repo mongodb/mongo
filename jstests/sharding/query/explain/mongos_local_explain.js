@@ -19,7 +19,9 @@ const expectedExplainStages = [stageSpec, {$match: {dummyField: {$eq: 1}}}];
 
 // Test that the mongoS-only pipeline is explainable.
 const explainPlan = assert.commandWorked(
-    mongosConn.getDB("admin").runCommand({aggregate: 1, pipeline: mongosOnlyPipeline, explain: true}),
+    mongosConn
+        .getDB("admin")
+        .runCommand({aggregate: 1, pipeline: mongosOnlyPipeline, explain: true}),
 );
 
 // We expect the stages to appear under the 'mongos' heading, for 'splitPipeline' to be

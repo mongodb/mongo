@@ -35,7 +35,9 @@ const setupColl = (coll, collName, usesMeta) => {
 
     // If usesMeta is true, we want the collection to have a onlyMeta field
     if (usesMeta) {
-        assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+        assert.commandWorked(
+            db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+        );
     } else {
         assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "t"}}));
     }
@@ -69,7 +71,9 @@ const assertPlanStagesInPipeline = ({
     let colls = onlyMeta ? [metaColl] : [coll, metaColl];
     for (const c of colls) {
         const aggRes = c.explain().aggregate(pipeline);
-        const planStage = getExplainedPipelineFromAggregation(db, c, pipeline, {inhibitOptimization: false});
+        const planStage = getExplainedPipelineFromAggregation(db, c, pipeline, {
+            inhibitOptimization: false,
+        });
         // We check index at i in the PlanStage against the i'th index in expectedStages
         // Should rewrite [{$_unpack}, {$limit: x}] pipeline as [{$limit:
         // x}, {$_unpack}, {$limit: x}]
@@ -116,7 +120,10 @@ const metaDocs = setupColl(metaColl, metaCollName, true);
 // Simple limit test. Because the pushed down limit is in the PlanStage now,
 // getExplainedPipelineFromAggregation does not display it and we don't see the first limit / sort
 // stage. The presence of the pushed limit is tested in unit tests.
-assertPlanStagesInPipeline({pipeline: [{$limit: 2}], expectedStages: ["$_internalUnpackBucket", "$limit"]});
+assertPlanStagesInPipeline({
+    pipeline: [{$limit: 2}],
+    expectedStages: ["$_internalUnpackBucket", "$limit"],
+});
 // Test that when two limits are present, they get squashed into 1 taking limit of the smaller
 // (tighter) value
 assertPlanStagesInPipeline({

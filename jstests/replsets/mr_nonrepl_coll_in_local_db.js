@@ -68,14 +68,22 @@ createdCollections.forEach(function (createdCollectionName) {
     // Search for a log entry for the creation of this collection.
     const oplogEntries = primaryDB
         .getSiblingDB("local")
-        ["oplog.rs"].find({op: "c", ns: dbName + ".$cmd", "o.create": collName, "o.idIndex.name": "_id_"})
+        ["oplog.rs"].find({
+            op: "c",
+            ns: dbName + ".$cmd",
+            "o.create": collName,
+            "o.idIndex.name": "_id_",
+        })
         .toArray();
     if (createdCollectionName.startsWith("local.")) {
         // We do not want to see any replication of "local" collections.
         assert.eq(
             oplogEntries.length,
             0,
-            "Found unexpected oplog entry for creation of " + createdCollectionName + ": " + tojson(oplogEntries),
+            "Found unexpected oplog entry for creation of " +
+                createdCollectionName +
+                ": " +
+                tojson(oplogEntries),
         );
     } else {
         assert.eq(

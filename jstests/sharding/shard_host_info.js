@@ -40,7 +40,9 @@ assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
 
 // Shard 'testColl' on {_id: 'hashed'}. This will automatically presplit the collection and
 // place chunks on each shard.
-assert.commandWorked(testDB.adminCommand({shardCollection: testColl.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(
+    testDB.adminCommand({shardCollection: testColl.getFullName(), key: {_id: "hashed"}}),
+);
 
 // Group $collStats result by $shard and $host to confirm that both fields are present.
 assert.eq(

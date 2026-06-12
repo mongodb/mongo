@@ -11,7 +11,10 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const replSet = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 replSet.startSet();
@@ -51,7 +54,12 @@ for (let db of [primaryDB, secondaryDB]) {
         assert.sameMembers(res.cursor.firstBatch, [{_id: 0}], tojson(res));
 
         res = assert.commandWorked(
-            db.runCommand({aggregate: collName, pipeline: [], cursor: {}, readConcern: readConcern}),
+            db.runCommand({
+                aggregate: collName,
+                pipeline: [],
+                cursor: {},
+                readConcern: readConcern,
+            }),
         );
         assert.sameMembers(res.cursor.firstBatch, [{_id: 0}], tojson(res));
     }

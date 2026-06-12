@@ -17,10 +17,15 @@ function enableShardingWithRetry(conn, dbName, excludeShards = []) {
     assert.soon(function () {
         try {
             primaryShard = getRandomShardName(conn, excludeShards);
-            assert.commandWorked(conn.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+            assert.commandWorked(
+                conn.adminCommand({enableSharding: dbName, primaryShard: primaryShard}),
+            );
             return true;
         } catch (e) {
-            if (e.code === ErrorCodes.ShardNotFound || e.code === ErrorCodes.FailedToSatisfyReadPreference) {
+            if (
+                e.code === ErrorCodes.ShardNotFound ||
+                e.code === ErrorCodes.FailedToSatisfyReadPreference
+            ) {
                 return false;
             }
             throw e;
@@ -101,7 +106,10 @@ describe("listDatabases after shard topology changes", function () {
         assert.commandWorked(coll1.insertOne({x: 1}));
 
         let res = assert.commandWorked(
-            testCollectionDB.adminCommand({listDatabases: 1, filter: {name: testCollectionDB.getName()}}),
+            testCollectionDB.adminCommand({
+                listDatabases: 1,
+                filter: {name: testCollectionDB.getName()},
+            }),
         );
         assert.eq(1, res.databases.length);
         assert.eq(testCollectionDB.getName(), res.databases[0].name);
@@ -122,7 +130,10 @@ describe("listDatabases after shard topology changes", function () {
         );
 
         res = assert.commandWorked(
-            testCollectionDB.adminCommand({listDatabases: 1, filter: {name: testCollectionDB.getName()}}),
+            testCollectionDB.adminCommand({
+                listDatabases: 1,
+                filter: {name: testCollectionDB.getName()},
+            }),
         );
         assert.eq(1, res.databases.length);
         assert.eq(testCollectionDB.getName(), res.databases[0].name);
@@ -156,7 +167,9 @@ describe("listDatabases after shard topology changes", function () {
             expectedErrorCodes,
         );
 
-        res = assert.commandWorked(testChunkDB.adminCommand({listDatabases: 1, filter: {name: testChunkDB.getName()}}));
+        res = assert.commandWorked(
+            testChunkDB.adminCommand({listDatabases: 1, filter: {name: testChunkDB.getName()}}),
+        );
         assert.eq(1, res.databases.length);
         assert.eq(testChunkDB.getName(), res.databases[0].name);
     });

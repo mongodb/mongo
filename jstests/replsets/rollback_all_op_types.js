@@ -112,7 +112,9 @@ let rollbackOps = {
                 );
             },
             op: (db, collName) => {
-                assert.commandWorked(db.runCommand({dropIndexes: collName, index: collName + "_index"}));
+                assert.commandWorked(
+                    db.runCommand({dropIndexes: collName, index: collName + "_index"}),
+                );
             },
         },
         {
@@ -142,7 +144,9 @@ let rollbackOps = {
             },
             op: (db, collName) => {
                 let nss = db[collName].getFullName();
-                assert.commandWorked(db.adminCommand({renameCollection: nss + "_source", to: nss + "_dest"}));
+                assert.commandWorked(
+                    db.adminCommand({renameCollection: nss + "_source", to: nss + "_dest"}),
+                );
             },
         },
         {
@@ -167,7 +171,9 @@ let rollbackOps = {
             op: (db, collName) => {
                 let sourceNss = db[collName].getFullName();
                 let destNss = db.getName() + "_dest." + collName;
-                assert.commandWorked(db.adminCommand({renameCollection: sourceNss, to: destNss, dropTarget: true}));
+                assert.commandWorked(
+                    db.adminCommand({renameCollection: sourceNss, to: destNss, dropTarget: true}),
+                );
             },
         },
         {
@@ -179,7 +185,11 @@ let rollbackOps = {
             op: (db, collName) => {
                 let nss = db[collName].getFullName();
                 assert.commandWorked(
-                    db.adminCommand({renameCollection: nss + "_source", to: nss + "_dest", dropTarget: true}),
+                    db.adminCommand({
+                        renameCollection: nss + "_source",
+                        to: nss + "_dest",
+                        dropTarget: true,
+                    }),
                 );
             },
         },
@@ -208,7 +218,11 @@ let rollbackOps = {
             },
             op: (db, collName) => {
                 assert.commandWorked(
-                    db.runCommand({collMod: collName, validationLevel: "moderate", validationAction: "warn"}),
+                    db.runCommand({
+                        collMod: collName,
+                        validationLevel: "moderate",
+                        validationAction: "warn",
+                    }),
                 );
             },
         },
@@ -217,7 +231,11 @@ let rollbackOps = {
             init: (db, collName) => {
                 assert.commandWorked(db.createCollection(collName));
                 assert.commandWorked(
-                    db.runCommand({collMod: collName, validationLevel: "moderate", validationAction: "warn"}),
+                    db.runCommand({
+                        collMod: collName,
+                        validationLevel: "moderate",
+                        validationAction: "warn",
+                    }),
                 );
             },
             op: (db, collName) => {
@@ -341,7 +359,12 @@ let RollbackOps = (node) => {
         // and log it, to improve diagnostics.
         const runCommandOriginal = Mongo.prototype.runCommand;
         Mongo.prototype.runCommand = function (dbName, commandObj, options) {
-            jsTestLog("Executing command for '" + opName + "' test: \n" + tojson(basicCommandObj(commandObj)));
+            jsTestLog(
+                "Executing command for '" +
+                    opName +
+                    "' test: \n" +
+                    tojson(basicCommandObj(commandObj)),
+            );
             return runCommandOriginal.apply(this, arguments);
         };
 

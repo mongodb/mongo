@@ -74,9 +74,13 @@ const metaField = "mt";
 const emptyCollName = "testEmptyColl";
 
 // Create a timeseries collection.
-assert.commandWorked(mongosDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 assert.commandWorked(
-    mongosDB.createCollection(emptyCollName, {timeseries: {timeField: timeField, metaField: metaField}}),
+    mongosDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+);
+assert.commandWorked(
+    mongosDB.createCollection(emptyCollName, {
+        timeseries: {timeField: timeField, metaField: metaField},
+    }),
 );
 
 // Populate the timeseries collection with some data. More interesting test case, and populates the
@@ -93,7 +97,8 @@ let clusterCollStatsResult = assert.commandWorked(mongosDB.runCommand({collStats
 jsTestLog("Cluster collStats command result: " + tojson(clusterCollStatsResult));
 assert(
     clusterCollStatsResult.timeseries,
-    "Expected a top-level 'timeseries' field but didn't find one: " + tojson(clusterCollStatsResult),
+    "Expected a top-level 'timeseries' field but didn't find one: " +
+        tojson(clusterCollStatsResult),
 );
 
 // Check that the top-level 'timeseries' fields match the primary shard's, that the stats were
@@ -104,7 +109,10 @@ assert(
     clusterCollStatsResult.shards[primaryShard.shardName].timeseries,
     "Expected a shard 'timeseries' field but didn't find one: " + tojson(clusterCollStatsResult),
 );
-assert.docEq(clusterCollStatsResult.timeseries, clusterCollStatsResult.shards[primaryShard.shardName].timeseries);
+assert.docEq(
+    clusterCollStatsResult.timeseries,
+    clusterCollStatsResult.shards[primaryShard.shardName].timeseries,
+);
 
 // Shard the timeseries collection
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -120,7 +128,10 @@ assert.commandWorked(
 clusterCollStatsResult = assert.commandWorked(mongosDB.runCommand({collStats: emptyCollName}));
 jsTestLog("Empty cluster collStats command result: " + tojson(clusterCollStatsResult));
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "avgBucketSize"));
-assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "avgNumMeasurementsPerCommit"));
+assert.eq(
+    0,
+    TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "avgNumMeasurementsPerCommit"),
+);
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "bucketCount"));
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketFetchesFailed"));
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketInserts"));
@@ -133,7 +144,10 @@ const splitPoint = {
     meta: numberDoc / numShards,
 };
 assert.commandWorked(
-    st.s.adminCommand({split: getTimeseriesCollForDDLOps(mongosDB, mongosColl).getFullName(), middle: splitPoint}),
+    st.s.adminCommand({
+        split: getTimeseriesCollForDDLOps(mongosDB, mongosColl).getFullName(),
+        middle: splitPoint,
+    }),
 );
 // Ensure that currently both chunks reside on the primary shard.
 let counts = st.chunkCounts(collName, dbName);
@@ -179,13 +193,16 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     assert.eq(
         total.avgBucketSize,
         Math.floor(
-            shards.map((x) => x.avgBucketSize * x.bucketCount).reduce((x, y) => x + y, 0 /* initial value */) /
-                total.bucketCount,
+            shards
+                .map((x) => x.avgBucketSize * x.bucketCount)
+                .reduce((x, y) => x + y, 0 /* initial value */) / total.bucketCount,
         ),
     );
     assert.eq(
         total.avgNumMeasurementsPerCommit,
-        shards.map((x) => x.numMeasurementsCommitted).reduce((x, y) => x + y, 0 /* initial value */) /
+        shards
+            .map((x) => x.numMeasurementsCommitted)
+            .reduce((x, y) => x + y, 0 /* initial value */) /
             shards.map((x) => x.numCommits).reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert.eq(
@@ -198,23 +215,33 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     );
     assert.eq(
         total.numBucketsOpenedDueToMetadata,
-        shards.map((x) => x.numBucketsOpenedDueToMetadata).reduce((x, y) => x + y, 0 /* initial value */),
+        shards
+            .map((x) => x.numBucketsOpenedDueToMetadata)
+            .reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert.eq(
         total.numBucketsClosedDueToCount,
-        shards.map((x) => x.numBucketsClosedDueToCount).reduce((x, y) => x + y, 0 /* initial value */),
+        shards
+            .map((x) => x.numBucketsClosedDueToCount)
+            .reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert.eq(
         total.numBucketsClosedDueToSize,
-        shards.map((x) => x.numBucketsClosedDueToSize).reduce((x, y) => x + y, 0 /* initial value */),
+        shards
+            .map((x) => x.numBucketsClosedDueToSize)
+            .reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert.eq(
         total.numBucketsClosedDueToTimeForward,
-        shards.map((x) => x.numBucketsClosedDueToTimeForward).reduce((x, y) => x + y, 0 /* initial value */),
+        shards
+            .map((x) => x.numBucketsClosedDueToTimeForward)
+            .reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert.eq(
         total.numBucketsClosedDueToMemoryThreshold,
-        shards.map((x) => x.numBucketsClosedDueToMemoryThreshold).reduce((x, y) => x + y, 0 /* initial value */),
+        shards
+            .map((x) => x.numBucketsClosedDueToMemoryThreshold)
+            .reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert.eq(
         total.numCommits,
@@ -226,7 +253,9 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     );
     assert.eq(
         total.numMeasurementsCommitted,
-        shards.map((x) => x.numMeasurementsCommitted).reduce((x, y) => x + y, 0 /* initial value */),
+        shards
+            .map((x) => x.numMeasurementsCommitted)
+            .reduce((x, y) => x + y, 0 /* initial value */),
     );
     assert(total.bucketCount > 0);
     assert(total.avgBucketSize > 0);
@@ -236,7 +265,11 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     assert(total.numMeasurementsCommitted > 0);
 }
 
-function verifyClusterCollStatsResult(clusterCollStatsResult, sumTimeseriesStatsAcrossShards, isAggregation) {
+function verifyClusterCollStatsResult(
+    clusterCollStatsResult,
+    sumTimeseriesStatsAcrossShards,
+    isAggregation,
+) {
     if (isAggregation) {
         // $collStats should output one document per shard.
         assert.eq(
@@ -251,7 +284,8 @@ function verifyClusterCollStatsResult(clusterCollStatsResult, sumTimeseriesStats
 
     assert(
         sumTimeseriesStatsAcrossShards,
-        "Expected an aggregated 'timeseries' field but didn't find one: " + tojson(clusterCollStatsResult),
+        "Expected an aggregated 'timeseries' field but didn't find one: " +
+            tojson(clusterCollStatsResult),
     );
 
     const primaryShardStats = isAggregation
@@ -279,7 +313,10 @@ function verifyClusterCollStatsResult(clusterCollStatsResult, sumTimeseriesStats
             tojson(clusterCollStatsResult),
     );
 
-    assertTimeseriesAggregationCorrectness(sumTimeseriesStatsAcrossShards, [primaryShardStats, otherShardStats]);
+    assertTimeseriesAggregationCorrectness(sumTimeseriesStatsAcrossShards, [
+        primaryShardStats,
+        otherShardStats,
+    ]);
 }
 
 //  Tests that the output of the collStats command returns results from both the shards and

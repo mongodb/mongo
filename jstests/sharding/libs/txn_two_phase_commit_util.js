@@ -34,7 +34,13 @@ export const runCommitThroughMongosInParallelThread = function (
     mongosHost,
     errorCode = ErrorCodes.OK,
 ) {
-    return new Thread(runCommitThroughMongos, extractUUIDFromObject(lsidUUID.id), txnNumber, mongosHost, errorCode);
+    return new Thread(
+        runCommitThroughMongos,
+        extractUUIDFromObject(lsidUUID.id),
+        txnNumber,
+        mongosHost,
+        errorCode,
+    );
 };
 
 // lsidUUID is the UUID value in string format.

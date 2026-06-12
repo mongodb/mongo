@@ -33,7 +33,10 @@ function getDatabaseVersionResponse(dbName, failureExpected = false) {
 
     assert.commandWorked(response);
     responseFields.forEach((field) =>
-        assert(response[field], `Missing or null field ${field} in getDatabaseVersion response ${tojson(response)}`),
+        assert(
+            response[field],
+            `Missing or null field ${field} in getDatabaseVersion response ${tojson(response)}`,
+        ),
     );
     dbVersionFields.forEach((field) =>
         assert(
@@ -68,10 +71,15 @@ assert.commandWorked(db.adminCommand({movePrimary: kDbName, to: anotherShard}));
 const uponPrimaryMoved = getDatabaseVersionResponse(kDbName);
 assert.eq(anotherShard, uponPrimaryMoved.primaryShard);
 assert.eq(uponPrimaryMoved.dbVersion.uuid, uponDatabaseCreated.dbVersion.uuid);
-assert.eq(1, timestampCmp(uponPrimaryMoved.dbVersion.timestamp, uponDatabaseCreated.dbVersion.timestamp));
+assert.eq(
+    1,
+    timestampCmp(uponPrimaryMoved.dbVersion.timestamp, uponDatabaseCreated.dbVersion.timestamp),
+);
 assert.gt(uponPrimaryMoved.dbVersion.lastMod, uponDatabaseCreated.dbVersion.lastMod);
 
-jsTest.log("getDatabaseVersion returns an updated value after dropping and recreating the targeted namespace");
+jsTest.log(
+    "getDatabaseVersion returns an updated value after dropping and recreating the targeted namespace",
+);
 assert.commandWorked(db.dropDatabase());
 getDatabaseVersionResponse(kDbName, true /*failureExpected*/);
 
@@ -79,4 +87,7 @@ assert.commandWorked(db.adminCommand({enableSharding: kDbName, primaryShard: pri
 const uponDatabaseRecreated = getDatabaseVersionResponse(kDbName);
 assert.eq(primaryShard, uponDatabaseRecreated.primaryShard);
 assert.neq(uponDatabaseRecreated.dbVersion.uuid, uponPrimaryMoved.dbVersion.uuid);
-assert.eq(1, timestampCmp(uponDatabaseRecreated.dbVersion.timestamp, uponPrimaryMoved.dbVersion.timestamp));
+assert.eq(
+    1,
+    timestampCmp(uponDatabaseRecreated.dbVersion.timestamp, uponPrimaryMoved.dbVersion.timestamp),
+);

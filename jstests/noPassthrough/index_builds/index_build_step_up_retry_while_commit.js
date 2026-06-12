@@ -31,7 +31,10 @@ assert.commandWorked(primaryColl.insert({_id: 1, x: 1}, {"writeConcern": {"w": 1
 assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
 // Enable fail point which makes the index build to hang before unregistering after a commit.
-const hangBeforeUnregisteringAfterCommit = configureFailPoint(primary, "hangBeforeUnregisteringAfterCommit");
+const hangBeforeUnregisteringAfterCommit = configureFailPoint(
+    primary,
+    "hangBeforeUnregisteringAfterCommit",
+);
 
 const indexThread = IndexBuildTest.startIndexBuild(
     primary,

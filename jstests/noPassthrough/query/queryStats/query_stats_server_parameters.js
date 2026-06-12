@@ -90,7 +90,9 @@ function runTest(conn) {
     {
         // Test enabling collecting write commands for 1% of the writes we can currently collect
         // stats for.
-        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.01}));
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.01}),
+        );
         const sampleRate = conn.adminCommand({
             getParameter: 1,
             internalQueryStatsWriteCmdSampleRate: 1,
@@ -100,7 +102,9 @@ function runTest(conn) {
 
     {
         // Test enabling collecting write commands for all writes we can current collect stats for.
-        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1.0}));
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1.0}),
+        );
         const sampleRate = conn.adminCommand({
             getParameter: 1,
             internalQueryStatsWriteCmdSampleRate: 1,
@@ -110,7 +114,9 @@ function runTest(conn) {
 
     {
         // Test disabling collecting write commands.
-        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0}));
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0}),
+        );
         const sampleRate = conn.adminCommand({
             getParameter: 1,
             internalQueryStatsWriteCmdSampleRate: 1,

@@ -41,7 +41,8 @@ export class ProxyProtocolServer {
 
         // The file that will serve as stdin for the ProxyProtocolServer process. This file will
         // only be used to supply tlv structs to the server.
-        this.tlvFile = MongoRunner.dataPath + `proxyprotocol_tlvs_${ingress_port}_${egress_port}.json`;
+        this.tlvFile =
+            MongoRunner.dataPath + `proxyprotocol_tlvs_${ingress_port}_${egress_port}.json`;
         writeFile(this.tlvFile, "");
     }
 
@@ -146,7 +147,9 @@ export class ProxyProtocolServer {
                         ["/bin/sh", "-c", "fuser -v -n tcp " + this.ingress_port],
                         ["/bin/sh", "-c", "ps -ef | grep " + this.ingress_port],
                     ];
-                    commands.map((args) => _startMongoProgram({args})).map((pid) => waitProgram(pid));
+                    commands
+                        .map((args) => _startMongoProgram({args}))
+                        .map((pid) => waitProgram(pid));
                 }
                 return {checkProgramResult, checkLogResult, expectedLogPattern};
             },
@@ -205,7 +208,9 @@ export class ProxyProtocolServer {
 
             const match = rawMongoProgramOutput(".*").match(regex);
             if (match === null) {
-                throw Error(`The output of ${args[0]} did not contain a connection to egress port ${this.egress_port}`);
+                throw Error(
+                    `The output of ${args[0]} did not contain a connection to egress port ${this.egress_port}`,
+                );
             }
 
             return parseInt(match[1], 10);

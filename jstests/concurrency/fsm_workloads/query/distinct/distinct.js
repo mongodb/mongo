@@ -31,7 +31,8 @@ export const $config = (function () {
                 // ExceededTimeLimit.
                 assert(
                     [ErrorCodes.QueryPlanKilled, ErrorCodes.ExceededTimeLimit].includes(e.code),
-                    "Expected a QueryPlanKilled or ExceededTimeLimit error, but encountered: " + e.message,
+                    "Expected a QueryPlanKilled or ExceededTimeLimit error, but encountered: " +
+                        e.message,
                 );
             }
         }

@@ -36,7 +36,9 @@ const mongosColl = mongosDB[collName];
 
 // Create and shard collection beforehand.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 const session = mongos.startSession();

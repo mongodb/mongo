@@ -141,7 +141,10 @@ const selfLookupPipe = [
 dropAndRecreateColls();
 coll1.aggregate(selfLookupPipe).toArray();
 const selfLookupExplain = coll1.explain().aggregate(pipeline);
-assert(joinOptUsed(selfLookupExplain), "Join optimizer was not used as expected: " + tojson(selfLookupExplain));
+assert(
+    joinOptUsed(selfLookupExplain),
+    "Join optimizer was not used as expected: " + tojson(selfLookupExplain),
+);
 
 assert.eq(getUsageCount("a_1", coll1), 1);
 assert.eq(db.runCommand({serverStatus: 1}).metrics.queryExecutor.collectionScans.total, 14); // 13 from before + 1 now

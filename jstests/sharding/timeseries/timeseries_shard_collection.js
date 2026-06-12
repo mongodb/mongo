@@ -41,7 +41,8 @@ function validateCollectionSharded({shardKey}) {
 }
 
 function validateTimeseriesCollectionCreated(viewName) {
-    const colls = sDB.runCommand({listCollections: 1, filter: {type: "timeseries", name: viewName}}).cursor.firstBatch;
+    const colls = sDB.runCommand({listCollections: 1, filter: {type: "timeseries", name: viewName}})
+        .cursor.firstBatch;
     assert.eq(colls.length, 1, colls);
 
     const tsOpts = colls[0].options.timeseries;
@@ -80,7 +81,9 @@ function metaShardKey(implicit) {
         );
     }
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries}),
+    );
 
     validateCollectionSharded({shardKey: {meta: 1}, timeseries});
 
@@ -88,11 +91,16 @@ function metaShardKey(implicit) {
 
     // shardCollection on a new time-series collection will use the default time-series index as the
     // index backing the shardKey.
-    const expectedKey = implicit ? {"meta": 1, "control.min.time": 1, "control.max.time": 1} : {"meta": 1};
+    const expectedKey = implicit
+        ? {"meta": 1, "control.min.time": 1, "control.max.time": 1}
+        : {"meta": 1};
     validateRawIndexBackingShardKey({expectedKey: expectedKey});
 
     assert.commandWorked(
-        st.s.adminCommand({split: `${dbName}.${getTimeseriesCollForDDLOps(sDB, collName)}`, middle: {meta: 10}}),
+        st.s.adminCommand({
+            split: `${dbName}.${getTimeseriesCollForDDLOps(sDB, collName)}`,
+            middle: {meta: 10},
+        }),
     );
 
     const primaryShard = st.getPrimaryShard(dbName);
@@ -135,7 +143,9 @@ function metaSubFieldShardKey(implicit) {
         );
     }
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: collNss, key: {"hostId.a": 1}, timeseries}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: collNss, key: {"hostId.a": 1}, timeseries}),
+    );
 
     validateCollectionSharded({shardKey: {"meta.a": 1}, timeseries});
 
@@ -144,7 +154,10 @@ function metaSubFieldShardKey(implicit) {
     validateRawIndexBackingShardKey({expectedKey: {"meta.a": 1}});
 
     assert.commandWorked(
-        st.s.adminCommand({split: `${dbName}.${getTimeseriesCollForDDLOps(sDB, collName)}`, middle: {"meta.a": 10}}),
+        st.s.adminCommand({
+            split: `${dbName}.${getTimeseriesCollForDDLOps(sDB, collName)}`,
+            middle: {"meta.a": 10},
+        }),
     );
 
     const primaryShard = st.getPrimaryShard(dbName);
@@ -256,7 +269,9 @@ function runShardKeyPatternValidation(collectionExists) {
     (function hashAndTimeShardKey() {
         if (collectionExists) {
             assert.commandWorked(
-                sDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "hostId"}}),
+                sDB.createCollection(collName, {
+                    timeseries: {timeField: "time", metaField: "hostId"},
+                }),
             );
         }
 
@@ -272,7 +287,9 @@ function runShardKeyPatternValidation(collectionExists) {
 
         if (!collectionExists) {
             assert.commandWorked(
-                sDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "hostId"}}),
+                sDB.createCollection(collName, {
+                    timeseries: {timeField: "time", metaField: "hostId"},
+                }),
             );
         }
         let coll = sDB.getCollection(collName);
@@ -306,7 +323,9 @@ function runShardKeyPatternValidation(collectionExists) {
 
         if (collectionExists) {
             assert.commandWorked(
-                sDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "hostId"}}),
+                sDB.createCollection(collName, {
+                    timeseries: {timeField: "time", metaField: "hostId"},
+                }),
             );
         }
         assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -335,7 +354,9 @@ function runShardKeyPatternValidation(collectionExists) {
     (function invalidShardKeyPatterns() {
         if (collectionExists) {
             assert.commandWorked(
-                sDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "hostId"}}),
+                sDB.createCollection(collName, {
+                    timeseries: {timeField: "time", metaField: "hostId"},
+                }),
             );
         }
 
@@ -412,10 +433,16 @@ function runShardKeyPatternValidation(collectionExists) {
         );
 
         assert.commandWorked(
-            st.s.adminCommand({shardCollection: collNss, key: {time: 1}, timeseries: {timeField: "time"}}),
+            st.s.adminCommand({
+                shardCollection: collNss,
+                key: {time: 1},
+                timeseries: {timeField: "time"},
+            }),
         );
 
-        validateRawIndexBackingShardKey({expectedKey: {"control.min.time": 1, "control.max.time": 1}});
+        validateRawIndexBackingShardKey({
+            expectedKey: {"control.min.time": 1, "control.max.time": 1},
+        });
 
         assert(sDB.getCollection(collName).drop());
     })();

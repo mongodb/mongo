@@ -102,7 +102,10 @@ let testCases = [
     },
 ];
 
-let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, WriteWithoutShardKeyTestUtil.Configurations.noSession);
+let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(
+    st,
+    WriteWithoutShardKeyTestUtil.Configurations.noSession,
+);
 testCases.forEach((testCase) => {
     WriteWithoutShardKeyTestUtil.runTestWithConfig(
         conn,

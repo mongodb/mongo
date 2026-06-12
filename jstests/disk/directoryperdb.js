@@ -44,7 +44,10 @@ const waitForDatabaseDirectoryRemoval = function (dbName, dbDirPath) {
                 return false;
             }
         },
-        "dbpath contained '" + dbName + "' directory when it should have been removed: " + tojson(listFiles(dbDirPath)),
+        "dbpath contained '" +
+            dbName +
+            "' directory when it should have been removed: " +
+            tojson(listFiles(dbDirPath)),
     );
 };
 
@@ -72,7 +75,10 @@ let checkDBFilesInDBDirectory = function (conn, dbToCheck) {
     for (let f in files) {
         if (files[f].isDirectory) continue;
         fileCount += 1;
-        assert(dbFileMatcher.test(files[f].name), "In directory:" + dir + " found unexpected file: " + files[f].name);
+        assert(
+            dbFileMatcher.test(files[f].name),
+            "In directory:" + dir + " found unexpected file: " + files[f].name,
+        );
     }
     assert(fileCount > 0, "Expected more than zero nondirectory files in database directory");
     return conn;
@@ -91,7 +97,9 @@ let checkDBDirectoryNonexistent = function (conn, dbToCheck) {
         if (!files[f].isDirectory) {
             assert(
                 !dbFileMatcher.test(files[f].name),
-                "Database file" + files[f].name + " exists in dbpath after deleting all non-directoryperdb databases",
+                "Database file" +
+                    files[f].name +
+                    " exists in dbpath after deleting all non-directoryperdb databases",
             );
         }
     }
@@ -109,7 +117,11 @@ let checkDBDirectoryNonexistent = function (conn, dbToCheck) {
     }
     assert(
         !files.some((file) => file.name === dir),
-        "Database " + dbToCheck + " directory " + dir + " left behind when it should have been removed",
+        "Database " +
+            dbToCheck +
+            " directory " +
+            dir +
+            " left behind when it should have been removed",
     );
     return conn;
 };

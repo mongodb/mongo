@@ -43,6 +43,10 @@ const errorEventCount = configDB.changelog
         },
     ])
     .itcount();
-assert.eq(1, errorEventCount, "Expected to find moveChunk.error event with errmsg: " + expectedErrMsg);
+assert.eq(
+    1,
+    errorEventCount,
+    "Expected to find moveChunk.error event with errmsg: " + expectedErrMsg,
+);
 
 st.stop();

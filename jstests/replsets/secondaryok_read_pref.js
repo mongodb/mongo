@@ -2,7 +2,14 @@
 // other than 'primary', and that queries which do have 'primary' read preference fail.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const readPrefs = [undefined, "primary", "secondary", "primaryPreferred", "secondaryPreferred", "nearest"];
+const readPrefs = [
+    undefined,
+    "primary",
+    "secondary",
+    "primaryPreferred",
+    "secondaryPreferred",
+    "nearest",
+];
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -56,7 +63,9 @@ function assertNotPrimaryNoSecondaryOk(func) {
 const secondaryColl = secDB.secondaryok_read_pref;
 assertNotPrimaryNoSecondaryOk(() => secondaryColl.aggregate([{$out: "target"}]).itcount());
 assertNotPrimaryNoSecondaryOk(() =>
-    secondaryColl.aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}]).itcount(),
+    secondaryColl
+        .aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}])
+        .itcount(),
 );
 /* eslint-disable */
 assertNotPrimaryNoSecondaryOk(() =>

@@ -36,14 +36,23 @@ runOnReplsetAndShardedCluster((conn, test) => {
     assert.eq(queryShapeHashes.length, 1);
 
     // Set query settings via hash. Representative query is missing so we can't run explain yet.
-    assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashes[0], settings: initialSettings}));
-    qsutils.assertQueryShapeConfiguration([{settings: initialSettings}], false /* shouldRunExplain */);
+    assert.commandWorked(
+        db.adminCommand({setQuerySettings: queryShapeHashes[0], settings: initialSettings}),
+    );
+    qsutils.assertQueryShapeConfiguration(
+        [{settings: initialSettings}],
+        false /* shouldRunExplain */,
+    );
 
     // Update the query settings via query. Representative query will be populated and we can run
     // explain to make sure that the settings applied with the hash map to and apply to the correct
     // query shape.
-    assert.commandWorked(db.adminCommand({setQuerySettings: querySettingsQuery, settings: {reject: true}}));
-    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(finalSettings, querySettingsQuery)]);
+    assert.commandWorked(
+        db.adminCommand({setQuerySettings: querySettingsQuery, settings: {reject: true}}),
+    );
+    qsutils.assertQueryShapeConfiguration([
+        qsutils.makeQueryShapeConfiguration(finalSettings, querySettingsQuery),
+    ]);
 
     // Cleanup.
     qsutils.removeAllQuerySettings();

@@ -33,7 +33,8 @@ assert(s.shard0.getDB("test").foo.find().toArray().length > 0, "blah 1");
 assert(s.shard1.getDB("test").foo.find().toArray().length > 0, "blah 2");
 assert.eq(
     7,
-    s.shard0.getDB("test").foo.find().toArray().length + s.shard1.getDB("test").foo.find().toArray().length,
+    s.shard0.getDB("test").foo.find().toArray().length +
+        s.shard1.getDB("test").foo.find().toArray().length,
     "blah 3",
 );
 

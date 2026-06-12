@@ -13,7 +13,10 @@
  * ]
  */
 
-import {doSnapshotFind, doSnapshotGetMore} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
+import {
+    doSnapshotFind,
+    doSnapshotGetMore,
+} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function () {

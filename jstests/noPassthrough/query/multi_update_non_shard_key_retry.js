@@ -20,7 +20,9 @@ const runTest = (useUnifiedWriteExecutor) => {
     coll.drop();
 
     // Create a sharded collection and split it across the 2 shards.
-    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
     assert.commandWorked(
@@ -49,7 +51,9 @@ const runTest = (useUnifiedWriteExecutor) => {
     ];
 
     errors.forEach((error) => {
-        jsTest.log.info(`Testing with unifiedWriteExecutor=${useUnifiedWriteExecutor}, errorCode=${error.code}`);
+        jsTest.log.info(
+            `Testing with unifiedWriteExecutor=${useUnifiedWriteExecutor}, errorCode=${error.code}`,
+        );
 
         // Create clean state for starting.
         coll.remove({});

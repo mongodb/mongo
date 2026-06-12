@@ -16,7 +16,9 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const sbeEnabled = checkSbeFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
+const sbeEnabled =
+    checkSbeFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
 
 if (!sbeEnabled) {
     quit();
@@ -28,7 +30,9 @@ const metaFieldName = "m";
 const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 // Bucket 1: a and b are both scalars.
@@ -37,10 +41,14 @@ assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 
 assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: 44, b: 19}));
 
 // Bucket 2: a is an array, b is scalar.
-assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: [1, 2, 3], b: 17}));
+assert.commandWorked(
+    coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: [1, 2, 3], b: 17}),
+);
 
 // Bucket 3: a.b is an array.
-assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: {b: [1, 2, 3]}, b: 17}));
+assert.commandWorked(
+    coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: {b: [1, 2, 3]}, b: 17}),
+);
 
 (function testBucketLevelFiltersOnCollScanPlan() {
     const pipeline = [{$match: {a: {$gt: 0}}}, {$project: {_id: 0, a: 1, b: 1}}];
@@ -51,7 +59,11 @@ assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 
     assert.eq(scanStages.length, 1, () => "Expected one scan stage " + tojson(explain));
 
     // Ensure the scan actually returned something.
-    assert.gte(scanStages[0].nReturned, 3, () => "Expected one value returned from scan " + tojson(explain));
+    assert.gte(
+        scanStages[0].nReturned,
+        3,
+        () => "Expected one value returned from scan " + tojson(explain),
+    );
 
     const bucketStages = getSbePlanStages(explain, "ts_bucket_to_cellblock");
     assert.eq(bucketStages.length, 1, () => "Expected one bucket stage " + tojson(explain));

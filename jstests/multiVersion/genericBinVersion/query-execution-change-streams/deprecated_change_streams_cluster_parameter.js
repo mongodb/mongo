@@ -10,7 +10,9 @@ function assertParametersWork(primaryConnection) {
     // To keep downwards-compatibility, it is still required that the parameter can be
     // set and requested without error.
     assert.commandWorked(
-        primaryConnection.adminCommand({setClusterParameter: {changeStreams: {expireAfterSeconds: 3600}}}),
+        primaryConnection.adminCommand({
+            setClusterParameter: {changeStreams: {expireAfterSeconds: 3600}},
+        }),
     );
 
     const clusterParameters = assert.commandWorked(

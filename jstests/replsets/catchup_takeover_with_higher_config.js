@@ -59,7 +59,9 @@ replSet.initiate(config);
 replSet.awaitReplication();
 assert.eq(replSet.getPrimary(), nodes[0]);
 
-const statusBeforeTakeover = assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
+const statusBeforeTakeover = assert.commandWorked(
+    nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}),
+);
 
 for (const node of nodes) {
     // Disable nodes from fasserting due to RSTL timeout
@@ -109,7 +111,9 @@ hangBeforeTermBumpFpNode1.off();
 jsTestLog(`Waiting for ${nodes[1].host} to step down before doing catchup takeover.`);
 waitForNodeState(nodes, 1, ReplSetTest.State.SECONDARY, 30 * 1000);
 
-jsTestLog(`Waiting for ${nodes[1].host} to finish config term bump and propagate to ${nodes[0].host}`);
+jsTestLog(
+    `Waiting for ${nodes[1].host} to finish config term bump and propagate to ${nodes[0].host}`,
+);
 assert.soon(() => getNodeConfigAndCompare(nodes[0], initialConfig, ">"));
 assert.soon(() => getNodeConfigAndCompare(nodes[1], initialConfig, ">"));
 // Check that node2 is still in catchup mode, so it cannot install a new config.
@@ -127,7 +131,9 @@ hangBeforeTermBumpFpNode2.off();
 replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes, nodes[1]);
 
 // Check that election metrics has been updated with the new reason counter.
-const statusAfterTakeover = assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
+const statusAfterTakeover = assert.commandWorked(
+    nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}),
+);
 verifyServerStatusElectionReasonCounterChange(
     statusBeforeTakeover.electionMetrics,
     statusAfterTakeover.electionMetrics,

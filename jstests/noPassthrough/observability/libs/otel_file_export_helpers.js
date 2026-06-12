@@ -79,7 +79,11 @@ function latestTime(record) {
         }
     }
     return allPoints.length > 0
-        ? Math.max(...allPoints.map((point) => safeConvertToNumber(BigInt(point.timeUnixNano) / 1_000_000n)))
+        ? Math.max(
+              ...allPoints.map((point) =>
+                  safeConvertToNumber(BigInt(point.timeUnixNano) / 1_000_000n),
+              ),
+          )
         : 0;
 }
 
@@ -148,7 +152,9 @@ export function getLatestMetrics(directory) {
     let result = Object.fromEntries(
         metrics.map((metric) => {
             let result = {};
-            for (const dataPoint of (metric.sum?.dataPoints ?? []).concat(metric.gauge?.dataPoints ?? [])) {
+            for (const dataPoint of (metric.sum?.dataPoints ?? []).concat(
+                metric.gauge?.dataPoints ?? [],
+            )) {
                 if (dataPoint.asInt) {
                     result["value"] ??= 0;
                     result["value"] += Number(dataPoint.asInt);
@@ -209,7 +215,10 @@ export function extractPrometheusMetricIntValue(metricsText, metricName) {
     const scopeRe = '\\{(?:\\w+\\="\\w+")?\\}';
     const valueRe = "\\s+(\\d+)";
 
-    const regexp = new RegExp(leadingWhitespaceRe + metricNameRe + unitSuffixRe + scopeRe + valueRe, "m");
+    const regexp = new RegExp(
+        leadingWhitespaceRe + metricNameRe + unitSuffixRe + scopeRe + valueRe,
+        "m",
+    );
     const match = metricsText && metricsText.match(regexp);
     if (match) {
         return parseInt(match[1], 10);
@@ -248,7 +257,9 @@ export function createMetricsDirectory(testName) {
     if (!Random.isInitialized()) {
         Random.setRandomSeed();
     }
-    const metricsDir = MongoRunner.toRealPath(`${testName}_otel_metrics_${Random.randInt(1000000)}`);
+    const metricsDir = MongoRunner.toRealPath(
+        `${testName}_otel_metrics_${Random.randInt(1000000)}`,
+    );
     assert(mkdir(metricsDir), `Failed to create metrics directory: ${metricsDir}`);
     return metricsDir;
 }
@@ -279,7 +290,11 @@ export function waitForMetric({metricsDir, metricName, minValue, afterDate}) {
     assert.soon(
         () => {
             const metrics = getLatestMetrics(metricsDir);
-            return metrics && metrics.time > afterDate.getTime() && (metrics[metricName]?.value ?? 0) >= minValue;
+            return (
+                metrics &&
+                metrics.time > afterDate.getTime() &&
+                (metrics[metricName]?.value ?? 0) >= minValue
+            );
         },
         `Expected ${metricName} >= ${minValue} in ${metricsDir}`,
         30000,
@@ -300,7 +315,14 @@ export function waitForMetric({metricsDir, metricName, minValue, afterDate}) {
  * @param {number} [intervalMs=500] - Polling interval in milliseconds.
  * @returns {Object} The metrics snapshot that satisfied the predicate.
  */
-export function awaitMetrics(metricsDir, afterDate, pred, descriptionCallback, timeoutMs = 30000, intervalMs = 500) {
+export function awaitMetrics(
+    metricsDir,
+    afterDate,
+    pred,
+    descriptionCallback,
+    timeoutMs = 30000,
+    intervalMs = 500,
+) {
     let result;
     let lastSeen = null;
     assert.soon(
@@ -315,7 +337,8 @@ export function awaitMetrics(metricsDir, afterDate, pred, descriptionCallback, t
             }
             return false;
         },
-        () => `Timed out waiting for metrics: ${lastSeen ? descriptionCallback(lastSeen) : "(no snapshot yet)"}`,
+        () =>
+            `Timed out waiting for metrics: ${lastSeen ? descriptionCallback(lastSeen) : "(no snapshot yet)"}`,
         timeoutMs,
         intervalMs,
     );
@@ -350,7 +373,8 @@ function assertMetricIncreases({metricsDir, metricName, minIncrease, fn, field})
         metricsDir,
         testStart,
         (m) => Number(m[metricName]?.[field] ?? 0) >= threshold,
-        (m) => `${metricName}.${field} >= ${threshold} (was ${baseline}, got ${m[metricName]?.[field] ?? "null"})`,
+        (m) =>
+            `${metricName}.${field} >= ${threshold} (was ${baseline}, got ${m[metricName]?.[field] ?? "null"})`,
     );
 }
 
@@ -366,11 +390,19 @@ export function assertCounterMetricIncreases({metricsDir, metricName, minIncreas
  * Asserts that the data point count for `metricName` with attribute `attrKey=attrValue` increases
  * by at least `minIncrease` after `fn` runs.
  */
-export function assertHistogramMetricIncreases({metricsDir, metricName, attrKey, attrValue, minIncrease = 1, fn}) {
+export function assertHistogramMetricIncreases({
+    metricsDir,
+    metricName,
+    attrKey,
+    attrValue,
+    minIncrease = 1,
+    fn,
+}) {
     const baseline = getHistogramCount(metricsDir, metricName, attrKey, attrValue);
     fn();
     assert.soon(
-        () => getHistogramCount(metricsDir, metricName, attrKey, attrValue) >= baseline + minIncrease,
+        () =>
+            getHistogramCount(metricsDir, metricName, attrKey, attrValue) >= baseline + minIncrease,
         `Expected ${metricName} ${attrKey}=${attrValue} count to increase by at least ${minIncrease} from ${baseline}`,
         30000,
         500,

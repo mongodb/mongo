@@ -12,6 +12,10 @@ const projectPushedDownRes = coll
 
 // Run it again where it cannot be pushed down.
 const projectNotPushedDownRes = coll
-    .aggregate([{$sort: {a: 1}}, {$unwind: {path: "$a"}}, {$project: {_id: 0, metaField: {$meta: "sortKey"}}}])
+    .aggregate([
+        {$sort: {a: 1}},
+        {$unwind: {path: "$a"}},
+        {$project: {_id: 0, metaField: {$meta: "sortKey"}}},
+    ])
     .toArray();
 assert.eq(projectPushedDownRes, projectNotPushedDownRes);

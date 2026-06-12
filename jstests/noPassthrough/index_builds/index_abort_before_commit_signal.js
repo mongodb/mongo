@@ -34,7 +34,9 @@ const createIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), 
 failPoint.wait();
 
 // Index build should be present in the config.system.indexBuilds collection.
-const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
 const indexBuildUUID = indexMap["a_1"].buildUUID;
 assert(indexBuildsColl.findOne({_id: indexBuildUUID}));
 
@@ -42,7 +44,9 @@ assert(indexBuildsColl.findOne({_id: indexBuildUUID}));
 // config.system.indexBuilds collection.
 jsTestLog("Aborting the index build");
 const abortIndexThread = startParallelShell(
-    'assert.commandWorked(db.getMongo().getCollection("' + coll.getFullName() + '").dropIndex("a_1"))',
+    'assert.commandWorked(db.getMongo().getCollection("' +
+        coll.getFullName() +
+        '").dropIndex("a_1"))',
     primary.port,
 );
 checkLog.containsJson(primary, 4656010);

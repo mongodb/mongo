@@ -71,7 +71,9 @@ let collATestQuery = [
 
 // Perform an identity $unionWith query. collB has no documents inside of it meaning that anything
 // we "union" it with will just be the union-ed collection (in this case, srcColl).
-let results = collB.aggregate([{$unionWith: {coll: collA.getName(), pipeline: collATestQuery}}]).toArray();
+let results = collB
+    .aggregate([{$unionWith: {coll: collA.getName(), pipeline: collATestQuery}}])
+    .toArray();
 
 let expectedResultIds = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15];
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);

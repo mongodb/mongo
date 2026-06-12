@@ -63,7 +63,9 @@ assert.commandWorked(
         {data: 0, ts: new Date(), "meta.x": 105, "meta.y": -16},
     ]),
 );
-assert.commandWorked(execRetryableInsert(lsidList[2], [{data: 16, ts: new Date(), "meta.x": 100, "meta.y": -10}]));
+assert.commandWorked(
+    execRetryableInsert(lsidList[2], [{data: 16, ts: new Date(), "meta.x": 100, "meta.y": -10}]),
+);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground({

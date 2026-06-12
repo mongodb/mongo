@@ -34,7 +34,9 @@ function assertCollStatsHasCorrectOrphanCount(coll, shardName, numOrphans) {
 // Setup database
 const dbName = "db";
 const db = st.getDB(dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Test non-existing collection
 const noColl = db["unusedColl"];
@@ -76,7 +78,11 @@ const numBatches = numDocs / rangeDeleterBatchSize;
 for (let i = 0; i < numBatches; i++) {
     // Wait for failpoint and check num orphans
     beforeDeletionFailpoint.wait();
-    assertCollStatsHasCorrectOrphanCount(coll, st.shard0.shardName, numDocs - rangeDeleterBatchSize * i);
+    assertCollStatsHasCorrectOrphanCount(
+        coll,
+        st.shard0.shardName,
+        numDocs - rangeDeleterBatchSize * i,
+    );
     // Unset and reset failpoint without allowing any batches deleted in the meantime
     afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");
     beforeDeletionFailpoint.off();

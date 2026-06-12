@@ -218,7 +218,13 @@ const invalidArgumentValueDocs = [
     },
 ];
 
-runConvertTests({coll, requiresFCV81, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
+runConvertTests({
+    coll,
+    requiresFCV81,
+    conversionTestDocs,
+    illegalConversionTestDocs,
+    invalidArgumentValueDocs,
+});
 
 // Additional tests covering shortcuts and string byteOrder.
 function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {
@@ -285,7 +291,10 @@ function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {
 (function testConvertBindataToIntShortCut() {
     let pipeline = [{$project: {_id: 0, expected: 1, output: {$toInt: "$binDataInput"}}}];
     // Hex: "0x=02", 1 byte integer
-    testConvertNumeric({pipeline: pipeline, docs: [{binDataInput: BinData(0, "Ag=="), expected: NumberInt(2)}]});
+    testConvertNumeric({
+        pipeline: pipeline,
+        docs: [{binDataInput: BinData(0, "Ag=="), expected: NumberInt(2)}],
+    });
 })();
 
 (function testConvertBindataToLongShortCut() {

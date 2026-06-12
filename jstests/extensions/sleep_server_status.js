@@ -103,7 +103,9 @@ describe("Extension getNext time serverStatus metric", function () {
         // Run a query with $sleep after $sort.
         // In sharded clusters, $sort causes merging on mongos, so $sleep runs on mongos.
         const sleepMs = 5;
-        const result = this.coll.aggregate([{$sort: {value: 1}}, {$sleep: {millis: sleepMs}}]).toArray();
+        const result = this.coll
+            .aggregate([{$sort: {value: 1}}, {$sleep: {millis: sleepMs}}])
+            .toArray();
         assert.eq(result.length, this.numDocs, "Query should return all documents");
 
         const afterValue = getTotalExtensionGetNextTimeMicros(db);

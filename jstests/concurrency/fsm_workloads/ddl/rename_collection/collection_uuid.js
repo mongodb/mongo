@@ -18,14 +18,20 @@ const otherDbName = "otherDb";
 const otherDbCollName = "otherDbColl";
 const sameDbCollName = "sameDbColl";
 
-const adminCommands = ["renameCollection", "shardCollection", "reshardCollection", "refineCollectionShardKey"];
+const adminCommands = [
+    "renameCollection",
+    "shardCollection",
+    "reshardCollection",
+    "refineCollectionShardKey",
+];
 const isAdminCommand = function (cmdName) {
     return adminCommands.includes(cmdName);
 };
 
 const getUUID = function (database, collName) {
-    return database.runCommand({listCollections: 1}).cursor.firstBatch.find((c) => c.name.startsWith(collName)).info
-        .uuid;
+    return database
+        .runCommand({listCollections: 1})
+        .cursor.firstBatch.find((c) => c.name.startsWith(collName)).info.uuid;
 };
 
 const executeCommand = function (db, namespace, cmdName, cmdObj) {
@@ -38,7 +44,14 @@ const executeCommand = function (db, namespace, cmdName, cmdObj) {
     return db.runCommand(cmdObj);
 };
 
-const runCommandInLoop = function (db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
+const runCommandInLoop = function (
+    db,
+    namespace,
+    cmdName,
+    cmdObj,
+    data,
+    expectedNonRetryableErrors = [],
+) {
     let cmdResult;
     let currentNamespace = namespace;
 
@@ -127,7 +140,9 @@ const runCommandInLoop = function (db, namespace, cmdName, cmdObj, data, expecte
         }
 
         // Raise exception otherwise.
-        throw new Error("Command: " + tojson(cmdObj) + " failed with unexpected error: " + tojson(cmdResult));
+        throw new Error(
+            "Command: " + tojson(cmdObj) + " failed with unexpected error: " + tojson(cmdResult),
+        );
     }
 
     jsTestLog(
@@ -153,7 +168,9 @@ const verifyFailingWithCollectionUUIDMismatch = function (
     data,
 ) {
     cmdObj["collectionUUID"] = collectionUUID;
-    let res = runCommandInLoop(db, expectedNamespace, cmdName, cmdObj, data, [ErrorCodes.CollectionUUIDMismatch]);
+    let res = runCommandInLoop(db, expectedNamespace, cmdName, cmdObj, data, [
+        ErrorCodes.CollectionUUIDMismatch,
+    ]);
 
     assert.eq(res.db, db.getName());
     assert.eq(res.collectionUUID, collectionUUID);
@@ -161,8 +178,23 @@ const verifyFailingWithCollectionUUIDMismatch = function (
     assert.eq(res.actualCollection, actualCollection);
 };
 
-export const testCommand = function (db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
-    verifyFailingWithCollectionUUIDMismatch(db, cmdName, cmdObj, data.sameDbCollUUID, sameDbCollName, namespace, data);
+export const testCommand = function (
+    db,
+    namespace,
+    cmdName,
+    cmdObj,
+    data,
+    expectedNonRetryableErrors = [],
+) {
+    verifyFailingWithCollectionUUIDMismatch(
+        db,
+        cmdName,
+        cmdObj,
+        data.sameDbCollUUID,
+        sameDbCollName,
+        namespace,
+        data,
+    );
 
     verifyFailingWithCollectionUUIDMismatch(
         db,
@@ -195,7 +227,8 @@ export const $config = (function () {
 
         function rename(db, collName) {
             // Create an unique namespace by appending the thread id and the incremented local id.
-            const targetNamespace = db.getName() + "." + collName + "_" + this.tid + "_" + this.Id++;
+            const targetNamespace =
+                db.getName() + "." + collName + "_" + this.tid + "_" + this.Id++;
             const srcNamespace = db.getName() + "." + collName;
             const renameCmd = {
                 renameCollection: srcNamespace,
@@ -261,7 +294,9 @@ export const $config = (function () {
             };
             // Consecutive drop commands can results in 'IndexNotFound' error, so on retry some
             // shards can fail while others succeed.
-            testCommand(db, namespace, "dropIndexes", dropIndexCmd, this, [ErrorCodes.IndexNotFound]);
+            testCommand(db, namespace, "dropIndexes", dropIndexCmd, this, [
+                ErrorCodes.IndexNotFound,
+            ]);
         }
 
         return {init: init, rename: rename, crud: crud, indexCommands: indexCommands};
@@ -290,7 +325,9 @@ export const $config = (function () {
             } else {
                 otherDbShard = shardNames[0];
             }
-            assert.commandWorked(db.adminCommand({enableSharding: otherDbName, primaryShard: otherDbShard}));
+            assert.commandWorked(
+                db.adminCommand({enableSharding: otherDbName, primaryShard: otherDbShard}),
+            );
         } else {
             db[sameDbCollName].drop();
             db.getSiblingDB(otherDbName)[otherDbCollName].drop();
@@ -302,7 +339,13 @@ export const $config = (function () {
             for (let j = 0; j < 100; ++j) {
                 const uniqueNum = i * 100 + j;
                 assert.commandWorked(
-                    db[collName].insert({_id: uniqueNum, x: i, ["y_" + i]: uniqueNum, a: uniqueNum, b: uniqueNum}),
+                    db[collName].insert({
+                        _id: uniqueNum,
+                        x: i,
+                        ["y_" + i]: uniqueNum,
+                        a: uniqueNum,
+                        b: uniqueNum,
+                    }),
                 );
             }
         }

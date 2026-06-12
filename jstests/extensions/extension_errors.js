@@ -28,13 +28,18 @@ function checkAssertionFailure({errmsg, code, assertionType}) {
         }),
         code,
     );
-    const expectedErrMsg = assertionType == "uassert" ? errmsg : "Extension encountered error: " + errmsg;
+    const expectedErrMsg =
+        assertionType == "uassert" ? errmsg : "Extension encountered error: " + errmsg;
     assert.eq(res.errmsg, expectedErrMsg, res);
     return res;
 }
 
 {
-    const res = checkAssertionFailure({errmsg: "this is a fake uassert", code: 1234, assertionType: "uassert"});
+    const res = checkAssertionFailure({
+        errmsg: "this is a fake uassert",
+        code: 1234,
+        assertionType: "uassert",
+    });
     assert.eq(res.codeName, "Location1234", res);
 }
 

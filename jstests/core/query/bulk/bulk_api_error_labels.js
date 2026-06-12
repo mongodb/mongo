@@ -27,7 +27,10 @@ const labelsResult = {
 
 // BulkWriteResult exposes errorLabels from bulkResult.
 const bwr = new BulkWriteResult(labelsResult, null, null);
-assert(bwr.hasOwnProperty("errorLabels"), "BulkWriteResult should carry errorLabels: " + tojson(bwr));
+assert(
+    bwr.hasOwnProperty("errorLabels"),
+    "BulkWriteResult should carry errorLabels: " + tojson(bwr),
+);
 assert.eq(["TransientTransactionError"], bwr.errorLabels);
 
 // WriteResult exposes errorLabels from bulkResult.

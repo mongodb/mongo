@@ -47,13 +47,17 @@ export function runTest(mongod) {
 
     admin.createRole({
         role: "ns1BypassDocumentValidation",
-        privileges: [{resource: {db: "test", collection: "coll"}, actions: ["bypassDocumentValidation"]}],
+        privileges: [
+            {resource: {db: "test", collection: "coll"}, actions: ["bypassDocumentValidation"]},
+        ],
         roles: [],
     });
 
     admin.createRole({
         role: "ns2BypassDocumentValidation",
-        privileges: [{resource: {db: "test1", collection: "coll1"}, actions: ["bypassDocumentValidation"]}],
+        privileges: [
+            {resource: {db: "test1", collection: "coll1"}, actions: ["bypassDocumentValidation"]},
+        ],
         roles: [],
     });
 
@@ -75,7 +79,13 @@ export function runTest(mongod) {
     admin.createUser({
         user: "user2",
         pwd: "pass",
-        roles: ["ns1Insert", "ns1Update", "ns1Remove", "ns1BypassDocumentValidation", "ns2BypassDocumentValidation"],
+        roles: [
+            "ns1Insert",
+            "ns1Update",
+            "ns1Remove",
+            "ns1BypassDocumentValidation",
+            "ns2BypassDocumentValidation",
+        ],
     });
     admin.createUser({user: "user3", pwd: "pass", roles: ["ns1Update"]});
 

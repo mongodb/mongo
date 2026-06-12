@@ -27,7 +27,11 @@ const getDB = (primaryConnection) => primaryConnection.getDB(dbName);
 function printIdents(node) {
     const identsResult = node
         .getDB("admin")
-        .aggregate([{$listCatalog: {}}, {$match: {db: dbName}}, {$project: {ns: 1, ident: 1, idxIdent: 1}}])
+        .aggregate([
+            {$listCatalog: {}},
+            {$match: {db: dbName}},
+            {$project: {ns: 1, ident: 1, idxIdent: 1}},
+        ])
         .toArray();
     jsTestLog(`Collection idents on ${node.port}: ${tojson(identsResult)}`);
 }
@@ -62,7 +66,9 @@ function setupCollection(rst, collName) {
 function downgradeSecondariesToLastLTS(rst) {
     // First downgrade FCV to simulate replica set downgrade.
     const primaryConnection = rst.getPrimary();
-    assert.commandWorked(primaryConnection.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        primaryConnection.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     // Finally, downgrade the secondaries to result in a mixed bin version replica set.
     rst.upgradeSecondaries({...lastLTSVersion});

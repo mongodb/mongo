@@ -52,7 +52,9 @@ let joinMoveChunk = moveChunkParallel(
 waitForMoveChunkStep(shard0, moveChunkStepNames.reachedSteadyState);
 
 jsTest.log("Sending false commit command....");
-assert.commandFailed(shard1.adminCommand({"_recvChunkCommit": 1, "sessionId": "fake-migration-session-id"}));
+assert.commandFailed(
+    shard1.adminCommand({"_recvChunkCommit": 1, "sessionId": "fake-migration-session-id"}),
+);
 
 jsTest.log("Checking migration recipient is still in steady state, waiting for commit....");
 let res = shard1.adminCommand("_recvChunkStatus");

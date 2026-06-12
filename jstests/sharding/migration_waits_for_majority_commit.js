@@ -20,7 +20,9 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const kDbName = "test";
 
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 const testDB = st.s.getDB(kDbName);
 assert.commandWorked(testDB.foo.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
@@ -28,7 +30,11 @@ assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {_id: 
 assert.commandWorked(st.s.adminCommand({split: "test.foo", middle: {_id: 0}}));
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // The document is in the majority committed snapshot.

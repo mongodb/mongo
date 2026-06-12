@@ -71,7 +71,11 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
     // Now resume using the resume token from the first change on a different mongos.
     const otherCst = new ChangeStreamTest(ChangeStreamTest.getDBForChangeStream(watchMode, s1DB));
 
-    const resumeCursor = otherCst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
+    const resumeCursor = otherCst.getChangeStream({
+        watchMode: watchMode,
+        coll: coll,
+        resumeAfter: firstChange._id,
+    });
 
     // Get the resume tokens for each change that occurred.
     const resumeTokens = [firstChange._id];
@@ -81,8 +85,15 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
 
     // Check that resuming from each possible resume token works.
     for (let i = 0; i < resumeTokens.length; i++) {
-        const cursor = otherCst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: resumeTokens[i]});
-        otherCst.assertNextChangesEqual({cursor: cursor, expectedChanges: docsFoundInOrder.splice(i + 1)});
+        const cursor = otherCst.getChangeStream({
+            watchMode: watchMode,
+            coll: coll,
+            resumeAfter: resumeTokens[i],
+        });
+        otherCst.assertNextChangesEqual({
+            cursor: cursor,
+            expectedChanges: docsFoundInOrder.splice(i + 1),
+        });
     }
     otherCst.cleanUp();
 }

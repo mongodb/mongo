@@ -64,7 +64,10 @@ function runBasicJoinTest(pipeline) {
     code(normalizeArray(noJoinOptResults));
 
     const noJoinExplain = coll.explain().aggregate(pipeline);
-    assert(!joinOptUsed(noJoinExplain), "Join optimizer was used unexpectedly: " + tojson(noJoinExplain));
+    assert(
+        !joinOptUsed(noJoinExplain),
+        "Join optimizer was used unexpectedly: " + tojson(noJoinExplain),
+    );
 
     runJoinTestAndCompare(
         "With bottom-up plan enumeration (left-deep)",
@@ -137,7 +140,11 @@ joinTestWrapper(db, () => {
                 as: "x",
                 localField: "a",
                 foreignField: "a",
-                pipeline: [{$match: {d: {$lt: 3}}}, {$match: {c: "blah"}}, {$match: {_id: {$gt: 0}}}],
+                pipeline: [
+                    {$match: {d: {$lt: 3}}},
+                    {$match: {c: "blah"}},
+                    {$match: {_id: {$gt: 0}}},
+                ],
             },
         },
         {$unwind: "$x"},
@@ -209,7 +216,9 @@ joinTestWrapper(db, () => {
         {$unwind: "$y"},
     ]);
 
-    section("Example with two joins, suffix, and sub-pipeline with un-correlated $match and $match prefix");
+    section(
+        "Example with two joins, suffix, and sub-pipeline with un-correlated $match and $match prefix",
+    );
     runBasicJoinTest([
         {$match: {a: {$gt: 1}}},
         {
@@ -280,7 +289,9 @@ joinTestWrapper(db, () => {
         {$unwind: "$z"},
     ]);
 
-    section("Basic example with 3 joins & subsequent join referencing fields from previous lookups");
+    section(
+        "Basic example with 3 joins & subsequent join referencing fields from previous lookups",
+    );
     runBasicJoinTest([
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
         {$unwind: "$x"},
@@ -301,7 +312,14 @@ joinTestWrapper(db, () => {
         {$unwind: "$x"},
         {$lookup: {from: foreignColl3.getName(), as: "w.y", localField: "x.c", foreignField: "c"}},
         {$unwind: "$w.y"},
-        {$lookup: {from: foreignColl2.getName(), as: "k.y.z", localField: "w.y.d", foreignField: "d"}},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "k.y.z",
+                localField: "w.y.d",
+                foreignField: "d",
+            },
+        },
         {$unwind: "$k.y.z"},
     ]);
 
@@ -314,7 +332,9 @@ joinTestWrapper(db, () => {
         {$unwind: "$y"},
     ]);
 
-    section("Basic example with a $project reducing the documents of the base collection to a single field");
+    section(
+        "Basic example with a $project reducing the documents of the base collection to a single field",
+    );
     runBasicJoinTest([
         {$project: {a: true}},
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
@@ -383,7 +403,9 @@ joinTestWrapper(db, () => {
             $lookup: {
                 from: foreignColl3.getName(),
                 let: {a: "$a", a12: "$coll12.a"},
-                pipeline: [{$match: {$expr: {$and: [{$eq: ["$a", "$$a"]}, {$eq: ["$a", "$$a12"]}]}}}],
+                pipeline: [
+                    {$match: {$expr: {$and: [{$eq: ["$a", "$$a"]}, {$eq: ["$a", "$$a12"]}]}}},
+                ],
                 as: "coll13",
             },
         },
@@ -412,7 +434,9 @@ joinTestWrapper(db, () => {
         {$match: {"x.d": {$eq: 2}}},
     ]);
 
-    section("Non-pipeline $lookup with absorbed $match on as field followed by $match on base field");
+    section(
+        "Non-pipeline $lookup with absorbed $match on as field followed by $match on base field",
+    );
     runBasicJoinTest([
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
         {$unwind: "$x"},

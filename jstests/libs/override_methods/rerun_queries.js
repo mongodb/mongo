@@ -9,12 +9,20 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 // will create a plan cache entry, at the second run we will promote the cache entry to active and
 // at the third run we will use the active cache entry.
 const numberOfRuns = 3;
-const kRerunnableReadCommands = new Set(["aggregate", "find", "count", "distinct", "mapReduce", "mapreduce"]);
+const kRerunnableReadCommands = new Set([
+    "aggregate",
+    "find",
+    "count",
+    "distinct",
+    "mapReduce",
+    "mapreduce",
+]);
 
 function isRerunnableQuery(cmdName, cmdObj) {
     if (
         OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj) ||
-        (cmdName.toLowerCase() == "mapreduce" && !OverrideHelpers.isMapReduceWithInlineOutput(cmdName, cmdObj))
+        (cmdName.toLowerCase() == "mapreduce" &&
+            !OverrideHelpers.isMapReduceWithInlineOutput(cmdName, cmdObj))
     ) {
         return false;
     }
@@ -38,7 +46,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 const respCollName = ns.split(".").slice(1).join(".");
                 // It's ok if the cursor ID is 0 or otherwise invalid:
                 // killCursors will succeed and report it under "cursorsNotFound".
-                assert.commandWorked(conn.getDB(respDbName).runCommand({killCursors: respCollName, cursors: [id]}));
+                assert.commandWorked(
+                    conn.getDB(respDbName).runCommand({killCursors: respCollName, cursors: [id]}),
+                );
             }
         }
     }

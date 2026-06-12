@@ -1,8 +1,14 @@
 /**
  * Tests that a synthetic high-water-mark (HWM) token obeys the same semantics as a regular token.
  */
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest, runCommandChangeStreamPassthroughAware} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
+import {
+    ChangeStreamTest,
+    runCommandChangeStreamPassthroughAware,
+} from "jstests/libs/query/change_stream_util.js";
 
 // Drop the test collections to assure a clean run.
 const collName = jsTestName();
@@ -40,7 +46,12 @@ for (let resumeType of ["startAfter", "resumeAfter"]) {
             pipeline: [
                 {$changeStream: {[resumeType]: pbrtBeforeCollExists}},
                 {
-                    $match: {$or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}]},
+                    $match: {
+                        $or: [
+                            {"fullDocument._id": "INSERT_ONE"},
+                            {"fullDocument._id": "INSERT_TWO"},
+                        ],
+                    },
                 },
             ],
             cursor: {},
@@ -51,7 +62,9 @@ csCursor = new DBCommandCursor(db, cmdResBeforeCollExists);
 
 // If the collection is then created with a case-insensitive collation, the resumed stream
 // continues to use the simple collation. We see 'INSERT_TWO' but not 'insert_one'.
-const testCollationCollection = assertCreateCollection(db, collName, {collation: {locale: "en_US", strength: 2}});
+const testCollationCollection = assertCreateCollection(db, collName, {
+    collation: {locale: "en_US", strength: 2},
+});
 assert.commandWorked(testCollationCollection.insert({_id: "insert_one"}));
 assert.commandWorked(testCollationCollection.insert({_id: "INSERT_TWO"}));
 assert.soon(() => csCursor.hasNext());
@@ -64,7 +77,11 @@ let cmdResResumeFromBeforeCollCreated = assert.commandWorked(
         aggregate: collName,
         pipeline: [
             {$changeStream: {resumeAfter: pbrtBeforeCollExists}},
-            {$match: {$or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}]}},
+            {
+                $match: {
+                    $or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}],
+                },
+            },
         ],
         cursor: {},
     }),
@@ -93,7 +110,11 @@ cmdResResumeFromBeforeCollCreated = assert.commandWorked(
         aggregate: collName,
         pipeline: [
             {$changeStream: {resumeAfter: pbrtBeforeCollExists}},
-            {$match: {$or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}]}},
+            {
+                $match: {
+                    $or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}],
+                },
+            },
         ],
         collation: {locale: "en_US", strength: 2},
         cursor: {},
@@ -130,7 +151,14 @@ const cmdResResumeWithCollation = assert.commandWorked(
         aggregate: collName,
         pipeline: [
             {$changeStream: {resumeAfter: hwmFromCollWithCollation}},
-            {$match: {$or: [{"fullDocument._id": "INSERT_THREE"}, {"fullDocument._id": "INSERT_FOUR"}]}},
+            {
+                $match: {
+                    $or: [
+                        {"fullDocument._id": "INSERT_THREE"},
+                        {"fullDocument._id": "INSERT_FOUR"},
+                    ],
+                },
+            },
         ],
         cursor: {},
     }),
@@ -208,7 +236,10 @@ for (let resumeType of ["startAfter", "resumeAfter"]) {
 
 // Now resumeAfter the token that was generated before the collection was created...
 csCursor = cst.startWatchingChanges({
-    pipeline: [{$changeStream: {resumeAfter: pbrtBeforeCollExists}}, {$project: {"fullDocument": 1}}],
+    pipeline: [
+        {$changeStream: {resumeAfter: pbrtBeforeCollExists}},
+        {$project: {"fullDocument": 1}},
+    ],
     collection: collName,
     aggregateOptions: {cursor: {batchSize: 1}},
 });

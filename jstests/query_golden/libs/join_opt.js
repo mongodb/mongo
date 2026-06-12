@@ -11,7 +11,10 @@ export function verifyExplainOutput(explain, joinOptExpectedInExplainOutput) {
     const winningPlan = getQueryPlanner(explain).winningPlan;
 
     if (joinOptExpectedInExplainOutput) {
-        assert(winningPlan.hasOwnProperty("usedJoinOptimization") && winningPlan.usedJoinOptimization, winningPlan);
+        assert(
+            winningPlan.hasOwnProperty("usedJoinOptimization") && winningPlan.usedJoinOptimization,
+            winningPlan,
+        );
         // Golden tests utils don't output winningPlan stats so manually record it in this helper function.
         line(`usedJoinOptimization: ${winningPlan.usedJoinOptimization}`);
         linebreak();
@@ -31,7 +34,14 @@ export function getJoinTestResultsAndExplain(desc, coll, pipeline, params) {
 /**
  * Note: if 'assertResultsEqual' is set to false, we just print a warning. This is useful for when we know a result divergence exists, but we should try to avoid using it unless we are planning on fixing this soon.
  */
-export function runJoinTestAndCompare(desc, coll, pipeline, params, expected, assertResultsEqual = true) {
+export function runJoinTestAndCompare(
+    desc,
+    coll,
+    pipeline,
+    params,
+    expected,
+    assertResultsEqual = true,
+) {
     const [actual, explain] = getJoinTestResultsAndExplain(desc, coll, pipeline, params);
     if (assertResultsEqual) {
         assertArrayEq({expected, actual});

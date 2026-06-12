@@ -91,7 +91,9 @@ describe("$vectorSearch explain", function () {
         // Only 2 documents have color: "red", so use limit: 2 to ensure nReturned matches.
         const filterLimit = 2;
         const filter = {color: {$eq: "red"}};
-        const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: filterLimit, index, filter}}];
+        const pipeline = [
+            {$vectorSearch: {queryVector, path, numCandidates, limit: filterLimit, index, filter}},
+        ];
 
         for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
             const result = coll.explain(verbosity).aggregate(pipeline);
@@ -137,7 +139,9 @@ describe("$vectorSearch explain", function () {
 
     it("should return explain output with different limits", function () {
         for (const testLimit of [1, 3, 5]) {
-            const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: testLimit, index}}];
+            const pipeline = [
+                {$vectorSearch: {queryVector, path, numCandidates, limit: testLimit, index}},
+            ];
 
             for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
                 const result = coll.explain(verbosity).aggregate(pipeline);
@@ -168,7 +172,15 @@ describe("$vectorSearch explain", function () {
         it(`should handle $limit ${description} $vectorSearch limit`, function () {
             const vectorSearchLimit = 5;
             const pipeline = [
-                {$vectorSearch: {queryVector, path, numCandidates, limit: vectorSearchLimit, index}},
+                {
+                    $vectorSearch: {
+                        queryVector,
+                        path,
+                        numCandidates,
+                        limit: vectorSearchLimit,
+                        index,
+                    },
+                },
                 {$limit: userLimit},
             ];
 

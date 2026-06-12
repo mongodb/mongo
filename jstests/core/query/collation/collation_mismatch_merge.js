@@ -44,8 +44,10 @@ try {
 
                     let srcCmd = {create: src.getName()};
                     let dstCmd = {create: dst.getName()};
-                    if (srcClustered.clustered) srcCmd.clusteredIndex = {key: {_id: 1}, unique: true};
-                    if (dstClustered.clustered) dstCmd.clusteredIndex = {key: {_id: 1}, unique: true};
+                    if (srcClustered.clustered)
+                        srcCmd.clusteredIndex = {key: {_id: 1}, unique: true};
+                    if (dstClustered.clustered)
+                        dstCmd.clusteredIndex = {key: {_id: 1}, unique: true};
                     if (srcCollation.collation) srcCmd.collation = srcCollation.collation;
                     if (dstCollation.collation) dstCmd.collation = dstCollation.collation;
                     assert.commandWorked(testDB.runCommand(srcCmd));

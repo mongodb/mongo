@@ -8,7 +8,11 @@ adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 let testUserSpecialCharacters = function () {
     // Create a user with special characters, make sure it can auth.
     assert(adminDB.auth("admin", "pass"));
-    adminDB.createUser({user: '~`!@#$%^&*()-_+={}[]||;:",.//><', pwd: "pass", roles: jsTest.adminUserRoles});
+    adminDB.createUser({
+        user: '~`!@#$%^&*()-_+={}[]||;:",.//><',
+        pwd: "pass",
+        roles: jsTest.adminUserRoles,
+    });
     assert(adminDB.logout());
 
     assert(adminDB.auth({user: '~`!@#$%^&*()-_+={}[]||;:",.//><', pwd: "pass"}));

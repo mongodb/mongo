@@ -43,7 +43,11 @@ function getShardNames(cluster) {
 }
 
 function getShardKeyMinRanges(coll) {
-    let a = coll.getDB().getSiblingDB("config").chunks.find({uuid: coll.getUUID()}, {min: 1, _id: 0}).sort({min: 1});
+    let a = coll
+        .getDB()
+        .getSiblingDB("config")
+        .chunks.find({uuid: coll.getUUID()}, {min: 1, _id: 0})
+        .sort({min: 1});
     return a.toArray();
 }
 
@@ -264,11 +268,17 @@ const wcCommandsTests = {
 
                     assert.commandWorked(coll.insert({_id: 0}));
 
-                    if (clusterType == "sharded" && bsonWoCompare(getShardKey(coll, fullNs), {}) == 0) {
+                    if (
+                        clusterType == "sharded" &&
+                        bsonWoCompare(getShardKey(coll, fullNs), {}) == 0
+                    ) {
                         // Set the primary shard to shard0 so we can assume that it's okay to run
                         // prepareTransaction on it
                         assert.commandWorked(
-                            coll.getDB().adminCommand({moveCollection: fullNs, toShard: cluster.shard0.shardName}),
+                            coll.getDB().adminCommand({
+                                moveCollection: fullNs,
+                                toShard: cluster.shard0.shardName,
+                            }),
                         );
                     }
 
@@ -295,7 +305,8 @@ const wcCommandsTests = {
                         }),
                     );
 
-                    let primary = clusterType == "sharded" ? cluster.rs0.getPrimary() : cluster.getPrimary();
+                    let primary =
+                        clusterType == "sharded" ? cluster.rs0.getPrimary() : cluster.getPrimary();
                     assert.commandWorked(
                         primary.getDB(dbName).adminCommand({
                             prepareTransaction: 1,
@@ -609,12 +620,18 @@ const wcCommandsTests = {
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({_id: 1}));
                 assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {}}));
-                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, undefined);
+                assert.eq(
+                    coll.getDB().getCollectionInfos({name: collName})[0].options.validator,
+                    undefined,
+                );
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, undefined);
+                assert.eq(
+                    coll.getDB().getCollectionInfos({name: collName})[0].options.validator,
+                    undefined,
+                );
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -623,12 +640,17 @@ const wcCommandsTests = {
             req: {collMod: collName, validator: {x: {$exists: true}}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({_id: 1, x: 1}));
-                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, undefined);
+                assert.eq(
+                    coll.getDB().getCollectionInfos({name: collName})[0].options.validator,
+                    undefined,
+                );
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, {x: {$exists: true}});
+                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, {
+                    x: {$exists: true},
+                });
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -650,7 +672,10 @@ const wcCommandsTests = {
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.IndexNotFound);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, undefined);
+                assert.eq(
+                    coll.getDB().getCollectionInfos({name: collName})[0].options.validator,
+                    undefined,
+                );
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -754,7 +779,9 @@ const wcCommandsTests = {
             req: {convertToCapped: collName, size: 10 * 1024 * 1024},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({_id: 1}));
-                assert.commandWorked(coll.runCommand({convertToCapped: collName, size: 10 * 1024 * 1024}));
+                assert.commandWorked(
+                    coll.runCommand({convertToCapped: collName, size: 10 * 1024 * 1024}),
+                );
                 assert.eq(coll.stats().capped, true);
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -942,7 +969,15 @@ const wcCommandsTests = {
                     secondariesRunning[0].getDB("admin").fsyncLock();
                 }
             },
-            confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
+            confirmFunc: (
+                res,
+                coll,
+                cluster,
+                clusterType,
+                secondariesRunning,
+                optionalArgs,
+                st,
+            ) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
@@ -958,7 +993,9 @@ const wcCommandsTests = {
             // Role already exists
             req: {createRole: "foo", privileges: [], roles: []},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.neq(coll.getDB().getRole("foo"), null);
 
                 // UMCs enforce wc: majority, so shut down the other node
@@ -977,7 +1014,15 @@ const wcCommandsTests = {
                     );
                 }
             },
-            confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
+            confirmFunc: (
+                res,
+                coll,
+                cluster,
+                clusterType,
+                secondariesRunning,
+                optionalArgs,
+                st,
+            ) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
@@ -1006,7 +1051,15 @@ const wcCommandsTests = {
                     secondariesRunning[0].getDB("admin").fsyncLock();
                 }
             },
-            confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
+            confirmFunc: (
+                res,
+                coll,
+                cluster,
+                clusterType,
+                secondariesRunning,
+                optionalArgs,
+                st,
+            ) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
@@ -1023,7 +1076,9 @@ const wcCommandsTests = {
             // User already exists
             req: {createUser: "foo", pwd: "bar", roles: []},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
                 assert.neq(coll.getDB().getUser("foo"), null);
 
                 // UMCs enforce wc: majority, so shut down the other node
@@ -1042,7 +1097,15 @@ const wcCommandsTests = {
                     );
                 }
             },
-            confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
+            confirmFunc: (
+                res,
+                coll,
+                cluster,
+                clusterType,
+                secondariesRunning,
+                optionalArgs,
+                st,
+            ) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
@@ -1148,7 +1211,9 @@ const wcCommandsTests = {
             // Basic dropAllRolesFromDatabase
             req: {dropAllRolesFromDatabase: 1},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
@@ -1209,7 +1274,9 @@ const wcCommandsTests = {
             // Basic dropAllUsersFromDatabase
             req: {dropAllUsersFromDatabase: 1},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
@@ -1235,7 +1302,9 @@ const wcCommandsTests = {
             req: {dropDatabase: 1},
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({a: 1}));
-                assert.commandWorkedIgnoringWriteConcernErrors(coll.getDB().runCommand({dropDatabase: 1}));
+                assert.commandWorkedIgnoringWriteConcernErrors(
+                    coll.getDB().runCommand({dropDatabase: 1}),
+                );
             },
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -1321,7 +1390,9 @@ const wcCommandsTests = {
             // Basic dropRole
             req: {dropRole: "foo"},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.eq(coll.getDB().getRoles().length, 1);
 
                 // UMCs enforce wc: majority, so shut down the other node
@@ -1380,7 +1451,9 @@ const wcCommandsTests = {
             // Basic dropUser
             req: {dropUser: "foo"},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
                 assert.eq(coll.getDB().getUsers().length, 1);
 
                 // UMCs enforce wc: majority, so shut down the other node
@@ -1477,9 +1550,15 @@ const wcCommandsTests = {
             // Basic enable sharding
             req: {enableSharding: dbName},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.eq(coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
+                assert.eq(
+                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(),
+                    1,
+                );
                 assert.commandWorked(coll.getDB().runCommand({dropDatabase: 1}));
-                assert.eq(coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 0);
+                assert.eq(
+                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(),
+                    0,
+                );
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding no
                 // longer override user provided writeConcern
@@ -1529,7 +1608,9 @@ const wcCommandsTests = {
             req: {findAndModify: collName, query: {_id: 1}, update: {_id: 1}},
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({_id: 1, x: 1}));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {x: {$exists: true}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {x: {$exists: true}}}),
+                );
             },
             confirmFunc: (res, coll) => {
                 assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure);
@@ -1568,11 +1649,15 @@ const wcCommandsTests = {
                 privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
             },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         grantPrivilegesToRole: "foo",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                     }),
                 );
 
@@ -1623,7 +1708,9 @@ const wcCommandsTests = {
                 privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
             },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
 
                 let role = coll.getDB().getRoles({rolesInfo: 1, showPrivileges: true});
                 assert.eq(role.length, 1);
@@ -1659,16 +1746,22 @@ const wcCommandsTests = {
             // Foo already has role bar
             req: {grantRolesToRole: "foo", roles: [{role: "bar", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         createRole: "bar",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                         roles: [],
                     }),
                 );
                 assert.commandWorked(
-                    coll.getDB().runCommand({grantRolesToRole: "foo", roles: [{role: "bar", db: dbName}]}),
+                    coll
+                        .getDB()
+                        .runCommand({grantRolesToRole: "foo", roles: [{role: "bar", db: dbName}]}),
                 );
 
                 let role = coll.getDB().getRole("foo");
@@ -1714,11 +1807,15 @@ const wcCommandsTests = {
             // Basic grantRolesToRole
             req: {grantRolesToRole: "foo", roles: [{role: "bar", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         createRole: "bar",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                         roles: [],
                     }),
                 );
@@ -1754,10 +1851,16 @@ const wcCommandsTests = {
             // User already has role
             req: {grantRolesToUser: "foo", roles: [{role: "foo", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
                 assert.commandWorked(
-                    coll.getDB().runCommand({grantRolesToUser: "foo", roles: [{role: "foo", db: dbName}]}),
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
+                assert.commandWorked(
+                    coll
+                        .getDB()
+                        .runCommand({grantRolesToUser: "foo", roles: [{role: "foo", db: dbName}]}),
                 );
 
                 let user = coll.getDB().getUser("foo");
@@ -1800,8 +1903,12 @@ const wcCommandsTests = {
             // Basic grantRolesToUser
             req: {grantRolesToUser: "foo", roles: [{role: "foo", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
 
                 let user = coll.getDB().getUser("foo");
                 assert.eq(user.roles.length, 0);
@@ -1830,7 +1937,9 @@ const wcCommandsTests = {
             // Role does not exist
             req: {grantRolesToUser: "foo", roles: ["fakeRole"]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
 
                 let user = coll.getDB().getUser("foo");
                 assert.eq(user.roles.length, 0);
@@ -1948,9 +2057,14 @@ const wcCommandsTests = {
                     .chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard;
                 let destShard = getShardNames(cluster)[1];
 
-                assert.commandWorked(coll.getDB().adminCommand({moveChunk: fullNs, find: keyToMove, to: destShard}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({moveChunk: fullNs, find: keyToMove, to: destShard}),
+                );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard,
                     destShard,
                 );
 
@@ -1962,17 +2076,27 @@ const wcCommandsTests = {
                 let keyMoved = getShardKeyMinRanges(coll)[0]["min"];
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
                     getShardNames(cluster)[1],
                 );
 
                 secondariesRunning[0].getDB("admin").fsyncUnlock();
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({moveChunk: fullNs, find: keyMoved, to: optionalArgs.originalShard}),
+                    coll.getDB().adminCommand({
+                        moveChunk: fullNs,
+                        find: keyMoved,
+                        to: optionalArgs.originalShard,
+                    }),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
                     optionalArgs.originalShard,
                 );
             },
@@ -1986,7 +2110,9 @@ const wcCommandsTests = {
             req: (cluster) => ({movePrimary: dbName, to: getShardNames(cluster)[0]}),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({_id: 1}));
-                assert.commandWorked(coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}),
+                );
                 assert.eq(coll.getDB().getDatabasePrimaryShardId(), cluster.shard0.shardName);
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -2004,7 +2130,9 @@ const wcCommandsTests = {
             req: (cluster) => ({movePrimary: dbName, to: getShardNames(cluster)[1]}),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({_id: 1}));
-                assert.commandWorked(coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}),
+                );
                 assert.eq(coll.getDB().getDatabasePrimaryShardId(), cluster.shard0.shardName);
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -2016,7 +2144,9 @@ const wcCommandsTests = {
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
 
                 // Change the primary back
-                assert.commandWorked(coll.getDB().adminCommand({movePrimary: dbName, to: cluster.shard0.shardName}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({movePrimary: dbName, to: cluster.shard0.shardName}),
+                );
                 assert.eq(coll.getDB().getDatabasePrimaryShardId(), cluster.shard0.shardName);
             },
             admin: true,
@@ -2040,10 +2170,15 @@ const wcCommandsTests = {
                 let destShard = getShardNames(cluster)[0];
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({moveRange: fullNs, min: keyToMove, toShard: destShard}),
+                    coll
+                        .getDB()
+                        .adminCommand({moveRange: fullNs, min: keyToMove, toShard: destShard}),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard,
                     destShard,
                 );
 
@@ -2056,17 +2191,27 @@ const wcCommandsTests = {
 
                 let keyMoved = getShardKeyMinRanges(coll)[0]["min"];
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
                     getShardNames(cluster)[0],
                 );
 
                 secondariesRunning[0].getDB("admin").fsyncUnlock();
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({moveRange: fullNs, min: keyMoved, toShard: optionalArgs.originalShard}),
+                    coll.getDB().adminCommand({
+                        moveRange: fullNs,
+                        min: keyMoved,
+                        toShard: optionalArgs.originalShard,
+                    }),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
                     optionalArgs.originalShard,
                 );
             },
@@ -2089,10 +2234,15 @@ const wcCommandsTests = {
                 let destShard = getShardNames(cluster)[1];
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({moveRange: fullNs, min: keyToMove, toShard: destShard}),
+                    coll
+                        .getDB()
+                        .adminCommand({moveRange: fullNs, min: keyToMove, toShard: destShard}),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyToMove}).shard,
                     destShard,
                 );
 
@@ -2105,17 +2255,27 @@ const wcCommandsTests = {
 
                 let keyMoved = getShardKeyMinRanges(coll)[0]["min"];
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
                     getShardNames(cluster)[1],
                 );
 
                 secondariesRunning[0].getDB("admin").fsyncUnlock();
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({moveRange: fullNs, min: keyMoved, toShard: optionalArgs.originalShard}),
+                    coll.getDB().adminCommand({
+                        moveRange: fullNs,
+                        min: keyMoved,
+                        toShard: optionalArgs.originalShard,
+                    }),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
+                    coll
+                        .getDB()
+                        .getSiblingDB("config")
+                        .chunks.findOne({uuid: coll.getUUID(), min: keyMoved}).shard,
                     optionalArgs.originalShard,
                 );
             },
@@ -2142,7 +2302,10 @@ const wcCommandsTests = {
     refineCollectionShardKey: {
         noop: {
             // Refine to same shard key
-            req: (cluster, coll) => ({refineCollectionShardKey: fullNs, key: getShardKey(coll, fullNs)}),
+            req: (cluster, coll) => ({
+                refineCollectionShardKey: fullNs,
+                key: getShardKey(coll, fullNs),
+            }),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({x: 1}));
 
@@ -2194,7 +2357,9 @@ const wcCommandsTests = {
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({refineCollectionShardKey: fullNs, key: optionalArgs.sk}),
+                    coll
+                        .getDB()
+                        .adminCommand({refineCollectionShardKey: fullNs, key: optionalArgs.sk}),
                 );
                 assert.eq(bsonWoCompare(getShardKey(coll, fullNs), optionalArgs.sk), 0);
             },
@@ -2283,14 +2448,18 @@ const wcCommandsTests = {
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         createRole: "foo",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["insert"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["insert"]},
+                        ],
                         roles: [],
                     }),
                 );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         revokePrivilegesFromRole: "foo",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["insert"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["insert"]},
+                        ],
                     }),
                 );
                 let role = coll.getDB().getRoles({rolesInfo: 1, showPrivileges: true});
@@ -2338,11 +2507,15 @@ const wcCommandsTests = {
                 privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
             },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         grantPrivilegesToRole: "foo",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                     }),
                 );
                 let role = coll.getDB().getRoles({rolesInfo: 1, showPrivileges: true});
@@ -2376,11 +2549,15 @@ const wcCommandsTests = {
             // Role foo does not have role bar
             req: {revokeRolesFromRole: "foo", roles: [{role: "bar", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         createRole: "bar",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                         roles: [],
                     }),
                 );
@@ -2425,16 +2602,22 @@ const wcCommandsTests = {
             // Basic revokeRolesFromRole
             req: {revokeRolesFromRole: "foo", roles: [{role: "bar", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         createRole: "bar",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                         roles: [],
                     }),
                 );
                 assert.commandWorked(
-                    coll.getDB().runCommand({grantRolesToRole: "foo", roles: [{role: "bar", db: dbName}]}),
+                    coll
+                        .getDB()
+                        .runCommand({grantRolesToRole: "foo", roles: [{role: "bar", db: dbName}]}),
                 );
 
                 let role = coll.getDB().getRole("foo");
@@ -2468,8 +2651,12 @@ const wcCommandsTests = {
             // User does not have role to revoke
             req: {revokeRolesFromUser: "foo", roles: [{role: "foo", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
 
                 let user = coll.getDB().getUser("foo");
                 assert.eq(user.roles.length, 0);
@@ -2511,10 +2698,16 @@ const wcCommandsTests = {
             // Basic revokeRolesFromUser
             req: {revokeRolesFromUser: "foo", roles: [{role: "foo", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}));
                 assert.commandWorked(
-                    coll.getDB().runCommand({grantRolesToUser: "foo", roles: [{role: "foo", db: dbName}]}),
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "bar", roles: []}),
+                );
+                assert.commandWorked(
+                    coll
+                        .getDB()
+                        .runCommand({grantRolesToUser: "foo", roles: [{role: "foo", db: dbName}]}),
                 );
 
                 let user = coll.getDB().getUser("foo");
@@ -2555,9 +2748,12 @@ const wcCommandsTests = {
             // Migrations already not allowed
             req: {setAllowMigrations: fullNs, allowMigrations: false},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().adminCommand({setAllowMigrations: fullNs, allowMigrations: false}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({setAllowMigrations: fullNs, allowMigrations: false}),
+                );
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").collections.findOne({_id: fullNs}).permitMigrations,
+                    coll.getDB().getSiblingDB("config").collections.findOne({_id: fullNs})
+                        .permitMigrations,
                     false,
                 );
 
@@ -2568,7 +2764,8 @@ const wcCommandsTests = {
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
                 assert.eq(
-                    coll.getDB().getSiblingDB("config").collections.findOne({_id: fullNs}).permitMigrations,
+                    coll.getDB().getSiblingDB("config").collections.findOne({_id: fullNs})
+                        .permitMigrations,
                     false,
                 );
 
@@ -2580,7 +2777,9 @@ const wcCommandsTests = {
             // Basic setAllowMigrations
             req: {setAllowMigrations: fullNs, allowMigrations: false},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().adminCommand({setAllowMigrations: fullNs, allowMigrations: true}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({setAllowMigrations: fullNs, allowMigrations: true}),
+                );
                 assert.eq(
                     coll
                         .getDB()
@@ -2619,7 +2818,10 @@ const wcCommandsTests = {
             req: {setDefaultRWConcern: 1, defaultWriteConcern: {"w": 1, "wtimeout": 0}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(
-                    coll.getDB().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {"w": 1, "wtimeout": 0}}),
+                    coll.getDB().adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {"w": 1, "wtimeout": 0},
+                    }),
                 );
                 assert.eq(coll.getDB().adminCommand({getDefaultRWConcern: 1}).defaultWriteConcern, {
                     "w": 1,
@@ -2658,9 +2860,10 @@ const wcCommandsTests = {
             req: {setDefaultRWConcern: 1, defaultWriteConcern: {"w": 1, "wtimeout": 0}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(
-                    coll
-                        .getDB()
-                        .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {"w": 1, "wtimeout": 1234}}),
+                    coll.getDB().adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {"w": 1, "wtimeout": 1234},
+                    }),
                 );
                 assert.eq(coll.getDB().adminCommand({getDefaultRWConcern: 1}).defaultWriteConcern, {
                     "w": 1,
@@ -2694,9 +2897,10 @@ const wcCommandsTests = {
             req: {setDefaultRWConcern: 1, defaultWriteConcern: {}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(
-                    coll
-                        .getDB()
-                        .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {"w": 1, "wtimeout": 1234}}),
+                    coll.getDB().adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {"w": 1, "wtimeout": 1234},
+                    }),
                 );
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
@@ -2747,11 +2951,15 @@ const wcCommandsTests = {
                 optionalArgs.fcv = fcv;
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+                    coll
+                        .getDB()
+                        .adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("admin").system.version.findOne({"_id": "featureCompatibilityVersion"})
-                        .version,
+                    coll
+                        .getDB()
+                        .getSiblingDB("admin")
+                        .system.version.findOne({"_id": "featureCompatibilityVersion"}).version,
                     latestFCV,
                 );
 
@@ -2764,17 +2972,24 @@ const wcCommandsTests = {
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
                 assert.eq(
-                    coll.getDB().getSiblingDB("admin").system.version.findOne({"_id": "featureCompatibilityVersion"})
-                        .version,
+                    coll
+                        .getDB()
+                        .getSiblingDB("admin")
+                        .system.version.findOne({"_id": "featureCompatibilityVersion"}).version,
                     latestFCV,
                 );
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({setFeatureCompatibilityVersion: optionalArgs.fcv, confirm: true}),
+                    coll.getDB().adminCommand({
+                        setFeatureCompatibilityVersion: optionalArgs.fcv,
+                        confirm: true,
+                    }),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("admin").system.version.findOne({"_id": "featureCompatibilityVersion"})
-                        .version,
+                    coll
+                        .getDB()
+                        .getSiblingDB("admin")
+                        .system.version.findOne({"_id": "featureCompatibilityVersion"}).version,
                     optionalArgs.fcv,
                 );
 
@@ -2795,11 +3010,15 @@ const wcCommandsTests = {
                 optionalArgs.fcv = fcv;
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+                    coll
+                        .getDB()
+                        .adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("admin").system.version.findOne({"_id": "featureCompatibilityVersion"})
-                        .version,
+                    coll
+                        .getDB()
+                        .getSiblingDB("admin")
+                        .system.version.findOne({"_id": "featureCompatibilityVersion"}).version,
                     lastLTSFCV,
                 );
 
@@ -2835,11 +3054,16 @@ const wcCommandsTests = {
 
                 // Reset FCV
                 assert.commandWorked(
-                    coll.getDB().adminCommand({setFeatureCompatibilityVersion: optionalArgs.fcv, confirm: true}),
+                    coll.getDB().adminCommand({
+                        setFeatureCompatibilityVersion: optionalArgs.fcv,
+                        confirm: true,
+                    }),
                 );
                 assert.eq(
-                    coll.getDB().getSiblingDB("admin").system.version.findOne({"_id": "featureCompatibilityVersion"})
-                        .version,
+                    coll
+                        .getDB()
+                        .getSiblingDB("admin")
+                        .system.version.findOne({"_id": "featureCompatibilityVersion"}).version,
                     optionalArgs.fcv,
                 );
             },
@@ -2857,11 +3081,18 @@ const wcCommandsTests = {
                 let fpConn = coll.getDB();
                 if (clusterType == "sharded") {
                     // Make sure we set the fp on a shard that will be sent the createIndex request
-                    let owningShard = cluster.getShard(coll, {_id: 1, b: 1}, false /* includeEmpty */);
+                    let owningShard = cluster.getShard(
+                        coll,
+                        {_id: 1, b: 1},
+                        false /* includeEmpty */,
+                    );
                     fpConn = owningShard.getDB(dbName);
                 }
 
-                optionalArgs.failpoint = configureFailPoint(fpConn, "hangAfterIndexBuildFirstDrain");
+                optionalArgs.failpoint = configureFailPoint(
+                    fpConn,
+                    "hangAfterIndexBuildFirstDrain",
+                );
                 optionalArgs.thread = new Thread(
                     (host, dbName, collName) => {
                         const conn = new Mongo(host);
@@ -2909,7 +3140,10 @@ const wcCommandsTests = {
                     let owningShard = cluster.getShard(coll, {_id: 1} /* includeEmpty */);
                     fpConn = owningShard.getDB(dbName);
                 }
-                optionalArgs.failpoint = configureFailPoint(fpConn, "hangAfterIndexBuildFirstDrain");
+                optionalArgs.failpoint = configureFailPoint(
+                    fpConn,
+                    "hangAfterIndexBuildFirstDrain",
+                );
                 optionalArgs.thread = new Thread(
                     (host, dbName, collName) => {
                         // Use the index builds coordinator for a two-phase index build.
@@ -2958,7 +3192,9 @@ const wcCommandsTests = {
             // Coll already sharded
             req: {shardCollection: fullNs, key: {x: 1}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().adminCommand({shardCollection: fullNs, key: {x: 1}}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({shardCollection: fullNs, key: {x: 1}}),
+                );
                 assert.eq(bsonWoCompare(getShardKey(coll, fullNs), {x: 1}), 0);
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -3054,7 +3290,9 @@ const wcCommandsTests = {
             req: {update: collName, updates: [{q: {_id: 1}, u: {_id: 1, c: 2}}]},
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({_id: 1, x: 1}));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {x: {$exists: true}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {x: {$exists: true}}}),
+                );
             },
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
@@ -3079,7 +3317,9 @@ const wcCommandsTests = {
                 assert.commandWorked(
                     coll.getDB().runCommand({
                         createRole: "foo",
-                        privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}],
+                        privileges: [
+                            {resource: {db: dbName, collection: collName}, actions: ["find"]},
+                        ],
                         roles: [],
                     }),
                 );
@@ -3119,8 +3359,12 @@ const wcCommandsTests = {
             // Basic updateRole to add inherited role
             req: {updateRole: "foo", roles: ["bar"]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createRole: "bar", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "bar", privileges: [], roles: []}),
+                );
                 assert.eq(coll.getDB().getRoles().length, 2);
 
                 let role = coll.getDB().getRole("foo");
@@ -3151,7 +3395,9 @@ const wcCommandsTests = {
             // Creating cycle
             req: {updateRole: "foo", roles: ["foo"]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
                 assert.eq(coll.getDB().getRoles().length, 1);
 
                 // UMCs enforce wc: majority, so shut down the other node
@@ -3189,8 +3435,12 @@ const wcCommandsTests = {
             // user already has role
             req: {updateUser: "foo", roles: [{role: "foo", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "pwd", roles: ["foo"]}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "pwd", roles: ["foo"]}),
+                );
 
                 let user = coll.getDB().getUser("foo");
                 assert.eq(user.roles.length, 1);
@@ -3233,8 +3483,12 @@ const wcCommandsTests = {
             // Basic updateUser to cadd role
             req: {updateUser: "foo", roles: [{role: "foo", db: dbName}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}));
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "pwd", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createRole: "foo", privileges: [], roles: []}),
+                );
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "pwd", roles: []}),
+                );
 
                 let user = coll.getDB().getUser("foo");
                 assert.eq(user.roles.length, 0);
@@ -3264,7 +3518,9 @@ const wcCommandsTests = {
             // Role does not exist
             req: {updateUser: "foo", roles: ["fakeRole"]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.getDB().runCommand({createUser: "foo", pwd: "pwd", roles: []}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({createUser: "foo", pwd: "pwd", roles: []}),
+                );
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
@@ -3541,7 +3797,9 @@ const wcTimeseriesCommandsTests = {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
                 assert.commandWorked(coll.insert({meta: 2, time: timeValue}));
                 assert.commandWorked(
-                    coll.getDB().createCollection("out", {timeseries: {timeField: "time", metaField: "meta"}}),
+                    coll.getDB().createCollection("out", {
+                        timeseries: {timeField: "time", metaField: "meta"},
+                    }),
                 );
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -3586,7 +3844,10 @@ const wcTimeseriesCommandsTests = {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
             },
             req: (cluster, coll) => {
-                const buckets = getTimeseriesCollForRawOps(coll.getDB(), coll).find().rawData().toArray();
+                const buckets = getTimeseriesCollForRawOps(coll.getDB(), coll)
+                    .find()
+                    .rawData()
+                    .toArray();
                 assert.eq(buckets.length, 1);
                 return {applyOps: [{op: "d", ns: fullNs, o: {_id: buckets[0]._id}}]};
             },
@@ -3684,7 +3945,10 @@ const wcTimeseriesCommandsTests = {
             confirmFunc: (res, coll, cluster) => {
                 assert.eq(res.nErrors, 1);
                 assert(res.cursor && res.cursor.firstBatch && res.cursor.firstBatch.length == 1);
-                assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.cursor.firstBatch[0].code);
+                assert.includes(
+                    [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                    res.cursor.firstBatch[0].code,
+                );
             },
             admin: true,
         },
@@ -3758,7 +4022,10 @@ const wcTimeseriesCommandsTests = {
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.IndexNotFound);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName})[0].options.validator, undefined);
+                assert.eq(
+                    coll.getDB().getCollectionInfos({name: collName})[0].options.validator,
+                    undefined,
+                );
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3989,7 +4256,9 @@ const wcTimeseriesCommandsTests = {
             req: {dropDatabase: 1},
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
-                assert.commandWorkedIgnoringWriteConcernErrors(coll.getDB().runCommand({dropDatabase: 1}));
+                assert.commandWorkedIgnoringWriteConcernErrors(
+                    coll.getDB().runCommand({dropDatabase: 1}),
+                );
                 assert.eq(coll.find().itcount(), 0);
             },
             confirmFunc: (res, coll) => {
@@ -4029,7 +4298,10 @@ const wcTimeseriesCommandsTests = {
 
                 // Make a non-acknowledged write so that the no-op will have to fail with WCE
                 assert.commandWorkedIgnoringWriteConcernErrors(
-                    coll.insert({meta: "a", time: timeValue}, {writeConcern: {w: "majority", wtimeout: 100}}),
+                    coll.insert(
+                        {meta: "a", time: timeValue},
+                        {writeConcern: {w: "majority", wtimeout: 100}},
+                    ),
                 );
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -4083,7 +4355,10 @@ const wcTimeseriesCommandsTests = {
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.getDB().runCommand({dropDatabase: 1}));
                 assert.commandWorked(coll.getDB().adminCommand({enableSharding: dbName}));
-                assert.eq(coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
+                assert.eq(
+                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(),
+                    1,
+                );
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding
                 // no longer override user provided writeConcern
@@ -4091,7 +4366,10 @@ const wcTimeseriesCommandsTests = {
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
+                assert.eq(
+                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(),
+                    1,
+                );
 
                 secondariesRunning[0].getDB("admin").fsyncUnlock();
             },
@@ -4102,7 +4380,10 @@ const wcTimeseriesCommandsTests = {
             req: {enableSharding: dbName},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.getDB().runCommand({dropDatabase: 1}));
-                assert.eq(coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 0);
+                assert.eq(
+                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(),
+                    0,
+                );
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding
                 // no longer override user provided writeConcern
@@ -4218,7 +4499,9 @@ const wcTimeseriesCommandsTests = {
             req: (cluster) => ({movePrimary: dbName, to: getShardNames(cluster)[0]}),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
-                assert.commandWorked(coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}),
+                );
                 assert.eq(coll.getDB().getDatabasePrimaryShardId(), cluster.shard0.shardName);
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -4236,7 +4519,9 @@ const wcTimeseriesCommandsTests = {
             req: (cluster) => ({movePrimary: dbName, to: getShardNames(cluster)[1]}),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
-                assert.commandWorked(coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({movePrimary: dbName, to: getShardNames(cluster)[0]}),
+                );
                 assert.eq(coll.getDB().getDatabasePrimaryShardId(), cluster.shard0.shardName);
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -4248,7 +4533,9 @@ const wcTimeseriesCommandsTests = {
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
 
                 // Change the primary back
-                assert.commandWorked(coll.getDB().adminCommand({movePrimary: dbName, to: cluster.shard0.shardName}));
+                assert.commandWorked(
+                    coll.getDB().adminCommand({movePrimary: dbName, to: cluster.shard0.shardName}),
+                );
                 assert.eq(coll.getDB().getDatabasePrimaryShardId(), cluster.shard0.shardName);
             },
             admin: true,
@@ -4276,7 +4563,10 @@ const wcTimeseriesCommandsTests = {
     refineCollectionShardKey: {
         noop: {
             // Refine to same shard key
-            req: (cluster, coll) => ({refineCollectionShardKey: fullNs, key: getShardKey(coll, fullNs)}),
+            req: (cluster, coll) => ({
+                refineCollectionShardKey: fullNs,
+                key: getShardKey(coll, fullNs),
+            }),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
 
@@ -4328,7 +4618,9 @@ const wcTimeseriesCommandsTests = {
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
 
                 assert.commandWorked(
-                    coll.getDB().adminCommand({refineCollectionShardKey: fullNs, key: optionalArgs.sk}),
+                    coll
+                        .getDB()
+                        .adminCommand({refineCollectionShardKey: fullNs, key: optionalArgs.sk}),
                 );
                 assert.eq(bsonWoCompare(getShardKey(coll, fullNs), optionalArgs.sk), 0);
             },
@@ -4452,7 +4744,9 @@ const wcTimeseriesCommandsTests = {
         failure: {
             req: {
                 update: collName,
-                updates: [{q: {"meta.x": 1}, u: {$set: {"meta.y": 2, time: "deadbeef"}}, multi: true}],
+                updates: [
+                    {q: {"meta.x": 1}, u: {$set: {"meta.y": 2, time: "deadbeef"}}, multi: true},
+                ],
             },
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({meta: {x: 1, y: 1}, time: timeValue}));
@@ -4460,7 +4754,10 @@ const wcTimeseriesCommandsTests = {
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                 assert(res.writeErrors && res.writeErrors.length == 1);
-                assert.includes([ErrorCodes.InvalidOptions, ErrorCodes.BadValue], res.writeErrors[0]["code"]);
+                assert.includes(
+                    [ErrorCodes.InvalidOptions, ErrorCodes.BadValue],
+                    res.writeErrors[0]["code"],
+                );
                 assert.eq(res.n, 0);
                 assert.eq(res.nModified, 0);
                 assert.eq(coll.count({"meta.y": 1}), 1);
@@ -4607,7 +4904,10 @@ const additionalCRUDOpsTimeseries = {
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                 assert(res.writeErrors && res.writeErrors.length == 1);
-                assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.writeErrors[0].code);
+                assert.includes(
+                    [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                    res.writeErrors[0].code,
+                );
                 assert.eq(res.n, 0);
                 assert.eq(res.nModified, 0);
             },
@@ -4623,7 +4923,8 @@ const additionalCRUDOpsTimeseries = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                 } else {
@@ -4719,7 +5020,8 @@ const additionalCRUDOpsTimeseries = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -4767,7 +5069,8 @@ const additionalCRUDOpsTimeseries = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -4775,7 +5078,10 @@ const additionalCRUDOpsTimeseries = {
                 ) {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 1);
-                    assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.writeErrors[0].code);
+                    assert.includes(
+                        [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                        res.writeErrors[0].code,
+                    );
                     assert.eq(res.nModified, 2);
                     assert.eq(coll.find().itcount(), 4);
                     assert.eq(coll.find({"meta.y": {$exists: true}}).toArray().length, 2);
@@ -4783,7 +5089,10 @@ const additionalCRUDOpsTimeseries = {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 3);
                     assert.eq(res.writeErrors[0].code, ErrorCodes.WriteConcernTimeout);
-                    assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.writeErrors[1].code);
+                    assert.includes(
+                        [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                        res.writeErrors[1].code,
+                    );
                     assert.eq(res.writeErrors[2].code, ErrorCodes.WriteConcernTimeout);
                     assert.eq(coll.find({"meta.y": {$exists: true}}).toArray().length, 0);
                 }
@@ -4842,7 +5151,8 @@ const additionalCRUDOpsTimeseries = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -4888,7 +5198,8 @@ const additionalCRUDOpsTimeseries = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -4896,7 +5207,10 @@ const additionalCRUDOpsTimeseries = {
                 ) {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 1);
-                    assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.writeErrors[0].code);
+                    assert.includes(
+                        [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                        res.writeErrors[0].code,
+                    );
                     assert.eq(res.nModified, 1);
                     assert.eq(coll.find().itcount(), 4);
                     assert.eq(coll.find({"meta.y": {$exists: true}}).toArray().length, 1);
@@ -4940,7 +5254,8 @@ const additionalCRUDOpsTimeseries = {
                 assert.eq(res.cursor.firstBatch[0].n, 1);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -4992,7 +5307,8 @@ const additionalCRUDOpsTimeseries = {
                 assert.eq(res.cursor.firstBatch[0].ok, 1);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -5060,10 +5376,14 @@ const additionalCRUDOpsTimeseries = {
                 assert.eq(res.cursor.firstBatch[0].n, 2);
 
                 assert.eq(res.cursor.firstBatch[1].ok, 0);
-                assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.cursor.firstBatch[1].code);
+                assert.includes(
+                    [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                    res.cursor.firstBatch[1].code,
+                );
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -5115,7 +5435,8 @@ const additionalCRUDOpsTimeseries = {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {meta: 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {meta: 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -5188,7 +5509,8 @@ const additionalCRUDOpsTimeseries = {
                 assert.eq(res.cursor.firstBatch[0].ok, 1);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (
                     clusterType != "sharded" ||
                     !writeWithoutSkOrId ||
@@ -5258,7 +5580,10 @@ const additionalCRUDOpsTimeseries = {
                 assert.eq(res.cursor.firstBatch[0].n, 2);
 
                 assert.eq(res.cursor.firstBatch[1].ok, 0);
-                assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.cursor.firstBatch[1].code);
+                assert.includes(
+                    [ErrorCodes.BadValue, ErrorCodes.InvalidOptions],
+                    res.cursor.firstBatch[1].code,
+                );
 
                 assert.eq(res.nErrors, 1);
                 assert.eq(res.nModified, 2);
@@ -5319,7 +5644,9 @@ let additionalCRUDOps = {
             req: {insert: collName, documents: [{a: -2}, {a: 2}], ordered: false},
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({a: 1}));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {x: {$exists: true}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {x: {$exists: true}}}),
+                );
             },
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
@@ -5333,7 +5660,10 @@ let additionalCRUDOps = {
     },
     "updateMany": {
         noop: {
-            req: {update: collName, updates: [{q: {a: {$gt: -21}}, u: {$set: {b: 1}}, multi: true}]},
+            req: {
+                update: collName,
+                updates: [{q: {a: {$gt: -21}}, u: {$set: {b: 1}}, multi: true}],
+            },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert([{a: -22}, {a: -20}, {a: 20}, {a: 21}]));
                 assert.commandWorked(coll.remove({a: {$gt: -21}}));
@@ -5347,7 +5677,10 @@ let additionalCRUDOps = {
             },
         },
         success: {
-            req: {update: collName, updates: [{q: {a: {$gt: -21}}, u: {$set: {b: 1}}, multi: true}]},
+            req: {
+                update: collName,
+                updates: [{q: {a: {$gt: -21}}, u: {$set: {b: 1}}, multi: true}],
+            },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert([{a: -22}, {a: -20}, {a: 20}, {a: 21}]));
                 assert.eq(coll.find().itcount(), 4);
@@ -5364,7 +5697,9 @@ let additionalCRUDOps = {
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({a: 1}));
                 assert.commandWorked(coll.insert({a: 2}));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}),
+                );
                 assert.eq(coll.find().itcount(), 2);
             },
             confirmFunc: (res, coll) => {
@@ -5387,7 +5722,8 @@ let additionalCRUDOps = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                 } else {
@@ -5405,7 +5741,8 @@ let additionalCRUDOps = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.value.a, 1);
@@ -5424,13 +5761,18 @@ let additionalCRUDOps = {
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({a: 1}));
                 assert.commandWorkedIgnoringWriteConcernErrors(
-                    coll.getDB().runCommand({findAndModify: collName, query: {a: 1}, update: {$set: {c: 2}}}),
+                    coll.getDB().runCommand({
+                        findAndModify: collName,
+                        query: {a: 1},
+                        update: {$set: {c: 2}},
+                    }),
                 );
                 assert.eq(coll.count({a: 1, c: 2}), 1);
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.lastErrorObject.updatedExisting, true);
@@ -5448,7 +5790,8 @@ let additionalCRUDOps = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.lastErrorObject.updatedExisting, true);
@@ -5465,7 +5808,9 @@ let additionalCRUDOps = {
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({a: 1, value: 1}));
                 assert.eq(coll.find().itcount(), 1);
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {value: {$gt: 4}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {value: {$gt: 4}}}),
+                );
             },
             confirmFunc: (res, coll) => {
                 assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure);
@@ -5485,7 +5830,9 @@ let additionalCRUDOps = {
                 ordered: false,
             },
             setupFunc: (coll) => {
-                assert.commandWorked(coll.insert([{a: -22, b: 1}, {a: -20, b: 1}, {a: 20, b: 1}, {a: 21}]));
+                assert.commandWorked(
+                    coll.insert([{a: -22, b: 1}, {a: -20, b: 1}, {a: 20, b: 1}, {a: 21}]),
+                );
                 assert.eq(coll.find().itcount(), 4);
             },
             confirmFunc: (res, coll) => {
@@ -5511,7 +5858,8 @@ let additionalCRUDOps = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.n, 3);
@@ -5544,12 +5892,15 @@ let additionalCRUDOps = {
             },
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert([{a: -22}, {a: -20}, {a: 20}, {a: 21}]));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}),
+                );
                 assert.eq(coll.find().itcount(), 4);
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 1);
@@ -5580,7 +5931,9 @@ let additionalCRUDOps = {
                 ordered: true,
             },
             setupFunc: (coll) => {
-                assert.commandWorked(coll.insert([{a: -22, b: 1}, {a: -20, b: 1}, {a: 20, b: 1}, {a: 21}]));
+                assert.commandWorked(
+                    coll.insert([{a: -22, b: 1}, {a: -20, b: 1}, {a: 20, b: 1}, {a: 21}]),
+                );
                 assert.eq(coll.find().itcount(), 4);
             },
             confirmFunc: (res, coll) => {
@@ -5606,7 +5959,8 @@ let additionalCRUDOps = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.nModified, 3);
@@ -5637,12 +5991,15 @@ let additionalCRUDOps = {
             },
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert([{a: -22}, {a: -20}, {a: 20}, {a: 21}]));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}),
+                );
                 assert.eq(coll.find().itcount(), 4);
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 1);
@@ -5685,7 +6042,8 @@ let additionalCRUDOps = {
                 assert.eq(res.cursor.firstBatch[0].n, 1);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.eq(res.cursor.firstBatch[1].ok, 1);
                     assert.eq(res.nErrors, 0);
@@ -5722,7 +6080,8 @@ let additionalCRUDOps = {
                 assert.eq(res.cursor.firstBatch[0].ok, 1);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.eq(res.cursor.firstBatch[1].ok, 1);
                     assert.eq(res.nErrors, 0);
@@ -5755,7 +6114,9 @@ let additionalCRUDOps = {
             },
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert([{a: -22}, {a: -20}, {a: 20}]));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}),
+                );
                 assert.eq(coll.find().itcount(), 3);
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
@@ -5769,7 +6130,8 @@ let additionalCRUDOps = {
                 assert.eq(res.cursor.firstBatch[1].code, ErrorCodes.DocumentValidationFailure);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.eq(res.cursor.firstBatch[2].ok, 1);
                     assert.eq(res.cursor.firstBatch[2].n, 1);
@@ -5813,7 +6175,8 @@ let additionalCRUDOps = {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.eq(res.cursor.firstBatch.length, 3);
 
@@ -5866,7 +6229,8 @@ let additionalCRUDOps = {
                 assert.eq(res.cursor.firstBatch[0].ok, 1);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                let writeWithoutSkOrId =
+                    bsonWoCompare(sk, {"a": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
                 if (clusterType != "sharded" || !writeWithoutSkOrId) {
                     assert.eq(res.cursor.firstBatch[1].ok, 1);
                     assert.eq(res.nErrors, 0);
@@ -5901,7 +6265,9 @@ let additionalCRUDOps = {
             },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert([{a: -22}, {a: -20}, {a: 20}]));
-                assert.commandWorked(coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}));
+                assert.commandWorked(
+                    coll.getDB().runCommand({collMod: collName, validator: {b: {$gt: 2}}}),
+                );
                 assert.eq(coll.find().itcount(), 3);
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
@@ -6014,7 +6380,16 @@ export function assertHasWCE(res, cmd) {
     }
 }
 
-function runCommandTest(testCase, conn, coll, cluster, clusterType, preSetup, secondariesRunning, forceUseMajorityWC) {
+function runCommandTest(
+    testCase,
+    conn,
+    coll,
+    cluster,
+    clusterType,
+    preSetup,
+    secondariesRunning,
+    forceUseMajorityWC,
+) {
     const dbName = coll.getDB().getName();
 
     // Drop collection.
@@ -6032,7 +6407,9 @@ function runCommandTest(testCase, conn, coll, cluster, clusterType, preSetup, se
     testCase.setupFunc(coll, cluster, clusterType, secondariesRunning, optionalArgs);
 
     const request =
-        typeof testCase.req === "function" ? testCase.req(cluster, coll) : Object.assign({}, testCase.req, {});
+        typeof testCase.req === "function"
+            ? testCase.req(cluster, coll)
+            : Object.assign({}, testCase.req, {});
 
     // Provide a small wtimeout that we expect to time out.
     if (forceUseMajorityWC) {
@@ -6049,7 +6426,9 @@ function runCommandTest(testCase, conn, coll, cluster, clusterType, preSetup, se
     const freshConn = new Mongo(conn.host);
 
     // We check the error code of 'res' in the 'confirmFunc'.
-    const res = testCase.admin ? freshConn.adminCommand(request) : freshConn.getDB(dbName).runCommand(request);
+    const res = testCase.admin
+        ? freshConn.adminCommand(request)
+        : freshConn.getDB(dbName).runCommand(request);
 
     try {
         // Tests that the command receives a write concern error.
@@ -6066,7 +6445,9 @@ function runCommandTest(testCase, conn, coll, cluster, clusterType, preSetup, se
 
     // Kill the implicit session to abort any idle transactions to "force" reap.
     assert.commandWorkedOrFailedWithCode(
-        freshConn.adminCommand({killSessions: [freshConn.getDB(dbName).getSession().getSessionId()]}),
+        freshConn.adminCommand({
+            killSessions: [freshConn.getDB(dbName).getSession().getSessionId()],
+        }),
         ErrorCodes.HostUnreachable,
     );
 }
@@ -6088,7 +6469,15 @@ const shardedDDLCommandsRequiringMajorityCommit = [
     "moveRange",
 ];
 
-function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk, timeseries, coll) {
+function shouldSkipTestCase(
+    clusterType,
+    command,
+    testCase,
+    shardedCollection,
+    writeWithoutSk,
+    timeseries,
+    coll,
+) {
     if (
         !shardedCollection &&
         (command == "moveChunk" ||
@@ -6098,12 +6487,18 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
             command == "updateDocSk")
     ) {
         jsTestLog(
-            "Skipping " + command + " because requires sharded collection, and the current collection is not sharded.",
+            "Skipping " +
+                command +
+                " because requires sharded collection, and the current collection is not sharded.",
         );
         return true;
     }
 
-    if (shardedCollection && command == "updateDocSk" && bsonWoCompare(getShardKey(coll, fullNs), {"_id": 1}) == 0) {
+    if (
+        shardedCollection &&
+        command == "updateDocSk" &&
+        bsonWoCompare(getShardKey(coll, fullNs), {"_id": 1}) == 0
+    ) {
         jsTestLog(
             "Skipping updating a document's shard key because the shard key is {_id: 1}, and the _id field is immutable.",
         );
@@ -6112,7 +6507,9 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
 
     if (shardedCollection && command == "shardCollection") {
         jsTestLog(
-            "Skipping " + command + " because requires an unsharded collection, and the current collection is sharded.",
+            "Skipping " +
+                command +
+                " because requires an unsharded collection, and the current collection is sharded.",
         );
         return true;
     }
@@ -6143,7 +6540,10 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
     }
 
     if (testCase == "success") {
-        if (clusterType == "sharded" && shardedDDLCommandsRequiringMajorityCommit.includes(command)) {
+        if (
+            clusterType == "sharded" &&
+            shardedDDLCommandsRequiringMajorityCommit.includes(command)
+        ) {
             jsTestLog("Skipping " + command + " test for success case.");
             return true;
         }
@@ -6220,7 +6620,11 @@ function executeWriteConcernBehaviorTests(
         let cmd = masterCommandsList[command];
 
         if (!cmd.skip && !cmd.noop && !cmd.success && !cmd.failure) {
-            throw "Must implement test case for command " + command + ", or explain why it should be skipped.";
+            throw (
+                "Must implement test case for command " +
+                command +
+                ", or explain why it should be skipped."
+            );
         }
 
         // Some commands only allow w:1 or w:majority in a sharded cluster, so we must choose
@@ -6228,7 +6632,17 @@ function executeWriteConcernBehaviorTests(
         let forceUseMajorityWC = clusterType == "sharded" && umcRequireMajority.includes(command);
 
         if (cmd.noop) {
-            if (!shouldSkipTestCase(clusterType, command, "noop", shardedCollection, writeWithoutSk, timeseries, coll))
+            if (
+                !shouldSkipTestCase(
+                    clusterType,
+                    command,
+                    "noop",
+                    shardedCollection,
+                    writeWithoutSk,
+                    timeseries,
+                    coll,
+                )
+            )
                 runCommandTest(
                     cmd.noop,
                     conn,
@@ -6350,7 +6764,12 @@ export function checkWriteConcernBehaviorForAllCommands(
         }
     });
 
-    if (FeatureFlagUtil.isPresentAndEnabled(cluster.configRS.getPrimary(), "CreateDatabaseDDLCoordinator")) {
+    if (
+        FeatureFlagUtil.isPresentAndEnabled(
+            cluster.configRS.getPrimary(),
+            "CreateDatabaseDDLCoordinator",
+        )
+    ) {
         shardedDDLCommandsRequiringMajorityCommit.push("enableSharding");
     }
 
@@ -6468,7 +6887,9 @@ export function checkWriteConcernBehaviorUpdatingDocShardKey(
             noop: {
                 req: () => ({
                     update: collName,
-                    updates: [{q: {a: 1}, u: {$set: {[Object.keys(getShardKey(coll, fullNs))[0]]: -1}}}],
+                    updates: [
+                        {q: {a: 1}, u: {$set: {[Object.keys(getShardKey(coll, fullNs))[0]]: -1}}},
+                    ],
                     lsid: getLSID(),
                     txnNumber: getTxnNumber(),
                 }),
@@ -6494,7 +6915,9 @@ export function checkWriteConcernBehaviorUpdatingDocShardKey(
             success: {
                 req: () => ({
                     update: collName,
-                    updates: [{q: {a: 1}, u: {$set: {[Object.keys(getShardKey(coll, fullNs))[0]]: -1}}}],
+                    updates: [
+                        {q: {a: 1}, u: {$set: {[Object.keys(getShardKey(coll, fullNs))[0]]: -1}}},
+                    ],
                     lsid: getLSID(),
                     txnNumber: getTxnNumber(),
                 }),
@@ -6511,7 +6934,10 @@ export function checkWriteConcernBehaviorUpdatingDocShardKey(
                 },
                 confirmFunc: (res, coll) => {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
-                    assert.eq(coll.find({[Object.keys(getShardKey(coll, fullNs))[0]]: -1}).itcount(), 1);
+                    assert.eq(
+                        coll.find({[Object.keys(getShardKey(coll, fullNs))[0]]: -1}).itcount(),
+                        1,
+                    );
                     genNextTxnNumber();
                 },
             },
@@ -6547,7 +6973,9 @@ export function precmdShardKey(shardKey, conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);
     let nss = dbName + "." + collName;
 
-    assert.commandWorked(db.adminCommand({enableSharding: dbName, primary: cluster.shard0.shardName}));
+    assert.commandWorked(
+        db.adminCommand({enableSharding: dbName, primary: cluster.shard0.shardName}),
+    );
     assert.commandWorked(db.adminCommand({shardCollection: nss, key: {[shardKey]: 1}}));
     assert.commandWorked(db.adminCommand({split: nss, middle: {[shardKey]: 0}}));
     assert.commandWorked(

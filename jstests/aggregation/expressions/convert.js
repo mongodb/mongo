@@ -184,6 +184,10 @@ const illegalConversionTestDocs = [
 //
 // One test document for each "nullish" value.
 //
-const nullTestDocs = [{_id: 0, input: null}, {_id: 1, input: undefined}, {_id: 2 /* input is missing */}];
+const nullTestDocs = [
+    {_id: 0, input: null},
+    {_id: 1, input: undefined},
+    {_id: 2 /* input is missing */},
+];
 
 runConvertTests({coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, nullTestDocs});

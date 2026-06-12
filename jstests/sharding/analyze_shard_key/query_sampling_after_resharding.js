@@ -9,7 +9,9 @@ import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_s
 function setUpCollection(st, isShardedColl) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     if (st) {
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
     }
     const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
     const ns = dbName + "." + collName;
@@ -20,7 +22,9 @@ function setUpCollection(st, isShardedColl) {
         assert(st);
         assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
         assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
-        assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}),
+        );
     }
 
     return {dbName, collName};
@@ -30,7 +34,11 @@ function enableQuerySampling(st, dbName, collName) {
     const ns = dbName + "." + collName;
     const collUuid = QuerySamplingUtil.getCollectionUuid(st.s.getDB(dbName), collName);
     assert.commandWorked(
-        st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}),
+        st.s.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: "full",
+            samplesPerSecond: samplesPerSecond,
+        }),
     );
     QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {st});
 }
@@ -71,11 +79,17 @@ function assertQuerySampling(dbName, collName, isActive, st) {
     // that it was not.
     assert.soon(() => {
         const aggRes = assert.commandWorked(
-            conn.adminCommand({aggregate: 1, pipeline: [{$listSampledQueries: {namespace: ns}}], cursor: {}}),
+            conn.adminCommand({
+                aggregate: 1,
+                pipeline: [{$listSampledQueries: {namespace: ns}}],
+                cursor: {},
+            }),
         );
         const sampledQueryDocs = aggRes.cursor.firstBatch;
 
-        const matchCount = sampledQueryDocs.filter((doc) => bsonWoCompare(uuid, doc.cmd.filter.comment) == 0).length;
+        const matchCount = sampledQueryDocs.filter(
+            (doc) => bsonWoCompare(uuid, doc.cmd.filter.comment) == 0,
+        ).length;
 
         if (isActive) {
             return matchCount == 1;

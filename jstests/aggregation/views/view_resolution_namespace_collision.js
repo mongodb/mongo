@@ -29,7 +29,11 @@ assert.commandWorked(otherColl.insert({_id: 0, notsecret: 1, secret: "really sec
 // Create a view on 'testDB' that will have the same name as the collection that $merge/$out
 // will create.
 assert.commandWorked(
-    testDB.runCommand({create: collidingCollName, viewOn: otherCollName, pipeline: [{$project: {secret: 0}}]}),
+    testDB.runCommand({
+        create: collidingCollName,
+        viewOn: otherCollName,
+        pipeline: [{$project: {secret: 0}}],
+    }),
 );
 
 // Verify that the view gets resolved correctly when performing a cross database aggregation where

@@ -34,7 +34,10 @@ TimeseriesTest.run((insert) => {
     );
 
     // Ensure the default index has the collation.
-    let indexSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), metaFieldName + "_1_" + timeFieldName + "_1");
+    let indexSpec = IndexCatalogHelpers.findByName(
+        coll.getIndexes(),
+        metaFieldName + "_1_" + timeFieldName + "_1",
+    );
     assert.neq(indexSpec, null);
     assert.eq(indexSpec.collation.locale, "en", tojson(indexSpec));
 
@@ -81,7 +84,11 @@ TimeseriesTest.run((insert) => {
 
     // Now let's check that min and max appropriately ignore collation for field names, but not
     // values.
-    const buckets = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+    const buckets = getTimeseriesCollForRawOps(coll)
+        .find()
+        .rawData()
+        .sort({"control.min._id": 1})
+        .toArray();
     jsTestLog("Checking buckets: " + tojson(buckets));
     assert.eq(buckets.length, 3);
     assert.eq(buckets[0].control.min.x, "10");

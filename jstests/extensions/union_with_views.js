@@ -151,7 +151,10 @@ function runUnionWithOnViewTest({
         viewSourceColl,
         aggOnView: false,
         aggSourceColl: collName,
-        pipeline: (viewName) => [...mainPipeline, {$unionWith: {coll: viewName, pipeline: unionWithPipeline}}],
+        pipeline: (viewName) => [
+            ...mainPipeline,
+            {$unionWith: {coll: viewName, pipeline: unionWithPipeline}},
+        ],
         expectedMainDocs,
         expectedUnionWithDocs: expectedViewDocs,
         compareOrdered,
@@ -241,7 +244,12 @@ runTest({
     desc: "$unionWith in view definition with $testBar in subpipeline",
     viewPipeline: [
         {$match: {x: {$lte: 2}}},
-        {$unionWith: {coll: foreignCollName, pipeline: [{$testBar: {noop: true}}, {$match: {x: {$lte: 20}}}]}},
+        {
+            $unionWith: {
+                coll: foreignCollName,
+                pipeline: [{$testBar: {noop: true}}, {$match: {x: {$lte: 20}}}],
+            },
+        },
     ],
     aggOnView: true,
     pipeline: [],
@@ -254,7 +262,12 @@ runTest({
     desc: "$unionWith in view definition with $testBar, queried with additional filter",
     viewPipeline: [
         {$match: {x: {$lte: 2}}},
-        {$unionWith: {coll: foreignCollName, pipeline: [{$testBar: {noop: true}}, {$match: {x: {$lte: 20}}}]}},
+        {
+            $unionWith: {
+                coll: foreignCollName,
+                pipeline: [{$testBar: {noop: true}}, {$match: {x: {$lte: 20}}}],
+            },
+        },
     ],
     aggOnView: true,
     pipeline: [{$match: {x: {$gte: 10}}}],
@@ -267,7 +280,12 @@ runTest({
     desc: "$unionWith in view definition with $matchTopN (desugar) in subpipeline",
     viewPipeline: [
         {$project: {_id: 1, x: 1, name: 1}},
-        {$unionWith: {coll: foreignCollName, pipeline: [{$matchTopN: {filter: {}, sort: {x: 1}, limit: 2}}]}},
+        {
+            $unionWith: {
+                coll: foreignCollName,
+                pipeline: [{$matchTopN: {filter: {}, sort: {x: 1}, limit: 2}}],
+            },
+        },
     ],
     aggOnView: true,
     pipeline: [],
@@ -312,7 +330,12 @@ runTest({
         desc: "nested $unionWith: extension in outer view, extension in inner subpipeline",
         viewPipeline: [{$testBar: {noop: true}}, {$match: {x: {$lte: 3}}}],
         unionWithPipeline: [
-            {$unionWith: {coll: foreignCollName, pipeline: [{$testBar: {noop: true}}, {$match: {name: "fig"}}]}},
+            {
+                $unionWith: {
+                    coll: foreignCollName,
+                    pipeline: [{$testBar: {noop: true}}, {$match: {name: "fig"}}],
+                },
+            },
         ],
         expectedViewDocs: [...expectedOuterViewDocs, ...expectedNestedDocs],
     });
@@ -324,7 +347,10 @@ runTest({
     const expectedViewBDocs = foreignDocuments.filter((d) => d.name === "grape");
     const viewBName = makeViewName("nested_viewB");
     assert.commandWorked(
-        testDb.createView(viewBName, foreignCollName, [{$testBar: {noop: true}}, {$match: {name: "grape"}}]),
+        testDb.createView(viewBName, foreignCollName, [
+            {$testBar: {noop: true}},
+            {$match: {name: "grape"}},
+        ]),
     );
 
     const expectedViewADocs = documents.filter((d) => d.x <= 2);
@@ -354,7 +380,10 @@ runTest({
         desc: "view with $unionWith definition, used in $unionWith with extension subpipeline",
         viewPipeline: [{$match: {x: {$lte: 2}}}, {$unionWith: foreignCollName}],
         mainPipeline: [{$match: {_id: 0}}],
-        unionWithPipeline: [{$testBar: {noop: true}}, {$match: {$or: [{x: {$gte: 10}}, {name: "apple"}]}}],
+        unionWithPipeline: [
+            {$testBar: {noop: true}},
+            {$match: {$or: [{x: {$gte: 10}}, {name: "apple"}]}},
+        ],
         expectedMainDocs: documents.filter((d) => d._id === 0),
         expectedViewDocs: expectedInnerViewDocs,
     });
@@ -365,11 +394,19 @@ runTest({
 {
     const level3ViewName = makeViewName("level3");
     assert.commandWorked(
-        testDb.createView(level3ViewName, foreignCollName, [{$testBar: {noop: true}}, {$sort: {_id: 1}}, {$limit: 1}]),
+        testDb.createView(level3ViewName, foreignCollName, [
+            {$testBar: {noop: true}},
+            {$sort: {_id: 1}},
+            {$limit: 1},
+        ]),
     );
 
     // level2 view: docs with x >= 3 (3 docs) + 1 foreign doc from level3.
-    const level2Pipeline = [{$testBar: {noop: true}}, {$match: {x: {$gte: 3}}}, {$unionWith: level3ViewName}];
+    const level2Pipeline = [
+        {$testBar: {noop: true}},
+        {$match: {x: {$gte: 3}}},
+        {$unionWith: level3ViewName},
+    ];
 
     runUnionWithOnViewTest({
         desc: "deeply nested $unionWith with multiple extensions at different levels",
@@ -396,7 +433,12 @@ runTest({
         mainPipeline: [{$match: {_id: 0}}],
         unionWithPipeline: [
             {$testBar: {noop: true}},
-            {$unionWith: {coll: foreignCollName, pipeline: [{$matchTopN: {filter: {}, sort: {x: 1}, limit: 1}}]}},
+            {
+                $unionWith: {
+                    coll: foreignCollName,
+                    pipeline: [{$matchTopN: {filter: {}, sort: {x: 1}, limit: 1}}],
+                },
+            },
         ],
         expectedMainDocs: documents.filter((d) => d._id === 0),
         expectedViewDocs: [...expectedView1Docs, ...expectedForeignDocs],
@@ -425,7 +467,12 @@ runUnionWithOnViewTest({
 // view1 filters to x >= 3, view2 further filters to x <= 4, so we get docs where 3 <= x <= 4.
 {
     const view1Name = makeViewName("chain_v1");
-    assert.commandWorked(testDb.createView(view1Name, collName, [{$testBar: {noop: true}}, {$match: {x: {$gte: 3}}}]));
+    assert.commandWorked(
+        testDb.createView(view1Name, collName, [
+            {$testBar: {noop: true}},
+            {$match: {x: {$gte: 3}}},
+        ]),
+    );
 
     runUnionWithOnViewTest({
         desc: "view chain where each view has extension",
@@ -470,9 +517,18 @@ runUnionWithOnViewTest({
  * Extract the explain output for a $unionWith subpipeline and validate that the expected
  * extension stage appears with correct parameters.
  */
-function verifyExtensionStageInUnionWithSubpipeline(explainOutput, expectedStage, expectedParams, verbosity) {
+function verifyExtensionStageInUnionWithSubpipeline(
+    explainOutput,
+    expectedStage,
+    expectedParams,
+    verbosity,
+) {
     const unionWithStages = getAggPlanStages(explainOutput, "$unionWith");
-    assert.gt(unionWithStages.length, 0, `Expected $unionWith in explain output: ${tojson(explainOutput)}`);
+    assert.gt(
+        unionWithStages.length,
+        0,
+        `Expected $unionWith in explain output: ${tojson(explainOutput)}`,
+    );
 
     for (const unionWithStage of unionWithStages) {
         const subpipelineExplain = unionWithStage["$unionWith"]["pipeline"];
@@ -491,7 +547,11 @@ function verifyExtensionStageInUnionWithSubpipeline(explainOutput, expectedStage
         );
 
         const stageOutput = extensionStages[0];
-        assert.eq(stageOutput[expectedStage], expectedParams, `Stage params mismatch: ${tojson(stageOutput)}`);
+        assert.eq(
+            stageOutput[expectedStage],
+            expectedParams,
+            `Stage params mismatch: ${tojson(stageOutput)}`,
+        );
 
         // Verify execution stats are populated for non-queryPlanner verbosity by checking for a
         // metric that the $explain extension itself provides.
@@ -509,28 +569,41 @@ function verifyExtensionStageInUnionWithSubpipeline(explainOutput, expectedStage
 // collections and the $unionWith explain is not directly comparable.
 if (!FixtureHelpers.isMongos(db)) {
     (function testExplain_ExtensionInViewDefinition() {
-        jsTest.log.info("Testing explain: extension stage in view definition populates explain output");
+        jsTest.log.info(
+            "Testing explain: extension stage in view definition populates explain output",
+        );
 
         // Use $explain extension which has well-defined explain serialization behavior.
         const viewName = makeViewName("explain_ext_in_view_def");
-        assert.commandWorked(testDb.createView(viewName, collName, [{$explain: {input: "fromView"}}]));
+        assert.commandWorked(
+            testDb.createView(viewName, collName, [{$explain: {input: "fromView"}}]),
+        );
 
         for (const verbosity of ["queryPlanner", "executionStats"]) {
             const explain = coll.explain(verbosity).aggregate([{$unionWith: viewName}]);
-            verifyExtensionStageInUnionWithSubpipeline(explain, "$explain", {input: "fromView", verbosity}, verbosity);
+            verifyExtensionStageInUnionWithSubpipeline(
+                explain,
+                "$explain",
+                {input: "fromView", verbosity},
+                verbosity,
+            );
         }
 
         dropView(viewName);
     })();
 
     (function testExplain_ExtensionInSubpipelineOnView() {
-        jsTest.log.info("Testing explain: extension stage in subpipeline on view populates explain output");
+        jsTest.log.info(
+            "Testing explain: extension stage in subpipeline on view populates explain output",
+        );
 
         // View has no extension, but the $unionWith subpipeline does.
         const viewName = makeViewName("explain_ext_in_subpipeline");
         assert.commandWorked(testDb.createView(viewName, collName, [{$match: {x: {$gte: 1}}}]));
 
-        const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$explain: {input: "fromSubpipeline"}}]}}];
+        const pipeline = [
+            {$unionWith: {coll: viewName, pipeline: [{$explain: {input: "fromSubpipeline"}}]}},
+        ];
         for (const verbosity of ["queryPlanner", "executionStats"]) {
             const explain = coll.explain(verbosity).aggregate(pipeline);
             verifyExtensionStageInUnionWithSubpipeline(

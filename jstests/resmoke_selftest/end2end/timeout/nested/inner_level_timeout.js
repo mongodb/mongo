@@ -5,7 +5,8 @@ rst.startSet();
 rst.initiate();
 
 // Signal that the test has started running
-let sentinelPath = (_getEnv("TMPDIR") || _getEnv("TMP_DIR") || "/tmp") + "/inner_level_timeout.js.sentinel";
+let sentinelPath =
+    (_getEnv("TMPDIR") || _getEnv("TMP_DIR") || "/tmp") + "/inner_level_timeout.js.sentinel";
 removeFile(sentinelPath);
 
 while (true) {

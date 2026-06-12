@@ -17,6 +17,8 @@ function runCommandOverride(conn, dbName, commandName, commandObj, func, makeFun
     return serverResponse;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/config_fuzzer_incompatible_commands.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/config_fuzzer_incompatible_commands.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandOverride);

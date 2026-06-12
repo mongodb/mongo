@@ -33,7 +33,10 @@ let doTest = function (count) {
     // Try to read the document using a large projection
     try {
         let findCount = testDB.collection.find({_id: id}, projection).itcount();
-        assert(findCount == 1, "Failed to find single stored document, find().itcount() == " + findCount);
+        assert(
+            findCount == 1,
+            "Failed to find single stored document, find().itcount() == " + findCount,
+        );
     } catch (e) {
         testDB.dropDatabase();
         doassert("Test FAILED!  Caught exception " + tojsononeline(e));

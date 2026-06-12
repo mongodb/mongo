@@ -56,7 +56,8 @@ assert.commandWorked(testDB.signal.insert({done: true}));
 awaitShell();
 
 // After the index build completion the indexBulkBuilder.memUsage should reset back to zero
-const memUsage = assert.commandWorked(primary.getDB("admin").serverStatus()).indexBulkBuilder.memUsage;
+const memUsage = assert.commandWorked(primary.getDB("admin").serverStatus()).indexBulkBuilder
+    .memUsage;
 assert.eq(memUsage, 0);
 
 replSet.stopSet();

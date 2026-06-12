@@ -19,7 +19,9 @@ assert.commandWorked(
     ]),
 );
 
-const result = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {s: {$binarySize: "$x"}}}]).toArray();
+const result = coll
+    .aggregate([{$sort: {_id: 1}}, {$addFields: {s: {$binarySize: "$x"}}}])
+    .toArray();
 assert.eq(result, [
     {_id: 0, x: "", s: 0},
     {_id: 1, x: "abc", s: 3},

@@ -35,7 +35,9 @@ const coll = reshardingTest.createShardedCollection({
 const db = coll.getDB();
 
 assert.commandWorked(coll.insert({data: 1, ts: new Date(), metaTest: {x: -1, y: -1, z: 0}}));
-assert.commandWorked(coll.createIndexes([{indexToDropDuringResharding: 1}, {indexToDropAfterResharding: 1}]));
+assert.commandWorked(
+    coll.createIndexes([{indexToDropDuringResharding: 1}, {indexToDropAfterResharding: 1}]),
+);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(
@@ -72,7 +74,10 @@ reshardingTest.withReshardingInBackground(
                 updates: [{q: {"metaTest.x": -1}, u: {$set: {"metaTest.x": -15}}, multi: true}],
                 maxTimeMS: 3000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
+            assert(
+                ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code),
+                tojson(res),
+            );
 
             res = getTimeseriesCollForRawOps(db, coll).runCommand({
                 update: getTimeseriesCollForRawOps(db, coll).getName(),
@@ -80,7 +85,10 @@ reshardingTest.withReshardingInBackground(
                 maxTimeMS: 3000,
                 ...getRawOperationSpec(db),
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
+            assert(
+                ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code),
+                tojson(res),
+            );
 
             jsTestLog("Attempting delete");
             res = coll.runCommand({
@@ -88,7 +96,10 @@ reshardingTest.withReshardingInBackground(
                 deletes: [{q: {"metaTest.x": -1}, limit: 1}],
                 maxTimeMS: 3000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
+            assert(
+                ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code),
+                tojson(res),
+            );
 
             res = getTimeseriesCollForRawOps(db, coll).runCommand({
                 delete: getTimeseriesCollForRawOps(db, coll).getName(),
@@ -96,7 +107,10 @@ reshardingTest.withReshardingInBackground(
                 maxTimeMS: 3000,
                 ...getRawOperationSpec(db),
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
+            assert(
+                ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code),
+                tojson(res),
+            );
 
             jsTestLog("Attempting createIndex");
             res = coll.runCommand({
@@ -123,7 +137,10 @@ reshardingTest.withReshardingInBackground(
             assert.soon(() => {
                 let ops = reshardingTest._st.s
                     .getDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command._shardsvrDropIndexes": coll.getName()}}])
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {"command._shardsvrDropIndexes": coll.getName()}},
+                    ])
                     .toArray();
                 return ops.length == 0;
             });
@@ -156,7 +173,10 @@ reshardingTest.withReshardingInBackground(
 jsTestLog("Verify that writes succeed after resharding operation has completed");
 
 assert.commandWorked(
-    coll.runCommand({insert: coll.getName(), documents: [{data: 3, ts: new Date(), metaTest: {x: -2, y: -2}}]}),
+    coll.runCommand({
+        insert: coll.getName(),
+        documents: [{data: 3, ts: new Date(), metaTest: {x: -2, y: -2}}],
+    }),
 );
 
 assert.commandWorked(
@@ -166,14 +186,21 @@ assert.commandWorked(
     }),
 );
 
-assert.commandWorked(coll.runCommand({delete: coll.getName(), deletes: [{q: {"metaTest.x": -1}, limit: 1}]}));
+assert.commandWorked(
+    coll.runCommand({delete: coll.getName(), deletes: [{q: {"metaTest.x": -1}, limit: 1}]}),
+);
 
 assert.commandWorked(
-    coll.runCommand({createIndexes: coll.getName(), indexes: [{key: {"metaTest.z": 1}, name: "metatestz_0"}]}),
+    coll.runCommand({
+        createIndexes: coll.getName(),
+        indexes: [{key: {"metaTest.z": 1}, name: "metatestz_0"}],
+    }),
 );
 
 assert.commandWorked(coll.runCommand({collMod: coll.getName()}));
 
-assert.commandWorked(coll.runCommand({dropIndexes: coll.getName(), index: {indexToDropAfterResharding: 1}}));
+assert.commandWorked(
+    coll.runCommand({dropIndexes: coll.getName(), index: {indexToDropAfterResharding: 1}}),
+);
 
 reshardingTest.teardown();

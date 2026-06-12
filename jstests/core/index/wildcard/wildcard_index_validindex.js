@@ -30,7 +30,11 @@ IndexCatalogHelpers.createIndexAndVerifyWithDrop(
 );
 
 // Can create a wildcard index with index level collation.
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, {"$**": 1}, {collation: {locale: "fr"}, name: kIndexName});
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll,
+    {"$**": 1},
+    {collation: {locale: "fr"}, name: kIndexName},
+);
 
 // Can create a wildcard index with an inclusion projection.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(
@@ -63,20 +67,29 @@ assert.commandFailedWithCode(coll.createIndex({"$**": 0}), ErrorCodes.CannotCrea
 assert.commandWorked(coll.createIndex({"$**": -1}));
 
 // Cannot create a wildcard index with sparse option.
-assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {sparse: true}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({"$**": 1}, {sparse: true}),
+    ErrorCodes.CannotCreateIndex,
+);
 
 // Cannot create a wildcard index with a v0 or v1 index.
 assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {v: 0}), ErrorCodes.CannotCreateIndex);
 assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {v: 1}), ErrorCodes.CannotCreateIndex);
 
 // Cannot create a unique index.
-assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {unique: true}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({"$**": 1}, {unique: true}),
+    ErrorCodes.CannotCreateIndex,
+);
 
 // Cannot create a hashed wildcard index.
 assert.commandFailedWithCode(coll.createIndex({"$**": "hashed"}), ErrorCodes.CannotCreateIndex);
 
 // Cannot create a TTL wildcard index.
-assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {expireAfterSeconds: 3600}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({"$**": 1}, {expireAfterSeconds: 3600}),
+    ErrorCodes.CannotCreateIndex,
+);
 
 // Cannot create a geoSpatial wildcard index.
 assert.commandFailedWithCode(coll.createIndex({"$**": "2dsphere"}), ErrorCodes.CannotCreateIndex);
@@ -86,7 +99,10 @@ assert.commandFailedWithCode(coll.createIndex({"$**": "2d"}), ErrorCodes.CannotC
 assert.commandFailedWithCode(coll.createIndex({"a.$**": "text"}), ErrorCodes.CannotCreateIndex);
 
 // Cannot specify plugin by string.
-assert.commandFailedWithCode(coll.createIndex({"a": "wildcard"}), [ErrorCodes.CannotCreateIndex, 7246202]);
+assert.commandFailedWithCode(coll.createIndex({"a": "wildcard"}), [
+    ErrorCodes.CannotCreateIndex,
+    7246202,
+]);
 assert.commandFailedWithCode(coll.createIndex({"$**": "wildcard"}), ErrorCodes.CannotCreateIndex);
 
 // Cannot create an wildcard index with an invalid spec.
@@ -96,7 +112,11 @@ assert.commandFailedWithCode(coll.createIndex({"$**": "hello"}), ErrorCodes.Cann
 
 // Cannot create an wildcard index with mixed inclusion exclusion.
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 0}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"$**": 1},
+        {name: kIndexName, wildcardProjection: {a: 1, b: 0}},
+    ),
     31254,
 );
 // Cannot create an wildcard index with computed fields.
@@ -110,22 +130,38 @@ assert.commandFailedWithCode(
 );
 // Cannot create an wildcard index with an empty projection.
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"$**": 1}, {name: kIndexName, wildcardProjection: {}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"$**": 1},
+        {name: kIndexName, wildcardProjection: {}},
+    ),
     ErrorCodes.FailedToParse,
 );
 // Cannot create another index type with "wildcardProjection" projection.
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"a": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"a": 1},
+        {name: kIndexName, wildcardProjection: {a: 1, b: 1}},
+    ),
     ErrorCodes.BadValue,
 );
 // Cannot create a text index with a "wildcardProjection" projection.
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"$**": "text"}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"$**": "text"},
+        {name: kIndexName, wildcardProjection: {a: 1, b: 1}},
+    ),
     ErrorCodes.BadValue,
 );
 // Cannot create an wildcard index with a non-object "wildcardProjection" projection.
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: "string"}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"a.$**": 1},
+        {name: kIndexName, wildcardProjection: "string"},
+    ),
     ErrorCodes.TypeMismatch,
 );
 // Cannot exclude an subfield of _id in an inclusion.
@@ -141,11 +177,19 @@ assert.commandFailedWithCode(
 
 // Cannot specify both a subpath and a projection.
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: {a: 1}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"a.$**": 1},
+        {name: kIndexName, wildcardProjection: {a: 1}},
+    ),
     ErrorCodes.FailedToParse,
 );
 assert.commandFailedWithCode(
-    IndexCatalogHelpers.createSingleIndex(coll, {"a.$**": 1}, {name: kIndexName, wildcardProjection: {b: 0}}),
+    IndexCatalogHelpers.createSingleIndex(
+        coll,
+        {"a.$**": 1},
+        {name: kIndexName, wildcardProjection: {b: 0}},
+    ),
     ErrorCodes.FailedToParse,
 );
 
@@ -153,7 +197,9 @@ assert.commandFailedWithCode(
 const clusteredCollName = "wildcard_clustered";
 const clusteredColl = db[clusteredCollName];
 assertDropCollection(db, clusteredCollName);
-assert.commandWorked(db.runCommand({create: clusteredCollName, clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 assert.commandWorked(IndexCatalogHelpers.createSingleIndex(coll, {"$**": 1}, {name: kIndexName}));
 
 // Test that you cannot cluster a collection using a wildcard index.

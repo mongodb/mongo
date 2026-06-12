@@ -27,7 +27,8 @@ function checkValidate(maxMemoryUsage, {minMissingKeys, maxMissingKeys}) {
     const res = coll.validate();
     assert.commandWorked(res);
     assert(!res.valid, tojson(res));
-    const notAllReportedPrefix = "Not all index entry inconsistencies are reported due to memory limitations.";
+    const notAllReportedPrefix =
+        "Not all index entry inconsistencies are reported due to memory limitations.";
     assert.containsPrefix(notAllReportedPrefix, res.errors, tojson(res));
     assert.gte(res.missingIndexEntries.length, minMissingKeys, tojson(res));
     assert.lte(res.missingIndexEntries.length, maxMissingKeys, tojson(res));

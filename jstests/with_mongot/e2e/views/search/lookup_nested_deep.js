@@ -149,7 +149,13 @@ assert.commandWorked(
             year: 2019,
             location: "Vancouver, Canada",
         },
-        {_id: 3, name: "IEEE Quantum Week", acronym: "QCE", year: 2021, location: "Broomfield, USA"},
+        {
+            _id: 3,
+            name: "IEEE Quantum Week",
+            acronym: "QCE",
+            year: 2021,
+            location: "Broomfield, USA",
+        },
         {
             _id: 4,
             name: "IEEE International Conference on Blockchain",
@@ -183,7 +189,9 @@ const publicationsViewPipeline = [
         },
     },
 ];
-assert.commandWorked(testDb.createView("publicationsView", publications.getName(), publicationsViewPipeline));
+assert.commandWorked(
+    testDb.createView("publicationsView", publications.getName(), publicationsViewPipeline),
+);
 const publicationsView = testDb.publicationsView;
 
 const authorsViewPipeline = [
@@ -197,12 +205,20 @@ const authorsViewPipeline = [
 assert.commandWorked(testDb.createView("authorsView", authors.getName(), authorsViewPipeline));
 const authorsView = testDb.authorsView;
 
-const universitiesViewPipeline = [{$addFields: {full_name: {$concat: ["$name", " (", "$location", ")"]}}}];
-assert.commandWorked(testDb.createView("universitiesView", universities.getName(), universitiesViewPipeline));
+const universitiesViewPipeline = [
+    {$addFields: {full_name: {$concat: ["$name", " (", "$location", ")"]}}},
+];
+assert.commandWorked(
+    testDb.createView("universitiesView", universities.getName(), universitiesViewPipeline),
+);
 const universitiesView = testDb.universitiesView;
 
-const conferencesViewPipeline = [{$addFields: {full_name: {$concat: ["$name", " (", "$acronym", ")"]}}}];
-assert.commandWorked(testDb.createView("conferencesView", conferences.getName(), conferencesViewPipeline));
+const conferencesViewPipeline = [
+    {$addFields: {full_name: {$concat: ["$name", " (", "$acronym", ")"]}}},
+];
+assert.commandWorked(
+    testDb.createView("conferencesView", conferences.getName(), conferencesViewPipeline),
+);
 const conferencesView = testDb.conferencesView;
 
 const keywordsViewPipeline = [
@@ -420,7 +436,8 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                                     acronym: "ICML",
                                     year: 2020,
                                     location: "Vienna, Austria",
-                                    full_name: "International Conference on Machine Learning (ICML)",
+                                    full_name:
+                                        "International Conference on Machine Learning (ICML)",
                                     relevant_keywords: [
                                         {
                                             _id: 501,
@@ -456,7 +473,11 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                     _id: 102,
                     name: "Prof. John Davis",
                     university_id: 202,
-                    research_areas: ["Deep Learning", "Natural Language Processing", "Computer Vision"],
+                    research_areas: [
+                        "Deep Learning",
+                        "Natural Language Processing",
+                        "Computer Vision",
+                    ],
                     display_name: "Prof. John Davis (Deep Learning)",
                     primary_area: "Deep Learning",
                     university_info: [
@@ -464,7 +485,11 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                             _id: 202,
                             name: "Massachusetts Institute of Technology",
                             location: "Massachusetts, USA",
-                            departments: ["Computer Science", "Electrical Engineering", "Mathematics"],
+                            departments: [
+                                "Computer Science",
+                                "Electrical Engineering",
+                                "Mathematics",
+                            ],
                             full_name: "Massachusetts Institute of Technology (Massachusetts, USA)",
                             related_conferences: [
                                 {
@@ -473,7 +498,8 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                                     acronym: "ICML",
                                     year: 2020,
                                     location: "Vienna, Austria",
-                                    full_name: "International Conference on Machine Learning (ICML)",
+                                    full_name:
+                                        "International Conference on Machine Learning (ICML)",
                                     relevant_keywords: [
                                         {
                                             _id: 501,
@@ -521,7 +547,11 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                     _id: 102,
                     name: "Prof. John Davis",
                     university_id: 202,
-                    research_areas: ["Deep Learning", "Natural Language Processing", "Computer Vision"],
+                    research_areas: [
+                        "Deep Learning",
+                        "Natural Language Processing",
+                        "Computer Vision",
+                    ],
                     display_name: "Prof. John Davis (Deep Learning)",
                     primary_area: "Deep Learning",
                     university_info: [
@@ -529,7 +559,11 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                             _id: 202,
                             name: "Massachusetts Institute of Technology",
                             location: "Massachusetts, USA",
-                            departments: ["Computer Science", "Electrical Engineering", "Mathematics"],
+                            departments: [
+                                "Computer Science",
+                                "Electrical Engineering",
+                                "Mathematics",
+                            ],
                             full_name: "Massachusetts Institute of Technology (Massachusetts, USA)",
                             related_conferences: [
                                 {
@@ -538,7 +572,8 @@ const lookupNestedDeepTestCases = (isStoredSource) => {
                                     acronym: "ICML",
                                     year: 2020,
                                     location: "Vienna, Austria",
-                                    full_name: "International Conference on Machine Learning (ICML)",
+                                    full_name:
+                                        "International Conference on Machine Learning (ICML)",
                                     relevant_keywords: [
                                         {
                                             _id: 501,

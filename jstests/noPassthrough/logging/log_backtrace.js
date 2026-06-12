@@ -17,7 +17,11 @@ function waitFailedToStart(pid, exitCode) {
         3 * 60 * 1000,
     );
 
-    assert.eq(exitCode, checkProgram(pid).exitCode, `Failed to wait for ${pid} to die with exit code ${exitCode}`);
+    assert.eq(
+        exitCode,
+        checkProgram(pid).exitCode,
+        `Failed to wait for ${pid} to die with exit code ${exitCode}`,
+    );
 }
 
 function parseLogFile(file) {

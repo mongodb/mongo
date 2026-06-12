@@ -16,7 +16,10 @@ const testCase = {
         {_id: 1, input: {a: "a"}},
     ],
     pipeline: [{$project: {_id: 0, output: {$convert: {input: "$input", to: "binData"}}}}],
-    result: [{output: BinData(0, "DgAAAAJhAAIAAABhAAA=")}, {output: BinData(0, "DgAAAAJhAAIAAABhAAA=")}],
+    result: [
+        {output: BinData(0, "DgAAAAJhAAIAAABhAAA=")},
+        {output: BinData(0, "DgAAAAJhAAIAAABhAAA=")},
+    ],
 };
 
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
@@ -46,7 +49,10 @@ function assertCreateViewAndEvaluateViewOrAggregateFail(primaryConnection) {
     // evaluating it should fail with ConversionFailure.
     db[viewName].drop();
     assert.commandWorked(db.createView(viewName, collectionName, testCase.pipeline));
-    assert.commandFailedWithCode(db.runCommand({find: viewName, filter: {}}), ErrorCodes.ConversionFailure);
+    assert.commandFailedWithCode(
+        db.runCommand({find: viewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
 
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collectionName, cursor: {}, pipeline: testCase.pipeline}),

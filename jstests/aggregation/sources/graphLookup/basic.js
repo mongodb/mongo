@@ -21,7 +21,8 @@ const basicGraphLookup = {
 assert.eq(
     local.aggregate([basicGraphLookup]).toArray().length,
     0,
-    "expected an empty result set for a $graphLookup with non-existent local and foreign " + "collections",
+    "expected an empty result set for a $graphLookup with non-existent local and foreign " +
+        "collections",
 );
 
 assert.commandWorked(foreign.insert({}));

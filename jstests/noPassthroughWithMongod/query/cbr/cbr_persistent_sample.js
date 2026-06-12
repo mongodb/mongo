@@ -31,7 +31,11 @@ if (!FeatureFlagUtil.isEnabled(db, "PersistentStats")) {
 const collName = jsTestName();
 const coll = db[collName];
 const kSourceSize = 1000;
-const kSourceDocs = Array.from({length: kSourceSize}, (_, i) => ({_id: i, a: i, tag: "from_source"}));
+const kSourceDocs = Array.from({length: kSourceSize}, (_, i) => ({
+    _id: i,
+    a: i,
+    tag: "from_source",
+}));
 const kSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
 const kNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
 
@@ -72,35 +76,69 @@ try {
 
     {
         jsTest.log.info("Testing random sampling technique with a persistent sample hit");
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
+        );
         resetCollections();
 
         // Collect a sample
-        db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random", sampleSize: kSampleSize});
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            samplingMethod: "random",
+            sampleSize: kSampleSize,
+        });
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
         assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
         assert.eq(meta.sampleTechnique, "random", "expected random technique", {meta});
-        assert.eq(meta.sampleDocCount, kSampleSize, "expected docCount to match persisted sample size", {meta});
-        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
-        assert(!meta.hasOwnProperty("sampleNumChunks"), "random technique should not have numChunks", {meta});
+        assert.eq(
+            meta.sampleDocCount,
+            kSampleSize,
+            "expected docCount to match persisted sample size",
+            {meta},
+        );
+        assert.eq(
+            meta.sampleRequestedDocCount,
+            kSampleSize,
+            "expected requestedDocCount to match",
+            {meta},
+        );
+        assert(
+            !meta.hasOwnProperty("sampleNumChunks"),
+            "random technique should not have numChunks",
+            {meta},
+        );
     }
 
     {
         jsTest.log.info("Testing random sampling technique with a persistent sample miss");
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
+        );
         resetCollections();
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
         assert.eq(meta.sampleSource, "onTheFly", "expected on-the-fly sample on miss", {meta});
         assert.eq(meta.sampleTechnique, "random", "expected random technique", {meta});
-        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
-        assert(!meta.hasOwnProperty("sampleNumChunks"), "random technique should not have numChunks", {meta});
+        assert.eq(
+            meta.sampleRequestedDocCount,
+            kSampleSize,
+            "expected requestedDocCount to match",
+            {meta},
+        );
+        assert(
+            !meta.hasOwnProperty("sampleNumChunks"),
+            "random technique should not have numChunks",
+            {meta},
+        );
     }
 
     {
         jsTest.log.info("Testing chunk sampling technique with a persistent sample hit");
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}),
+        );
         resetCollections();
 
         // Collect a sample
@@ -116,8 +154,17 @@ try {
         // sampleSize; compare sampleDocCount against what was actually stored, not the request size.
         const storedDocCount = (() => {
             const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-            const id = PersistentSamplesUtils.getExpectedId(uuid, "chunk", kSampleSize, 1, kNumChunks);
-            const doc = PersistentSamplesUtils.getSampleDoc(PersistentSamplesUtils.getSamplesColl(db), id);
+            const id = PersistentSamplesUtils.getExpectedId(
+                uuid,
+                "chunk",
+                kSampleSize,
+                1,
+                kNumChunks,
+            );
+            const doc = PersistentSamplesUtils.getSampleDoc(
+                PersistentSamplesUtils.getSamplesColl(db),
+                id,
+            );
             return doc[PersistentSamplesUtils.sampleDocFieldNames.docsField].length;
         })();
 
@@ -125,20 +172,37 @@ try {
         assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
         assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
         assert.eq(meta.sampleNumChunks, kNumChunks, "expected numChunks to match", {meta});
-        assert.eq(meta.sampleDocCount, storedDocCount, "expected docCount to match persisted sample size", {meta});
-        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
+        assert.eq(
+            meta.sampleDocCount,
+            storedDocCount,
+            "expected docCount to match persisted sample size",
+            {meta},
+        );
+        assert.eq(
+            meta.sampleRequestedDocCount,
+            kSampleSize,
+            "expected requestedDocCount to match",
+            {meta},
+        );
     }
 
     {
         jsTest.log.info("Testing chunk sampling technique with a persistent sample miss");
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}),
+        );
         resetCollections();
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
         assert.eq(meta.sampleSource, "onTheFly", "expected on-the-fly sample on miss", {meta});
         assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
         assert.eq(meta.sampleNumChunks, kNumChunks, "expected numChunks to match", {meta});
-        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
+        assert.eq(
+            meta.sampleRequestedDocCount,
+            kSampleSize,
+            "expected requestedDocCount to match",
+            {meta},
+        );
     }
 } finally {
     setCBRConfig(db, prevCBRConfig);

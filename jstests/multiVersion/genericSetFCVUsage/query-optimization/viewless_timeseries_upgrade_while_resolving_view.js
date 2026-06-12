@@ -28,17 +28,23 @@ const testDB = primary.getDB(dbName);
 const coll = testDB[collName];
 
 // Create timeseries in viewful format.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t"}}));
 assert.commandWorked(coll.insertOne({t: ISODate()}));
 
 // Pause aggregation after resolving the view but before acquiring buckets.
-const fp = configureFailPoint(primary, "hangAfterAcquiringCollectionCatalog", {collection: collName});
+const fp = configureFailPoint(primary, "hangAfterAcquiringCollectionCatalog", {
+    collection: collName,
+});
 
 const aggThread = new Thread(
     function (host, dbName, collName) {
         const conn = new Mongo(host);
-        const result = conn.getDB(dbName).runCommand({aggregate: collName, pipeline: [], cursor: {}});
+        const result = conn
+            .getDB(dbName)
+            .runCommand({aggregate: collName, pipeline: [], cursor: {}});
         assert.commandWorked(result);
         assert.eq(1, result.cursor.firstBatch.length);
     },
@@ -51,7 +57,9 @@ aggThread.start();
 fp.wait();
 
 // Upgrade FCV while aggregation is paused - converts viewful to viewless.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 // Release aggregation. We expect non-empty results.
 fp.off();

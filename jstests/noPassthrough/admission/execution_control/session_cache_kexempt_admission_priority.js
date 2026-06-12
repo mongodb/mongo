@@ -50,16 +50,23 @@ describe("Session cache operations use kExempt admission priority", function () 
         ).executionControlConcurrentWriteTransactions;
 
         // Set write concurrency to 0 to block all non-exempt write operations.
-        assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}));
+        assert.commandWorked(
+            primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}),
+        );
 
         try {
             // Session refresh must complete because it uses kExempt admission priority and
             // bypasses the ticket queue entirely.
-            assert.commandWorked(primary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+            assert.commandWorked(
+                primary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+            );
         } finally {
             // Restore write ticket concurrency to avoid affecting subsequent tests.
             assert.commandWorked(
-                primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: origWriteTickets}),
+                primary.adminCommand({
+                    setParameter: 1,
+                    executionControlConcurrentWriteTransactions: origWriteTickets,
+                }),
             );
         }
 
@@ -67,10 +74,15 @@ describe("Session cache operations use kExempt admission priority", function () 
         // _activeSessions was empty the refresh would be a no-op and the test would prove
         // nothing about write-ticket exemption.
         const sessionDocsAfter = primary.getDB("config").system.sessions.countDocuments({});
-        assert.gt(sessionDocsAfter, sessionDocsBefore, "expected session to be upserted into config.system.sessions", {
-            sessionDocsBefore,
+        assert.gt(
             sessionDocsAfter,
-        });
+            sessionDocsBefore,
+            "expected session to be upserted into config.system.sessions",
+            {
+                sessionDocsBefore,
+                sessionDocsAfter,
+            },
+        );
     });
 
     it("should complete session reap even when write ticket concurrency is zero", function () {
@@ -87,7 +99,9 @@ describe("Session cache operations use kExempt admission priority", function () 
         ).executionControlConcurrentWriteTransactions;
 
         // Set write concurrency to 0 to block all non-exempt write operations.
-        assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}));
+        assert.commandWorked(
+            primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}),
+        );
 
         try {
             // Session reap must complete because it uses kExempt admission priority and
@@ -95,7 +109,10 @@ describe("Session cache operations use kExempt admission priority", function () 
             assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
         } finally {
             assert.commandWorked(
-                primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: origWriteTickets}),
+                primary.adminCommand({
+                    setParameter: 1,
+                    executionControlConcurrentWriteTransactions: origWriteTickets,
+                }),
             );
         }
 
@@ -103,10 +120,15 @@ describe("Session cache operations use kExempt admission priority", function () 
         // due to an error the job count would be unchanged.
         const reaperJobsAfter = primary.adminCommand({serverStatus: 1}).logicalSessionRecordCache
             .transactionReaperJobCount;
-        assert.gt(reaperJobsAfter, reaperJobsBefore, "expected the reaper to have run at least one job cycle", {
-            reaperJobsBefore,
+        assert.gt(
             reaperJobsAfter,
-        });
+            reaperJobsBefore,
+            "expected the reaper to have run at least one job cycle",
+            {
+                reaperJobsBefore,
+                reaperJobsAfter,
+            },
+        );
     });
 
     it("should increment the exempt write admission counter when refreshing sessions", function () {
@@ -166,15 +188,22 @@ describe("Session cache operations use kExempt admission priority", function () 
         ).executionControlConcurrentReadTransactions;
 
         // Set read concurrency to 0 to block all non-exempt read operations.
-        assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlConcurrentReadTransactions: 0}));
+        assert.commandWorked(
+            primary.adminCommand({setParameter: 1, executionControlConcurrentReadTransactions: 0}),
+        );
 
         try {
             // Session refresh reads config.system.sessions (findRemovedSessions); this must
             // complete because it uses kExempt admission priority.
-            assert.commandWorked(primary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+            assert.commandWorked(
+                primary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+            );
         } finally {
             assert.commandWorked(
-                primary.adminCommand({setParameter: 1, executionControlConcurrentReadTransactions: origReadTickets}),
+                primary.adminCommand({
+                    setParameter: 1,
+                    executionControlConcurrentReadTransactions: origReadTickets,
+                }),
             );
         }
 
@@ -182,9 +211,14 @@ describe("Session cache operations use kExempt admission priority", function () 
         // write uses write tickets which are not restricted here, so a count increase proves
         // the refresh executed its full pipeline rather than bailing out early.
         const sessionDocsAfter = primary.getDB("config").system.sessions.countDocuments({});
-        assert.gt(sessionDocsAfter, sessionDocsBefore, "expected session to be upserted into config.system.sessions", {
-            sessionDocsBefore,
+        assert.gt(
             sessionDocsAfter,
-        });
+            sessionDocsBefore,
+            "expected session to be upserted into config.system.sessions",
+            {
+                sessionDocsBefore,
+                sessionDocsAfter,
+            },
+        );
     });
 });

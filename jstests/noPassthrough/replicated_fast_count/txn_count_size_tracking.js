@@ -34,7 +34,11 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
 
 if (
-    PersistenceProviderUtil.allNodesHavePropertyWithValue(testDB, "shouldUseReplicatedFastCount", false) &&
+    PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        testDB,
+        "shouldUseReplicatedFastCount",
+        false,
+    ) &&
     !FeatureFlagUtil.isEnabled(testDB, "ReplicatedFastCount")
 ) {
     rst.stopSet();
@@ -80,10 +84,15 @@ function doTxnOps(sessionColl1, sessionColl2, opType, opCount) {
             countDelta += 1;
             sizeDelta += Object.bsonsize(doc);
         } else if (opType === "update") {
-            assert.commandWorked(sessionColl1.update({_id: i + 1}, {$set: {payload: "x".repeat(200)}}));
-            assert.commandWorked(sessionColl2.update({_id: i + 1}, {$set: {payload: "x".repeat(200)}}));
+            assert.commandWorked(
+                sessionColl1.update({_id: i + 1}, {$set: {payload: "x".repeat(200)}}),
+            );
+            assert.commandWorked(
+                sessionColl2.update({_id: i + 1}, {$set: {payload: "x".repeat(200)}}),
+            );
             sizeDelta +=
-                Object.bsonsize({_id: i + 1, x: "a", payload: "x".repeat(200)}) - Object.bsonsize({_id: i + 1, x: "a"});
+                Object.bsonsize({_id: i + 1, x: "a", payload: "x".repeat(200)}) -
+                Object.bsonsize({_id: i + 1, x: "a"});
         } else {
             // "delete"
             const doc = {_id: i + 1, x: "a"};
@@ -121,7 +130,8 @@ function doMixedTxnOps(sessionColl1, sessionColl2, opCount) {
         assert.commandWorked(sessionColl1.update({_id: i + 1}, {$set: {payload: "x".repeat(200)}}));
         assert.commandWorked(sessionColl2.update({_id: i + 1}, {$set: {payload: "x".repeat(200)}}));
         sizeDelta +=
-            Object.bsonsize({_id: i + 1, x: "a", payload: "x".repeat(200)}) - Object.bsonsize({_id: i + 1, x: "a"});
+            Object.bsonsize({_id: i + 1, x: "a", payload: "x".repeat(200)}) -
+            Object.bsonsize({_id: i + 1, x: "a"});
     }
 
     for (let i = 0; i < opCount; i++) {
@@ -144,7 +154,9 @@ function doMixedTxnOps(sessionColl1, sessionColl2, opCount) {
  * @param {string}  opType           - "insert", "update", or "delete".
  */
 function runTest(testName, {commit, chainedApplyOps, opType}) {
-    jsTestLog(`${testName}: commit=${commit}, chainedApplyOps=${chainedApplyOps}, opType=${opType}`);
+    jsTestLog(
+        `${testName}: commit=${commit}, chainedApplyOps=${chainedApplyOps}, opType=${opType}`,
+    );
 
     const coll1 = testDB["txn_count_size_1"];
     const coll2 = testDB["txn_count_size_2"];
@@ -216,8 +228,15 @@ function runTest(testName, {commit, chainedApplyOps, opType}) {
             // Confirm the oplog contains exactly 4 chained applyOps entries for this transaction.
             const txnNum = session.getTxnNumber_forTesting();
             const sessionId = session.getSessionId().id;
-            const txnOps = primary.getDB("local")["oplog.rs"].find({"lsid.id": sessionId, txnNumber: txnNum}).toArray();
-            assert.eq(txnOps.length, 4, "expected 4 chained applyOps entries; got: " + tojson(txnOps));
+            const txnOps = primary
+                .getDB("local")
+                ["oplog.rs"].find({"lsid.id": sessionId, txnNumber: txnNum})
+                .toArray();
+            assert.eq(
+                txnOps.length,
+                4,
+                "expected 4 chained applyOps entries; got: " + tojson(txnOps),
+            );
         }
     } else {
         assert.commandWorked(session.abortTransaction_forTesting());

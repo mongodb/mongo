@@ -16,7 +16,9 @@ function testRS(opts, expectWarning) {
     rs.awaitReplication();
 
     function checkWarning(member) {
-        const observed = /[N,n]o SSL certificate provided by peer/.test(cat(member.fullOptions.logFile));
+        const observed = /[N,n]o SSL certificate provided by peer/.test(
+            cat(member.fullOptions.logFile),
+        );
         assert.eq(observed, expectWarning);
     }
     checkWarning(rs.getPrimary());

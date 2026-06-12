@@ -7,7 +7,12 @@ p.createIndex({ts: 1});
 assert.eq(
     1,
     p
-        .find({live: true, ts: {$lt: new Date(1234119308272)}, cls: "entry", verticals: "alleyinsider"})
+        .find({
+            live: true,
+            ts: {$lt: new Date(1234119308272)},
+            cls: "entry",
+            verticals: "alleyinsider",
+        })
         .sort({ts: -1})
         .hint({ts: 1})
         .count(),

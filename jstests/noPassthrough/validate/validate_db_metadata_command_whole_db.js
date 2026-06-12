@@ -67,7 +67,9 @@ function runTest(conn) {
     // Create a view which uses unstable expression and verify that validateDBMetadata commands
     // throws an assertion.
     const viewName = "view1";
-    const view = testDB.createView(viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
+    const view = testDB.createView(viewName, coll2.getName(), [
+        {$project: {v: {$_testApiVersion: {unstable: true}}}},
+    ]);
 
     validate({apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
     validate({apiStrict: false});
@@ -79,7 +81,9 @@ function runTest(conn) {
 
     const validatorCollName = "validator";
     assert.commandWorked(
-        testDB.createCollection(validatorCollName, {validator: {$expr: {$_testApiVersion: {unstable: true}}}}),
+        testDB.createCollection(validatorCollName, {
+            validator: {$expr: {$_testApiVersion: {unstable: true}}},
+        }),
     );
 
     validate({apiStrict: true, error: {code: ErrorCodes.APIStrictError}});

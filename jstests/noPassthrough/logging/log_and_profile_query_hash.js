@@ -30,7 +30,10 @@ assert.commandWorked(testDB.setLogLevel(0, "query"));
 // Returns true if the logLine command components correspond to the profile entry. This is
 // sufficient for the purpose of testing 'planCacheShapeHash'.
 function logMatchesEntry(logLine, profileEntry) {
-    return logLine.indexOf('command":{"find":"test"') >= 0 && logLine.indexOf(profileEntry["command"]["comment"]) >= 0;
+    return (
+        logLine.indexOf('command":{"find":"test"') >= 0 &&
+        logLine.indexOf(profileEntry["command"]["comment"]) >= 0
+    );
 }
 
 // Fetch the log line that corresponds to the profile entry. If there is no such line, return
@@ -160,7 +163,8 @@ const creationLogList = log.filter(
     (logLine) =>
         logLine.indexOf("Creating inactive cache entry for query") != -1 &&
         logLine.indexOf('"planCacheKey":"' + String(onCreationHashes.planCacheKey)) != -1 &&
-        logLine.indexOf('"planCacheShapeHash":"' + String(onCreationHashes.planCacheShapeHash)) != -1,
+        logLine.indexOf('"planCacheShapeHash":"' + String(onCreationHashes.planCacheShapeHash)) !=
+            -1,
 );
 assert.eq(1, creationLogList.length);
 

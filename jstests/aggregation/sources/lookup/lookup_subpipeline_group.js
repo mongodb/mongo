@@ -35,8 +35,9 @@ assert.commandWorked(fromColl.createIndex({key: 1, num: -1}));
 assert.commandWorked(fromColl.createIndex({key: 1, num: -1, other: 1}));
 
 function assertLookupResults({pipeline, expected}) {
-    const actual = assert.commandWorked(db.runCommand({aggregate: baseCollName, pipeline, cursor: {batchSize: 100}}))
-        .cursor.firstBatch;
+    const actual = assert.commandWorked(
+        db.runCommand({aggregate: baseCollName, pipeline, cursor: {batchSize: 100}}),
+    ).cursor.firstBatch;
     assertArrayEq({expected, actual});
 }
 
@@ -126,7 +127,14 @@ assertLookupResults({
             $lookup: {
                 from: fromCollName,
                 as: fromCollName,
-                pipeline: [{$group: {_id: "$key", top: {$top: {output: "$num", sortBy: {key: -1, num: 1}}}}}],
+                pipeline: [
+                    {
+                        $group: {
+                            _id: "$key",
+                            top: {$top: {output: "$num", sortBy: {key: -1, num: 1}}},
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -161,7 +169,14 @@ assertLookupResults({
                 as: fromCollName,
                 localField: "key",
                 foreignField: "key",
-                pipeline: [{$group: {_id: "$key", top: {$top: {output: "$num", sortBy: {key: 1, num: -1}}}}}],
+                pipeline: [
+                    {
+                        $group: {
+                            _id: "$key",
+                            top: {$top: {output: "$num", sortBy: {key: 1, num: -1}}},
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -180,7 +195,14 @@ assertLookupResults({
                 as: fromCollName,
                 localField: "key",
                 foreignField: "key",
-                pipeline: [{$group: {_id: "$key", bottom: {$bottom: {output: "$num", sortBy: {key: 1, num: -1}}}}}],
+                pipeline: [
+                    {
+                        $group: {
+                            _id: "$key",
+                            bottom: {$bottom: {output: "$num", sortBy: {key: 1, num: -1}}},
+                        },
+                    },
+                ],
             },
         },
         {$unwind: {path: "$" + fromCollName}},
@@ -200,7 +222,10 @@ assertLookupResults({
             $lookup: {
                 from: fromCollName,
                 as: fromCollName,
-                pipeline: [{$sort: {key: -1, num: 1}}, {$group: {_id: "$key", first: {$first: "$num"}}}],
+                pipeline: [
+                    {$sort: {key: -1, num: 1}},
+                    {$group: {_id: "$key", first: {$first: "$num"}}},
+                ],
             },
         },
     ],
@@ -235,7 +260,10 @@ assertLookupResults({
                 as: fromCollName,
                 localField: "key",
                 foreignField: "key",
-                pipeline: [{$sort: {key: -1, num: 1}}, {$group: {_id: "$key", last: {$last: "$num"}}}],
+                pipeline: [
+                    {$sort: {key: -1, num: 1}},
+                    {$group: {_id: "$key", last: {$last: "$num"}}},
+                ],
             },
         },
     ],
@@ -254,7 +282,10 @@ assertLookupResults({
                 as: fromCollName,
                 localField: "key",
                 foreignField: "key",
-                pipeline: [{$sort: {key: 1, num: -1}}, {$group: {_id: "$key", last: {$last: "$num"}}}],
+                pipeline: [
+                    {$sort: {key: 1, num: -1}},
+                    {$group: {_id: "$key", last: {$last: "$num"}}},
+                ],
             },
         },
         {$unwind: {path: "$" + fromCollName}},

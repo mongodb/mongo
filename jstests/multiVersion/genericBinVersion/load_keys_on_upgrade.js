@@ -15,9 +15,13 @@ let rst = new ReplSetTest({nodes: nodes, keyFile: keyFile});
 
 rst.startSet();
 
-rst.initiate(Object.extend(rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: true}), null, {
-    initiateWithDefaultElectionTimeout: true,
-});
+rst.initiate(
+    Object.extend(rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: true}),
+    null,
+    {
+        initiateWithDefaultElectionTimeout: true,
+    },
+);
 
 // Wait for a primary node...
 let primary = rst.getPrimary();

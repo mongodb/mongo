@@ -27,7 +27,11 @@ const indexName = "x_1";
 const primaryDB = primary.getDB(dbName);
 const coll = primaryDB.getCollection(collName);
 
-const requiredFlags = ["PrimaryDrivenIndexBuilds", "ContainerWrites", "ResumablePrimaryDrivenIndexBuilds"];
+const requiredFlags = [
+    "PrimaryDrivenIndexBuilds",
+    "ContainerWrites",
+    "ResumablePrimaryDrivenIndexBuilds",
+];
 for (const flag of requiredFlags) {
     if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, flag)) {
         jsTest.log.info("Skipping: featureFlag" + flag + " is disabled");
@@ -44,11 +48,17 @@ for (let i = 0; i < 1500; i++) {
 assert.commandWorked(bulk.execute());
 rst.awaitReplication();
 
-jsTest.log.info("2. Start index build, paused before scanning (before any periodic resume-state write)");
+jsTest.log.info(
+    "2. Start index build, paused before scanning (before any periodic resume-state write)",
+);
 const holdFp = configureFailPoint(primary, "hangBeforeBuildingIndex");
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), indexSpec, {name: indexName}, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    indexSpec,
+    {name: indexName},
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, indexName);
 
 jsTest.log.info("3. Insert a large document to trigger the tearable side write abort sentinel");

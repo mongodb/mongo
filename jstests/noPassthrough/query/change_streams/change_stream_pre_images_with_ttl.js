@@ -22,7 +22,9 @@ const testDB = primary.getDB(jsTestName());
 const cst = new ChangeStreamTest(testDB);
 
 const collName = "coll_with_pre_images";
-const coll = assertDropAndRecreateCollection(testDB, collName, {changeStreamPreAndPostImages: {enabled: true}});
+const coll = assertDropAndRecreateCollection(testDB, collName, {
+    changeStreamPreAndPostImages: {enabled: true},
+});
 
 const doc0 = {
     _id: 0,

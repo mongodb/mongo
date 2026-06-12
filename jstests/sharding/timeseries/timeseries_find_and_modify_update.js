@@ -29,7 +29,15 @@ import {
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
-const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
+const docs = [
+    doc1_a_nofields,
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc5_b_f104,
+    doc6_c_f105,
+    doc7_c_f106,
+];
 
 setUpShardedCluster();
 
@@ -42,7 +50,11 @@ setUpShardedCluster();
 })();
 
 (function testProjectOptionHonoredOnShardedCollection() {
-    const returnDoc = {_id: doc7_c_f106._id, [timeFieldName]: doc7_c_f106[timeFieldName], f: doc7_c_f106.f};
+    const returnDoc = {
+        _id: doc7_c_f106._id,
+        [timeFieldName]: doc7_c_f106[timeFieldName],
+        f: doc7_c_f106.f,
+    };
     const copyDocs = docs.map((doc) => Object.assign({}, doc));
     const resultDocList = copyDocs.filter((doc) => doc._id !== 7);
     resultDocList.push(Object.assign({}, doc7_c_f106, {f: 300}));
@@ -105,7 +117,10 @@ setUpShardedCluster();
             bucketFilter: makeBucketFilter(
                 {"meta": {$eq: "C"}},
                 {
-                    $and: [{"control.min.f": {$_internalExprLte: 17}}, {"control.max.f": {$_internalExprGte: 17}}],
+                    $and: [
+                        {"control.min.f": {$_internalExprLte: 17}},
+                        {"control.max.f": {$_internalExprGte: 17}},
+                    ],
                 },
             ),
             residualFilter: {f: {$eq: 17}},
@@ -127,7 +142,10 @@ setUpShardedCluster();
             dataBearingShard: "none",
             rootStage: "TS_MODIFY",
             bucketFilter: makeBucketFilter({
-                $and: [{"control.min.f": {$_internalExprLte: 17}}, {"control.max.f": {$_internalExprGte: 17}}],
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 17}},
+                    {"control.max.f": {$_internalExprGte: 17}},
+                ],
             }),
             residualFilter: {f: {$eq: 17}},
         },
@@ -157,7 +175,10 @@ setUpShardedCluster();
             bucketFilter: makeBucketFilter(
                 {"meta": {$eq: "B"}},
                 {
-                    $and: [{"control.min.f": {$_internalExprLte: 103}}, {"control.max.f": {$_internalExprGte: 103}}],
+                    $and: [
+                        {"control.min.f": {$_internalExprLte: 103}},
+                        {"control.max.f": {$_internalExprGte: 103}},
+                    ],
                 },
             ),
             residualFilter: {f: {$eq: 103}},
@@ -294,7 +315,10 @@ const replacementDoc = {
             bucketFilter: makeBucketFilter(
                 {"meta": {$eq: "B"}},
                 {
-                    $and: [{"control.min.f": {$_internalExprLte: 2345}}, {"control.max.f": {$_internalExprGte: 2345}}],
+                    $and: [
+                        {"control.min.f": {$_internalExprLte: 2345}},
+                        {"control.max.f": {$_internalExprGte: 2345}},
+                    ],
                 },
             ),
             residualFilter: {f: {$eq: 2345}},
@@ -388,18 +412,26 @@ const replacementDoc = {
                     {"_id": {"$lte": ObjectId("43b71b80ffffffffffffffff")}},
                     {"_id": {"$gte": ObjectId("43b70d700000000000000000")}},
                     {
-                        [`control.max.${timeFieldName}`]: {$_internalExprGte: doc6_c_f105[timeFieldName]},
+                        [`control.max.${timeFieldName}`]: {
+                            $_internalExprGte: doc6_c_f105[timeFieldName],
+                        },
                     },
                     // +1 hour
                     {
-                        [`control.min.${timeFieldName}`]: {$_internalExprGte: ISODate("2005-12-31T23:00:00Z")},
+                        [`control.min.${timeFieldName}`]: {
+                            $_internalExprGte: ISODate("2005-12-31T23:00:00Z"),
+                        },
                     },
                     // -1 hour
                     {
-                        [`control.max.${timeFieldName}`]: {$_internalExprLte: ISODate("2006-01-01T01:00:00Z")},
+                        [`control.max.${timeFieldName}`]: {
+                            $_internalExprLte: ISODate("2006-01-01T01:00:00Z"),
+                        },
                     },
                     {
-                        [`control.min.${timeFieldName}`]: {$_internalExprLte: doc6_c_f105[timeFieldName]},
+                        [`control.min.${timeFieldName}`]: {
+                            $_internalExprLte: doc6_c_f105[timeFieldName],
+                        },
                     },
                 ],
             }),

@@ -48,7 +48,10 @@ describe("Nonfatal error when attempting to update an improper timeseries-only i
     it("Cannot build a 2dsphere_bucket index on a populated collection", function () {
         assert.commandWorked(this.coll.insert({abc: "xyz"}));
         assert.commandFailedWithCode(this.coll.createIndex({x: "2dsphere_bucket"}), 12113200);
-        assert.commandFailedWithCode(this.coll.createIndex({"data.a.b.c": "2dsphere_bucket"}), 12113200);
+        assert.commandFailedWithCode(
+            this.coll.createIndex({"data.a.b.c": "2dsphere_bucket"}),
+            12113200,
+        );
     });
 
     afterEach(function () {

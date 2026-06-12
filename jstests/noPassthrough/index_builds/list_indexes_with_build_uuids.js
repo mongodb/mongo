@@ -52,7 +52,9 @@ addTestDocuments(primaryDB);
 replSet.awaitReplication();
 
 // Build and finish the first index.
-assert.commandWorked(primaryDB.runCommand({createIndexes: collName, indexes: [{key: {i: 1}, name: firstIndexName}]}));
+assert.commandWorked(
+    primaryDB.runCommand({createIndexes: collName, indexes: [{key: {i: 1}, name: firstIndexName}]}),
+);
 replSet.awaitReplication();
 
 const primaryDriven = FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds");
@@ -63,7 +65,12 @@ IndexBuildTest.pauseIndexBuilds(primaryDriven ? primary : secondary);
 // Build and hang on the second index. This should be run in the background if we pause index
 // builds on the primary because the createIndexes command will block.
 const coll = primaryDB.getCollection(collName);
-const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {j: 1}, {name: secondIndexName});
+const createIdx = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    {j: 1},
+    {name: secondIndexName},
+);
 
 // Wait for index builds to start on the secondary.
 const opId = IndexBuildTest.waitForIndexBuildToStart(primaryDriven ? primaryDB : secondaryDB);
@@ -76,7 +83,9 @@ let indexes;
 assert.soon(
     function () {
         // Check the listIndexes() output.
-        res = assert.commandWorked(secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true}));
+        res = assert.commandWorked(
+            secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true}),
+        );
         indexes = res.cursor.firstBatch;
         return 3 == indexes.length;
     },

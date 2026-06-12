@@ -5,7 +5,14 @@
  */
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
-function runCommandFailUncleanShutdownIncompatibleCommands(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandFailUncleanShutdownIncompatibleCommands(
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
@@ -15,11 +22,17 @@ function runCommandFailUncleanShutdownIncompatibleCommands(conn, dbName, command
         (!commandObj.hasOwnProperty("query") || Object.keys(commandObj["query"]).length === 0)
     ) {
         throw new Error(
-            "Cowardly fail if fastcount is run with a mongod that had an unclean" + " shutdown: " + tojson(commandObj),
+            "Cowardly fail if fastcount is run with a mongod that had an unclean" +
+                " shutdown: " +
+                tojson(commandObj),
         );
     }
 
-    if (commandName === "dataSize" && !commandObj.hasOwnProperty("min") && !commandObj.hasOwnProperty("max")) {
+    if (
+        commandName === "dataSize" &&
+        !commandObj.hasOwnProperty("min") &&
+        !commandObj.hasOwnProperty("max")
+    ) {
         throw new Error(
             "Cowardly fail if unbounded dataSize is run with a mongod that had an" +
                 " unclean shutdown: " +

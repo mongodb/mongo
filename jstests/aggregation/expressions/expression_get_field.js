@@ -10,7 +10,9 @@ coll.drop();
 
 // Test that $getField fails with the provided 'code' for invalid arguments 'getFieldArgs'.
 function assertGetFieldFailedWithCode(getFieldArgs, code) {
-    const error = assert.throws(() => coll.aggregate([{$project: {test: {$getField: getFieldArgs}}}]));
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {test: {$getField: getFieldArgs}}}]),
+    );
     assert.commandFailedWithCode(error, code);
 }
 
@@ -302,23 +304,29 @@ assertGetFieldResultsEq({$const: "$v.."}, [
     {_id: 1, test: null},
 ]);
 assertGetFieldResultsEq({$const: "$u.."}, [{_id: 0}, {_id: 1}]); // The test field should evaluate to missing.
-assertGetFieldResultsEq({field: "doesNotExist2", input: {$getField: "doesNotExist1"}}, [{_id: 0}, {_id: 1}]);
+assertGetFieldResultsEq({field: "doesNotExist2", input: {$getField: "doesNotExist1"}}, [
+    {_id: 0},
+    {_id: 1},
+]);
 assertGetFieldResultsEq({field: "x", input: {$getField: "doesNotExist"}}, [{_id: 0}, {_id: 1}]);
 assertGetFieldResultsEq({field: "a", input: true}, [{_id: 0}, {_id: 1}]);
 
 // Test case where $getField stages are nested.
-assertGetFieldResultsEq({field: "a", input: {$getField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}}}}, [
-    {_id: 0, test: 5},
-    {_id: 1, test: 5},
-]);
-assertGetFieldResultsEq({field: "x", input: {$getField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}}}}, [
-    {_id: 0},
-    {_id: 1},
-]);
-assertGetFieldResultsEq({field: "a", input: {$getField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}}}}, [
-    {_id: 0},
-    {_id: 1},
-]);
+assertGetFieldResultsEq(
+    {field: "a", input: {$getField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}}}},
+    [
+        {_id: 0, test: 5},
+        {_id: 1, test: 5},
+    ],
+);
+assertGetFieldResultsEq(
+    {field: "x", input: {$getField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}}}},
+    [{_id: 0}, {_id: 1}],
+);
+assertGetFieldResultsEq(
+    {field: "a", input: {$getField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}}}},
+    [{_id: 0}, {_id: 1}],
+);
 assertGetFieldResultsEq({field: {$const: "$a"}, input: {$getField: {$const: "$x..$y"}}}, [
     {_id: 0, test: 1},
     {_id: 1, test: 1},

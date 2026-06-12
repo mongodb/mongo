@@ -38,8 +38,13 @@ export function runJoinsExistingOperationTest(
     // All operations use the same failpoints on the donor shard.
     const donorShardConn = new Mongo(topology.shards[donorShardNames[0]].nodes[0]);
 
-    const pauseFailpoint = configureFailPoint(donorShardConn, "reshardingPauseRecipientDuringCloning");
-    const shorterLockTimeout = configureFailPoint(donorShardConn, "overrideDDLLockTimeout", {"timeoutMillisecs": 500});
+    const pauseFailpoint = configureFailPoint(
+        donorShardConn,
+        "reshardingPauseRecipientDuringCloning",
+    );
+    const shorterLockTimeout = configureFailPoint(donorShardConn, "overrideDDLLockTimeout", {
+        "timeoutMillisecs": 500,
+    });
 
     const joiningThread = makeJoiningThreadFn(mongos.host, ns, joiningThreadExtraArgs);
 
@@ -50,8 +55,10 @@ export function runJoinsExistingOperationTest(
     const withOperationInBackgroundFn = {
         "reshardCollection": (args, fn) => reshardingTest.withReshardingInBackground(args, fn),
         "moveCollection": (args, fn) => reshardingTest.withMoveCollectionInBackground(args, fn),
-        "unshardCollection": (args, fn) => reshardingTest.withUnshardCollectionInBackground(args, fn),
-        "rewriteCollection": (args, fn) => reshardingTest.withRewriteCollectionInBackground(args, fn),
+        "unshardCollection": (args, fn) =>
+            reshardingTest.withUnshardCollectionInBackground(args, fn),
+        "rewriteCollection": (args, fn) =>
+            reshardingTest.withRewriteCollectionInBackground(args, fn),
     }[opType];
 
     assert(withOperationInBackgroundFn, `Unknown operation type: ${opType}`);
@@ -63,7 +70,10 @@ export function runJoinsExistingOperationTest(
         // original collection once resharding has completed.
         expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
 
-        const joinedFP = configureFailPoint(donorShardConn, "shardsvrReshardCollectionJoinedExistingOperation");
+        const joinedFP = configureFailPoint(
+            donorShardConn,
+            "shardsvrReshardCollectionJoinedExistingOperation",
+        );
 
         joiningThread.start();
 
@@ -82,6 +92,9 @@ export function runJoinsExistingOperationTest(
     // the second command was issued.
     assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
     const sourceCollection = mongos.getCollection(ns);
-    const finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+    const finalSourceCollectionUUID = getUUIDFromListCollections(
+        sourceCollection.getDB(),
+        sourceCollection.getName(),
+    );
     assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 }

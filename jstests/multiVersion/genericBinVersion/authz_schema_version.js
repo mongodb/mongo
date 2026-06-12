@@ -19,7 +19,11 @@ TestData.keyFileData = "foopdedoop";
 TestData.authenticationDatabase = "local";
 
 function testChangeBinariesWithAuthzSchemaDoc(originalBinVersion, updatedBinVersion) {
-    const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: originalBinVersion, auth: ""}, keyFile: keyfile});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {binVersion: originalBinVersion, auth: ""},
+        keyFile: keyfile,
+    });
     rst.startSet();
     rst.initiate();
 
@@ -27,12 +31,20 @@ function testChangeBinariesWithAuthzSchemaDoc(originalBinVersion, updatedBinVers
     // on lower binVersion binaries .
     let primary = rst.getPrimary();
     let adminDB = primary.getDB("admin");
-    assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}));
+    assert.commandWorked(
+        adminDB.runCommand({
+            createUser: "admin",
+            pwd: "admin",
+            roles: [{role: "root", db: "admin"}],
+        }),
+    );
 
     // If updatedBinVersion is last-lts, then we need to downgrade FCV before downgrading the
     // binary.
     if (updatedBinVersion === "last-lts") {
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
     }
 
     // Query the authorization schema doc to ensure that it exists and is set to
@@ -63,19 +75,31 @@ function testChangeBinariesWithAuthzSchemaDoc(originalBinVersion, updatedBinVers
 
 function testMixedVersionInitialSync(primaryBinVersion, newNodeBinVersion) {
     // Create a single-node replica set with binVersion primaryBinVersion.
-    const rst = new ReplSetTest({nodes: 1, nodeOptions: {binVersion: primaryBinVersion, auth: ""}, keyFile: keyfile});
+    const rst = new ReplSetTest({
+        nodes: 1,
+        nodeOptions: {binVersion: primaryBinVersion, auth: ""},
+        keyFile: keyfile,
+    });
     rst.startSet();
     rst.initiate();
 
     // Create a user, which should automatically create an authorization schema document.
     let primary = rst.getPrimary();
     let adminDB = primary.getDB("admin");
-    assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}));
+    assert.commandWorked(
+        adminDB.runCommand({
+            createUser: "admin",
+            pwd: "admin",
+            roles: [{role: "root", db: "admin"}],
+        }),
+    );
 
     // If newNodeBinVersion is 'last-lts', then we need to downgrade FCV prior to adding the new
     // node.
     if (newNodeBinVersion === "last-lts") {
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
     }
 
     // Query the authorization schema doc to ensure that it exists and is set to
@@ -87,11 +111,17 @@ function testMixedVersionInitialSync(primaryBinVersion, newNodeBinVersion) {
 
     // Add a newNodeBinVersion node to the replica set and check that initial sync succeeds. The new
     // node will have no priority or
-    let secondary = rst.add({binVersion: newNodeBinVersion, keyFile: keyfile, rsConfig: {votes: 0, priority: 0}});
+    let secondary = rst.add({
+        binVersion: newNodeBinVersion,
+        keyFile: keyfile,
+        rsConfig: {votes: 0, priority: 0},
+    });
 
     // Reinitiate the replica set and check that initial sync has completed on the secondary.
     rst.reInitiate();
-    assert.commandWorked(primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 2}}));
+    assert.commandWorked(
+        primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 2}}),
+    );
     rst.awaitReplication();
     rst.awaitSecondaryNodes();
 

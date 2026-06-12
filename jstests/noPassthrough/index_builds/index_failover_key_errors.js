@@ -43,7 +43,9 @@ assert.commandWorked(coll.insert(badDoc));
 // builder is able to observe the invalid document.
 // By comparison, IndexBuildTest.pauseIndexBuilds() stalls the index build in the middle of the
 // collection scan.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}),
+);
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1, b: 1});
 
 // Wait for the index build to start on the secondary.
@@ -51,7 +53,9 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {
+    includeBuildUUIDs: true,
+});
 
 // Step down the primary.
 const stepDown = startParallelShell(() => {
@@ -68,7 +72,9 @@ checkLog.containsJson(primary, 20444);
 stepDown();
 
 // Unblock the index build on the old primary.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}),
+);
 
 const newPrimary = rst.getPrimary();
 const newPrimaryDB = newPrimary.getDB("test");

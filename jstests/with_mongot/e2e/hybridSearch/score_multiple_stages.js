@@ -10,7 +10,10 @@ import {
     createMoviesCollWithSearchAndVectorIndex,
     dropDefaultMovieSearchAndOrVectorIndexes,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
-import {searchStageWithDetails, vectorStage} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
+import {
+    searchStageWithDetails,
+    vectorStage,
+} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
 const coll = createMoviesCollWithSearchAndVectorIndex();
 
@@ -168,7 +171,11 @@ runMultipleScoreTest(
 
 runMultipleScoreTest(
     {
-        a: [searchStageWithDetails, scoreSigmoidNormalizationStage, scoreMinMaxScalerNormalizationStage],
+        a: [
+            searchStageWithDetails,
+            scoreSigmoidNormalizationStage,
+            scoreMinMaxScalerNormalizationStage,
+        ],
         b: [vectorStage, scoreMinMaxScalerNormalizationStage, scoreSigmoidNormalizationStage],
     },
     "minMaxScaler",
@@ -206,7 +213,11 @@ runMultipleScoreTest(
     "none",
     "none",
     buildRecursiveScore(buildSigmoidScore(6, 5.1, 0.4), 10.0, 0.9),
-    buildRecursiveScore(buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5), 10.0, 0.9),
+    buildRecursiveScore(
+        buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5),
+        10.0,
+        0.9,
+    ),
 );
 
 dropDefaultMovieSearchAndOrVectorIndexes();

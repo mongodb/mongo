@@ -8,7 +8,9 @@ let admin = mongos.getDB("admin");
 let config = mongos.getDB("config");
 let coll = st.s.getCollection("TestDB.coll");
 
-assert.commandWorked(mongos.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: "TestDB.coll", key: {_id: 1}}));
 
 jsTest.log("Refreshing second mongos...");
@@ -21,7 +23,9 @@ let collB = mongosB.getCollection(coll + "");
 assert.eq(0, collB.find().itcount());
 
 jsTest.log("Moving chunk to create stale mongos...");
-assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 jsTest.log("Inserting docs that needs to be retried...");
 

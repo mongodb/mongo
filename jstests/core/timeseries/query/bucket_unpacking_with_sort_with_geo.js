@@ -14,7 +14,10 @@
  *     requires_timeseries,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {runDoesntRewriteTest} from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
@@ -24,7 +27,9 @@ const geoColl = db[geoCollName];
 geoColl.drop();
 // We'll only use the geo collection to test that the rewrite doesn't happen, so it doesn't
 // need to be big.
-assert.commandWorked(db.createCollection(geoCollName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(geoCollName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 // This polygon is big enough that a 2dsphere index on it is multikey.
 const area = {
     type: "Polygon",
@@ -56,5 +61,7 @@ const indexes = [
 for (const ix of indexes) {
     assert.commandWorked(geoColl.dropIndexes());
     assert.commandWorked(geoColl.createIndex(ix, add2dsphereVersionIfNeeded()));
-    runDoesntRewriteTest({t: 1}, null /* Don't recreate index. */, ix, geoColl, [{$match: {"m.a": 7}}]);
+    runDoesntRewriteTest({t: 1}, null /* Don't recreate index. */, ix, geoColl, [
+        {$match: {"m.a": 7}},
+    ]);
 }

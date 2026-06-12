@@ -71,12 +71,16 @@ let hashedShardedColl = testDB.hashed;
 let rangeShardedNs = rangeShardedColl.getFullName();
 let hashedShardedNs = hashedShardedColl.getFullName();
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 jsTest.log("Test range sharding...");
 assert.commandWorked(testDB.adminCommand({shardCollection: rangeShardedNs, key: {x: 1}}));
 assert.commandWorked(testDB.adminCommand({split: rangeShardedNs, middle: {x: 50}}));
-assert.commandWorked(testDB.adminCommand({moveChunk: rangeShardedNs, find: {x: 100}, to: st.shard1.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: rangeShardedNs, find: {x: 100}, to: st.shard1.shardName}),
+);
 
 let ownedDocs = [];
 for (let i = 0; i < 100; i++) {

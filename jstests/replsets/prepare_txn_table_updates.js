@@ -24,7 +24,11 @@ function doTest(commitOrAbort) {
     replSet.stopSet();
 }
 
-if (TestData && TestData.setParameters && TestData.setParameters.maxNumberOfTransactionOperationsInSingleOplogEntry) {
+if (
+    TestData &&
+    TestData.setParameters &&
+    TestData.setParameters.maxNumberOfTransactionOperationsInSingleOplogEntry
+) {
     jsTest.log.info(
         `Skipping test with maxNumberOfTransactionOperationsInSingleOplogEntry set due to incompatibility with this test.`,
     );

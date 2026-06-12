@@ -19,7 +19,9 @@ import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "tag"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "tag"}}),
+);
 
 // Trivial, small data set with one document and one bucket.
 assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
@@ -37,14 +39,22 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
         assert.eq(scanStages.length, 1, () => "Expected one scan stage " + tojson(explain));
 
         // Ensure the scan actually returned something.
-        assert.gte(scanStages[0].nReturned, 1, () => "Expected one value returned from scan " + tojson(explain));
+        assert.gte(
+            scanStages[0].nReturned,
+            1,
+            () => "Expected one value returned from scan " + tojson(explain),
+        );
 
         // Check that the ts_bucket_to_cellblock stage and its child returned 0 blocks, since
         // nothing passed the bucket level filter.
         const bucketStages = getSbePlanStages(explain, "ts_bucket_to_cellblock");
         assert.eq(bucketStages.length, 1, () => "Expected one bucket stage " + tojson(explain));
 
-        assert.eq(bucketStages[0].nReturned, 0, () => "Expected bucket stage to return nothing " + tojson(explain));
+        assert.eq(
+            bucketStages[0].nReturned,
+            0,
+            () => "Expected bucket stage to return nothing " + tojson(explain),
+        );
         assert.eq(
             bucketStages[0].inputStage.nReturned,
             0,
@@ -54,7 +64,11 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
         const collScanStage = getAggPlanStage(explain, "COLLSCAN");
 
         // The bucket-level filter attached to the COLLSCAN should have filtered out everything.
-        assert.eq(0, collScanStage.nReturned, () => "Expected coll scan stage to return nothing " + tojson(explain));
+        assert.eq(
+            0,
+            collScanStage.nReturned,
+            () => "Expected coll scan stage to return nothing " + tojson(explain),
+        );
         assert.gt(
             collScanStage.docsExamined,
             0,
@@ -79,10 +93,18 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
         // Ensure we get an ixscan/fetch plan, with one ixseek stage and one seek stage.
         const seekStages = getSbePlanStages(explain, "fetch");
         assert.eq(seekStages.length, 1, () => "Expected one seek stage " + tojson(explain));
-        assert.eq(getSbePlanStages(explain, "ixseek").length, 1, () => "Expected one ixseek stage " + tojson(explain));
+        assert.eq(
+            getSbePlanStages(explain, "ixseek").length,
+            1,
+            () => "Expected one ixseek stage " + tojson(explain),
+        );
 
         // Ensure the seek stage actually returned something.
-        assert.gte(seekStages[0].nReturned, 1, () => "Expected seek to have returned something " + tojson(explain));
+        assert.gte(
+            seekStages[0].nReturned,
+            1,
+            () => "Expected seek to have returned something " + tojson(explain),
+        );
 
         const bucketStages = getSbePlanStages(explain, "ts_bucket_to_cellblock");
         assert.eq(bucketStages.length, 1, () => "Expected a bucket stage " + tojson(explain));
@@ -110,7 +132,11 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
 
         const fetchStage = getAggPlanStage(explain, "FETCH");
         // The fetch stage should filter out all of the buckets with the bucket-level filter.
-        assert.eq(0, fetchStage.nReturned, () => "Expected fetch stage to return 0 rows " + tojson(explain));
+        assert.eq(
+            0,
+            fetchStage.nReturned,
+            () => "Expected fetch stage to return 0 rows " + tojson(explain),
+        );
     }
 })();
 
@@ -119,7 +145,9 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
 // results are correct).
 (function testWithMissingField() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     // These two events will be inserted into the same bucket.
     const event = {_id: 0, t: new Date(), m: 0, x: "abc"};

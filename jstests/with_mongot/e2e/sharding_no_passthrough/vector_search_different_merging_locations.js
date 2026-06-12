@@ -72,7 +72,9 @@ describe("$vectorSearch with different merging locations", function () {
         shardNames = getShardNames(testDb.getMongo());
         assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
 
-        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}));
+        assert.commandWorked(
+            testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}),
+        );
 
         testColl.drop();
 
@@ -91,8 +93,12 @@ describe("$vectorSearch with different merging locations", function () {
         );
 
         // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
-        assert.commandWorked(testDb.adminCommand({shardCollection: testColl.getFullName(), key: {_id: 1}}));
-        assert.commandWorked(testDb.adminCommand({split: testColl.getFullName(), middle: {_id: 10}}));
+        assert.commandWorked(
+            testDb.adminCommand({shardCollection: testColl.getFullName(), key: {_id: 1}}),
+        );
+        assert.commandWorked(
+            testDb.adminCommand({split: testColl.getFullName(), middle: {_id: 10}}),
+        );
         assert.commandWorked(
             testDb.adminCommand({
                 moveChunk: testColl.getFullName(),
@@ -106,7 +112,14 @@ describe("$vectorSearch with different merging locations", function () {
             name: vectorSearchIndex,
             type: "vectorSearch",
             definition: {
-                fields: [{type: "vector", path: "x", numDimensions: queryVector.length, similarity: "cosine"}],
+                fields: [
+                    {
+                        type: "vector",
+                        path: "x",
+                        numDimensions: queryVector.length,
+                        similarity: "cosine",
+                    },
+                ],
             },
         });
     });

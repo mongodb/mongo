@@ -35,18 +35,33 @@ assert.commandWorked(coll.insertMany(testData));
 // Test $testFoo stage fails to parse.
 {
     const pipeline = [{$testFoo: {invalidField: "value"}}];
-    assertErrorCode(coll, pipeline, 11165101, "Using $testFoo with invalid field should be rejected");
+    assertErrorCode(
+        coll,
+        pipeline,
+        11165101,
+        "Using $testFoo with invalid field should be rejected",
+    );
 }
 
 // Test $testBar stage fails to parse.
 {
     const pipeline = [{$testBar: {}}];
-    assertErrorCode(coll, pipeline, 10785800, "Using $testBar with empty object should be rejected");
+    assertErrorCode(
+        coll,
+        pipeline,
+        10785800,
+        "Using $testBar with empty object should be rejected",
+    );
 }
 
 // Test no-op stages throughout a pipeline.
 {
-    const pipeline = [{$testBar: {anyField: true}}, {$match: {x: {$gte: 2}}}, {$testFoo: {}}, {$sort: {x: 1}}];
+    const pipeline = [
+        {$testBar: {anyField: true}},
+        {$match: {x: {$gte: 2}}},
+        {$testFoo: {}},
+        {$sort: {x: 1}},
+    ];
     const result = coll.aggregate(pipeline).toArray();
 
     assertArrayEq({
@@ -60,7 +75,11 @@ assert.commandWorked(coll.insertMany(testData));
 
 // Test no-op stage with a subsequent stage that modifies documents.
 {
-    const pipeline = [{$match: {x: {$gte: 2}}}, {$testFoo: {}}, {$group: {_id: null, cnt: {$sum: 1}}}];
+    const pipeline = [
+        {$match: {x: {$gte: 2}}},
+        {$testFoo: {}},
+        {$group: {_id: null, cnt: {$sum: 1}}},
+    ];
     const result = coll.aggregate(pipeline).toArray();
 
     assertArrayEq({actual: result, expected: [{_id: null, cnt: 2}]});

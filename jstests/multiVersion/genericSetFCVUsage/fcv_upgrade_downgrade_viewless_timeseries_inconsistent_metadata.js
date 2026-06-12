@@ -22,7 +22,9 @@ const db = st.s.getDB(dbName);
 const adminDB = st.s.getDB("admin");
 
 assert(FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections"));
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Checks if collection is in viewless format.
 function isViewlessTimeseriesFormat(collName) {
@@ -42,7 +44,9 @@ const primaryShard = st.rs0.getPrimary();
 const shardDB = primaryShard.getDB(dbName);
 
 jsTest.log.info("Downgrading FCV to lastLTS to create legacy timeseries collections");
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 jsTest.log.info("Creating valid timeseries collection in legacy format");
 assert.commandWorked(
@@ -72,7 +76,9 @@ const createBucketsOp = {
 assert.commandWorked(shardDB.runCommand({applyOps: [createBucketsOp]}));
 
 jsTest.log.info("Attempting FCV upgrade, this should succeed despite the metadata inconsistency");
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 jsTest.log.info("Verifying valid collection was converted to viewless format");
 assert.eq(true, isViewlessTimeseriesFormat(validTsCollName));
@@ -89,11 +95,15 @@ assert.commandFailedWithCode(
     ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
 );
 
-assert.commandWorked(primaryShard.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: true}));
+assert.commandWorked(
+    primaryShard.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: true}),
+);
 assert.commandWorked(db.runCommand({count: inconsistentCollName}));
 
 // cleanup
-assert.commandWorked(primaryShard.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: false}));
+assert.commandWorked(
+    primaryShard.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: false}),
+);
 assert.commandWorked(db.dropDatabase());
 
 st.stop();

@@ -21,16 +21,25 @@ import {getOplogEntriesForTxn} from "jstests/sharding/libs/sharded_transactions_
 export var validateTransactionTableHistory = function (rst, lsid, txnNumber) {
     let primary = rst.getPrimary();
     const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-    if (FeatureFlagUtil.isPresentAndEnabled(primary, "DisableTransactionUpdateCoalescing") && !isMultiversion) {
-        jsTest.log.info("Checking the history of updates on config.transactions collection across nodes");
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
+    if (
+        FeatureFlagUtil.isPresentAndEnabled(primary, "DisableTransactionUpdateCoalescing") &&
+        !isMultiversion
+    ) {
+        jsTest.log.info(
+            "Checking the history of updates on config.transactions collection across nodes",
+        );
         let oplogs = getOplogEntriesForTxn(rst, lsid, txnNumber);
         oplogs.forEach((oplog) => {
             let opTime = oplog["ts"];
             let res = assert.commandWorked(
                 primary.getDB("config").runCommand({
                     find: "transactions",
-                    readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime["t"], opTime["i"])},
+                    readConcern: {
+                        level: "snapshot",
+                        atClusterTime: Timestamp(opTime["t"], opTime["i"]),
+                    },
                 }),
             );
             assert.eq(res.cursor.firstBatch.length, 1);
@@ -41,7 +50,10 @@ export var validateTransactionTableHistory = function (rst, lsid, txnNumber) {
                 let secRes = assert.commandWorked(
                     secondary.getDB("config").runCommand({
                         find: "transactions",
-                        readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime["t"], opTime["i"])},
+                        readConcern: {
+                            level: "snapshot",
+                            atClusterTime: Timestamp(opTime["t"], opTime["i"]),
+                        },
                     }),
                 );
                 assert.eq(secRes.cursor.firstBatch.length, 1);
@@ -103,15 +115,19 @@ let runTest = function (
     );
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
-        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        primary.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     rst.awaitReplication();
 
     let [secondary1, secondary2, secondary3, secondary4] = rst.getSecondaries();
 
     // Disable replication on all of the secondaries to manually control the replication progress.
-    const stopReplProducerFailpoints = [secondary1, secondary2, secondary3, secondary4].map((conn) =>
-        configureFailPoint(conn, "stopReplProducer"),
+    const stopReplProducerFailpoints = [secondary1, secondary2, secondary3, secondary4].map(
+        (conn) => configureFailPoint(conn, "stopReplProducer"),
     );
 
     // Using an odd number ensures that in the insert batch counterMajorityCommitted + 1 will be
@@ -166,7 +182,9 @@ let runTest = function (
 
     // Wait for secondary1 to have advanced its stable_timestamp.
     assert.soon(() => {
-        const {lastStableRecoveryTimestamp} = assert.commandWorked(secondary1.adminCommand({replSetGetStatus: 1}));
+        const {lastStableRecoveryTimestamp} = assert.commandWorked(
+            secondary1.adminCommand({replSetGetStatus: 1}),
+        );
 
         print(
             `${secondary1.host}: ${tojsononeline({
@@ -190,7 +208,9 @@ let runTest = function (
     rst.getPrimary();
 
     // Do a write which becomes majority committed and wait for secondary1 to complete its rollback.
-    assert.commandWorked(secondary2.getCollection("test.dummy").insert({}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        secondary2.getCollection("test.dummy").insert({}, {writeConcern: {w: "majority"}}),
+    );
 
     for (const fp of stopReplProducerOnDocumentFailpoints) {
         fp.off();
@@ -213,7 +233,9 @@ let runTest = function (
         rst.awaitSecondaryNodes(null, [secondary1]);
         secondary1.setSecondaryOk();
         // On startup, we expect to see the update persisted in the 'config.transactions' table.
-        let restoredDoc = secondary1.getCollection("config.transactions").findOne({"_id.id": lsid.id});
+        let restoredDoc = secondary1
+            .getCollection("config.transactions")
+            .findOne({"_id.id": lsid.id});
         assert.neq(null, restoredDoc);
         secondary1.adminCommand({configureFailPoint: "stopReplProducer", mode: "off"});
     } else {
@@ -242,10 +264,24 @@ export var runTests = function (
     // Test the general scenario where we perform the appropriate update to the
     // 'config.transactions'
     // table during rollback.
-    runTest(false, initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);
+    runTest(
+        false,
+        initFunc,
+        stopReplProducerOnDocumentFunc,
+        opsFunc,
+        stmtMajorityCommittedFunc,
+        validateFunc,
+    );
 
     // Extends the test to crash the secondary in the middle of rollback right after oplog
     // truncation. We assert that the update made to the 'config.transactions' table persisted on
     // startup.
-    runTest(true, initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);
+    runTest(
+        true,
+        initFunc,
+        stopReplProducerOnDocumentFunc,
+        opsFunc,
+        stmtMajorityCommittedFunc,
+        validateFunc,
+    );
 };

@@ -34,12 +34,19 @@ function runTest(conn) {
     // Unknown users receive the server's enabled mechanisms so the client can select an
     // accepted one. The field is present but the contents may vary by server configuration.
     let res = assert.commandWorked(db.runCommand({hello: 1, saslSupportedMechs: "test.bogus"}));
-    assert(Array.isArray(res.saslSupportedMechs), "saslSupportedMechs should be an array even for unknown users", {
-        res,
-    });
+    assert(
+        Array.isArray(res.saslSupportedMechs),
+        "saslSupportedMechs should be an array even for unknown users",
+        {
+            res,
+        },
+    );
 
     // Check that invalid usernames produce the correct error code
-    assert.commandFailedWithCode(db.runCommand({hello: 1, saslSupportedMechs: "bogus"}), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        db.runCommand({hello: 1, saslSupportedMechs: "bogus"}),
+        ErrorCodes.BadValue,
+    );
 
     assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: []}));
     assert.commandWorked(externalDB.runCommand({createUser: "user", roles: []}));
@@ -55,9 +62,18 @@ function runTest(conn) {
     }
 
     // Users with explicit mechs should only support those mechanisms
-    assert.commandWorked(db.runCommand({createUser: "256Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]}));
+    assert.commandWorked(
+        db.runCommand({
+            createUser: "256Only",
+            pwd: "pwd",
+            roles: [],
+            mechanisms: ["SCRAM-SHA-256"],
+        }),
+    );
     checkMechs("admin.256Only", ["SCRAM-SHA-256"]);
-    assert.commandWorked(db.runCommand({createUser: "1Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}));
+    assert.commandWorked(
+        db.runCommand({createUser: "1Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}),
+    );
     checkMechs("admin.1Only", ["SCRAM-SHA-1"]);
 
     // Users with normalized and unnormalized names do not conflict
@@ -88,7 +104,9 @@ let st = new ShardingTest({
     keyFile: "jstests/libs/key1",
     shards: 0,
     other: {
-        mongosOptions: {setParameter: {authenticationMechanisms: "PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"}},
+        mongosOptions: {
+            setParameter: {authenticationMechanisms: "PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"},
+        },
     },
 });
 runTest(st.s0);

@@ -108,7 +108,10 @@ function setTestParameters(internalQueryExecYieldIterations, internalQueryExecYi
     });
     res.internalQueryExecYieldIterations = assert.commandWorked(commandRes).was;
 
-    commandRes = db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS});
+    commandRes = db.adminCommand({
+        setParameter: 1,
+        internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS,
+    });
     res.internalQueryExecYieldPeriodMS = assert.commandWorked(commandRes).was;
 
     return res;

@@ -102,7 +102,9 @@ function runAllTestsForConfigAndExecCtx(config, execCtxType) {
     useFindAndModify = config.hasOwnProperty("findAndModify") ? config.findAndModify : false;
     doUpsert = config.hasOwnProperty("upsert") ? config.upsert : false;
 
-    const doReplacementUpdate = config.hasOwnProperty("replacementUpdate") ? config.replacementUpdate : false;
+    const doReplacementUpdate = config.hasOwnProperty("replacementUpdate")
+        ? config.replacementUpdate
+        : false;
 
     const docs = [{_id: 1, x: -1, y: 1, z: 1}];
     const docsUpdated = [{_id: 1, y: 1, z: -1}];

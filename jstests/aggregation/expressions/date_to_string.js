@@ -135,7 +135,10 @@ assert.eq(
             {
                 $project: {
                     date: {
-                        $dateToString: {format: "Natural: %Y-W%w-%U, ISO: %G-W%u-%V", date: "$date"},
+                        $dateToString: {
+                            format: "Natural: %Y-W%w-%U, ISO: %G-W%u-%V",
+                            date: "$date",
+                        },
                     },
                 },
             },
@@ -162,7 +165,10 @@ assert.eq(
         {_id: 2, date: "Dec (December) 04, 2017"},
     ],
     coll
-        .aggregate([{$project: {date: {$dateToString: {format: "%b (%B) %d, %Y", date: "$date"}}}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$project: {date: {$dateToString: {format: "%b (%B) %d, %Y", date: "$date"}}}},
+            {$sort: {_id: 1}},
+        ])
         .toArray(),
 );
 /* --------------------------------------------------------------------------------------- */
@@ -230,7 +236,9 @@ assert.eq(
         {_id: 1, date: "2017-07-04T15:09:12.911Z"},
         {_id: 2, date: "2017-12-04T15:09:14.911Z"},
     ],
-    coll.aggregate([{$project: {date: {$dateToString: {date: "$date"}}}}, {$sort: {_id: 1}}]).toArray(),
+    coll
+        .aggregate([{$project: {date: {$dateToString: {date: "$date"}}}}, {$sort: {_id: 1}}])
+        .toArray(),
 );
 
 // UTC timezone explicitly specified. Gives UTC time, and the format includes the 'Z' (UTC) suffix.
@@ -241,7 +249,10 @@ assert.eq(
         {_id: 2, date: "2017-12-04T15:09:14.911Z"},
     ],
     coll
-        .aggregate([{$project: {date: {$dateToString: {date: "$date", timezone: "UTC"}}}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$project: {date: {$dateToString: {date: "$date", timezone: "UTC"}}}},
+            {$sort: {_id: 1}},
+        ])
         .toArray(),
 );
 
@@ -312,7 +323,9 @@ assert.eq(
 );
 /* --------------------------------------------------------------------------------------- */
 
-let pipeline = [{$project: {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: 5}}}}];
+let pipeline = [
+    {$project: {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: 5}}}},
+];
 let res = coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}});
 assert.commandFailedWithCode(res, 18533);
 
@@ -358,7 +371,9 @@ assert.commandFailedWithCode(res, 40485);
 
 pipeline = [
     {
-        $project: {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%"}}},
+        $project: {
+            date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%"}},
+        },
     },
 ];
 assertErrCodeAndErrMsgContains(coll, pipeline, 18535, "Unmatched '%' at end of format string");
@@ -366,7 +381,14 @@ assertErrCodeAndErrMsgContains(coll, pipeline, 18535, "Unmatched '%' at end of f
 // Fails for unknown format specifier.
 pipeline = [
     {
-        $project: {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%n"}}},
+        $project: {
+            date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%n"}},
+        },
     },
 ];
-assertErrCodeAndErrMsgContains(coll, pipeline, 18536, "Invalid format character '%n' in format string");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    18536,
+    "Invalid format character '%n' in format string",
+);

@@ -107,7 +107,9 @@ for (let t = 0; t < 2; t++) {
 
             // printjson( box )
 
-            let withinResults = db.geoarray2.find({loc: {$within: {$box: box}}, type: type}).toArray();
+            let withinResults = db.geoarray2
+                .find({loc: {$within: {$box: box}}, type: type})
+                .toArray();
 
             assert.eq(withinResults.length, count);
 
@@ -127,7 +129,9 @@ for (let t = 0; t < 2; t++) {
             // Do within check (circle)
             objsFound = {};
 
-            withinResults = db.geoarray2.find({loc: {$within: {$center: [center, 1.5]}}, type: type}).toArray();
+            withinResults = db.geoarray2
+                .find({loc: {$within: {$center: [center, 1.5]}}, type: type})
+                .toArray();
 
             assert.eq(withinResults.length, count);
 

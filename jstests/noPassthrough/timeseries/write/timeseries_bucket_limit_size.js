@@ -32,7 +32,9 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
         coll.drop();
 
-        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+        );
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {
@@ -61,7 +63,11 @@ TimeseriesTest.run((insert) => {
             );
         }
 
-        const bucketDocs = getTimeseriesCollForRawOps(db, coll).find().rawData().sort({"control.min._id": 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(db, coll)
+            .find()
+            .rawData()
+            .sort({"control.min._id": 1})
+            .toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.

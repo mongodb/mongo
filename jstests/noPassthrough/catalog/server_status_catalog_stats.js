@@ -35,7 +35,9 @@ assertCatalogStats(db1, (stats) => {
 
 assert.commandWorked(db1.coll.insert({a: 1}));
 assert.commandWorked(db1.createCollection("capped", {capped: true, size: 1024}));
-assert.commandWorked(db1.createCollection("clustered", {clusteredIndex: {unique: true, key: {_id: 1}}}));
+assert.commandWorked(
+    db1.createCollection("clustered", {clusteredIndex: {unique: true, key: {_id: 1}}}),
+);
 assert.commandWorked(db1.createCollection("view", {viewOn: "coll", pipeline: []}));
 assert.commandWorked(db1.createCollection("ts", {timeseries: {timeField: "t"}}));
 
@@ -81,7 +83,9 @@ assertCatalogStats(db1, (stats) => {
 
 assert.commandWorked(db2.coll.insert({a: 1}));
 assert.commandWorked(db2.createCollection("capped", {capped: true, size: 1024}));
-assert.commandWorked(db2.createCollection("clustered", {clusteredIndex: {unique: true, key: {_id: 1}}}));
+assert.commandWorked(
+    db2.createCollection("clustered", {clusteredIndex: {unique: true, key: {_id: 1}}}),
+);
 assert.commandWorked(db2.createCollection("view", {viewOn: "coll", pipeline: []}));
 assert.commandWorked(db2.createCollection("ts", {timeseries: {timeField: "t"}}));
 

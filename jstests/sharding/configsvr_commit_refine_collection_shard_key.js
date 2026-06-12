@@ -36,12 +36,20 @@ const initialCollectionMetadata = st.s.getCollection("config.collections").findO
 
 assert.eq(initialShardKey, initialCollectionMetadata.key);
 assert.commandWorked(
-    st.s.getDB(dbName).runCommand({createIndexes: collName, indexes: [{key: newShardKey, name: "index_2"}]}),
+    st.s
+        .getDB(dbName)
+        .runCommand({createIndexes: collName, indexes: [{key: newShardKey, name: "index_2"}]}),
 );
 
 // First run of the command, should succeed, check that the metadata changed.
 assert.commandWorked(
-    runConfigsvrCommitRefineCollectionShardKey(st, ns, initialCollectionMetadata.timestamp, Timestamp(), newShardKey),
+    runConfigsvrCommitRefineCollectionShardKey(
+        st,
+        ns,
+        initialCollectionMetadata.timestamp,
+        Timestamp(),
+        newShardKey,
+    ),
 );
 
 const finalCollectionMetadata = st.s.getCollection("config.collections").findOne({_id: ns});
@@ -73,7 +81,13 @@ assert.eq(noopCollectionMetadata.lastmodEpoch, finalCollectionMetadata.lastmodEp
 // This should fail, the newTimestamp must match with the first newTimestamp committed, just like
 // the oldTimestamp does.
 assert.commandFailedWithCode(
-    runConfigsvrCommitRefineCollectionShardKey(st, ns, initialCollectionMetadata.timestamp, Timestamp(), newShardKey),
+    runConfigsvrCommitRefineCollectionShardKey(
+        st,
+        ns,
+        initialCollectionMetadata.timestamp,
+        Timestamp(),
+        newShardKey,
+    ),
     7648608,
 );
 

@@ -18,7 +18,9 @@ configRS.initiate(replConfig);
 
 // Ensure the featureCompatibilityVersion is lastLTSFCV so that the mongos can connect if it is
 // binary version last-lts.
-assert.commandWorked(configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 jsTestLog("getting mongos");
 let e;
@@ -34,7 +36,12 @@ assert.soon(
         }
     },
     function () {
-        return "mongos " + mongos.host + " did not begin accepting connections in time; final exception: " + tojson(e);
+        return (
+            "mongos " +
+            mongos.host +
+            " did not begin accepting connections in time; final exception: " +
+            tojson(e)
+        );
     },
 );
 

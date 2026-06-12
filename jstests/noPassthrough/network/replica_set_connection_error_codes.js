@@ -20,7 +20,9 @@ _setShellFailPoint({
 const rst = new ReplSetTest({
     nodes: 3,
     nodeOptions: {
-        setParameter: {"failpoint.respondWithNotPrimaryInCommandDispatch": tojson({mode: "alwaysOn"})},
+        setParameter: {
+            "failpoint.respondWithNotPrimaryInCommandDispatch": tojson({mode: "alwaysOn"}),
+        },
     },
 });
 rst.startSet();
@@ -28,7 +30,10 @@ rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const directConn = rst.getPrimary();
 const rsConn = new Mongo(rst.getURL());
-assert(rsConn.isReplicaSetConnection(), "expected " + rsConn.host + " to be a replica set connection string");
+assert(
+    rsConn.isReplicaSetConnection(),
+    "expected " + rsConn.host + " to be a replica set connection string",
+);
 
 function stepDownPrimary(rst) {
     const awaitShell = startParallelShell(

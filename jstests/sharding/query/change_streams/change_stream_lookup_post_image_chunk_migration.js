@@ -93,7 +93,9 @@ for (const [id, shard] of [
     [2, shard2],
 ]) {
     const dest = shard.shardName;
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}),
+    );
 }
 
 // After sharding the collection and moving the documents to different shards, create a change
@@ -144,7 +146,9 @@ for (const [id, shard] of [
     [2, shard3],
 ]) {
     const dest = shard.shardName;
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}),
+    );
 }
 
 // After adding the new shard and migrating the documents to the new shard, create a change stream

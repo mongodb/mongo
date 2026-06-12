@@ -34,12 +34,21 @@ let secondaryColl = secondaryDB.collate_id;
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 // Stop the secondary from syncing. This will ensure that the writes on the primary get applied
 // on the secondary in a large batch.
-assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
-checkLog.contains(secondaryDB, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+assert.commandWorked(
+    secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}),
+);
+checkLog.contains(
+    secondaryDB,
+    "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled",
+);
 
 assert.commandWorked(primaryDB.createCollection(primaryColl.getName(), caseInsensitive));
 
@@ -64,7 +73,9 @@ for (let i = 0; i < 1000; i++) {
 assert.eq(0, primaryColl.find().itcount());
 
 // Allow the secondary to sync, and test that it also ends up with an empty collection.
-assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+assert.commandWorked(
+    secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
+);
 replTest.awaitReplication();
 assert.eq(0, secondaryColl.find().itcount());
 replTest.stopSet();

@@ -42,7 +42,10 @@ assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key
 // Cannot create the index with a conflicting shard key.
 coll = db[collNamePrefix + count++];
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {b: 1}}));
-assert.commandFailedWithCode(coll.createIndex({a: 1}, {prepareUnique: 1}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1}, {prepareUnique: 1}),
+    ErrorCodes.CannotCreateIndex,
+);
 assert.commandFailedWithCode(coll.createIndex({a: 1}, {unique: 1}), ErrorCodes.CannotCreateIndex);
 // Can create the index with a compatible shard key.
 assert.commandWorked(coll.createIndex({b: 1, a: 1}, {prepareUnique: 1}));
@@ -58,7 +61,14 @@ assert.commandFailedWithCode(
 );
 // Can convert an index to prepareUnique and unique with a compatible shard key.
 assert.commandWorked(coll.createIndex({b: 1, d: 1}));
-assert.commandWorked(db.runCommand({collMod: coll.getName(), index: {keyPattern: {b: 1, d: 1}, prepareUnique: true}}));
-assert.commandWorked(db.runCommand({collMod: coll.getName(), index: {keyPattern: {b: 1, d: 1}, unique: true}}));
+assert.commandWorked(
+    db.runCommand({
+        collMod: coll.getName(),
+        index: {keyPattern: {b: 1, d: 1}, prepareUnique: true},
+    }),
+);
+assert.commandWorked(
+    db.runCommand({collMod: coll.getName(), index: {keyPattern: {b: 1, d: 1}, unique: true}}),
+);
 
 st.stop();

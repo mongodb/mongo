@@ -23,7 +23,9 @@ import {Thread} from "jstests/libs/parallelTester.js";
  * still holds the ticket during the sleep).
  */
 function runScenario({maxReleaseCycles, expectTicketHeld}) {
-    jsTestLog(`Running scenario: maxReleaseCycles=${maxReleaseCycles} expectTicketHeld=${expectTicketHeld}`);
+    jsTestLog(
+        `Running scenario: maxReleaseCycles=${maxReleaseCycles} expectTicketHeld=${expectTicketHeld}`,
+    );
 
     const rst = new ReplSetTest({
         nodes: 1,
@@ -61,13 +63,18 @@ function runScenario({maxReleaseCycles, expectTicketHeld}) {
             verbosity: "queryPlanner",
         };
         const explain = assert.commandWorked(db.runCommand(explainCmd));
-        assert(!isExpress(db, explain), "Batched delete should not use express executor", {explain});
+        assert(!isExpress(db, explain), "Batched delete should not use express executor", {
+            explain,
+        });
     }
 
     // Hang before logAndBackoff so we can probe ticket state while the delete is suspended.
     const hangFp = configureFailPoint(primary, "planExecutorHangBeforeLogAndBackoff");
     // Force the delete stage to throw WriteConflict on every attempt.
-    const writeConflictFp = configureFailPoint(primary, "throwWriteConflictExceptionInBatchedDeleteStage");
+    const writeConflictFp = configureFailPoint(
+        primary,
+        "throwWriteConflictExceptionInBatchedDeleteStage",
+    );
 
     const deleteThread = new Thread(function (host) {
         const conn = new Mongo(host);
@@ -197,7 +204,10 @@ assert.commandWorked(coll.insertOne({_id: expressTestDocId, a: "foo", b: 10}));
 const expressHangFp = configureFailPoint(primary, "expressExecutorHangBeforeLogAndBackoff");
 
 // Enable the failpoint to throw write conflicts during express writes.
-const expressWriteConflictFp = configureFailPoint(primary, "throwWriteConflictExceptionInExpressWrite");
+const expressWriteConflictFp = configureFailPoint(
+    primary,
+    "throwWriteConflictExceptionInExpressWrite",
+);
 
 // Create a thread that will run an express update (single-doc update by _id).
 const expressUpdateThread = new Thread(
@@ -289,7 +299,10 @@ assert.commandWorked(coll.insertOne({_id: expressDeleteDocId, a: "foo", b: 30}))
 const expressDeleteHangFp = configureFailPoint(primary, "expressExecutorHangBeforeLogAndBackoff");
 
 // Enable the failpoint to throw write conflicts during express writes.
-const expressDeleteWriteConflictFp = configureFailPoint(primary, "throwWriteConflictExceptionInExpressWrite");
+const expressDeleteWriteConflictFp = configureFailPoint(
+    primary,
+    "throwWriteConflictExceptionInExpressWrite",
+);
 
 // Create a thread that will run an express delete (single-doc delete by _id).
 const expressDeleteThread = new Thread(
@@ -335,7 +348,9 @@ assert.commandWorked(
     }),
 );
 
-jsTestLog("Successfully inserted document, confirming express delete thread is not holding write tickets");
+jsTestLog(
+    "Successfully inserted document, confirming express delete thread is not holding write tickets",
+);
 
 // Disable the failpoints and allow the express delete to finish.
 expressDeleteHangFp.off();
@@ -393,7 +408,12 @@ assert.commandWorked(coll.insertOne({_id: fallbackTestDocId, a: "foo", b: 40}));
 
 // Configure the hang failpoint with skip=1: skip the first activation (release-ticket path at
 // numAttempts=0) and only pause at the second activation (hold-ticket path at numAttempts=1).
-const fallbackHangFp = configureFailPoint(primary, "expressExecutorHangBeforeLogAndBackoff", {}, {"skip": 1});
+const fallbackHangFp = configureFailPoint(
+    primary,
+    "expressExecutorHangBeforeLogAndBackoff",
+    {},
+    {"skip": 1},
+);
 
 // Enable the WCE failpoint so every express write attempt conflicts.
 const fallbackWCEFp = configureFailPoint(primary, "throwWriteConflictExceptionInExpressWrite");
@@ -484,7 +504,10 @@ assert.commandWorked(coll.insertOne({_id: tuTestDocId, a: "foo", b: 50}));
 
 // Enable the hang failpoint inside the WaitingForBackoff callback (fires after the ticket is
 // released but before the sleep, confirming we are in the released-ticket state).
-const tuHangFp = configureFailPoint(primary, "expressExecutorHangBeforeTemporarilyUnavailableBackoff");
+const tuHangFp = configureFailPoint(
+    primary,
+    "expressExecutorHangBeforeTemporarilyUnavailableBackoff",
+);
 
 // Enable the failpoint that injects a TemporarilyUnavailableException into express writes.
 const tuFp = configureFailPoint(primary, "throwTemporarilyUnavailableExceptionInExpressWrite");
@@ -541,10 +564,14 @@ jsTestLog(
 // Disable the failpoints and allow the express thread to finish.
 tuHangFp.off();
 tuFp.off();
-jsTestLog("Failpoints disabled, allowing blocked express TemporarilyUnavailable operation to proceed");
+jsTestLog(
+    "Failpoints disabled, allowing blocked express TemporarilyUnavailable operation to proceed",
+);
 
 tuThread.join();
-jsTest.log("Express TemporarilyUnavailable thread completed with result: " + tojson(tuThread.returnData()));
+jsTest.log(
+    "Express TemporarilyUnavailable thread completed with result: " + tojson(tuThread.returnData()),
+);
 
 // Cleanup.
 rst.stopSet();

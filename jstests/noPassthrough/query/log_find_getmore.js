@@ -59,7 +59,10 @@ cursor.next(); // Perform initial query and retrieve first document in batch.
 
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
-let priorityPortFFEnabled = FeatureFlagUtil.isPresentAndEnabled(testDB, "DedicatedPortForPriorityOperations");
+let priorityPortFFEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    testDB,
+    "DedicatedPortForPriorityOperations",
+);
 
 let logLine = priorityPortFFEnabled
     ? [

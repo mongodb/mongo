@@ -74,16 +74,46 @@ function runPipelineAndCheckExpectedMetaScoreResult(scorePipeline, expectedResul
 // Project'ing "score" many stages after $score works.
 (function projectScoreManyStagesAfterScoreStageWorks() {
     runPipelineAndCheckExpectedMetaScoreResult(
-        [scoreStage, matchStage, skipStage, limitStage, metaProjectScoreStage, inhibitOptimizationStage, sortStage],
-        [matchStage, skipStage, limitStage, constantProjectMyScoreStage, inhibitOptimizationStage, sortStage],
+        [
+            scoreStage,
+            matchStage,
+            skipStage,
+            limitStage,
+            metaProjectScoreStage,
+            inhibitOptimizationStage,
+            sortStage,
+        ],
+        [
+            matchStage,
+            skipStage,
+            limitStage,
+            constantProjectMyScoreStage,
+            inhibitOptimizationStage,
+            sortStage,
+        ],
     );
 })();
 
 // Project'ing "score" works when $score isn't the first stage.
 (function projectScoreWhenScoreStageIsNotFirst() {
     runPipelineAndCheckExpectedMetaScoreResult(
-        [matchStage, skipStage, scoreStage, limitStage, metaProjectScoreStage, inhibitOptimizationStage, sortStage],
-        [matchStage, skipStage, limitStage, constantProjectMyScoreStage, inhibitOptimizationStage, sortStage],
+        [
+            matchStage,
+            skipStage,
+            scoreStage,
+            limitStage,
+            metaProjectScoreStage,
+            inhibitOptimizationStage,
+            sortStage,
+        ],
+        [
+            matchStage,
+            skipStage,
+            limitStage,
+            constantProjectMyScoreStage,
+            inhibitOptimizationStage,
+            sortStage,
+        ],
     );
 })();
 
@@ -99,7 +129,14 @@ function runPipelineAndCheckExpectedMetaScoreResult(scorePipeline, expectedResul
             inhibitOptimizationStage,
             sortStage,
         ],
-        [matchStage, skipStage, limitStage, {$project: {myScore: "$a"}}, inhibitOptimizationStage, sortStage],
+        [
+            matchStage,
+            skipStage,
+            limitStage,
+            {$project: {myScore: "$a"}},
+            inhibitOptimizationStage,
+            sortStage,
+        ],
     );
 })();
 

@@ -16,7 +16,9 @@ TimeseriesTest.run((insert) => {
     coll.drop();
 
     const timeFieldName = "time";
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     for (let i = 0; i < 10; i++) {
         assert.commandWorked(
@@ -29,8 +31,8 @@ TimeseriesTest.run((insert) => {
     }
 
     const spec = {"control.min.time": "2dsphere"};
-    assert.commandFailedWithCode(createRawTimeseriesIndex(coll, spec, add2dsphereVersionIfNeededForSpec(spec)), [
-        16755,
-        ErrorCodes.GeoKeyExtractionFailed,
-    ]);
+    assert.commandFailedWithCode(
+        createRawTimeseriesIndex(coll, spec, add2dsphereVersionIfNeededForSpec(spec)),
+        [16755, ErrorCodes.GeoKeyExtractionFailed],
+    );
 });

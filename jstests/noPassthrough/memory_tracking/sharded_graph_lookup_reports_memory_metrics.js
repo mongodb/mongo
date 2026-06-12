@@ -14,7 +14,9 @@ const collName = jsTestName();
 const coll = testDB[collName];
 testDB[collName].drop();
 
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 st.shardColl(coll, {_id: 1}, {_id: "hashed"});
 

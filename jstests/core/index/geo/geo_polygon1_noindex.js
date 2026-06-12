@@ -46,7 +46,11 @@ boxBounds = [
     [100, 100],
     [100, -100],
 ];
-assert.eq(num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Big Bounding Box Test");
+assert.eq(
+    num,
+    t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(),
+    "Big Bounding Box Test",
+);
 
 t.drop();
 

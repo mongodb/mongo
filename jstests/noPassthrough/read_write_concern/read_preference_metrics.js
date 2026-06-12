@@ -14,7 +14,8 @@ function getReadPreferenceMetrics(conn) {
     const serverStatus = assert.commandWorked(conn.getDB("admin").runCommand({serverStatus: 1}));
     assert(
         serverStatus.process.startsWith("mongod"),
-        "Server status 'process' field does not start with 'mongod'. process: " + serverStatus.process,
+        "Server status 'process' field does not start with 'mongod'. process: " +
+            serverStatus.process,
     );
     assert(
         serverStatus.hasOwnProperty("readPreferenceCounters"),
@@ -60,7 +61,13 @@ function runTest(fixture) {
     const primary = fixture.getPrimary();
     const secondary = fixture.getSecondary();
 
-    const preferences = ["primary", "primaryPreferred", "secondary", "secondaryPreferred", "nearest"];
+    const preferences = [
+        "primary",
+        "primaryPreferred",
+        "secondary",
+        "secondaryPreferred",
+        "nearest",
+    ];
 
     for (const readPref of preferences) {
         verifyMetricIncrement(primary, readPref, "executedOnPrimary");

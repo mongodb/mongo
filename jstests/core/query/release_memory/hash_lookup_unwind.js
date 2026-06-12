@@ -55,7 +55,10 @@ setServerParameter(sbeIncreasedSpillingKnob, "never");
 // plan and would otherwise drain it to EOF (and dispose it) before releaseMemory runs, leaving
 // nothing to spill. Force the DSCursor to read one doc at a time so the SBE exec stays alive.
 // TODO SERVER-127608 set parameters with try/finally to avoid leaking changed values on failure
-const dsCursorKnobs = ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
+const dsCursorKnobs = [
+    "internalDocumentSourceCursorInitialBatchSize",
+    "internalDocumentSourceCursorBatchSizeBytes",
+];
 const dsCursorKnobValues = [];
 for (const knob of dsCursorKnobs) {
     dsCursorKnobValues.push(getServerParameter(knob));
@@ -93,7 +96,12 @@ assert.commandWorked(animals.insertMany(animasDocs));
 
 const pipeline1 = [
     {
-        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
+        $lookup: {
+            from: locations.getName(),
+            localField: "locationName",
+            foreignField: "name",
+            as: "location",
+        },
     },
     {$unwind: "$location"},
     {
@@ -108,7 +116,12 @@ const pipeline1 = [
 
 const pipeline2 = [
     {
-        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
+        $lookup: {
+            from: locations.getName(),
+            localField: "locationName",
+            foreignField: "name",
+            as: "location",
+        },
     },
     {$unwind: {path: "$location", preserveNullAndEmptyArrays: true}},
     {
@@ -123,7 +136,12 @@ const pipeline2 = [
 
 const pipeline3 = [
     {
-        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
+        $lookup: {
+            from: locations.getName(),
+            localField: "locationName",
+            foreignField: "name",
+            as: "location",
+        },
     },
     {$unwind: {path: "$location", includeArrayIndex: "index"}},
     {
@@ -162,7 +180,10 @@ for (let pipeline of [pipeline1, pipeline2, pipeline3]) {
             let initialSpillCount = getSpillCounter();
 
             // Retrieve the first batch without spilling.
-            const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+            const cursor = animals.aggregate(pipeline, {
+                "allowDiskUse": true,
+                cursor: {batchSize: 1},
+            });
             const cursorId = cursor.getId();
 
             // Assert it did not spill during the first batch.
@@ -196,7 +217,10 @@ for (let pipeline of [pipeline1, pipeline2, pipeline3]) {
             let initialSpillCount = getSpillCounter();
 
             // Retrieve the first batch.
-            const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+            const cursor = animals.aggregate(pipeline, {
+                "allowDiskUse": true,
+                cursor: {batchSize: 1},
+            });
             const cursorId = cursor.getId();
 
             // Assert it spilt during the first batch.
@@ -226,7 +250,10 @@ for (let pipeline of [pipeline1, pipeline2, pipeline3]) {
         jsTest.log.info(`Running releaseMemory with no disk space available`);
 
         runReleaseMemoryTestWithRetries(() => {
-            const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+            const cursor = animals.aggregate(pipeline, {
+                "allowDiskUse": true,
+                cursor: {batchSize: 1},
+            });
             const cursorId = cursor.getId();
 
             // Release memory (i.e., spill)
@@ -235,7 +262,11 @@ for (let pipeline of [pipeline1, pipeline2, pipeline3]) {
             jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
             const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
             assert.commandWorked(releaseMemoryRes);
-            assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
+            assertReleaseMemoryFailedWithCode(
+                releaseMemoryRes,
+                cursorId,
+                ErrorCodes.OutOfDiskSpace,
+            );
             setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
             jsTest.log.info("Running getMore");

@@ -18,7 +18,9 @@ assert.commandWorked(mydb.dropDatabase());
 // If the test fixture is enabling clustered collections by default, all test collections created
 // in this test will have a 'clusteredIndex' field in the collection options returned by
 // listCollections.
-const defaultCollectionOptionsFilter = ClusteredCollectionUtil.areAllCollectionsClustered(mydb.getMongo())
+const defaultCollectionOptionsFilter = ClusteredCollectionUtil.areAllCollectionsClustered(
+    mydb.getMongo(),
+)
     ? {"options.clusteredIndex.unique": true}
     : {options: {}};
 
@@ -29,7 +31,11 @@ assert.commandWorked(mydb.createCollection("unordered_sets"));
 
 if (!FixtureHelpers.isMongos(mydb)) {
     assert.commandWorked(
-        mydb.runCommand({applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}}]}),
+        mydb.runCommand({
+            applyOps: [
+                {op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}},
+            ],
+        }),
     );
 }
 
@@ -57,7 +63,10 @@ function testListCollections(filter, expectedNames) {
     assert.eq(cursorResultNames.sort(), expectedNames.sort());
 
     // Assert the shell helper returns the same list, but in sorted order.
-    const shellResultNames = mydb.getCollectionInfos(filter).map(stripToName).filter(isNotProfileCollection);
+    const shellResultNames = mydb
+        .getCollectionInfos(filter)
+        .map(stripToName)
+        .filter(isNotProfileCollection);
     assert.eq(shellResultNames, expectedNames.sort());
 }
 
@@ -80,7 +89,10 @@ testListCollections({name: 1234}, []);
 // Filter with $in.
 testListCollections({name: {$in: ["lists"]}}, ["lists"]);
 testListCollections({name: {$in: []}}, []);
-testListCollections({name: {$in: ["lists", "ordered_sets", "non-existent", "", 1234]}}, ["lists", "ordered_sets"]);
+testListCollections({name: {$in: ["lists", "ordered_sets", "non-existent", "", 1234]}}, [
+    "lists",
+    "ordered_sets",
+]);
 // With a regex.
 testListCollections({name: {$in: ["lists", /.*_sets$/, "non-existent", "", 1234]}}, [
     "lists",
@@ -97,20 +109,27 @@ if (!FixtureHelpers.isMongos(mydb)) {
 }
 
 // Filter with $and and $in.
-testListCollections(Object.merge({name: {$in: ["lists", /.*_sets$/]}}, defaultCollectionOptionsFilter), [
-    "lists",
-    "ordered_sets",
-    "unordered_sets",
-]);
+testListCollections(
+    Object.merge({name: {$in: ["lists", /.*_sets$/]}}, defaultCollectionOptionsFilter),
+    ["lists", "ordered_sets", "unordered_sets"],
+);
 testListCollections(
     {
-        $and: [{name: {$in: ["lists", /.*_sets$/]}}, {name: "lists"}, defaultCollectionOptionsFilter],
+        $and: [
+            {name: {$in: ["lists", /.*_sets$/]}},
+            {name: "lists"},
+            defaultCollectionOptionsFilter,
+        ],
     },
     ["lists"],
 );
 testListCollections(
     {
-        $and: [{name: {$in: ["lists", /.*_sets$/]}}, {name: "non-existent"}, defaultCollectionOptionsFilter],
+        $and: [
+            {name: {$in: ["lists", /.*_sets$/]}},
+            {name: "non-existent"},
+            defaultCollectionOptionsFilter,
+        ],
     },
     [],
 );

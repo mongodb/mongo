@@ -30,7 +30,10 @@ assert.commandWorked(res);
         ErrorCodes.IllegalOperation,
     );
 
-    assert.commandFailedWithCode(mongosConfigDB.runCommand({drop: "shards"}), ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        mongosConfigDB.runCommand({drop: "shards"}),
+        ErrorCodes.IllegalOperation,
+    );
 
     assert.commandFailedWithCode(
         mongosConfigDB.runCommand({
@@ -43,7 +46,11 @@ assert.commandWorked(res);
     );
 
     assert.commandFailedWithCode(
-        mongosAdminDB.adminCommand({reshardCollection: "config.system.sessions", key: {uid: 1}, numInitialChunks: 2}),
+        mongosAdminDB.adminCommand({
+            reshardCollection: "config.system.sessions",
+            key: {uid: 1},
+            numInitialChunks: 2,
+        }),
         ErrorCodes.IllegalOperation,
     );
 }
@@ -56,7 +63,10 @@ assert.commandWorked(res);
         ErrorCodes.IllegalOperation,
     );
 
-    assert.commandFailedWithCode(mongosAdminDB.runCommand({drop: "system.healthLog"}), ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        mongosAdminDB.runCommand({drop: "system.healthLog"}),
+        ErrorCodes.IllegalOperation,
+    );
 
     assert.commandFailedWithCode(
         mongosAdminDB.runCommand({
@@ -69,7 +79,11 @@ assert.commandWorked(res);
     );
 
     assert.commandFailedWithCode(
-        mongosAdminDB.adminCommand({reshardCollection: "admin.system.roles", key: {uid: 1}, numInitialChunks: 2}),
+        mongosAdminDB.adminCommand({
+            reshardCollection: "admin.system.roles",
+            key: {uid: 1},
+            numInitialChunks: 2,
+        }),
         [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded],
     );
 }
@@ -91,8 +105,14 @@ assert.commandWorked(res);
 // Mongos commands on the config database that previoulsy failed that should succeed when run
 // directly on the config server
 {
-    const renameRes0 = configSvrAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"});
-    const renameRes1 = configSvrAdminDB.runCommand({renameCollection: "config.joe", to: "config.shards"});
+    const renameRes0 = configSvrAdminDB.runCommand({
+        renameCollection: "config.shards",
+        to: "config.joe",
+    });
+    const renameRes1 = configSvrAdminDB.runCommand({
+        renameCollection: "config.joe",
+        to: "config.shards",
+    });
 
     if (isReplicaSetEndpointActive) {
         assert.commandFailedWithCode(renameRes0, ErrorCodes.IllegalOperation);
@@ -128,14 +148,20 @@ assert.commandWorked(res);
 // directly on the config server.
 // Note: renameCollection and drop will still fail for certain collections in the admin databases.
 {
-    const renameRes0 = configSvrAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"});
+    const renameRes0 = configSvrAdminDB.runCommand({
+        renameCollection: "admin.system.roles",
+        to: "admin.joe",
+    });
     if (isReplicaSetEndpointActive) {
         assert.commandFailedWithCode(renameRes0, ErrorCodes.IllegalOperation);
     } else {
         assert.commandWorked(renameRes0);
     }
 
-    const renameRes1 = configSvrAdminDB.runCommand({renameCollection: "admin.joe", to: "admin.system.roles"});
+    const renameRes1 = configSvrAdminDB.runCommand({
+        renameCollection: "admin.joe",
+        to: "admin.system.roles",
+    });
     if (isReplicaSetEndpointActive) {
         assert.commandFailedWithCode(renameRes1, ErrorCodes.IllegalOperation);
     } else {

@@ -59,7 +59,9 @@ let explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, false);
 
 assert.commandWorked(coll.createIndexes([{x: 1}, {x: 1, y: 1}]));
-assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}),
+);
 assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
 explain = assert.commandWorked(coll.find({x: 3}).explain());
@@ -84,7 +86,9 @@ assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
 // Changing the catalog and then setting an index filter should not result in duplicate entries.
 assert.commandWorked(coll.createIndex({x: 1, a: 1}));
-assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}),
+);
 assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
 // Recreate the {x: 1, y: 1} index and be sure that it's still used.

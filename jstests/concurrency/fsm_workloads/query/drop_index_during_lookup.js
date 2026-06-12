@@ -17,7 +17,16 @@ export const $config = (function () {
             try {
                 const coll = db[this.collName];
                 const result = coll
-                    .aggregate([{$lookup: {from: this.foreignCollName, localField: "a", foreignField: "b", as: "out"}}])
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: this.foreignCollName,
+                                localField: "a",
+                                foreignField: "b",
+                                as: "out",
+                            },
+                        },
+                    ])
                     .toArray();
                 assert.eq(result.length, 1);
                 assert.docEq({_id: 0, a: 0, out: [{_id: 0, b: 0}]}, result[0]);

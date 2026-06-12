@@ -17,7 +17,12 @@ coll.drop();
 [0, 1, 100, 1000, 10000].forEach((length) => {
     coll.remove({});
     assert.commandWorked(coll.insert({a: "y".repeat(kMaxOldRegexPatternLength + length)}));
-    assert.eq(1, coll.find({a: {$regex: buildAnchoredPattern(kMaxOldRegexPatternLength + length)}}).itcount());
+    assert.eq(
+        1,
+        coll
+            .find({a: {$regex: buildAnchoredPattern(kMaxOldRegexPatternLength + length)}})
+            .itcount(),
+    );
 });
 
 // Using a too long pattern will always fail.

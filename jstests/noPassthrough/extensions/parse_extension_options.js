@@ -6,7 +6,10 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {withExtensions, checkPlatformCompatibleWithExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    withExtensions,
+    checkPlatformCompatibleWithExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -15,7 +18,9 @@ function confirmNoMaxRestriction(conn) {
     const coll = db[jsTestName()];
 
     let pipeline = [{$checkNum: {num: Infinity}}];
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+    );
 }
 
 function confirmMaxValIsEnforced(conn, maxValueToCheck) {
@@ -23,7 +28,9 @@ function confirmMaxValIsEnforced(conn, maxValueToCheck) {
     const coll = db[jsTestName()];
 
     let pipeline = [{$checkNum: {num: maxValueToCheck - 1}}];
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+    );
 
     pipeline = [{$checkNum: {num: maxValueToCheck + 1}}];
     assertErrorCode(coll, pipeline, 10999106);
@@ -41,6 +48,9 @@ withExtensions({"libparse_options_mongo_extension.so": {checkMax: false, max: 1}
 
 // Confirm $checkNum is restricted when 'checkMax' is true. We expect failure if $checkNum provides a number that is greater than 'max'.
 const maxValueToCheck = 100;
-withExtensions({"libparse_options_mongo_extension.so": {checkMax: true, max: maxValueToCheck}}, (conn) => {
-    confirmMaxValIsEnforced(conn, maxValueToCheck);
-});
+withExtensions(
+    {"libparse_options_mongo_extension.so": {checkMax: true, max: maxValueToCheck}},
+    (conn) => {
+        confirmMaxValIsEnforced(conn, maxValueToCheck);
+    },
+);

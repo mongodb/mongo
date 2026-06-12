@@ -193,14 +193,23 @@
         assert.throwsWithCode(() => coll.find(filterOnLongField).itcount(), 5729100);
         assert.throwsWithCode(() => coll.explain().find(filterOnLongField).finish(), 5729100);
 
-        assert.throwsWithCode(() => coll.find({foo: 1}, filterOnLongField).itcount(), ErrorCodes.Overflow);
-        assert.throwsWithCode(() => coll.explain().find({foo: 1}, filterOnLongField).finish(), ErrorCodes.Overflow);
+        assert.throwsWithCode(
+            () => coll.find({foo: 1}, filterOnLongField).itcount(),
+            ErrorCodes.Overflow,
+        );
+        assert.throwsWithCode(
+            () => coll.explain().find({foo: 1}, filterOnLongField).finish(),
+            ErrorCodes.Overflow,
+        );
 
         let sliceProjectionOnLongField = {
             ["a" + ".a".repeat(depth - 1)]: {$slice: 1},
         };
 
-        assert.throwsWithCode(() => coll.find({foo: 1}, sliceProjectionOnLongField).itcount(), ErrorCodes.Overflow);
+        assert.throwsWithCode(
+            () => coll.find({foo: 1}, sliceProjectionOnLongField).itcount(),
+            ErrorCodes.Overflow,
+        );
         assert.throwsWithCode(
             () => coll.explain().find({foo: 1}, sliceProjectionOnLongField).finish(),
             ErrorCodes.Overflow,

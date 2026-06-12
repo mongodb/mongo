@@ -27,7 +27,9 @@ withTxnAndAutoRetryOnMongos(
         let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
         assert(res.hasOwnProperty("cursor"), tojson(res));
         assert(res.cursor.hasOwnProperty("id"), tojson(res));
-        assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+        assert.commandWorked(
+            sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+        );
     },
     /* txnOpts = */ {},
 );

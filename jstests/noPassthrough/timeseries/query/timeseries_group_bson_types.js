@@ -3,11 +3,16 @@
  * queries that result in different BSON types to ensure the results are the same.
  */
 
-import {blockProcessingTestCases, generateMetaVals} from "jstests/libs/query/block_processing_test_cases.js";
+import {
+    blockProcessingTestCases,
+    generateMetaVals,
+} from "jstests/libs/query/block_processing_test_cases.js";
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
 const scalarConn = MongoRunner.runMongod();
-const bpConn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
+const bpConn = MongoRunner.runMongod({
+    setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true},
+});
 
 assert.neq(null, scalarConn, "mongod was unable to start up");
 assert.neq(null, bpConn, "mongod was unable to start up");
@@ -141,7 +146,9 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
             test,
             scalarResults: scalarResults.sort((lhs, rhs) => bsonWoCompare(lhs._id, rhs._id)),
             bpResults: bpResults.sort((lhs, rhs) => bsonWoCompare(lhs._id, rhs._id)),
-            scalarExplain: scalarColl.explain("executionStats").aggregate(test.pipeline, {allowDiskUse}),
+            scalarExplain: scalarColl
+                .explain("executionStats")
+                .aggregate(test.pipeline, {allowDiskUse}),
             bpExplain: bpColl.explain("executionStats").aggregate(test.pipeline, {allowDiskUse}),
         };
     });
@@ -149,7 +156,10 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
 
 function runTestCases(allowDiskUse, forceSpilling) {
     assert.commandWorked(
-        bpDb.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}),
+        bpDb.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling,
+        }),
     );
     let testcases = blockProcessingTestCases(
         timeFieldName,

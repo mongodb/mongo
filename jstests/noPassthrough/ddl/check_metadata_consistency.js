@@ -35,7 +35,11 @@ function assertNoInconsistencies() {
     const checkOptions = {"checkIndexes": 1};
 
     let res = mongos.getDB("admin").checkMetadataConsistency(checkOptions).toArray();
-    assert.eq(0, res.length, "Found unexpected metadata inconsistencies at cluster level: " + tojson(res));
+    assert.eq(
+        0,
+        res.length,
+        "Found unexpected metadata inconsistencies at cluster level: " + tojson(res),
+    );
 
     mongos.getDBNames().forEach((dbName) => {
         if (dbName == "admin") {
@@ -44,12 +48,20 @@ function assertNoInconsistencies() {
 
         let db = mongos.getDB(dbName);
         res = db.checkMetadataConsistency(checkOptions).toArray();
-        assert.eq(0, res.length, "Found unexpected metadata inconsistencies at database level: " + tojson(res));
+        assert.eq(
+            0,
+            res.length,
+            "Found unexpected metadata inconsistencies at database level: " + tojson(res),
+        );
 
         db.getCollectionNames().forEach((collName) => {
             let coll = db.getCollection(collName);
             res = coll.checkMetadataConsistency(checkOptions).toArray();
-            assert.eq(0, res.length, "Found unexpected metadata inconsistencies at collection level: " + tojson(res));
+            assert.eq(
+                0,
+                res.length,
+                "Found unexpected metadata inconsistencies at collection level: " + tojson(res),
+            );
         });
     });
 }
@@ -89,7 +101,10 @@ function assertCollectionOptionsMismatch(inconsistencies, expectedOptionsWithSha
 function assertOnlyExpectedInconsistencyTypes(inconsistencies, allowedTypes) {
     const allowed = new Set(allowedTypes);
     inconsistencies.forEach((inc) => {
-        assert(allowed.has(inc.type), "Unexpected inconsistency type " + inc.type + " in " + tojson(inconsistencies));
+        assert(
+            allowed.has(inc.type),
+            "Unexpected inconsistency type " + inc.type + " in " + tojson(inconsistencies),
+        );
     });
 }
 
@@ -121,7 +136,12 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     let isFcvGreater = true;
     st.forEachConnection(function (conn) {
         const fcvDoc = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, fcvRequired) < 0) {
+        if (
+            MongoRunner.compareBinVersions(
+                fcvDoc.featureCompatibilityVersion.version,
+                fcvRequired,
+            ) < 0
+        ) {
             isFcvGreater = false;
         }
     });
@@ -132,17 +152,27 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     jsTest.log("Executing testCursor");
     const db = getNewDb();
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(st.shard1.getDB(db.getName()).coll1.insert({_id: "foo"}));
     assert.commandWorked(st.shard1.getDB(db.getName()).coll2.insert({_id: "foo"}));
     assert.commandWorked(st.shard1.getDB(db.getName()).coll3.insert({_id: "foo"}));
     assert.commandWorked(st.shard1.getDB(db.getName()).coll4.insert({_id: "foo"}));
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: db.coll1.getFullName(), key: {_id: 1}}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: db.coll2.getFullName(), key: {_id: 1}}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: db.coll3.getFullName(), key: {_id: 1}}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: db.coll4.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: db.coll1.getFullName(), key: {_id: 1}}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: db.coll2.getFullName(), key: {_id: 1}}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: db.coll3.getFullName(), key: {_id: 1}}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: db.coll4.getFullName(), key: {_id: 1}}),
+    );
 
     // Check correct behaviour of cursor with DBCommandCursor
     let res = db.runCommand({checkMetadataConsistency: 1, cursor: {batchSize: 1}});
@@ -163,7 +193,9 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert.eq(3, res.cursor.firstBatch.length);
 
     const getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf(".") + 1);
-    res = assert.commandWorked(db.runCommand({getMore: res.cursor.id, collection: getMoreCollName}));
+    res = assert.commandWorked(
+        db.runCommand({getMore: res.cursor.id, collection: getMoreCollName}),
+    );
     assert.eq(1, res.cursor.nextBatch.length);
 
     // Clean up the database to pass the hooks that detect inconsistencies
@@ -175,11 +207,15 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     jsTest.log("Executing testCollectionUUIDMismatchInconsistency");
     const db = getNewDb();
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(st.shard1.getDB(db.getName()).coll.insert({_id: "foo"}));
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: db.coll.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: db.coll.getFullName(), key: {_id: 1}}),
+    );
 
     // Database level mode command
     let inconsistencies = db.checkMetadataConsistency().toArray();
@@ -190,7 +226,11 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     // Collection level mode command
     const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
     assert.eq(1, collInconsistencies.length);
-    assert.eq("CollectionUUIDMismatch", collInconsistencies[0].type, tojson(collInconsistencies[0]));
+    assert.eq(
+        "CollectionUUIDMismatch",
+        collInconsistencies[0].type,
+        tojson(collInconsistencies[0]),
+    );
     assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
@@ -202,7 +242,9 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     jsTest.log("Executing testMisplacedCollection");
     const db = getNewDb();
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(st.shard1.getDB(db.getName()).coll.insert({_id: "foo"}));
 
@@ -245,7 +287,9 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
-    assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}));
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}),
+    );
     assertNoInconsistencies();
 })();
 
@@ -255,7 +299,14 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const db = getNewDb();
     const kSourceCollName = "coll";
 
-    st.shardColl(kSourceCollName, {skey: 1}, {skey: 0}, {skey: 1}, db.getName(), true /* waitForDelete */);
+    st.shardColl(
+        kSourceCollName,
+        {skey: 1},
+        {skey: 0},
+        {skey: 1},
+        db.getName(),
+        true /* waitForDelete */,
+    );
 
     // Connect directly to shards to bypass the mongos checks for dropping shard key indexes
     assert.commandWorked(st.shard0.getDB(db.getName()).coll.dropIndex({skey: 1}));
@@ -290,15 +341,26 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         const checkOptions = {"checkRangeDeletionIndexes": 1};
 
         // Enforce dbPrimary to be shard0 (first chunk is on shard0 is granted)
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
 
-        st.shardColl(kSourceCollName, {skey: 1}, {skey: 0}, {skey: 1}, dbName, true /* waitForDelete */);
+        st.shardColl(
+            kSourceCollName,
+            {skey: 1},
+            {skey: 0},
+            {skey: 1},
+            dbName,
+            true /* waitForDelete */,
+        );
 
         // Suspend range deletions
         let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
 
         // Move one chunk to create an orphaned range on shard0 (donor)
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: -10}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {skey: -10}, to: st.shard1.shardName}),
+        );
 
         // Connect directly to shards to bypass the mongos checks for dropping shard key indexes
         assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: 1}));
@@ -311,7 +373,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         assert.eq(2, inconsistencies.length, tojson(inconsistencies));
         const incTypes = inconsistencies.map((inconsistency) => inconsistency.type);
         const correctIncTypes =
-            incTypes.includes("MissingShardKeyIndex") && incTypes.includes("RangeDeletionMissingShardKeyIndex");
+            incTypes.includes("MissingShardKeyIndex") &&
+            incTypes.includes("RangeDeletionMissingShardKeyIndex");
         assert.eq(true, correctIncTypes, tojson(inconsistencies));
 
         // Clean up the database to pass the hooks that detect inconsistencies
@@ -346,11 +409,19 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         // Check inconsistencies in case one shard owns a chunk and has a outstanding range
         // deletion, and one shard owns two chunks and has no outstanding range deletions
         let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
-        let chunk0 = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName});
+        let chunk0 = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), ns, {
+            shard: st.shard0.shardName,
+        });
         assert.commandWorked(db.adminCommand({split: ns, bounds: [chunk0.min, chunk0.max]}));
-        let halfChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName});
+        let halfChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), ns, {
+            shard: st.shard0.shardName,
+        });
         assert.commandWorked(
-            db.adminCommand({moveChunk: ns, bounds: [halfChunk.min, halfChunk.max], to: st.shard1.shardName}),
+            db.adminCommand({
+                moveChunk: ns,
+                bounds: [halfChunk.min, halfChunk.max],
+                to: st.shard1.shardName,
+            }),
         );
         assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: "hashed"}));
 
@@ -361,9 +432,15 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         // Check inconsistencies in case one shard does not own chunks and has outstanding range
         // deletions, and one shard owns two chunks and has no outstanding range deletions
         assert.commandWorked(st.shard0.getDB(dbName).coll.createIndex({skey: "hashed"}));
-        halfChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName});
+        halfChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), ns, {
+            shard: st.shard0.shardName,
+        });
         assert.commandWorked(
-            db.adminCommand({moveChunk: ns, bounds: [halfChunk.min, halfChunk.max], to: st.shard1.shardName}),
+            db.adminCommand({
+                moveChunk: ns,
+                bounds: [halfChunk.min, halfChunk.max],
+                to: st.shard1.shardName,
+            }),
         );
         assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: "hashed"}));
 
@@ -406,7 +483,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assertNoInconsistencies();
 
     // Check inconsistent index property across shards
-    assert.commandWorked(shard0Coll.createIndex({key1: 1}, {name: "index1", sparse: true, expireAfterSeconds: 3600}));
+    assert.commandWorked(
+        shard0Coll.createIndex({key1: 1}, {name: "index1", sparse: true, expireAfterSeconds: 3600}),
+    );
     assert.commandWorked(shard1Coll.createIndex({key1: 1}, {name: "index1", sparse: true}));
 
     inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
@@ -450,7 +529,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("HiddenShardedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
-    assert.eq(coll1.getFullName(), inconsistencies[0].details.namespace, tojson(inconsistencies[0]));
+    assert.eq(
+        coll1.getFullName(),
+        inconsistencies[0].details.namespace,
+        tojson(inconsistencies[0]),
+    );
 
     // Remove db2 so that coll2 also became hidden
     assert.commandWorked(configDatabasesColl.deleteOne({_id: db2.getName()}));
@@ -458,9 +541,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(2, inconsistencies.length, tojson(inconsistencies));
     assert.eq("HiddenShardedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
-    assert.eq(coll1.getFullName(), inconsistencies[0].details.namespace, tojson(inconsistencies[0]));
+    assert.eq(
+        coll1.getFullName(),
+        inconsistencies[0].details.namespace,
+        tojson(inconsistencies[0]),
+    );
     assert.eq("HiddenShardedCollection", inconsistencies[1].type, tojson(inconsistencies[1]));
-    assert.eq(coll2.getFullName(), inconsistencies[1].details.namespace, tojson(inconsistencies[1]));
+    assert.eq(
+        coll2.getFullName(),
+        inconsistencies[1].details.namespace,
+        tojson(inconsistencies[1]),
+    );
 
     // Restore db1 and db2 configuration to ensure the correct behavior of dropDatabase operations
     assert.commandWorked(configDatabasesColl.insertMany([db1ConfigEntry, db2ConfigEntry]));
@@ -514,7 +605,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         tojson(inconsistencies),
     );
     assert(
-        inconsistencies.some((object) => object.type === "InconsistentShardCatalogCollectionMetadata"),
+        inconsistencies.some(
+            (object) => object.type === "InconsistentShardCatalogCollectionMetadata",
+        ),
         tojson(inconsistencies),
     );
 
@@ -526,7 +619,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
 (function testMissingRoutingTableInconsistency() {
     if (jsTest.options().storageEngine === "inMemory") {
-        jsTestLog("Skipping testMissingRoutingTableInconsistency because we need persistance to restart nodes");
+        jsTestLog(
+            "Skipping testMissingRoutingTableInconsistency because we need persistance to restart nodes",
+        );
         return;
     }
 
@@ -553,7 +648,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         tojson(inconsistencies),
     );
     assert(
-        inconsistencies.some((object) => object.type === "InconsistentShardCatalogCollectionMetadata"),
+        inconsistencies.some(
+            (object) => object.type === "InconsistentShardCatalogCollectionMetadata",
+        ),
         tojson(inconsistencies),
     );
 
@@ -572,25 +669,43 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Insert MisplacedCollection inconsistency in db_MisplacedCollection1
     assert.commandWorked(
-        mongos.adminCommand({enableSharding: db_MisplacedCollection1.getName(), primaryShard: st.shard0.shardName}),
+        mongos.adminCommand({
+            enableSharding: db_MisplacedCollection1.getName(),
+            primaryShard: st.shard0.shardName,
+        }),
     );
-    assert.commandWorked(st.shard1.getDB(db_MisplacedCollection1.getName()).coll.insert({_id: "foo"}));
+    assert.commandWorked(
+        st.shard1.getDB(db_MisplacedCollection1.getName()).coll.insert({_id: "foo"}),
+    );
 
     // Insert MisplacedCollection inconsistency in db_MisplacedCollection2
     assert.commandWorked(
-        mongos.adminCommand({enableSharding: db_MisplacedCollection2.getName(), primaryShard: st.shard1.shardName}),
+        mongos.adminCommand({
+            enableSharding: db_MisplacedCollection2.getName(),
+            primaryShard: st.shard1.shardName,
+        }),
     );
-    assert.commandWorked(st.shard0.getDB(db_MisplacedCollection2.getName()).coll.insert({_id: "foo"}));
+    assert.commandWorked(
+        st.shard0.getDB(db_MisplacedCollection2.getName()).coll.insert({_id: "foo"}),
+    );
 
     // Insert CollectionUUIDMismatch inconsistency in db_CollectionUUIDMismatch
     assert.commandWorked(
-        mongos.adminCommand({enableSharding: db_CollectionUUIDMismatch.getName(), primaryShard: st.shard1.shardName}),
+        mongos.adminCommand({
+            enableSharding: db_CollectionUUIDMismatch.getName(),
+            primaryShard: st.shard1.shardName,
+        }),
     );
 
-    assert.commandWorked(st.shard0.getDB(db_CollectionUUIDMismatch.getName()).coll.insert({_id: "foo"}));
+    assert.commandWorked(
+        st.shard0.getDB(db_CollectionUUIDMismatch.getName()).coll.insert({_id: "foo"}),
+    );
 
     assert.commandWorked(
-        st.s.adminCommand({shardCollection: db_CollectionUUIDMismatch.coll.getFullName(), key: {_id: 1}}),
+        st.s.adminCommand({
+            shardCollection: db_CollectionUUIDMismatch.coll.getFullName(),
+            key: {_id: 1},
+        }),
     );
 
     // Cluster level mode command
@@ -662,7 +777,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const primaryShard = st.shard1;
 
     // set a primary shard
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // create a splittable collection with a key != {_id:1}
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
@@ -695,7 +812,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const primaryShard = st.shard0;
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a timeseries sharded collection.
     assert.commandWorked(
@@ -736,7 +855,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // TODO SERVER-95414 Remove FCV check when 9.0 becomes last LTS.
     if (!isFcvGraterOrEqualTo("8.1")) {
-        jsTestLog("Skipping testCollectionAuxiliaryMetadataMismatch test because required FCV is less than 8.1.");
+        jsTestLog(
+            "Skipping testCollectionAuxiliaryMetadataMismatch test because required FCV is less than 8.1.",
+        );
         return;
     }
 
@@ -747,12 +868,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection and place data in 2 shards.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}),
+    );
     assertNoInconsistencies();
 
     // Insert a catalog top level metadata inconsistency and check that it's detected.
@@ -809,7 +934,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const primaryShard = st.shard0;
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a collection with a specific default collation.
     assert.commandWorked(db.runCommand({create: kSourceCollName, collation: {locale: "ca"}}));
@@ -820,13 +947,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Note: we need to specify a simple collation on shardCollection command to make clear that
     // chunks will be sorted using a simple collation, however, the default collation for the
     // collection is preserved to {'locale':'ca'}.
-    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}, collation: {locale: "simple"}}));
+    assert.commandWorked(
+        db.adminCommand({shardCollection: kNss, key: {x: 1}, collation: {locale: "simple"}}),
+    );
 
     const no_inconsistency = db.checkMetadataConsistency().toArray();
     assert.eq(0, no_inconsistency.length);
 
     // Update the default collation on the sharding catalog only and catch the inconsistency.
-    assert.commandWorked(configDB.collections.update({_id: kNss}, {$unset: {defaultCollation: ""}}));
+    assert.commandWorked(
+        configDB.collections.update({_id: kNss}, {$unset: {defaultCollation: ""}}),
+    );
 
     const inconsistencies = db.checkMetadataConsistency().toArray();
     assert.eq(2, inconsistencies.length);
@@ -849,7 +980,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const primaryShard = st.shard0;
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a capped collection.
     assert.commandWorked(db.runCommand({create: kSourceCollName, capped: true, size: 1000}));
@@ -905,17 +1038,23 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     if (!isFcvGraterOrEqualTo("8.0")) {
-        jsTestLog("Skipping testCappedCollectionCantBeSharded test because required FCV is less than 8.0.");
+        jsTestLog(
+            "Skipping testCappedCollectionCantBeSharded test because required FCV is less than 8.0.",
+        );
         return;
     }
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}),
+    );
     assertNoInconsistencies();
 
     // Drop the collection on all the shards and catch the inconsistency
@@ -926,13 +1065,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.gte(inconsistencies.length, 2);
     assert(
         inconsistencies.some(
-            (object) => object.type === "MissingLocalCollection" && object.details.shard === primaryShard.shardName,
+            (object) =>
+                object.type === "MissingLocalCollection" &&
+                object.details.shard === primaryShard.shardName,
         ),
         tojson(inconsistencies),
     );
     assert(
         inconsistencies.some(
-            (object) => object.type === "MissingLocalCollection" && object.details.shard === anotherShard.shardName,
+            (object) =>
+                object.type === "MissingLocalCollection" &&
+                object.details.shard === anotherShard.shardName,
         ),
         tojson(inconsistencies),
     );
@@ -951,17 +1094,23 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     if (!isFcvGraterOrEqualTo("8.0")) {
-        jsTestLog("Skipping testUuidMismatchAcrossShards test because required FCV is less than 8.0. ");
+        jsTestLog(
+            "Skipping testUuidMismatchAcrossShards test because required FCV is less than 8.0. ",
+        );
         return;
     }
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection and place data in 2 shards.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}),
+    );
     const uuidOnPrimaryShard = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
     assertNoInconsistencies();
 
@@ -969,8 +1118,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // the uuid.
     anotherShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
     anotherShard.getDB(db.getName()).runCommand({create: kSourceCollName});
-    const uuidOnAnotherShard = anotherShard.getDB(db.getName()).getCollectionInfos({name: kSourceCollName})[0]
-        .info.uuid;
+    const uuidOnAnotherShard = anotherShard
+        .getDB(db.getName())
+        .getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Catch the inconsistency.
     const inconsistencies = db.checkMetadataConsistency().toArray();
@@ -994,12 +1144,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     if (!isFcvGraterOrEqualTo("8.0")) {
-        jsTestLog("Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.",
+        );
         return;
     }
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
@@ -1011,7 +1165,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach((chunk) => {
-        assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}),
+        );
     });
 
     // There should not be any inconsistency.
@@ -1031,12 +1187,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     if (!isFcvGraterOrEqualTo("8.0")) {
-        jsTestLog("Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.",
+        );
         return;
     }
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
@@ -1048,14 +1208,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach((chunk) => {
-        assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}),
+        );
     });
 
     // Drop the collection from the primary shard after moving all chunks out of the primary shard.
     primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
     primaryShard.getDB(db.getName()).runCommand({create: kSourceCollName});
-    const uuidOnPrimaryShard = primaryShard.getDB(db.getName()).getCollectionInfos({name: kSourceCollName})[0]
-        .info.uuid;
+    const uuidOnPrimaryShard = primaryShard
+        .getDB(db.getName())
+        .getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Catch the inconsistency.
     const inconsistencies = db.checkMetadataConsistency().toArray();
@@ -1079,17 +1242,23 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     if (!isFcvGraterOrEqualTo("8.0")) {
-        jsTestLog("Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.",
+        );
         return;
     }
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection and place data in 2 shards.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}),
+    );
     assertNoInconsistencies();
 
     // Drop the collection from the primary shard after moving all chunks out of the primary shard.
@@ -1115,12 +1284,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const anotherShard = st.shard1;
 
     if (!isFcvGraterOrEqualTo("8.0")) {
-        jsTestLog("Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.",
+        );
         return;
     }
 
     // Set a primary shard.
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+    );
 
     // Create a tracked collection.
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
@@ -1132,7 +1305,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach((chunk) => {
-        assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}),
+        );
     });
 
     // At this point there should not be any inconsistency.
@@ -1172,11 +1347,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     const db_MisplacedCollection = getNewDb();
     assert.commandWorked(
-        mongos.adminCommand({enableSharding: db_MisplacedCollection.getName(), primaryShard: st.shard0.shardName}),
+        mongos.adminCommand({
+            enableSharding: db_MisplacedCollection.getName(),
+            primaryShard: st.shard0.shardName,
+        }),
     );
 
     // Insert MisplacedCollection inconsistency in db_MisplacedCollection.
-    assert.commandWorked(st.shard1.getDB(db_MisplacedCollection.getName()).coll.insert({_id: "foo"}));
+    assert.commandWorked(
+        st.shard1.getDB(db_MisplacedCollection.getName()).coll.insert({_id: "foo"}),
+    );
 
     // Restart nodes to clear filtering metadata to trigger a refresh with following operations.
     st.rs0.nodes.forEach((node) => {
@@ -1205,16 +1385,22 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const kNss = db.getName() + "." + collName;
 
     // Create sharded collection with unique chunk placed on shard0
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
     assertNoInconsistencies();
 
-    const chunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), kNss, {shard: st.shard0.shardName});
+    const chunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), kNss, {
+        shard: st.shard0.shardName,
+    });
 
     // Artificially corrupt chunk (missing onCurrentShardSince field)
     {
         const onCurrentShardSince = chunk.onCurrentShardSince;
-        assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$unset: {onCurrentShardSince: 1}}));
+        assert.commandWorked(
+            configDB.chunks.update({_id: chunk._id}, {$unset: {onCurrentShardSince: 1}}),
+        );
 
         let inconsistencies = db.checkMetadataConsistency().toArray();
         assert.eq(inconsistencies.length, 1);
@@ -1227,7 +1413,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
         // Restore correct value
         assert.commandWorked(
-            configDB.chunks.update({_id: chunk._id}, {$set: {"onCurrentShardSince": onCurrentShardSince}}),
+            configDB.chunks.update(
+                {_id: chunk._id},
+                {$set: {"onCurrentShardSince": onCurrentShardSince}},
+            ),
         );
         assertNoInconsistencies();
     }
@@ -1240,7 +1429,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             " but it is " +
             st.shard1.shardName;
         assert.commandWorked(
-            configDB.chunks.update({_id: chunk._id}, {$set: {"history.0.shard": st.shard1.shardName}}),
+            configDB.chunks.update(
+                {_id: chunk._id},
+                {$set: {"history.0.shard": st.shard1.shardName}},
+            ),
         );
         let inconsistencies = db.checkMetadataConsistency().toArray();
         assert.eq(inconsistencies.length, 1);
@@ -1249,7 +1441,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
         // Restore correct value
         assert.commandWorked(
-            configDB.chunks.update({_id: chunk._id}, {$set: {"history.0.shard": st.shard0.shardName}}),
+            configDB.chunks.update(
+                {_id: chunk._id},
+                {$set: {"history.0.shard": st.shard0.shardName}},
+            ),
         );
         assertNoInconsistencies();
     }
@@ -1260,7 +1455,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         let inconsistencies = db.checkMetadataConsistency().toArray();
         assert.eq(inconsistencies.length, 1);
         assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
-        assert.eq("The history field is empty", inconsistencies[0].details.issue, tojson(inconsistencies));
+        assert.eq(
+            "The history field is empty",
+            inconsistencies[0].details.issue,
+            tojson(inconsistencies),
+        );
     }
 
     // Artificially corrupt chunk (missing history field)
@@ -1270,7 +1469,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         let inconsistencies = db.checkMetadataConsistency().toArray();
         assert.eq(inconsistencies.length, 1);
         assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
-        assert.eq("The history field is empty", inconsistencies[0].details.issue, tojson(inconsistencies));
+        assert.eq(
+            "The history field is empty",
+            inconsistencies[0].details.issue,
+            tojson(inconsistencies),
+        );
     }
 
     db.dropDatabase();
@@ -1295,7 +1498,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const bucketsCollName = getTimeseriesBucketsColl(collName);
     const fullNs = db.getName() + "." + bucketsCollName;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     // Create bucket collection without view backing it
     assert.commandWorked(
@@ -1307,7 +1512,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                     {
                         op: "c",
                         ns: db.getName() + ".$cmd",
-                        o: {create: bucketsCollName, clusteredIndex: true, timeseries: {timeField: "t"}},
+                        o: {
+                            create: bucketsCollName,
+                            clusteredIndex: true,
+                            timeseries: {timeField: "t"},
+                        },
                     },
                 ],
             }),
@@ -1316,7 +1525,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Test missing view
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
-    assert.eq("MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection",
+        inconsistencies[0].type,
+        tojson(inconsistencies),
+    );
     assert.eq(
         fullNs + " is a bucket collection but is missing a valid view backing it",
         inconsistencies[0].details.issue,
@@ -1349,7 +1562,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                     {
                         op: "i",
                         ns: db.getName() + ".system.views",
-                        o: {_id: db.getName() + "." + collName, viewOn: bucketsCollName, pipeline: []},
+                        o: {
+                            _id: db.getName() + "." + collName,
+                            viewOn: bucketsCollName,
+                            pipeline: [],
+                        },
                     },
                 ],
             }),
@@ -1357,7 +1574,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
-    assert.eq("MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection",
+        inconsistencies[0].type,
+        tojson(inconsistencies),
+    );
     assert.eq(
         fullNs + " is a bucket collection but is missing a valid view backing it",
         inconsistencies[0].details.issue,
@@ -1375,7 +1596,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                     {
                         op: "c",
                         ns: db.getName() + ".$cmd",
-                        o: {create: bucketsCollName, clusteredIndex: true, timeseries: {timeField: "t"}},
+                        o: {
+                            create: bucketsCollName,
+                            clusteredIndex: true,
+                            timeseries: {timeField: "t"},
+                        },
                     },
                 ],
             }),
@@ -1397,7 +1622,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
-    assert.eq("MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection",
+        inconsistencies[0].type,
+        tojson(inconsistencies),
+    );
     assert.eq(
         fullNs + " is a bucket collection but is missing a valid view backing it",
         inconsistencies[0].details.issue,
@@ -1426,14 +1655,20 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const bucketsCollName = getTimeseriesBucketsColl(collName);
     const fullNs = db.getName() + "." + bucketsCollName;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     configureFailPoint(st.rs0.getPrimary(), "skipCreateTimeseriesBucketsWithoutOptionsCheck");
     assert.commandWorked(db.createCollection(bucketsCollName));
 
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
-    assert.eq("MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection",
+        inconsistencies[0].type,
+        tojson(inconsistencies),
+    );
     assert.eq(
         fullNs + " is a bucket collection but is missing the timeseries options",
         inconsistencies[0].details.issue,
@@ -1457,7 +1692,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
-    assert.eq("MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection",
+        inconsistencies[0].type,
+        tojson(inconsistencies),
+    );
     assert.eq(
         fullNs + " is a bucket collection but is missing the timeseries options",
         inconsistencies[0].details.issue,
@@ -1476,7 +1715,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     }
 
     function generateCollationInconsistency(shardRS) {
-        shardRS.stopSet(undefined, true /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+        shardRS.stopSet(undefined, true /* forRestart */, {
+            skipCheckDBHashes: true,
+            skipValidation: true,
+        });
 
         for (let i = 0; i < shardRS.nodes.length; i++) {
             delete shardRS.nodes[i].fullOptions.shardsvr;
@@ -1500,7 +1742,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
             }),
         );
 
-        shardRS.stopSet(undefined, true /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+        shardRS.stopSet(undefined, true /* forRestart */, {
+            skipCheckDBHashes: true,
+            skipValidation: true,
+        });
 
         for (let i = 0; i < shardRS.nodes.length; i++) {
             shardRS.nodes[i].fullOptions.shardsvr = "";
@@ -1515,7 +1760,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const coll = db[collName];
     const primaryShardRS = st.rs0;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {shardKey: 1}}));
 
@@ -1549,7 +1796,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Generate inconsistency in the other shard.
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {shardKey: 5}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {shardKey: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {shardKey: 5}, to: st.shard1.shardName}),
+    );
 
     generateCollationInconsistency(st.rs1);
     inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();

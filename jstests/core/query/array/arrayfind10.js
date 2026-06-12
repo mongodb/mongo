@@ -75,7 +75,9 @@ runWithAndWithoutIndex({"a.b": 1}, () => {
 
 assert(t.drop());
 
-assert.commandWorked(t.insert([{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+assert.commandWorked(
+    t.insert([{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]),
+);
 
 runWithAndWithoutIndex({"a.b": 1}, () => {
     assert(
@@ -149,7 +151,13 @@ assert.commandWorked(
 );
 
 runWithAndWithoutIndex({a: 1}, () => {
-    assert(arrayEq(t.find({a: {$eq: [2]}}, {_id: 0}).toArray(), [{a: [2]}, {a: [[2]]}, {a: [[1], [2]]}]));
+    assert(
+        arrayEq(t.find({a: {$eq: [2]}}, {_id: 0}).toArray(), [
+            {a: [2]},
+            {a: [[2]]},
+            {a: [[1], [2]]},
+        ]),
+    );
 
     assert(
         arrayEq(t.find({a: {$lt: [2]}}, {_id: 0}).toArray(), [

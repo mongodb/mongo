@@ -67,7 +67,9 @@ export const workerThread = (function () {
 
             // Retry operations that fail due to in-progress background operations. Load this early
             // so that later overrides can be retried.
-            await import("jstests/libs/override_methods/index_builds/implicitly_retry_on_background_op_in_progress.js");
+            await import(
+                "jstests/libs/override_methods/index_builds/implicitly_retry_on_background_op_in_progress.js"
+            );
 
             if (typeof args.sessionOptions !== "undefined") {
                 let initialClusterTime;
@@ -88,7 +90,9 @@ export const workerThread = (function () {
                 }
 
                 if (typeof args.sessionOptions.initialOperationTime === "string") {
-                    initialOperationTime = eval("(" + args.sessionOptions.initialOperationTime + ")");
+                    initialOperationTime = eval(
+                        "(" + args.sessionOptions.initialOperationTime + ")",
+                    );
 
                     // The initialOperationTime property was removed from SessionOptions in a
                     // later revision of the Driver's specification, so we remove the property
@@ -127,7 +131,10 @@ export const workerThread = (function () {
                 let connectionDesc = "";
                 // In sharded environments, mongos is acting as a proxy for the mongo shell and
                 // therefore has a different outbound port than the 'whatsmyuri' command returns.
-                if (!Cluster.isSharded(args.clusterOptions) && !TestData.testingReplicaSetEndpoint) {
+                if (
+                    !Cluster.isSharded(args.clusterOptions) &&
+                    !TestData.testingReplicaSetEndpoint
+                ) {
                     let res = assert.commandWorked(myDB.runCommand({whatsmyuri: 1}));
                     const myUri = res.you;
 
@@ -156,17 +163,27 @@ export const workerThread = (function () {
             }
 
             if (TestData.shardsAddedRemoved) {
-                await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js"
+                );
             }
 
-            if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns || TestData.killShards) {
-                await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+            if (
+                TestData.runningWithConfigStepdowns ||
+                TestData.runningWithShardStepdowns ||
+                TestData.killShards
+            ) {
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js"
+                );
             }
 
             if (TestData.runningWithBalancer && !TestData.shardsAddedRemoved) {
                 // Skipping the import on shard transitions because it's already imported under
                 // implicitly_retry_on_shard_transition_errors.js
-                await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js"
+                );
             }
 
             if (TestData.fuzzRuntimeParams) {
@@ -194,7 +211,9 @@ export const workerThread = (function () {
                     await import("jstests/libs/override_methods/network_error_and_txn_override.js");
                     if (TestData.killShards) {
                         // TODO (SERVER-107404): Remove the override below.
-                        await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
+                        await import(
+                            "jstests/libs/override_methods/implicitly_retry_resharding.js"
+                        );
                     }
                 }
 
@@ -205,7 +224,9 @@ export const workerThread = (function () {
                 // implicitly_retry_on_database_drop_pending.js file to make it so that the clients
                 // started by the concurrency framework automatically retry their operation in the
                 // face of this particular error response.
-                await import("jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js");
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js"
+                );
             }
 
             if (TestData.defaultReadConcernLevel || TestData.defaultWriteConcern) {

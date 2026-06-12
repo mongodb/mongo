@@ -9,12 +9,28 @@ const coll = db.sharded_agg_sort;
 coll.drop();
 
 assert.commandWorked(
-    shardingTest.s0.adminCommand({enableSharding: db.getName(), primaryShard: shardingTest.shard1.shardName}),
+    shardingTest.s0.adminCommand({
+        enableSharding: db.getName(),
+        primaryShard: shardingTest.shard1.shardName,
+    }),
 );
-assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+);
 
 const nDocs = 10;
-const yValues = ["abc", "ABC", null, 1, NumberLong(2), NumberDecimal(-20), MinKey, MaxKey, BinData(0, ""), [3, 4]];
+const yValues = [
+    "abc",
+    "ABC",
+    null,
+    1,
+    NumberLong(2),
+    NumberDecimal(-20),
+    MinKey,
+    MaxKey,
+    BinData(0, ""),
+    [3, 4],
+];
 const bulkOp = coll.initializeOrderedBulkOp();
 for (let i = 0; i < nDocs; ++i) {
     bulkOp.insert({_id: i, x: Math.floor(i / 2), y: yValues[i]});
@@ -128,7 +144,9 @@ testSorts();
 // Test that a sort including the text score is merged properly in a sharded cluster.
 const textColl = db.sharded_agg_sort_text;
 
-assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: textColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    shardingTest.s0.adminCommand({shardCollection: textColl.getFullName(), key: {_id: 1}}),
+);
 
 assert.commandWorked(
     textColl.insert([
@@ -142,8 +160,12 @@ assert.commandWorked(
 );
 
 // Split the data into 3 chunks
-assert.commandWorked(shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 2}}));
-assert.commandWorked(shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 4}}));
+assert.commandWorked(
+    shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 2}}),
+);
+assert.commandWorked(
+    shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 4}}),
+);
 
 // Migrate the middle chunk to another shard
 assert.commandWorked(
@@ -157,7 +179,10 @@ assert.commandWorked(
 assert.commandWorked(textColl.createIndex({text: "text"}));
 assertResultsEqual({
     actual: textColl
-        .aggregate([{$match: {$text: {$search: "apple banana orange"}}}, {$sort: {x: {$meta: "textScore"}}}])
+        .aggregate([
+            {$match: {$text: {$search: "apple banana orange"}}},
+            {$sort: {x: {$meta: "textScore"}}},
+        ])
         .toArray(),
     expected: [
         {_id: 3, text: "apple orange banana apple apple banana"},
@@ -205,7 +230,9 @@ assertSortedByMetaField(
 );
 
 assertSortedByMetaField(
-    textColl.aggregate([{$sample: {size: 10}}, {$project: {_id: 0, meta: {$meta: "randVal"}}}]).toArray(),
+    textColl
+        .aggregate([{$sample: {size: 10}}, {$project: {_id: 0, meta: {$meta: "randVal"}}}])
+        .toArray(),
 );
 
 shardingTest.stop();

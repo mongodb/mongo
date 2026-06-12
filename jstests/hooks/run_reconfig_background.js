@@ -69,7 +69,8 @@ function getVotingReconfig(config, primaryIndex, numNodes) {
     // We want to ensure that there are at least 3 voting nodes so that killing the primary
     // will not affect a majority.
     config.version++;
-    config.members[indexToChange].votes = config.members[indexToChange].votes === 1 && numVotingNodes > 3 ? 0 : 1;
+    config.members[indexToChange].votes =
+        config.members[indexToChange].votes === 1 && numVotingNodes > 3 ? 0 : 1;
     config.members[indexToChange].priority = config.members[indexToChange].votes;
 
     return config;
@@ -109,7 +110,9 @@ function getPriorityPortReconfig(config, priorityPorts) {
             }
         } else {
             const memberIndex = memberIndexes[Random.randInt(memberIndexes.length)];
-            jsTest.log.info(`Running reconfig to add priority port to node at index ${memberIndex}`);
+            jsTest.log.info(
+                `Running reconfig to add priority port to node at index ${memberIndex}`,
+            );
             config.members[memberIndex].priorityPort = priorityPorts[memberIndex];
         }
 
@@ -131,7 +134,9 @@ function getPriorityPortReconfig(config, priorityPorts) {
             }
         } else {
             const memberIndex = memberIndexes[Random.randInt(memberIndexes.length)];
-            jsTest.log.info(`Running reconfig to remove priority port from node at index ${memberIndex}`);
+            jsTest.log.info(
+                `Running reconfig to remove priority port from node at index ${memberIndex}`,
+            );
             delete config.members[memberIndex].priorityPort;
         }
 

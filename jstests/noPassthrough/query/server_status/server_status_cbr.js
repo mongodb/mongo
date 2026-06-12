@@ -40,7 +40,9 @@ assert.commandWorked(
 );
 
 // Force the classic engine so CBR applies.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 // Insert enough documents for sampling to work.
 const kNumDocs = 1000;
@@ -67,7 +69,11 @@ function assertCBRCounterMetrics(cbrMetrics, expectedCount) {
     if (expectedCount > 0) {
         assert.gt(cbrMetrics.micros, 0, `cbr.micros should be > 0:\n${cbrMetrics}`);
         assert.gt(cbrMetrics.samplingMicros, 0, "cbr.samplingMicros should be > 0:\n${cbrMetrics}");
-        assert.gte(cbrMetrics.numPlans, expectedCount, "cbr.numPlans should be >= 1 per invocation:\n${cbrMetrics}");
+        assert.gte(
+            cbrMetrics.numPlans,
+            expectedCount,
+            "cbr.numPlans should be >= 1 per invocation:\n${cbrMetrics}",
+        );
     } else {
         assert.eq(
             cbrMetrics.micros,
@@ -293,7 +299,8 @@ const nonProductiveFilterWithSingleSolution = {nonexistentField: {$exists: true}
     assert.soon(
         () => {
             // Verify FTDC includes CBR metrics.
-            const cbrMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.cbr;
+            const cbrMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics
+                .query.cbr;
 
             if (cbrMetricsFtdc.count != expectedCount) {
                 // This is an indication we haven't retrieved the expected serverStatus metrics yet.

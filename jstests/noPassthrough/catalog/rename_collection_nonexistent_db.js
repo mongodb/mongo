@@ -24,7 +24,9 @@ function runTestRenameCollectionOnEvent(st, eventFunction, expectedErrorCode) {
     assert.commandWorked(sourceCol.insertMany([{a: 1}, {a: 2}, {a: 3}]));
     assert.commandWorked(sourceCol.createIndexes([{a: 1}, {b: 1}]));
 
-    assert.commandWorked(testDb.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"}));
+    assert.commandWorked(
+        testDb.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"}),
+    );
 
     const renameDone = startParallelShell(
         funWithArgs(function (expectedErrorCode) {
@@ -79,7 +81,10 @@ const createDestinationCollection = (testDb) => {
     let destCol = destDb.renameDifferentDb;
     assert.commandWorked(destCol.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 };
-runTestRenameCollectionOnEvent(st, createDestinationCollection, [ErrorCodes.NamespaceExists, ErrorCodes.CommandFailed]);
+runTestRenameCollectionOnEvent(st, createDestinationCollection, [
+    ErrorCodes.NamespaceExists,
+    ErrorCodes.CommandFailed,
+]);
 
 // Tests that the rename command errors if the destination database is dropped right after creation
 // during execution.

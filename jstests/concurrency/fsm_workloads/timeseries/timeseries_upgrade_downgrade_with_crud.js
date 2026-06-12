@@ -44,17 +44,25 @@ export const $config = (function () {
     let states = {
         upgrade: function (db, collName) {
             jsTestLog(`Upgrade`);
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+            );
         },
         downgrade: function (db, collName) {
             jsTestLog(`Downgrade`);
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            );
         },
         insertOne: function (db, collName) {
             const coll = db[getCollNames()[0]];
             try {
                 const res = assert.commandWorked(
-                    coll.insertOne({"op": "insertOne", [metaFieldName]: rndMeta(), [timeFieldName]: ISODate()}),
+                    coll.insertOne({
+                        "op": "insertOne",
+                        [metaFieldName]: rndMeta(),
+                        [timeFieldName]: ISODate(),
+                    }),
                 );
                 jsTest.log(`${coll.getName()} insertOne: ${tojsononeline(res)}`);
             } catch (e) {
@@ -69,7 +77,11 @@ export const $config = (function () {
             const coll = db[getCollNames()[0]];
             let docs = [];
             for (let i = 0; i < 1000; i++) {
-                docs.push({"op": "insertMany", [metaFieldName]: rndMeta(), [timeFieldName]: ISODate()});
+                docs.push({
+                    "op": "insertMany",
+                    [metaFieldName]: rndMeta(),
+                    [timeFieldName]: ISODate(),
+                });
             }
             try {
                 const res = assert.commandWorked(coll.insertMany(docs));
@@ -112,7 +124,10 @@ export const $config = (function () {
             const coll = db[getCollNames()[0]];
             try {
                 const res = assert.commandWorked(
-                    coll.updateMany({[metaFieldName]: rndMeta()}, {$set: {[metaFieldName]: rndMeta()}}),
+                    coll.updateMany(
+                        {[metaFieldName]: rndMeta()},
+                        {$set: {[metaFieldName]: rndMeta()}},
+                    ),
                 );
                 jsTest.log(`${coll.getName()} updateMany: ${tojsononeline(res)}`);
             } catch (e) {
@@ -172,12 +187,16 @@ export const $config = (function () {
     let setup = function (db, collName) {
         const collNames = getCollNames();
         for (const collName of collNames) {
-            db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
+            db.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            });
         }
     };
 
     let teardown = function (db, collName) {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
 
     return {

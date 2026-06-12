@@ -41,7 +41,8 @@ function addApprox2MBOfStatsData(testDB, coll) {
 
     const kEstimatedEntrySizeBytes = (() => {
         // Metrics stored per shape.
-        const kNumCountersAndDates = 4 /* top-level */ + 4 * 15; /* those with sum, min, max, sumOfSquares */
+        const kNumCountersAndDates =
+            4 /* top-level */ + 4 * 15; /* those with sum, min, max, sumOfSquares */
 
         // Just a sample, will change based on where the test is run - shouldn't be off by too much
         // though.
@@ -90,7 +91,9 @@ function addApprox2MBOfStatsData(testDB, coll) {
  * back to 0.
  */
 function assertCountersAreZeroAfterReset(conn, testDB) {
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}),
+    );
     const metricSnapshot = testDB.serverStatus().metrics.queryStats;
     assert.eq(0, metricSnapshot.numEntries, metricSnapshot);
     assert.eq(0, metricSnapshot.queryStatsStoreSizeEstimateBytes, metricSnapshot);
@@ -117,7 +120,9 @@ function evictionTest(conn, testDB, coll, testOptions) {
     const midMetrics = testDB.serverStatus().metrics.queryStats;
     assert.eq(midMetrics.numEvicted, 0);
     assert.gt(midMetrics.numEntries, 0);
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}),
+    );
     const endMetrics = testDB.serverStatus().metrics.queryStats;
     assert.eq(endMetrics.maxSizeBytes, 1 * 1024 * 1024, endMetrics);
     assert.gt(endMetrics.numEvicted, 0, endMetrics);
@@ -134,7 +139,8 @@ function evictionTest(conn, testDB, coll, testOptions) {
  *  e.g., { samplingRate: -1, numRequests: 20 }
  */
 function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
-    const numRateLimitedRequestsBefore = testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
+    const numRateLimitedRequestsBefore =
+        testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
     assert.eq(numRateLimitedRequestsBefore, 0);
 
     coll.insert({a: 0});
@@ -145,7 +151,8 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
         coll.aggregate([{$match: {a: 1}}]);
     }
 
-    const numRateLimitedRequestsAfter = testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
+    const numRateLimitedRequestsAfter =
+        testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
 
     if (testOptions.samplingRate === 0) {
         // queryStats should not be collected for any requests.
@@ -169,7 +176,8 @@ function queryStatsStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
     for (let i = 100; i < 200; i++) {
         coll.aggregate([{$match: {["foo" + i]: "bar"}}]).itcount();
         if (i == 150) {
-            halfWayPointSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
+            halfWayPointSize =
+                testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
         }
     }
     // Confirm that queryStats store has grown and size is non-zero.
@@ -202,7 +210,10 @@ function queryStatsStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
     }
 
     // Make sure that we recorded a write error for each run.
-    assert.eq(testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors, errorsBefore + 5);
+    assert.eq(
+        testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors,
+        errorsBefore + 5,
+    );
 }
 
 /**
@@ -224,7 +235,9 @@ function queryStatsAggregationStageTest(conn, testDB, coll) {
     const evictedBefore = testDB.serverStatus().metrics.queryStats.numEvicted;
 
     // Run a $queryStats pipeline. We should insert a new entry for this query.
-    assert.commandWorked(testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
+    );
 
     assert.eq(
         testDB.serverStatus().metrics.queryStats.numEvicted,
@@ -239,7 +252,9 @@ function queryStatsAggregationStageTest(conn, testDB, coll) {
     sizeBefore = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
 
     // Now run $queryStats again. The command should be fully read-only.
-    assert.commandWorked(testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
+    );
 
     assert.eq(
         testDB.serverStatus().metrics.queryStats.numEvicted,
@@ -258,41 +273,51 @@ function queryStatsAggregationStageTest(conn, testDB, coll) {
  */
 (function testMemorySizeAndNumPartitions() {
     let numPartitions = 0;
-    runTestWithMongodOptions({setParameter: {internalQueryStatsCacheSize: "2MB"}}, (conn, testDB, coll) => {
-        const metrics = testDB.serverStatus().metrics.queryStats;
-        assert.eq(2 * 1024 * 1024, metrics.maxSizeBytes, metrics);
-        numPartitions = metrics.numPartitions;
-        assert.gt(numPartitions, 0, metrics);
-    });
+    runTestWithMongodOptions(
+        {setParameter: {internalQueryStatsCacheSize: "2MB"}},
+        (conn, testDB, coll) => {
+            const metrics = testDB.serverStatus().metrics.queryStats;
+            assert.eq(2 * 1024 * 1024, metrics.maxSizeBytes, metrics);
+            numPartitions = metrics.numPartitions;
+            assert.gt(numPartitions, 0, metrics);
+        },
+    );
     // Then increase the cache size to something much larger which should result in a greater number
     // of partitions. Since the number of partitions is in part based on the number of cores on the
     // machine, we will be somewhat relaxed with the assertion here.
-    runTestWithMongodOptions({setParameter: {internalQueryStatsCacheSize: "1GB"}}, (conn, testDB, coll) => {
-        const metrics = testDB.serverStatus().metrics.queryStats;
-        assert.eq(1 * 1024 * 1024 * 1024, metrics.maxSizeBytes, metrics);
-        // We cap each partition at 16MB, so 1GB/16MB = 62.5 (rounded to 63) is the new expected
-        // number of partitions. This is expected to be greater than what we started with.
-        if (friendlyEqual(metrics.numPartitions, numPartitions)) {
-            // What we started with was probably just equal to minimum number of partitions: the
-            // number of cores on this machine. If for example this machine had 100 cores, both
-            // cases would hit this minimum and we'd end up in this special case where they are
-            // equal:
-            assert.eq(numPartitions, numberOfCores(testDB));
-        } else {
-            assert.gt(metrics.numPartitions, numPartitions, metrics);
-        }
+    runTestWithMongodOptions(
+        {setParameter: {internalQueryStatsCacheSize: "1GB"}},
+        (conn, testDB, coll) => {
+            const metrics = testDB.serverStatus().metrics.queryStats;
+            assert.eq(1 * 1024 * 1024 * 1024, metrics.maxSizeBytes, metrics);
+            // We cap each partition at 16MB, so 1GB/16MB = 62.5 (rounded to 63) is the new expected
+            // number of partitions. This is expected to be greater than what we started with.
+            if (friendlyEqual(metrics.numPartitions, numPartitions)) {
+                // What we started with was probably just equal to minimum number of partitions: the
+                // number of cores on this machine. If for example this machine had 100 cores, both
+                // cases would hit this minimum and we'd end up in this special case where they are
+                // equal:
+                assert.eq(numPartitions, numberOfCores(testDB));
+            } else {
+                assert.gt(metrics.numPartitions, numPartitions, metrics);
+            }
 
-        // Test that you can change it at runtime and have it reflected.
+            // Test that you can change it at runtime and have it reflected.
 
-        assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, internalQueryStatsCacheSize: "8MB"}));
-        const metricsPostGrowth = testDB.serverStatus().metrics.queryStats;
-        const debugInfo = {original: metrics, postGrowth: metricsPostGrowth};
-        assert.eq(8 * 1024 * 1024, metricsPostGrowth.maxSizeBytes, debugInfo);
-        // You might expect the number of partitions to change based on that adjustment.
-        // This won't happen until restart, since doing so at runtime would be a correctness and
-        // performance challenge while the data structure is being accessed concurrently.
-        assert.eq(metricsPostGrowth.numPartitions, metrics.numPartitions, debugInfo);
-    });
+            assert.commandWorked(
+                conn
+                    .getDB("admin")
+                    .runCommand({setParameter: 1, internalQueryStatsCacheSize: "8MB"}),
+            );
+            const metricsPostGrowth = testDB.serverStatus().metrics.queryStats;
+            const debugInfo = {original: metrics, postGrowth: metricsPostGrowth};
+            assert.eq(8 * 1024 * 1024, metricsPostGrowth.maxSizeBytes, debugInfo);
+            // You might expect the number of partitions to change based on that adjustment.
+            // This won't happen until restart, since doing so at runtime would be a correctness and
+            // performance challenge while the data structure is being accessed concurrently.
+            assert.eq(metricsPostGrowth.numPartitions, metrics.numPartitions, debugInfo);
+        },
+    );
 })();
 
 const noRateLimit = {
@@ -302,18 +327,26 @@ const noRateLimit = {
  * In this configuration, we insert enough entries into the queryStats store to trigger LRU
  * eviction.
  */
-runTestWithMongodOptions({setParameter: {...noRateLimit, internalQueryStatsCacheSize: "1MB"}}, evictionTest, {
-    resetCacheSize: false,
-});
+runTestWithMongodOptions(
+    {setParameter: {...noRateLimit, internalQueryStatsCacheSize: "1MB"}},
+    evictionTest,
+    {
+        resetCacheSize: false,
+    },
+);
 /**
  * In this configuration, eviction is triggered only when the queryStats store size is reset.
  *
  * Use an 8MB upper limit since our estimated size of the query stats entry is pretty rough and
  * meant to give us some wiggle room so we don't have to keep adjusting this test as we tweak it.
  */
-runTestWithMongodOptions({setParameter: {...noRateLimit, internalQueryStatsCacheSize: "8MB"}}, evictionTest, {
-    resetCacheSize: true,
-});
+runTestWithMongodOptions(
+    {setParameter: {...noRateLimit, internalQueryStatsCacheSize: "8MB"}},
+    evictionTest,
+    {
+        resetCacheSize: true,
+    },
+);
 
 /**
  * In this configuration, every query is sampled, so no requests should be rate-limited.
@@ -327,10 +360,14 @@ runTestWithMongodOptions({setParameter: noRateLimit}, countRateLimitedRequestsTe
  * In this configuration, the sampling rate is set so that some but not all requests are
  * rate-limited.
  */
-runTestWithMongodOptions({setParameter: {internalQueryStatsRateLimit: 10}}, countRateLimitedRequestsTest, {
-    samplingRate: 10,
-    numRequests: 20,
-});
+runTestWithMongodOptions(
+    {setParameter: {internalQueryStatsRateLimit: 10}},
+    countRateLimitedRequestsTest,
+    {
+        samplingRate: 10,
+        numRequests: 20,
+    },
+);
 
 /**
  * Sample all queries and assert that the size of queryStats store is equal to num entries * entry

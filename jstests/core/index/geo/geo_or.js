@@ -45,7 +45,10 @@ assert.eq(
     2,
     t
         .find({
-            $or: [{loc: {$geoWithin: {$centerSphere: [p, 10]}}}, {loc: {$geoWithin: {$centerSphere: [p, 10]}}}],
+            $or: [
+                {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
+                {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
+            ],
         })
         .itcount(),
     "multiple $geoWithin clauses not supported by $or. index type: " + indexname,
@@ -93,7 +96,9 @@ assert.eq(
             $or: [
                 {
                     loc: {
-                        $geoIntersects: {$geometry: {type: "Polygon", coordinates: [[[0, 0], p, q, [0, 0]]]}},
+                        $geoIntersects: {
+                            $geometry: {type: "Polygon", coordinates: [[[0, 0], p, q, [0, 0]]]},
+                        },
                     },
                 },
                 {
@@ -129,7 +134,10 @@ assert.eq(
     2,
     t
         .find({
-            $or: [{loc: {$geoWithin: {$centerSphere: [p, 10]}}}, {loc: {$geoWithin: {$centerSphere: [p, 10]}}}],
+            $or: [
+                {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
+                {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
+            ],
         })
         .itcount(),
     "multiple $geoWithin clauses not supported by $or. index type: " + indexname,

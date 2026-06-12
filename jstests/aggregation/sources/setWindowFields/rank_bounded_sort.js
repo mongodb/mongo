@@ -22,7 +22,9 @@ const indexForBoundedSort = {
 };
 assert.commandWorked(tsColl.createIndex(indexForBoundedSort));
 
-const boundedSortPipeline = [{$setWindowFields: {sortBy: {"time": 1}, output: {rank: {$documentNumber: {}}}}}];
+const boundedSortPipeline = [
+    {$setWindowFields: {sortBy: {"time": 1}, output: {rank: {$documentNumber: {}}}}},
+];
 
 assert.commandWorked(
     tsColl.runCommand("aggregate", {

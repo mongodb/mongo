@@ -30,13 +30,17 @@ describe("pre-image truncation is non-deprioritizable", function () {
         primaryDb = primary.getDB(dbName);
         coll = primaryDb.getCollection("coll");
 
-        assert.commandWorked(primaryDb.createCollection("coll", {changeStreamPreAndPostImages: {enabled: true}}));
+        assert.commandWorked(
+            primaryDb.createCollection("coll", {changeStreamPreAndPostImages: {enabled: true}}),
+        );
 
         // Insert pre-images during setup so they are older than 1 second by the time the test
         // body runs (replica set startup takes several seconds).
         assert.commandWorked(coll.insert({_id: 1, x: 1}, {writeConcern: {w: "majority"}}));
         for (let i = 0; i < 20; i++) {
-            assert.commandWorked(coll.update({_id: 1}, {$inc: {x: 1}}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                coll.update({_id: 1}, {$inc: {x: 1}}, {writeConcern: {w: "majority"}}),
+            );
         }
     });
 
@@ -51,7 +55,9 @@ describe("pre-image truncation is non-deprioritizable", function () {
         // older than 1 second, so they expire immediately when this parameter is applied.
         assert.commandWorked(
             primary.getDB("admin").runCommand({
-                setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: 1}}},
+                setClusterParameter: {
+                    changeStreamOptions: {preAndPostImages: {expireAfterSeconds: 1}},
+                },
             }),
         );
 

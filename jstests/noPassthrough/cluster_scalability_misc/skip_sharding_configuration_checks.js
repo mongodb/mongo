@@ -20,9 +20,13 @@ function expectState(rst, state) {
     });
 }
 
-assert.throws(() => MongoRunner.runMongod({configsvr: "", setParameter: "skipShardingConfigurationChecks=true"}));
+assert.throws(() =>
+    MongoRunner.runMongod({configsvr: "", setParameter: "skipShardingConfigurationChecks=true"}),
+);
 
-assert.throws(() => MongoRunner.runMongod({shardsvr: "", setParameter: "skipShardingConfigurationChecks=true"}));
+assert.throws(() =>
+    MongoRunner.runMongod({shardsvr: "", setParameter: "skipShardingConfigurationChecks=true"}),
+);
 
 let st = new ShardingTest({name: "skipConfig", shards: {rs0: {nodes: 1}}});
 let configRS = st.configRS;

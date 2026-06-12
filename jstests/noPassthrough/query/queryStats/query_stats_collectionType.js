@@ -13,9 +13,13 @@ function runTest(conn) {
     // We create one collection for each corresponding type reported by query stats.
     assert.commandWorked(testDB.createCollection(jsTestName() + "_collection"));
     assert.commandWorked(
-        testDB.createView(jsTestName() + "_view", jsTestName() + "_collection", [{$match: {v: {$gt: 42}}}]),
+        testDB.createView(jsTestName() + "_view", jsTestName() + "_collection", [
+            {$match: {v: {$gt: 42}}},
+        ]),
     );
-    assert.commandWorked(testDB.createCollection(jsTestName() + "_timeseries", {timeseries: {timeField: "time"}}));
+    assert.commandWorked(
+        testDB.createCollection(jsTestName() + "_timeseries", {timeseries: {timeField: "time"}}),
+    );
     // We create an additional view over the existing view to test full view resolution. We use
     // the $setWindowFields stage since it desugars into multiple stages, to make sure the query
     // shape produced is restricted to the user-provided query.
@@ -67,13 +71,21 @@ function runTest(conn) {
 
     // QueryStats should still be collected for queries run on nonexistent collections.
     assert.commandWorked(testDB.runCommand({find: jsTestName() + "_nonExistent", filter: {v: 6}}));
-    assert.commandWorked(testDB.runCommand({aggregate: jsTestName() + "_nonExistent", pipeline: [], cursor: {}}));
+    assert.commandWorked(
+        testDB.runCommand({aggregate: jsTestName() + "_nonExistent", pipeline: [], cursor: {}}),
+    );
 
     // Verify that we have two query stats entries for the collection type. This assumes we have
     // executed one find and one agg query for the given collection type.
-    function verifyQueryStatsForCollectionType(collectionType, collectionName = jsTestName() + "_" + collectionType) {
+    function verifyQueryStatsForCollectionType(
+        collectionType,
+        collectionName = jsTestName() + "_" + collectionType,
+    ) {
         const queryStats = getQueryStats(conn, {
-            extraMatch: {"key.collectionType": collectionType, "key.queryShape.cmdNs.coll": collectionName},
+            extraMatch: {
+                "key.collectionType": collectionType,
+                "key.queryShape.cmdNs.coll": collectionName,
+            },
         });
         // We should see one entry for find() and one for aggregate()
         // for each collection type. The queries account for the fact
@@ -90,9 +102,15 @@ function runTest(conn) {
     verifyQueryStatsForCollectionType("nonExistent");
 
     // Run commands that should be tracked as "virtual" collection type.
-    assert.commandWorked(testDB.adminCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}}));
-    assert.commandWorked(testDB.adminCommand({aggregate: 1, pipeline: [{$documents: [{a: 1}, {a: 4}]}], cursor: {}}));
-    assert.commandWorked(testDB.adminCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}], cursor: {}}));
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}}),
+    );
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$documents: [{a: 1}, {a: 4}]}], cursor: {}}),
+    );
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}], cursor: {}}),
+    );
 
     // Verify the queries on "virtual" collection types were tracked appropriately. This includes
     // the 3 queries directly run above, in addition to 1 entry for the $queryStats aggregations

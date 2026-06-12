@@ -36,7 +36,8 @@ function validateBatchedDeletes(conn) {
 
         const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
         const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
-        const serverStatusBatchesExpected = serverStatusBatchesBefore + Math.ceil(collCount / docsPerBatch);
+        const serverStatusBatchesExpected =
+            serverStatusBatchesBefore + Math.ceil(collCount / docsPerBatch);
         const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
         assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
         assert.eq(serverStatusDocsAfter, serverStatusDocsExpected);
@@ -72,7 +73,9 @@ function validateBatchedDeletes(conn) {
 
     // Actual deletion.
     for (const docsPerBatch of [10, docsPerBatchDefault]) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}),
+        );
         validateDeletion(db, coll, docsPerBatch);
     }
 }

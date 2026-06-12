@@ -35,8 +35,12 @@ let oneDegree = Math.PI / 180; // in radians
 if (0) {
     assert.eq(test.t.count({loc: {$within: {$centerSphere: [[180, 0], oneDegree]}}}), 2);
     assert.eq(test.t.count({loc: {$within: {$centerSphere: [[-180, 0], oneDegree]}}}), 2);
-    test.t.find({loc: {$within: {$centerSphere: [[180, 0], oneDegree]}}}).forEach(assertXIsPositive);
-    test.t.find({loc: {$within: {$centerSphere: [[-180, 0], oneDegree]}}}).forEach(assertXIsNegative);
+    test.t
+        .find({loc: {$within: {$centerSphere: [[180, 0], oneDegree]}}})
+        .forEach(assertXIsPositive);
+    test.t
+        .find({loc: {$within: {$centerSphere: [[-180, 0], oneDegree]}}})
+        .forEach(assertXIsNegative);
 }
 
 assert.eq(

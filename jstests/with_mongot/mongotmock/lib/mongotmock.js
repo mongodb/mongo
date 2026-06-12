@@ -7,7 +7,10 @@
  */
 
 import {CA_CERT, CLIENT_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
-import {getDefaultExplainContents, getDefaultLastExplainContents} from "jstests/with_mongot/mongotmock/lib/utils.js";
+import {
+    getDefaultExplainContents,
+    getDefaultLastExplainContents,
+} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 /**
  * Helper to create an expected command for mongot.
@@ -94,11 +97,17 @@ export function mongotMultiCursorResponseForBatch(
     let metaCursor = {cursor: {id: secondId, ns, nextBatch: secondCursorBatch, type: "meta"}, ok};
     if (explainContents != null) {
         resultsCursor.explain = explainContents;
-        assert(metaExplainContents, "metaExplainContents should not be null as explainContents is not null");
+        assert(
+            metaExplainContents,
+            "metaExplainContents should not be null as explainContents is not null",
+        );
     }
     if (metaExplainContents != null) {
         metaCursor.explain = metaExplainContents;
-        assert(explainContents, "explainContents should not be null as metaExplainContents is not null");
+        assert(
+            explainContents,
+            "explainContents should not be null as metaExplainContents is not null",
+        );
     }
     return {ok, cursors: [resultsCursor, metaCursor]};
 }
@@ -165,7 +174,12 @@ export function mockPlanShardedSearchResponseOnConn(
         resp["sortSpec"] = sortSpec;
     }
 
-    let expectedCommand = {planShardedSearch: collName, query: query, $db: dbName, searchFeatures: {shardedSort: 1}};
+    let expectedCommand = {
+        planShardedSearch: collName,
+        query: query,
+        $db: dbName,
+        searchFeatures: {shardedSort: 1},
+    };
 
     if (hasSearchMetaStage) {
         expectedCommand.optimizationFlags = {omitSearchDocumentResults: true};
@@ -387,7 +401,9 @@ export class MongotMock {
         if (tlsEnabled || this.useGRPC()) {
             args.push("--tlsMode");
             if (this.useGRPC() && !tlsEnabled) {
-                jsTestLog("Overriding tlsMode=disabled due to mongotmock gRPC server requiring TLS");
+                jsTestLog(
+                    "Overriding tlsMode=disabled due to mongotmock gRPC server requiring TLS",
+                );
                 args.push("allowTLS"); // "disabled" is not a valid setting for ingress gRPC
             } else {
                 args.push(opts.tlsMode);
@@ -560,7 +576,9 @@ export class MongotMock {
             setManageSearchIndexResponse: 1,
             manageSearchIndexResponse: expectedManageSearchIndexResponse,
         };
-        assert.commandWorked(connection.getDB("mongotmock").runCommand(setManageSearchIndexResponseCommand));
+        assert.commandWorked(
+            connection.getDB("mongotmock").runCommand(setManageSearchIndexResponseCommand),
+        );
     }
 
     /**
@@ -573,7 +591,9 @@ export class MongotMock {
             collectionUUID: UUID(),
             userCommand: {"user-command-field": "user-command-value"},
         };
-        return assert.commandWorked(connection.getDB("mongotmock").runCommand(manageSearchIndexCommand));
+        return assert.commandWorked(
+            connection.getDB("mongotmock").runCommand(manageSearchIndexCommand),
+        );
     }
 
     /**
@@ -582,6 +602,8 @@ export class MongotMock {
      */
     closeConnectionInResponseToNextNRequests(n) {
         const connection = this.getConnection();
-        assert.commandWorked(connection.adminCommand({closeConnectionOnNextRequests: NumberInt(n)}));
+        assert.commandWorked(
+            connection.adminCommand({closeConnectionOnNextRequests: NumberInt(n)}),
+        );
     }
 }

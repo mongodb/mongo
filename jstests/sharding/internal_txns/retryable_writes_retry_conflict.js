@@ -45,7 +45,9 @@ function stepDownShard0Primary() {
     const oldPrimary = st.rs0.getPrimary();
     const oldSecondary = st.rs0.getSecondary();
     assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: 0}));
-    assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     const newPrimary = st.rs0.getPrimary();
     assert.neq(oldPrimary, newPrimary);
     shard0Primary = newPrimary;
@@ -130,12 +132,18 @@ function testBlockingRetry(retryFunc, testOpts) {
     // exactly once despite the concurrent retry, whether or not the retry interrupted the original
     // attempt.
     if (testOpts.prepareBeforeRetry) {
-        assert.commandWorked(shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(
+                testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj,
+            ),
+        );
         retryThread.join();
     } else {
         // The retry should have interrupted the original attempt.
         assert.commandFailedWithCode(
-            shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj),
+            shard0TestDB.adminCommand(
+                testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj,
+            ),
             ErrorCodes.NoSuchTransaction,
         );
     }
@@ -222,7 +230,9 @@ function runTests(retryFunc) {
 
     let retryFunc = async (testOpts) => {
         const {createRst} = await import("jstests/replsets/rslib.js");
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
         const shard0Rst = createRst(testOpts.shard0RstArgs);
         let shard0Primary = shard0Rst.getPrimary();
 

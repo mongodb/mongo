@@ -61,13 +61,15 @@ function assertListIndexesOutputsMatch(
             // Index is done, no indexBuildInfo
             assert(
                 !withBuildInfo[i].hasOwnProperty("indexBuildInfo"),
-                "Index expected to be done building had indexBuildInfo: " + tojson(withBuildInfo[i]),
+                "Index expected to be done building had indexBuildInfo: " +
+                    tojson(withBuildInfo[i]),
             );
         } else {
             // Index building, should have indexBuildInfo.buildUUID
             assert(
                 withBuildInfo[i].hasOwnProperty("indexBuildInfo"),
-                "Index expected to be in-progress building did not have indexBuildInfo: " + tojson(withBuildInfo[i]),
+                "Index expected to be in-progress building did not have indexBuildInfo: " +
+                    tojson(withBuildInfo[i]),
             );
             assert(
                 withBuildInfo[i].indexBuildInfo.hasOwnProperty("buildUUID"),
@@ -83,8 +85,11 @@ function assertListIndexesOutputsMatch(
             );
             assert.eq(
                 withBuildInfo[i].indexBuildInfo.method,
-                FeatureFlagUtil.isPresentAndEnabled(db, "PrimaryDrivenIndexBuilds") ? "Primary driven" : "hybrid",
-                "Index expected to be in-progress is building with an unexpected method: " + tojson(withBuildInfo[i]),
+                FeatureFlagUtil.isPresentAndEnabled(db, "PrimaryDrivenIndexBuilds")
+                    ? "Primary driven"
+                    : "hybrid",
+                "Index expected to be in-progress is building with an unexpected method: " +
+                    tojson(withBuildInfo[i]),
             );
 
             // Index building, should have indexBuildInfo.phase.
@@ -96,7 +101,8 @@ function assertListIndexesOutputsMatch(
             assert.eq(
                 withBuildInfo[i].indexBuildInfo.phase,
                 1,
-                "Index expected to be in-progress is building an unexpected phase: " + tojson(withBuildInfo[i]),
+                "Index expected to be in-progress is building an unexpected phase: " +
+                    tojson(withBuildInfo[i]),
             );
 
             // Index building, should have indexBuildInfo.phaseStr.
@@ -108,7 +114,8 @@ function assertListIndexesOutputsMatch(
             assert.eq(
                 withBuildInfo[i].indexBuildInfo.phaseStr,
                 "collection scan",
-                "Index expected to be in-progress building unexpected phaseStr: " + tojson(withBuildInfo[i]),
+                "Index expected to be in-progress building unexpected phaseStr: " +
+                    tojson(withBuildInfo[i]),
             );
 
             // Index building, should have indexBuildInfo.opid.
@@ -135,7 +142,8 @@ function assertListIndexesOutputsMatch(
             assert.eq(
                 withBuildInfo[i].indexBuildInfo.resumable,
                 expectedBuildingInfo[withBuildInfo[i].spec.name].resumable,
-                "Index expected to be in-progress building has unexpected resumable value: " + tojson(withBuildInfo[i]),
+                "Index expected to be in-progress building has unexpected resumable value: " +
+                    tojson(withBuildInfo[i]),
             );
 
             // Index building, should have indexBuildInfo.replicationState.
@@ -170,10 +178,13 @@ coll.insert({a: 600, b: 700});
 
 // Create a new index.
 const doneIndexName = "a_1";
-assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: doneIndexName}]}));
+assert.commandWorked(
+    db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: doneIndexName}]}),
+);
 
 // Ensure that the format of the listIndexes output still changes in the index build complete case.
-let listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch;
+let listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor
+    .firstBatch;
 let listIndexesIncludeIndexBuildInfoOutput = assert.commandWorked(
     db.runCommand({listIndexes: collName, includeIndexBuildInfo: true}),
 ).cursor.firstBatch;
@@ -193,7 +204,10 @@ assert.commandFailedWithCode(
 const listIndexesIncludeIndexBuildInfoBuildUUIDsFalseOutput = assert.commandWorked(
     db.runCommand({listIndexes: collName, includeIndexBuildInfo: true, includeBuildUUIDs: false}),
 ).cursor.firstBatch;
-assert.eq(listIndexesIncludeIndexBuildInfoBuildUUIDsFalseOutput, listIndexesIncludeIndexBuildInfoOutput);
+assert.eq(
+    listIndexesIncludeIndexBuildInfoBuildUUIDsFalseOutput,
+    listIndexesIncludeIndexBuildInfoOutput,
+);
 const listIndexesIncludeBuildUUIDsIndexBuildInfoFalseOutput = assert.commandWorked(
     db.runCommand({listIndexes: collName, includeIndexBuildInfo: false, includeBuildUUIDs: true}),
 ).cursor.firstBatch;
@@ -213,7 +227,11 @@ const awaitIndexBuild = IndexBuildTest.startIndexBuild(
     [],
     /*commitQuorum=*/ "votingMembers",
 );
-const buildingOpId = IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, buildingIndexName);
+const buildingOpId = IndexBuildTest.waitForIndexBuildToScanCollection(
+    db,
+    collName,
+    buildingIndexName,
+);
 
 // Add a non-resumable index build to the listIndexes result by providing a commit quorum of 1,
 // though any commit quorum other than the default of all voting members will do the job.
@@ -232,7 +250,8 @@ const buildingOpIdNonResumable = IndexBuildTest.waitForIndexBuildToScanCollectio
     buildingIndexNameNonResumable,
 );
 
-listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch;
+listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor
+    .firstBatch;
 assert(listIndexesDefaultOutput.length == 4);
 
 listIndexesIncludeIndexBuildInfoOutput = assert.commandWorked(
@@ -334,7 +353,9 @@ try {
 
     // Insert a document so that createIndex does not fast-path through the empty-collection path,
     // which is important for the in-progress index build case below.
-    assert.commandWorked(tsColl.insert({[timeFieldName]: ISODate(), [metaFieldName]: {tag: "a"}, x: 1}));
+    assert.commandWorked(
+        tsColl.insert({[timeFieldName]: ISODate(), [metaFieldName]: {tag: "a"}, x: 1}),
+    );
 
     // Create a ready index on the timeseries collection.
     const tsReadyIndexName2 = "x_1";
@@ -346,15 +367,21 @@ try {
     );
 
     // listIndexes without the flag returns flat index specs with user-visible timeseries keys.
-    const tsWithoutBuildInfo = assert.commandWorked(tsDb.runCommand({listIndexes: timeseriesCollName})).cursor
-        .firstBatch;
+    const tsWithoutBuildInfo = assert.commandWorked(
+        tsDb.runCommand({listIndexes: timeseriesCollName}),
+    ).cursor.firstBatch;
 
     // listIndexes with includeIndexBuildInfo: true must wrap each spec under 'spec'.
     const tsWithBuildInfo = assert.commandWorked(
         tsDb.runCommand({listIndexes: timeseriesCollName, includeIndexBuildInfo: true}),
     ).cursor.firstBatch;
 
-    assertListIndexesOutputsMatch(tsWithoutBuildInfo, tsWithBuildInfo, [tsReadyIndexName1, tsReadyIndexName2], []);
+    assertListIndexesOutputsMatch(
+        tsWithoutBuildInfo,
+        tsWithBuildInfo,
+        [tsReadyIndexName1, tsReadyIndexName2],
+        [],
+    );
 
     // Pause index builds and start a new one to exercise the in-progress case on a timeseries
     // collection.
@@ -374,8 +401,9 @@ try {
         tsBuildingIndexName,
     );
 
-    const tsCurrWithoutBuildInfo = assert.commandWorked(tsDb.runCommand({listIndexes: timeseriesCollName})).cursor
-        .firstBatch;
+    const tsCurrWithoutBuildInfo = assert.commandWorked(
+        tsDb.runCommand({listIndexes: timeseriesCollName}),
+    ).cursor.firstBatch;
     const tsInProgressOutput = assert.commandWorked(
         tsDb.runCommand({listIndexes: timeseriesCollName, includeIndexBuildInfo: true}),
     ).cursor.firstBatch;

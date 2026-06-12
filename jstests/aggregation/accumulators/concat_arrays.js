@@ -28,7 +28,13 @@ let result = coll
 assert.eq(result, [
     {
         _id: null,
-        allBooks: ["Adrian Book 0", "Adrian Book 1", "Militsa Book 0", "Hana Book 0", "Hana Book 1"],
+        allBooks: [
+            "Adrian Book 0",
+            "Adrian Book 1",
+            "Militsa Book 0",
+            "Hana Book 0",
+            "Hana Book 1",
+        ],
     },
 ]);
 
@@ -45,7 +51,13 @@ result = coll
 assert.eq(result, [
     {
         _id: null,
-        allBooks: ["Hana Book 0", "Hana Book 1", "Militsa Book 0", "Adrian Book 0", "Adrian Book 1"],
+        allBooks: [
+            "Hana Book 0",
+            "Hana Book 1",
+            "Militsa Book 0",
+            "Adrian Book 0",
+            "Adrian Book 1",
+        ],
     },
 ]);
 
@@ -55,7 +67,11 @@ assert.commandWorked(
         _id: 3,
         author: "Ben",
         publisher: "Pub2",
-        books: [["Ben Series 0 Book 0", "Ben Series 0 Book 1"], ["Ben Series 1 Book 0"], "Ben Book 4"],
+        books: [
+            ["Ben Series 0 Book 0", "Ben Series 0 Book 1"],
+            ["Ben Series 1 Book 0"],
+            "Ben Book 4",
+        ],
     }),
 );
 result = coll
@@ -110,7 +126,11 @@ for (const notAnArray of notArrays) {
         ]),
     );
 
-    assertErrorCode(coll, [{$group: {_id: null, allBooks: {$concatArrays: "$books"}}}], ErrorCodes.TypeMismatch);
+    assertErrorCode(
+        coll,
+        [{$group: {_id: null, allBooks: {$concatArrays: "$books"}}}],
+        ErrorCodes.TypeMismatch,
+    );
 
     assert.commandWorked(coll.deleteOne({_id: "doesNotMatter"}));
 }
@@ -128,7 +148,11 @@ assert.eq(result, [
     {_id: "Pub1", booksByPublisher: ["Adrian Book 0", "Adrian Book 1", "Militsa Book 0"]},
     {
         _id: "Pub2",
-        booksByPublisher: [["Ben Series 0 Book 0", "Ben Series 0 Book 1"], ["Ben Series 1 Book 0"], "Ben Book 4"],
+        booksByPublisher: [
+            ["Ben Series 0 Book 0", "Ben Series 0 Book 1"],
+            ["Ben Series 1 Book 0"],
+            "Ben Book 4",
+        ],
     },
 ]);
 
@@ -141,7 +165,9 @@ assert.commandWorked(
         {_id: 3, a: {b: [7, 8, 9]}},
     ]),
 );
-result = coll.aggregate([{$sort: {_id: 1}}, {$group: {_id: null, nums: {$concatArrays: "$a.b"}}}]).toArray();
+result = coll
+    .aggregate([{$sort: {_id: 1}}, {$group: {_id: null, nums: {$concatArrays: "$a.b"}}}])
+    .toArray();
 assert.eq(result, [{_id: null, nums: [1, 2, 3, 4, 5, 6, 7, 8, 9]}]);
 assert(coll.drop());
 
@@ -154,7 +180,9 @@ assert.commandWorked(
         {_id: 3, a: [{b: [7, 8, 9]}]},
     ]),
 );
-result = coll.aggregate([{$sort: {_id: 1}}, {$group: {_id: null, nums: {$concatArrays: "$a.b"}}}]).toArray();
+result = coll
+    .aggregate([{$sort: {_id: 1}}, {$group: {_id: null, nums: {$concatArrays: "$a.b"}}}])
+    .toArray();
 assert.eq(result, [
     {
         _id: null,

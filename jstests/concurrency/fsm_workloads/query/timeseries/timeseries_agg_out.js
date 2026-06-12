@@ -42,7 +42,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.query = function query(db, collName) {
         jsTestLog(`Running query: coll=${collName} out=${this.outputCollName}`);
         const sourceCollectionWasUntrackedBeforeQuery =
-            FixtureHelpers.maySkipImplicitSharding() && !isTrackedTimeseries(db.getCollection(collName));
+            FixtureHelpers.maySkipImplicitSharding() &&
+            !isTrackedTimeseries(db.getCollection(collName));
         const res = db[collName].runCommand({
             aggregate: collName,
             pipeline: [
@@ -117,7 +118,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             expireAfterSeconds = Random.rand();
         }
 
-        jsTestLog(`Running collMod: coll=${this.outputCollName} expireAfterSeconds=${expireAfterSeconds}`);
+        jsTestLog(
+            `Running collMod: coll=${this.outputCollName} expireAfterSeconds=${expireAfterSeconds}`,
+        );
         assert.commandWorkedOrFailedWithCode(
             db.runCommand({collMod: this.outputCollName, expireAfterSeconds: expireAfterSeconds}),
             [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.NamespaceNotFound],
@@ -129,15 +132,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
-        assert.commandFailedWithCode(db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
-            ErrorCodes.MovePrimaryInProgress,
-            ErrorCodes.NamespaceNotFound,
-            ErrorCodes.NamespaceCannotBeSharded,
-            // Can't convert a timeseries collection to a capped collection
-            ErrorCodes.IllegalOperation,
-            // TODO(SERVER-108560): Remove CommandNotSupportedOnView after 9.0 becomes last LTS
-            ErrorCodes.CommandNotSupportedOnView,
-        ]);
+        assert.commandFailedWithCode(
+            db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
+            [
+                ErrorCodes.MovePrimaryInProgress,
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.NamespaceCannotBeSharded,
+                // Can't convert a timeseries collection to a capped collection
+                ErrorCodes.IllegalOperation,
+                // TODO(SERVER-108560): Remove CommandNotSupportedOnView after 9.0 becomes last LTS
+                ErrorCodes.CommandNotSupportedOnView,
+            ],
+        );
     };
 
     /**
@@ -214,7 +220,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             assert(!collNames.includes("system.buckets.timeseries_agg_out"));
         } else {
             // Ensure that for the buckets collection there is a corresponding view.
-            assert(collNames.includes("system.buckets.timeseries_agg_out") && collNames.includes("timeseries_agg_out"));
+            assert(
+                collNames.includes("system.buckets.timeseries_agg_out") &&
+                    collNames.includes("timeseries_agg_out"),
+            );
         }
     };
 
@@ -224,7 +233,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         db[collName].drop();
         assert.commandWorked(
-            db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
         const docs = [];
         for (let i = 0; i < numDocs; ++i) {

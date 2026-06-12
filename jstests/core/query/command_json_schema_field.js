@@ -16,10 +16,10 @@ function assertCommandFailsWithCorrectError(command, code) {
 }
 
 // Aggregate
-assertCommandFailsWithCorrectError({aggregate: coll.getName(), pipeline: [], cursor: {}, jsonSchema: {}}, [
-    ErrorCodes.FailedToParse,
-    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
-]);
+assertCommandFailsWithCorrectError(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, jsonSchema: {}},
+    [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownFieldPossibleMongocryptd],
+);
 
 // Find
 assertCommandFailsWithCorrectError({find: coll.getName(), jsonSchema: {}}, [
@@ -28,10 +28,10 @@ assertCommandFailsWithCorrectError({find: coll.getName(), jsonSchema: {}}, [
 ]);
 
 // FindAndModify
-assertCommandFailsWithCorrectError({findAndModify: coll.getName(), query: {_id: 0}, remove: true, jsonSchema: {}}, [
-    ErrorCodes.FailedToParse,
-    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
-]);
+assertCommandFailsWithCorrectError(
+    {findAndModify: coll.getName(), query: {_id: 0}, remove: true, jsonSchema: {}},
+    [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownFieldPossibleMongocryptd],
+);
 
 // Count
 assertCommandFailsWithCorrectError(

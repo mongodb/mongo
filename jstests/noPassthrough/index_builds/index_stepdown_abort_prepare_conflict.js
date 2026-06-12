@@ -37,7 +37,9 @@ const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
 
 // This will cause the index build to fail with a CannotIndexParallelArrays error.
-assert.commandWorked(primaryColl.insert({_id: 1, x: [1, 2], y: [1, 2]}, {"writeConcern": {"w": 1}}));
+assert.commandWorked(
+    primaryColl.insert({_id: 1, x: [1, 2], y: [1, 2]}, {"writeConcern": {"w": 1}}),
+);
 
 // Enable fail point which makes hybrid index build to hang before it aborts.
 let failPoint;
@@ -50,7 +52,9 @@ let failPoint;
 // holding the lock.
 failPoint = "hangAfterInitializingIndexBuild";
 
-let res = assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+let res = assert.commandWorked(
+    primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}),
+);
 let timesEntered = res.count;
 
 const indexName = "myidx";

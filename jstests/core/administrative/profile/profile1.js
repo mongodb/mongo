@@ -68,7 +68,14 @@ try {
     // create a msg for later if there is a failure.
     let msg = "";
     profileItems.forEach(function (d) {
-        msg += "profile doc: " + d.ns + " " + d.op + " " + tojson(d.query ? d.query : d.command) + "\n";
+        msg +=
+            "profile doc: " +
+            d.ns +
+            " " +
+            d.op +
+            " " +
+            tojson(d.query ? d.query : d.command) +
+            "\n";
     });
     msg += tojson(testDb.system.profile.stats());
 

@@ -12,7 +12,9 @@ const testDB = mongos.getDB(testDBName);
 const collName = "test_coll";
 
 assert.commandWorked(adminDB.runCommand({enableSharding: testDBName}));
-assert.commandWorked(adminDB.runCommand({shardCollection: testDB[collName].getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    adminDB.runCommand({shardCollection: testDB[collName].getFullName(), key: {_id: 1}}),
+);
 
 const bulk = testDB[collName].initializeUnorderedBulkOp();
 for (let i = 0; i < 50; i++) {
@@ -28,7 +30,8 @@ const serverStatus = assert.commandWorked(adminDB.runCommand({serverStatus: 1}))
 const section = serverStatus["shardingTaskExecutorMetrics"];
 assert(
     section,
-    "Expected 'shardingTaskExecutorMetrics' section in serverStatus. Keys: " + tojson(Object.keys(serverStatus)),
+    "Expected 'shardingTaskExecutorMetrics' section in serverStatus. Keys: " +
+        tojson(Object.keys(serverStatus)),
 );
 
 jsTestLog("shardingTaskExecutorMetrics " + tojson(section));
@@ -43,8 +46,14 @@ for (let i = 0; i < interfaceNames.length; i++) {
     const stats = section[name];
     assert(stats, "Stats for " + name + " should not be null");
 
-    assert(stats.hasOwnProperty("scheduled"), "Missing 'scheduled' for " + name + ": " + tojson(stats));
-    assert(stats.hasOwnProperty("executed"), "Missing 'executed' for " + name + ": " + tojson(stats));
+    assert(
+        stats.hasOwnProperty("scheduled"),
+        "Missing 'scheduled' for " + name + ": " + tojson(stats),
+    );
+    assert(
+        stats.hasOwnProperty("executed"),
+        "Missing 'executed' for " + name + ": " + tojson(stats),
+    );
     assert(
         stats.hasOwnProperty("averageWaitTimeMicros"),
         "Missing 'averageWaitTimeMicros' for " + name + ": " + tojson(stats),
@@ -59,8 +68,14 @@ for (let i = 0; i < interfaceNames.length; i++) {
     assert.gte(stats["averageWaitTimeMicros"], 0);
     assert.gte(stats["averageRunTimeMicros"], 0);
 
-    assert(!stats.hasOwnProperty("waitTime"), "Unexpected 'waitTime' histogram in server status for " + name);
-    assert(!stats.hasOwnProperty("runTime"), "Unexpected 'runTime' histogram in server status for " + name);
+    assert(
+        !stats.hasOwnProperty("waitTime"),
+        "Unexpected 'waitTime' histogram in server status for " + name,
+    );
+    assert(
+        !stats.hasOwnProperty("runTime"),
+        "Unexpected 'runTime' histogram in server status for " + name,
+    );
 
     totalExecuted += stats["executed"];
 }

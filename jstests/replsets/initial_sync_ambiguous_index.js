@@ -48,9 +48,13 @@ const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
 // We set the collectionClonerBatchSize low above, so we will definitely hit
 // this fail-point and hang after the first batch is applied. While the
 // secondary is hung we clone the problematic document.
-const failPoint = configureFailPoint(secondary, "initialSyncHangCollectionClonerAfterHandlingBatchResponse", {
-    nss: secondaryColl.getFullName(),
-});
+const failPoint = configureFailPoint(
+    secondary,
+    "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
+    {
+        nss: secondaryColl.getFullName(),
+    },
+);
 rst.reInitiate();
 failPoint.wait();
 

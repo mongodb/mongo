@@ -45,7 +45,9 @@ assert.eq(results, documents);
 // assert.sameMembers(documents.slice(0, 2), results[0].dogs);
 
 // Test in $unionWith.
-results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$readNDocuments: {numDocs: 2}}]}}]).toArray();
+results = coll
+    .aggregate([{$unionWith: {coll: collName, pipeline: [{$readNDocuments: {numDocs: 2}}]}}])
+    .toArray();
 assert.sameMembers(results, documents.concat(documents.slice(0, 2)));
 results = coll
     .aggregate([

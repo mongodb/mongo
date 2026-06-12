@@ -58,65 +58,101 @@ assert.commandFailedWithCode(
     40094,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", null]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", null]}}}]),
+    ),
     40094,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "$missing"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "$missing"]}}}]),
+    ),
     40094,
 );
 
 // Test that $indexOfCP throws an error when given an invalid index.
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", "hello"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", "hello"]}}}]),
+    ),
     40096,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", -2]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", -2]}}}]),
+    ),
     40097,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1, "hello"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1, "hello"]}}}]),
+    ),
     40096,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1, -2]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1, -2]}}}]),
+    ),
     40097,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1.4]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1.4]}}}]),
+    ),
     40096,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1, 5.2]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfCP: ["$item", "bar", 1, 5.2]}}}]),
+    ),
     40096,
 );
 
 // Test that $indexOfCP returns null when the first argument is null or missing.
-assert.eq(null, coll.aggregate({$project: {byteLocation: {$indexOfCP: [null, "$item"]}}}).toArray()[0].byteLocation);
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", "$item"]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: [null, "$item"]}}}).toArray()[0]
+        .byteLocation,
 );
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfCP: [undefined, "$item"]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", "$item"]}}}).toArray()[0]
+        .byteLocation,
+);
+assert.eq(
+    null,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: [undefined, "$item"]}}}).toArray()[0]
+        .byteLocation,
 );
 
 // Test that $indexOfCP returns null when given a string or substring that is not a string.
-assert.eq(null, coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", null]}}}).toArray()[0].byteLocation);
-assert.eq(null, coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", 4]}}}).toArray()[0].byteLocation);
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", "$missing"]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", null]}}}).toArray()[0]
+        .byteLocation,
+);
+assert.eq(
+    null,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", 4]}}}).toArray()[0]
+        .byteLocation,
+);
+assert.eq(
+    null,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["$missing", "$missing"]}}}).toArray()[0]
+        .byteLocation,
 );
 
 // Test the edge case of searching for an empty string inside an empty string, where the start index
 // is past the end index. These cases are designed to reproduce SERVER-56819.
-assert.eq(-1, coll.aggregate({$project: {byteLocation: {$indexOfCP: ["", "$emptyStr", 3]}}}).toArray()[0].byteLocation);
 assert.eq(
     -1,
-    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["", "$emptyStr", 3, 1]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["", "$emptyStr", 3]}}}).toArray()[0]
+        .byteLocation,
+);
+assert.eq(
+    -1,
+    coll.aggregate({$project: {byteLocation: {$indexOfCP: ["", "$emptyStr", 3, 1]}}}).toArray()[0]
+        .byteLocation,
 );
 
 coll.drop();

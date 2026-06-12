@@ -29,7 +29,9 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 const shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}));
+assert.commandWorked(
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}),
+);
 
 function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
     const cmdObj = {
@@ -97,7 +99,13 @@ function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
         let stmtId = 1;
         let commitRes;
         withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
-            const insertCmdObj0 = makeInsertCmdObj([{x: 0}], lsid, txnNum, stmtId++, true /* startTransaction */);
+            const insertCmdObj0 = makeInsertCmdObj(
+                [{x: 0}],
+                lsid,
+                txnNum,
+                stmtId++,
+                true /* startTransaction */,
+            );
             const insertCmdObj1 = makeInsertCmdObj([{x: 1}], lsid, txnNum, stmtId++);
             const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNum);
             assert.commandWorked(db.runCommand(insertCmdObj0));
@@ -130,7 +138,13 @@ function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
         const txnNumber = 0;
         let stmtId = 1;
         withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
-            const insertCmdObj0 = makeInsertCmdObj([{x: 0}], lsid, txnNum, stmtId++, true /* startTransaction */);
+            const insertCmdObj0 = makeInsertCmdObj(
+                [{x: 0}],
+                lsid,
+                txnNum,
+                stmtId++,
+                true /* startTransaction */,
+            );
             const insertCmdObj1 = makeInsertCmdObj([{x: 1}], lsid, txnNum, stmtId++);
             const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNum);
 
@@ -157,24 +171,36 @@ function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
 
 {
     jsTest.log(
-        "Test that running an additional write statement after the transaction has " + "prepared returns an error",
+        "Test that running an additional write statement after the transaction has " +
+            "prepared returns an error",
     );
     let runTest = (db) => {
         const lsid = {id: UUID(), txnNumber: NumberLong(0), txnUUID: UUID()};
         const txnNumber = 0;
         let stmtId = 1;
-        const insertCmdObj0 = makeInsertCmdObj([{x: 0}], lsid, txnNumber, stmtId++, true /* startTransaction */);
+        const insertCmdObj0 = makeInsertCmdObj(
+            [{x: 0}],
+            lsid,
+            txnNumber,
+            stmtId++,
+            true /* startTransaction */,
+        );
         const insertCmdObj1 = makeInsertCmdObj([{x: 1}], lsid, txnNumber, stmtId++);
         const prepareCmdObj = makePrepareTransactionCmdObj(lsid, txnNumber);
         const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNumber);
 
         assert.commandWorked(db.runCommand(insertCmdObj0));
-        const isPreparedTransactionRes = assert.commandWorked(shard0TestDB.adminCommand(prepareCmdObj));
+        const isPreparedTransactionRes = assert.commandWorked(
+            shard0TestDB.adminCommand(prepareCmdObj),
+        );
 
         const oplogEntriesBefore = getOplogEntriesForTxn(st.rs0, lsid, txnNumber);
         const txnEntriesBefore = getTxnEntriesForSession(st.rs0, lsid);
 
-        assert.commandFailedWithCode(db.runCommand(insertCmdObj1), ErrorCodes.PreparedTransactionInProgress);
+        assert.commandFailedWithCode(
+            db.runCommand(insertCmdObj1),
+            ErrorCodes.PreparedTransactionInProgress,
+        );
 
         const oplogEntriesAfter = getOplogEntriesForTxn(st.rs0, lsid, txnNumber);
         const txnEntriesAfter = getTxnEntriesForSession(st.rs0, lsid);
@@ -185,7 +211,10 @@ function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
             assert.neq(oplogEntriesBefore, oplogEntriesAfter);
             assert.neq(txnEntriesBefore, txnEntriesAfter);
 
-            assert.commandFailedWithCode(db.adminCommand(commitCmdObj), ErrorCodes.NoSuchTransaction);
+            assert.commandFailedWithCode(
+                db.adminCommand(commitCmdObj),
+                ErrorCodes.NoSuchTransaction,
+            );
             assert.eq(mongosTestColl.count(), 0);
         } else {
             assert.eq(oplogEntriesBefore, oplogEntriesAfter);

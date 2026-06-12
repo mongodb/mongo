@@ -21,7 +21,16 @@ function randomChoice(array) {
  * }
  */
 function generateRandomDocument(docId) {
-    const manufacturers = ["Sony", "Samsung", "LG", "Panasonic", "Mitsubishi", "Vizio", "Toshiba", "Sharp"];
+    const manufacturers = [
+        "Sony",
+        "Samsung",
+        "LG",
+        "Panasonic",
+        "Mitsubishi",
+        "Vizio",
+        "Toshiba",
+        "Sharp",
+    ];
     const minPrice = 100;
     const maxPrice = 4000;
     const minScreenSize = 18;
@@ -76,7 +85,9 @@ const automaticallyBucketedPricePipe = [{$bucketAuto: {groupBy: "$price", bucket
 
 const mostCommonManufacturers = coll.aggregate(manufacturerPipe).toArray();
 const numTVsBucketedByPriceRange = coll.aggregate(bucketedPricePipe).toArray();
-const numTVsAutomaticallyBucketedByPriceRange = coll.aggregate(automaticallyBucketedPricePipe).toArray();
+const numTVsAutomaticallyBucketedByPriceRange = coll
+    .aggregate(automaticallyBucketedPricePipe)
+    .toArray();
 
 const facetPipe = [
     {
@@ -108,7 +119,9 @@ coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "quizzes": [{"score": 100}]}));
 assert.commandWorked(coll.insert({"_id": 2, "quizzes": [{"score": 200}]}));
 
-const facetPipeline = [{$facet: {scoreRank: [{$match: {"quizzes.0.score": {$gt: 0}}}, {$count: "count"}]}}];
+const facetPipeline = [
+    {$facet: {scoreRank: [{$match: {"quizzes.0.score": {$gt: 0}}}, {$count: "count"}]}},
+];
 
 const facetRes = coll.aggregate(facetPipeline).toArray();
 assert.eq(facetRes.length, 1);
@@ -122,7 +135,10 @@ assert.commandWorked(coll.insert({"_id": 5, "title": "cakes and oranges"}));
 coll.aggregate([
     {
         $facet: {
-            "manufacturers": [{"$sortByCount": "$manufacturer"}, {"$sort": {"count": -1, "_id": 1}}],
+            "manufacturers": [
+                {"$sortByCount": "$manufacturer"},
+                {"$sort": {"count": -1, "_id": 1}},
+            ],
             "autoBucketedPrices": [{"$bucketAuto": {"groupBy": "$price", "buckets": 5}}],
         },
     },

@@ -73,7 +73,15 @@ import {
 // Query on the 'f' field matches docs in multiple buckets but only deletes from one.
 (function testMatchMultiBucketOnlyDeletesOne() {
     testDeleteOne({
-        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
+        initialDocList: [
+            doc1_a_nofields,
+            doc2_a_f101,
+            doc3_a_f102,
+            doc4_b_f103,
+            doc5_b_f104,
+            doc6_c_f105,
+            doc7_c_f106,
+        ],
         filter: {f: {$gt: 101}},
         // Don't validate exact results as we could delete one of a few docs.
         nDeleted: 1,
@@ -83,7 +91,15 @@ import {
 // Empty filter matches all docs but only deletes one.
 (function testEmptyFilterOnlyDeletesOne() {
     testDeleteOne({
-        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
+        initialDocList: [
+            doc1_a_nofields,
+            doc2_a_f101,
+            doc3_a_f102,
+            doc4_b_f103,
+            doc5_b_f104,
+            doc6_c_f105,
+            doc7_c_f106,
+        ],
         filter: {},
         // Don't validate exact results as we could delete any doc.
         nDeleted: 1,

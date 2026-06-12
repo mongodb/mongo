@@ -22,7 +22,10 @@ class TextFieldBase {
 export class SuffixField extends TextFieldBase {
     createQueryTypeDescriptor(db) {
         let queryType = "suffix";
-        if (this._forcePreview || (db && !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "QEPrefixSuffixSearch"))) {
+        if (
+            this._forcePreview ||
+            (db && !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "QEPrefixSuffixSearch"))
+        ) {
             queryType = "suffixPreview";
         }
         return Object.assign({"queryType": queryType}, super.createQueryTypeDescriptor());
@@ -48,7 +51,11 @@ export class SuffixField extends TextFieldBase {
         const uniqueStrs = new Set(strs);
         const paddedStrs = new Set();
         for (const str of strs) {
-            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length); affix_len++) {
+            for (
+                let affix_len = this._lb;
+                affix_len <= Math.min(this._ub, str.length);
+                affix_len++
+            ) {
                 affixSet.add(str.slice(-affix_len));
             }
             const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
@@ -68,7 +75,10 @@ export class PrefixField extends SuffixField {
     createQueryTypeDescriptor(db) {
         let spec = super.createQueryTypeDescriptor(db);
         spec.queryType = "prefix";
-        if (this._forcePreview || (db && !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "QEPrefixSuffixSearch"))) {
+        if (
+            this._forcePreview ||
+            (db && !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "QEPrefixSuffixSearch"))
+        ) {
             spec.queryType = "prefixPreview";
         }
         return spec;
@@ -79,7 +89,11 @@ export class PrefixField extends SuffixField {
         const uniqueStrs = new Set(strs);
         const paddedStrs = new Set();
         for (const str of strs) {
-            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length); affix_len++) {
+            for (
+                let affix_len = this._lb;
+                affix_len <= Math.min(this._ub, str.length);
+                affix_len++
+            ) {
                 affixSet.add(str.slice(0, affix_len));
             }
             const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
@@ -96,7 +110,15 @@ export class PrefixField extends SuffixField {
 }
 
 export class SubstringField extends TextFieldBase {
-    constructor(mlen, lb, ub, caseSensitive, diacriticSensitive, maxContention, forcePreview = false) {
+    constructor(
+        mlen,
+        lb,
+        ub,
+        caseSensitive,
+        diacriticSensitive,
+        maxContention,
+        forcePreview = false,
+    ) {
         super(lb, ub, caseSensitive, diacriticSensitive, maxContention, forcePreview);
         this._mlen = NumberInt(mlen);
     }
@@ -137,7 +159,11 @@ export class SubstringField extends TextFieldBase {
 
         for (const str of strs) {
             const strSubstringSet = new Set();
-            for (let substr_len = this._lb; substr_len <= Math.min(this._ub, str.length); substr_len++) {
+            for (
+                let substr_len = this._lb;
+                substr_len <= Math.min(this._ub, str.length);
+                substr_len++
+            ) {
                 for (let start = 0; start <= str.length - substr_len; start++) {
                     const sub = str.slice(start, start + substr_len);
                     substringSet.add(sub);
@@ -159,7 +185,16 @@ export class SubstringField extends TextFieldBase {
 }
 
 export class SuffixAndPrefixField {
-    constructor(sfxLb, sfxUb, pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention, forcePreview = false) {
+    constructor(
+        sfxLb,
+        sfxUb,
+        pfxLb,
+        pfxUb,
+        caseSensitive,
+        diacriticSensitive,
+        maxContention,
+        forcePreview = false,
+    ) {
         this._suffixField = new SuffixField(
             sfxLb,
             sfxUb,
@@ -178,7 +213,10 @@ export class SuffixAndPrefixField {
         );
     }
     createQueryTypeDescriptor(db) {
-        return [this._suffixField.createQueryTypeDescriptor(db), this._prefixField.createQueryTypeDescriptor(db)];
+        return [
+            this._suffixField.createQueryTypeDescriptor(db),
+            this._prefixField.createQueryTypeDescriptor(db),
+        ];
     }
     calculateExpectedTagCount(byte_len) {
         // subtract 1 since the exact match string is doubly counted in the other call

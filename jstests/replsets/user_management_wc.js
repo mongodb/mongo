@@ -11,7 +11,11 @@ import {assertWriteConcernError, runCommandCheckAdmin} from "jstests/libs/write_
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-let replTest = new ReplSetTest({name: "UserManagementWCSet", nodes: 3, settings: {chainingAllowed: false}});
+let replTest = new ReplSetTest({
+    name: "UserManagementWCSet",
+    nodes: 3,
+    settings: {chainingAllowed: false},
+});
 replTest.startSet();
 replTest.initiate();
 
@@ -114,7 +118,10 @@ function testValidWriteConcern(cmd) {
     cmd.setupFunc();
     let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
-    assert(!res.writeConcernError, "command on a full replicaset had writeConcernError: " + tojson(res));
+    assert(
+        !res.writeConcernError,
+        "command on a full replicaset had writeConcernError: " + tojson(res),
+    );
     cmd.confirmFunc();
 }
 

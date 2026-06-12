@@ -20,7 +20,8 @@ function runConfigsvrRemoveTagsWithRetries(conn, ns, lsid, txnNumber) {
         if (
             RetryableWritesUtil.isRetryableCode(res.code) ||
             RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-            (res.writeConcernError && RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
+            (res.writeConcernError &&
+                RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
         ) {
             return false; // Retry
         }
@@ -46,24 +47,38 @@ let lsid = assert.commandWorked(st.s.getDB("admin").runCommand({startSession: 1}
 // Create a zone
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone0"}));
 
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: 10}, zone: "zone0"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 10}, max: {x: 20}, zone: "zone0"}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: 10}, zone: "zone0"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 10}, max: {x: 20}, zone: "zone0"}),
+);
 
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: anotherNs, min: {x: 0}, max: {x: 10}, zone: "zone0"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: anotherNs, min: {x: 10}, max: {x: 20}, zone: "zone0"}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: anotherNs, min: {x: 0}, max: {x: 10}, zone: "zone0"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: anotherNs, min: {x: 10}, max: {x: 20}, zone: "zone0"}),
+);
 
 assert.eq(2, configDB.tags.countDocuments({ns: ns}));
 assert.eq(2, configDB.tags.countDocuments({ns: anotherNs}));
 
 // Remove tags matching 'ns'
-assert.commandWorked(runConfigsvrRemoveTagsWithRetries(st.configRS.getPrimary(), ns, lsid, NumberLong(1)));
+assert.commandWorked(
+    runConfigsvrRemoveTagsWithRetries(st.configRS.getPrimary(), ns, lsid, NumberLong(1)),
+);
 
 assert.eq(0, configDB.tags.countDocuments({ns: ns}));
 assert.eq(2, configDB.tags.countDocuments({ns: anotherNs}));
 
 // Create new zones
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 50}, max: {x: 60}, zone: "zone0"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 70}, max: {x: 80}, zone: "zone0"}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 50}, max: {x: 60}, zone: "zone0"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 70}, max: {x: 80}, zone: "zone0"}),
+);
 
 assert.eq(2, configDB.tags.countDocuments({ns: ns}));
 

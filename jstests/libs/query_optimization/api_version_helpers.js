@@ -106,7 +106,8 @@ export var APIVersionHelpers = (function () {
     return {
         assertAggregateFailsWithAPIStrict: assertAggregateFailsWithAPIStrict,
         assertAggregateSucceedsWithAPIStrict: assertAggregateSucceedsWithAPIStrict,
-        assertAggregateSucceedsAPIVersionWithoutAPIStrict: assertAggregateSucceedsAPIVersionWithoutAPIStrict,
+        assertAggregateSucceedsAPIVersionWithoutAPIStrict:
+            assertAggregateSucceedsAPIVersionWithoutAPIStrict,
         assertViewFailsWithAPIStrict: assertViewFailsWithAPIStrict,
         assertViewSucceedsWithAPIStrict: assertViewSucceedsWithAPIStrict,
     };

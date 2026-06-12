@@ -13,7 +13,9 @@
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const parameterName = "internalQueryEnableBooleanExpressionsSimplifier";
-const isSimplifierEnabled = assert.commandWorked(db.adminCommand({getParameter: 1, [parameterName]: 1}))[parameterName];
+const isSimplifierEnabled = assert.commandWorked(
+    db.adminCommand({getParameter: 1, [parameterName]: 1}),
+)[parameterName];
 if (!isSimplifierEnabled) {
     jsTest.log("Skipping the Boolean simplifier tests, since the simplifier is disabled...");
     quit();
@@ -66,7 +68,10 @@ const testCases = [
     // a == 1 and a != 1 is simplified to AlwaysFalse
     [{"$or": [{"$and": [{a: 1}, {a: {"$ne": 1}}]}, {b: 2}]}, {b: {"$eq": 2}}],
     // $elemMatch expression is not mixed with other expressions
-    [{$and: [{c: 1}, {c: {$elemMatch: {$ne: 1}}}]}, {$and: [{c: {$elemMatch: {$not: {$eq: 1}}}}, {c: {$eq: 1}}]}],
+    [
+        {$and: [{c: 1}, {c: {$elemMatch: {$ne: 1}}}]},
+        {$and: [{c: {$elemMatch: {$not: {$eq: 1}}}}, {c: {$eq: 1}}]},
+    ],
     // nested $elemMatch
     [
         {d: {$elemMatch: {e: {$elemMatch: {f: {$elemMatch: {$eq: 11}}}}}}},
@@ -90,15 +95,24 @@ const testCases = [
     // SERVER-22857.
     [{$and: [{"a": 1}, {"a": 1}]}, {a: {$eq: 1}}],
     // Inside $elemMatch $not is not expanded
-    [{a: {$elemMatch: {$not: {$gt: 5, $lt: 8}, $gt: 4}}}, {a: {$elemMatch: {$not: {$gt: 5, $lt: 8}, $gt: 4}}}],
+    [
+        {a: {$elemMatch: {$not: {$gt: 5, $lt: 8}, $gt: 4}}},
+        {a: {$elemMatch: {$not: {$gt: 5, $lt: 8}, $gt: 4}}},
+    ],
     // TODO SERVER-81788: we don't optimize $elemMatch yet as originally requested in the second
     // example of SERVER-22857.
     [
         {
-            $and: [{a: {$elemMatch: {$and: [{b: {$eq: 9}}, {id: {$eq: 1}}]}}}, {a: {$eq: {id: {$eq: 1}}}}],
+            $and: [
+                {a: {$elemMatch: {$and: [{b: {$eq: 9}}, {id: {$eq: 1}}]}}},
+                {a: {$eq: {id: {$eq: 1}}}},
+            ],
         },
         {
-            $and: [{a: {$elemMatch: {$and: [{b: {$eq: 9}}, {id: {$eq: 1}}]}}}, {a: {$eq: {id: {$eq: 1}}}}],
+            $and: [
+                {a: {$elemMatch: {$and: [{b: {$eq: 9}}, {id: {$eq: 1}}]}}},
+                {a: {$eq: {id: {$eq: 1}}}},
+            ],
         },
     ],
     // TODO SERVER-81792: we don't optimize $exists yet as originally requested in SERVER-35018.

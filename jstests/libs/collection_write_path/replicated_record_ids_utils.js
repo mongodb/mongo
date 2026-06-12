@@ -19,7 +19,9 @@ export function hasRecordIdsReplicated(db, collName) {
 export function getShowRecordIdsCursor(node, dbName, replicatedCollName) {
     return node
         .getDB(dbName)
-        [replicatedCollName].aggregate([{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}]);
+        [
+            replicatedCollName
+        ].aggregate([{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}]);
 }
 
 // Confirms data returned from a full collection scan on 'replicatedCollName', with the '$recordId'
@@ -49,7 +51,10 @@ export function validateShowRecordIdReplicatesAcrossNodes(nodes, dbName, replica
 // Returns the '$recordId' associated with the 'doc' when a find() with 'showRecordId()' is
 // performed.
 export function getRidForDoc(db, collName, doc) {
-    assert(db[collName].exists(), `Collection ${db[collName].getFullName()} not found on ${db.getMongo().host}`);
+    assert(
+        db[collName].exists(),
+        `Collection ${db[collName].getFullName()} not found on ${db.getMongo().host}`,
+    );
     const docs = db[collName].find(doc).showRecordId().toArray();
     assert.eq(
         docs.length,
@@ -66,8 +71,14 @@ export function getRidForDoc(db, collName, doc) {
 // name of the key.
 export function mapFieldToMatchingDocRid(docs, fieldName) {
     return docs.reduce((m, doc) => {
-        assert(doc.hasOwnProperty(fieldName), `Missing key ${fieldName} in query results: ${tojson(doc)}`);
-        assert(doc.hasOwnProperty("$recordId"), `Missing record ID in query results: ${tojson(doc)}`);
+        assert(
+            doc.hasOwnProperty(fieldName),
+            `Missing key ${fieldName} in query results: ${tojson(doc)}`,
+        );
+        assert(
+            doc.hasOwnProperty("$recordId"),
+            `Missing record ID in query results: ${tojson(doc)}`,
+        );
         const recordId = doc["$recordId"];
         m[doc[fieldName]] = recordId;
         return m;
@@ -82,7 +93,11 @@ export function mapFieldToMatchingDocRid(docs, fieldName) {
 // The 'beforeCloningFP' is a failpoint that is used to pause initial sync before
 // collections have been cloned. The 'afterCloningFP' is a failpoint that is used to pause initial
 // sync after collections have been cloned, but before oplog application.
-export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeCloningFP, afterCloningFP) {
+export function testPreservingRecordIdsDuringInitialSync(
+    initSyncMethod,
+    beforeCloningFP,
+    afterCloningFP,
+) {
     const testName = jsTestName();
     const replTest = new ReplSetTest({name: testName, nodes: 2});
     replTest.startSet();
@@ -164,19 +179,27 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
                 initialSyncMethod: initSyncMethod,
             },
         });
-        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "alwaysOn"}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "alwaysOn"}),
+        );
         replTest.reInitiate();
 
         jsTestLog("Wait for the initial sync to start and pause right after copying databases.");
         assert.commandWorked(
-            initialSyncNode.adminCommand({waitForFailPoint: afterCloningFP, timesEntered: 1, maxTimeMS: 60000}),
+            initialSyncNode.adminCommand({
+                waitForFailPoint: afterCloningFP,
+                timesEntered: 1,
+                maxTimeMS: 60000,
+            }),
         );
 
         jsTestLog("Insert documents on the primary.");
         assert.commandWorked(primDB[collName].insertMany(moreDocsToInsert));
 
         jsTestLog("Resume initial sync.");
-        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "off"}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "off"}),
+        );
         replTest.awaitSecondaryNodes(null, [initialSyncNode], null, true);
         replTest.awaitReplication();
 
@@ -214,19 +237,27 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
                 initialSyncMethod: initSyncMethod,
             },
         });
-        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "alwaysOn"}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "alwaysOn"}),
+        );
         replTest.reInitiate();
 
         jsTestLog("Wait for the initial sync to start and pause right before copying databases.");
         assert.commandWorked(
-            initialSyncNode.adminCommand({waitForFailPoint: beforeCloningFP, timesEntered: 1, maxTimeMS: 60000}),
+            initialSyncNode.adminCommand({
+                waitForFailPoint: beforeCloningFP,
+                timesEntered: 1,
+                maxTimeMS: 60000,
+            }),
         );
 
         jsTestLog("Insert documents on the primary.");
         assert.commandWorked(primDB[collName].insertMany(moreDocsToInsert));
 
         jsTestLog("Resume initial sync.");
-        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "off"}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "off"}),
+        );
         replTest.awaitSecondaryNodes(null, [initialSyncNode], null, true);
         replTest.awaitReplication();
 
@@ -243,7 +274,9 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
         assert.commandWorked(primDB.runCommand({create: collName}));
         // Insert a few 16 MB documents.
         for (let i = 0; i < 5; i++) {
-            assert.commandWorked(primDB[collName].insert({_id: -100 + i, a: "a".repeat(16 * 1024 * 1024 - 26)}));
+            assert.commandWorked(
+                primDB[collName].insert({_id: -100 + i, a: "a".repeat(16 * 1024 * 1024 - 26)}),
+            );
         }
 
         jsTestLog("Add a new node.");

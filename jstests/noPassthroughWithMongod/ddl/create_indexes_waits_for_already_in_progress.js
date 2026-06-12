@@ -44,11 +44,15 @@ assert.commandWorked(testColl.insert({a: 1}));
 function runSuccessfulIndexBuild(dbName, collName, indexSpec, requestNumber) {
     jsTest.log("Index build request " + requestNumber + " starting...");
     const res = db.getSiblingDB(dbName).runCommand({createIndexes: collName, indexes: [indexSpec]});
-    jsTest.log("Index build request " + requestNumber + ", expected to succeed, result: " + tojson(res));
+    jsTest.log(
+        "Index build request " + requestNumber + ", expected to succeed, result: " + tojson(res),
+    );
     assert.commandWorked(res);
 }
 
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}),
+);
 let joinFirstIndexBuild;
 let joinSecondIndexBuild;
 try {
@@ -59,7 +63,10 @@ try {
     );
 
     jsTest.log("Waiting for first index build to get started...");
-    checkLog.contains(db.getMongo(), "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'");
+    checkLog.contains(
+        db.getMongo(),
+        "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'",
+    );
 
     jsTest.log("Starting a parallel shell to run second index build request...");
     joinSecondIndexBuild = startParallelShell(
@@ -68,9 +75,14 @@ try {
     );
 
     jsTest.log("Waiting for second index build request to wait behind the first...");
-    checkLog.contains(db.getMongo(), "but found that at least one of the indexes is already being built");
+    checkLog.contains(
+        db.getMongo(),
+        "but found that at least one of the indexes is already being built",
+    );
 } finally {
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}),
+    );
 }
 
 // The second request stalled behind the first, so now all we need to do is check that they both
@@ -88,11 +100,15 @@ assert.commandWorked(testDB.adminCommand({clearLog: "global"}));
 
 function runFailedIndexBuild(dbName, collName, indexSpec, requestNumber) {
     const res = db.getSiblingDB(dbName).runCommand({createIndexes: collName, indexes: [indexSpec]});
-    jsTest.log("Index build request " + requestNumber + ", expected to fail, result: " + tojson(res));
+    jsTest.log(
+        "Index build request " + requestNumber + ", expected to fail, result: " + tojson(res),
+    );
     assert.commandFailedWithCode(res, 4698903);
 }
 
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}),
+);
 let joinFailedIndexBuild;
 let joinSuccessfulIndexBuild;
 try {
@@ -103,7 +119,10 @@ try {
     );
 
     jsTest.log("Waiting for third index build to get started...");
-    checkLog.contains(db.getMongo(), "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'");
+    checkLog.contains(
+        db.getMongo(),
+        "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'",
+    );
 
     jsTest.log("Starting a parallel shell to run fourth index build request...");
     joinSuccessfulIndexBuild = startParallelShell(
@@ -112,12 +131,19 @@ try {
     );
 
     jsTest.log("Waiting for fourth index build request to wait behind the third...");
-    checkLog.contains(db.getMongo(), "but found that at least one of the indexes is already being built");
+    checkLog.contains(
+        db.getMongo(),
+        "but found that at least one of the indexes is already being built",
+    );
 
     jsTest.log("Failing third index build");
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: {times: 1}}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: {times: 1}}),
+    );
 } finally {
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}),
+    );
 }
 
 // The second request stalled behind the first, so now all we need to do is check that they both
@@ -125,7 +151,9 @@ try {
 joinFailedIndexBuild();
 joinSuccessfulIndexBuild();
 
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: "off"}),
+);
 
 // Make sure the parallel shells sucessfully built the index. We should now have the _id index,
 // the 'the_b_1_index' index and the 'the_c_1_index' just built in the parallel shells.

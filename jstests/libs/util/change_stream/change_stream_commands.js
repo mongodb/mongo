@@ -125,7 +125,10 @@ class Command {
      */
     static fromSpec(spec) {
         const cls = Command._registry[spec.type];
-        assert(cls, `Unknown command type: ${spec.type}. Did you forget to add it to _registerAll()?`);
+        assert(
+            cls,
+            `Unknown command type: ${spec.type}. Did you forget to add it to _registerAll()?`,
+        );
         const cmd = Object.create(cls.prototype);
         Object.assign(cmd, spec);
         return cmd;
@@ -230,7 +233,9 @@ class CreateDatabaseCommand extends Command {
     }
 
     execute(connection) {
-        assert.commandWorked(connection.adminCommand({enableSharding: this.dbName, primaryShard: this.primaryShard}));
+        assert.commandWorked(
+            connection.adminCommand({enableSharding: this.dbName, primaryShard: this.primaryShard}),
+        );
     }
 
     toString() {
@@ -251,7 +256,8 @@ class CreateDatabaseCommand extends Command {
 class CreateUnsplittableCollectionCommand extends Command {
     constructor({dbName, collName, shardSet, collectionCtx, dataShard = null}) {
         super({dbName, collName, shardSet, collectionCtx});
-        this.dataShard = dataShard ?? (shardSet?.length ? shardSet[Random.randInt(shardSet.length)]._id : null);
+        this.dataShard =
+            dataShard ?? (shardSet?.length ? shardSet[Random.randInt(shardSet.length)]._id : null);
     }
 
     execute(connection) {
@@ -485,19 +491,26 @@ function _reconfigureZonesForShardSet(connection, ns, shardSet) {
             .map((s) => s._id),
     );
 
-    if (currentZoneShardIds.size === newShardIds.size && [...newShardIds].every((id) => currentZoneShardIds.has(id))) {
+    if (
+        currentZoneShardIds.size === newShardIds.size &&
+        [...newShardIds].every((id) => currentZoneShardIds.has(id))
+    ) {
         return;
     }
 
     for (const shardId of currentZoneShardIds) {
         if (!newShardIds.has(shardId)) {
-            assert.commandWorked(connection.adminCommand({removeShardFromZone: shardId, zone: zoneName}));
+            assert.commandWorked(
+                connection.adminCommand({removeShardFromZone: shardId, zone: zoneName}),
+            );
         }
     }
 
     for (const shard of shardSet) {
         if (!currentZoneShardIds.has(shard._id)) {
-            assert.commandWorked(connection.adminCommand({addShardToZone: shard._id, zone: zoneName}));
+            assert.commandWorked(
+                connection.adminCommand({addShardToZone: shard._id, zone: zoneName}),
+            );
         }
     }
 }
@@ -851,7 +864,9 @@ class RenameCommand extends Command {
         // execution, or never created). Just create it on the same primary shard as
         // the source DB — no movePrimary needed.
         const sourceDbPrimary = getDbPrimary(connection, this.dbName);
-        new CreateDatabaseCommand({dbName: targetDb, primaryShard: sourceDbPrimary}).execute(connection);
+        new CreateDatabaseCommand({dbName: targetDb, primaryShard: sourceDbPrimary}).execute(
+            connection,
+        );
     }
 
     toString() {
@@ -1005,10 +1020,17 @@ class MoveCommandBase extends Command {
      * Pick a target shard different from the current shard.
      */
     _getTargetShard(connection) {
-        assert(this.shardSet && this.shardSet.length > 1, `${this} requires a shard set with at least 2 shards`);
+        assert(
+            this.shardSet && this.shardSet.length > 1,
+            `${this} requires a shard set with at least 2 shards`,
+        );
         const currentShard = this._getCurrentShard(connection);
         const otherShards = this.shardSet.filter((s) => s._id !== currentShard);
-        assert.gt(otherShards.length, 0, `${this}: no other shard to move to (currently on ${currentShard})`);
+        assert.gt(
+            otherShards.length,
+            0,
+            `${this}: no other shard to move to (currently on ${currentShard})`,
+        );
         return otherShards[Random.randInt(otherShards.length)]._id;
     }
 
@@ -1265,7 +1287,11 @@ class MoveChunkCommand extends MoveCommandBase {
 
         const donorShardId = this._getDonorShardId(connection);
         const otherShardIds = this.shardSet.filter((s) => s._id !== donorShardId).map((s) => s._id);
-        assert.gt(otherShardIds.length, 0, `${this}: no recipient shards to drain donor ${donorShardId}`);
+        assert.gt(
+            otherShardIds.length,
+            0,
+            `${this}: no recipient shards to drain donor ${donorShardId}`,
+        );
 
         this._drainChunksFromDonor(connection, ns, configDb, collDoc, donorShardId, otherShardIds);
     }
@@ -1277,12 +1303,17 @@ class MoveChunkCommand extends MoveCommandBase {
      */
     _drainChunksFromDonor(connection, ns, configDb, collDoc, donorShardId, otherShardIds) {
         let moved = 0;
-        let donorChunks = configDb.chunks.find({uuid: collDoc.uuid, shard: donorShardId}).sort({min: 1}).toArray();
+        let donorChunks = configDb.chunks
+            .find({uuid: collDoc.uuid, shard: donorShardId})
+            .sort({min: 1})
+            .toArray();
 
         while (donorChunks.length > 0) {
             for (let i = 0; i < donorChunks.length; i++) {
                 const recipient = otherShardIds[(moved + i) % otherShardIds.length];
-                assert.commandWorked(connection.adminCommand(this._buildMoveChunkCmd(ns, donorChunks[i], recipient)));
+                assert.commandWorked(
+                    connection.adminCommand(this._buildMoveChunkCmd(ns, donorChunks[i], recipient)),
+                );
 
                 if (moved + i === 0 && this.interleavedDocuments.length > 0) {
                     const coll = connection.getDB(this.dbName).getCollection(this.collName);
@@ -1293,7 +1324,10 @@ class MoveChunkCommand extends MoveCommandBase {
 
             // Re-query to catch any chunks that appeared on the donor
             // (e.g. from auto-splitting triggered by the interleaved insert).
-            donorChunks = configDb.chunks.find({uuid: collDoc.uuid, shard: donorShardId}).sort({min: 1}).toArray();
+            donorChunks = configDb.chunks
+                .find({uuid: collDoc.uuid, shard: donorShardId})
+                .sort({min: 1})
+                .toArray();
         }
 
         assert.eq(
@@ -1321,7 +1355,9 @@ class MoveChunkCommand extends MoveCommandBase {
  */
 class FCVDowngradeCommand extends Command {
     execute(conn) {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
     }
 
     toString() {
@@ -1338,7 +1374,9 @@ class FCVDowngradeCommand extends Command {
  */
 class FCVUpgradeCommand extends Command {
     execute(conn) {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     }
 
     toString() {

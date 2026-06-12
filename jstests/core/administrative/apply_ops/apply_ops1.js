@@ -25,7 +25,10 @@ t.drop();
 //
 
 // Empty array of operations.
-assert.commandWorked(db.adminCommand({applyOps: []}), "applyOps should not fail on empty array of operations");
+assert.commandWorked(
+    db.adminCommand({applyOps: []}),
+    "applyOps should not fail on empty array of operations",
+);
 
 // Non-array type for operations.
 assert.commandFailed(
@@ -52,7 +55,10 @@ assert.commandFailed(
 );
 
 // Missing 'ns' field in an operation.
-assert.commandFailed(db.adminCommand({applyOps: [{op: "c"}]}), 'applyOps should fail on operation without "ns" field');
+assert.commandFailed(
+    db.adminCommand({applyOps: [{op: "c"}]}),
+    'applyOps should fail on operation without "ns" field',
+);
 
 // Non-string 'ns' field in an operation.
 assert.commandFailed(
@@ -132,14 +138,24 @@ assert.commandFailed(
                                                     "o": {
                                                         "applyOps": [
                                                             {
-                                                                "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                                                "ts": {
+                                                                    "$timestamp": {
+                                                                        "t": 1,
+                                                                        "i": 100,
+                                                                    },
+                                                                },
                                                                 "v": 2,
                                                                 "op": "c",
                                                                 "ns": "test.$cmd",
                                                                 "o": {
                                                                     "applyOps": [
                                                                         {
-                                                                            "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                                                            "ts": {
+                                                                                "$timestamp": {
+                                                                                    "t": 1,
+                                                                                    "i": 100,
+                                                                                },
+                                                                            },
                                                                             "v": 2,
                                                                             "op": "c",
                                                                             "ns": "test.$cmd",
@@ -147,82 +163,86 @@ assert.commandFailed(
                                                                                 "applyOps": [
                                                                                     {
                                                                                         "ts": {
-                                                                                            "$timestamp": {
-                                                                                                "t": 1,
-                                                                                                "i": 100,
-                                                                                            },
+                                                                                            "$timestamp":
+                                                                                                {
+                                                                                                    "t": 1,
+                                                                                                    "i": 100,
+                                                                                                },
                                                                                         },
                                                                                         "v": 2,
                                                                                         "op": "c",
                                                                                         "ns": "test.$cmd",
                                                                                         "o": {
-                                                                                            "applyOps": [
-                                                                                                {
-                                                                                                    "ts": {
-                                                                                                        "$timestamp": {
-                                                                                                            "t": 1,
-                                                                                                            "i": 100,
+                                                                                            "applyOps":
+                                                                                                [
+                                                                                                    {
+                                                                                                        "ts": {
+                                                                                                            "$timestamp":
+                                                                                                                {
+                                                                                                                    "t": 1,
+                                                                                                                    "i": 100,
+                                                                                                                },
+                                                                                                        },
+                                                                                                        "v": 2,
+                                                                                                        "op": "c",
+                                                                                                        "ns": "test.$cmd",
+                                                                                                        "o": {
+                                                                                                            "applyOps":
+                                                                                                                [
+                                                                                                                    {
+                                                                                                                        "ts": {
+                                                                                                                            "$timestamp":
+                                                                                                                                {
+                                                                                                                                    "t": 1,
+                                                                                                                                    "i": 100,
+                                                                                                                                },
+                                                                                                                        },
+                                                                                                                        "v": 2,
+                                                                                                                        "op": "c",
+                                                                                                                        "ns": "test.$cmd",
+                                                                                                                        "o": {
+                                                                                                                            "applyOps":
+                                                                                                                                [
+                                                                                                                                    {
+                                                                                                                                        "ts": {
+                                                                                                                                            "$timestamp":
+                                                                                                                                                {
+                                                                                                                                                    "t": 1,
+                                                                                                                                                    "i": 100,
+                                                                                                                                                },
+                                                                                                                                        },
+                                                                                                                                        "v": 2,
+                                                                                                                                        "op": "c",
+                                                                                                                                        "ns": "test.$cmd",
+                                                                                                                                        "o": {
+                                                                                                                                            "applyOps":
+                                                                                                                                                [
+                                                                                                                                                    {
+                                                                                                                                                        "ts": {
+                                                                                                                                                            "$timestamp":
+                                                                                                                                                                {
+                                                                                                                                                                    "t": 1,
+                                                                                                                                                                    "i": 100,
+                                                                                                                                                                },
+                                                                                                                                                        },
+                                                                                                                                                        "v": 2,
+                                                                                                                                                        "op": "c",
+                                                                                                                                                        "ns": "test.$cmd",
+                                                                                                                                                        "o": {
+                                                                                                                                                            "applyOps":
+                                                                                                                                                                [],
+                                                                                                                                                        },
+                                                                                                                                                    },
+                                                                                                                                                ],
+                                                                                                                                        },
+                                                                                                                                    },
+                                                                                                                                ],
+                                                                                                                        },
+                                                                                                                    },
+                                                                                                                ],
                                                                                                         },
                                                                                                     },
-                                                                                                    "v": 2,
-                                                                                                    "op": "c",
-                                                                                                    "ns": "test.$cmd",
-                                                                                                    "o": {
-                                                                                                        "applyOps": [
-                                                                                                            {
-                                                                                                                "ts": {
-                                                                                                                    "$timestamp":
-                                                                                                                        {
-                                                                                                                            "t": 1,
-                                                                                                                            "i": 100,
-                                                                                                                        },
-                                                                                                                },
-                                                                                                                "v": 2,
-                                                                                                                "op": "c",
-                                                                                                                "ns": "test.$cmd",
-                                                                                                                "o": {
-                                                                                                                    "applyOps":
-                                                                                                                        [
-                                                                                                                            {
-                                                                                                                                "ts": {
-                                                                                                                                    "$timestamp":
-                                                                                                                                        {
-                                                                                                                                            "t": 1,
-                                                                                                                                            "i": 100,
-                                                                                                                                        },
-                                                                                                                                },
-                                                                                                                                "v": 2,
-                                                                                                                                "op": "c",
-                                                                                                                                "ns": "test.$cmd",
-                                                                                                                                "o": {
-                                                                                                                                    "applyOps":
-                                                                                                                                        [
-                                                                                                                                            {
-                                                                                                                                                "ts": {
-                                                                                                                                                    "$timestamp":
-                                                                                                                                                        {
-                                                                                                                                                            "t": 1,
-                                                                                                                                                            "i": 100,
-                                                                                                                                                        },
-                                                                                                                                                },
-                                                                                                                                                "v": 2,
-                                                                                                                                                "op": "c",
-                                                                                                                                                "ns": "test.$cmd",
-                                                                                                                                                "o": {
-                                                                                                                                                    "applyOps":
-                                                                                                                                                        [],
-                                                                                                                                                },
-                                                                                                                                            },
-                                                                                                                                        ],
-                                                                                                                                },
-                                                                                                                            },
-                                                                                                                        ],
-                                                                                                                },
-                                                                                                            },
-                                                                                                        ],
-                                                                                                    },
-                                                                                                },
-                                                                                            ],
+                                                                                                ],
                                                                                         },
                                                                                     },
                                                                                 ],
@@ -283,7 +303,12 @@ function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCod
 // Insert and update operations on non-existent collections/databases should return
 // NamespaceNotFound.
 testCrudOperationOnNonExistentNamespace("i", {_id: 0}, {}, ErrorCodes.NamespaceNotFound);
-testCrudOperationOnNonExistentNamespace("u", {$v: 2, diff: {x: 0}}, {_id: 0}, ErrorCodes.NamespaceNotFound);
+testCrudOperationOnNonExistentNamespace(
+    "u",
+    {$v: 2, diff: {x: 0}},
+    {_id: 0},
+    ErrorCodes.NamespaceNotFound,
+);
 
 // TODO(SERVER-46221): These oplog entries are inserted as given.  After SERVER-21700 and with
 // steady-state oplog constraint enforcement on, they will result in secondary crashes.  We
@@ -296,13 +321,17 @@ if (false) {
 }
 
 assert.commandWorked(db.createCollection(t.getName()));
-let a = assert.commandWorked(db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
+let a = assert.commandWorked(
+    db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}),
+);
 assert.eq(1, t.find().count(), "Valid insert failed");
 assert.eq(true, a.results[0], "Bad result value for valid insert");
 
 // TODO(SERVER-46221): Duplicate inserts result in invalid oplog entries, as above.
 if (false) {
-    a = assert.commandWorked(db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
+    a = assert.commandWorked(
+        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}),
+    );
     assert.eq(1, t.find().count(), "Duplicate insert failed");
     assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 }
@@ -466,7 +495,12 @@ res = assert.commandWorked(
     db.adminCommand({
         applyOps: [
             {"op": "i", "ns": t.getFullName(), "o": {_id: 9}},
-            {"op": "u", "ns": t.getFullName(), "o2": {_id: 9}, "o": {$v: 2, diff: {u: {z: 1, a: 2}}}},
+            {
+                "op": "u",
+                "ns": t.getFullName(),
+                "o2": {_id: 9},
+                "o": {$v: 2, diff: {u: {z: 1, a: 2}}},
+            },
         ],
     }),
 );
@@ -538,7 +572,9 @@ assert.eq(t.findOne({_id: 12}), {_id: 12, newField: "foo"});
 
 // Test interesting $v field values
 {
-    assert.commandWorked(db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 13}}]}));
+    assert.commandWorked(
+        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 13}}]}),
+    );
 
     // {$v: 3} does not exist yet, and we check that trying to use it throws an error.
     assert.commandFailedWithCode(
@@ -711,5 +747,7 @@ assert.eq(t.findOne({_id: 15}), {_id: 15, x: "nested apply op update2 (explicit 
 
 assert.commandWorked(t.createIndex({a: 1}));
 assert.commandWorked(
-    t.runCommand({applyOps: [{op: "c", ns: t.getFullName(), o: {dropIndexes: "testColl", index: "a_1"}}]}),
+    t.runCommand({
+        applyOps: [{op: "c", ns: t.getFullName(), o: {dropIndexes: "testColl", index: "a_1"}}],
+    }),
 );

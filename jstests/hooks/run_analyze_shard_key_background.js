@@ -10,7 +10,8 @@ const topology = DiscoverTopology.findConnectedNodes(conn);
 
 if (topology.type === Topology.kStandalone) {
     throw new Error(
-        "Can only analyze shard keys on a replica set or shard cluster, but got: " + tojsononeline(topology),
+        "Can only analyze shard keys on a replica set or shard cluster, but got: " +
+            tojsononeline(topology),
     );
 }
 if (topology.type === Topology.kReplicaSet) {
@@ -21,7 +22,9 @@ if (topology.type === Topology.kReplicaSet) {
  * Returns the database name and collection name for a random user collection.
  */
 function getRandomCollection() {
-    const dbInfos = conn.getDBs(undefined /* driverSession */, {name: {$nin: ["local", "admin", "config"]}}).databases;
+    const dbInfos = conn.getDBs(undefined /* driverSession */, {
+        name: {$nin: ["local", "admin", "config"]},
+    }).databases;
     if (dbInfos.length > 0) {
         const dbInfo = AnalyzeShardKeyUtil.getRandomElement(dbInfos);
         const collInfos = conn.getDB(dbInfo.name).getCollectionInfos({type: "collection"});
@@ -55,7 +58,10 @@ function getSupportedShardKeys(indexKey) {
         const nextFieldIndex = currFieldIndex + 1;
         generateShardKeys(Object.assign({}, currShardKey, {[currFieldName]: 1}), nextFieldIndex);
         if (!AnalyzeShardKeyUtil.isHashedKeyPattern(currShardKey)) {
-            generateShardKeys(Object.assign({}, currShardKey, {[currFieldName]: "hashed"}), nextFieldIndex);
+            generateShardKeys(
+                Object.assign({}, currShardKey, {[currFieldName]: "hashed"}),
+                nextFieldIndex,
+            );
         }
     }
 
@@ -167,11 +173,15 @@ function analyzeShardKey(ns, shardKey, indexKey) {
         return res;
     }
     if (res.code == 16746) {
-        jsTest.log(`Failed to analyze the shard key because it contains an array index field: ${tojsononeline(res)}`);
+        jsTest.log(
+            `Failed to analyze the shard key because it contains an array index field: ${tojsononeline(res)}`,
+        );
         return res;
     }
     if (res.code == 4952606) {
-        jsTest.log(`Failed to analyze the shard key because of its low cardinality: ${tojsononeline(res)}`);
+        jsTest.log(
+            `Failed to analyze the shard key because of its low cardinality: ${tojsononeline(res)}`,
+        );
         return res;
     }
     if (res.code == ErrorCodes.QueryPlanKilled) {
@@ -197,14 +207,18 @@ function analyzeShardKey(ns, shardKey, indexKey) {
         return res;
     }
     if (res.code == ErrorCodes.CollectionUUIDMismatch) {
-        jsTest.log(`Failed to analyze the shard key because the collection has been recreated: ${tojsononeline(res)}`);
+        jsTest.log(
+            `Failed to analyze the shard key because the collection has been recreated: ${tojsononeline(res)}`,
+        );
         return res;
     }
     if (res.code == 28799 || res.code == 4952606) {
         // (WT-8003) 28799 is the error that $sample throws when it fails to find a
         // non-duplicate document using a random cursor. 4952606 is the error that the sampling
         // based split policy throws if it fails to find the specified number of split points.
-        print(`Failed to analyze the shard key due to duplicate keys returned by random cursor ${tojsononeline(res)}`);
+        print(
+            `Failed to analyze the shard key due to duplicate keys returned by random cursor ${tojsononeline(res)}`,
+        );
         return res;
     }
     if (res.code == 7559401) {
@@ -243,7 +257,10 @@ function analyzeShardKey(ns, shardKey, indexKey) {
         return res;
     }
     if (res.code == ErrorCodes.StaleConfig) {
-        print(`Failed to analyze the shard key because it failed with a StaleConfig error. ` + `${tojsononeline(res)}`);
+        print(
+            `Failed to analyze the shard key because it failed with a StaleConfig error. ` +
+                `${tojsononeline(res)}`,
+        );
         return res;
     }
     if (res.code == ErrorCodes.NetworkInterfaceExceededTimeLimit && buildInfo.debug) {
@@ -281,7 +298,10 @@ function analyzeRandomShardKeys(dbName, collName) {
 
     const ns = dbName + "." + collName;
     const coll = conn.getCollection(ns);
-    jsTest.log("Analyzing random shard keys for the collection " + tojsononeline({ns, collInfo: collInfos[0]}));
+    jsTest.log(
+        "Analyzing random shard keys for the collection " +
+            tojsononeline({ns, collInfo: collInfos[0]}),
+    );
 
     let doc;
     try {
@@ -289,12 +309,16 @@ function analyzeRandomShardKeys(dbName, collName) {
     } catch (e) {
         if (e.code == ErrorCodes.QueryPlanKilled) {
             jsTest.log(
-                `Skip analyzing shard keys for ${ns}` + `since the collection has been dropped: ${tojsononeline(e)}`,
+                `Skip analyzing shard keys for ${ns}` +
+                    `since the collection has been dropped: ${tojsononeline(e)}`,
             );
             return;
         }
         if (e.code == ErrorCodes.ObjectIsBusy) {
-            jsTest.log(`Skip analyzing shard keys for ${ns}` + `since the storage is busy: ${tojsononeline(e)}`);
+            jsTest.log(
+                `Skip analyzing shard keys for ${ns}` +
+                    `since the storage is busy: ${tojsononeline(e)}`,
+            );
             return;
         }
         throw e;
@@ -304,10 +328,12 @@ function analyzeRandomShardKeys(dbName, collName) {
         const shardKey = generateRandomShardKey(doc);
         if (!AnalyzeShardKeyUtil.isIdKeyPattern(shardKey)) {
             jsTest.log(
-                `Analyzing a shard key that is likely to not have a corresponding index ${tojsononeline({
-                    shardKey,
-                    doc,
-                })}`,
+                `Analyzing a shard key that is likely to not have a corresponding index ${tojsononeline(
+                    {
+                        shardKey,
+                        doc,
+                    },
+                )}`,
             );
             analyzeShardKey(ns, shardKey);
         }

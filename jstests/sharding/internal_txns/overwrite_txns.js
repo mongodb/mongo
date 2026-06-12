@@ -294,7 +294,11 @@ withRetryOnTransientTxnError(
             testDB.runCommand({
                 insert: kCollName,
                 documents: [{x: 1}],
-                lsid: {id: clientSession.id, txnUUID: UUID(), txnNumber: NumberLong(clientTxnNumber)},
+                lsid: {
+                    id: clientSession.id,
+                    txnUUID: UUID(),
+                    txnNumber: NumberLong(clientTxnNumber),
+                },
                 txnNumber: NumberLong(clientTxnNumber),
                 startTransaction: true,
                 autocommit: false,

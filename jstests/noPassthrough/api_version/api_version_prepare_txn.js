@@ -26,7 +26,9 @@ let inc = 1;
 assert.commandWorked(testColl.insert(oldDoc));
 
 const runTest = function (failover, commit) {
-    jsTestLog(`Testing ${commit ? "Commiting" : "Aborting"} with ${failover ? "Failover" : "Restarting Primary"}.`);
+    jsTestLog(
+        `Testing ${commit ? "Commiting" : "Aborting"} with ${failover ? "Failover" : "Restarting Primary"}.`,
+    );
     const newDoc = {_id: 42, x: inc++};
     let session = primary.startSession();
     const sessionColl = session.getDatabase(dbName).getCollection(collName);

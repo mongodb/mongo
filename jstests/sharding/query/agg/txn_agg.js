@@ -15,11 +15,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.user", key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: "test.user", middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: "test.user", find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: "test.user", find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 // Preemptively create the collections in the shard since it is not allowed in transactions.
 let coll = st.s.getDB("test").user;
@@ -65,7 +69,9 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     sessionColl.insert({_id: 1});
     assert.eq(2, sessionColl.find().itcount());
 
-    let res = sessionColl.aggregate([{$match: {_id: {$gte: -200}}}], {allowDiskUse: false}).toArray();
+    let res = sessionColl
+        .aggregate([{$match: {_id: {$gte: -200}}}], {allowDiskUse: false})
+        .toArray();
     assert.eq(2, res.length, tojson(res));
 
     assert.commandWorked(session.abortTransaction_forTesting());
@@ -80,7 +86,10 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     assert.eq(2, sessionColl.find().itcount());
 
     let res = sessionColl
-        .aggregate([{$match: {_id: {$gte: -200}}}, {$_internalSplitPipeline: {mergeType: "anyShard"}}])
+        .aggregate([
+            {$match: {_id: {$gte: -200}}},
+            {$_internalSplitPipeline: {mergeType: "anyShard"}},
+        ])
         .toArray();
     assert.eq(2, res.length, tojson(res));
 
@@ -95,9 +104,12 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     assert.eq(1, sessionColl.find().itcount());
 
     const err = assert.throws(() =>
-        sessionColl.aggregate([{$match: {_id: {$gte: -200}}}, {$_internalSplitPipeline: {mergeType: "anyShard"}}], {
-            readConcern: {level: "majority"},
-        }),
+        sessionColl.aggregate(
+            [{$match: {_id: {$gte: -200}}}, {$_internalSplitPipeline: {mergeType: "anyShard"}}],
+            {
+                readConcern: {level: "majority"},
+            },
+        ),
     );
     assert.eq(err.code, ErrorCodes.InvalidOptions, err);
 
@@ -122,10 +134,15 @@ withTxnAndAutoRetryOnMongos(session, () => {
 });
 
 // Move all of the data to shard 1.
-assert.commandWorked(st.s.adminCommand({moveChunk: "test.user", find: {_id: -1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: "test.user", find: {_id: -1}, to: st.shard1.shardName}),
+);
 
 // Be sure that only one shard will be targeted after the moveChunk.
-const pipeline = [{$_internalSplitPipeline: {mergeType: {"specificShard": specificShardName}}}, {$sort: {_id: 1}}];
+const pipeline = [
+    {$_internalSplitPipeline: {mergeType: {"specificShard": specificShardName}}},
+    {$sort: {_id: 1}},
+];
 const explain = sessionColl.explain().aggregate(pipeline);
 assert.eq(Object.keys(explain.shards), [st.shard1.shardName], explain);
 

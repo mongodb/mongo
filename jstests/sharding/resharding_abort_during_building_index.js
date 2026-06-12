@@ -38,7 +38,10 @@ assert.commandWorked(
     ]),
 );
 assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));
-const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
+const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(
+    recipient,
+    "hangAfterInitializingIndexBuild",
+);
 
 let awaitAbort;
 reshardingTest.withReshardingInBackground(
@@ -60,7 +63,9 @@ reshardingTest.withReshardingInBackground(
         );
 
         assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
+            const coordinatorDoc = mongos
+                .getCollection("config.reshardingOperations")
+                .findOne({ns: ns});
             return coordinatorDoc === null || coordinatorDoc.state === "aborting";
         });
     },

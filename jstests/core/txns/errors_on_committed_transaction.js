@@ -52,21 +52,34 @@ jsTestLog(
     "Test the error precedence when calling prepare on a committed transaction but not " +
         "providing autocommit to prepareTransaction.",
 );
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber}), 50768);
+assert.commandFailedWithCode(
+    sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber}),
+    50768,
+);
 
 jsTestLog(
     "Test the error precedence when calling prepare on a committed transaction and " +
         "providing startTransaction to prepareTransaction.",
 );
 assert.commandFailedWithCode(
-    sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber, autocommit: false, startTransaction: true}),
+    sessionDB.adminCommand({
+        prepareTransaction: 1,
+        txnNumber: txnNumber,
+        autocommit: false,
+        startTransaction: true,
+    }),
     ErrorCodes.OperationNotSupportedInTransaction,
 );
 
 // Call commit on committed transaction without shell helper.
 jsTestLog("Test that calling commit with invalid fields on a committed transaction fails.");
 assert.commandFailedWithCode(
-    sessionDB.adminCommand({commitTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        invalidField: 1,
+        txnNumber: txnNumber,
+        autocommit: false,
+    }),
     ErrorCodes.IDLUnknownField,
 );
 
@@ -79,7 +92,12 @@ assert.commandFailedWithCode(
 
 jsTestLog("Test that calling abort with invalid fields on a committed transaction fails.");
 assert.commandFailedWithCode(
-    sessionDB.adminCommand({abortTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
+    sessionDB.adminCommand({
+        abortTransaction: 1,
+        invalidField: 1,
+        txnNumber: txnNumber,
+        autocommit: false,
+    }),
     ErrorCodes.IDLUnknownField,
 );
 

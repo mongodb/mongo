@@ -30,9 +30,21 @@ print("insert-insert conflict.");
 let t1Op = {insert: collName, documents: [{_id: 1, x: 1}]};
 let t2Op = {insert: collName, documents: [{_id: 2, x: 1}]};
 let expectedDocs1 = [{_id: 1, x: 1}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs1,
+    WriteConflictHelpers.T1StartsFirstAndWins,
+);
 let expectedDocs2 = [{_id: 2, x: 1}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs2,
+    WriteConflictHelpers.T2StartsSecondAndWins,
+);
 
 print("update-update conflict");
 let initOp = {
@@ -85,9 +97,21 @@ t2Op = {
     updates: [{q: {_id: 2}, u: {$set: {x: 1}}, upsert: true}],
 };
 expectedDocs1 = [{_id: 1, x: 1}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs1,
+    WriteConflictHelpers.T1StartsFirstAndWins,
+);
 expectedDocs2 = [{_id: 2, x: 1}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs2,
+    WriteConflictHelpers.T2StartsSecondAndWins,
+);
 
 /***********************************************************************************************
  * Multi-document and predicate based conflicts.
@@ -117,13 +141,25 @@ expectedDocs1 = [
     {_id: 2, x: 2},
     {_id: 3, x: 3},
 ];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs1,
+    WriteConflictHelpers.T1StartsFirstAndWins,
+);
 expectedDocs2 = [
     {_id: 4, x: 2},
     {_id: 5, x: 3},
     {_id: 6, x: 4},
 ];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs2,
+    WriteConflictHelpers.T2StartsSecondAndWins,
+);
 
 print("multiupdate-multiupdate conflict");
 // Update disjoint sets of documents such that the post-image of each set would create a unique

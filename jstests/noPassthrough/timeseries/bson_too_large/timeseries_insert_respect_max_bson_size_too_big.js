@@ -27,7 +27,9 @@ TimeseriesTest.run((insert) => {
     const timestamp = ISODate("2025-01-01T12:00:00Z");
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {"timeField": timeField, "metaField": metaField}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {"timeField": timeField, "metaField": metaField},
+        }),
     );
 
     const largeMeta = "a".repeat(16 * 1024 * 1024 + 1);

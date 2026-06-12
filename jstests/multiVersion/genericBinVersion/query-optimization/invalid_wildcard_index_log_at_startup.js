@@ -26,7 +26,9 @@ const oldVersion = "8.0.16";
         assert.commandWorked(testDB[collName].insert({a: 1}));
 
         // Invalid index
-        assert.commandWorked(testDB[collName].createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 0}}));
+        assert.commandWorked(
+            testDB[collName].createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 0}}),
+        );
 
         MongoRunner.stopMongod(conn);
     }

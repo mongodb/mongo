@@ -22,8 +22,14 @@ assert.commandWorked(mongosColl.insert({x: undefined}));
 jsTestLog("Doing writes that generate oplog entries including undefined document key");
 
 assert.commandWorked(
-    mongosColl.update({}, {$set: {a: 1}}, {multi: true, writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+    mongosColl.update(
+        {},
+        {$set: {a: 1}},
+        {multi: true, writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+    ),
 );
-assert.commandWorked(mongosColl.remove({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    mongosColl.remove({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 st.stop();

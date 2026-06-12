@@ -43,7 +43,10 @@ assert.commandWorked(
     ]),
 );
 assert.commandWorked(mongos.getCollection(ns).createIndex({"metaTest.x": 1}));
-const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
+const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(
+    recipient,
+    "hangAfterInitializingIndexBuild",
+);
 
 // In legacy timeseries (FCV < 9.0), config.reshardingOperations and abortReshardCollection
 // use the bucket namespace. Compute it once before starting resharding.
@@ -56,14 +59,19 @@ let awaitAbort;
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {"metaTest.y": 1},
-        newChunks: [{min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]}],
+        newChunks: [
+            {min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]},
+        ],
     },
     () => {
         reshardingTest.awaitCloneTimestampChosen();
         hangAfterInitializingIndexBuildFailPoint.wait();
         jsTestLog("Hang primary during building index, then abort resharding");
 
-        assert.neq(null, mongos.getCollection("config.reshardingOperations").findOne({ns: abortNs}));
+        assert.neq(
+            null,
+            mongos.getCollection("config.reshardingOperations").findOne({ns: abortNs}),
+        );
         awaitAbort = startParallelShell(
             funWithArgs(function (sourceNamespace) {
                 db.adminCommand({abortReshardCollection: sourceNamespace});
@@ -72,7 +80,9 @@ reshardingTest.withReshardingInBackground(
         );
 
         assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: abortNs});
+            const coordinatorDoc = mongos
+                .getCollection("config.reshardingOperations")
+                .findOne({ns: abortNs});
             return coordinatorDoc === null || coordinatorDoc.state === "aborting";
         });
     },

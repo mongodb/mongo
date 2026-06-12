@@ -31,7 +31,9 @@ let testDB = st.s.getDB("BlackHoleDB");
 let configDB = st.s.getDB("config");
 
 assert.commandWorked(testDB.adminCommand({enableSharding: "BlackHoleDB"}));
-assert.commandWorked(testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}),
+);
 
 let bulk = testDB.ShardedColl.initializeUnorderedBulkOp();
 for (let i = 0; i < 1000; i++) {

@@ -9,13 +9,19 @@ let st = new ShardingTest({shards: 3, mongos: 2});
 let admin = st.s0.getDB("admin");
 let coll = st.s0.getCollection("foo.bar");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {skey: 1}}));
 
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {skey: 0}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {skey: 100}}));
-assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {skey: 0}, to: st.shard1.shardName}));
-assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {skey: 100}, to: st.shard2.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll + "", find: {skey: 0}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll + "", find: {skey: 100}, to: st.shard2.shardName}),
+);
 
 jsTest.log("Testing multi-update...");
 

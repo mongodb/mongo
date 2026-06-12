@@ -3,9 +3,15 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
-const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}], nodeOptions: {setParameter: {logLevel: 1}}});
+const rst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {priority: 0}}],
+    nodeOptions: {setParameter: {logLevel: 1}},
+});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();

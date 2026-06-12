@@ -34,9 +34,15 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
         const outerViewName = jsTestName() + "_outer";
         const idrmViewName = jsTestName() + "_idrm";
 
-        assert.commandWorked(db.createView(simpleViewName, coll.getName(), [{$match: {status: "active"}}]));
-        assert.commandWorked(db.createView(innerViewName, coll.getName(), [{$match: {status: "active"}}]));
-        assert.commandWorked(db.createView(outerViewName, innerViewName, [{$addFields: {fromOuter: true}}]));
+        assert.commandWorked(
+            db.createView(simpleViewName, coll.getName(), [{$match: {status: "active"}}]),
+        );
+        assert.commandWorked(
+            db.createView(innerViewName, coll.getName(), [{$match: {status: "active"}}]),
+        );
+        assert.commandWorked(
+            db.createView(outerViewName, innerViewName, [{$addFields: {fromOuter: true}}]),
+        );
         assert.commandWorked(
             db.createView(idrmViewName, coll.getName(), [
                 {$_internalDocumentResultsAndMetadata: {source: {$collStats: {latencyStats: {}}}}},
@@ -51,7 +57,11 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
     describe("$disallowViewsSource error propagation", function () {
         it("propagates bindViewInfo error through $_idrm on a simple view", function () {
             assert.commandFailedWithCode(
-                db.runCommand({aggregate: simpleView.getName(), pipeline: [idrmDisallowViews], cursor: {}}),
+                db.runCommand({
+                    aggregate: simpleView.getName(),
+                    pipeline: [idrmDisallowViews],
+                    cursor: {},
+                }),
                 12756000,
             );
         });
@@ -60,7 +70,13 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
             assert.commandFailedWithCode(
                 db.runCommand({
                     aggregate: outerView.getName(),
-                    pipeline: [{$_internalDocumentResultsAndMetadata: {source: {$disallowViewsSource: {}}}}],
+                    pipeline: [
+                        {
+                            $_internalDocumentResultsAndMetadata: {
+                                source: {$disallowViewsSource: {}},
+                            },
+                        },
+                    ],
                     cursor: {},
                 }),
                 12756000,
@@ -88,13 +104,21 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
 
         it("does not prepend view's $match in front of $_idrm on simple view", function () {
             const explain = assert.commandWorked(simpleView.explain().aggregate([idrmCollStats]));
-            assert.gt(getAggPlanStages(explain, "$_internalDocumentResultsAndMetadata").length, 0, explain);
+            assert.gt(
+                getAggPlanStages(explain, "$_internalDocumentResultsAndMetadata").length,
+                0,
+                explain,
+            );
             assert.eq(getAggPlanStages(explain, "$match").length, 0, explain);
         });
 
         it("does not prepend any view stages in front of $_idrm on nested view", function () {
             const explain = assert.commandWorked(outerView.explain().aggregate([idrmCollStats]));
-            assert.gt(getAggPlanStages(explain, "$_internalDocumentResultsAndMetadata").length, 0, explain);
+            assert.gt(
+                getAggPlanStages(explain, "$_internalDocumentResultsAndMetadata").length,
+                0,
+                explain,
+            );
             assert.eq(getAggPlanStages(explain, "$match").length, 0, explain);
             assert.eq(getAggPlanStages(explain, "$addFields").length, 0, explain);
         });
@@ -103,7 +127,11 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
     describe("kDoNothing in sub-pipelines", function () {
         it("applies inside a $unionWith sub-pipeline targeting a view", function () {
             assert.commandWorked(
-                coll.explain().aggregate([{$unionWith: {coll: simpleView.getName(), pipeline: [idrmCollStats]}}]),
+                coll
+                    .explain()
+                    .aggregate([
+                        {$unionWith: {coll: simpleView.getName(), pipeline: [idrmCollStats]}},
+                    ]),
             );
         });
 
@@ -126,7 +154,10 @@ describe("$_internalDocumentResultsAndMetadata view handling", function () {
             assert.commandWorked(
                 simpleView
                     .explain()
-                    .aggregate([idrmCollStats, {$unionWith: {coll: simpleView.getName(), pipeline: [idrmCollStats]}}]),
+                    .aggregate([
+                        idrmCollStats,
+                        {$unionWith: {coll: simpleView.getName(), pipeline: [idrmCollStats]}},
+                    ]),
             );
         });
 

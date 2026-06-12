@@ -18,7 +18,9 @@ function testExpressionBytes(coll, expression, result, shouldTestEquivalence = t
         args = ["$string", "$substring", arr[2], arr[3]];
     }
     assert.commandWorked(coll.insert({string: arr[0], substring: arr[1]}));
-    const aggResult = coll.aggregate({$project: {byteLocation: {$indexOfBytes: args}}}).toArray()[0];
+    const aggResult = coll
+        .aggregate({$project: {byteLocation: {$indexOfBytes: args}}})
+        .toArray()[0];
     assert.eq(result, aggResult.byteLocation);
     coll.drop();
 
@@ -52,72 +54,107 @@ assert.commandWorked(coll.insert({item: "foobar foobar"}));
 
 // Test that $indexOfBytes throws an error when given a string or substring that is not a string.
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: [4, "$item"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: [4, "$item"]}}}]),
+    ),
     40091,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", 4]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", 4]}}}]),
+    ),
     40092,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", null]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", null]}}}]),
+    ),
     40092,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "$missing"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "$missing"]}}}]),
+    ),
     40092,
 );
 
 // Test that $indexOfBytes throws an error when given an invalid index.
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", "hello"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", "hello"]}}}]),
+    ),
     40096,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", -2]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", -2]}}}]),
+    ),
     40097,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1, "hello"]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1, "hello"]}}}]),
+    ),
     40096,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1, -2]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1, -2]}}}]),
+    ),
     40097,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1.4]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1.4]}}}]),
+    ),
     40096,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1, 5.2]}}}])),
+    assert.throws(() =>
+        coll.aggregate([{$project: {byteLocation: {$indexOfBytes: ["$item", "bar", 1, 5.2]}}}]),
+    ),
     40096,
 );
 
 // Test that $indexOfBytes returns null when the first argument is null or missing.
-assert.eq(null, coll.aggregate({$project: {byteLocation: {$indexOfBytes: [null, "$item"]}}}).toArray()[0].byteLocation);
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", "$item"]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfBytes: [null, "$item"]}}}).toArray()[0]
+        .byteLocation,
 );
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfBytes: [undefined, "$item"]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", "$item"]}}}).toArray()[0]
+        .byteLocation,
+);
+assert.eq(
+    null,
+    coll.aggregate({$project: {byteLocation: {$indexOfBytes: [undefined, "$item"]}}}).toArray()[0]
+        .byteLocation,
 );
 
 // Test that $indexOfBytes returns null when given a string or substring that is not a string.
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", null]}}}).toArray()[0].byteLocation,
-);
-assert.eq(null, coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", 4]}}}).toArray()[0].byteLocation);
-assert.eq(
-    null,
-    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", "$missing"]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", null]}}}).toArray()[0]
+        .byteLocation,
 );
 assert.eq(
     null,
-    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", undefined]}}}).toArray()[0].byteLocation,
+    coll.aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", 4]}}}).toArray()[0]
+        .byteLocation,
+);
+assert.eq(
+    null,
+    coll
+        .aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", "$missing"]}}})
+        .toArray()[0].byteLocation,
+);
+assert.eq(
+    null,
+    coll
+        .aggregate({$project: {byteLocation: {$indexOfBytes: ["$missing", undefined]}}})
+        .toArray()[0].byteLocation,
 );
 coll.drop();
 

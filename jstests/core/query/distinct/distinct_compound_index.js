@@ -29,15 +29,22 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 const explain_distinct_with_query = coll.explain("executionStats").distinct("b", {a: 1});
 assert.commandWorked(explain_distinct_with_query);
 assert(planHasStage(db, getWinningPlanFromExplain(explain_distinct_with_query), "DISTINCT_SCAN"));
-assert(planHasStage(db, getWinningPlanFromExplain(explain_distinct_with_query), "PROJECTION_COVERED"));
+assert(
+    planHasStage(db, getWinningPlanFromExplain(explain_distinct_with_query), "PROJECTION_COVERED"),
+);
 // If the collection is sharded, we expect at most 2 distinct values per shard. If the
 // collection is not sharded, we expect 2 returned.
-assert.lte(explain_distinct_with_query.executionStats.nReturned, 2 * FixtureHelpers.numberOfShardsForCollection(coll));
+assert.lte(
+    explain_distinct_with_query.executionStats.nReturned,
+    2 * FixtureHelpers.numberOfShardsForCollection(coll),
+);
 
 const explain_distinct_without_query = coll.explain("executionStats").distinct("b");
 assert.commandWorked(explain_distinct_without_query);
 assert(planHasStage(db, getWinningPlanFromExplain(explain_distinct_without_query), "COLLSCAN"));
-assert(!planHasStage(db, getWinningPlanFromExplain(explain_distinct_without_query), "DISTINCT_SCAN"));
+assert(
+    !planHasStage(db, getWinningPlanFromExplain(explain_distinct_without_query), "DISTINCT_SCAN"),
+);
 assert.eq(40, explain_distinct_without_query.executionStats.nReturned);
 
 // Verify that compound special indexes such as '2dsphere' and 'text' can never use index to answer
@@ -47,7 +54,9 @@ const cmdObj = {
     key: "a",
 };
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.createIndex({a: 1, b: 1, geoField: "2dsphere"}, add2dsphereVersionIfNeeded()));
+assert.commandWorked(
+    coll.createIndex({a: 1, b: 1, geoField: "2dsphere"}, add2dsphereVersionIfNeeded()),
+);
 assertStagesForExplainOfCommand({
     coll: coll,
     cmdObj: cmdObj,

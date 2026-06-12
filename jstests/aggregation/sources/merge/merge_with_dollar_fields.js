@@ -119,7 +119,10 @@ assert.docEq(targetDoc, runTestMatched({whenMatched: "keepExisting", whenNotMatc
 assert.docEq(sourceDoc, runTestNotMatched({whenMatched: "keepExisting", whenNotMatched: "insert"}));
 
 // whenMatched: 'fail', whenNotMatched: 'insert'
-assert.throwsWithCode(() => runTestMatched({whenMatched: "fail", whenNotMatched: "insert"}), ErrorCodes.DuplicateKey);
+assert.throwsWithCode(
+    () => runTestMatched({whenMatched: "fail", whenNotMatched: "insert"}),
+    ErrorCodes.DuplicateKey,
+);
 
 assert.docEq(sourceDoc, runTestNotMatched({whenMatched: "fail", whenNotMatched: "insert"}));
 
@@ -142,6 +145,9 @@ assert.throwsWithCode(
 );
 
 // whenMatched: 'pipeline', whenNotMatched: 'discard'
-assert.docEq(targetDocAddFields, runTestMatched({whenMatched: pipeline, whenNotMatched: "discard"}));
+assert.docEq(
+    targetDocAddFields,
+    runTestMatched({whenMatched: pipeline, whenNotMatched: "discard"}),
+);
 
 assert.eq(null, runTestNotMatched({whenMatched: pipeline, whenNotMatched: "discard"}));

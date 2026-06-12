@@ -21,7 +21,10 @@ if (lastLTSFCV != "8.0") {
 }
 
 const rst = new ReplSetTest({nodes: 2});
-rst.startSet({binVersion: "last-lts", setParameter: {featureFlagTSBucketingParametersUnchanged: true}});
+rst.startSet({
+    binVersion: "last-lts",
+    setParameter: {featureFlagTSBucketingParametersUnchanged: true},
+});
 rst.initiate();
 
 assert.commandWorked(

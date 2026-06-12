@@ -51,7 +51,11 @@ function runAgg(db) {
     // so only the engDoc will appear in the results.
     let pipeline = [
         {
-            $match: {$expr: {$not: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}}},
+            $match: {
+                $expr: {
+                    $not: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]},
+                },
+            },
         },
     ];
     let res = coll.aggregate(pipeline).toArray();
@@ -70,12 +74,18 @@ function runAgg(db) {
         {$project: {_id: 0, docThatMatchesRoles: 1}},
     ];
     const lookupRes = findColl.aggregate(lookupPipeline).toArray();
-    assert.eq([{"docThatMatchesRoles": [{"_id": 2, "allowedRoles": ["readWriteAnyDatabase", "read"]}]}], lookupRes);
+    assert.eq(
+        [{"docThatMatchesRoles": [{"_id": 2, "allowedRoles": ["readWriteAnyDatabase", "read"]}]}],
+        lookupRes,
+    );
 
     // Ensure that $$USER_ROLES can be present in a $unionWith subpipeline. The result set should
     // include the one document from findColl and the document from the unioned collection inserted
     // above where the allowedRoles field has the currently authenticated user's roles.
-    const unionWithPipeline = [{$unionWith: {coll: aggCollName, pipeline: subpipeline}}, {$project: {_id: 0}}];
+    const unionWithPipeline = [
+        {$unionWith: {coll: aggCollName, pipeline: subpipeline}},
+        {$project: {_id: 0}},
+    ];
     const unionWithRes = findColl.aggregate(unionWithPipeline).toArray();
     assert.eq([{a: 1}, {allowedRoles: ["readWriteAnyDatabase", "read"]}], unionWithRes);
 }

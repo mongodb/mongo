@@ -36,7 +36,11 @@ let secondary = replSet.getSecondary();
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Do an initial insert to prevent the secondary from going into recovery
@@ -50,9 +54,15 @@ assert.commandWorked(
     "failed to enable fail point on secondary",
 );
 // Wait for Oplog Applier to hang on the failpoint.
-checkLog.contains(secondary, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+checkLog.contains(
+    secondary,
+    "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled",
+);
 
-const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
+const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(
+    secondary,
+    "ReduceMajorityWriteLatency",
+);
 let bufferCountBefore = reduceMajorityWriteLatency
     ? secondary.getDB("foo").serverStatus().metrics.repl.buffer.write.count
     : secondary.getDB("foo").serverStatus().metrics.repl.buffer.count;
@@ -70,7 +80,10 @@ assert.soon(
             ? serverStatus.metrics.repl.buffer.write.count
             : serverStatus.metrics.repl.buffer.count;
         let bufferCountChange = bufferCount - bufferCountBefore;
-        jsTestLog("Number of operations buffered on secondary since stopping applier: " + bufferCountChange);
+        jsTestLog(
+            "Number of operations buffered on secondary since stopping applier: " +
+                bufferCountChange,
+        );
         return bufferCountChange >= numDocuments - 1;
     },
     "secondary did not buffer operations for new inserts on primary",
@@ -93,7 +106,11 @@ secondary.setSecondaryOk(false);
 jsTestLog("New primary should not be readable yet, without secondaryOk bit");
 let res = secondary.getDB("foo").runCommand({find: "foo"});
 assert.commandFailed(res);
-assert.eq(ErrorCodes.NotPrimaryNoSecondaryOk, res.code, "find failed with unexpected error code: " + tojson(res));
+assert.eq(
+    ErrorCodes.NotPrimaryNoSecondaryOk,
+    res.code,
+    "find failed with unexpected error code: " + tojson(res),
+);
 // Nor should it be readable with the secondaryOk bit.
 secondary.setSecondaryOk();
 assert.commandWorked(secondary.getDB("foo").runCommand({find: "foo"}));

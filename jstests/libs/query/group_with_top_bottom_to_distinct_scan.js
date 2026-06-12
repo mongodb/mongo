@@ -48,7 +48,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     // Verifies that a $group pipeline can use DISTINCT_SCAN when the sort within a $bottom
@@ -60,7 +61,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: 3},
             {_id: 2, accum: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -70,7 +72,10 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {
-                $group: {_id: "$foo.a", accum: {$top: {sortBy: {"foo.a": 1, "foo.b": 1}, output: "$foo.b"}}},
+                $group: {
+                    _id: "$foo.a",
+                    accum: {$top: {sortBy: {"foo.a": 1, "foo.b": 1}, output: "$foo.b"}},
+                },
             },
         ],
         expectedOutput: [
@@ -79,7 +84,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 2, accum: 2},
             {_id: 3, accum: null},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
@@ -97,14 +103,18 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 2, accum: 2},
             {_id: 3, accum: null},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
     });
 
     //
     // Verifies that we _do not_ attempt to use a DISTINCT_SCAN on a multikey dotted-path field.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$sort: {"mkFoo.a": 1, "mkFoo.b": 1}}, {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}],
+        pipeline: [
+            {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
+            {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
@@ -119,7 +129,9 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     // are [minKey, maxKey].
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}],
+        pipeline: [
+            {$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: [1, 3]},
@@ -131,7 +143,9 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}}],
+        pipeline: [
+            {$group: {_id: "$aa", accum: {$top: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: [1, 3]},
@@ -143,7 +157,9 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}}],
+        pipeline: [
+            {$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 2},
@@ -306,7 +322,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: [1, 3]},
             {_id: 2, accum: []},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {aa: 1, bb: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {aa: 1, bb: 1, c: 1}),
     });
 
     //
@@ -314,13 +331,16 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     // that accesses a multikey field, provided that field is not part of the index.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: 1, bb: 1}, output: "$mkB"}}}}],
+        pipeline: [
+            {$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: 1, bb: 1}, output: "$mkB"}}}},
+        ],
         expectedOutput: [
             {_id: 1, accum: 2},
             {_id: 2, accum: []},
             {_id: null, accum: null},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {aa: 1, bb: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {aa: 1, bb: 1, c: 1}),
     });
 
     //
@@ -330,7 +350,10 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {
-                $group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: {$add: ["$b", "$c"]}}}},
+                $group: {
+                    _id: "$a",
+                    accum: {$top: {sortBy: {a: 1, b: 1}, output: {$add: ["$b", "$c"]}}},
+                },
             },
         ],
         expectedOutput: [
@@ -338,7 +361,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: 2},
             {_id: 2, accum: 4},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -364,7 +388,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: 6},
             {_id: 2, accum: 5},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -378,7 +403,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: 3},
             {_id: 2, accum: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
@@ -388,7 +414,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -431,7 +458,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, f1: 3, f2: 3},
             {_id: 2, f1: 2, f2: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
@@ -449,7 +477,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, fb: 3, fc: 2},
             {_id: 2, fb: 2, fc: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -470,7 +499,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, l1: 1, l2: 1},
             {_id: 2, l1: 2, l2: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
@@ -488,7 +518,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: 1, lb: 1, lc: 1},
             {_id: 2, lb: 2, lc: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -536,7 +567,11 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
         pipeline: [
             {$sort: {a: -1, b: -1}},
             {
-                $group: {_id: "$a", t: {$top: {sortBy: {a: -1, b: -1}, output: "$b"}}, l: {$last: "$b"}},
+                $group: {
+                    _id: "$a",
+                    t: {$top: {sortBy: {a: -1, b: -1}, output: "$b"}},
+                    l: {$last: "$b"},
+                },
             },
         ],
         expectedOutput: [
@@ -586,7 +621,10 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", f: {$first: "$b"}, l: {$last: "$b"}}}],
+        pipeline: [
+            {$sort: {a: -1, b: -1}},
+            {$group: {_id: "$a", f: {$first: "$b"}, l: {$last: "$b"}}},
+        ],
         expectedOutput: [
             {_id: null, f: 1, l: null},
             {_id: 1, f: 3, l: 1},
@@ -630,7 +668,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
             {_id: {v: 1}, accum: 1},
             {_id: {v: 2}, accum: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -638,13 +677,16 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     // the group _id field is a singleton object instead of a fieldPath.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: {v: "$a"}, accum: {$bottom: {sortBy: {a: 1, b: 1}, output: "$b"}}}}],
+        pipeline: [
+            {$group: {_id: {v: "$a"}, accum: {$bottom: {sortBy: {a: 1, b: 1}, output: "$b"}}}},
+        ],
         expectedOutput: [
             {_id: {v: null}, accum: 1},
             {_id: {v: 1}, accum: 3},
             {_id: {v: 2}, accum: 2},
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -672,7 +714,9 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
+        pipeline: [
+            {$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: "FoO", accum: 2},
@@ -745,7 +789,9 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
+        pipeline: [
+            {$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: "FoO", accum: 2},
@@ -822,7 +868,9 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [{$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
+        pipeline: [
+            {$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}},
+        ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: "FoO", accum: 2},

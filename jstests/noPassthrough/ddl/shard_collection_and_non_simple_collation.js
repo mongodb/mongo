@@ -31,10 +31,14 @@ describe("shard collection and non-simple collation tests", function () {
         const shardKey = {a: 1};
 
         // Create unique index with simple collation (default).
-        assert.commandWorked(coll.createIndex(shardKey, {unique: true, collation: {locale: "simple"}}));
+        assert.commandWorked(
+            coll.createIndex(shardKey, {unique: true, collation: {locale: "simple"}}),
+        );
 
         // Shard the collection - should succeed because the index has simple collation.
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}),
+        );
 
         // Shard another collection with explicit simple collation in the shardCollection command.
         assert.commandWorked(
@@ -53,7 +57,11 @@ describe("shard collection and non-simple collation tests", function () {
 
         // Create unique index with non-simple collation.
         assert.commandWorked(
-            coll.createIndex(shardKey, {unique: true, collation: {locale: "en_US", strength: 2}, name: "a_1_enUS"}),
+            coll.createIndex(shardKey, {
+                unique: true,
+                collation: {locale: "en_US", strength: 2},
+                name: "a_1_enUS",
+            }),
         );
 
         // Attempt to shard the collection - should fail because the index has non-simple collation.
@@ -68,10 +76,17 @@ describe("shard collection and non-simple collation tests", function () {
         const shardKey = {a: 1};
 
         // Shard the collection first.
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}),
+        );
 
         // Create a non-unique index with non-simple collation - should succeed.
-        assert.commandWorked(coll.createIndex(shardKey, {collation: {locale: "en_US", strength: 2}, name: "a_1_enUS"}));
+        assert.commandWorked(
+            coll.createIndex(shardKey, {
+                collation: {locale: "en_US", strength: 2},
+                name: "a_1_enUS",
+            }),
+        );
     });
 
     it("shards a collection and fails to create a unique non-simple collation index with the same key format", () => {
@@ -79,11 +94,17 @@ describe("shard collection and non-simple collation tests", function () {
         const shardKey = {a: 1};
 
         // Shard the collection first.
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}),
+        );
 
         // Attempt to create a unique index with non-simple collation - should fail.
         assert.commandFailedWithCode(
-            coll.createIndex(shardKey, {unique: true, collation: {locale: "en_US", strength: 2}, name: "a_1_enUS"}),
+            coll.createIndex(shardKey, {
+                unique: true,
+                collation: {locale: "en_US", strength: 2},
+                name: "a_1_enUS",
+            }),
             ErrorCodes.CannotCreateIndex,
         );
     });
@@ -93,9 +114,16 @@ describe("shard collection and non-simple collation tests", function () {
         const shardKey = {a: 1};
 
         // Shard the collection.
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: coll.getFullName(), key: shardKey}),
+        );
 
-        assert.commandWorked(coll.createIndex(shardKey, {collation: {locale: "en_US", strength: 2}, name: "a_1_enUS"}));
+        assert.commandWorked(
+            coll.createIndex(shardKey, {
+                collation: {locale: "en_US", strength: 2},
+                name: "a_1_enUS",
+            }),
+        );
 
         // Attempt to use collMod to change prepareUnique and collation to non-simple - should fail.
         assert.commandFailedWithCode(

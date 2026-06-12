@@ -42,7 +42,9 @@ export const $config = (function () {
         // be visible to other transactions, depending on readConcern/writeConcern settings.
         const wcMajority = {w: "majority"};
         // Only allowed to create one text index, other tests may create one.
-        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [ixSpec], writeConcern: wcMajority}));
+        assert.commandWorked(
+            db.runCommand({createIndexes: collName, indexes: [ixSpec], writeConcern: wcMajority}),
+        );
     }
 
     let text = [

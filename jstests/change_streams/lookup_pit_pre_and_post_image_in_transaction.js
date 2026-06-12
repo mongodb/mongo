@@ -14,7 +14,9 @@ import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_
 
 const testDB = db.getSiblingDB(jsTestName());
 const cst = new ChangeStreamTest(testDB);
-const coll = assertDropAndRecreateCollection(testDB, "coll", {changeStreamPreAndPostImages: {enabled: true}});
+const coll = assertDropAndRecreateCollection(testDB, "coll", {
+    changeStreamPreAndPostImages: {enabled: true},
+});
 const collOther = assertDropAndRecreateCollection(testDB, "coll_regular");
 
 // Verifies that change stream cursor 'changeStreamCursor' returns events defined in array
@@ -51,7 +53,9 @@ assert.commandWorked(
 
 // Open a change stream on the test collection with pre- and post-images requested.
 const changeStreamCursor = cst.startWatchingChanges({
-    pipeline: [{$changeStream: {fullDocumentBeforeChange: "whenAvailable", fullDocument: "whenAvailable"}}],
+    pipeline: [
+        {$changeStream: {fullDocumentBeforeChange: "whenAvailable", fullDocument: "whenAvailable"}},
+    ],
     collection: coll,
 });
 

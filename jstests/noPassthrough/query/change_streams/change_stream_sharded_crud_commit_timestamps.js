@@ -63,19 +63,32 @@ function assertNextEvents(cursor, expectedEvents, expectCommitTimestamp) {
         if (!expectCommitTimestamp || changeDoc.operationType === "endOfTransaction") {
             continue;
         }
-        assert(changeDoc.hasOwnProperty("commitTimestamp"), "expecting doc to have a 'commitTimestamp' field", {
-            changeDoc,
-        });
-        assert(isTimestamp(changeDoc["commitTimestamp"]), "expecting 'commitTimestamp' field to be a timestamp", {
-            changeDoc,
-        });
+        assert(
+            changeDoc.hasOwnProperty("commitTimestamp"),
+            "expecting doc to have a 'commitTimestamp' field",
+            {
+                changeDoc,
+            },
+        );
+        assert(
+            isTimestamp(changeDoc["commitTimestamp"]),
+            "expecting 'commitTimestamp' field to be a timestamp",
+            {
+                changeDoc,
+            },
+        );
         if (commitTimestamp === null) {
             commitTimestamp = changeDoc.commitTimestamp;
         } else {
-            assert.eq(commitTimestamp, changeDoc["commitTimestamp"], "expecting equal commitTimestamps", {
+            assert.eq(
                 commitTimestamp,
-                changeDoc,
-            });
+                changeDoc["commitTimestamp"],
+                "expecting equal commitTimestamps",
+                {
+                    commitTimestamp,
+                    changeDoc,
+                },
+            );
         }
 
         // Commit timestamp must be before clusterTime.
@@ -90,7 +103,9 @@ function assertNextEvents(cursor, expectedEvents, expectCommitTimestamp) {
 
 // Create database with a sharded collection (2 shards).
 const db = st.s.getDB(jsTestName());
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const collName = "change_stream_commit_timestamp";
 assertDropAndRecreateCollection(db, collName);
@@ -103,8 +118,12 @@ const ns = {
 // Shard and split the collection.
 assert.commandWorked(st.s0.adminCommand({shardCollection: kNsName, key: {shard: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: kNsName, middle: {shard: 0}}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {shard: -1}, to: st["shard0"].shardName}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {shard: 1}, to: st["shard1"].shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: kNsName, find: {shard: -1}, to: st["shard0"].shardName}),
+);
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: kNsName, find: {shard: 1}, to: st["shard1"].shardName}),
+);
 
 // Create changestream on the target database.
 const cursor = db.watch([], {showExpandedEvents: true, showCommitTimestamp: true});
@@ -208,7 +227,9 @@ withTxnAndAutoRetryOnMongos(
             },
             {operationType: "delete", ns, documentKey: {_id: "shard-key-1", shard: 1}},
         ];
-        assert.commandWorked(sessionColl.update({_id: "shard-key-1", shard: 1}, {$set: {shard: -1, updated: 1}}));
+        assert.commandWorked(
+            sessionColl.update({_id: "shard-key-1", shard: 1}, {$set: {shard: -1, updated: 1}}),
+        );
         if (FeatureFlagUtil.isEnabled(db, "EndOfTransactionChangeEvent")) {
             expectedEvents.push({operationType: "endOfTransaction"});
         }

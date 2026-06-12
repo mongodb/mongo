@@ -27,7 +27,11 @@ let level;
 for (level = 1; level < kJavaScriptMaxDepthLimit - 3; level++) {
     let res = db.runCommand({insert: collection.getName(), documents: [makeNestArr(level)]});
     if (!res.ok) {
-        assert.commandFailedWithCode(res, 17280, "Expected insertion to fail only because key is too large to index");
+        assert.commandFailedWithCode(
+            res,
+            17280,
+            "Expected insertion to fail only because key is too large to index",
+        );
         break;
     }
 }

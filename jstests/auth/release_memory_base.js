@@ -29,7 +29,13 @@ const createInactiveCursor = function (db, collName) {
     return cmdRes.cursor.id;
 };
 
-function testReleaseMemory(conn, user, shouldWorkCollection, shouldWorkDatabase, shouldWorkCluster) {
+function testReleaseMemory(
+    conn,
+    user,
+    shouldWorkCollection,
+    shouldWorkDatabase,
+    shouldWorkCluster,
+) {
     const admin = conn.getDB("admin");
     admin.auth(user, "pass");
 

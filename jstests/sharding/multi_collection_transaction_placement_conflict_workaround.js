@@ -42,7 +42,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
         assert.commandWorked(coll2.insert({x: 1}));
 
         assert.commandWorked(
-            st.s.getDB(dbName).createCollection(viewName, {viewOn: collName2, pipeline: [{$match: {}}]}),
+            st.s
+                .getDB(dbName)
+                .createCollection(viewName, {viewOn: collName2, pipeline: [{$match: {}}]}),
         );
         // Start a multi-document transaction and make one read on shard0
         const session = st.s.startSession();
@@ -102,7 +104,10 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
 {
     function runTest(readConcernLevel, command) {
         jsTest.log(
-            "Test transaction with concurrent move primary. Command: " + command + " Read Concern: " + readConcernLevel,
+            "Test transaction with concurrent move primary. Command: " +
+                command +
+                " Read Concern: " +
+                readConcernLevel,
         );
 
         const dbName1 = "test_txn_with_move_primary_and_" + readConcernLevel + "_" + command;
@@ -121,7 +126,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
         coll2.insert({x: 2, c: 0});
 
         assert.commandWorked(
-            st.s.getDB(dbName2).createCollection(viewName, {viewOn: collName2, pipeline: [{$match: {}}]}),
+            st.s
+                .getDB(dbName2)
+                .createCollection(viewName, {viewOn: collName2, pipeline: [{$match: {}}]}),
         );
         const view2 = st.s.getDB(dbName2)[viewName];
 
@@ -151,7 +158,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             } else if (command === "aggregate-view") {
                 session.getDatabase(dbName2)[viewName].aggregate().itcount();
             } else if (command === "update") {
-                assert.commandWorked(session.getDatabase(dbName2)[collName2].update({x: 1}, {$set: {c: 1}}));
+                assert.commandWorked(
+                    session.getDatabase(dbName2)[collName2].update({x: 1}, {$set: {c: 1}}),
+                );
             } else if (command === "bulkWrite") {
                 assert.commandWorked(
                     session.getDatabase("admin").runCommand({
@@ -203,8 +212,12 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
 
         // These tests only make sense with untracked collections since movePrimary does not affect
         // tracked collections
-        assert.commandWorked(st.getDB(dbName1).runCommand({createUnsplittableCollection: collName1}));
-        assert.commandWorked(st.getDB(dbName2).runCommand({createUnsplittableCollection: collName2}));
+        assert.commandWorked(
+            st.getDB(dbName1).runCommand({createUnsplittableCollection: collName1}),
+        );
+        assert.commandWorked(
+            st.getDB(dbName2).runCommand({createUnsplittableCollection: collName2}),
+        );
 
         const coll1 = st.getDB(dbName1)[collName1];
         coll1.insert({x: 1, c: 0});
@@ -213,7 +226,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
         coll2.insert({x: 2, c: 0});
 
         assert.commandWorked(
-            st.s.getDB(dbName2).createCollection(viewName, {viewOn: collName2, pipeline: [{$match: {}}]}),
+            st.s
+                .getDB(dbName2)
+                .createCollection(viewName, {viewOn: collName2, pipeline: [{$match: {}}]}),
         );
         const view2 = st.s.getDB(dbName2)[viewName];
 
@@ -223,13 +238,17 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
         assert.eq(1, session.getDatabase(dbName1)[collName1].find().itcount());
 
         // Run moveCollection to move dbName2.collName2 from shard1 to shard0.
-        assert.commandWorked(st.s.adminCommand({moveCollection: ns2, toShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveCollection: ns2, toShard: st.shard0.shardName}),
+        );
         // For views, we can only test co-located collections. Unsplittable collections outside of
         // the dbPrimary will cause the transaction to fail with unrelated errors used for the
         // kick-back mechanism. In general, we don't care of testing that because that's equivalent
         // to a find/aggregation on a collection which we are already testing.
         if (command == "find-view" || command == "aggregate-view") {
-            assert.commandWorked(st.s.adminCommand({moveCollection: ns2, toShard: st.shard1.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({moveCollection: ns2, toShard: st.shard1.shardName}),
+            );
         }
         // Make sure the router has fresh routing info to avoid causing the transaction to fail due
         // to StaleConfig.
@@ -241,7 +260,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
         // case of snapshot read concern, the router will fail to find chunk history for the
         // timestamp before even sending the request to the shard.
         const expectedError =
-            readConcernLevel == "snapshot" ? ErrorCodes.StaleChunkHistory : ErrorCodes.MigrationConflict;
+            readConcernLevel == "snapshot"
+                ? ErrorCodes.StaleChunkHistory
+                : ErrorCodes.MigrationConflict;
         let err = assert.throwsWithCode(() => {
             if (command === "find") {
                 session.getDatabase(dbName2)[collName2].find().itcount();
@@ -252,7 +273,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             } else if (command === "aggregate-view") {
                 session.getDatabase(dbName2)[viewName].aggregate().itcount();
             } else if (command === "update") {
-                assert.commandWorked(session.getDatabase(dbName2)[collName2].update({x: 1}, {$set: {c: 1}}));
+                assert.commandWorked(
+                    session.getDatabase(dbName2)[collName2].update({x: 1}, {$set: {c: 1}}),
+                );
             } else if (command === "bulkWrite") {
                 assert.commandWorked(
                     session.getDatabase("admin").runCommand({
@@ -303,7 +326,10 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             let view3 = st.s.getDB(dbName)[viewName];
 
             jsTest.log(
-                "Running transaction + rename test with read concern " + readConcernLevel + " and command " + command,
+                "Running transaction + rename test with read concern " +
+                    readConcernLevel +
+                    " and command " +
+                    command,
             );
 
             // 1. Initial state:
@@ -329,7 +355,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             assert.commandWorked(coll2.insert({a: 1}));
 
             assert.commandWorked(
-                st.s.getDB(dbName).createCollection(viewName, {viewOn: collName3, pipeline: [{$match: {}}]}),
+                st.s
+                    .getDB(dbName)
+                    .createCollection(viewName, {viewOn: collName3, pipeline: [{$match: {}}]}),
             );
 
             // Start a multi-document transaction and make one read on shard0
@@ -399,7 +427,8 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
                     ", read concern: " +
                     readConcernLevel,
             );
-            const dbName = "test_txn_and_" + operation + "_with_" + command + "_and_" + readConcernLevel;
+            const dbName =
+                "test_txn_and_" + operation + "_with_" + command + "_and_" + readConcernLevel;
             const collName1 = "coll1";
             const collName2 = "coll2";
             const viewName = "view1";
@@ -441,7 +470,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             assert.commandWorked(coll2.insert({a: 1}));
 
             assert.commandWorked(
-                st.s.getDB(dbName).createCollection(viewName, {viewOn: collName1, pipeline: [{$match: {}}]}),
+                st.s
+                    .getDB(dbName)
+                    .createCollection(viewName, {viewOn: collName1, pipeline: [{$match: {}}]}),
             );
 
             // Start a multi-document transaction and make one read on shard0 for ns2/
@@ -520,7 +551,8 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
                     " Read Concern: " +
                     readConcernLevel,
             );
-            const dbName = "test_txn_and_reshardCollection_with_" + command + "_and_" + readConcernLevel;
+            const dbName =
+                "test_txn_and_reshardCollection_with_" + command + "_and_" + readConcernLevel;
             const collName1 = "coll1";
             const collName2 = "coll2";
             const viewName = "view1";
@@ -555,7 +587,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             assert.commandWorked(coll2.insertOne({a: 1}));
 
             assert.commandWorked(
-                st.s.getDB(dbName).createCollection(viewName, {viewOn: collName1, pipeline: [{$match: {}}]}),
+                st.s
+                    .getDB(dbName)
+                    .createCollection(viewName, {viewOn: collName1, pipeline: [{$match: {}}]}),
             );
 
             // Set fp to block resharding after commit on configsvr but before commit on shards.
@@ -563,7 +597,10 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
             // that falls between the timestamp at which resharding commits on the configsvr and the
             // timestamp at which the temporary resharding collections are renamed to the original
             // nss on the shards.
-            const fp = configureFailPoint(st.configRS.getPrimary(), "reshardingPauseBeforeTellingParticipantsToCommit");
+            const fp = configureFailPoint(
+                st.configRS.getPrimary(),
+                "reshardingPauseBeforeTellingParticipantsToCommit",
+            );
 
             // On parallel shell, start resharding
             const joinResharding = startParallelShell(
@@ -681,7 +718,9 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
 
         // Get a clusterTime inclusive of the above inserts, but not inclusive of the
         // drop-and-recreate operation that will follow.
-        const clusterTimeBeforeDropAndRecreateAsUnsharded = db.getMongo().getClusterTime().clusterTime;
+        const clusterTimeBeforeDropAndRecreateAsUnsharded = db
+            .getMongo()
+            .getClusterTime().clusterTime;
 
         // Drop and recreate
         assert(coll.drop());
@@ -696,18 +735,27 @@ const commands = ["find", "find-view", "aggregate", "aggregate-view", "update", 
         if (command == "find") {
             cmdResponse = coll.runCommand({
                 find: coll.getName(),
-                readConcern: {level: "snapshot", atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded},
+                readConcern: {
+                    level: "snapshot",
+                    atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded,
+                },
             });
         } else if (command == "aggregate") {
             cmdResponse = coll.runCommand({
                 aggregate: coll.getName(),
                 pipeline: [],
                 cursor: {},
-                readConcern: {level: "snapshot", atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded},
+                readConcern: {
+                    level: "snapshot",
+                    atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded,
+                },
             });
         }
 
-        assert.commandFailedWithCode(cmdResponse, [ErrorCodes.SnapshotUnavailable, ErrorCodes.StaleChunkHistory]);
+        assert.commandFailedWithCode(cmdResponse, [
+            ErrorCodes.SnapshotUnavailable,
+            ErrorCodes.StaleChunkHistory,
+        ]);
     }
 
     ["find", "aggregate"].forEach((command) => {

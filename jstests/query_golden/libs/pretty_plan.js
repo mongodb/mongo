@@ -68,7 +68,9 @@ function shortenField(node, fieldName) {
 
 function printPlanNode(node) {
     // Place any fields with special formatting/ that we don't want in the default output here.
-    const bannedFieldNames = ["stage", "planNodeId", "nss", "joinPredicates"].concat(kExplainChildFieldNames);
+    const bannedFieldNames = ["stage", "planNodeId", "nss", "joinPredicates"].concat(
+        kExplainChildFieldNames,
+    );
 
     const entries = Object.entries(node).filter(([f, _]) => !bannedFieldNames.includes(f));
     let str = `${node.stage}${shortenField(node, "nss")}${shortenField(node, "joinPredicates")}\n`;

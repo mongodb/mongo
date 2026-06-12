@@ -132,7 +132,9 @@ const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFl
 // have values "last-lts" and "last-continuous".
 function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags = []) {
     if (testCases.length === 0) {
-        jsTest.log.info("Skipping setup for tests against " + lastVersion + " since there are none");
+        jsTest.log.info(
+            "Skipping setup for tests against " + lastVersion + " since there are none",
+        );
         return;
     }
 
@@ -143,9 +145,12 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     for (let i = 0; i < featureFlags.length; i++) {
         const command = {"getParameter": 1};
         command[featureFlags[i]] = 1;
-        const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
+        const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]]
+            .value;
         if (!featureEnabled) {
-            jsTest.log.info("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
+            jsTest.log.info(
+                "Skipping test because the " + featureFlags[i] + " feature flag is disabled",
+            );
             MongoRunner.stopMongod(conn);
             return;
         }
@@ -154,7 +159,9 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     let adminDB = conn.getDB("admin");
 
     // Explicitly set the feature compatibility version to the latest version.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     testCases.forEach(function (test, i) {
         // Create a collection with a validator using new query features.
@@ -191,7 +198,10 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
 
     // Set the feature compatibility version to the last version.
     assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),
+            confirm: true,
+        }),
     );
 
     testCases.forEach(function (test, i) {
@@ -209,13 +219,17 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         let res = testDB.createCollection("other", {validator: test.validator});
         assert.commandFailed(
             res,
-            "Expected *not* to be able to create collection with validator " + tojson(test.validator),
+            "Expected *not* to be able to create collection with validator " +
+                tojson(test.validator),
         );
 
         // Trying to update a collection with a validator using new query features should also
         // fail.
         res = testDB.runCommand({collMod: coll.getName(), validator: test.validator});
-        assert.commandFailed(res, `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+        assert.commandFailed(
+            res,
+            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
+        );
     });
 
     MongoRunner.stopMongod(conn);
@@ -282,7 +296,9 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     testDB = conn.getDB(testName);
 
     // Set the feature compatibility version back to the latest version.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     testCases.forEach(function (test, i) {
         const coll = testDB["coll2" + i];
@@ -305,12 +321,23 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     // Set the feature compatibility version to the last version and then restart with
     // internalValidateFeaturesAsPrimary=false.
     assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),
+            confirm: true,
+        }),
     );
     MongoRunner.stopMongod(conn);
 }
 
 testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);
-testCollectionValidatorFCVBehavior("last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
+testCollectionValidatorFCVBehavior(
+    "last-lts",
+    testCasesLastStableWithFeatureFlags,
+    featureFlagsToEnable,
+);
 testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuous);
-testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
+testCollectionValidatorFCVBehavior(
+    "last-continuous",
+    testCasesLastContinuousWithFeatureFlags,
+    featureFlagsToEnable,
+);

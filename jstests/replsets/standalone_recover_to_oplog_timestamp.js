@@ -35,7 +35,9 @@ assert.commandWorked(
 assert.commandWorked(primaryDB.getCollection(collName).createIndex({a: 1}));
 
 const docs = [{_id: 1, a: 1}];
-const operationTime = assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
+const operationTime = assert.commandWorked(
+    primaryDB.runCommand({insert: collName, documents: docs}),
+).operationTime;
 
 rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 

@@ -30,7 +30,9 @@ function testUpsert(withIndex) {
     }
 
     // The upserted record matches the filter but shouldn't be re-updated.
-    assert.commandWorked(coll.updateMany({key: {$gt: 0}}, {$set: {key: 1}, $inc: {cUpdates: 1}}, options));
+    assert.commandWorked(
+        coll.updateMany({key: {$gt: 0}}, {$set: {key: 1}, $inc: {cUpdates: 1}}, options),
+    );
 
     assert.eq(2, coll.count(), "Count of documents in the collection after upsert");
     assert.eq(1, coll.count({key: 1}), "Count of documents with the new key");

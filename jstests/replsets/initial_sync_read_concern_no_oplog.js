@@ -16,7 +16,9 @@ replSet.reInitiate();
 failPoint.wait();
 
 assert.commandFailedWithCode(
-    secondary.getDB("local").runCommand({find: "coll", limit: 1, readConcern: {afterClusterTime: Timestamp(1, 1)}}),
+    secondary
+        .getDB("local")
+        .runCommand({find: "coll", limit: 1, readConcern: {afterClusterTime: Timestamp(1, 1)}}),
     ErrorCodes.NotYetInitialized,
 );
 

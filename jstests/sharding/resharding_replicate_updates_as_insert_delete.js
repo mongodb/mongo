@@ -31,7 +31,8 @@ let txnWriteTs;
 
 const mongos = testColl.getMongo();
 
-const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(mongos);
+const updateDocumentShardKeyUsingTransactionApiEnabled =
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled(mongos);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(
@@ -64,7 +65,9 @@ reshardingTest.withReshardingInBackground(
         }
 
         const session = testColl.getMongo().startSession({retryWrites: true});
-        const sessionColl = session.getDatabase(testColl.getDB().getName()).getCollection(testColl.getName());
+        const sessionColl = session
+            .getDatabase(testColl.getDB().getName())
+            .getCollection(testColl.getName());
 
         assert.commandFailedWithCode(
             sessionColl.update({_id: 0, x: 2, s: 2}, {$set: {y: 10}}, {multi: true}),
@@ -91,7 +94,8 @@ reshardingTest.withReshardingInBackground(
                 ]);
                 return false;
             },
-            () => `was unable to update value under new shard key as retryable write: ${tojson(res)}`,
+            () =>
+                `was unable to update value under new shard key as retryable write: ${tojson(res)}`,
         );
 
         assert.soon(
@@ -124,7 +128,10 @@ reshardingTest.withReshardingInBackground(
                         ErrorCodes.WriteConflict,
                     ]);
                 } else {
-                    assert.commandFailedWithCode(res, [ErrorCodes.NoSuchTransaction, ErrorCodes.WriteConflict]);
+                    assert.commandFailedWithCode(res, [
+                        ErrorCodes.NoSuchTransaction,
+                        ErrorCodes.WriteConflict,
+                    ]);
                 }
                 session.abortTransaction();
                 return false;

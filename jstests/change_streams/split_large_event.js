@@ -31,7 +31,11 @@ const testColl = assertDropAndRecreateCollection(testDB, "test");
     assert.commandFailedWithCode(
         testDB.runCommand({
             aggregate: testColl.getName(),
-            pipeline: [{$changeStream: {}}, {$changeStreamSplitLargeEvent: {}}, {$changeStreamSplitLargeEvent: {}}],
+            pipeline: [
+                {$changeStream: {}},
+                {$changeStreamSplitLargeEvent: {}},
+                {$changeStreamSplitLargeEvent: {}},
+            ],
             cursor: {},
         }),
         7182802,
@@ -43,7 +47,11 @@ const testColl = assertDropAndRecreateCollection(testDB, "test");
     assert.commandFailedWithCode(
         testDB.runCommand({
             aggregate: testColl.getName(),
-            pipeline: [{$changeStream: {}}, {$changeStreamSplitLargeEvent: {}}, {$project: {fullDocument: 0}}],
+            pipeline: [
+                {$changeStream: {}},
+                {$changeStreamSplitLargeEvent: {}},
+                {$project: {fullDocument: 0}},
+            ],
             cursor: {},
         }),
         7182802,
@@ -81,7 +89,9 @@ function getChangeStreamMetricSum(metricName) {
 }
 
 // Enable pre- and post-images.
-assert.commandWorked(testDB.runCommand({collMod: testColl.getName(), changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: testColl.getName(), changeStreamPreAndPostImages: {enabled: true}}),
+);
 
 // Open a change stream without pre- and post-images.
 let csCursor = testColl.watch([]);
@@ -115,7 +125,9 @@ assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeS
 {
     // Test that for events which are not over the size limit, $changeStreamSplitLargeEvent does not
     // change anything.
-    const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {resumeAfter: testStartToken});
+    const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
+        resumeAfter: testStartToken,
+    });
     assert.soon(() => csCursor.hasNext());
     const fullEvent = csCursor.next();
     assert.eq("aaa", fullEvent.documentKey._id);
@@ -190,14 +202,20 @@ for (const postImageMode of ["required", "updateLookup"]) {
             fullDocumentBeforeChange: "required",
             resumeAfter: testStartToken,
         });
-        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.BSONObjectTooLarge);
+        assert.throwsWithCode(
+            () => assert.soon(() => csCursor.hasNext()),
+            ErrorCodes.BSONObjectTooLarge,
+        );
 
         const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
         // We will hit the 'BSONObjectTooLarge' error once on each shard that encounters a large
         // change event document. The error will occur maximum on 2 shards, because we trigger only
         // 2 change events. The error might occur only on 1 shard when the collection is not sharded
         // or due to the timing of exceptions on sharded clusters.
-        assert.contains(newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed, [1, 2]);
+        assert.contains(
+            newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed,
+            [1, 2],
+        );
     }
 
     {
@@ -264,19 +282,28 @@ for (const postImageMode of ["required", "updateLookup"]) {
         assert.soon(() => csCursor.hasNext());
         const resumedEvent = csCursor.next();
         assert.eq(resumedEvent.updateDescription.updatedFields.a.length, kLargeStringSize);
-        assert.docEq({fragment: resumeTokens.length, of: resumeTokens.length}, resumedEvent.splitEvent);
+        assert.docEq(
+            {fragment: resumeTokens.length, of: resumeTokens.length},
+            resumedEvent.splitEvent,
+        );
     }
 
     {
         // Test that projecting out one of the large fields in the resumed pipeline changes the
         // split such that the resume point won't be generated, and we therefore throw an exception.
-        const csCursor = testColl.watch([{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
-            batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
-            fullDocument: postImageMode,
-            fullDocumentBeforeChange: "required",
-            resumeAfter: resumeTokens[resumeTokens.length - 1],
-        });
-        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.ChangeStreamFatalError);
+        const csCursor = testColl.watch(
+            [{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}],
+            {
+                batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
+                fullDocument: postImageMode,
+                fullDocumentBeforeChange: "required",
+                resumeAfter: resumeTokens[resumeTokens.length - 1],
+            },
+        );
+        assert.throwsWithCode(
+            () => assert.soon(() => csCursor.hasNext()),
+            ErrorCodes.ChangeStreamFatalError,
+        );
     }
 }
 
@@ -304,7 +331,10 @@ for (const postImageMode of ["required", "updateLookup"]) {
         batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
         resumeAfter: resumeTokens[resumeTokens.length - 1],
     });
-    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.ChangeStreamFatalError);
+    assert.throwsWithCode(
+        () => assert.soon(() => csCursor.hasNext()),
+        ErrorCodes.ChangeStreamFatalError,
+    );
 }
 
 {
@@ -334,7 +364,9 @@ for (const postImageMode of ["required", "updateLookup"]) {
                 // (mongoS) pipeline.
                 // TODO SERVER-55492: Update the comment above when there are rename checks for
                 // 'other' match expressions.
-                $match: {$jsonSchema: {properties: {fullDocument: {properties: {a: {type: "number"}}}}}},
+                $match: {
+                    $jsonSchema: {properties: {fullDocument: {properties: {a: {type: "number"}}}}},
+                },
             },
             {$changeStreamSplitLargeEvent: {}},
         ],

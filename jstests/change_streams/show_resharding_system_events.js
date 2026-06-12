@@ -20,7 +20,9 @@ const st = new ShardingTest({
     shards: 1,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
     other: {
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+        configOptions: {
+            setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000},
+        },
     },
 });
 
@@ -141,13 +143,18 @@ let expectedReshardingEvents = [
     },
 ];
 if (!FeatureFlagUtil.isEnabled(st.s, "EndOfTransactionChangeEvent")) {
-    expectedReshardingEvents = expectedReshardingEvents.filter((event) => event.operationType !== "endOfTransaction");
+    expectedReshardingEvents = expectedReshardingEvents.filter(
+        (event) => event.operationType !== "endOfTransaction",
+    );
 }
 
 // Helper to confirm the sequence of events observed in the change stream.
 function assertChangeStreamEventSequence(csConfig, expectedEvents) {
     // Open a change stream on the test DB using the given configuration.
-    const finalConfig = Object.assign({resumeAfter: startPoint, showExpandedEvents: true}, csConfig);
+    const finalConfig = Object.assign(
+        {resumeAfter: startPoint, showExpandedEvents: true},
+        csConfig,
+    );
     const csCursor = testDB.watch([], finalConfig);
 
     // Confirm that we see the expected sequence of events.
@@ -163,7 +170,10 @@ assertChangeStreamEventSequence({showSystemEvents: true}, expectedReshardingEven
 // With showSystemEvents set to false, we expect to only see events on the original namespace and
 // not see the "reshardBlockingWrites" event.
 const nonSystemEvents = expectedReshardingEvents.filter(
-    (event) => event.ns && event.ns.coll === testColl.getName() && event.operationType != "reshardBlockingWrites",
+    (event) =>
+        event.ns &&
+        event.ns.coll === testColl.getName() &&
+        event.operationType != "reshardBlockingWrites",
 );
 assertChangeStreamEventSequence({showSystemEvents: false}, nonSystemEvents);
 

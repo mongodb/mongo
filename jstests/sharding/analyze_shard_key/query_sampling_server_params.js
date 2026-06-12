@@ -25,7 +25,9 @@ function testQuerySampling(conn, writeConcern, {rst, st}) {
     assert.commandWorked(coll.insert(docs, {writeConcern}));
     const collUuid = QuerySamplingUtil.getCollectionUuid(db, collName);
 
-    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+    assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}),
+    );
     QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {rst, st});
 
     assert.commandWorked(coll.update({x: 1}, {$mul: {x: -1}}));
@@ -108,7 +110,10 @@ const mongosSetParameterCmdObj = {
 }
 
 {
-    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: mongodSetParameterOptsStartup}});
+    const rst = new ReplSetTest({
+        nodes: numNodesPerRS,
+        nodeOptions: {setParameter: mongodSetParameterOptsStartup},
+    });
     rst.startSet();
     rst.initiate();
 

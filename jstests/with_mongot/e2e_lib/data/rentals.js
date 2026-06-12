@@ -86,7 +86,8 @@ export function getRentalData() {
                 "*I listed this place late so can be flexible for you. I'm quick to respond - contact me and let's discuss whether we can make something work for you asap* Sorry about the lack of pictures. Will link you to Streeteasy when you reply. There is a small (regular for NYC) bedroom, a living room with couches and a TV (with apple tv but only basic cable), a kitchen, and a bathroom. It is in a walk up building a couple of flights up. Need relatively quiet guests for this residential building - definitely not a place for your weekend party.",
             "description":
                 "A comfortable one bedroom for responsible guests. Plenty of natural light. Walk up building. You'll feel like a local staying in this residential neighborhood, right next to great food, bars, subways, the High Line, Chelsea Piers, etc. *I listed this place late so can be flexible for you. I'm quick to respond - contact me and let's discuss whether we can make something work for you asap* Sorry about the lack of pictures. Will link you to Streeteasy when you reply. There is a small (regular for NYC) bedroom, a living room with couches and a TV (with apple tv but only basic cable), a kitchen, and a bathroom. It is in a walk up building a couple of flights up. Need relatively quiet guests for this residential building - definitely not a place for your weekend party. I am available to help you any time and will provide a cell # for questions. When I let you in, I'll also be able to answer any questions and point you to restaurants and local attractions. Chelsea is considered a high end nei",
-            "neighborhood_overview": "Chelsea is considered a high end neighborhood in NYC.  (URL HIDDEN)",
+            "neighborhood_overview":
+                "Chelsea is considered a high end neighborhood in NYC.  (URL HIDDEN)",
             "number_of_reviews": 1,
             "address": {
                 "street": "New York, NY, United States",
@@ -161,7 +162,8 @@ export function getRentalData() {
             "name": "Room Close to LGA and 35 mins to Times Square",
             "summary":
                 "A private small bedroom in a 2 BR 1BA apartment. There’s no living area as I converted to live in. The location is 2 minutes to Q33 bus stop, 5 minutes to 7 train station ( which directly takes you to Times Square in 35-40 minutes ).",
-            "space": "The bedroom has a queen bed, a closet, a mini fridge, outlets, USB ports, wifi, and AC.",
+            "space":
+                "The bedroom has a queen bed, a closet, a mini fridge, outlets, USB ports, wifi, and AC.",
             "description":
                 "A private small bedroom in a 2 BR 1BA apartment. There’s no living area as I converted to live in. The location is 2 minutes to Q33 bus stop, 5 minutes to 7 train station ( which directly takes you to Times Square in 35-40 minutes ). The bedroom has a queen bed, a closet, a mini fridge, outlets, USB ports, wifi, and AC. Kitchen is not provided to use. Guest have access to the bedroom and bathroom only. This apartment has my husband and me. This place also has a chinchilla and a French Bulldog. We are living in this apartment in a living area. And we are offering an actual room for your privacy. I would be very happy to welcome all dog lovers because our frenchie loves to interact with people. So feel free to contact me if you have any questions :) This elevator building is located in a great neighborhood where there are many great restaurants from all parts of the world ( Latin American, Indian, Thai, Japanese, Filipino and the list goes on) .  The building is also conveniently near ma",
             "neighborhood_overview":
@@ -1023,7 +1025,8 @@ export function getRentalData() {
             "name": "1 BR 1/2 block to A/B/C/D trains",
             "summary":
                 "1BR in a 2BR apt -Ideal for tourists. Easy access to the city with the express trains (A,D)  -15 min. to Times Square -10 min. to Central Park -3 min. walk to 24 hs Supermarket, Starbucks, Duane reade and Banks   ",
-            "space": "It is a bigger apartment than the standard NYC size. It is also a very quite one.",
+            "space":
+                "It is a bigger apartment than the standard NYC size. It is also a very quite one.",
             "description":
                 "1BR in a 2BR apt -Ideal for tourists. Easy access to the city with the express trains (A,D)  -15 min. to Times Square -10 min. to Central Park -3 min. walk to 24 hs Supermarket, Starbucks, Duane reade and Banks    It is a bigger apartment than the standard NYC size. It is also a very quite one. You will have their own keys and access the apartment and all of its areas of the but my room 24hrs. The Neighbourhood is nice and safe day and night. The police station is around the corner (Inside the metro station). I never had a problem. A, B, C and D trains are around the corner. A and D are Express. 1 Train is 3 blocks away and M3 Bus is on the other side of the street. You would be sharing the apartment with me. I am a musician, very respectful, clean, and easy going.  You will have access to all the areas, kitchenware, oven and spices to cook. There is turbo speed Wi-fi in the Apartment. ",
             "neighborhood_overview":

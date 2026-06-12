@@ -70,7 +70,9 @@ const cursorId = NumberLong(123);
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 // Verify that a $searchBeta query works end to end.
@@ -87,7 +89,9 @@ assert.eq(expected, cursor.toArray());
 
 // Verify that a deprecation warning was logged for $searchBeta usage.
 const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-const count = getMatchingLoglinesCount(globalLog.log, {msg: "$searchBeta is deprecated. Use $search instead."});
+const count = getMatchingLoglinesCount(globalLog.log, {
+    msg: "$searchBeta is deprecated. Use $search instead.",
+});
 assert.eq(count, 1, "Expected exactly one deprecation warning for $searchBeta");
 
 MongoRunner.stopMongod(conn);

@@ -168,7 +168,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({
         update: coll.getName(),
-        updates: [{q: {_id: "supplied_doc"}, u: [{$set: {x: 1}}], upsert: true, upsertSupplied: true}],
+        updates: [
+            {q: {_id: "supplied_doc"}, u: [{$set: {x: 1}}], upsert: true, upsertSupplied: true},
+        ],
     }),
     ErrorCodes.FailedToParse,
 );
@@ -177,7 +179,15 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({
         update: coll.getName(),
-        updates: [{q: {_id: "supplied_doc"}, u: [{$set: {x: 1}}], upsert: true, upsertSupplied: true, c: {}}],
+        updates: [
+            {
+                q: {_id: "supplied_doc"},
+                u: [{$set: {x: 1}}],
+                upsert: true,
+                upsertSupplied: true,
+                c: {},
+            },
+        ],
     }),
     ErrorCodes.FailedToParse,
 );
@@ -212,13 +222,21 @@ assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(coll.update({x: 1}, [{$sort: {x: 1}}]), ErrorCodes.InvalidOptions);
 
 assert.commandWorked(coll.insert({x: 1, z: 1}));
-assert.commandFailedWithCode(coll.update({x: 1}, [{$facet: {a: [{$match: {x: 1}}]}}]), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    coll.update({x: 1}, [{$facet: {a: [{$match: {x: 1}}]}}]),
+    ErrorCodes.InvalidOptions,
+);
 
 assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(
     coll.update({x: 1}, [
         {
-            $bucket: {groupBy: "$a", boundaries: [0, 1], default: "foo", output: {count: {$sum: 1}}},
+            $bucket: {
+                groupBy: "$a",
+                boundaries: [0, 1],
+                default: "foo",
+                output: {count: {$sum: 1}},
+            },
         },
     ]),
     ErrorCodes.InvalidOptions,
@@ -234,7 +252,13 @@ assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(
     coll.update({x: 1}, [
         {
-            $graphLookup: {from: "foo", startWith: "$a", connectFromField: "a", connectToField: "b", as: "as"},
+            $graphLookup: {
+                from: "foo",
+                startWith: "$a",
+                connectFromField: "a",
+                connectToField: "b",
+                as: "as",
+            },
         },
     ]),
     ErrorCodes.InvalidOptions,

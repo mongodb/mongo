@@ -5,7 +5,10 @@
  *
  */
 import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    isDeferredGetExecutorEnabled,
+} from "jstests/libs/query/sbe_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod({
@@ -28,7 +31,10 @@ for (let i = 0; i < 5; i++) {
 const group1 = {$group: {_id: "$a", tot: {$sum: "$b"}}};
 const lookup = {$lookup: {from: "f", localField: "_id", foreignField: "a", as: "r"}};
 // Optimizer absorbs the $unwind into the $lookup as '_unwindSrc'.
-const lookupUnwindA = [{$lookup: {from: "f", localField: "a", foreignField: "a", as: "rA"}}, {$unwind: "$rA"}];
+const lookupUnwindA = [
+    {$lookup: {from: "f", localField: "a", foreignField: "a", as: "rA"}},
+    {$unwind: "$rA"},
+];
 const matchId = {$match: {_id: {$gte: 0}}};
 // Optimizer absorbs matchRaField into lookupUnwindA as '_matchSrc', making the $lookup
 // requiresSbeFull and thus ineligible for trySbeRestricted pushdown.
@@ -168,7 +174,14 @@ function runAllExamples() {
             }
 
             {
-                const plan = explain([...prefix, addExtra, {$match: {extra: {$gte: 0}}}, group1, matchId, lookup]);
+                const plan = explain([
+                    ...prefix,
+                    addExtra,
+                    {$match: {extra: {$gte: 0}}},
+                    group1,
+                    matchId,
+                    lookup,
+                ]);
                 logPlanInfo("ex5", plan, ctx);
                 assertPlan(
                     "ex5",

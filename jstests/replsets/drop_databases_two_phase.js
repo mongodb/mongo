@@ -43,7 +43,11 @@ let primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let dbToDrop = primary.getDB(dbNameToDrop);
@@ -51,7 +55,9 @@ let collNameToDrop = "collectionToDrop";
 
 // Create the collection that will be dropped and let it replicate.
 let collToDrop = dbToDrop.getCollection(collNameToDrop);
-assert.commandWorked(collToDrop.insert({_id: 0}, {writeConcern: {w: 2, wtimeout: replTest.timeoutMS}}));
+assert.commandWorked(
+    collToDrop.insert({_id: 0}, {writeConcern: {w: 2, wtimeout: replTest.timeoutMS}}),
+);
 assert.eq(1, collToDrop.find().itcount());
 
 // Pause the oplog fetcher on secondary so that commit point doesn't advance, meaning that a dropped
@@ -90,13 +96,19 @@ let dropDatabaseProcess = startParallelShell(dropDatabaseFn, primary.port);
 
 // Check that primary has started two phase drop of the collection.
 jsTestLog(
-    "Waiting for primary " + primary.host + " to prepare two phase drop of collection " + collToDrop.getFullName(),
+    "Waiting for primary " +
+        primary.host +
+        " to prepare two phase drop of collection " +
+        collToDrop.getFullName(),
 );
 assert.soonNoExcept(
     function () {
         return collToDrop.find().itcount() == 0;
     },
-    "Primary " + primary.host + " failed to prepare two phase drop of collection " + collToDrop.getFullName(),
+    "Primary " +
+        primary.host +
+        " failed to prepare two phase drop of collection " +
+        collToDrop.getFullName(),
 );
 
 // Commands that manipulate the database being dropped or perform destructive catalog operations

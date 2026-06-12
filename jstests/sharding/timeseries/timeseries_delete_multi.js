@@ -324,11 +324,8 @@ function runTest(collConfig, reqConfig, insertFn) {
     }
 
     // Checks that the query was routed to the correct shards and gets profile entries if so.
-    const [primaryEntries, otherEntries] = assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(
-        reqConfig,
-        primaryDB,
-        otherDB,
-    );
+    const [primaryEntries, otherEntries] =
+        assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(reqConfig, primaryDB, otherDB);
 
     // Ensures that the collection contains only expected documents.
     const remainingIds = coll

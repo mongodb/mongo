@@ -43,7 +43,9 @@ const analyzeShardKeyTestCases = [
     {operationType: "drop", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
     {
         operationType: "recreate",
-        expectedErrCodes: [ErrorCodes.CollectionUUIDMismatch].concat(expectedAnalyzeShardKeyErrCodes),
+        expectedErrCodes: [ErrorCodes.CollectionUUIDMismatch].concat(
+            expectedAnalyzeShardKeyErrCodes,
+        ),
     },
     {operationType: "makeEmpty", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
 ];
@@ -93,7 +95,9 @@ function runAnalyzeShardKeyTest(conn, testCase, fpConn, fpName) {
     assert.commandWorked(conn.getCollection(ns).insert(docs));
 
     const runCmdFunc = async (host, ns) => {
-        const {AnalyzeShardKeyUtil} = await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+        const {AnalyzeShardKeyUtil} = await import(
+            "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js"
+        );
         const conn = new Mongo(host);
         sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
         return conn.adminCommand({analyzeShardKey: ns, key: {_id: 1}});
@@ -122,16 +126,27 @@ async function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
     jsTest.log(`Testing configureQueryAnalyzer command ${tojson({testCase, dbName, collName})}`);
 
     const runCmdFunc = async (host, ns, mode, samplesPerSecond) => {
-        const {AnalyzeShardKeyUtil} = await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+        const {AnalyzeShardKeyUtil} = await import(
+            "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js"
+        );
         const conn = new Mongo(host);
         sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
         return conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond});
     };
 
-    let runCmdThread = new Thread(runCmdFunc, conn.host, ns, "full" /* mode */, 1 /* samplesPerSecond */);
+    let runCmdThread = new Thread(
+        runCmdFunc,
+        conn.host,
+        ns,
+        "full" /* mode */,
+        1 /* samplesPerSecond */,
+    );
     runCmdThread.start();
     setUpTestCase(conn, dbName, collName, testCase.operationType);
-    const res = assert.commandWorkedOrFailedWithCode(runCmdThread.returnData(), testCase.expectedErrCodes);
+    const res = assert.commandWorkedOrFailedWithCode(
+        runCmdThread.returnData(),
+        testCase.expectedErrCodes,
+    );
 
     if (testCase.operationType == "recreate") {
         const configDoc = conn.getCollection("config.queryAnalyzers").findOne({_id: ns});
@@ -159,7 +174,10 @@ async function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
         testCase.expectedErrCodes,
     );
     sleep(queryAnalysisSamplerConfigurationRefreshSecs);
-    assert.commandWorkedOrFailedWithCode(await runCmdFunc(conn.host, ns, "off" /* mode */), testCase.expectedErrCodes);
+    assert.commandWorkedOrFailedWithCode(
+        await runCmdFunc(conn.host, ns, "off" /* mode */),
+        testCase.expectedErrCodes,
+    );
 }
 
 {

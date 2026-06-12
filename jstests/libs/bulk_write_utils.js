@@ -4,7 +4,8 @@ import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
  * Helper function to check a BulkWrite cursorEntry.
  */
 export const cursorEntryValidator = function (entry, expectedEntry) {
-    const assertMsg = " value did not match for bulkWrite reply item. actual reply: " + tojson(entry);
+    const assertMsg =
+        " value did not match for bulkWrite reply item. actual reply: " + tojson(entry);
     assert.eq(entry.ok, expectedEntry.ok, "'ok'" + assertMsg);
     assert.eq(entry.idx, expectedEntry.idx, "'idx'" + assertMsg);
     assert.eq(entry.n, expectedEntry.n, "'n'" + assertMsg);
@@ -22,7 +23,8 @@ export const cursorSizeValidator = function (response, expectedSize) {
 };
 
 export const summaryFieldsValidator = function (response, fields) {
-    const assertMsg = " value did not match for bulkWrite summary fields. actual reply: " + tojson(response);
+    const assertMsg =
+        " value did not match for bulkWrite summary fields. actual reply: " + tojson(response);
     assert.eq(response.nErrors, fields.nErrors, "nErrors" + assertMsg);
     assert.eq(response.nInserted, fields.nInserted, "nInserted" + assertMsg);
     assert.eq(response.nDeleted, fields.nDeleted, "nDeleted" + assertMsg);
@@ -33,7 +35,11 @@ export const summaryFieldsValidator = function (response, fields) {
 
 // assert.eq(before + diff, after, errorMessage) but with more information on failure.
 const checkEqual = function (before, expectedDiff, after, errorMessage) {
-    assert.eq(before + expectedDiff, after, `${errorMessage}: ${before} + ${expectedDiff} != ${after}`);
+    assert.eq(
+        before + expectedDiff,
+        after,
+        `${errorMessage}: ${before} + ${expectedDiff} != ${after}`,
+    );
 };
 
 // Helper class for the bulkwrite_metrics tests.
@@ -99,7 +105,12 @@ export class BulkWriteMetricChecker {
                     top1[ns].update.count,
                     `update.count mismatch for ${ns}`,
                 );
-                checkEqual(top0[ns].remove.count, deleteCount, top1[ns].remove.count, "remove.count mismatch");
+                checkEqual(
+                    top0[ns].remove.count,
+                    deleteCount,
+                    top1[ns].remove.count,
+                    "remove.count mismatch",
+                );
                 checkEqual(
                     top0[ns].insert.count,
                     inserted + retriedInsert,
@@ -111,11 +122,23 @@ export class BulkWriteMetricChecker {
     }
 
     // Metrics corresponding to CurOp::get(opCtx)->debug().additiveMetrics.
-    _checkAdditiveMetrics(status0, status1, actualInserts, updated, fleSafeContentUpdates, deleted) {
+    _checkAdditiveMetrics(
+        status0,
+        status1,
+        actualInserts,
+        updated,
+        fleSafeContentUpdates,
+        deleted,
+    ) {
         const doc0 = status0.metrics.document;
         const doc1 = status1.metrics.document;
 
-        checkEqual(doc0.updated, updated + fleSafeContentUpdates, doc1.updated, "document.updated mismatch");
+        checkEqual(
+            doc0.updated,
+            updated + fleSafeContentUpdates,
+            doc1.updated,
+            "document.updated mismatch",
+        );
         checkEqual(doc0.deleted, deleted, doc1.deleted, "document.deleted mismatch");
         checkEqual(doc0.inserted, actualInserts, doc1.inserted, "document.inserted mismatch");
     }
@@ -142,18 +165,40 @@ export class BulkWriteMetricChecker {
             checkEqual(wC0.update.wmajority, 0, wC1.update.wmajority, "update.wmajority mismatch");
             checkEqual(wC0.delete.wmajority, 0, wC1.delete.wmajority, "delete.wmajority mismatch");
             checkEqual(wC0.insert.wmajority, 0, wC1.insert.wmajority, "insert.wmajority mismatch");
-            checkEqual(wC0.update.none, fleSafeContentUpdates, wC1.update.none, "update.none mismatch");
+            checkEqual(
+                wC0.update.none,
+                fleSafeContentUpdates,
+                wC1.update.none,
+                "update.none mismatch",
+            );
             checkEqual(wC0.delete.none, deleted, wC1.delete.none, "delete.none mismatch");
             checkEqual(wC0.insert.none, actualInserts, wC1.insert.none, "insert.none mismatch");
         } else {
             // All calls are done with {writeConcern: {w: "majority"}} so "none" count should be
             // unchanged, except for timeseries.
             // TODO SERVER-84799 timeseries condition below and comment above.
-            const [uNone, uMaj] = this.timeseries && retryCount > 1 ? [updateCount, 0] : [0, updateCount];
-            const [dNone, dMaj] = this.timeseries && retryCount > 1 ? [deleteCount, 0] : [0, deleteCount];
-            checkEqual(wC0.update.wmajority, uMaj, wC1.update.wmajority, "update.wmajority mismatch");
-            checkEqual(wC0.delete.wmajority, dMaj, wC1.delete.wmajority, "delete.wmajority mismatch");
-            checkEqual(wC0.insert.wmajority, inserted, wC1.insert.wmajority, "insert.wmajority mismatch");
+            const [uNone, uMaj] =
+                this.timeseries && retryCount > 1 ? [updateCount, 0] : [0, updateCount];
+            const [dNone, dMaj] =
+                this.timeseries && retryCount > 1 ? [deleteCount, 0] : [0, deleteCount];
+            checkEqual(
+                wC0.update.wmajority,
+                uMaj,
+                wC1.update.wmajority,
+                "update.wmajority mismatch",
+            );
+            checkEqual(
+                wC0.delete.wmajority,
+                dMaj,
+                wC1.delete.wmajority,
+                "delete.wmajority mismatch",
+            );
+            checkEqual(
+                wC0.insert.wmajority,
+                inserted,
+                wC1.insert.wmajority,
+                "insert.wmajority mismatch",
+            );
 
             checkEqual(wC0.update.none, uNone, wC1.update.none, "update.none mismatch");
             checkEqual(wC0.delete.none, dNone, wC1.delete.none, "delete.none mismatch");
@@ -169,7 +214,10 @@ export class BulkWriteMetricChecker {
 
         const update1 = status1.metrics.commands[updateField];
         const update0 = status0.metrics.commands[updateField];
-        if (update1 != undefined && (update1.arrayFilters != undefined || update1.pipeline != undefined)) {
+        if (
+            update1 != undefined &&
+            (update1.arrayFilters != undefined || update1.pipeline != undefined)
+        ) {
             let arrayFilters0 = 0;
             let pipeline0 = 0;
             if (update0 != undefined) {
@@ -179,10 +227,19 @@ export class BulkWriteMetricChecker {
 
             let arrayFiltersDiff = updateArrayFilters;
 
-            checkEqual(arrayFilters0, arrayFiltersDiff, update1.arrayFilters, "update.arrayFilters mismatch");
+            checkEqual(
+                arrayFilters0,
+                arrayFiltersDiff,
+                update1.arrayFilters,
+                "update.arrayFilters mismatch",
+            );
             checkEqual(pipeline0, updatePipeline, update1.pipeline, "update.pipeline mismatch");
         } else {
-            assert.eq(0, updateArrayFilters, `metrics.commands.${updateField} should not be undefined`);
+            assert.eq(
+                0,
+                updateArrayFilters,
+                `metrics.commands.${updateField} should not be undefined`,
+            );
             assert.eq(0, updatePipeline, `metrics.commands.${updateField} should not be undefined`);
         }
     }
@@ -234,14 +291,21 @@ export class BulkWriteMetricChecker {
                 }
                 // FLE2 updates don't execute the safeContent updates on retries, only the
                 // findAndModify step.
-                opUpdated = (this.bulkWrite ? 0 : numberOfUpdateStatements) * retryCount + fleSafeContentUpdates;
+                opUpdated =
+                    (this.bulkWrite ? 0 : numberOfUpdateStatements) * retryCount +
+                    fleSafeContentUpdates;
                 opUpdateMany = (this.bulkWrite ? 0 : updateManyCount) * retryCount;
             }
         } else if (this.fle) {
             opUpdated = fleSafeContentUpdates;
         }
 
-        checkEqual(op0.update, opUpdated * opcounterFactor, op1.update, "opcounters.update mismatch");
+        checkEqual(
+            op0.update,
+            opUpdated * opcounterFactor,
+            op1.update,
+            "opcounters.update mismatch",
+        );
         checkEqual(op0.delete, opDeleted, op1.delete, "opcounters.delete mismatch");
         checkEqual(op0.insert, opInserted, op1.insert, "opcounters.insert mismatch");
 
@@ -294,7 +358,14 @@ export class BulkWriteMetricChecker {
         perNamespaceMetrics,
         nsIndicesInRequest,
     ) {
-        this._checkAdditiveMetrics(status0, status1, actualInserts, updated, fleSafeContentUpdates, deleted);
+        this._checkAdditiveMetrics(
+            status0,
+            status1,
+            actualInserts,
+            updated,
+            fleSafeContentUpdates,
+            deleted,
+        );
 
         // Not checking metrics.document.returned or metrics.queryExecutor.scannedObjects as
         // they are not stable across runs of the test, even without bulkWrite.
@@ -391,7 +462,12 @@ export class BulkWriteMetricChecker {
 
         // Note that in the case of the UWE, we do not double count retryable timeseries updates.
         const uweEnabled = isUweEnabled(this.testDB);
-        if (this.timeseries && !this.bulkWrite && !uweEnabled && updateShardField === "manyShards") {
+        if (
+            this.timeseries &&
+            !this.bulkWrite &&
+            !uweEnabled &&
+            updateShardField === "manyShards"
+        ) {
             targetedUpdate = targetedUpdate * 2;
         }
 
@@ -517,7 +593,8 @@ export class BulkWriteMetricChecker {
             const top1 = this.testDB.adminCommand({top: 1}).totals;
             // See comment on unshardedInsert for the ternary.
             const retriedCommandsCount =
-                (1 + 2 * (eqIndexedEncryptedFields > 0 ? 1 : 0) + (this.bulkWrite && this.fle)) * (retryCount - 1);
+                (1 + 2 * (eqIndexedEncryptedFields > 0 ? 1 : 0) + (this.bulkWrite && this.fle)) *
+                (retryCount - 1);
             const retriedStatementsCount = (1 + 2 * eqIndexedEncryptedFields) * (retryCount - 1);
             this._checkMongodOnlyMetrics(
                 status0,
@@ -645,10 +722,22 @@ export class BulkWriteMetricChecker {
             }
         }
         expectedMetrics.retryCount = 1;
-        this._checkMetricsImpl(statusBefore, topBefore, this._findNsIndicesInRequest(bulkWriteOps), expectedMetrics);
+        this._checkMetricsImpl(
+            statusBefore,
+            topBefore,
+            this._findNsIndicesInRequest(bulkWriteOps),
+            expectedMetrics,
+        );
     }
 
-    checkMetricsWithRetries(testcaseName, bulkWriteOps, normalCommand, expectedMetrics, lsid, txnNumber) {
+    checkMetricsWithRetries(
+        testcaseName,
+        bulkWriteOps,
+        normalCommand,
+        expectedMetrics,
+        lsid,
+        txnNumber,
+    ) {
         jsTest.log.info(
             `Testcase: ${testcaseName} (on a ${
                 this.isMongos ? "ShardingTest" : "ReplSetTest"
@@ -700,6 +789,11 @@ export class BulkWriteMetricChecker {
             }
         }
         expectedMetrics.retryCount = this.retryCount;
-        this._checkMetricsImpl(statusBefore, topBefore, this._findNsIndicesInRequest(bulkWriteOps), expectedMetrics);
+        this._checkMetricsImpl(
+            statusBefore,
+            topBefore,
+            this._findNsIndicesInRequest(bulkWriteOps),
+            expectedMetrics,
+        );
     }
 }

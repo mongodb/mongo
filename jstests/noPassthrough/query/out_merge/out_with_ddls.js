@@ -175,12 +175,18 @@ assert.commandWorked(
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
         setupFn() {
             setup();
-            st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
+            st.s.adminCommand({
+                enableSharding: targetDB.getName(),
+                primaryShard: st.shard1.shardName,
+            });
             targetColl.insertOne({val: "should get overwritten"});
         },
         ddlFn() {
             assert.commandWorked(
-                st.s.adminCommand({moveCollection: targetColl.getFullName(), toShard: st.shard2.shardName}),
+                st.s.adminCommand({
+                    moveCollection: targetColl.getFullName(),
+                    toShard: st.shard2.shardName,
+                }),
             );
         },
     }),
@@ -192,7 +198,10 @@ assert.commandWorked(
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
         setupFn() {
             setup();
-            st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
+            st.s.adminCommand({
+                enableSharding: targetDB.getName(),
+                primaryShard: st.shard1.shardName,
+            });
             targetColl.insertOne({val: "should get overwritten"});
         },
         ddlFn() {
@@ -205,7 +214,10 @@ for (const targetDBExists of [true, false]) {
     const targetDBDesc = ` and targetDB does${targetDBExists ? " " : " not "}exist`;
     const maybeCreateTargetDB = () => {
         if (targetDBExists) {
-            st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
+            st.s.adminCommand({
+                enableSharding: targetDB.getName(),
+                primaryShard: st.shard1.shardName,
+            });
         }
     };
 
@@ -230,7 +242,10 @@ for (const targetDBExists of [true, false]) {
             },
             ddlFn() {
                 assert.commandWorked(
-                    st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: st.shard2.shardName}),
+                    st.s.adminCommand({
+                        moveCollection: sourceColl.getFullName(),
+                        toShard: st.shard2.shardName,
+                    }),
                 );
             },
         }),
@@ -335,7 +350,10 @@ for (const targetDBExists of [true, false]) {
             failpointName: "hangWhileBuildingDocumentSourceOutBatch",
             setupFn() {
                 setup();
-                st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: st.shard0.shardName});
+                st.s.adminCommand({
+                    moveCollection: sourceColl.getFullName(),
+                    toShard: st.shard0.shardName,
+                });
                 maybeCreateTargetDB();
             },
             ddlFn() {

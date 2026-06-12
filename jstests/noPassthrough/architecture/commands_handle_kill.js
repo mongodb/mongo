@@ -8,7 +8,9 @@ const coll = db.getCollection(collName);
 
 // How many works it takes to yield.
 const yieldIterations = 2;
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: yieldIterations}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: yieldIterations}),
+);
 const nDocs = yieldIterations + 2;
 
 /**
@@ -16,7 +18,8 @@ const nDocs = yieldIterations + 2;
  */
 function assertContainsErrorMessage(commandResult) {
     assert(
-        commandResult.ok === 0 || (commandResult.ok === 1 && commandResult.writeErrors !== undefined),
+        commandResult.ok === 0 ||
+            (commandResult.ok === 1 && commandResult.writeErrors !== undefined),
         "expected command to fail: " + tojson(commandResult),
     );
     if (commandResult.ok === 0) {
@@ -42,15 +45,20 @@ function setupCollection() {
  */
 function assertCommandPropogatesPlanExecutorFailure(cmdObj) {
     // Make sure the command propagates failure messages.
-    assert.commandWorked(db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "alwaysOn"}),
+    );
     let res = db.runCommand(cmdObj);
     let errorMessage = assertContainsErrorMessage(res);
     assert.neq(
         errorMessage.indexOf("planExecutorAlwaysFails"),
         -1,
-        "Expected error message to include 'planExecutorAlwaysFails', instead found: " + errorMessage,
+        "Expected error message to include 'planExecutorAlwaysFails', instead found: " +
+            errorMessage,
     );
-    assert.commandWorked(db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}),
+    );
 }
 
 /**
@@ -89,7 +97,10 @@ function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
     ];
 
     if (options.usesIndex) {
-        invalidatingCommands.push({command: {dropIndexes: collName, index: {a: 1}}, message: "index 'a_1' dropped"});
+        invalidatingCommands.push({
+            command: {dropIndexes: collName, index: {a: 1}},
+            message: "index 'a_1' dropped",
+        });
     }
 
     for (let invalidatingCommand of invalidatingCommands) {
@@ -99,7 +110,9 @@ function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
         }
 
         // Enable a failpoint that causes PlanExecutors to hang during execution.
-        assert.commandWorked(db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}),
+        );
 
         const canYield = options.commandYields === undefined || options.commandYields;
         // Start a parallel shell to run the command. This should hang until we unset the
@@ -158,7 +171,9 @@ if (${canYield}) {
         // proceed.
         jsTestLog("Running invalidating command: " + tojson(invalidatingCommand.command));
         assert.commandWorked(db.runCommand(invalidatingCommand.command));
-        assert.commandWorked(db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}),
+        );
         awaitCmdFailure();
     }
 
@@ -171,18 +186,26 @@ if (${canYield}) {
 
 // Disable aggregation's batching behavior, since that can prevent the PlanExecutor from being
 // active during the command that would have caused it to be killed.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}),
+);
 assertCommandPropogatesPlanExecutorKillReason({aggregate: collName, pipeline: [], cursor: {}});
 assertCommandPropogatesPlanExecutorKillReason(
     {aggregate: collName, pipeline: [{$match: {a: {$gte: 0}}}], cursor: {}},
     {usesIndex: true},
 );
 
-assertCommandPropogatesPlanExecutorKillReason({dataSize: coll.getFullName()}, {commandYields: false});
+assertCommandPropogatesPlanExecutorKillReason(
+    {dataSize: coll.getFullName()},
+    {commandYields: false},
+);
 
 assertCommandPropogatesPlanExecutorKillReason("dbHash", {commandYields: false});
 
-assertCommandPropogatesPlanExecutorKillReason({count: collName, query: {a: {$gte: 0}}}, {usesIndex: true});
+assertCommandPropogatesPlanExecutorKillReason(
+    {count: collName, query: {a: {$gte: 0}}},
+    {usesIndex: true},
+);
 
 assertCommandPropogatesPlanExecutorKillReason(
     {distinct: collName, key: "_id", query: {a: {$gte: 0}}},
@@ -201,7 +224,11 @@ assertCommandPropogatesPlanExecutorKillReason(
         cursor: {},
         pipeline: [
             {
-                $geoNear: {near: {type: "Point", coordinates: [0, 0]}, spherical: true, distanceField: "dis"},
+                $geoNear: {
+                    near: {type: "Point", coordinates: [0, 0]},
+                    spherical: true,
+                    distanceField: "dis",
+                },
             },
         ],
     },
@@ -213,7 +240,10 @@ assertCommandPropogatesPlanExecutorKillReason(
 );
 
 assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {}});
-assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {a: {$gte: 0}}}, {usesIndex: true});
+assertCommandPropogatesPlanExecutorKillReason(
+    {find: coll.getName(), filter: {a: {$gte: 0}}},
+    {usesIndex: true},
+);
 
 assertCommandPropogatesPlanExecutorKillReason(
     {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}, multi: true}]},

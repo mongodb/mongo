@@ -10,7 +10,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {
     doc1_a_nofields,
     doc2_a_f101,
@@ -22,7 +25,15 @@ import {
     prepareCollection,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
-const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
+const docs = [
+    doc1_a_nofields,
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc5_b_f104,
+    doc6_c_f105,
+    doc7_c_f106,
+];
 
 Random.setRandomSeed();
 
@@ -42,7 +53,11 @@ Random.setRandomSeed();
     assert.eq(1, res.lastErrorObject.n, `findAndModify failed: ${tojson(res)}`);
 
     const newBucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    assert.eq(orgBucketDocs.length - 1, newBucketDocs.length, `Wrong number of buckets left: ${tojson(newBucketDocs)}`);
+    assert.eq(
+        orgBucketDocs.length - 1,
+        newBucketDocs.length,
+        `Wrong number of buckets left: ${tojson(newBucketDocs)}`,
+    );
     assert(!newBucketDocs.find((e) => e === orgBucketDocs[bucketDocIdx]), tojson(newBucketDocs));
 })();
 
@@ -64,6 +79,10 @@ Random.setRandomSeed();
     assert.eq("D", res.value.meta, `Wrong meta field: ${tojson(res)}`);
 
     const newBucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    assert.eq(orgBucketDocs.length, newBucketDocs.length, `Wrong number of buckets left: ${tojson(newBucketDocs)}`);
+    assert.eq(
+        orgBucketDocs.length,
+        newBucketDocs.length,
+        `Wrong number of buckets left: ${tojson(newBucketDocs)}`,
+    );
     assert(!newBucketDocs.find((e) => e === orgBucketDocs[bucketDocIdx]), tojson(newBucketDocs));
 })();

@@ -33,7 +33,9 @@ function calculateNumReads(execStages) {
 }
 
 function getTotalDocsExaminedAndTotalKeysExaminedSum(executionStats) {
-    return NumberInt(executionStats.totalDocsExamined) + NumberInt(executionStats.totalKeysExamined);
+    return (
+        NumberInt(executionStats.totalDocsExamined) + NumberInt(executionStats.totalKeysExamined)
+    );
 }
 
 /**
@@ -60,11 +62,15 @@ function checkStatsAreCorrect(db, coll, filter, proj = {}, sort = {}) {
     let classicExplain;
     let sbeEngineExplain;
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+    );
     classicExplain = runExplain(coll, filter, proj, sort);
     assert(classicExplain.hasOwnProperty("executionStats"), classicExplain);
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+    );
     sbeEngineExplain = runExplain(coll, filter, proj, sort);
     assert(sbeEngineExplain.hasOwnProperty("executionStats"), sbeEngineExplain);
 

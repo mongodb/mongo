@@ -25,7 +25,9 @@ const someline = {
 };
 assert.commandWorked(t.insert({geo: someline, nonGeo: "someline"}));
 assert.commandWorked(t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
-const results = t.find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40, 5]}}}}).toArray();
+const results = t
+    .find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40, 5]}}}})
+    .toArray();
 assert.eq(results.length, 1, dumpCollection);
 assert.eq(results[0].geo, someline, dumpCollection);
 t.dropIndex({geo: "2dsphere"});
@@ -145,7 +147,11 @@ assert.throws(function () {
 t.drop();
 t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 const failedInsertRes = t.insert({
-    loc: {type: "Point", coordinates: [40, 5], crs: {type: "name", properties: {name: "EPSG:2000"}}},
+    loc: {
+        type: "Point",
+        coordinates: [40, 5],
+        crs: {type: "name", properties: {name: "EPSG:2000"}},
+    },
 });
 assert.writeError(failedInsertRes);
 assert.eq(0, t.find().itcount(), dumpCollection);
@@ -153,7 +159,11 @@ assert.eq(0, t.find().itcount(), dumpCollection);
 assert.commandWorked(t.insert({loc: {type: "Point", coordinates: [40, 5]}}));
 assert.commandWorked(
     t.insert({
-        loc: {type: "Point", coordinates: [40, 5], crs: {type: "name", properties: {name: "EPSG:4326"}}},
+        loc: {
+            type: "Point",
+            coordinates: [40, 5],
+            crs: {type: "name", properties: {name: "EPSG:4326"}},
+        },
     }),
 );
 assert.commandWorked(
@@ -173,16 +183,27 @@ assert.commandWorked(t.insert({loc: [0, 0]}));
 assert.commandWorked(
     t.createIndex(
         {loc: "2dsphere"},
-        Object.assign({finestIndexedLevel: 17, coarsestIndexedLevel: 5}, add2dsphereVersionIfNeeded()),
+        Object.assign(
+            {finestIndexedLevel: 17, coarsestIndexedLevel: 5},
+            add2dsphereVersionIfNeeded(),
+        ),
     ),
 );
 // Ensure the index actually works at a basic level
-assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}}), dumpCollection);
+assert.neq(
+    null,
+    t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}}),
+    dumpCollection,
+);
 
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
 assert.commandFailed(
-    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, coarsestIndexedLevel: 5}, add2dsphereVersionIfNeeded()),
+    t.createIndex(
+        {loc: "2dsphere"},
+        {finestIndexedLevel: 31, coarsestIndexedLevel: 5},
+        add2dsphereVersionIfNeeded(),
+    ),
 );
 
 t.drop();
@@ -190,12 +211,19 @@ assert.commandWorked(t.insert({loc: [0, 0]}));
 assert.commandWorked(
     t.createIndex(
         {loc: "2dsphere"},
-        Object.assign({finestIndexedLevel: 30, coarsestIndexedLevel: 0}, add2dsphereVersionIfNeeded()),
+        Object.assign(
+            {finestIndexedLevel: 30, coarsestIndexedLevel: 0},
+            add2dsphereVersionIfNeeded(),
+        ),
     ),
 );
 
 // Ensure the index actually works at a basic level
-assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}}), dumpCollection);
+assert.neq(
+    null,
+    t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}}),
+    dumpCollection,
+);
 
 {
     const created = t.getIndexes().filter((idx) => idx.hasOwnProperty("2dsphereIndexVersion"))[0];
@@ -206,21 +234,37 @@ assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordina
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
 assert.commandFailed(
-    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: -1}, add2dsphereVersionIfNeeded()),
+    t.createIndex(
+        {loc: "2dsphere"},
+        {finestIndexedLevel: 30, coarsestIndexedLevel: -1},
+        add2dsphereVersionIfNeeded(),
+    ),
 );
 
 // SERVER-21491 Verify that 2dsphere index options require correct types.
 assert.commandFailedWithCode(
-    t.createIndex({loc: "2dsphere"}, {"2dsphereIndexVersion": "NOT_A_NUMBER"}, add2dsphereVersionIfNeeded()),
+    t.createIndex(
+        {loc: "2dsphere"},
+        {"2dsphereIndexVersion": "NOT_A_NUMBER"},
+        add2dsphereVersionIfNeeded(),
+    ),
     ErrorCodes.TypeMismatch,
 );
 
 assert.commandFailedWithCode(
-    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: "NOT_A_NUMBER"}, add2dsphereVersionIfNeeded()),
+    t.createIndex(
+        {loc: "2dsphere"},
+        {finestIndexedLevel: "NOT_A_NUMBER"},
+        add2dsphereVersionIfNeeded(),
+    ),
     ErrorCodes.TypeMismatch,
 );
 assert.commandFailedWithCode(
-    t.createIndex({loc: "2dsphere"}, {coarsestIndexedLevel: "NOT_A_NUMBER"}, add2dsphereVersionIfNeeded()),
+    t.createIndex(
+        {loc: "2dsphere"},
+        {coarsestIndexedLevel: "NOT_A_NUMBER"},
+        add2dsphereVersionIfNeeded(),
+    ),
     ErrorCodes.TypeMismatch,
 );
 assert.commandFailedWithCode(

@@ -29,7 +29,8 @@ assert.commandWorked(
 
 function getCachedPlansEvictedMetric() {
     const metricName = usingSbePlanCache ? "sbe" : "classic";
-    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[metricName].cached_plans_evicted;
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[metricName]
+        .cached_plans_evicted;
 }
 
 function runQueriesOnField(field) {

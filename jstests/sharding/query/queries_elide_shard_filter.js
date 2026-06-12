@@ -71,7 +71,9 @@ explain = assert.commandWorked(coll.explain("executionStats").count({a: true}));
 assertShardFilter(explain);
 explain = assert.commandWorked(coll.explain("executionStats").count({a: true, b: true}));
 assertCountScan(explain);
-explain = assert.commandWorked(coll.explain("executionStats").count({a: true, b: {$in: [true, false]}}));
+explain = assert.commandWorked(
+    coll.explain("executionStats").count({a: true, b: {$in: [true, false]}}),
+);
 assertShardFilter(explain);
 
 explain = assert.commandWorked(coll.find({a: true}).explain());

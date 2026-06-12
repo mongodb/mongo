@@ -49,15 +49,21 @@ assert.commandFailedWithCode(
 );
 
 // The maximum: 1PB
-assert.commandWorked(primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB}));
+assert.commandWorked(
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB}),
+);
 
 // Valid size and minRetentionHours
 assert.commandWorked(
-    primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB, minRetentionHours: 5}),
+    primary
+        .getDB("admin")
+        .runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB, minRetentionHours: 5}),
 );
 
 // Valid minRetentionHours with no size parameter.
-assert.commandWorked(primary.getDB("admin").runCommand({replSetResizeOplog: 1, minRetentionHours: 1}));
+assert.commandWorked(
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, minRetentionHours: 1}),
+);
 
 assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 1 * PB);
 

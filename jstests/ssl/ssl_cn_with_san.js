@@ -36,10 +36,20 @@ assert(
 // Windowds/Mac will bail out too early to show this message.
 if (determineSSLProvider() === "openssl") {
     clearRawMongoProgramOutput();
-    const mongo = runMongoProgram("mongo", "--tls", "--tlsCAFile", CA, "localhost:" + mongod.port, "--eval", ";");
+    const mongo = runMongoProgram(
+        "mongo",
+        "--tls",
+        "--tlsCAFile",
+        CA,
+        "localhost:" + mongod.port,
+        "--eval",
+        ";",
+    );
     assert.neq(mongo, 0, "Shell connected when it should have failed");
     assert(
-        rawMongoProgramOutput(".*").includes("CN: localhost would have matched, but was overridden by SAN"),
+        rawMongoProgramOutput(".*").includes(
+            "CN: localhost would have matched, but was overridden by SAN",
+        ),
         "Expected detail warning not seen",
     );
 }

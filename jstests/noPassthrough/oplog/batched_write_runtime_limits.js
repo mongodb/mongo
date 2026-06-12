@@ -50,18 +50,28 @@ let ops = getApplyOpsSince(beforeTs);
 assert.eq(1, ops.length, () => `expected a single applyOps entry, got: ${tojson(ops)}`);
 
 // Lower the op count limit and expect the delete to split across two applyOps.
-assert.commandWorked(primary.adminCommand({setParameter: 1, maxNumberOfBatchedOperationsInSingleOplogEntry: 2}));
+assert.commandWorked(
+    primary.adminCommand({setParameter: 1, maxNumberOfBatchedOperationsInSingleOplogEntry: 2}),
+);
 assertDropAndRecreateCollection(db, coll.getName());
 assert.commandWorked(coll.insert([{_id: 10}, {_id: 11}, {_id: 12}, {_id: 13}]));
 beforeTs = latestOplogTs();
 assert.commandWorked(coll.remove({}));
 ops = getApplyOpsSince(beforeTs);
-assert.eq(2, ops.length, () => `expected two applyOps entries after lowering op-count limit: ${tojson(ops)}`);
+assert.eq(
+    2,
+    ops.length,
+    () => `expected two applyOps entries after lowering op-count limit: ${tojson(ops)}`,
+);
 
 // Lower the size limit and expect a split driven by size.
 const bigString = "x".repeat(400);
-assert.commandWorked(primary.adminCommand({setParameter: 1, maxNumberOfBatchedOperationsInSingleOplogEntry: 100}));
-assert.commandWorked(primary.adminCommand({setParameter: 1, maxSizeOfBatchedOperationsInSingleOplogEntryBytes: 200}));
+assert.commandWorked(
+    primary.adminCommand({setParameter: 1, maxNumberOfBatchedOperationsInSingleOplogEntry: 100}),
+);
+assert.commandWorked(
+    primary.adminCommand({setParameter: 1, maxSizeOfBatchedOperationsInSingleOplogEntryBytes: 200}),
+);
 assertDropAndRecreateCollection(db, coll.getName());
 assert.commandWorked(
     coll.insert([
@@ -72,6 +82,10 @@ assert.commandWorked(
 beforeTs = latestOplogTs();
 assert.commandWorked(coll.remove({}));
 ops = getApplyOpsSince(beforeTs);
-assert.eq(2, ops.length, () => `expected two applyOps entries after lowering size limit: ${tojson(ops)}`);
+assert.eq(
+    2,
+    ops.length,
+    () => `expected two applyOps entries after lowering size limit: ${tojson(ops)}`,
+);
 
 rst.stopSet();

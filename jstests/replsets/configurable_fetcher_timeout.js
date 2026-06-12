@@ -25,7 +25,10 @@ assert.gt(
 );
 for (let node of rst.nodes) {
     assert.commandWorked(
-        node.adminCommand({setParameter: 1, syncSourceResolverFindFetcherTimeoutMillis: kFetcherTimeoutMillis}),
+        node.adminCommand({
+            setParameter: 1,
+            syncSourceResolverFindFetcherTimeoutMillis: kFetcherTimeoutMillis,
+        }),
     );
 }
 

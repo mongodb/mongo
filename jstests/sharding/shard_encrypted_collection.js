@@ -37,7 +37,9 @@ const sampleEncryptedFields = {
 };
 
 // Set up the encrypted collection & enable sharding
-assert.commandWorked(client.createEncryptionCollection("basic", {encryptedFields: sampleEncryptedFields}));
+assert.commandWorked(
+    client.createEncryptionCollection("basic", {encryptedFields: sampleEncryptedFields}),
+);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 function testShardingCommand(command) {
@@ -53,16 +55,28 @@ function testShardingCommand(command) {
     jsTestLog("Fail " + command + " if shard key is an encrypted field");
     commandObj["key"] = {firstName: 1};
     res = mongos.adminCommand(commandObj);
-    assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions, command + " on encrypted field passed");
+    assert.commandFailedWithCode(
+        res,
+        ErrorCodes.InvalidOptions,
+        command + " on encrypted field passed",
+    );
 
     commandObj["key"] = {lastName: 1, firstName: "hashed", middleName: 1};
     res = mongos.adminCommand(commandObj);
-    assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions, command + " on encrypted field passed");
+    assert.commandFailedWithCode(
+        res,
+        ErrorCodes.InvalidOptions,
+        command + " on encrypted field passed",
+    );
 
     jsTestLog("Fail " + command + " if shard key is a prefix of an encrypted field");
     commandObj["key"] = {"paymentMethods.creditCards": 1};
     res = mongos.adminCommand(commandObj);
-    assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions, command + " on prefix of encrypted field passed");
+    assert.commandFailedWithCode(
+        res,
+        ErrorCodes.InvalidOptions,
+        command + " on prefix of encrypted field passed",
+    );
 
     jsTestLog("Fail " + command + " if shard key has a prefix matching an encrypted field");
     commandObj["key"] = {"paymentMethods.creditCards.number.lastFour": 1};

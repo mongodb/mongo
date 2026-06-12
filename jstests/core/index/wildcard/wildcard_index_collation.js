@@ -17,17 +17,25 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-import {getPlanStages, getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isIndexOnly,
+} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
 // Create the collection and assign it a default case-insensitive collation.
-let coll = assertDropAndRecreateCollection(db, "wildcard_collation", {collation: {locale: "en_US", strength: 1}});
+let coll = assertDropAndRecreateCollection(db, "wildcard_collation", {
+    collation: {locale: "en_US", strength: 1},
+});
 
 // Extracts the winning plan for the given query and projection from the explain output.
 const winningPlan = (query, proj) =>
     FixtureHelpers.isMongos(db)
-        ? getWinningPlanFromExplain(getWinningPlanFromExplain(coll.find(query, proj).explain().queryPlanner).shards[0])
+        ? getWinningPlanFromExplain(
+              getWinningPlanFromExplain(coll.find(query, proj).explain().queryPlanner).shards[0],
+          )
         : getWinningPlanFromExplain(coll.find(query, proj).explain().queryPlanner);
 
 // Runs the given query and confirms that: (1) the $** was used to answer the query, (2) the
@@ -69,7 +77,10 @@ function assertIndexHasCollation(keyPattern, collation) {
     );
 }
 
-const wildcardIndexes = [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}}];
+const wildcardIndexes = [
+    {keyPattern: {"$**": 1}},
+    {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}},
+];
 
 for (const indexSpec of wildcardIndexes) {
     const option = {};
@@ -136,5 +147,7 @@ for (const indexSpec of wildcardIndexes) {
     assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, E: 1})));
     assert(!isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, e: 1})));
 
-    coll = assertDropAndRecreateCollection(db, "wildcard_collation", {collation: {locale: "en_US", strength: 1}});
+    coll = assertDropAndRecreateCollection(db, "wildcard_collation", {
+        collation: {locale: "en_US", strength: 1},
+    });
 }

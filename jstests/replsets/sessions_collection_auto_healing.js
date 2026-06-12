@@ -27,10 +27,14 @@ let secondaryAdmin = secondary.getDB("admin");
 
 let arbiter = replTest.getArbiter();
 
-const refreshErrorMsgRegex = new RegExp("Failed to refresh session cache, will try again at the next refresh interval");
+const refreshErrorMsgRegex = new RegExp(
+    "Failed to refresh session cache, will try again at the next refresh interval",
+);
 
 // Get the current value of the TTL index so that we can verify it's being properly applied.
-let res = assert.commandWorked(primary.adminCommand({getParameter: 1, localLogicalSessionTimeoutMinutes: 1}));
+let res = assert.commandWorked(
+    primary.adminCommand({getParameter: 1, localLogicalSessionTimeoutMinutes: 1}),
+);
 let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
 
 // Test that we can use sessions on the primary before the sessions collection exists.
@@ -104,9 +108,10 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
 // Test that a refresh on a secondary will not create the TTL index on the sessions collection.
 {
     assert.commandWorked(
-        primary
-            .getDB("config")
-            .system.sessions.runCommand("dropIndexes", {index: {lastUse: 1}, writeConcern: {w: "majority"}}),
+        primary.getDB("config").system.sessions.runCommand("dropIndexes", {
+            index: {lastUse: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
 
     validateSessionsCollection(primary, true, false, timeoutMinutes);
@@ -139,7 +144,10 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
 
 timeoutMinutes = 4;
 
-replTest.restart(0, {startClean: false, setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes});
+replTest.restart(0, {
+    startClean: false,
+    setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes,
+});
 
 primary = replTest.getPrimary();
 primaryAdmin = primary.getDB("admin");

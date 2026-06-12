@@ -101,7 +101,9 @@ export function observeExtensionMetricsChange(operationsToRun, getMetricsFn, met
 
             // If expectSuccess is explicitly set to true, the operation should have succeeded.
             if (expectSuccessExplicitlySet && expectSuccess === true) {
-                throw new Error(`Operation ${i} was expected to succeed but failed with error: ${e.message}`);
+                throw new Error(
+                    `Operation ${i} was expected to succeed but failed with error: ${e.message}`,
+                );
             }
         }
     }

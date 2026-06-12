@@ -118,13 +118,18 @@ export function densifyInJS(stage, docs) {
         }
         const minValue = docsWithoutNulls[0][field];
         const maxValue = docsWithoutNulls[docsWithoutNulls.length - 1][field];
-        return densifyInJS({field: stage.field, range: {step, bounds: [minValue, maxValue], unit}}, docs);
+        return densifyInJS(
+            {field: stage.field, range: {step, bounds: [minValue, maxValue], unit}},
+            docs,
+        );
     } else if (bounds === "partition") {
         throw new Error("Partitioning not supported by JS densify.");
     } else if (bounds.length == 2) {
         const [lower, upper] = bounds;
         let currentVal =
-            docsWithoutNulls.length > 0 ? Math.min(docsWithoutNulls[0], sub(lower, step)) : sub(lower, step);
+            docsWithoutNulls.length > 0
+                ? Math.min(docsWithoutNulls[0], sub(lower, step))
+                : sub(lower, step);
         for (let i = 0; i < docs.length; i++) {
             const nextVal = docs[i][field];
             if (nextVal === null || nextVal === undefined) {
@@ -144,7 +149,9 @@ export function densifyInJS(stage, docs) {
             currentVal = nextVal;
         }
         const lastVal =
-            docsWithoutNulls.length > 0 ? docsWithoutNulls[docsWithoutNulls.length - 1][field] : sub(lower, step);
+            docsWithoutNulls.length > 0
+                ? docsWithoutNulls[docsWithoutNulls.length - 1][field]
+                : sub(lower, step);
         if (lastVal < upper) {
             stream.push(...generateDocuments(getNextStepFromBase(currentVal, lower, step), upper));
         }
@@ -164,10 +171,24 @@ export const insertDocumentsFromOffsets = ({base, offsets, addFunc, coll, field}
     offsets.forEach((num) => coll.insert({[field || "val"]: addFunc(base, num)}));
 
 export const insertDocumentsOnPredicate = ({base, min, max, pred, addFunc, coll, field}) =>
-    insertDocumentsFromOffsets({base, offsets: genRange(min, max).filter(pred), addFunc, coll, field});
+    insertDocumentsFromOffsets({
+        base,
+        offsets: genRange(min, max).filter(pred),
+        addFunc,
+        coll,
+        field,
+    });
 
 export const insertDocumentsOnStep = ({base, min, max, step, addFunc, coll, field}) =>
-    insertDocumentsOnPredicate({base, min, max, pred: (i) => (i - min) % step === 0, addFunc, coll, field});
+    insertDocumentsOnPredicate({
+        base,
+        min,
+        max,
+        pred: (i) => (i - min) % step === 0,
+        addFunc,
+        coll,
+        field,
+    });
 
 export function buildErrorString(found, expected) {
     return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);

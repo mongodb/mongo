@@ -25,8 +25,16 @@ export var ElectionHandoffTest = (function () {
         const numNodes = config.members.length;
         const memberInfo = config.members[expectedCandidateId];
 
-        assert.neq(true, memberInfo["arbiterOnly"], "Election handoff candidate cannot be an arbiter.");
-        assert.neq(0, memberInfo["priority"], "Election handoff candidate cannot have zero priority");
+        assert.neq(
+            true,
+            memberInfo["arbiterOnly"],
+            "Election handoff candidate cannot be an arbiter.",
+        );
+        assert.neq(
+            0,
+            memberInfo["priority"],
+            "Election handoff candidate cannot have zero priority",
+        );
 
         rst.awaitNodesAgreeOnPrimary();
         const primary = rst.getPrimary();
@@ -50,7 +58,10 @@ export var ElectionHandoffTest = (function () {
         assert.commandWorked(
             primary
                 .getDB("test")
-                .secondariesMustBeCaughtUpToHere.insert({"a": 1}, {writeConcern: {w: rst.nodes.length}}),
+                .secondariesMustBeCaughtUpToHere.insert(
+                    {"a": 1},
+                    {writeConcern: {w: rst.nodes.length}},
+                ),
         );
         rst.awaitNodesAgreeOnAppliedOpTime();
 
@@ -66,7 +77,8 @@ export var ElectionHandoffTest = (function () {
             assert.commandWorked(
                 primary.adminCommand({
                     replSetStepDown: options.stepDownPeriodSecs || kStepDownPeriodSecs,
-                    secondaryCatchUpPeriodSecs: options.secondaryCatchUpPeriodSecs || kStepDownPeriodSecs / 2,
+                    secondaryCatchUpPeriodSecs:
+                        options.secondaryCatchUpPeriodSecs || kStepDownPeriodSecs / 2,
                 }),
             );
         }

@@ -49,7 +49,10 @@ if (!isLinux()) {
     }
 
     // Get all log messages (including warnings)
-    const logResults = assert.commandWorked(db.adminCommand({getLog: "global"}), "Failed to get global log");
+    const logResults = assert.commandWorked(
+        db.adminCommand({getLog: "global"}),
+        "Failed to get global log",
+    );
 
     assert(
         !!findMatchingLogLine(logResults.log, {id: 11621101}),

@@ -13,7 +13,10 @@ function assertCreatedWithChunks(shardKey, chunks) {
     CreateShardedCollectionUtil.shardCollectionWithChunks(collection, shardKey, chunks);
 
     const configDB = st.s.getDB("config");
-    const actualChunks = findChunksUtil.findChunksByNs(configDB, collection.getFullName()).sort({min: 1}).toArray();
+    const actualChunks = findChunksUtil
+        .findChunksByNs(configDB, collection.getFullName())
+        .sort({min: 1})
+        .toArray();
     assert.eq(
         chunks.slice().sort((a, b) => bsonWoCompare(a.min, b.min)),
         actualChunks.map((chunk) => ({min: chunk.min, max: chunk.max, shard: chunk.shard})),
@@ -70,7 +73,10 @@ function assertFailToCreateWithChunks(shardKey, chunks, errRegex) {
         CreateShardedCollectionUtil.shardCollectionWithChunks(collection, shardKey, chunks),
     );
 
-    assert(errRegex.test(err.message), `${tojson(errRegex)} didn't match error message: ${tojson(err)}`);
+    assert(
+        errRegex.test(err.message),
+        `${tojson(errRegex)} didn't match error message: ${tojson(err)}`,
+    );
 }
 
 // Cannot have chunks array be empty.

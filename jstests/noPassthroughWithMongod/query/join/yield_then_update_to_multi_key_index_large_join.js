@@ -39,7 +39,9 @@ function resetCollections(db, localColl) {
     ];
     assert.commandWorked(localColl.insertMany(docs));
     // Add index for multikeyness info for path arrayness.
-    assert.commandWorked(localColl.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1}));
+    assert.commandWorked(
+        localColl.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1}),
+    );
     /* Iterate over A through H of the alphabet */
     for (const joinField of charRange("a", "h")) {
         const from = `coll${joinField.toUpperCase()}`;
@@ -47,7 +49,9 @@ function resetCollections(db, localColl) {
         coll.drop();
         assert.commandWorked(coll.insertMany(docs));
         // Add index for multikeyness info for path arrayness.
-        assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1}));
+        assert.commandWorked(
+            coll.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1}),
+        );
 
         const key = {[joinField]: 1};
         assert.commandWorked(coll.createIndex(key));
@@ -79,7 +83,9 @@ function runPipeline({pipeline, localColl}) {
     Random.setRandomSeed(20230328);
     /* Running the randomizer through a loop 50 times will generate good join order, shape, and method coverage.*/
     for (let i = 0; i < 50; i++) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: Random.randInt(10000)}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: Random.randInt(10000)}),
+        );
         let explain = localColl.explain().aggregate(pipeline);
         assert(joinOptUsed(explain));
         let cursor = localColl.aggregate(pipeline, {cursor: {batchSize: 1}});

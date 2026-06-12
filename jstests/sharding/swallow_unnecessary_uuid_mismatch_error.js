@@ -10,7 +10,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 3});
 
 const db = st.s.getDB(jsTestName());
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const getUUIDForCollection = function (coll) {
     return assert
@@ -31,7 +33,9 @@ assert.commandWorked(coll1.insert([{_id: 0}, {_id: 10}, {_id: 50}, {_id: 100}]))
 // shard0: [inf, 50), shard1: [50, inf), shard2 has no chunks
 assert.commandWorked(st.s.adminCommand({shardCollection: collFullName1, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: collFullName1, middle: {_id: 50}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: collFullName1, find: {_id: 50}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: collFullName1, find: {_id: 50}, to: st.shard1.shardName}),
+);
 
 let uuid1 = getUUIDForCollection(coll1);
 
@@ -42,7 +46,10 @@ let cmdObj = {
     deletes: [
         {
             q: {
-                $and: [{$expr: {$gte: ["$_id", {$literal: 0}]}}, {$expr: {$lt: ["$_id", {$literal: 99}]}}],
+                $and: [
+                    {$expr: {$gte: ["$_id", {$literal: 0}]}},
+                    {$expr: {$lt: ["$_id", {$literal: 99}]}},
+                ],
             },
             limit: 0,
             hint: {_id: 1},
@@ -62,13 +69,17 @@ assert.commandWorked(coll2.insert([{_id: 0}, {_id: 10}, {_id: 50}, {_id: 100}]))
 assert.commandWorked(coll2.insert([{_id: 11}, {_id: 51}]));
 
 // Create an index on {x: 1}.
-assert.commandWorked(db.runCommand({createIndexes: collName2, indexes: [{name: "x_1", key: {x: 1}}]}));
+assert.commandWorked(
+    db.runCommand({createIndexes: collName2, indexes: [{name: "x_1", key: {x: 1}}]}),
+);
 
 // Shard the collection on {x: 1} and split up the key space so that shard0 owns [inf, 50) and
 // shard1 owns [50, inf).
 assert.commandWorked(st.s.adminCommand({shardCollection: collFullName2, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: collFullName2, middle: {x: 50}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: collFullName2, find: {x: 50}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: collFullName2, find: {x: 50}, to: st.shard1.shardName}),
+);
 
 let uuid2 = getUUIDForCollection(coll2);
 

@@ -38,7 +38,12 @@ function runScoreFusionMultiplePipelineTest(normalization, expectedResults) {
                                     index: getRentalSearchIndexSpec().name,
                                     text: {
                                         query: "brooklyn",
-                                        path: ["name", "summary", "description", "neighborhood_overview"],
+                                        path: [
+                                            "name",
+                                            "summary",
+                                            "description",
+                                            "neighborhood_overview",
+                                        ],
                                     },
                                 },
                             },

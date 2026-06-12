@@ -20,7 +20,11 @@ export const $config = (function () {
         let bulk = coll.initializeUnorderedBulkOp();
 
         for (let i = 0; i < nDocsToInsert; ++i) {
-            bulk.insert(data.usingNestedKey ? {tid: data.tid, a: i, b: {c: i}} : {tid: data.tid, a: i, b: i});
+            bulk.insert(
+                data.usingNestedKey
+                    ? {tid: data.tid, a: i, b: {c: i}}
+                    : {tid: data.tid, a: i, b: i},
+            );
         }
 
         const res = bulk.execute();
@@ -49,7 +53,9 @@ export const $config = (function () {
             // Randomly add 1 to this.latch.getCount() to increase the odds of inserting into a
             // collection that has just been refined.
             const collectionNumber =
-                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
+                Math.random() < 0.5
+                    ? this.latch.getCount()
+                    : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const coll = db.getCollection(collName + "_" + collectionNumber);
             const res = this.usingNestedKey
@@ -65,7 +71,9 @@ export const $config = (function () {
             // Randomly add 1 to this.latch.getCount() to increase the odds of finding in a
             // collection that has just been refined.
             const collectionNumber =
-                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
+                Math.random() < 0.5
+                    ? this.latch.getCount()
+                    : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const idx = Random.randInt(this.latchCount);
             const coll = db.getCollection(collName + "_" + collectionNumber);
@@ -80,7 +88,9 @@ export const $config = (function () {
             // Randomly add 1 to this.latch.getCount() to increase the odds of updating in a
             // collection that has just been refined.
             const collectionNumber =
-                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
+                Math.random() < 0.5
+                    ? this.latch.getCount()
+                    : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const coll = this.sessionDB.getCollection(collName + "_" + collectionNumber);
             const res = this.usingNestedKey
@@ -102,7 +112,9 @@ export const $config = (function () {
                 ) {
                     // If we are running with the balancer disabled, we might update the document so
                     // that it moves to a shard which contains an orphaned version of the document.
-                    jsTest.log("Ignoring DuplicateKey error during update due to ongoing migrations");
+                    jsTest.log(
+                        "Ignoring DuplicateKey error during update due to ongoing migrations",
+                    );
                     return;
                 }
 
@@ -138,12 +150,20 @@ export const $config = (function () {
             // Randomly add 1 to this.latch.getCount() to increase the odds of removing from a
             // collection that has just been refined.
             const collectionNumber =
-                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
+                Math.random() < 0.5
+                    ? this.latch.getCount()
+                    : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const coll = db.getCollection(collName + "_" + collectionNumber);
             const res = this.usingNestedKey
-                ? coll.remove({tid: this.tid, a: this.removeIdx, b: {c: this.removeIdx}}, {justOne: true})
-                : coll.remove({tid: this.tid, a: this.removeIdx, b: this.removeIdx}, {justOne: true});
+                ? coll.remove(
+                      {tid: this.tid, a: this.removeIdx, b: {c: this.removeIdx}},
+                      {justOne: true},
+                  )
+                : coll.remove(
+                      {tid: this.tid, a: this.removeIdx, b: this.removeIdx},
+                      {justOne: true},
+                  );
 
             assert.commandWorked(res);
             assert.eq(res.nRemoved, 1);
@@ -155,7 +175,10 @@ export const $config = (function () {
 
             try {
                 assert.commandWorked(
-                    db.adminCommand({refineCollectionShardKey: coll.getFullName(), key: this.newShardKey}),
+                    db.adminCommand({
+                        refineCollectionShardKey: coll.getFullName(),
+                        key: this.newShardKey,
+                    }),
                 );
             } catch (e) {
                 // There is a race that could occur where two threads run refineCollectionShardKey
@@ -220,7 +243,13 @@ export const $config = (function () {
             refineCollectionShardKey: 0.18,
             flushRouterConfig: 0.1,
         },
-        flushRouterConfig: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
+        flushRouterConfig: {
+            insert: 0.2,
+            find: 0.2,
+            update: 0.2,
+            remove: 0.2,
+            refineCollectionShardKey: 0.2,
+        },
     };
 
     function setup(db, collName, cluster) {
@@ -240,7 +269,9 @@ export const $config = (function () {
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
             let coll = db.getCollection(collName + "_" + i);
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: this.oldShardKey}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: this.oldShardKey}),
+            );
             assert.commandWorked(coll.createIndex(this.newShardKey));
         }
     }

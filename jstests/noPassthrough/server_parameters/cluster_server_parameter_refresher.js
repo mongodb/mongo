@@ -27,7 +27,9 @@ function runTest(st, startupRefreshIntervalMS) {
     const kRefreshLogId = 6226403;
     const startupRefreshIntervalRelaxedMS = startupRefreshIntervalMS * 2 + errorMarginMS;
     let expectedParams = {};
-    const defaultParams = Object.fromEntries(kAllClusterParameterDefaults.map((elem) => [elem._id, elem]));
+    const defaultParams = Object.fromEntries(
+        kAllClusterParameterDefaults.map((elem) => [elem._id, elem]),
+    );
 
     function assertParams(timeoutMillis) {
         let expectedLogged = Object.keys(expectedParams).map((key) => {
@@ -53,7 +55,9 @@ function runTest(st, startupRefreshIntervalMS) {
                     if (obj.id === kRefreshLogId) {
                         let cpd = obj.attr.clusterParameterDocuments[0].updatedParameters;
                         // We may observe updates to parameters done by MongoDB itself; exclude them
-                        cpd = cpd.filter((elem) => !kAllClusterParameterSetInternallyNames.includes(elem._id));
+                        cpd = cpd.filter(
+                            (elem) => !kAllClusterParameterSetInternallyNames.includes(elem._id),
+                        );
                         cpd.sort(bsonWoCompare);
                         if (bsonWoCompare(cpd, expectedLogged) === 0) {
                             return true;
@@ -68,20 +72,28 @@ function runTest(st, startupRefreshIntervalMS) {
             {runHangAnalyzer: false},
         );
 
-        runGetClusterParameterSharded(st, "*", Object.values({...defaultParams, ...expectedParams}));
+        runGetClusterParameterSharded(
+            st,
+            "*",
+            Object.values({...defaultParams, ...expectedParams}),
+        );
     }
 
     assertParams(startupRefreshIntervalRelaxedMS);
 
     // Set a cluster parameter to a different value and then wait.
-    assert.commandWorked(conn.adminCommand({setClusterParameter: {testIntClusterParameter: {intData: 2022}}}));
+    assert.commandWorked(
+        conn.adminCommand({setClusterParameter: {testIntClusterParameter: {intData: 2022}}}),
+    );
     expectedParams.testIntClusterParameter = {_id: "testIntClusterParameter", intData: 2022};
 
     // Check that the newly set parameter is refreshed within the interval.
     assertParams(startupRefreshIntervalRelaxedMS);
 
     // Set another cluster parameter and check that both parameters are refreshed.
-    assert.commandWorked(conn.adminCommand({setClusterParameter: {testStrClusterParameter: {strData: "welcome"}}}));
+    assert.commandWorked(
+        conn.adminCommand({setClusterParameter: {testStrClusterParameter: {strData: "welcome"}}}),
+    );
     expectedParams.testStrClusterParameter = {_id: "testStrClusterParameter", strData: "welcome"};
 
     assertParams(startupRefreshIntervalRelaxedMS);
@@ -90,9 +102,14 @@ function runTest(st, startupRefreshIntervalMS) {
     const newRefreshIntervalMS = startupRefreshIntervalMS - 8000;
     const newRefreshIntervalRelaxedMS = newRefreshIntervalMS * 2 + errorMarginMS;
     assert.commandWorked(
-        conn.adminCommand({setParameter: 1, clusterServerParameterRefreshIntervalSecs: newRefreshIntervalMS / 1000}),
+        conn.adminCommand({
+            setParameter: 1,
+            clusterServerParameterRefreshIntervalSecs: newRefreshIntervalMS / 1000,
+        }),
     );
-    assert.commandWorked(conn.adminCommand({setClusterParameter: {testIntClusterParameter: {intData: 2025}}}));
+    assert.commandWorked(
+        conn.adminCommand({setClusterParameter: {testIntClusterParameter: {intData: 2025}}}),
+    );
     expectedParams.testIntClusterParameter.intData = 2025;
 
     assertParams(newRefreshIntervalRelaxedMS);
@@ -104,15 +121,21 @@ function runTest(st, startupRefreshIntervalMS) {
     assertParams(startupRefreshIntervalRelaxedMS);
 
     // Check that single parameter updates are caught as expected after restart.
-    assert.commandWorked(conn.adminCommand({setClusterParameter: {testStrClusterParameter: {strData: "goodbye"}}}));
+    assert.commandWorked(
+        conn.adminCommand({setClusterParameter: {testStrClusterParameter: {strData: "goodbye"}}}),
+    );
     expectedParams.testStrClusterParameter.strData = "goodbye";
 
     assertParams(startupRefreshIntervalRelaxedMS);
 
     // Check that multiple setClusterParameter invocations within a single refresh cycle
     // are captured and updated.
-    assert.commandWorked(conn.adminCommand({setClusterParameter: {testIntClusterParameter: {intData: 2028}}}));
-    assert.commandWorked(conn.adminCommand({setClusterParameter: {testBoolClusterParameter: {boolData: true}}}));
+    assert.commandWorked(
+        conn.adminCommand({setClusterParameter: {testIntClusterParameter: {intData: 2028}}}),
+    );
+    assert.commandWorked(
+        conn.adminCommand({setClusterParameter: {testBoolClusterParameter: {boolData: true}}}),
+    );
     expectedParams.testIntClusterParameter.intData = 2028;
     expectedParams.testBoolClusterParameter = {_id: "testBoolClusterParameter", boolData: true};
 

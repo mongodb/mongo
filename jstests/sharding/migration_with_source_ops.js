@@ -73,9 +73,10 @@ assert.eq(20, coll.count());
 
 jsTest.log("Setting failpoint failMigrationReceivedOutOfRangeOperation");
 assert.commandWorked(
-    recipient
-        .getDB("admin")
-        .runCommand({configureFailPoint: "failMigrationReceivedOutOfRangeOperation", mode: "alwaysOn"}),
+    recipient.getDB("admin").runCommand({
+        configureFailPoint: "failMigrationReceivedOutOfRangeOperation",
+        mode: "alwaysOn",
+    }),
 );
 
 jsTest.log("Setting chunk migration recipient failpoint so that it pauses after bulk clone step");
@@ -90,7 +91,14 @@ pauseMigrateAtStep(recipient, migrateStepNames.cloned);
 // Donor:     [0, 20)
 // Recipient:    [20, 40)
 jsTest.log("Starting migration, pause after cloning...");
-let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s0.host,
+    {a: 20},
+    null,
+    coll.getFullName(),
+    st.shard1.shardName,
+);
 
 /**
  * Wait for recipient to finish cloning step.

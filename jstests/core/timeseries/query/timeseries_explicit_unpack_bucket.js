@@ -11,16 +11,23 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const tsCollWithMeta = testDB.getCollection("tsCollWithMeta");
 const tsCollWithoutMeta = testDB.getCollection("tsCollWithoutMeta");
 assert.commandWorked(
-    testDB.createCollection(tsCollWithMeta.getName(), {timeseries: {timeField: "start", metaField: "tags"}}),
+    testDB.createCollection(tsCollWithMeta.getName(), {
+        timeseries: {timeField: "start", metaField: "tags"},
+    }),
 );
-assert.commandWorked(testDB.createCollection(tsCollWithoutMeta.getName(), {timeseries: {timeField: "start"}}));
+assert.commandWorked(
+    testDB.createCollection(tsCollWithoutMeta.getName(), {timeseries: {timeField: "start"}}),
+);
 
 const nMeasurements = 50;
 const aDayInMs = 24 * 60 * 60 * 1000;
@@ -41,16 +48,27 @@ for (let i = 0; i < nMeasurements; i++) {
 
 const resultsWithMeta = getTimeseriesCollForRawOps(tsCollWithMeta)
     .aggregate(
-        [{$_unpackBucket: {timeField: "start", metaField: "tags"}}, {$project: {_id: 0}}, {$sort: {value: 1}}],
+        [
+            {$_unpackBucket: {timeField: "start", metaField: "tags"}},
+            {$project: {_id: 0}},
+            {$sort: {value: 1}},
+        ],
         kRawOperationSpec,
     )
     .toArray();
 const resultsWithoutMeta = getTimeseriesCollForRawOps(tsCollWithoutMeta)
-    .aggregate([{$_unpackBucket: {timeField: "start"}}, {$project: {_id: 0}}, {$sort: {value: 1}}], kRawOperationSpec)
+    .aggregate(
+        [{$_unpackBucket: {timeField: "start"}}, {$project: {_id: 0}}, {$sort: {value: 1}}],
+        kRawOperationSpec,
+    )
     .toArray();
 const resultsWithNonExistentMeta = getTimeseriesCollForRawOps(tsCollWithoutMeta)
     .aggregate(
-        [{$_unpackBucket: {timeField: "start", metaField: "foo"}}, {$project: {_id: 0}}, {$sort: {value: 1}}],
+        [
+            {$_unpackBucket: {timeField: "start", metaField: "foo"}},
+            {$project: {_id: 0}},
+            {$sort: {value: 1}},
+        ],
         kRawOperationSpec,
     )
     .toArray();
@@ -174,14 +192,20 @@ assert.commandFailedWithCode(
 // $_unpackBucket specification must be an object.
 assert.commandFailedWithCode(
     assert.throws(() =>
-        getTimeseriesCollForRawOps(tsCollWithMeta).aggregate([{$_unpackBucket: "foo"}], kRawOperationSpec),
+        getTimeseriesCollForRawOps(tsCollWithMeta).aggregate(
+            [{$_unpackBucket: "foo"}],
+            kRawOperationSpec,
+        ),
     ),
     5612400,
 );
 // $_unpackBucket fails if "timeField" is not a string.
 assert.commandFailedWithCode(
     assert.throws(() =>
-        getTimeseriesCollForRawOps(tsCollWithMeta).aggregate([{$_unpackBucket: {timeField: 60}}], kRawOperationSpec),
+        getTimeseriesCollForRawOps(tsCollWithMeta).aggregate(
+            [{$_unpackBucket: {timeField: 60}}],
+            kRawOperationSpec,
+        ),
     ),
     5612401,
 );
@@ -232,7 +256,9 @@ const tsCollNullByte = testDB.getCollection("tsCollNullByte");
 assert.commandFailedWithCode(
     assert.throws(() =>
         assert.commandWorked(
-            testDB.createCollection(tsCollNullByte.getName(), {timeseries: {timeField: "a\x00b", metaField: "tags"}}),
+            testDB.createCollection(tsCollNullByte.getName(), {
+                timeseries: {timeField: "a\x00b", metaField: "tags"},
+            }),
         ),
     ),
     ErrorCodes.BadValue,
@@ -241,7 +267,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     assert.throws(() =>
         assert.commandWorked(
-            testDB.createCollection(tsCollNullByte.getName(), {timeseries: {timeField: "time", metaField: "a\x00b"}}),
+            testDB.createCollection(tsCollNullByte.getName(), {
+                timeseries: {timeField: "time", metaField: "a\x00b"},
+            }),
         ),
     ),
     ErrorCodes.BadValue,

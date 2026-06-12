@@ -50,15 +50,26 @@ assert.commandWorked(
     }),
 );
 assert.commandWorked(
-    sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(0), stmtId: NumberInt(1), autocommit: false}),
+    sessionDB.adminCommand({
+        prepareTransaction: 1,
+        txnNumber: NumberLong(0),
+        stmtId: NumberInt(1),
+        autocommit: false,
+    }),
 );
 
 let transactionEntry = config.transactions.findOne();
 const txnNum = transactionEntry.txnNum;
 
-jsTestLog("Test that updates to config.transactions fails when there is a prepared " + "transaction on the session");
+jsTestLog(
+    "Test that updates to config.transactions fails when there is a prepared " +
+        "transaction on the session",
+);
 assert.commandFailedWithCode(
-    sessionConfigDB.transactions.update({_id: transactionEntry._id}, {$set: {"txnNumber": NumberLong(23)}}),
+    sessionConfigDB.transactions.update(
+        {_id: transactionEntry._id},
+        {$set: {"txnNumber": NumberLong(23)}},
+    ),
     40528,
 );
 
@@ -66,14 +77,23 @@ assert.commandFailedWithCode(
 transactionEntry = config.transactions.findOne();
 assert.eq(transactionEntry.txnNum, NumberLong(txnNum));
 
-jsTestLog("Test that deletes to config.transactions fails when there is a prepared " + "transaction on the session");
-assert.commandFailedWithCode(sessionConfigDB.transactions.remove({_id: transactionEntry._id}), 40528);
+jsTestLog(
+    "Test that deletes to config.transactions fails when there is a prepared " +
+        "transaction on the session",
+);
+assert.commandFailedWithCode(
+    sessionConfigDB.transactions.remove({_id: transactionEntry._id}),
+    40528,
+);
 
 // Make sure that the entry in config.transactions wasn't removed.
 transactionEntry = config.transactions.findOne();
 assert(transactionEntry);
 
-jsTestLog("Test that dropping config.transactions fails when there is a prepared transaction" + " present");
+jsTestLog(
+    "Test that dropping config.transactions fails when there is a prepared transaction" +
+        " present",
+);
 jsTestLog("[1] collection drop in the same session");
 assert.commandFailedWithCode(
     assert.throws(function () {
@@ -100,7 +120,12 @@ assert.commandWorked(sessionColl2.insert({_id: 1}));
 PrepareHelpers.prepareTransaction(session2);
 
 assert.commandWorked(
-    sessionDB.adminCommand({abortTransaction: 1, txnNumber: NumberLong(0), stmtId: NumberInt(2), autocommit: false}),
+    sessionDB.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(0),
+        stmtId: NumberInt(2),
+        autocommit: false,
+    }),
 );
 session.endSession();
 

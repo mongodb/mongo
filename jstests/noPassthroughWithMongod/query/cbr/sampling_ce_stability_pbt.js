@@ -34,9 +34,15 @@ const numQueriesPerRun = 30;
 const experimentColl = db[jsTestName()];
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"}),
+        db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "samplingCE",
+        }),
     );
     testProperty(
         createPlanStabilityProperty(experimentColl, true /* assertCeExists */),
@@ -46,6 +52,8 @@ try {
     );
 } finally {
     // Reset the plan ranker mode to its default value.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
+    );
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

@@ -45,5 +45,8 @@ let buildPipeline = (matchValue) => [
 qsutils.assertRejection({
     query: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline(1), cursor: {}}),
     queryPrime: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline(12345), cursor: {}}),
-    unrelatedQuery: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline("string"), cursor: {}}),
+    unrelatedQuery: qsutils.makeAggregateQueryInstance({
+        pipeline: buildPipeline("string"),
+        cursor: {},
+    }),
 });

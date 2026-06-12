@@ -21,7 +21,12 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // Helper to add generic txn fields to a command.
 function addTxnFieldsToCmd(cmd, lsid, txnNumber) {
-    return Object.extend(cmd, {lsid, txnNumber: NumberLong(txnNumber), stmtId: NumberInt(0), autocommit: false});
+    return Object.extend(cmd, {
+        lsid,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(0),
+        autocommit: false,
+    });
 }
 
 const dbName = "test";
@@ -31,7 +36,9 @@ const ns = dbName + "." + collName;
 const st = new ShardingTest({shards: [{verbose: 1}, {verbose: 1}]});
 
 // Set up sharded collection with two chunks - [-inf, 0), [0, inf)
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 
@@ -52,11 +59,17 @@ assert.commandWorked(
     st.s
         .getDB(dbName)
         .runCommand(
-            addTxnFieldsToCmd({insert: collName, documents: [{_id: -5}], startTransaction: true}, lsid, txnNumber),
+            addTxnFieldsToCmd(
+                {insert: collName, documents: [{_id: -5}], startTransaction: true},
+                lsid,
+                txnNumber,
+            ),
         ),
 );
 
-assert.commandWorked(st.rs0.getPrimary().adminCommand(addTxnFieldsToCmd({prepareTransaction: 1}, lsid, txnNumber)));
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand(addTxnFieldsToCmd({prepareTransaction: 1}, lsid, txnNumber)),
+);
 
 // Set a failpoint to hang right after beginning the index scan for documents to delete.
 st.rs0.getPrimary().adminCommand({configureFailPoint: "hangBeforeDoingDeletion", mode: "alwaysOn"});
@@ -74,6 +87,8 @@ st.rs0.getPrimary().adminCommand({configureFailPoint: "hangBeforeDoingDeletion",
 assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 5, force: true}));
 
 // Cleanup the transaction so the sharding test can shut down.
-assert.commandWorked(st.rs0.getPrimary().adminCommand(addTxnFieldsToCmd({abortTransaction: 1}, lsid, txnNumber)));
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand(addTxnFieldsToCmd({abortTransaction: 1}, lsid, txnNumber)),
+);
 
 st.stop();

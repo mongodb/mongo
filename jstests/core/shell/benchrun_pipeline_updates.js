@@ -33,7 +33,11 @@ if (jsTest.options().auth) {
 }
 let res = benchRun(benchArgs);
 assert.eq(res.errCount, 0);
-assert.gte(coll.findOne({_id: 0}).x, 2, "Expected at least one update to succeed and increment 'x'");
+assert.gte(
+    coll.findOne({_id: 0}).x,
+    2,
+    "Expected at least one update to succeed and increment 'x'",
+);
 
 // Now test that the pipeline is still subject to benchRun's keyword replacement.
 
@@ -51,4 +55,8 @@ benchArgs.ops = [
 ];
 res = benchRun(benchArgs);
 assert.eq(res.errCount, 0);
-assert.lte(coll.findOne({_id: 0}).x, 3, "Expected 'x' to be no more than 3 after randInt replacement");
+assert.lte(
+    coll.findOne({_id: 0}).x,
+    3,
+    "Expected 'x' to be no more than 3 after randInt replacement",
+);

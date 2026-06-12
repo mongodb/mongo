@@ -20,7 +20,9 @@ export const $config = (function () {
     const prefix = "view_catalog_cycle_lookup_";
 
     let data = {
-        viewList: ["viewA", "viewB", "viewC", "viewD", "viewE"].map((viewName) => prefix + viewName),
+        viewList: ["viewA", "viewB", "viewC", "viewD", "viewE"].map(
+            (viewName) => prefix + viewName,
+        ),
         getRandomView: function (viewList) {
             return viewList[Random.randInt(viewList.length)];
         },
@@ -97,7 +99,11 @@ export const $config = (function () {
 
             const fromName = this.getRandomView(this.viewList);
             const toName = this.getRandomView(this.viewList);
-            const res = db.runCommand({collMod: fromName, viewOn: toName, pipeline: this.getRandomViewPipeline()});
+            const res = db.runCommand({
+                collMod: fromName,
+                viewOn: toName,
+                pipeline: this.getRandomViewPipeline(),
+            });
             assert.commandWorkedOrFailedWithCode(res, [
                 ErrorCodes.GraphContainsCycle,
                 ErrorCodes.ConflictingOperationInProgress,
@@ -118,7 +124,11 @@ export const $config = (function () {
             }
 
             const fromName = this.getRandomView(this.viewList);
-            const res = db.runCommand({collMod: fromName, viewOn: collName, pipeline: this.getRandomViewPipeline()});
+            const res = db.runCommand({
+                collMod: fromName,
+                viewOn: collName,
+                pipeline: this.getRandomViewPipeline(),
+            });
             assert.commandWorkedOrFailedWithCode(res, [
                 ErrorCodes.GraphContainsCycle,
                 ErrorCodes.ConflictingOperationInProgress,
@@ -163,7 +173,11 @@ export const $config = (function () {
 
     let transitions = {
         remapViewToView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
-        remapViewToCollection: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
+        remapViewToCollection: {
+            remapViewToView: 0.4,
+            remapViewToCollection: 0.1,
+            readFromView: 0.5,
+        },
         readFromView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
     };
 
@@ -186,7 +200,9 @@ export const $config = (function () {
         // in suites that run multi-document transactions.
         this.originalTransactionLifetimeLimitSeconds = {};
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}),
+            );
             this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
 
@@ -208,10 +224,16 @@ export const $config = (function () {
         cluster.executeOnMongodNodes((db) => {
             // Store the old value of the max subpipeline view depth so we can restore it at the end
             // of the test.
-            const maxSubPipelineViewDepthParam = db.adminCommand({getParameter: 1, internalMaxSubPipelineViewDepth: 1});
+            const maxSubPipelineViewDepthParam = db.adminCommand({
+                getParameter: 1,
+                internalMaxSubPipelineViewDepth: 1,
+            });
             assert(maxSubPipelineViewDepthParam.hasOwnProperty("internalMaxSubPipelineViewDepth"));
-            this.oldMaxSubPipelineViewDepth = maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}));
+            this.oldMaxSubPipelineViewDepth =
+                maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}),
+            );
         });
     }
 
@@ -234,7 +256,8 @@ export const $config = (function () {
             assert.commandWorked(
                 db.adminCommand({
                     setParameter: 1,
-                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                    transactionLifetimeLimitSeconds:
+                        this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
                 }),
             );
         });

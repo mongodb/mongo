@@ -80,7 +80,9 @@ describe("Tests for priority port usage within replication internals", function 
         jsTest.log.info("Do some writes on the primary with local write concern");
         for (let i = 0; i < 100; i++) {
             assert.commandWorked(
-                primaryConn.getDB("test").runCommand({insert: "foo", documents: [{x: i}], writeConcern: {w: 1}}),
+                primaryConn
+                    .getDB("test")
+                    .runCommand({insert: "foo", documents: [{x: i}], writeConcern: {w: 1}}),
             );
         }
 
@@ -104,7 +106,9 @@ describe("Tests for priority port usage within replication internals", function 
         this.rs.waitForStepUpWrites();
         this.rs.awaitReplication();
 
-        jsTest.log.info("Block connections on the main port and drop all existing connections from within the RS");
+        jsTest.log.info(
+            "Block connections on the main port and drop all existing connections from within the RS",
+        );
         let fps = configureFailPointForRS(this.rs.nodes, "rejectNewNonPriorityConnections");
         dropAllConns(this.rs);
 
@@ -147,8 +151,10 @@ describe("Tests for priority port usage within replication internals", function 
         assert.soon(() => {
             // Check for sending heartbeats on the primary
             return (
-                rawMongoProgramOutput(heartbeatResponseReceivedLogID).split("\n").length >= waitForHeartbeats &&
-                rawMongoProgramOutput(heartbeatRequestSentLogID).split("\n").length >= waitForHeartbeats
+                rawMongoProgramOutput(heartbeatResponseReceivedLogID).split("\n").length >=
+                    waitForHeartbeats &&
+                rawMongoProgramOutput(heartbeatRequestSentLogID).split("\n").length >=
+                    waitForHeartbeats
             );
         });
 
@@ -169,7 +175,9 @@ describe("Tests for priority port usage within replication internals", function 
     it("Steady state replication via priority port", () => {
         this.rs.initiate();
 
-        jsTest.log.info("Block connections and kill ongoing oplog fetching to force a new connection");
+        jsTest.log.info(
+            "Block connections and kill ongoing oplog fetching to force a new connection",
+        );
         let fps = configureFailPointForRS(this.rs.nodes, "rejectNewNonPriorityConnections");
         dropAllConns(this.rs);
         killAllOplogFetchings(this.rs);
@@ -187,7 +195,9 @@ describe("Tests for priority port usage within replication internals", function 
         );
         let secondary = this.rs.getSecondary();
         let primaryHostAndPort = this.rs.getPrimary().host;
-        let fp = configureFailPoint(secondary, "forceSyncSourceCandidate", {hostAndPort: primaryHostAndPort});
+        let fp = configureFailPoint(secondary, "forceSyncSourceCandidate", {
+            hostAndPort: primaryHostAndPort,
+        });
         killAllOplogFetchings(this.rs);
 
         jsTest.log.info("Do some writes and check replication works");
@@ -213,7 +223,11 @@ describe("Tests for priority port usage within replication internals", function 
         jsTest.log.info("Add a new node to the replica set configuration");
         let newNode = this.rs.add();
         let config = this.rs.getReplSetConfigFromNode();
-        config.members.push({_id: 3, host: newNode.host, priorityPort: parseInt(newNode.priorityPort)});
+        config.members.push({
+            _id: 3,
+            host: newNode.host,
+            priorityPort: parseInt(newNode.priorityPort),
+        });
         config.version++;
         assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
 
@@ -226,7 +240,9 @@ describe("Tests for priority port usage within replication internals", function 
     it("Election handoff via priority port", () => {
         this.rs.initiate();
 
-        jsTest.log.info("Block connections on the main port and drop all existing connections from within the RS");
+        jsTest.log.info(
+            "Block connections on the main port and drop all existing connections from within the RS",
+        );
         let fps = configureFailPointForRS(this.rs.nodes, "rejectNewNonPriorityConnections");
         dropAllConns(this.rs);
 
@@ -246,7 +262,9 @@ describe("Tests for priority port usage within replication internals", function 
         newConfig.version += 1;
         assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: newConfig}));
 
-        jsTest.log.info("Do some writes to make sure there is someone to sync from which is ahead of us");
+        jsTest.log.info(
+            "Do some writes to make sure there is someone to sync from which is ahead of us",
+        );
         doWritesAndCheckReplication(this.rs.getPrimary(), this.rs.getSecondaries());
 
         jsTest.log.info("Check that we switch to replicating via the priority port");

@@ -64,7 +64,9 @@ let conn = MongoRunner.runMongod({
     },
 });
 
-assert.commandWorked(conn.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: numThreads}));
+assert.commandWorked(
+    conn.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: numThreads}),
+);
 
 const db = conn.getDB(dbName);
 const coll = db[collName];
@@ -118,7 +120,9 @@ for (let i = 1; i <= numThreads; ++i) {
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 // Launch a bunch of blocked search queries.
@@ -138,7 +142,9 @@ assert(coll.findOne(), "Expected to be able to run a concurrent query");
 
 // Now turn off the fail point and let the $search queries complete.
 assert.commandWorked(
-    mongotmock.getConnection().adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}),
+    mongotmock
+        .getConnection()
+        .adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}),
 );
 
 for (const thread of threads) {

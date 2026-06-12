@@ -8,7 +8,12 @@ let coll = runner.getDB("test").ttl_partial_index;
 coll.drop();
 
 // Create TTL partial index.
-assert.commandWorked(coll.createIndex({x: 1}, {expireAfterSeconds: 0, partialFilterExpression: {z: {$exists: true}}}));
+assert.commandWorked(
+    coll.createIndex(
+        {x: 1},
+        {expireAfterSeconds: 0, partialFilterExpression: {z: {$exists: true}}},
+    ),
+);
 
 let now = new Date();
 assert.commandWorked(coll.insert({x: now, z: 2}));
@@ -26,5 +31,9 @@ assert.eq(
         .itcount(),
     "Wrong number of documents in partial index, after TTL monitor run",
 );
-assert.eq(1, coll.find().itcount(), "Wrong number of documents in collection, after TTL monitor run");
+assert.eq(
+    1,
+    coll.find().itcount(),
+    "Wrong number of documents in collection, after TTL monitor run",
+);
 MongoRunner.stopMongod(runner);

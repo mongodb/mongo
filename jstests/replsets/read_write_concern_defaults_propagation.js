@@ -14,7 +14,11 @@ ReadWriteConcernDefaultsPropagation.runTests(primary, [primary, ...secondaries])
 // Verify the in-memory defaults are updated correctly. This verifies the cache is invalidated
 // properly on secondaries when an update to the defaults document is replicated because the
 // in-memory value will only be updated after an invalidation.
-ReadWriteConcernDefaultsPropagation.runTests(primary, [primary, ...secondaries], true /* inMemory */);
+ReadWriteConcernDefaultsPropagation.runTests(
+    primary,
+    [primary, ...secondaries],
+    true /* inMemory */,
+);
 
 ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(primary, [primary, ...secondaries]);
 

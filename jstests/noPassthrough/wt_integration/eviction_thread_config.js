@@ -22,10 +22,14 @@ admin.setLogLevel(1);
 const runtimeValue = 3;
 
 jsTestLog("minThreads: ", runtimeValue);
-assert.commandWorked(db.adminCommand({setParameter: 1, wiredTigerEvictionThreadsMin: runtimeValue}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, wiredTigerEvictionThreadsMin: runtimeValue}),
+);
 
 jsTestLog("maxThreads: ", runtimeValue);
-assert.commandWorked(db.adminCommand({setParameter: 1, wiredTigerEvictionThreadsMax: runtimeValue}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, wiredTigerEvictionThreadsMax: runtimeValue}),
+);
 
 // check startup value was set and is being replaced by the new runtime value
 checkLog.contains(db, `"newValue":"${runtimeValue}.0","oldValue":"${startupValue}"`);

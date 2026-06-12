@@ -27,7 +27,11 @@ coll.insertMany(docs);
             "nums": [0, 42, 1, 42, 2, 42, 3, 42, 4, 42, 5, 42, 6, 42, 7, 42, 8, 42, 9, 42],
         },
     ];
-    assert.eq(res, expected, "$bucketAuto with 1 bucket & $concatArrays does not obey sort order of incoming docs.");
+    assert.eq(
+        res,
+        expected,
+        "$bucketAuto with 1 bucket & $concatArrays does not obey sort order of incoming docs.",
+    );
 }
 
 {
@@ -42,7 +46,11 @@ coll.insertMany(docs);
         {"_id": {"min": 0, "max": 5}, "nums": [5, 42, 6, 42, 7, 42, 8, 42, 9, 42]},
         {"_id": {"min": 5, "max": 9}, "nums": [0, 42, 1, 42, 2, 42, 3, 42, 4, 42]},
     ];
-    assert.eq(res, expected, "$bucketAuto with 2 buckets & $concatArrays does not obey sort order of incoming docs.");
+    assert.eq(
+        res,
+        expected,
+        "$bucketAuto with 2 buckets & $concatArrays does not obey sort order of incoming docs.",
+    );
 }
 
 {
@@ -54,11 +62,17 @@ coll.insertMany(docs);
                 "$bucketAuto": {
                     "groupBy": "$a",
                     "buckets": 1,
-                    "output": {"array": {"$concatArrays": {$getField: {"field": "b", "input": {a: 0}}}}},
+                    "output": {
+                        "array": {"$concatArrays": {$getField: {"field": "b", "input": {a: 0}}}},
+                    },
                 },
             },
         ])
         .toArray();
     const expected = [{"_id": {"min": null, "max": null}, "array": []}];
-    assert.eq(res, expected, "$bucketAuto with $concatArrays does not append any missing values as null.");
+    assert.eq(
+        res,
+        expected,
+        "$bucketAuto with $concatArrays does not append any missing values as null.",
+    );
 }

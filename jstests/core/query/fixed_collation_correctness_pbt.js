@@ -17,7 +17,10 @@
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
-import {getIndexModel, getTimeSeriesIndexModel} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {
+    getIndexModel,
+    getTimeSeriesIndexModel,
+} from "jstests/libs/property_test_helpers/models/index_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
@@ -100,4 +103,9 @@ function makeCollationWorkloadModel() {
         });
 }
 
-testProperty(correctnessProperty, {controlColl, experimentColl}, makeCollationWorkloadModel(), numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeCollationWorkloadModel(),
+    numRuns,
+);

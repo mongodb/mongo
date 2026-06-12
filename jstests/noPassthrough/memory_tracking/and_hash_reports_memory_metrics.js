@@ -28,12 +28,16 @@ assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
 
 // Force SBE to be fully enabled so the SBE AndHash stage is used.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+);
 
 // Force AND_HASH index intersection plans so the SBE AndHash stage is used.
 // internalQueryPlannerEnableHashIntersection enables AND_HASH plan generation;
 // internalQueryForceIntersectionPlans boosts intersection plan scores in the ranker.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}),
+);
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
 
 const coll = db[jsTestName()];
@@ -62,7 +66,9 @@ assert(
 // causing them to fall back to the classic engine even with trySbeEngine set.
 const execExplain = coll.explain("executionStats").aggregate(pipeline, {allowDiskUse: false});
 if (execExplain.explainVersion !== "2") {
-    jsTest.log.info("Skipping memory tracking assertions: AND_HASH ran in classic engine, not SBE AndHash.");
+    jsTest.log.info(
+        "Skipping memory tracking assertions: AND_HASH ran in classic engine, not SBE AndHash.",
+    );
     coll.drop();
     MongoRunner.stopMongod(conn);
     quit();

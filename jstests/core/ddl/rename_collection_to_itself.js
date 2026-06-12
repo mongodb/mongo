@@ -14,7 +14,10 @@
     const sameCollName = sameColl.toString().split(".")[1];
 
     let dropTarget = true;
-    assert.commandFailedWithCode(sameColl.renameCollection(sameCollName, dropTarget), ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        sameColl.renameCollection(sameCollName, dropTarget),
+        ErrorCodes.IllegalOperation,
+    );
     assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not lose data");
 
     sameColl.drop(); // Drop collection to avoid reusing it in case of repeated executions

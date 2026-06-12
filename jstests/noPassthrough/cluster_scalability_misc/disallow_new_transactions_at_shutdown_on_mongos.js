@@ -16,7 +16,10 @@ pauseAfterImplicitlyAbortAllTransactionsFp.wait();
 
 const session = st.s0.startSession();
 session.startTransaction();
-assert.commandFailedWithCode(session.getDatabase("testDB")["testColl"].insert({x: 2}), ErrorCodes.HostUnreachable);
+assert.commandFailedWithCode(
+    session.getDatabase("testDB")["testColl"].insert({x: 2}),
+    ErrorCodes.HostUnreachable,
+);
 
 pauseAfterImplicitlyAbortAllTransactionsFp.off();
 

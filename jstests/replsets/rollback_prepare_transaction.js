@@ -60,7 +60,10 @@ PrepareHelpers.commitTransaction(session1, prepareTs);
 assert.eq(6, testColl.count());
 
 // Check the visible documents.
-assert.sameMembers([{_id: "a"}, {_id: "b"}, {_id: "t2_a"}, {_id: "t2_b"}, {_id: "t2_c"}], testColl.find().toArray());
+assert.sameMembers(
+    [{_id: "a"}, {_id: "b"}, {_id: "t2_a"}, {_id: "t2_b"}, {_id: "t2_c"}],
+    testColl.find().toArray(),
+);
 
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();

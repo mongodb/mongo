@@ -51,7 +51,9 @@ awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: true});
 // Force the primary node to end the "hello" stream by not setting the 'moreToCome' bit on the
 // resposne. The RSM should not mark the server as down or unknown and should continue monitoring
 // the node.
-jsTestLog("Turning on doNotSetMoreToCome failpoint. Node should return successful hello responses.");
+jsTestLog(
+    "Turning on doNotSetMoreToCome failpoint. Node should return successful hello responses.",
+);
 const moreToComeFailpoint = configureFailPoint(rsPrimary, "doNotSetMoreToCome");
 // Wait for maxAwaitTimeMS to guarantee that mongos has received at least one "hello" response from
 // the primary without the moreToCome bit set.

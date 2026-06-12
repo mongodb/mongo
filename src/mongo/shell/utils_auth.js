@@ -70,7 +70,12 @@ authutil.assertAuthenticateFails = function (conns, dbName, authParams) {
         const ex = assert.throws(
             retryOnNetworkError,
             [db._authOrThrow.bind(db, authParams)],
-            "Unexpectedly authenticated " + conn + " to " + dbName + " using parameters " + tojson(authParams),
+            "Unexpectedly authenticated " +
+                conn +
+                " to " +
+                dbName +
+                " using parameters " +
+                tojson(authParams),
         );
         if (isNetworkError(ex)) {
             throw ex;
@@ -88,7 +93,10 @@ authutil.asCluster = function (conn, keyfile, action) {
     if (conn.length == null) connArray = [conn];
 
     const connOptions = connArray[0].fullOptions || {};
-    const authMode = connOptions.clusterAuthMode || connArray[0].clusterAuthMode || jsTest.options().clusterAuthMode;
+    const authMode =
+        connOptions.clusterAuthMode ||
+        connArray[0].clusterAuthMode ||
+        jsTest.options().clusterAuthMode;
 
     let clusterTimes = connArray.map((connElem) => {
         const connClusterTime = connElem.getClusterTime();
@@ -103,7 +111,11 @@ authutil.asCluster = function (conn, keyfile, action) {
     });
 
     let authDB = "admin";
-    if (authMode === "keyFile" || authMode === "sendKeyFile" || (authMode === "sendX509" && keyfile !== undefined)) {
+    if (
+        authMode === "keyFile" ||
+        authMode === "sendKeyFile" ||
+        (authMode === "sendX509" && keyfile !== undefined)
+    ) {
         if (keyfile === undefined) {
             keyfile = connOptions.keyFile || connArray[0].keyFile;
             assert(
@@ -147,10 +159,14 @@ authutil.asCluster = function (conn, keyfile, action) {
                     connElem.advanceClusterTime(clusterTimes[i].connClusterTime);
                 }
                 if (clusterTimes[i].sessionClusterTime) {
-                    connElem._getDefaultSession().advanceClusterTime(clusterTimes[i].sessionClusterTime);
+                    connElem
+                        ._getDefaultSession()
+                        .advanceClusterTime(clusterTimes[i].sessionClusterTime);
                 }
                 if (clusterTimes[i].operationTime) {
-                    connElem._getDefaultSession().advanceOperationTime(clusterTimes[i].operationTime);
+                    connElem
+                        ._getDefaultSession()
+                        .advanceOperationTime(clusterTimes[i].operationTime);
                 }
             }
         } catch (ex) {}

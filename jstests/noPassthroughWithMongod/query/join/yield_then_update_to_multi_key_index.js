@@ -17,8 +17,12 @@ assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptim
 function resetCollections(foreignColl, localColl) {
     assert(foreignColl.drop());
     assert(localColl.drop());
-    assert.commandWorked(foreignColl.insert(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, b: i}))));
-    assert.commandWorked(localColl.insert(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, b: i}))));
+    assert.commandWorked(
+        foreignColl.insert(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, b: i}))),
+    );
+    assert.commandWorked(
+        localColl.insert(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, b: i}))),
+    );
     // Add index for multikeyness info for path arrayness.
     assert.commandWorked(foreignColl.createIndex({dummy: 1, a: 1, b: 1}));
     assert.commandWorked(localColl.createIndex({dummy: 1, a: 1, b: 1}));

@@ -72,7 +72,9 @@ function testForReplicaSet() {
 
     // Set lastLTS FCV (8.0) to simulate the environment where non-integer expireAfterSeconds
     // values could reside on disk.
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     // Create a TTL index with an integer expireAfterSeconds (the current behavior).
     assert.commandWorked(
@@ -101,7 +103,9 @@ function testForReplicaSet() {
     // Upgrade to latest FCV. This triggers the repair path that converts any non-integer
     // 'expireAfterSeconds' values to their integer equivalent.
     db = rst.getPrimary().getDB(dbName);
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Ensure changes are replicated to all nodes before asserting.
     rst.awaitReplication();
@@ -109,7 +113,11 @@ function testForReplicaSet() {
     // Check expireAfterSeconds has been converted to an integer.
     rst.nodes.forEach((node) => {
         const expireAfterSeconds = getIndexExpireAfterSeconds(node, "ttl_index");
-        assert.eq(123, expireAfterSeconds, "Expected expireAfterSeconds to be converted to an integer");
+        assert.eq(
+            123,
+            expireAfterSeconds,
+            "Expected expireAfterSeconds to be converted to an integer",
+        );
         assert(Number.isInteger(expireAfterSeconds));
     });
 
@@ -145,11 +153,15 @@ function testForShardedCluster() {
 
     // Set lastLTS FCV (8.0) to simulate the environment where non-integer expireAfterSeconds
     // values could reside on disk.
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     let db = st.s.getDB(dbName);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: fullNs, key: {x: 1}}));
 
     // Create a TTL index with an integer expireAfterSeconds (the current behavior).
@@ -177,7 +189,9 @@ function testForShardedCluster() {
 
     // Upgrade to latest FCV. This triggers the repair path that converts any non-integer
     // 'expireAfterSeconds' values to their integer equivalent.
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Ensure changes are replicated to all nodes before asserting.
     st.shard0.rs.awaitReplication();
@@ -185,7 +199,11 @@ function testForShardedCluster() {
     // Ensure expireAfterSeconds is stored as an integer.
     st.shard0.rs.nodes.forEach((node) => {
         const expireAfterSeconds = getIndexExpireAfterSeconds(node, "ttl_index");
-        assert.eq(123, expireAfterSeconds, "Expected expireAfterSeconds to be converted to an integer");
+        assert.eq(
+            123,
+            expireAfterSeconds,
+            "Expected expireAfterSeconds to be converted to an integer",
+        );
         assert(Number.isInteger(expireAfterSeconds));
     });
 

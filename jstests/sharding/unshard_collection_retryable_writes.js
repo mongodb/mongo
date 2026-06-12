@@ -64,12 +64,20 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         assert.eq(2, docs.length, {docs});
 
         for (const doc of docs) {
-            assert.eq(1, doc.counter, {message: `retryable write executed more than once`, id: doc._id, docs});
+            assert.eq(1, doc.counter, {
+                message: `retryable write executed more than once`,
+                id: doc._id,
+                docs,
+            });
         }
     }
 
     // before resharding
-    let res = RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, ErrorCodes.OK);
+    let res = RetryableWritesUtil.runRetryableWrite(
+        sessionCollection,
+        updateCommand,
+        ErrorCodes.OK,
+    );
     assert(res.nModified == 2, res);
     checkDocsConsistency();
 
@@ -83,7 +91,11 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             return coordinatorDoc !== null && coordinatorDoc.state === "applying";
         });
         // oldKey update will target shard which has the info for the write.
-        res = RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, ErrorCodes.OK);
+        res = RetryableWritesUtil.runRetryableWrite(
+            sessionCollection,
+            updateCommand,
+            ErrorCodes.OK,
+        );
         assert(res.nModified == 2, res);
         checkDocsConsistency();
     });

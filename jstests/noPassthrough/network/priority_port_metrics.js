@@ -29,7 +29,9 @@ describe("Tests metrics and logging for connections via the priority port", func
         let currentCount;
         assert.soon(
             () => {
-                let connectionMetrics = assert.commandWorked(conn.adminCommand({serverStatus: 1})).connections;
+                let connectionMetrics = assert.commandWorked(
+                    conn.adminCommand({serverStatus: 1}),
+                ).connections;
                 currentCount = connectionMetrics.priority;
                 return currentCount == expectedCount;
             },
@@ -45,7 +47,11 @@ describe("Tests metrics and logging for connections via the priority port", func
     }
 
     before(() => {
-        this.conn = MongoRunner.runMongod({priorityPort: allocatePort(), bind_ip: "127.0.0.1", useHostname: false});
+        this.conn = MongoRunner.runMongod({
+            priorityPort: allocatePort(),
+            bind_ip: "127.0.0.1",
+            useHostname: false,
+        });
         this.host = this.conn.hostNoPort;
         this.mainPort = this.conn.port;
         this.priorityPort = this.conn.priorityPort;

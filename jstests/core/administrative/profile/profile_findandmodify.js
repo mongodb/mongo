@@ -23,12 +23,16 @@ let coll = testDB.getCollection(collName);
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDB
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 //
@@ -115,7 +119,10 @@ for (var i = 0; i < 3; i++) {
 // bounded collection scan.
 const expectedKeysInserted = collectionIsClustered ? 0 : 1;
 const expectedDocsExamined = 0;
-assert.eq({_id: 4, a: 1}, coll.findAndModify({query: {_id: 4}, update: {$inc: {a: 1}}, upsert: true, new: true}));
+assert.eq(
+    {_id: 4, a: 1},
+    coll.findAndModify({query: {_id: 4}, update: {$inc: {a: 1}}, upsert: true, new: true}),
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.op, "command", tojson(profileObj));
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
@@ -147,7 +154,12 @@ const expectedPlan = collectionIsClustered
 assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {_id: 2}, update: {$inc: {b: 1}}}));
 profileObj = getLatestProfilerEntry(testDB);
 // Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
-assert.between(expectedKeysExamined, profileObj.keysExamined, 2 * expectedKeysExamined, tojson(profileObj));
+assert.between(
+    expectedKeysExamined,
+    profileObj.keysExamined,
+    2 * expectedKeysExamined,
+    tojson(profileObj),
+);
 assert.between(1, profileObj.docsExamined, 2, tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
 assert.eq(profileObj.nModified, 1, tojson(profileObj));
@@ -162,7 +174,10 @@ for (var i = 0; i < 3; i++) {
     assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
-assert.eq({a: 2}, coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}, fields: {_id: 0, a: 1}}));
+assert.eq(
+    {a: 2},
+    coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}, fields: {_id: 0, a: 1}}),
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.op, "command", tojson(profileObj));
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
@@ -202,7 +217,10 @@ for (var i = 0; i < 3; i++) {
     assert.commandWorked(coll.insert({_id: i, a: i}));
 }
 
-assert.eq({_id: 0, a: 0}, coll.findAndModify({query: {a: {$gte: 0}}, sort: {a: 1}, update: {$inc: {b: 1}}}));
+assert.eq(
+    {_id: 0, a: 0},
+    coll.findAndModify({query: {a: {$gte: 0}}, sort: {a: 1}, update: {$inc: {b: 1}}}),
+);
 
 profileObj = getLatestProfilerEntry(testDB);
 

@@ -5,7 +5,11 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
-import {PrefixField, SuffixAndPrefixField, SuffixField} from "jstests/fle2/libs/qe_text_search_util.js";
+import {
+    PrefixField,
+    SuffixAndPrefixField,
+    SuffixField,
+} from "jstests/fle2/libs/qe_text_search_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "qe_prefix_suffix_downgrade_test";
@@ -15,7 +19,10 @@ const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
 
 function testBinaryDowngrade(queryTypeConfig) {
     jsTest.log.info("Testing downgrade from latest to last-lts");
-    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: {featureFlagQEPrefixSuffixSearch: true}}});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {setParameter: {featureFlagQEPrefixSuffixSearch: true}},
+    });
     rst.startSet();
     rst.initiate();
 
@@ -55,7 +62,11 @@ function testBinaryDowngrade(queryTypeConfig) {
 
     // Downgrade should fail because of basic_text
     assert.commandFailedWithCode(
-        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true, writeConcern: {w: 1}}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+            writeConcern: {w: 1},
+        }),
         ErrorCodes.CannotDowngrade,
     );
 
@@ -63,7 +74,11 @@ function testBinaryDowngrade(queryTypeConfig) {
     edb.basic_text.drop();
 
     assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true, writeConcern: {w: 1}}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+            writeConcern: {w: 1},
+        }),
     );
 
     // Downgrade should now succeed

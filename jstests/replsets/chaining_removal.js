@@ -22,7 +22,11 @@ let primary = replTest.getPrimary();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 replTest.awaitReplication();
@@ -33,10 +37,14 @@ replTest.awaitReplication();
 // repl_settings_init.cpp and TopologyCoordinatorImpl::Options) in
 // TopologyCoordinatorImpl::shouldChangeSyncSource().
 assert.commandWorked(
-    nodes[1].getDB("admin").runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "alwaysOn"}),
+    nodes[1]
+        .getDB("admin")
+        .runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "alwaysOn"}),
 );
 assert.commandWorked(
-    nodes[4].getDB("admin").runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "alwaysOn"}),
+    nodes[4]
+        .getDB("admin")
+        .runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "alwaysOn"}),
 );
 
 // Force node 1 to sync directly from node 0.
@@ -51,10 +59,14 @@ assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, options));
 
 // Re-enable 'maxSyncSourceLagSecs' checking on sync source.
 assert.commandWorked(
-    nodes[1].getDB("admin").runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "off"}),
+    nodes[1]
+        .getDB("admin")
+        .runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "off"}),
 );
 assert.commandWorked(
-    nodes[4].getDB("admin").runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "off"}),
+    nodes[4]
+        .getDB("admin")
+        .runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "off"}),
 );
 
 let config = primary.getDB("local").system.replset.findOne();

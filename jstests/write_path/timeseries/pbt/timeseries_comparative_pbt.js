@@ -17,8 +17,14 @@ import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
-import {assertCollectionValid, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
-import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
+import {
+    assertCollectionValid,
+    assertCollectionsMatch,
+} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {
+    getFcParams,
+    getFcAssertArgs,
+} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const fcParams = getFcParams();

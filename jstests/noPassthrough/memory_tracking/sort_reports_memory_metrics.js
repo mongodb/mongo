@@ -31,7 +31,9 @@ db[collName].drop();
 // The tests expect that memory metrics appear right after memory is used. Decrease the threshold
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
 // limit.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
+);
 
 const bigStr = Array(1025).toString(); // 1KB of ','
 const lowMaxMemoryLimit = 5000;
@@ -47,7 +49,9 @@ assert.commandWorked(bulk.execute());
 // checking the relevant stages for the variant; for example, we will get test coverage for SBE Sort
 // on trySbeEngine evergreen variants, so there is no need to force SBE execution on variants where
 // SBE is not enabled by default.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+);
 let configs;
 if (checkSbeFullyEnabled(db)) {
     jsTest.log.info("SBE is fully enabled.");

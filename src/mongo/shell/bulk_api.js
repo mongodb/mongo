@@ -58,9 +58,12 @@ function WriteConcern(wValue, wTimeout, jValue) {
         throw Error("Numeric w value must be equal to or larger than 0, not " + opts.w);
 
     if (typeof opts.wtimeout != "undefined") {
-        if (typeof opts.wtimeout != "number") throw Error("wtimeout must be a number, not " + opts.wtimeout);
+        if (typeof opts.wtimeout != "number")
+            throw Error("wtimeout must be a number, not " + opts.wtimeout);
         if (NumberInt(opts.wtimeout).toNumber() < 0)
-            throw Error("wtimeout must be a number greater than or equal to 0, not " + opts.wtimeout);
+            throw Error(
+                "wtimeout must be a number greater than or equal to 0, not " + opts.wtimeout,
+            );
     }
 
     if (typeof opts.j != "undefined" && typeof opts.j != "boolean")
@@ -98,7 +101,8 @@ function WriteConcern(wValue, wTimeout, jValue) {
  * @param {WriteConcern} writeConcern
  */
 function WriteResult(bulkResult, singleBatchType, writeConcern) {
-    if (!(this instanceof WriteResult)) return new WriteResult(bulkResult, singleBatchType, writeConcern);
+    if (!(this instanceof WriteResult))
+        return new WriteResult(bulkResult, singleBatchType, writeConcern);
 
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
@@ -111,7 +115,11 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
         defineReadOnlyProperty(this, "errorLabels", bulkResult.errorLabels);
     }
     if (bulkResult.upserted.length > 0) {
-        defineReadOnlyProperty(this, "_id", bulkResult.upserted[bulkResult.upserted.length - 1]._id);
+        defineReadOnlyProperty(
+            this,
+            "_id",
+            bulkResult.upserted[bulkResult.upserted.length - 1]._id,
+        );
     }
 
     //
@@ -141,7 +149,10 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
     };
 
     this.getWriteConcernError = function () {
-        if (!bulkResult.hasOwnProperty("writeConcernErrors") || bulkResult.writeConcernErrors.length == 0) {
+        if (
+            !bulkResult.hasOwnProperty("writeConcernErrors") ||
+            bulkResult.writeConcernErrors.length == 0
+        ) {
             return null;
         } else {
             return bulkResult.writeConcernErrors[0];
@@ -262,7 +273,10 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
     };
 
     this.hasWriteConcernError = function () {
-        return bulkResult.hasOwnProperty("writeConcernErrors") && bulkResult.writeConcernErrors.length > 0;
+        return (
+            bulkResult.hasOwnProperty("writeConcernErrors") &&
+            bulkResult.writeConcernErrors.length > 0
+        );
     };
 
     this.getWriteConcernError = function () {
@@ -341,7 +355,8 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
      * @return {WriteResult} the simplified results condensed into one.
      */
     this.toSingleResult = function () {
-        if (singleBatchType == null) throw Error("Cannot output single WriteResult from multiple batch result");
+        if (singleBatchType == null)
+            throw Error("Cannot output single WriteResult from multiple batch result");
         return new WriteResult(bulkResult, singleBatchType, writeConcern);
     };
 }

@@ -39,12 +39,21 @@ function runTest(op, result) {
     // Construct a valid oplog entry.
     function constructOplogEntry(oplog) {
         const lastOplogEntry = oplog.find().sort({ts: -1}).limit(1).toArray()[0];
-        const testCollOplogEntry = oplog.find({op: "i", ns: "test.coll"}).sort({ts: -1}).limit(1).toArray()[0];
+        const testCollOplogEntry = oplog
+            .find({op: "i", ns: "test.coll"})
+            .sort({ts: -1})
+            .limit(1)
+            .toArray()[0];
         const highestTS = lastOplogEntry.ts;
         const oplogToInsertTS = Timestamp(highestTS.getTime(), highestTS.getInc() + 1);
         delete testCollOplogEntry.o2;
         if (op === "Delete") {
-            return Object.extend(testCollOplogEntry, {op: "d", ns: "test.coll", o: {_id: 0}, ts: oplogToInsertTS});
+            return Object.extend(testCollOplogEntry, {
+                op: "d",
+                ns: "test.coll",
+                o: {_id: 0},
+                ts: oplogToInsertTS,
+            });
         } else if (op === "Update") {
             return Object.extend(testCollOplogEntry, {
                 op: "u",
@@ -71,12 +80,18 @@ function runTest(op, result) {
     }
 
     // Do an initial insert.
-    assert.commandWorked(conn.getDB("test").coll.insert({_id: 0, a: 0}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        conn.getDB("test").coll.insert({_id: 0, a: 0}, {writeConcern: {w: "majority"}}),
+    );
     if (result == "CrudError") {
         // For 'update' and 'delete' oplog to not find the document.
-        assert.commandWorked(conn.getDB("test").coll.deleteOne({_id: 0}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            conn.getDB("test").coll.deleteOne({_id: 0}, {writeConcern: {w: "majority"}}),
+        );
         // For 'insert' to fail with duplicate key error.
-        assert.commandWorked(conn.getDB("test").coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            conn.getDB("test").coll.insert({_id: 1}, {writeConcern: {w: "majority"}}),
+        );
     } else if (result == "NamespaceNotFound") {
         conn.getDB("test").coll.drop();
     }
@@ -110,7 +125,9 @@ function runTest(op, result) {
             assert.eq({_id: 1, a: 1}, conn.getDB("test").coll.findOne({_id: 1}));
         }
     } else {
-        jsTestLog("Server should crash while applying the added oplog during replication recovery.");
+        jsTestLog(
+            "Server should crash while applying the added oplog during replication recovery.",
+        );
         const node = rst.start(0, {noCleanData: true, waitForConnect: false});
         const exitCode = waitProgram(node.pid);
         assert.eq(exitCode, MongoRunner.EXIT_ABORT);

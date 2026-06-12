@@ -15,7 +15,10 @@ function assertTopologyGt(topologyTime1, topologyTime2, msg) {
 }
 
 function cmdAsInternalClient(st, cmd) {
-    const command = {[cmd]: 1, internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}};
+    const command = {
+        [cmd]: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    };
     const connInternal = new Mongo(st.configRS.getPrimary().host);
     const res = assert.commandWorked(connInternal.adminCommand(command));
     connInternal.close();

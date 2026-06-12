@@ -26,7 +26,11 @@ replTest.awaitSecondaryNodes(null, [replTest.nodes[1]]);
 replTest.awaitReplication();
 
 let newNodeCollection = newNode.getDB("test").getCollection(collectionName);
-assert.eq(1, newNodeCollection.find({a: 1}).itcount(), "expect documents to be present in secondary after replication");
+assert.eq(
+    1,
+    newNodeCollection.find({a: 1}).itcount(),
+    "expect documents to be present in secondary after replication",
+);
 
 let signal = 15;
 replTest.stopSet(signal);

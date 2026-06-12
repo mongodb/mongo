@@ -7,7 +7,10 @@
  * ]
  */
 import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {prettyPrintWinningPlan, getWinningJoinOrderOneLine} from "jstests/query_golden/libs/pretty_plan.js";
+import {
+    prettyPrintWinningPlan,
+    getWinningJoinOrderOneLine,
+} from "jstests/query_golden/libs/pretty_plan.js";
 import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName() + "_base"];
@@ -86,7 +89,10 @@ function runRandomReorderTests(pipeline) {
         const res = runSingleTest(`Random reordering with seed ${seed}`, pipeline, seen);
         if (res !== undefined) {
             // Skip seed if we've seen this order before.
-            assert(_resultSetsEqualUnordered(baseRes, res), `Results differ between no join opt and seed ${seed}`);
+            assert(
+                _resultSetsEqualUnordered(baseRes, res),
+                `Results differ between no join opt and seed ${seed}`,
+            );
         }
         seed++;
     }

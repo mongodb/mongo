@@ -33,7 +33,9 @@ function recursiveAggregateFunction(db, collectionName, fn) {
                 $addFields: {
                     fld: {
                         $function: {
-                            body: whereFnTemplate.toString().replace("__fn_placeholder__", fn.toString()),
+                            body: whereFnTemplate
+                                .toString()
+                                .replace("__fn_placeholder__", fn.toString()),
                             args: ["$name"],
                             lang: "js",
                         },
@@ -47,7 +49,10 @@ function recursiveAggregateFunction(db, collectionName, fn) {
 
 function assertThrowsInfiniteRecursion(res) {
     assert.commandFailedWithCode(res, ErrorCodes.JSInterpreterFailure);
-    assert(/too much recursion/.test(res.errmsg), `Error wasn't caused by infinite recursion: ${tojson(res)}`);
+    assert(
+        /too much recursion/.test(res.errmsg),
+        `Error wasn't caused by infinite recursion: ${tojson(res)}`,
+    );
 
     // The choice of 20 for the number of frames is somewhat arbitrary. We check for there to be
     // some reasonable number of stack frames because most regressions would cause the stack to
@@ -74,7 +79,11 @@ const setJsTimeout = function (timeout) {
             internalQueryJavaScriptFnTimeoutMillis: timeout,
         },
     });
-    assert.gt(commandResArr.length, 0, "Setting internalQueryJavaScriptFnTimeoutMillis on primaries failed");
+    assert.gt(
+        commandResArr.length,
+        0,
+        "Setting internalQueryJavaScriptFnTimeoutMillis on primaries failed",
+    );
     return assert.commandWorked(commandResArr[0]).was;
 };
 

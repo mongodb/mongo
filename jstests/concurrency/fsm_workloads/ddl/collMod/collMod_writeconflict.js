@@ -30,12 +30,19 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Set up failpoint to trigger WriteConflictException during write operations.
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: {activationProbability: 0.5}}),
+            db.adminCommand({
+                configureFailPoint: "WTWriteConflictException",
+                mode: {activationProbability: 0.5},
+            }),
         );
     };
     $config.teardown = function teardown(db, collName, cluster) {
-        assert.commandWorked(db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}));
-        assert.commandWorked(db.adminCommand({setParameter: 1, traceWriteConflictExceptions: false}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}),
+        );
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, traceWriteConflictExceptions: false}),
+        );
     };
 
     $config.threadCount = 2;

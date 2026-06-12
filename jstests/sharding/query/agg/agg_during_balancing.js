@@ -6,12 +6,17 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const shardedAggTest = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(
-    shardedAggTest.s0.adminCommand({enablesharding: "aggShard", primaryShard: shardedAggTest.shard0.shardName}),
+    shardedAggTest.s0.adminCommand({
+        enablesharding: "aggShard",
+        primaryShard: shardedAggTest.shard0.shardName,
+    }),
 );
 
 const database = shardedAggTest.getDB("aggShard");
 
-assert.commandWorked(shardedAggTest.s0.adminCommand({shardcollection: "aggShard.ts1", key: {"_id": 1}}));
+assert.commandWorked(
+    shardedAggTest.s0.adminCommand({shardcollection: "aggShard.ts1", key: {"_id": 1}}),
+);
 
 // Test combining results in mongos for operations that sub-aggregate on shards.
 //
@@ -95,7 +100,9 @@ shardedAggTest.awaitBalancerRound();
     ]);
 
     jsTestLog("an initial group starts the group in the shards, and combines them in mongos");
-    let a3 = database.ts1.aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}]).toArray();
+    let a3 = database.ts1
+        .aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}])
+        .toArray();
 
     for (let i = 0; i < strings.length; ++i) {
         assert.eq(a3[i].total, nItems / strings.length, "agg sharded test sum numbers failed");
@@ -153,7 +160,11 @@ testSkipLimit([{$limit: 10}, {$skip: 5}, {$skip: 3}], 10 - 3 - 5);
 // test sort + limit (using random to pull from both shards)
 function testSortLimit(limit, direction) {
     jsTestLog("Testing $sort with $limit: " + limit + ", " + direction);
-    let from_cursor = database.ts1.find({}, {random: 1, _id: 0}).sort({random: direction}).limit(limit).toArray();
+    let from_cursor = database.ts1
+        .find({}, {random: 1, _id: 0})
+        .sort({random: direction})
+        .limit(limit)
+        .toArray();
     let from_agg = database.ts1
         .aggregate([{$project: {random: 1, _id: 0}}, {$sort: {random: direction}}, {$limit: limit}])
         .toArray();
@@ -208,16 +219,24 @@ if (isFCVgte(shardedAggTest.s0, "8.1")) {
 
 (function testOutWithCopy() {
     jsTestLog("Testing $out by copying source collection verbatim to output");
-    assert.commandWorked(shardedAggTest.s0.adminCommand({shardcollection: "aggShard.literal", key: {"_id": 1}}));
+    assert.commandWorked(
+        shardedAggTest.s0.adminCommand({shardcollection: "aggShard.literal", key: {"_id": 1}}),
+    );
 
     let outCollection = database.ts1_out;
     assert.eq(database.ts1.aggregate([{$out: outCollection.getName()}]).toArray(), "");
     assert.eq(database.ts1.find().itcount(), outCollection.find().itcount());
-    assert.eq(database.ts1.find().sort({_id: 1}).toArray(), outCollection.find().sort({_id: 1}).toArray());
+    assert.eq(
+        database.ts1.find().sort({_id: 1}).toArray(),
+        outCollection.find().sort({_id: 1}).toArray(),
+    );
 
     // Make sure we error out if $out collection is sharded
     assert.commandFailed(
-        database.runCommand({aggregate: outCollection.getName(), pipeline: [{$out: database.ts1.getName()}]}),
+        database.runCommand({
+            aggregate: outCollection.getName(),
+            pipeline: [{$out: database.ts1.getName()}],
+        }),
     );
 
     assert.commandWorked(database.literal.save({dollar: false}));
@@ -225,7 +244,10 @@ if (isFCVgte(shardedAggTest.s0, "8.1")) {
     let result = database.literal
         .aggregate([
             {
-                $project: {_id: 0, cost: {$cond: ["$dollar", {$literal: "$1.00"}, {$literal: "$.99"}]}},
+                $project: {
+                    _id: 0,
+                    cost: {$cond: ["$dollar", {$literal: "$1.00"}, {$literal: "$.99"}]},
+                },
             },
         ])
         .toArray();

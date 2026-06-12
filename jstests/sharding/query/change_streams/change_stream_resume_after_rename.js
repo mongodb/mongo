@@ -17,7 +17,10 @@ import {
     cursorCommentFilter,
     waitForClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
-import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
+import {
+    ChangeStreamReader,
+    ChangeStreamReadingMode,
+} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {
@@ -120,7 +123,12 @@ describe("$changeStream", function () {
         // Initial placement: the target collection does not yet exist, but the DB is present
         // with primary on shard0. The v2 targeter falls back to the DB primary, so a single
         // cursor is opened on shard0 and no config-server placement watcher is needed.
-        assertOpenCursors(st, [shards[0]._id], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [shards[0]._id],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
 
         // Execute commands via Writer.
         const writerName = "writer_rename_resume";
@@ -140,7 +148,10 @@ describe("$changeStream", function () {
         ChangeStreamReader.run(st.s, readerConfig);
 
         // Build VerifierContext and run SingleReaderVerificationTestCase.
-        const ctx = new VerifierContext({[readerName]: readerConfig}, {[readerName]: createMatcher(expectedEvents)});
+        const ctx = new VerifierContext(
+            {[readerName]: readerConfig},
+            {[readerName]: createMatcher(expectedEvents)},
+        );
         new SingleReaderVerificationTestCase(readerName).run(st.s, ctx);
 
         // Wait for the writer so all events (including the trailing drop) have flushed.
@@ -184,7 +195,9 @@ describe("$changeStream", function () {
         });
         csTest.assertNoChange(verifyCursor);
         // Confirm the cursor landed on shard1 only.
-        assertOpenCursors(st, [shards[1]._id], /*expectedConfigCursor=*/ false, {ns: `${testDb}.${targetColl}`});
+        assertOpenCursors(st, [shards[1]._id], /*expectedConfigCursor=*/ false, {
+            ns: `${testDb}.${targetColl}`,
+        });
 
         // Clean up the lingering testColl_renamed so afterEach's dropDatabase doesn't trip
         // on a surprise collection (the rename command no longer drops it for us).

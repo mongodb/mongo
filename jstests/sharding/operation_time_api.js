@@ -65,7 +65,9 @@ testDB = replTest.getPrimary().getDB("test");
 res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 4}]}));
 assert(
     responseContainsTimestampOperationTime(res),
-    "Expected response from a non-sharded replica set to contain an operationTime, " + "received: " + tojson(res),
+    "Expected response from a non-sharded replica set to contain an operationTime, " +
+        "received: " +
+        tojson(res),
 );
 
 replTest.stopSet();
@@ -77,7 +79,9 @@ testDB = standalone.getDB("test");
 res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 5}]}));
 assert(
     !responseContainsTimestampOperationTime(res),
-    "Expected response from a standalone mongod to not contain an operationTime, " + "received: " + tojson(res),
+    "Expected response from a standalone mongod to not contain an operationTime, " +
+        "received: " +
+        tojson(res),
 );
 
 MongoRunner.stopMongod(standalone);

@@ -52,7 +52,9 @@ function runPipelineWithApiStrict(pipeline) {
 // Asserts that a plan cache entry for the given 'cacheKey' exists in the plan cache and has
 // certain properties set as per provided 'properties' argument.
 function assertPlanCacheEntryExists(cacheKey, properties = {}) {
-    const entries = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
+    const entries = coll
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}])
+        .toArray();
     assert.eq(entries.length, 1, entries);
     const entry = entries[0];
 

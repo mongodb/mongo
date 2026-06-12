@@ -71,7 +71,9 @@ function interpretCommandResult(cmdRes, expectedFullSize) {
         return "error";
     }
     let fetchedSize =
-        cmdRes.cursor.firstBatch !== undefined ? cmdRes.cursor.firstBatch.length : cmdRes.cursor.nextBatch.length;
+        cmdRes.cursor.firstBatch !== undefined
+            ? cmdRes.cursor.firstBatch.length
+            : cmdRes.cursor.nextBatch.length;
     if (cmdRes.cursor.partialResultsReturned) {
         assert.lt(fetchedSize, expectedFullSize);
         assert.eq(0, cmdRes.cursor.id); // Note: we always see cursor id == 0 with partial results.
@@ -85,7 +87,12 @@ function interpretCommandResult(cmdRes, expectedFullSize) {
 function runBigBatchQuery(timeoutMs) {
     // The batchSize is equal to the full collection size.
     return interpretCommandResult(
-        coll.runCommand({find: collName, maxTimeMS: timeoutMs, allowPartialResults: true, batchSize: nDocs}),
+        coll.runCommand({
+            find: collName,
+            maxTimeMS: timeoutMs,
+            allowPartialResults: true,
+            batchSize: nDocs,
+        }),
         nDocs,
     );
 }
@@ -180,7 +187,11 @@ searchForAndAssertPartialResults(Math.round(0.5 * fullQueryTimeoutMS), function 
     // getMores sent to the shards (for details, see SERVER-71248).
     const secondBatchSize = nDocs - firstBatchSize;
     return interpretCommandResult(
-        coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: secondBatchSize}),
+        coll.runCommand({
+            getMore: findRes.cursor.id,
+            collection: collName,
+            batchSize: secondBatchSize,
+        }),
         secondBatchSize,
     );
 });

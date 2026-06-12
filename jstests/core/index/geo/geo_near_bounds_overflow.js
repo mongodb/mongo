@@ -17,7 +17,10 @@ function testBounds(min, max, expectedErrorCode = null) {
     if (expectedErrorCode === null) {
         assert.commandWorked(test.t.createIndex({loc: "2d"}, indexBounds));
     } else {
-        assert.commandFailedWithCode(test.t.createIndex({loc: "2d"}, indexBounds), expectedErrorCode);
+        assert.commandFailedWithCode(
+            test.t.createIndex({loc: "2d"}, indexBounds),
+            expectedErrorCode,
+        );
     }
 
     test.reset();

@@ -83,7 +83,9 @@ t.save({_id: 100, x: [{a: 1}]});
 assert.commandWorked(t.update({_id: 100}, {$push: {x: {$each: [2], $slice: -2, $sort: {a: 1}}}}));
 
 // For the same reason as above, '1' is an valid $each element.
-assert.commandWorked(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}, 1], $slice: -2, $sort: {a: 1}}}}));
+assert.commandWorked(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}, 1], $slice: -2, $sort: {a: 1}}}}),
+);
 
 // The sort key pattern cannot be empty.
 assert.writeErrorWithCode(
@@ -92,7 +94,9 @@ assert.writeErrorWithCode(
 );
 
 // Support positive $slice's (ie, trimming from the array's front).
-assert.commandWorked(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: 2, $sort: {a: 1}}}}));
+assert.commandWorked(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: 2, $sort: {a: 1}}}}),
+);
 
 // A $slice cannot be a fractional value.
 assert.writeErrorWithCode(
@@ -132,4 +136,6 @@ t.remove({});
 
 // Existing values are validated in the array do not have to be objects during a $sort with $each.
 t.save({_id: 100, x: [1, "foo"]});
-assert.commandWorked(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {a: 1}}}}));
+assert.commandWorked(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {a: 1}}}}),
+);

@@ -23,7 +23,9 @@ const st = new ShardingTest({shards: 1, mongos: 1});
 {
     const db = st.rs0.getPrimary().getDB("admin");
 
-    const res = assert.commandWorked(db.runCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+    const res = assert.commandWorked(
+        db.runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+    );
 
     assert(res.hasOwnProperty("featureCompatibilityVersion"));
     assert(res.featureCompatibilityVersion.hasOwnProperty("version"));

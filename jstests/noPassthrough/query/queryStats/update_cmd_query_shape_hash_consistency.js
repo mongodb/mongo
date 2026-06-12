@@ -51,7 +51,13 @@ function getLatestQueryShapeHashFromQueryStats(mongosConn, collName) {
  * @param {object} mongodDB - The mongod database connection to check slow logs.
  * @param {string} [testDesc] - Optional description for error messages.
  */
-function assertQueryStatsAndMongodHashesMatch(mongosConn, collName, comment, mongodDB, testDesc = "") {
+function assertQueryStatsAndMongodHashesMatch(
+    mongosConn,
+    collName,
+    comment,
+    mongodDB,
+    testDesc = "",
+) {
     // Get queryShapeHash from mongos $queryStats.
     const queryStatsHash = getLatestQueryShapeHashFromQueryStats(mongosConn, collName);
     assert.neq(
@@ -89,7 +95,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
 
         this.dbName = jsTestName();
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         this.routerDB = this.st.s.getDB(this.dbName);
@@ -133,7 +142,11 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                     updates: [
                         {
                             q: {v: {$gte: 1}, x: {$lt: 50}, y: "a"},
-                            u: {$set: {updated: true}, $inc: {x: 5}, $currentDate: {lastModified: true}},
+                            u: {
+                                $set: {updated: true},
+                                $inc: {x: 5},
+                                $currentDate: {lastModified: true},
+                            },
                             multi: true,
                         },
                     ],
@@ -257,7 +270,11 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
             // Verify every queryStats entry's queryShapeHash appears in the mongod slow logs.
             for (const entry of entries) {
                 const hash = entry.queryShapeHash;
-                assert.neq(hash, null, `queryShapeHash should be present in queryStats entry: ${tojson(entry)}`);
+                assert.neq(
+                    hash,
+                    null,
+                    `queryShapeHash should be present in queryStats entry: ${tojson(entry)}`,
+                );
                 assert(
                     slowLogHashes.has(hash),
                     `queryShapeHash ${hash} from $queryStats not found in mongod slow query logs. ` +

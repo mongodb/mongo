@@ -80,7 +80,9 @@ for (const kmsType of kmsTypes) {
     for (const encryptionAlgorithm of encryptionAlgorithms) {
         collection.drop();
 
-        const keyId = keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]);
+        const keyId = keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", [
+            "mongoKey",
+        ]);
 
         let pass;
         let fail;
@@ -98,7 +100,10 @@ for (const kmsType of kmsTypes) {
             assert.eq(passTestCase, clientEncrypt.decrypt(encPassTestCase));
 
             if (encryptionAlgorithm === deterministicAlgorithm) {
-                assert.eq(encPassTestCase, clientEncrypt.encrypt(keyId, passTestCase, encryptionAlgorithm));
+                assert.eq(
+                    encPassTestCase,
+                    clientEncrypt.encrypt(keyId, passTestCase, encryptionAlgorithm),
+                );
             }
         }
 

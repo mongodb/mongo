@@ -40,9 +40,13 @@ function simulateResharding() {
     assert.commandWorked(testDB.createCollection(tempReshardingColl));
     assert.commandWorked(mongos.adminCommand({shardCollection: tempReshardingNss, key: {y: 1}}));
     assert.commandWorked(mongos.adminCommand({split: tempReshardingNss, middle: {y: 5}}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: tempReshardingNss, find: {y: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: tempReshardingNss, find: {y: 5}, to: st.shard1.shardName}),
+    );
 
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {x: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {x: 5}, to: st.shard1.shardName}),
+    );
 
     jsTestLog("Updating resharding fields");
     let donorReshardingFields = {
@@ -71,19 +75,31 @@ function simulateResharding() {
         assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     }
 
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
-    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
-
     assert.commandWorked(
-        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: tempReshardingNss, syncFromConfig: true}),
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
     );
     assert.commandWorked(
-        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: tempReshardingNss, syncFromConfig: true}),
+        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
+    );
+
+    assert.commandWorked(
+        st.shard0.adminCommand({
+            _flushRoutingTableCacheUpdates: tempReshardingNss,
+            syncFromConfig: true,
+        }),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({
+            _flushRoutingTableCacheUpdates: tempReshardingNss,
+            syncFromConfig: true,
+        }),
     );
     st.refreshCatalogCacheForNs(mongos, ns);
 }
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(mongos.adminCommand({split: ns, middle: {x: 5}}));
 

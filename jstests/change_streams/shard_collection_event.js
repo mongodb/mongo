@@ -11,8 +11,14 @@
  * ]
  */
 
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTestLog("creating sharding test");
@@ -85,7 +91,9 @@ function runTest(startChangeStream) {
                 break;
             }
             // The only possible other events are create collection or index.
-            assert(events[0].operationType == "create" || events[0].operationType == "createIndexes");
+            assert(
+                events[0].operationType == "create" || events[0].operationType == "createIndexes",
+            );
             events = test.getNextChanges(cursor, 1);
         }
 

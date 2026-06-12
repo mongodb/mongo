@@ -16,9 +16,11 @@ let createUser = function (db) {
 
 let createRole = function (mongo) {
     print("============ adding a role.");
-    mongo
-        .getDB("admin")
-        .createRole({role: "roleAdministrator", roles: [{role: "userAdmin", db: "admin"}], privileges: []});
+    mongo.getDB("admin").createRole({
+        role: "roleAdministrator",
+        roles: [{role: "userAdmin", db: "admin"}],
+        privileges: [],
+    });
 };
 
 let assertCannotRunCommands = function (mongo) {
@@ -175,10 +177,14 @@ let runNonlocalTest = function (host) {
 
     assertCannotRunCommands(mongo);
     assert.throws(function () {
-        mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+        mongo
+            .getDB("admin")
+            .createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
     });
     assert.throws(function () {
-        mongo.getDB("$external").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+        mongo
+            .getDB("$external")
+            .createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
     });
     shutdown(conn);
 };

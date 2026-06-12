@@ -31,7 +31,14 @@ function sendHelloMaybeLB(node, port, loadBalanced, count) {
 
     if (loadBalanced) {
         assert(
-            checkLog.checkContainsWithCountJson(node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
+            checkLog.checkContainsWithCountJson(
+                node,
+                kLoadBalancerNoOpMessage,
+                {},
+                count,
+                undefined,
+                true,
+            ),
             `Did not find log id ${kLoadBalancerNoOpMessage} ${tojson(count)} times in the log`,
         );
     }
@@ -54,7 +61,15 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
             return actual === expected;
         };
         assert(
-            checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true, compareCounts),
+            checkLog.checkContainsWithCountJson(
+                node,
+                id,
+                attrs,
+                count,
+                undefined,
+                true,
+                compareCounts,
+            ),
             `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} in the log the expected number of times. Expected to see it ${count} times but saw it ${actualCount} times. This assertion failed while handling an expected error. The error was: ${tojson(err)}`,
         );
     }

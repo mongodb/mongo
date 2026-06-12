@@ -23,12 +23,21 @@ let coordinator = st.shard0;
 let participant1 = st.shard1;
 let participant2 = st.shard2;
 
-let expectedParticipantList = [participant1.shardName, participant2.shardName, coordinator.shardName];
+let expectedParticipantList = [
+    participant1.shardName,
+    participant2.shardName,
+    coordinator.shardName,
+];
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
 
-const checkParticipantListMatches = function (coordinatorConn, lsid, txnNumber, expectedParticipantList) {
+const checkParticipantListMatches = function (
+    coordinatorConn,
+    lsid,
+    txnNumber,
+    expectedParticipantList,
+) {
     let coordDoc = coordinatorConn
         .getDB("config")
         .getCollection("transaction_coordinators")
@@ -51,7 +60,8 @@ const startSimulatingNetworkFailures = function (connArray) {
         );
         assert.commandWorked(
             conn.adminCommand({
-                configureFailPoint: "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
+                configureFailPoint:
+                    "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
                 mode: {times: 5},
             }),
         );
@@ -63,7 +73,8 @@ const startSimulatingNetworkFailures = function (connArray) {
         );
         assert.commandWorked(
             conn.adminCommand({
-                configureFailPoint: "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
+                configureFailPoint:
+                    "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
                 mode: {times: 5},
             }),
         );
@@ -80,7 +91,8 @@ const stopSimulatingNetworkFailures = function (connArray) {
         );
         assert.commandWorked(
             conn.adminCommand({
-                configureFailPoint: "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
+                configureFailPoint:
+                    "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
                 mode: "off",
             }),
         );
@@ -92,7 +104,8 @@ const stopSimulatingNetworkFailures = function (connArray) {
         );
         assert.commandWorked(
             conn.adminCommand({
-                configureFailPoint: "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
+                configureFailPoint:
+                    "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
                 mode: "off",
             }),
         );
@@ -104,12 +117,18 @@ const setUp = function () {
     // shard0: [-inf, 0)
     // shard1: [0, 10)
     // shard2: [10, +inf)
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}),
+    );
 
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
@@ -183,7 +202,12 @@ const testCommitProtocol = function (shouldCommit, simulateNetworkFailures) {
     if (shouldCommit) {
         commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     } else {
-        commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
+        commitThread = runCommitThroughMongosInParallelThread(
+            lsid,
+            txnNumber,
+            st.s.host,
+            ErrorCodes.NoSuchTransaction,
+        );
     }
     commitThread.start();
 
@@ -195,7 +219,12 @@ const testCommitProtocol = function (shouldCommit, simulateNetworkFailures) {
     // Check that the coordinator wrote the decision.
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
     checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
-    const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, shouldCommit ? "commit" : "abort");
+    const commitTimestamp = checkDecisionIs(
+        coordinator,
+        lsid,
+        txnNumber,
+        shouldCommit ? "commit" : "abort",
+    );
     hangBeforeWaitingForDecisionWriteConcernFp.off();
 
     // Check that the coordinator deleted its persisted state.

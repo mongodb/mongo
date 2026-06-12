@@ -20,12 +20,17 @@ for (let i = 0; i < 1000; i++) {
 
 // Test that accumulators respect the collation when the group operation spills to disk.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "always"}),
+    db.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "always",
+    }),
 );
 const caseInsensitive = {
     collation: {locale: "en_US", strength: 2},
 };
-let results = coll.aggregate([{$group: {_id: null, result: {$addToSet: "$x"}}}], caseInsensitive).toArray();
+let results = coll
+    .aggregate([{$group: {_id: null, result: {$addToSet: "$x"}}}], caseInsensitive)
+    .toArray();
 assert.eq(1, results.length, results);
 assert.eq({_id: null, result: ["a"]}, results[0]);
 
@@ -48,7 +53,11 @@ results = coll
     .aggregate(
         [
             {
-                $group: {_id: {X: "$x", Y: "$y"}, val: {$first: {$toLower: "$y"}}, count: {$count: {}}},
+                $group: {
+                    _id: {X: "$x", Y: "$y"},
+                    val: {$first: {$toLower: "$y"}},
+                    count: {$count: {}},
+                },
             },
         ],
         caseInsensitive,
@@ -139,7 +148,10 @@ for (let i = 0; i < 1000; i++) {
 }
 
 results = coll
-    .aggregate([{$group: {_id: {F: "$f"}, firstF: {$first: "$f"}, count: {$count: {}}}}], caseInsensitive)
+    .aggregate(
+        [{$group: {_id: {F: "$f"}, firstF: {$first: "$f"}, count: {$count: {}}}}],
+        caseInsensitive,
+    )
     .toArray();
 assertArrayEq({
     actual: results,
@@ -152,7 +164,9 @@ assertArrayEq({
 });
 
 // Re-issue the query with the simple collation and check that the grouping becomes case-sensitive.
-results = coll.aggregate([{$group: {_id: {F: "$f"}, firstF: {$first: "$f"}, count: {$count: {}}}}]).toArray();
+results = coll
+    .aggregate([{$group: {_id: {F: "$f"}, firstF: {$first: "$f"}, count: {$count: {}}}}])
+    .toArray();
 assertArrayEq({
     actual: results,
     expected: [

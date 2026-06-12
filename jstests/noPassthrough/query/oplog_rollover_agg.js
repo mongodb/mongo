@@ -20,7 +20,11 @@ const oplogColl = localDB.oplog.rs;
 
 // Insert one document into the test collection.
 const insertCmdRes = assert.commandWorked(
-    testDB.runCommand({insert: testColl.getName(), documents: [{_id: 1}], writeConcern: {w: "majority"}}),
+    testDB.runCommand({
+        insert: testColl.getName(),
+        documents: [{_id: 1}],
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Record the optime of the insert to resume from later in the test.
@@ -62,7 +66,8 @@ assert.eq(next.o2._id, 1);
 // the first entry in the oplog is the replica set initialization message.
 const firstOplogEntry = getFirstOplogEntry(rst.getPrimary());
 assert(
-    firstOplogEntry.o.msg === "initiating set" || (firstOplogEntry.o.msg === "new primary" && firstOplogEntry.t == 1),
+    firstOplogEntry.o.msg === "initiating set" ||
+        (firstOplogEntry.o.msg === "new primary" && firstOplogEntry.t == 1),
 );
 assert.eq(firstOplogEntry.op, "n");
 
@@ -96,7 +101,12 @@ function oplogIsRolledOver() {
     // The oplog has rolled over if the op that used to be newest is now older than the
     // oplog's current oldest entry. Said another way, the oplog is rolled over when
     // everything in the oplog is newer than what used to be the newest entry.
-    return bsonWoCompare(mostRecentOplogEntry.ts, getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) < 0;
+    return (
+        bsonWoCompare(
+            mostRecentOplogEntry.ts,
+            getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts,
+        ) < 0
+    );
 }
 
 while (!oplogIsRolledOver()) {

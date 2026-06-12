@@ -28,7 +28,9 @@ const metaField = "meta";
 
 function setUpShardedCluster() {
     assert.commandWorked(
-        mongosDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+        mongosDB.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 
@@ -42,7 +44,9 @@ function setUpShardedCluster() {
 
     const numberDoc = 100;
     for (let i = 0; i < numberDoc; i++) {
-        assert.commandWorked(mongosColl.insert({[timeField]: ISODate("2025-09-03T10:00:00Z"), [metaField]: i}));
+        assert.commandWorked(
+            mongosColl.insert({[timeField]: ISODate("2025-09-03T10:00:00Z"), [metaField]: i}),
+        );
     }
 
     let splitPoint = {[metaField]: 50};

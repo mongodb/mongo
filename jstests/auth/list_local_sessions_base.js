@@ -51,5 +51,9 @@ export function runListLocalSessionsTest(mongod) {
     assert.eq(otherArray.length, 0);
 
     // Ensure that one user can not explicitly ask for another's sessions.
-    assertErrorCode(admin, [{"$listLocalSessions": {users: [{user: "user1", db: "test"}]}}], ErrorCodes.Unauthorized);
+    assertErrorCode(
+        admin,
+        [{"$listLocalSessions": {users: [{user: "user1", db: "test"}]}}],
+        ErrorCodes.Unauthorized,
+    );
 }

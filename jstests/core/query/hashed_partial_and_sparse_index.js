@@ -92,5 +92,9 @@ testSparseHashedIndex({a: "hashed", b: 1});
     validateFindCmdOutputAndPlan({filter: {b: 4}, expectedStages: ["COLLSCAN"]});
 
     // Verify that index is used if the query predicate matches the 'partialFilterExpression'.
-    validateFindCmdOutputAndPlan({filter: {b: 6}, expectedOutput: [{a: 1, b: 6}], expectedStages: ["IXSCAN", "FETCH"]});
+    validateFindCmdOutputAndPlan({
+        filter: {b: 6},
+        expectedOutput: [{a: 1, b: 6}],
+        expectedStages: ["IXSCAN", "FETCH"],
+    });
 });

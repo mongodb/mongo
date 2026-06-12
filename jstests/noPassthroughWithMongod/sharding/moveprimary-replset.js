@@ -43,7 +43,11 @@ let testDB = mongosConn.getDB(testDBName);
 mongosConn.adminCommand({addshard: replSet1.getURL()});
 
 testDB[testCollName].update({}, {$set: {y: "hello"}}, false /*upsert*/, true /*multi*/);
-assert.eq(testDB[testCollName].count({y: "hello"}), numDocs, "updating and counting docs via mongos failed");
+assert.eq(
+    testDB[testCollName].count({y: "hello"}),
+    numDocs,
+    "updating and counting docs via mongos failed",
+);
 
 mongosConn.adminCommand({addshard: replSet2.getURL()});
 
@@ -57,6 +61,10 @@ assert.eq(
 );
 
 testDB[testCollName].update({}, {$set: {z: "world"}}, false /*upsert*/, true /*multi*/);
-assert.eq(testDB[testCollName].count({z: "world"}), numDocs, "updating and counting docs via mongos failed");
+assert.eq(
+    testDB[testCollName].count({z: "world"}),
+    numDocs,
+    "updating and counting docs via mongos failed",
+);
 
 shardingTest.stop();

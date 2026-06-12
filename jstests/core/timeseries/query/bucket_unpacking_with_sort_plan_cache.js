@@ -28,7 +28,11 @@ import {
     runningWithViewlessTimeseriesUpgradeDowngrade,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {getAggPlanStage, getAggPlanStages, getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getAggPlanStages,
+    getPlanCacheKeyFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
     jsTest.log.info(
@@ -70,11 +74,18 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     const numDocs = 20;
     setupCollection(coll, collName, numDocs);
 
-    assert.commandWorked(coll.createIndex({"m.a": indexDirection, "m.i": indexDirection, t: indexDirection}));
-    assert.commandWorked(coll.createIndex({"m.b": indexDirection, "m.i": indexDirection, t: indexDirection}));
+    assert.commandWorked(
+        coll.createIndex({"m.a": indexDirection, "m.i": indexDirection, t: indexDirection}),
+    );
+    assert.commandWorked(
+        coll.createIndex({"m.b": indexDirection, "m.i": indexDirection, t: indexDirection}),
+    );
 
     // Check that the rewrite is performed before caching.
-    const pipeline = [{$sort: {"m.i": sortDirection, t: sortDirection}}, {$match: {"m.a": 1, "m.b": 1}}];
+    const pipeline = [
+        {$sort: {"m.i": sortDirection, t: sortDirection}},
+        {$match: {"m.a": 1, "m.b": 1}},
+    ];
     let explain = coll.explain().aggregate(pipeline);
     assert.eq(getAggPlanStages(explain, stageName).length, 1, explain);
     const traversalDirection = sortDirection === indexDirection ? "forward" : "backward";
@@ -99,7 +110,9 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
 
     // Get constants needed for replanning.
     const cursorStageName = "$cursor";
-    const planCacheKey = getPlanCacheKeyFromExplain(getAggPlanStage(explain, cursorStageName)[cursorStageName]);
+    const planCacheKey = getPlanCacheKeyFromExplain(
+        getAggPlanStage(explain, cursorStageName)[cursorStageName],
+    );
     const planCacheEntry = (() => {
         const planCache = getTimeseriesCollForDDLOps(db, coll)
             .getPlanCache()
@@ -124,7 +137,9 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     // Don't profile the setFCV command, which could be run during this test in the
     // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
     assert.commandWorked(
-        db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+        db.setProfilingLevel(1, {
+            filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+        }),
     );
 
     // Rerun command with replanning.
@@ -138,7 +153,10 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
 
     // Check that rewrite happens with replanning.
     explain = coll.explain().aggregate(pipeline);
-    assert.eq(getAggPlanStages(explain, stageName).length, 1, {explain, stages: getAggPlanStages(explain, stageName)});
+    assert.eq(getAggPlanStages(explain, stageName).length, 1, {
+        explain,
+        stages: getAggPlanStages(explain, stageName),
+    });
     assert.eq(getAggPlanStage(explain, "IXSCAN").direction, traversalDirection, explain);
 };
 

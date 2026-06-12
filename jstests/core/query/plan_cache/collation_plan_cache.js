@@ -84,15 +84,25 @@ if (!isSbeEnabled) {
 coll.getPlanCache().clear();
 
 // Run a query so that an entry is inserted into the cache.
-assert.commandWorked(coll.runCommand("find", {filter: {a: "foo", b: 5}, collation: {locale: "en_US"}}));
+assert.commandWorked(
+    coll.runCommand("find", {filter: {a: "foo", b: 5}, collation: {locale: "en_US"}}),
+);
 let explainRes = coll.find({a: "foo", b: 5}).collation({locale: "en_US"}).explain();
 
 // The query should have cached plans.
-assert.lt(0, getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length, dumpPlanCacheState());
+assert.lt(
+    0,
+    getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length,
+    dumpPlanCacheState(),
+);
 
 explainRes = coll.find({a: "foo", b: 5}).collation({locale: "fr_CA"}).explain();
 // A query with a different collation should have no cached plans.
-assert.eq(0, getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length, dumpPlanCacheState());
+assert.eq(
+    0,
+    getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length,
+    dumpPlanCacheState(),
+);
 // Cache the query, then assert that different collations lead to different hashes.
 coll.find({a: "foo", b: 5}).collation({locale: "fr_CA"}).toArray();
 const cache = coll.getPlanCache().list();
@@ -101,7 +111,11 @@ assert.neq(cache[0].solutionHash, cache[1].solutionHash);
 
 explainRes = coll.find({a: "foo", b: "bar"}).collation({locale: "en_US"}).explain();
 // A query with different string locations should have no cached plans.
-assert.eq(0, getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length, dumpPlanCacheState());
+assert.eq(
+    0,
+    getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length,
+    dumpPlanCacheState(),
+);
 
 coll.getPlanCache().clear();
 
@@ -110,7 +124,12 @@ coll.getPlanCache().clear();
 // Passing a query with an empty collation object should throw.
 assert.throws(
     function () {
-        coll.getPlanCache().clearPlansByQuery({query: {a: "foo", b: 5}, sort: {}, projection: {}, collation: {}});
+        coll.getPlanCache().clearPlansByQuery({
+            query: {a: "foo", b: 5},
+            sort: {},
+            projection: {},
+            collation: {},
+        });
     },
     [],
     "empty collation object should throw",
@@ -172,13 +191,20 @@ coll.getPlanCache().clearPlansByQuery({
 assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
 // 'collation' parameter is not allowed with 'query' parameter for 'planCacheClear'.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {collation: {locale: "en_US"}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {collation: {locale: "en_US"}}),
+    ErrorCodes.BadValue,
+);
 
 // Index filter commands.
 
 // planCacheSetFilter should fail if 'collation' is an empty object.
 assert.commandFailed(
-    coll.runCommand("planCacheSetFilter", {query: {a: "foo", b: 5}, collation: {}, indexes: [{a: 1, b: 1}]}),
+    coll.runCommand("planCacheSetFilter", {
+        query: {a: "foo", b: 5},
+        collation: {},
+        indexes: [{a: 1, b: 1}],
+    }),
     "planCacheSetFilter should fail on empty collation object",
 );
 
@@ -243,18 +269,46 @@ assert.commandFailed(
 
 // Clearing a plan cache filter with no collation should have no effect.
 assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: {a: "foo", b: 5}}));
-assert.eq(1, coll.runCommand("planCacheListFilters").filters.length, "unexpected number of plan cache filters");
+assert.eq(
+    1,
+    coll.runCommand("planCacheListFilters").filters.length,
+    "unexpected number of plan cache filters",
+);
 
 // Clearing a plan cache filter with a different collation should have no effect.
-assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: {a: "foo", b: 5}, collation: {locale: "fr_CA"}}));
-assert.eq(1, coll.runCommand("planCacheListFilters").filters.length, "unexpected number of plan cache filters");
+assert.commandWorked(
+    coll.runCommand("planCacheClearFilters", {
+        query: {a: "foo", b: 5},
+        collation: {locale: "fr_CA"},
+    }),
+);
+assert.eq(
+    1,
+    coll.runCommand("planCacheListFilters").filters.length,
+    "unexpected number of plan cache filters",
+);
 
 // Clearing a plan cache filter with different string locations should have no effect.
 assert.commandWorked(
-    coll.runCommand("planCacheClearFilters", {query: {a: "foo", b: "bar", collation: {locale: "en_US"}}}),
+    coll.runCommand("planCacheClearFilters", {
+        query: {a: "foo", b: "bar", collation: {locale: "en_US"}},
+    }),
 );
-assert.eq(1, coll.runCommand("planCacheListFilters").filters.length, "unexpected number of plan cache filters");
+assert.eq(
+    1,
+    coll.runCommand("planCacheListFilters").filters.length,
+    "unexpected number of plan cache filters",
+);
 
 // Clear plan cache filter.
-assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: {a: "foo", b: 5}, collation: {locale: "en_US"}}));
-assert.eq(0, coll.runCommand("planCacheListFilters").filters.length, "unexpected number of plan cache filters");
+assert.commandWorked(
+    coll.runCommand("planCacheClearFilters", {
+        query: {a: "foo", b: 5},
+        collation: {locale: "en_US"},
+    }),
+);
+assert.eq(
+    0,
+    coll.runCommand("planCacheListFilters").filters.length,
+    "unexpected number of plan cache filters",
+);

@@ -89,14 +89,18 @@ describe("merge, split, and move chunks", function () {
     // previous test. mochalite runs tests serially within a describe, so this is safe.
     describe("chunk merge and split workflows", function () {
         it("merges chunks including MinKey", function () {
-            assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{_id: MinKey}, {_id: 10}]}));
+            assert.commandWorked(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: MinKey}, {_id: 10}]}),
+            );
             assert.eq(8, findChunksUtil.findChunksByNs(config, ns).itcount());
             // S0: min->10, 20->40, 40->50, 50->90, 100->110, 110->max
             // S1: 10->20, 90->100
         });
 
         it("merges three adjacent chunks in the middle", function () {
-            assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{_id: 20}, {_id: 90}]}));
+            assert.commandWorked(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: 20}, {_id: 90}]}),
+            );
             assert.eq(6, findChunksUtil.findChunksByNs(config, ns).itcount());
             assert.eq(numDocs, coll.find().itcount());
             // S0: min->10, 20->90, 100->110, 110->max
@@ -112,8 +116,12 @@ describe("merge, split, and move chunks", function () {
         });
 
         it("moves newly split chunks to another shard", function () {
-            assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 20}, to: shardNames[1]}));
-            assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 55}, to: shardNames[1]}));
+            assert.commandWorked(
+                admin.runCommand({moveChunk: ns, find: {_id: 20}, to: shardNames[1]}),
+            );
+            assert.commandWorked(
+                admin.runCommand({moveChunk: ns, find: {_id: 55}, to: shardNames[1]}),
+            );
             assert.eq(7, findChunksUtil.findChunksByNs(config, ns).itcount());
             assert.eq(numDocs, coll.find().itcount());
             // S0: min->10, 100->110, 110->max
@@ -121,22 +129,32 @@ describe("merge, split, and move chunks", function () {
         });
 
         it("merges chunks including MaxKey", function () {
-            assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{_id: 100}, {_id: MaxKey}]}));
+            assert.commandWorked(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: 100}, {_id: MaxKey}]}),
+            );
             assert.eq(6, findChunksUtil.findChunksByNs(config, ns).itcount());
             // S0: min->10, 100->max
             // S1: 10->20, 20->55, 55->90, 90->100
         });
 
         it("merges chunks after a chunk has been moved out of a shard", function () {
-            assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 110}, to: shardNames[1]}));
-            assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 10}, to: shardNames[0]}));
+            assert.commandWorked(
+                admin.runCommand({moveChunk: ns, find: {_id: 110}, to: shardNames[1]}),
+            );
+            assert.commandWorked(
+                admin.runCommand({moveChunk: ns, find: {_id: 10}, to: shardNames[0]}),
+            );
             assert.eq(numDocs, coll.find().itcount());
             assert.eq(6, findChunksUtil.findChunksByNs(config, ns).itcount());
             // S0: min->10, 10->20
             // S1: 20->55, 55->90, 90->100, 100->max
 
-            assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{_id: 90}, {_id: MaxKey}]}));
-            assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{_id: 20}, {_id: 90}]}));
+            assert.commandWorked(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: 90}, {_id: MaxKey}]}),
+            );
+            assert.commandWorked(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: 20}, {_id: 90}]}),
+            );
             assert.eq(numDocs, coll.find().itcount());
             // S0: min->10, 10->20
             // S1: 20->90, 90->max
@@ -145,7 +163,9 @@ describe("merge, split, and move chunks", function () {
         it("splits after merge then moves across shards", function () {
             assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 15}}));
             assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 30}}));
-            assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 30}, to: shardNames[0]}));
+            assert.commandWorked(
+                admin.runCommand({moveChunk: ns, find: {_id: 30}, to: shardNames[0]}),
+            );
             assert.eq(numDocs, coll.find().itcount());
             // S0: min->10, 10->15, 15->20, 30->90
             // S1: 20->30, 90->max
@@ -153,7 +173,9 @@ describe("merge, split, and move chunks", function () {
 
         it("rejects merge across a hole in chunk ranges", function () {
             // S0 has chunks min->10, 10->15, 15->20, 30->90 with a hole at [20, 30)
-            assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{_id: MinKey}, {_id: 90}]}));
+            assert.commandFailed(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: MinKey}, {_id: 90}]}),
+            );
             assert.eq(6, findChunksUtil.findChunksByNs(config, ns).itcount());
         });
 
@@ -178,7 +200,9 @@ describe("merge, split, and move chunks", function () {
             assert.neq(null, targetChunk);
             const chunksBefore = findChunksUtil.findChunksByNs(config, ns).itcount();
 
-            assert.commandWorked(admin.runCommand({split: ns, bounds: [targetChunk.min, targetChunk.max]}));
+            assert.commandWorked(
+                admin.runCommand({split: ns, bounds: [targetChunk.min, targetChunk.max]}),
+            );
             assert.gt(findChunksUtil.findChunksByNs(config, ns).itcount(), chunksBefore);
             assert.eq(numDocs, coll.find().itcount());
         });
@@ -191,7 +215,9 @@ describe("merge, split, and move chunks", function () {
             assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 12}}));
             assert.eq(chunksBefore + 1, findChunksUtil.findChunksByNs(config, ns).itcount());
 
-            assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{_id: 10}, {_id: 15}]}));
+            assert.commandWorked(
+                admin.runCommand({mergeChunks: ns, bounds: [{_id: 10}, {_id: 15}]}),
+            );
             assert.eq(chunksBefore, findChunksUtil.findChunksByNs(config, ns).itcount());
 
             assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 12}}));

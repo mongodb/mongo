@@ -19,12 +19,19 @@
  *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator,
+} from "jstests/libs/bulk_write_utils.js";
 
 const serverStatus = assert.commandWorked(db.getSiblingDB("admin").runCommand({serverStatus: 1}));
 const currVersion = serverStatus.version;
 const is82OrHigher =
-    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(currVersion), MongoRunner.getBinVersionFor("8.2")) >= 1;
+    MongoRunner.compareBinVersions(
+        MongoRunner.getBinVersionFor(currVersion),
+        MongoRunner.getBinVersionFor("8.2"),
+    ) >= 1;
 
 let coll = db.getCollection("coll");
 let coll1 = db.getCollection("coll1");
@@ -111,9 +118,10 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 // Missing nsInfo
-assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}]}), [
-    ErrorCodes.IDLFailedToParse,
-]);
+assert.commandFailedWithCode(
+    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}]}),
+    [ErrorCodes.IDLFailedToParse],
+);
 
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
@@ -132,7 +140,11 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: "test"}], nsInfo: [{ns: "test.coll"}]}),
+    db.adminCommand({
+        bulkWrite: 1,
+        ops: [{insert: 0, document: "test"}],
+        nsInfo: [{ns: "test.coll"}],
+    }),
     [ErrorCodes.TypeMismatch],
 );
 
@@ -140,22 +152,31 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}], nsInfo: ["test"]}),
+    db.adminCommand({
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}],
+        nsInfo: ["test"],
+    }),
     [ErrorCodes.TypeMismatch],
 );
 
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
-assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, ops: "test", nsInfo: [{ns: "test.coll"}]}), [
-    ErrorCodes.TypeMismatch,
-]);
+assert.commandFailedWithCode(
+    db.adminCommand({bulkWrite: 1, ops: "test", nsInfo: [{ns: "test.coll"}]}),
+    [ErrorCodes.TypeMismatch],
+);
 
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}], nsInfo: "test"}),
+    db.adminCommand({
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}],
+        nsInfo: "test",
+    }),
     [ErrorCodes.TypeMismatch],
 );
 
@@ -180,10 +201,29 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 1});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 1,
+});
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 0, upserted: {_id: 1}});
+cursorEntryValidator(res.cursor.firstBatch[0], {
+    ok: 0,
+    idx: 0,
+    n: 0,
+    nModified: 0,
+    code: ErrorCodes.ImmutableField,
+});
+cursorEntryValidator(res.cursor.firstBatch[1], {
+    ok: 1,
+    idx: 1,
+    n: 1,
+    nModified: 0,
+    upserted: {_id: 1},
+});
 coll.drop();
 coll2.drop();
 
@@ -202,9 +242,22 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
+cursorEntryValidator(res.cursor.firstBatch[0], {
+    ok: 0,
+    idx: 0,
+    n: 0,
+    nModified: 0,
+    code: ErrorCodes.ImmutableField,
+});
 coll.drop();
 coll2.drop();
 
@@ -234,7 +287,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -243,9 +303,19 @@ cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 // In some cases we may see the javascript execution interrupted because it takes longer than
 // our default time limit, so we allow that possibility.
 try {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: ErrorCodes.BSONObjectTooLarge});
+    cursorEntryValidator(res.cursor.firstBatch[1], {
+        ok: 0,
+        n: 0,
+        idx: 1,
+        code: ErrorCodes.BSONObjectTooLarge,
+    });
 } catch {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
+    cursorEntryValidator(res.cursor.firstBatch[1], {
+        ok: 0,
+        n: 0,
+        idx: 1,
+        code: ErrorCodes.Interrupted,
+    });
 }
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, n: 1, idx: 2});
 
@@ -265,7 +335,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -274,9 +351,19 @@ cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 // In some cases we may see the javascript execution interrupted because it takes longer than
 // our default time limit, so we allow that possibility.
 try {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: ErrorCodes.BSONObjectTooLarge});
+    cursorEntryValidator(res.cursor.firstBatch[1], {
+        ok: 0,
+        n: 0,
+        idx: 1,
+        code: ErrorCodes.BSONObjectTooLarge,
+    });
 } catch {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
+    cursorEntryValidator(res.cursor.firstBatch[1], {
+        ok: 0,
+        n: 0,
+        idx: 1,
+        code: ErrorCodes.Interrupted,
+    });
 }
 
 coll.drop();
@@ -294,7 +381,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -322,7 +416,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -363,11 +464,24 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
-cursorEntryValidator(res.cursor.firstBatch[2], {ok: 0, idx: 2, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
+cursorEntryValidator(res.cursor.firstBatch[2], {
+    ok: 0,
+    idx: 2,
+    n: 0,
+    nModified: 0,
+    code: ErrorCodes.ImmutableField,
+});
 coll.drop();
 
 coll.insert({_id: 0, skey: "MongoDB"});
@@ -398,9 +512,22 @@ keysToTest.forEach((value) => {
 
     assert.commandWorked(res);
     cursorSizeValidator(res, 1);
-    summaryFieldsValidator(res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+    summaryFieldsValidator(res, {
+        nErrors: 1,
+        nInserted: 0,
+        nDeleted: 0,
+        nMatched: 0,
+        nModified: 0,
+        nUpserted: 0,
+    });
 
-    cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
+    cursorEntryValidator(res.cursor.firstBatch[0], {
+        ok: 0,
+        idx: 0,
+        n: 0,
+        nModified: 0,
+        code: 51198,
+    });
 
     // TODO SERVER-99035: Re-enable exact match assertion and delete partial match assertion.
     // Currently the TXN API returns a CommitResult struct which pre-pends "Command error committing
@@ -409,7 +536,11 @@ keysToTest.forEach((value) => {
     //
     // assert.eq(res.cursor.firstBatch[0].errmsg,
     //           "Constant values may only be specified for pipeline updates");
-    assert(res.cursor.firstBatch[0].errmsg.includes("Constant values may only be specified for pipeline updates"));
+    assert(
+        res.cursor.firstBatch[0].errmsg.includes(
+            "Constant values may only be specified for pipeline updates",
+        ),
+    );
 });
 coll.drop();
 
@@ -431,7 +562,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 9});
 assert.eq(
@@ -454,7 +592,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res, "bulkWrite command response: " + tojson(res));
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 assert(res.cursor.id == 0, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, n: 0, idx: 1, code: 11000});

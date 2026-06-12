@@ -10,7 +10,10 @@ import {
     getMongodConns,
     numMostCommonValues,
 } from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
-import {getNonPrimaryShardName, getPrimaryShardNameForDB} from "jstests/sharding/libs/sharding_util.js";
+import {
+    getNonPrimaryShardName,
+    getPrimaryShardNameForDB,
+} from "jstests/sharding/libs/sharding_util.js";
 
 function awaitReplicationIfNeeded(db, coll) {
     if (!FixtureHelpers.isStandalone(db)) {
@@ -117,7 +120,8 @@ for (let testCaseBase of shardKeyPrefixedIndexTestCases) {
         // Hashed indexes cannot have a uniqueness constraint.
         const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
         testCase.indexOptions.unique = true;
-        testCase.expectUnique = Object.keys(testCaseBase.shardKey).length == Object.keys(testCaseBase.indexKey).length;
+        testCase.expectUnique =
+            Object.keys(testCaseBase.shardKey).length == Object.keys(testCaseBase.indexKey).length;
         candidateKeyTestCases.push(testCase);
         currentKeyTestCases.push(testCase);
     }
@@ -134,7 +138,8 @@ for (let testCaseBase of compatibleIndexTestCases) {
         // Hashed indexes cannot have a uniqueness constraint.
         const testCase = Object.extend({indexOptions: {}}, testCaseBase, true /* deep */);
         testCase.indexOptions.unique = true;
-        testCase.expectUnique = Object.keys(testCaseBase.shardKey).length == Object.keys(testCaseBase.indexKey).length;
+        testCase.expectUnique =
+            Object.keys(testCaseBase.shardKey).length == Object.keys(testCaseBase.indexKey).length;
         candidateKeyTestCases.push(testCase);
     }
 }
@@ -161,13 +166,24 @@ export function makeDocument(fieldNames, value) {
  * Tests the cardinality and frequency metrics for a shard key that either has a non-unique
  * supporting/compatible index or doesn't a supporting/compatible index.
  */
-function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKey, testCase, writeConcern) {
+function testAnalyzeShardKeyNoUniqueIndex(
+    conn,
+    dbName,
+    collName,
+    currentShardKey,
+    testCase,
+    writeConcern,
+) {
     assert(!testCase.indexOptions.unique);
     const db = conn.getDB(dbName);
     const ns = dbName + "." + collName;
     const coll = db.getCollection(collName);
 
-    const fieldNames = AnalyzeShardKeyUtil.getCombinedFieldNames(currentShardKey, testCase.shardKey, testCase.indexKey);
+    const fieldNames = AnalyzeShardKeyUtil.getCombinedFieldNames(
+        currentShardKey,
+        testCase.shardKey,
+        testCase.indexKey,
+    );
     const shardKeyContainsId = testCase.shardKey.hasOwnProperty("_id");
     const isUnique = false;
 
@@ -190,7 +206,10 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
             const isMostCommon = maxFrequency - frequency < numMostCommonValues;
             if (testCase.expectMetrics && isMostCommon) {
                 mostCommonValues.push({
-                    value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, testCase.shardKey),
+                    value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+                        doc,
+                        testCase.shardKey,
+                    ),
                     frequency,
                 });
             }
@@ -214,7 +233,9 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
     assert.commandWorked(coll.insert(docs0, {writeConcern}));
 
-    jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues - 1");
+    jsTest.log(
+        "Testing metrics with non-unique index, numDistinctValues = numMostCommonValues - 1",
+    );
     awaitReplicationIfNeeded(db, coll);
     const res0 = conn.adminCommand({
         analyzeShardKey: ns,
@@ -261,7 +282,9 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
     assert.commandWorked(coll.insert(docs2, {writeConcern}));
 
-    jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues * 25");
+    jsTest.log(
+        "Testing metrics with non-unique index, numDistinctValues = numMostCommonValues * 25",
+    );
     awaitReplicationIfNeeded(db, coll);
 
     const res2 = conn.adminCommand({
@@ -284,7 +307,14 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
  * Tests the cardinality and frequency metrics for a shard key that has a unique
  * supporting/compatible index.
  */
-function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey, testCase, writeConcern) {
+function testAnalyzeShardKeyUniqueIndex(
+    conn,
+    dbName,
+    collName,
+    currentShardKey,
+    testCase,
+    writeConcern,
+) {
     assert(testCase.indexOptions.unique);
     assert(testCase.expectMetrics);
 
@@ -292,7 +322,11 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     const ns = dbName + "." + collName;
     const coll = db.getCollection(collName);
 
-    const fieldNames = AnalyzeShardKeyUtil.getCombinedFieldNames(currentShardKey, testCase.shardKey, testCase.indexKey);
+    const fieldNames = AnalyzeShardKeyUtil.getCombinedFieldNames(
+        currentShardKey,
+        testCase.shardKey,
+        testCase.indexKey,
+    );
     const isUnique = testCase.expectUnique;
 
     const makeSubTestCase = (numDistinctValues) => {
@@ -329,7 +363,9 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
     assert.commandWorked(coll.insert(docs0, {writeConcern}));
 
-    jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues - 1");
+    jsTest.log(
+        "Testing metrics with non-unique index, numDistinctValues = numMostCommonValues - 1",
+    );
     awaitReplicationIfNeeded(db, coll);
     const res0 = assert.commandWorked(
         conn.adminCommand({
@@ -369,7 +405,9 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
     assert.commandWorked(coll.insert(docs2, {writeConcern}));
 
-    jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues * 25");
+    jsTest.log(
+        "Testing metrics with non-unique index, numDistinctValues = numMostCommonValues * 25",
+    );
     awaitReplicationIfNeeded(db, coll);
     const res2 = assert.commandWorked(
         conn.adminCommand({
@@ -399,7 +437,9 @@ export function testAnalyzeCandidateShardKeysUnshardedCollection(conn, {rst, st}
     const coll = db.getCollection(collName);
     const mongodConns = rst && st ? getMongodConns({rst, st}) : null;
 
-    jsTest.log(`Testing candidate shard keys for an unsharded collection: ${tojson({dbName, collName})}`);
+    jsTest.log(
+        `Testing candidate shard keys for an unsharded collection: ${tojson({dbName, collName})}`,
+    );
 
     candidateKeyTestCases.forEach((testCaseBase) => {
         const testCase = Object.assign({}, testCaseBase);
@@ -510,22 +550,29 @@ export function testAnalyzeCandidateShardKeysShardedCollection(conn, st, writeCo
         assert.commandWorked(initialcoll.insert([{a: 1}], {writeConcern}));
     }
 
-    jsTest.log(`Testing candidate shard keys for a sharded collection: ${tojson({dbName, collName})}`);
+    jsTest.log(
+        `Testing candidate shard keys for a sharded collection: ${tojson({dbName, collName})}`,
+    );
 
     const primaryShardName = getPrimaryShardNameForDB(db);
     const nonPrimaryShard = getNonPrimaryShardName(db);
-    assert.commandWorked(conn.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
+    assert.commandWorked(
+        conn.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}),
+    );
     const result = conn.adminCommand({shardCollection: ns, key: currentShardKey});
     // Some suites automatically create indexes that prevent the collection from being
     // sharded with the specified shard key.
     if (!result.ok && result.code == ErrorCodes.AlreadyInitialized) {
         jsTest.log(
-            "Skipping testAnalyzeCandidateShardKeysShardedCollection because AlreadyInitialized: " + result.errmsg,
+            "Skipping testAnalyzeCandidateShardKeysShardedCollection because AlreadyInitialized: " +
+                result.errmsg,
         );
         return;
     }
     assert.commandWorked(conn.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
-    assert.commandWorked(conn.adminCommand({moveChunk: ns, find: currentShardKeySplitPoint, to: nonPrimaryShard}));
+    assert.commandWorked(
+        conn.adminCommand({moveChunk: ns, find: currentShardKeySplitPoint, to: nonPrimaryShard}),
+    );
 
     candidateKeyTestCases.forEach((testCaseBase) => {
         if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCaseBase.indexKey)) {
@@ -576,9 +623,23 @@ export function testAnalyzeCandidateShardKeysShardedCollection(conn, st, writeCo
             }
 
             if (testCase.indexOptions.unique) {
-                testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey, testCase, writeConcern);
+                testAnalyzeShardKeyUniqueIndex(
+                    conn,
+                    dbName,
+                    collName,
+                    currentShardKey,
+                    testCase,
+                    writeConcern,
+                );
             } else {
-                testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKey, testCase, writeConcern);
+                testAnalyzeShardKeyNoUniqueIndex(
+                    conn,
+                    dbName,
+                    collName,
+                    currentShardKey,
+                    testCase,
+                    writeConcern,
+                );
             }
 
             if (mongodConns) {
@@ -655,7 +716,8 @@ export function testAnalyzeCurrentShardKeys(conn, st, writeConcern) {
 
             if (!result.ok && result.code == ErrorCodes.CannotCreateIndex) {
                 jsTest.log(
-                    "Skipping testAnalyzeCurrentShardKeys test case because CannotCreateIndex: " + result.errmsg,
+                    "Skipping testAnalyzeCurrentShardKeys test case because CannotCreateIndex: " +
+                        result.errmsg,
                 );
                 skipTestCase = true;
             } else {
@@ -681,7 +743,11 @@ export function testAnalyzeCurrentShardKeys(conn, st, writeConcern) {
                     }
                     assert.commandWorked(db.adminCommand({split: ns, middle: shardKeySplitPoint}));
                     assert.commandWorked(
-                        db.adminCommand({moveChunk: ns, find: shardKeySplitPoint, to: nonPrimaryShard}),
+                        db.adminCommand({
+                            moveChunk: ns,
+                            find: shardKeySplitPoint,
+                            to: nonPrimaryShard,
+                        }),
                     );
                 }
 
@@ -690,9 +756,23 @@ export function testAnalyzeCurrentShardKeys(conn, st, writeConcern) {
                 }
 
                 if (testCase.indexOptions.unique) {
-                    testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey, testCase, writeConcern);
+                    testAnalyzeShardKeyUniqueIndex(
+                        conn,
+                        dbName,
+                        collName,
+                        currentShardKey,
+                        testCase,
+                        writeConcern,
+                    );
                 } else {
-                    testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKey, testCase, writeConcern);
+                    testAnalyzeShardKeyNoUniqueIndex(
+                        conn,
+                        dbName,
+                        collName,
+                        currentShardKey,
+                        testCase,
+                        writeConcern,
+                    );
                 }
 
                 if (mongodConns) {

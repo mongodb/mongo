@@ -60,7 +60,9 @@ export const ShardTransitionUtil = (function () {
                 return;
             } catch (e) {
                 if (e.code === ErrorCodes.ShardNotFound) {
-                    jsTest.log.info("Ignoring error with transitioning shard, retrying", {error: e});
+                    jsTest.log.info("Ignoring error with transitioning shard, retrying", {
+                        error: e,
+                    });
                     continue;
                 }
 

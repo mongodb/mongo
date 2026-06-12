@@ -65,4 +65,6 @@ indexList = coll.getIndexes();
 assertIndexesDontExist(coll, ["b_1", "c_1", "d_1"]);
 
 // Test edge case: try to drop only non-existent indexes
-assert.commandWorked(db.runCommand({dropIndexes: coll.getName(), index: ["nonexistent1", "nonexistent2"]}));
+assert.commandWorked(
+    db.runCommand({dropIndexes: coll.getName(), index: ["nonexistent1", "nonexistent2"]}),
+);

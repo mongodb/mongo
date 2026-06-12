@@ -18,7 +18,9 @@ function numInsertOplogEntry(oplog) {
         if (e.code !== ErrorCodes.CappedPositionLost) {
             throw e;
         }
-        print(`Skipping oplog times logging for ${oplog.getMongo().host} due to conflict with oplog cap maintainer`);
+        print(
+            `Skipping oplog times logging for ${oplog.getMongo().host} due to conflict with oplog cap maintainer`,
+        );
     }
     let result;
     assert.soon(() => {
@@ -69,7 +71,10 @@ export function rollOver1MBOplog(replSet) {
 
     // Insert the first document.
     const firstInsertTimestamp = assert.commandWorked(
-        coll.runCommand("insert", {documents: [{_id: 0, longString: longString}], writeConcern: {w: 2}}),
+        coll.runCommand("insert", {
+            documents: [{_id: 0, longString: longString}],
+            writeConcern: {w: 2},
+        }),
     ).operationTime;
     jsTestLog("First insert timestamp: " + tojson(firstInsertTimestamp));
 
@@ -79,7 +84,10 @@ export function rollOver1MBOplog(replSet) {
 
     // Insert the second document.
     const secondInsertTimestamp = assert.commandWorked(
-        coll.runCommand("insert", {documents: [{_id: 1, longString: longString}], writeConcern: {w: 2}}),
+        coll.runCommand("insert", {
+            documents: [{_id: 1, longString: longString}],
+            writeConcern: {w: 2},
+        }),
     ).operationTime;
     jsTestLog("Second insert timestamp: " + tojson(secondInsertTimestamp));
 
@@ -103,7 +111,10 @@ export function rollOver1MBOplog(replSet) {
     // marker and will start truncating oplog entries. The oplog entry for the first
     // insert will be truncated after the oplog cap maintainer thread finishes.
     const thirdInsertTimestamp = assert.commandWorked(
-        coll.runCommand("insert", {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}),
+        coll.runCommand("insert", {
+            documents: [{_id: 2, longString: longString}],
+            writeConcern: {w: 2},
+        }),
     ).operationTime;
     jsTestLog("Third insert timestamp: " + tojson(thirdInsertTimestamp));
 
@@ -119,8 +130,12 @@ export function rollOver1MBOplog(replSet) {
     assert.eq(3, numInsertOplogEntry(secondaryOplog));
 
     // Let the oplog cap maintainer thread start truncating the oplog.
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
-    assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}),
+    );
+    assert.commandWorked(
+        secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}),
+    );
 }
 
 export function oplogRolloverTest(storageEngine, initialSyncMethod) {

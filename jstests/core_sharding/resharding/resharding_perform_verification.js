@@ -127,7 +127,9 @@ function waitForFailPointOrCountDownLatch(fp, countDownLatch) {
 
 function validateStateDocuments(topology, collNS, performVerification) {
     const configRSPrimary = new Mongo(topology.configsvr.primary);
-    const coordinatorDoc = configRSPrimary.getCollection("config.reshardingOperations").findOne({ns: collNS});
+    const coordinatorDoc = configRSPrimary
+        .getCollection("config.reshardingOperations")
+        .findOne({ns: collNS});
 
     if (performVerification === null && isVerificationEnabled) {
         // The command didn't specify 'performVerification'. If the feature flag was enabled when
@@ -135,19 +137,25 @@ function validateStateDocuments(topology, collNS, performVerification) {
         // get set.
         performVerification = true;
     }
-    jsTest.log("Validating state documents " + tojson({expectedPerformVerification: performVerification}));
+    jsTest.log(
+        "Validating state documents " + tojson({expectedPerformVerification: performVerification}),
+    );
 
     assert.eq(coordinatorDoc.performVerification, performVerification, coordinatorDoc);
 
     coordinatorDoc.donorShards.forEach((donorEntry) => {
         const shardRSPrimary = new Mongo(topology.shards[donorEntry.id].primary);
-        const donorDoc = shardRSPrimary.getCollection("config.localReshardingOperations.donor").findOne();
+        const donorDoc = shardRSPrimary
+            .getCollection("config.localReshardingOperations.donor")
+            .findOne();
         assert.eq(donorDoc.performVerification, performVerification, donorDoc);
     });
 
     coordinatorDoc.recipientShards.forEach((recipientEntry) => {
         const shardRSPrimary = new Mongo(topology.shards[recipientEntry.id].primary);
-        const recipientDoc = shardRSPrimary.getCollection("config.localReshardingOperations.recipient").findOne();
+        const recipientDoc = shardRSPrimary
+            .getCollection("config.localReshardingOperations.recipient")
+            .findOne();
         assert.eq(recipientDoc.performVerification, performVerification, recipientDoc);
     });
 }

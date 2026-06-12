@@ -27,11 +27,15 @@ for (const collectionName of [collName, collName2, collName3, collName4, viewNam
 }
 
 // Should be able to enable the 'changeStreamPreAndPostImages' via create or collMod.
-assert.commandWorked(testDB.runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    testDB.runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}),
+);
 assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName);
 
 assert.commandWorked(testDB.runCommand({create: collName2}));
-assert.commandWorked(testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: {enabled: true}}),
+);
 assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName2);
 
 // Verify that setting collection options with 'collMod' command does not affect
@@ -40,7 +44,9 @@ assert.commandWorked(testDB.runCommand({"collMod": collName2, validationLevel: "
 assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName2);
 
 // Should successfully disable 'changeStreamPreAndPostImages' using the 'collMod' command.
-assert.commandWorked(testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: {enabled: false}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: {enabled: false}}),
+);
 assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collName2);
 
 assert.commandWorked(testDB.runCommand({create: collName3}));
@@ -48,7 +54,11 @@ assert.commandWorked(testDB.runCommand({create: collName3}));
 // Should fail to create a view with enabled 'changeStreamPreAndPostImages' option.
 assert.commandFailedWithCode(
     testDB.runCommand(
-        Object.assign({create: viewName, viewOn: collName, changeStreamPreAndPostImages: {enabled: true}}),
+        Object.assign({
+            create: viewName,
+            viewOn: collName,
+            changeStreamPreAndPostImages: {enabled: true},
+        }),
     ),
     ErrorCodes.InvalidOptions,
 );
@@ -72,7 +82,10 @@ assert.commandFailedWithCode(
 // Creates a time-series collection with name 'collectionName' while using connection 'testDB'.
 // Returns true if the collection was created, and false otherwise.
 function createTimeSeriesCollection(collectionName) {
-    const createCommandResponse = testDB.runCommand({create: collectionName, timeseries: {timeField: "time"}});
+    const createCommandResponse = testDB.runCommand({
+        create: collectionName,
+        timeseries: {timeField: "time"},
+    });
     try {
         assert.commandWorked(createCommandResponse);
         return true;

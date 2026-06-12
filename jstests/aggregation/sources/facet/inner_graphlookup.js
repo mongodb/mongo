@@ -31,14 +31,18 @@ const projectStage = {
 };
 
 const normalResults = graphColl.aggregate([graphLookupStage, projectStage]).toArray();
-const facetedResults = graphColl.aggregate([{$facet: {nested: [graphLookupStage, projectStage]}}]).toArray();
+const facetedResults = graphColl
+    .aggregate([{$facet: {nested: [graphLookupStage, projectStage]}}])
+    .toArray();
 arrayEq(facetedResults, [{nested: normalResults}]);
 
 const sortStage = {
     $sort: {_id: 1, "connected._id": 1},
 };
 
-const normalResultsUnwound = graphColl.aggregate([graphLookupStage, {$unwind: "$connected"}, sortStage]).toArray();
+const normalResultsUnwound = graphColl
+    .aggregate([graphLookupStage, {$unwind: "$connected"}, sortStage])
+    .toArray();
 const facetedResultsUnwound = graphColl
     .aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}, sortStage]}}])
     .toArray();

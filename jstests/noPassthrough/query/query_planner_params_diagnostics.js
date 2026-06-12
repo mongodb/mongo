@@ -80,8 +80,13 @@ function runTest({
     });
 
     // Only SBE fills out planner params for external collections.
-    const framework = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}));
-    if (framework.internalQueryFrameworkControl != "forceClassicEngine" && expectedSecondaryDiagnosticInfo) {
+    const framework = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+    );
+    if (
+        framework.internalQueryFrameworkControl != "forceClassicEngine" &&
+        expectedSecondaryDiagnosticInfo
+    ) {
         assertOnDiagnosticLogContents({
             description: description,
             logFile: conn.fullOptions.logFile,

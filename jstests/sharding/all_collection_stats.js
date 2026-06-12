@@ -36,7 +36,10 @@ function checkResults(aggregationPipeline, checksToDo) {
                         break;
                     }
                 }
-                assert(exists, "Expected to have $_internalAllCollectionStats results for coll" + i);
+                assert(
+                    exists,
+                    "Expected to have $_internalAllCollectionStats results for coll" + i,
+                );
             } catch (e) {
                 // As we perform two logical executions of $collStats they might return different
                 // storageSizes since WT may have rewritten the file during a checkpoint or
@@ -76,7 +79,9 @@ for (let i = numCollections / 2; i < numCollections; i++) {
     const aggregationPipeline = [{$_internalAllCollectionStats: {stats: {storageStats: {}}}}];
 
     const checksToDo = (left, right) => {
-        const msg = "Expected same output from $_internalAllCollectionStats and $collStats " + "for same namespace";
+        const msg =
+            "Expected same output from $_internalAllCollectionStats and $collStats " +
+            "for same namespace";
         assert.eq(left.host, right[0].host, msg);
         assert.eq(left.shard, right[0].shard, msg);
         assert.eq(left.storageStats.size, right[0].storageStats.size, msg);
@@ -171,7 +176,9 @@ for (let i = numCollections / 2; i < numCollections; i++) {
     ];
 
     const checksToDo = (left, right) => {
-        const msg = "Expected same output after a projection with fields from different storage " + "stats groups";
+        const msg =
+            "Expected same output after a projection with fields from different storage " +
+            "stats groups";
         assert.eq(left.storageStats.numOrphanDocs, right[0].storageStats.numOrphanDocs, msg);
         assert.eq(left.storageStats.storageSize, right[0].storageStats.storageSize, msg);
         assert.eq(left.storageStats.nindexes, right[0].storageStats.nindexes, msg);
@@ -181,7 +188,9 @@ for (let i = numCollections / 2; i < numCollections; i++) {
 })();
 
 // Test valid query with empty specification
-assert.commandWorked(adminDb.runCommand({aggregate: 1, pipeline: [{$_internalAllCollectionStats: {}}], cursor: {}}));
+assert.commandWorked(
+    adminDb.runCommand({aggregate: 1, pipeline: [{$_internalAllCollectionStats: {}}], cursor: {}}),
+);
 
 // Test invalid queries/values.
 assert.commandFailedWithCode(

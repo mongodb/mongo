@@ -148,7 +148,9 @@ testCase((coll) => {
             },
             // Insert earlier than the bucket span. This is eligible for deletion.
             {
-                [timeFieldName]: new Date(nowTime.getTime() - 1000 * defaultBucketMaxRange - 1000 * 5 * 60),
+                [timeFieldName]: new Date(
+                    nowTime.getTime() - 1000 * defaultBucketMaxRange - 1000 * 5 * 60,
+                ),
                 [metaFieldName]: "localhost",
             },
         ]),

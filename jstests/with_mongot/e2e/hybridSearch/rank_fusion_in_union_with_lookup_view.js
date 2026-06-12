@@ -22,7 +22,12 @@ function buildRankFusionPipeline(inputPipelines) {
     // and a view on the $unionWith/$lookup. Test queries like:
     // db.coll.aggregate([{$unionWith/$lookup: { from: "view", pipeline: [{$rankFusion}] }}])
     function runRankFusionInUnionWithLookupSubViewTest(testName, viewPipeline, inputPipelines) {
-        runHybridSearchInUnionWithLookupSubViewTest(testName, viewPipeline, inputPipelines, buildRankFusionPipeline);
+        runHybridSearchInUnionWithLookupSubViewTest(
+            testName,
+            viewPipeline,
+            inputPipelines,
+            buildRankFusionPipeline,
+        );
     }
 
     (function testMatchView() {
@@ -79,7 +84,11 @@ function buildRankFusionPipeline(inputPipelines) {
     // Tests when the query is running on the underlying collection at the top-level,
     // and a view on the $unionWith/$lookup. Test queries like:
     // db.view.aggregate([{$unionWith/$lookup: { from: "coll", pipeline: [{$rankFusion}] }}])
-    function runRankFusionInUnionWithLookupTopLevelViewTest(testName, viewPipeline, inputPipelines) {
+    function runRankFusionInUnionWithLookupTopLevelViewTest(
+        testName,
+        viewPipeline,
+        inputPipelines,
+    ) {
         runHybridSearchInUnionWithLookupTopLevelViewTest(
             testName,
             viewPipeline,
@@ -89,10 +98,14 @@ function buildRankFusionPipeline(inputPipelines) {
     }
 
     (function testMatchView() {
-        runRankFusionInUnionWithLookupTopLevelViewTest("match_view_match_pipelines", [{$match: {y: {$gt: 10}}}], {
-            a: [{$match: {x: {$gte: 3}}}, {$sort: {x: 1}}, {$limit: 10}],
-            b: [{$match: {x: {$lte: 13}}}, {$sort: {x: -1}}, {$limit: 8}],
-        });
+        runRankFusionInUnionWithLookupTopLevelViewTest(
+            "match_view_match_pipelines",
+            [{$match: {y: {$gt: 10}}}],
+            {
+                a: [{$match: {x: {$gte: 3}}}, {$sort: {x: 1}}, {$limit: 10}],
+                b: [{$match: {x: {$lte: 13}}}, {$sort: {x: -1}}, {$limit: 8}],
+            },
+        );
 
         runRankFusionInUnionWithLookupTopLevelViewTest(
             "match_view_search_pipeline_second",

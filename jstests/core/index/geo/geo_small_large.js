@@ -74,7 +74,11 @@ for (let i = 0; i < scales.length; i++) {
 
     printjson(t.find().toArray());
 
-    assert.eq(t.count({p: {$within: {$center: [[0, 0], radius]}}}), 1, "Incorrect center points found!");
+    assert.eq(
+        t.count({p: {$within: {$center: [[0, 0], radius]}}}),
+        1,
+        "Incorrect center points found!",
+    );
     assert.eq(
         t.count({
             p: {
@@ -163,7 +167,16 @@ for (let i = 0; i < scales.length; i++) {
     for (let f = 0; f < found.length; f++) {
         let x = found[f].p.x != undefined ? found[f].p.x : found[f].p[0];
         let y = found[f].p.y != undefined ? found[f].p.y : found[f].p[1];
-        print("Dist: x : " + x + " y : " + y + " dist : " + Math.sqrt(x * x + y * y) + " radius : " + radius);
+        print(
+            "Dist: x : " +
+                x +
+                " y : " +
+                y +
+                " dist : " +
+                Math.sqrt(x * x + y * y) +
+                " radius : " +
+                radius,
+        );
     }
 
     assert.eq(

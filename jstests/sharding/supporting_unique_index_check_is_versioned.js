@@ -12,7 +12,12 @@ function prepareProfilerOnShards(st, dbName) {
     });
 }
 
-function verifyProfilerListIndexesEntry({profileDB, collName, expectShardVersion, expectDbVersion}) {
+function verifyProfilerListIndexesEntry({
+    profileDB,
+    collName,
+    expectShardVersion,
+    expectDbVersion,
+}) {
     profilerHasAtLeastOneMatchingEntryOrThrow({
         profileDB: profileDB,
         filter: {
@@ -25,7 +30,9 @@ function verifyProfilerListIndexesEntry({profileDB, collName, expectShardVersion
 
 // Creates the source collection and target collection as unsharded collections on shard0.
 function setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, targetCollName) {
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.getDB(dbName).createCollection(sourceCollName));
     assert.commandWorked(st.s.getDB(dbName).createCollection(targetCollName));
 
@@ -36,12 +43,16 @@ function setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, ta
 // Creates the source collection as an unsharded collection on shard0 and the target collection as a
 // sharded collection with one chunk on shard0.
 function setUpUnshardedSourceShardedTargetCollections(st, dbName, sourceCollName, targetCollName) {
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(st.s.getDB(dbName)[sourceCollName].insert({a: 10, b: 11}));
 
     const targetColl = st.s.getDB(dbName)[targetCollName];
-    assert.commandWorked(st.s.adminCommand({shardCollection: targetColl.getFullName(), key: {a: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: targetColl.getFullName(), key: {a: 1}}),
+    );
     assert.commandWorked(targetColl.insert({a: 10, b: 12}));
 }
 
@@ -106,7 +117,9 @@ const targetCollName = "targetFoo";
     const otherRouter = st.s1;
     assert.commandWorked(otherRouter.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
-    assert.commandWorked(otherRouter.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}));
+    assert.commandWorked(
+        otherRouter.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}),
+    );
 
     // Run $merge and expect it to succeed because the stale router refreshes and is able to find
     // the correct indexes. Enable the profiler to verify shard/db versions later.
@@ -130,7 +143,9 @@ const targetCollName = "targetFoo";
     setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, targetCollName);
 
     // Create the index necessary for the merge below.
-    assert.commandWorked(st.s.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}));
+    assert.commandWorked(
+        st.s.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}),
+    );
 
     // Move the primary from shard0 to shard1 and drop the index required for the merge only on the
     // new primary. Note that the collection will be dropped from the old primary when the
@@ -174,7 +189,11 @@ const targetCollName = "targetFoo";
     const otherRouter = st.s1;
     const targetColl = otherRouter.getDB(dbName)[targetCollName];
     assert.commandWorked(
-        otherRouter.adminCommand({moveChunk: targetColl.getFullName(), find: {a: 0}, to: st.shard1.shardName}),
+        otherRouter.adminCommand({
+            moveChunk: targetColl.getFullName(),
+            find: {a: 0},
+            to: st.shard1.shardName,
+        }),
     );
     assert.commandWorked(targetColl.createIndex({a: 1, b: 1}, {unique: true}));
 
@@ -200,7 +219,9 @@ const targetCollName = "targetFoo";
     setUpUnshardedSourceShardedTargetCollections(st, dbName, sourceCollName, targetCollName);
 
     // Create the index necessary for the merge below.
-    assert.commandWorked(st.s.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}));
+    assert.commandWorked(
+        st.s.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}),
+    );
 
     // Move the only chunk for the test collection from shard0 to shard1 and drop the index required
     // for the merge. dropIndexes will only target shards that own chunks, so the index will still
@@ -208,7 +229,11 @@ const targetCollName = "targetFoo";
     const otherRouter = st.s1;
     const targetColl = otherRouter.getDB(dbName)[targetCollName];
     assert.commandWorked(
-        otherRouter.adminCommand({moveChunk: targetColl.getFullName(), find: {a: 0}, to: st.shard1.shardName}),
+        otherRouter.adminCommand({
+            moveChunk: targetColl.getFullName(),
+            find: {a: 0},
+            to: st.shard1.shardName,
+        }),
     );
     assert.commandWorked(targetColl.dropIndex("a_1_b_1"));
 
@@ -245,10 +270,16 @@ const targetCollName = "targetFoo";
 
     const targetColl = otherRouter.getDB(dbName)[targetCollName];
     assert.commandWorked(targetColl.createIndex({a: 1}));
-    assert.commandWorked(st.s1.adminCommand({shardCollection: targetColl.getFullName(), key: {a: 1}}));
+    assert.commandWorked(
+        st.s1.adminCommand({shardCollection: targetColl.getFullName(), key: {a: 1}}),
+    );
 
     assert.commandWorked(
-        otherRouter.adminCommand({moveChunk: targetColl.getFullName(), find: {a: 0}, to: st.shard1.shardName}),
+        otherRouter.adminCommand({
+            moveChunk: targetColl.getFullName(),
+            find: {a: 0},
+            to: st.shard1.shardName,
+        }),
     );
     assert.commandWorked(targetColl.createIndex({a: 1, b: 1}, {unique: true}));
 
@@ -274,7 +305,9 @@ const targetCollName = "targetFoo";
     setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, targetCollName);
 
     // Create the index necessary for the merge below.
-    assert.commandWorked(st.s.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}));
+    assert.commandWorked(
+        st.s.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}),
+    );
 
     // Drop and recreate the sharded target collection as an unsharded collection with its primary
     // on shard1. Dropping the collection will also drop the index required for the merge.

@@ -41,7 +41,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.mapReduce = function mapReduce(db, collName) {
         let fullName = db[this.outCollName].getFullName();
-        assert(db[this.outCollName].exists() !== null, "output collection '" + fullName + "' should exist");
+        assert(
+            db[this.outCollName].exists() !== null,
+            "output collection '" + fullName + "' should exist",
+        );
 
         let options = {
             finalize: this.finalizer,

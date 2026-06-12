@@ -40,7 +40,9 @@ for (let testCursor of [
     assert.commandFailedWithCode(getMoreRes, ErrorCodes.ShutdownInProgress);
 
     // Disable the failpoint.
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}),
+    );
 }
 
 rst.stopSet();

@@ -88,10 +88,14 @@ describe("$rankFusion/$scoreFusion OOM guard for typo suggestion", function () {
             assert.commandFailedWithCode(res, kWeightsMismatchCode, {stageName});
             // "kit" is 1 edit from "kite" and 2 from "mite", so only "kite" should be suggested.
             assert.includes(res.errmsg, "suggested: 'kite'", {stageName, errmsg: res.errmsg});
-            assert(!res.errmsg.includes("mite"), "expected 'mite' not to appear in suggestion for 'kit'", {
-                stageName,
-                errmsg: res.errmsg,
-            });
+            assert(
+                !res.errmsg.includes("mite"),
+                "expected 'mite' not to appear in suggestion for 'kit'",
+                {
+                    stageName,
+                    errmsg: res.errmsg,
+                },
+            );
         }
     });
 });

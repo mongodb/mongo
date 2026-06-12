@@ -7,7 +7,12 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {
+    checkHealthLog,
+    clearHealthLog,
+    resetAndInsert,
+    runDbCheck,
+} from "jstests/replsets/libs/dbcheck_utils.js";
 
 (function () {
     "use strict";
@@ -41,7 +46,10 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     replSet.startSet();
@@ -61,7 +69,13 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
 
     const debugBuild = primaryDB.adminCommand("buildInfo").debug;
 
-    function checkNumBatchesAndSnapshots(healthLog, nDocs, batchSize, snapshotSize, inconsistentBatch = false) {
+    function checkNumBatchesAndSnapshots(
+        healthLog,
+        nDocs,
+        batchSize,
+        snapshotSize,
+        inconsistentBatch = false,
+    ) {
         const expectedNumBatches = Math.ceil(nDocs / batchSize);
 
         let query = infoBatchQuery;
@@ -78,10 +92,13 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
                 const lastBatchSize = nDocs % batchSize == 0 ? batchSize : nDocs % batchSize;
                 const lastBatchSnapshots = Math.ceil(lastBatchSize / snapshotSize);
 
-                expectedNumSnapshots = (expectedNumBatches - 1) * snapshotsPerBatch + lastBatchSnapshots;
+                expectedNumSnapshots =
+                    (expectedNumBatches - 1) * snapshotsPerBatch + lastBatchSnapshots;
             }
             const actualNumSnapshots =
-                rawMongoProgramOutput("Catalog snapshot for reverse lookup check ending").split(/7844808/).length - 1;
+                rawMongoProgramOutput("Catalog snapshot for reverse lookup check ending").split(
+                    /7844808/,
+                ).length - 1;
             assert.eq(
                 actualNumSnapshots,
                 expectedNumSnapshots,
@@ -118,12 +135,20 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         replSet.awaitReplication();
         assert.eq(primaryColl.find({}).count(), nDocs);
 
-        const skipUpdatingIndexDocumentPrimary = configureFailPoint(primaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
-        const skipUpdatingIndexDocumentSecondary = configureFailPoint(secondaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
+        const skipUpdatingIndexDocumentPrimary = configureFailPoint(
+            primaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
+        const skipUpdatingIndexDocumentSecondary = configureFailPoint(
+            secondaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
 
         jsTestLog("Updating docs to remove index key field");
 
@@ -159,7 +184,12 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         jsTestLog("Checking for correct number of batches on primary");
         checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, defaultSnapshotSize);
         jsTestLog("Checking for correct number of batches on secondary");
-        checkNumBatchesAndSnapshots(secondaryHealthLog, nDocsChecked, batchSize, defaultSnapshotSize);
+        checkNumBatchesAndSnapshots(
+            secondaryHealthLog,
+            nDocsChecked,
+            batchSize,
+            defaultSnapshotSize,
+        );
 
         skipUpdatingIndexDocumentPrimary.off();
         skipUpdatingIndexDocumentSecondary.off();
@@ -197,12 +227,20 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         replSet.awaitReplication();
         assert.eq(primaryColl.find({}).count(), nDocs);
 
-        const skipUpdatingIndexDocumentPrimary = configureFailPoint(primaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
-        const skipUpdatingIndexDocumentSecondary = configureFailPoint(secondaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
+        const skipUpdatingIndexDocumentPrimary = configureFailPoint(
+            primaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
+        const skipUpdatingIndexDocumentSecondary = configureFailPoint(
+            secondaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
 
         jsTestLog("Updating docs to remove index key field");
 
@@ -238,7 +276,12 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         jsTestLog("Checking for correct number of batches on primary");
         checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, defaultSnapshotSize);
         jsTestLog("Checking for correct number of batches on secondary");
-        checkNumBatchesAndSnapshots(secondaryHealthLog, nDocsChecked, batchSize, defaultSnapshotSize);
+        checkNumBatchesAndSnapshots(
+            secondaryHealthLog,
+            nDocsChecked,
+            batchSize,
+            defaultSnapshotSize,
+        );
 
         skipUpdatingIndexDocumentPrimary.off();
         skipUpdatingIndexDocumentSecondary.off();
@@ -278,9 +321,13 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         assert.eq(primaryColl.find({}).count(), nDocs);
 
         // Set up inconsistency.
-        const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+            primaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         assert.commandWorked(primaryColl.deleteMany({}));
 
         replSet.awaitReplication();
@@ -306,7 +353,12 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
 
         jsTestLog("Checking for correct number of batches on primary");
-        checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, 1 /* batchSize */, defaultSnapshotSize);
+        checkNumBatchesAndSnapshots(
+            primaryHealthLog,
+            nDocs,
+            1 /* batchSize */,
+            defaultSnapshotSize,
+        );
         jsTestLog("Checking for correct number of inconsistent batches on secondary");
         checkNumBatchesAndSnapshots(
             secondaryHealthLog,
@@ -355,9 +407,13 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         assert.eq(primaryColl.find({}).count(), nDocs);
 
         // Set up inconsistency.
-        const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+            primaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting docs");
         assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -384,7 +440,12 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
         checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
 
         jsTestLog("Checking for correct number of batches on primary");
-        checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, 1 /* batchSize */, defaultSnapshotSize);
+        checkNumBatchesAndSnapshots(
+            primaryHealthLog,
+            nDocs,
+            1 /* batchSize */,
+            defaultSnapshotSize,
+        );
         jsTestLog("Checking for correct number of inconsistent batches on secondary");
         checkNumBatchesAndSnapshots(
             secondaryHealthLog,
@@ -430,5 +491,8 @@ import {checkHealthLog, clearHealthLog, resetAndInsert, runDbCheck} from "jstest
     // TODO SERVER-79846:
     // * Test progress meter/stats are correct
 
-    replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+    replSet.stopSet(undefined /* signal */, false /* forRestart */, {
+        skipCheckDBHashes: true,
+        skipValidation: true,
+    });
 })();

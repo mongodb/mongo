@@ -31,7 +31,9 @@ const validateBucketReopening = function (metaFieldName = null) {
     if (metaFieldName != null) {
         timeseriesOptions = Object.merge(timeseriesOptions, {metaField: metaFieldName});
     }
-    jsTestLog("Running validateBucketReopening() with timeseriesOptions = " + tojson(timeseriesOptions));
+    jsTestLog(
+        "Running validateBucketReopening() with timeseriesOptions = " + tojson(timeseriesOptions),
+    );
 
     const coll = db.getCollection(collNamePrefix + testCaseId++);
     coll.drop();
@@ -44,10 +46,16 @@ const validateBucketReopening = function (metaFieldName = null) {
         for (let j = 0; j < distinctMetaValues; ++j) {
             if (metaFieldName != null) {
                 assert.commandWorked(
-                    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: j, [valueFieldName]: "a"}),
+                    coll.insert({
+                        [timeFieldName]: ISODate(),
+                        [metaFieldName]: j,
+                        [valueFieldName]: "a",
+                    }),
                 );
             } else {
-                assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [valueFieldName]: "a"}));
+                assert.commandWorked(
+                    coll.insert({[timeFieldName]: ISODate(), [valueFieldName]: "a"}),
+                );
             }
         }
     }
@@ -81,7 +89,11 @@ const validateBucketReopening = function (metaFieldName = null) {
             "Timeseries stats: " + tojson(stats),
         );
         assert.eq(stats.timeseries["numBucketsQueried"], 990, "Timeseries stats: " + tojson(stats));
-        assert.eq(stats.timeseries["numBucketQueriesFailed"], 10, "Timeseries stats: " + tojson(stats));
+        assert.eq(
+            stats.timeseries["numBucketQueriesFailed"],
+            10,
+            "Timeseries stats: " + tojson(stats),
+        );
 
         // The number of bucket inserts should be less than the number of bucket updates.
         assert.lt(

@@ -27,8 +27,13 @@ const newKeyDoc = {
     d: 1,
 };
 
-const isAuthoritativeMetadata = FeatureFlagUtil.isEnabled(st.s.getDB("admin"), "featureFlagAuthoritativeShardsDDL");
-const kShardCatalogCollectionsNs = isAuthoritativeMetadata ? kAuthoritativeCollectionsNs : kCachedCollectionsNs;
+const isAuthoritativeMetadata = FeatureFlagUtil.isEnabled(
+    st.s.getDB("admin"),
+    "featureFlagAuthoritativeShardsDDL",
+);
+const kShardCatalogCollectionsNs = isAuthoritativeMetadata
+    ? kAuthoritativeCollectionsNs
+    : kCachedCollectionsNs;
 
 // Returns the persisted collection metadata entry for 'kNsName' from the shard catalog, reading
 // from the authoritative or the cached collection depending on the feature flag.
@@ -46,7 +51,11 @@ function assertChunks(expectedChunks) {
     let minFieldName;
     if (isAuthoritativeMetadata) {
         const uuid = getCollEntry().uuid;
-        chunkArr = shard.getCollection(kAuthoritativeChunksNs).find({uuid: uuid}).sort({min: 1}).toArray();
+        chunkArr = shard
+            .getCollection(kAuthoritativeChunksNs)
+            .find({uuid: uuid})
+            .sort({min: 1})
+            .toArray();
         minFieldName = "min";
     } else {
         chunkArr = shard.getCollection(kCacheChunksNs).find({}).sort({_id: 1}).toArray();

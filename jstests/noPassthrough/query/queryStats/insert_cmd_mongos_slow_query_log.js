@@ -8,7 +8,10 @@
  * @tags: [featureFlagQueryStatsInsert]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {getQueryShapeHashFromSlowLogs, getSlowQueryLogs} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryShapeHashFromSlowLogs,
+    getSlowQueryLogs,
+} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
@@ -26,7 +29,10 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
 
         this.dbName = jsTestName();
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         this.routerDB = this.st.s.getDB(this.dbName);
@@ -68,7 +74,10 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
                 }),
             );
 
-            const hash = getQueryShapeHashFromSlowLogs({testDB: this.routerDB, queryComment: comment});
+            const hash = getQueryShapeHashFromSlowLogs({
+                testDB: this.routerDB,
+                queryComment: comment,
+            });
             assert.neq(
                 hash,
                 null,
@@ -87,7 +96,10 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
                 }),
             );
 
-            const hash = getQueryShapeHashFromSlowLogs({testDB: this.routerDB, queryComment: comment});
+            const hash = getQueryShapeHashFromSlowLogs({
+                testDB: this.routerDB,
+                queryComment: comment,
+            });
             assert.neq(
                 hash,
                 null,
@@ -115,11 +127,15 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
             assert.gte(mongosLogs.length, 1, "Expected at least one slow query log entry");
 
             // For inserts, queryShapeHash should always be present since the shape is fixed.
-            const hash = getQueryShapeHashFromSlowLogs({testDB: this.routerDB, queryComment: comment});
+            const hash = getQueryShapeHashFromSlowLogs({
+                testDB: this.routerDB,
+                queryComment: comment,
+            });
             assert.neq(
                 hash,
                 null,
-                "queryShapeHash should be present on mongos for multi-doc insert: " + tojson(mongosLogs),
+                "queryShapeHash should be present on mongos for multi-doc insert: " +
+                    tojson(mongosLogs),
             );
         });
 
@@ -137,7 +153,10 @@ describe("Mongos - Insert Query Shape Hash in Slow Logs", function () {
                 }),
             );
 
-            const hash = getQueryShapeHashFromSlowLogs({testDB: this.routerDB, queryComment: comment});
+            const hash = getQueryShapeHashFromSlowLogs({
+                testDB: this.routerDB,
+                queryComment: comment,
+            });
             assert.neq(
                 hash,
                 null,

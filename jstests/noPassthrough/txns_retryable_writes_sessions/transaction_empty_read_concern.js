@@ -27,7 +27,9 @@ const lsid = {
         autocommit: false,
     };
 
-    assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
+    assert.commandWorked(
+        collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})),
+    );
 
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {readConcern: {}})));
 
@@ -55,7 +57,9 @@ const lsid = {
         autocommit: false,
     };
 
-    assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
+    assert.commandWorked(
+        collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})),
+    );
 
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {readConcern: {}})));
 

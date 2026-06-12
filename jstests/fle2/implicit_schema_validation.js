@@ -151,9 +151,15 @@ function assertFailedWithAnnotation(result, coll, fleErrors) {
     const schema = findContainingObject(errInfo, "operatorName", "implicitFLESchema");
 
     if (fleErrors) {
-        assert(schema, "Result errInfo does not contain an implicitFLESchema error: " + tojson(errInfo));
+        assert(
+            schema,
+            "Result errInfo does not contain an implicitFLESchema error: " + tojson(errInfo),
+        );
     } else {
-        assert(!schema, "Result errInfo contains unexpected implicitFLESchema error: " + tojson(errInfo));
+        assert(
+            !schema,
+            "Result errInfo contains unexpected implicitFLESchema error: " + tojson(errInfo),
+        );
         return;
     }
     assert(schema.hasOwnProperty("schemaRulesNotSatisfied"));
@@ -170,7 +176,11 @@ function assertFailedWithAnnotation(result, coll, fleErrors) {
             "No error details found for property '" + path + "': " + tojson(errInfo),
         );
 
-        const detail = findContainingObject(subschema.details, "operatorName", fleErrors[path].operator);
+        const detail = findContainingObject(
+            subschema.details,
+            "operatorName",
+            fleErrors[path].operator,
+        );
         assert(
             detail,
             "Error details for property '" +
@@ -230,12 +240,18 @@ function negativeTests(coll, hasUserValidator, invert = false) {
     );
 
     jsTestLog("test path to encrypted field has arrays");
-    assertExpectedResult(coll.insert({a: [{b: {c: validEncryptedInt}}]}), {"a": typeMatchedArrayError});
-    assertExpectedResult(coll.insert({a: {b: [{c: validEncryptedInt}]}}), {"a.b": typeMatchedArrayError});
+    assertExpectedResult(coll.insert({a: [{b: {c: validEncryptedInt}}]}), {
+        "a": typeMatchedArrayError,
+    });
+    assertExpectedResult(coll.insert({a: {b: [{c: validEncryptedInt}]}}), {
+        "a.b": typeMatchedArrayError,
+    });
     assertExpectedResult(coll.insert({a: {b: {c: []}}}), {"a.b.c": valueNotEncryptedError});
 
     jsTestLog("test inserting encrypted field with BinData of incorrect subtype");
-    assertExpectedResult(coll.insert({firstName: nonEncryptedBinData}), {firstName: valueNotEncryptedError});
+    assertExpectedResult(coll.insert({firstName: nonEncryptedBinData}), {
+        firstName: valueNotEncryptedError,
+    });
     assertExpectedResult(
         coll.insert({
             firstName: validEncryptedString,
@@ -250,7 +266,9 @@ function negativeTests(coll, hasUserValidator, invert = false) {
     );
 
     jsTestLog("test inserting encrypted field with incorrect Queryable Encryption subtype");
-    assertExpectedResult(coll.insert({firstName: fle1RandomBinData}), {firstName: wrongEncryptedTypeError});
+    assertExpectedResult(coll.insert({firstName: fle1RandomBinData}), {
+        firstName: wrongEncryptedTypeError,
+    });
     assertExpectedResult(
         coll.insert({
             firstName: validEncryptedString,
@@ -264,8 +282,12 @@ function negativeTests(coll, hasUserValidator, invert = false) {
         {"a.b.c": wrongEncryptedTypeError},
     );
 
-    jsTestLog("test inserting encrypted field with incorrect BSONType specifier for the unencrypted value");
-    assertExpectedResult(coll.insert({firstName: validEncryptedInt}), {firstName: wrongEncryptedTypeError});
+    jsTestLog(
+        "test inserting encrypted field with incorrect BSONType specifier for the unencrypted value",
+    );
+    assertExpectedResult(coll.insert({firstName: validEncryptedInt}), {
+        firstName: wrongEncryptedTypeError,
+    });
     assertExpectedResult(
         coll.insert({
             firstName: validEncryptedString,
@@ -285,7 +307,9 @@ function negativeTests(coll, hasUserValidator, invert = false) {
 
     jsTestLog("test insert violating user-provided validator");
     assertExpectedResult(coll.insert({firstName: validEncryptedString, name: 234}));
-    assertExpectedResult(coll.insert({firstName: nonEncryptedBinData, name: 234}), {firstName: valueNotEncryptedError});
+    assertExpectedResult(coll.insert({firstName: nonEncryptedBinData, name: 234}), {
+        firstName: valueNotEncryptedError,
+    });
 }
 
 // Tests invalid updates on encrypted collection 'coll'
@@ -329,11 +353,17 @@ function negativeUpdateTests(coll, invert = false) {
     assertExpectedResult(coll.update({"test_id": 0}, {$set: {"firstName": validEncryptedInt}}), {
         firstName: wrongEncryptedTypeError,
     });
-    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.x.y": [1, 2, 3]}}), {"a.x.y": valueNotEncryptedError});
-    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.x": {"y": 42}}}), {"a.x": valueNotEncryptedError});
+    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.x.y": [1, 2, 3]}}), {
+        "a.x.y": valueNotEncryptedError,
+    });
+    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.x": {"y": 42}}}), {
+        "a.x": valueNotEncryptedError,
+    });
 
     jsTestLog("test updating prefix of encrypted field with array value");
-    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.b": [1, 2, 3]}}), {"a.b": typeMatchedArrayError});
+    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.b": [1, 2, 3]}}), {
+        "a.b": typeMatchedArrayError,
+    });
 }
 
 // Tests valid inserts on encrypted collection 'coll'.
@@ -428,7 +458,9 @@ function positiveUpdateTests(coll, invert = false) {
     jsTestLog("test unset & set of encrypted field");
     assertExpectedResult(coll.update({"test_id": 0}, {$unset: {"firstName": ""}}));
     assertExpectedResult(coll.update({"test_id": 0}, {$set: {"firstName": validEncryptedString}}));
-    assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a": {"x": {"y": validEncryptedString}}}}));
+    assertExpectedResult(
+        coll.update({"test_id": 0}, {$set: {"a": {"x": {"y": validEncryptedString}}}}),
+    );
     assertExpectedResult(coll.update({"test_id": 0}, {$set: {"a.x": {"y": validEncryptedString}}}));
 
     jsTestLog("test updating prefix of encrypted field with non-array value");
@@ -445,7 +477,10 @@ positiveTests(dbTest[collName], false);
 jsTestLog("test implicit validator with user validator containing query ops");
 dbTest[collName].drop();
 assert.commandWorked(
-    dbTest.createCollection(collName, {encryptedFields: sampleEncryptedFields, validator: userQueryOpSchema}),
+    dbTest.createCollection(collName, {
+        encryptedFields: sampleEncryptedFields,
+        validator: userQueryOpSchema,
+    }),
 );
 negativeTests(dbTest[collName], true);
 positiveTests(dbTest[collName], true);
@@ -453,7 +488,10 @@ positiveTests(dbTest[collName], true);
 jsTestLog("test implicit validator with user validator containing json schema");
 dbTest[collName].drop();
 assert.commandWorked(
-    dbTest.createCollection(collName, {encryptedFields: sampleEncryptedFields, validator: userJsonSchema}),
+    dbTest.createCollection(collName, {
+        encryptedFields: sampleEncryptedFields,
+        validator: userJsonSchema,
+    }),
 );
 negativeTests(dbTest[collName], true);
 positiveTests(dbTest[collName], true);
@@ -461,7 +499,10 @@ positiveTests(dbTest[collName], true);
 jsTestLog("test user validator rules conflicting with implicit rules");
 dbTest[collName].drop();
 assert.commandWorked(
-    dbTest.createCollection(collName, {encryptedFields: sampleEncryptedFields, validator: userJsonConflictSchema}),
+    dbTest.createCollection(collName, {
+        encryptedFields: sampleEncryptedFields,
+        validator: userJsonConflictSchema,
+    }),
 );
 negativeTests(dbTest[collName], true);
 positiveTests(dbTest[collName], true, true);
@@ -469,13 +510,19 @@ positiveTests(dbTest[collName], true, true);
 jsTestLog("test malformed user validator on encrypted collection");
 dbTest[collName].drop();
 assert.commandFailed(
-    dbTest.createCollection(collName, {encryptedFields: sampleEncryptedFields, validator: userMalformedSchema}),
+    dbTest.createCollection(collName, {
+        encryptedFields: sampleEncryptedFields,
+        validator: userMalformedSchema,
+    }),
 );
 
 jsTestLog("test FLE1 schema validator on Queryable Encryption collection");
 dbTest[collName].drop();
 assert.commandFailedWithCode(
-    dbTest.createCollection(collName, {encryptedFields: sampleEncryptedFields, validator: fle1Schema}),
+    dbTest.createCollection(collName, {
+        encryptedFields: sampleEncryptedFields,
+        validator: fle1Schema,
+    }),
     ErrorCodes.QueryFeatureNotAllowed,
 );
 

@@ -78,7 +78,9 @@ function testWriteConcernBasic(st) {
     // 3. Set the failWriteConcernFailpoint on shard 0, shard 2, and the config shard.
     // 4. Move the collection from shard 0 to shard 2.
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+    );
     assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
     assert.commandWorked(testColl.createIndex({x: 1}));
 
@@ -132,7 +134,9 @@ function testWriteConcernFailover(st) {
     // 3. Set the failWriteConcernFailpoint on shard 0, shard 2, and the config shard.
     // 4. Move the collection from shard 0 to shard 2.
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+    );
     assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
     assert.commandWorked(testColl.createIndex({x: 1}));
 

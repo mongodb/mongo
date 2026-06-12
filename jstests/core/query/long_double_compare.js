@@ -65,7 +65,10 @@ runWithAndWithoutIndex({a: 1}, () => {
             })
             .filter(lambda);
         const result = coll.find(query, {a: 1, _id: 0}).toArray();
-        assert(arrayEq(result, expected), tojson(query) + " failed:\n" + tojson(result) + " != " + tojson(expected));
+        assert(
+            arrayEq(result, expected),
+            tojson(query) + " failed:\n" + tojson(result) + " != " + tojson(expected),
+        );
     };
 
     for (const {_id: id, a: a, c: c} of values) {

@@ -20,10 +20,15 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(inputCollection, {oldKey: 
     {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-const inputCollectionUUID = getUUIDFromListCollections(inputCollection.getDB(), inputCollection.getName());
+const inputCollectionUUID = getUUIDFromListCollections(
+    inputCollection.getDB(),
+    inputCollection.getName(),
+);
 const inputCollectionUUIDString = extractUUIDFromObject(inputCollectionUUID);
 
-const temporaryReshardingCollection = st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
+const temporaryReshardingCollection = st.s.getCollection(
+    `reshardingDb.system.resharding.${inputCollectionUUIDString}`,
+);
 
 CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollection, {newKey: 1}, [
     {min: {newKey: MinKey}, max: {newKey: 0}, shard: st.shard0.shardName},
@@ -36,9 +41,9 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
 // testReshardCloneCollection command.
 for (const shard of [st.shard0, st.shard1]) {
     assert.commandWorked(
-        shard.rs
-            .getPrimary()
-            .adminCommand({_flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName()}),
+        shard.rs.getPrimary().adminCommand({
+            _flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName(),
+        }),
     );
 }
 
@@ -71,11 +76,20 @@ const outerLoop = configureFailPoint(
     {skip: 1},
 );
 
-const staleConfigFP = configureFailPoint(shard0Primary, "reshardingCollectionClonerShouldFailWithStaleConfig");
+const staleConfigFP = configureFailPoint(
+    shard0Primary,
+    "reshardingCollectionClonerShouldFailWithStaleConfig",
+);
 
 const reshardShell = startParallelShell(
     funWithArgs(
-        (inputCollectionFullName, inputCollectionUUID, shardName, atClusterTime, tempCollectionFullName) => {
+        (
+            inputCollectionFullName,
+            inputCollectionUUID,
+            shardName,
+            atClusterTime,
+            tempCollectionFullName,
+        ) => {
             assert.commandWorked(
                 db.adminCommand({
                     testReshardCloneCollection: inputCollectionFullName,
@@ -103,7 +117,10 @@ outerLoop.off();
 
 reshardShell();
 
-assert.eq(documents.length, st.s.getCollection(temporaryReshardingCollection.getFullName()).countDocuments({}));
+assert.eq(
+    documents.length,
+    st.s.getCollection(temporaryReshardingCollection.getFullName()).countDocuments({}),
+);
 
 // The temporary reshard collection must be dropped before checking metadata integrity.
 assert(temporaryReshardingCollection.drop());

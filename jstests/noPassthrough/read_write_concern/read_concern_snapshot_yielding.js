@@ -21,7 +21,9 @@ TestData.numDocs = 4;
 // Set 'internalQueryExecYieldIterations' to 2 to ensure that commands yield on the second try
 // (i.e. after they have established a snapshot but before they have returned any documents).
 const defaultYieldIterations = 2;
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: defaultYieldIterations}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: defaultYieldIterations}),
+);
 
 // Set 'internalQueryExecYieldPeriodMS' to 24 hours to significantly reduce a probability of a
 // situation occuring where the execution threads do not receive enough CPU time and commands yield
@@ -30,7 +32,9 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIte
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 86400000}));
 
 function assertKillPending(opId) {
-    const res = adminDB.aggregate([{$currentOp: {}}, {$match: {ns: coll.getFullName(), opid: opId}}]).toArray();
+    const res = adminDB
+        .aggregate([{$currentOp: {}}, {$match: {ns: coll.getFullName(), opid: opId}}])
+        .toArray();
     assert.eq(
         res.length,
         1,
@@ -43,7 +47,9 @@ function assertKillPending(opId) {
 function populateCollection() {
     db.coll.drop({writeConcern: {w: "majority"}});
     for (let i = 0; i < TestData.numDocs; i++) {
-        assert.commandWorked(db.coll.insert({_id: i, x: 1, location: [0, 0]}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            db.coll.insert({_id: i, x: 1, location: [0, 0]}, {writeConcern: {w: "majority"}}),
+        );
     }
 
     assert.commandWorked(
@@ -62,7 +68,12 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
     // that more accurately pauses execution between acquiring a snapshot and returning the
     // first document and eliminate the use of setting yield iterations in this test.
     if (setYieldIterations) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: setYieldIterations}));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryExecYieldIterations: setYieldIterations,
+            }),
+        );
     }
 
     //
@@ -74,7 +85,10 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
 
     // Start a command that hangs before checking for interrupt.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}),
+        db.adminCommand({
+            configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+            mode: "alwaysOn",
+        }),
     );
     let awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
 
@@ -93,7 +107,10 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
 
     // Remove the hang, and check that the command is killed.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}),
+        db.adminCommand({
+            configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+            mode: "off",
+        }),
     );
     let exitCode = awaitCommand({checkExitSuccess: false});
     assert.neq(0, exitCode, "Expected shell to exit with failure due to operation kill");
@@ -107,10 +124,18 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
 
     // Start a command that hangs before checking for interrupt.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}),
+        db.adminCommand({
+            configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+            mode: "alwaysOn",
+        }),
     );
     awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
-    waitForCurOpByFailPoint(db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
+    waitForCurOpByFailPoint(
+        db,
+        coll.getFullName(),
+        "setInterruptOnlyPlansCheckForInterruptHang",
+        curOpFilter,
+    );
 
     // Start a drop. This should block behind the command, since the command does not yield
     // locks.
@@ -120,7 +145,10 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
 
     // Remove the hang. The command should complete successfully.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}),
+        db.adminCommand({
+            configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+            mode: "off",
+        }),
     );
     awaitCommand();
 
@@ -138,19 +166,33 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
 
     // Start a command that hangs before checking for interrupt.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}),
+        db.adminCommand({
+            configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+            mode: "alwaysOn",
+        }),
     );
     awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
-    waitForCurOpByFailPoint(db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
+    waitForCurOpByFailPoint(
+        db,
+        coll.getFullName(),
+        "setInterruptOnlyPlansCheckForInterruptHang",
+        curOpFilter,
+    );
 
     // Insert data that should not be read by the command.
     assert.commandWorked(
-        db.coll.insert({_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]}, {writeConcern: {w: "majority"}}),
+        db.coll.insert(
+            {_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]},
+            {writeConcern: {w: "majority"}},
+        ),
     );
 
     // Remove the hang. The command should complete successfully.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}),
+        db.adminCommand({
+            configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+            mode: "off",
+        }),
     );
     awaitCommand();
 
@@ -165,24 +207,42 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
 
         // Insert the document that the command will write to.
         assert.commandWorked(
-            db.coll.insert({_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]}, {writeConcern: {w: "majority"}}),
+            db.coll.insert(
+                {_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]},
+                {writeConcern: {w: "majority"}},
+            ),
         );
 
         // Start a command that hangs before checking for interrupt.
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}),
+            db.adminCommand({
+                configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+                mode: "alwaysOn",
+            }),
         );
         awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
-        waitForCurOpByFailPoint(db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
+        waitForCurOpByFailPoint(
+            db,
+            coll.getFullName(),
+            "setInterruptOnlyPlansCheckForInterruptHang",
+            curOpFilter,
+        );
 
         // Update the document that the command will write to.
         assert.commandWorked(
-            db.coll.update({_id: TestData.numDocs}, {$set: {conflict: true}}, {writeConcern: {w: "majority"}}),
+            db.coll.update(
+                {_id: TestData.numDocs},
+                {$set: {conflict: true}},
+                {writeConcern: {w: "majority"}},
+            ),
         );
 
         // Remove the hang. The command should fail.
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}),
+            db.adminCommand({
+                configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+                mode: "off",
+            }),
         );
         exitCode = awaitCommand({checkExitSuccess: false});
         assert.neq(0, exitCode, "Expected shell to exit with failure due to WriteConflict");
@@ -191,7 +251,10 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIte
     // Reset the yield iterations parameter to the test's default.
     if (setYieldIterations) {
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: defaultYieldIterations}),
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryExecYieldIterations: defaultYieldIterations,
+            }),
         );
     }
 }
@@ -216,20 +279,34 @@ testCommand(
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}),
+            db.adminCommand({
+                configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+                mode: "off",
+            }),
         );
         const initialFindBatchSize = 2;
         const cursorId = assert.commandWorked(
             sessionDb.runCommand({find: "coll", filter: {x: 1}, batchSize: initialFindBatchSize}),
         ).cursor.id;
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}),
+            db.adminCommand({
+                configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+                mode: "alwaysOn",
+            }),
         );
         const res = assert.commandWorked(
-            sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll", batchSize: TestData.numDocs}),
+            sessionDb.runCommand({
+                getMore: NumberLong(cursorId),
+                collection: "coll",
+                batchSize: TestData.numDocs,
+            }),
         );
         assert.commandWorked(session.commitTransaction_forTesting());
-        assert.eq(res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
+        assert.eq(
+            res.cursor.nextBatch.length,
+            TestData.numDocs - initialFindBatchSize,
+            tojson(res),
+        );
     },
     {"cursor.originatingCommand.filter": {x: 1}},
 );
@@ -257,18 +334,30 @@ testCommand(
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}),
+            db.adminCommand({
+                configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+                mode: "off",
+            }),
         );
         const initialFindBatchSize = 0;
         const cursorId = assert.commandWorked(
             sessionDb.runCommand({find: "coll", filter: {x: 1}, batchSize: initialFindBatchSize}),
         ).cursor.id;
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}),
+            db.adminCommand({
+                configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang",
+                mode: "alwaysOn",
+            }),
         );
-        const res = assert.commandWorked(sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll"}));
+        const res = assert.commandWorked(
+            sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll"}),
+        );
         assert.commandWorked(session.commitTransaction_forTesting());
-        assert.eq(res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
+        assert.eq(
+            res.cursor.nextBatch.length,
+            TestData.numDocs - initialFindBatchSize,
+            tojson(res),
+        );
     },
     {"cursor.originatingCommand.filter": {x: 1}},
 );
@@ -343,7 +432,11 @@ testCommand(
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(
-            sessionDb.runCommand({findAndModify: "coll", query: {new: 1}, update: {$set: {findAndModify: 1}}}),
+            sessionDb.runCommand({
+                findAndModify: "coll",
+                query: {new: 1},
+                update: {$set: {findAndModify: 1}},
+            }),
         );
         assert.commandWorked(session.commitTransaction_forTesting());
         assert(res.hasOwnProperty("lastErrorObject"));
@@ -361,7 +454,11 @@ testCommand(
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(
-            sessionDb.runCommand({findAndModify: "coll", query: {new: 1}, update: {$set: {findAndModify: 1}}}),
+            sessionDb.runCommand({
+                findAndModify: "coll",
+                query: {new: 1},
+                update: {$set: {findAndModify: 1}},
+            }),
         );
         assert.commandWorked(session.commitTransaction_forTesting());
         assert(res.hasOwnProperty("lastErrorObject"));

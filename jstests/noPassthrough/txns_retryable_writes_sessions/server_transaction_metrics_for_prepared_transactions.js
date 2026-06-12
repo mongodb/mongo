@@ -12,11 +12,13 @@ import {getLastOpTime} from "jstests/replsets/rslib.js";
 function verifyServerStatusFields(serverStatusResponse) {
     assert(
         serverStatusResponse.hasOwnProperty("transactions"),
-        "Expected the serverStatus response to have a 'transactions' field: " + tojson(serverStatusResponse),
+        "Expected the serverStatus response to have a 'transactions' field: " +
+            tojson(serverStatusResponse),
     );
     assert(
         serverStatusResponse.transactions.hasOwnProperty("totalPrepared"),
-        "Expected the serverStatus response to have a 'totalPrepared' field: " + tojson(serverStatusResponse),
+        "Expected the serverStatus response to have a 'totalPrepared' field: " +
+            tojson(serverStatusResponse),
     );
     assert(
         serverStatusResponse.transactions.hasOwnProperty("totalPreparedThenCommitted"),
@@ -30,7 +32,8 @@ function verifyServerStatusFields(serverStatusResponse) {
     );
     assert(
         serverStatusResponse.transactions.hasOwnProperty("currentPrepared"),
-        "Expected the serverStatus response to have a 'currentPrepared' field: " + tojson(serverStatusResponse),
+        "Expected the serverStatus response to have a 'currentPrepared' field: " +
+            tojson(serverStatusResponse),
     );
 }
 
@@ -128,18 +131,32 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "cu
 
 // Verify that the prepare entry has the oldest timestamp of any active transaction
 // in the transactions table.
-verifyOldestActiveTransactionTimestamp(testDB, opTimeBeforePrepareForCommit.ts, prepareTimestampForCommit);
+verifyOldestActiveTransactionTimestamp(
+    testDB,
+    opTimeBeforePrepareForCommit.ts,
+    prepareTimestampForCommit,
+);
 
 // Verify the total prepared and committed transaction counters are updated after a commit
 // and that the current prepared counter is decremented.
 PrepareHelpers.commitTransaction(session, prepareTimestampForCommit);
 newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
 verifyServerStatusFields(newStatus);
-verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalPreparedThenCommitted", 1);
+verifyServerStatusChange(
+    initialStatus.transactions,
+    newStatus.transactions,
+    "totalPreparedThenCommitted",
+    1,
+);
 verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentPrepared", 0);
 
 // Verify that other prepared transaction metrics have not changed.
-verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalPreparedThenAborted", 0);
+verifyServerStatusChange(
+    initialStatus.transactions,
+    newStatus.transactions,
+    "totalPreparedThenAborted",
+    0,
+);
 verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalPrepared", 1);
 
 // Test server metrics for a prepared transaction that is aborted.
@@ -166,18 +183,32 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "cu
 
 // Verify that the prepare entry has the oldest timestamp of any active transaction
 // in the transactions table.
-verifyOldestActiveTransactionTimestamp(testDB, opTimeBeforePrepareForAbort.ts, prepareTimestampForAbort);
+verifyOldestActiveTransactionTimestamp(
+    testDB,
+    opTimeBeforePrepareForAbort.ts,
+    prepareTimestampForAbort,
+);
 
 // Verify the total prepared and aborted transaction counters are updated after an abort and the
 // current prepared counter is decremented.
 assert.commandWorked(session.abortTransaction_forTesting());
 newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
 verifyServerStatusFields(newStatus);
-verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalPreparedThenAborted", 1);
+verifyServerStatusChange(
+    initialStatus.transactions,
+    newStatus.transactions,
+    "totalPreparedThenAborted",
+    1,
+);
 verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentPrepared", 0);
 
 // Verify that other prepared transaction metrics have not changed.
-verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalPreparedThenCommitted", 1);
+verifyServerStatusChange(
+    initialStatus.transactions,
+    newStatus.transactions,
+    "totalPreparedThenCommitted",
+    1,
+);
 verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalPrepared", 2);
 
 // End the session and stop the replica set.

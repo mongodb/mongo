@@ -14,7 +14,10 @@ const collName = "supported_read_concern_levels";
 
 function runTest(level, sessionOptions, supported) {
     jsTestLog(
-        "Testing transactions with read concern level: " + level + " and sessionOptions: " + tojson(sessionOptions),
+        "Testing transactions with read concern level: " +
+            level +
+            " and sessionOptions: " +
+            tojson(sessionOptions),
     );
 
     db.getSiblingDB(dbName).runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -34,7 +37,10 @@ function runTest(level, sessionOptions, supported) {
             () => {
                 assert.commandWorked(
                     sessionDB.runCommand({find: collName}),
-                    "expected success, read concern level: " + level + ", sessionOptions: " + tojson(sessionOptions),
+                    "expected success, read concern level: " +
+                        level +
+                        ", sessionOptions: " +
+                        tojson(sessionOptions),
                 );
             },
             txnOpts,
@@ -45,9 +51,15 @@ function runTest(level, sessionOptions, supported) {
         assert.commandFailedWithCode(
             res,
             ErrorCodes.InvalidOptions,
-            "expected failure, read concern level: " + level + ", sessionOptions: " + tojson(sessionOptions),
+            "expected failure, read concern level: " +
+                level +
+                ", sessionOptions: " +
+                tojson(sessionOptions),
         );
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
     }
 
     session.endSession();

@@ -24,10 +24,14 @@ const mongosColl = mongosDB["coll"];
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the test collection on the field "shardKey".
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}),
+);
 
 // Make sure the negative chunk is on shard 0.
 assert.commandWorked(
@@ -58,7 +62,9 @@ assert.soon(() => {
     while (!finished) {
         try {
             const changeStream = resumeToken
-                ? mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup", resumeAfter: resumeToken}}])
+                ? mongosColl.aggregate([
+                      {$changeStream: {fullDocument: "updateLookup", resumeAfter: resumeToken}},
+                  ])
                 : mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
             resumeToken = changeStream._resumeToken;
 
@@ -70,7 +76,9 @@ assert.soon(() => {
                     lastInserted = id;
                 }
                 if (id > lastUpdated) {
-                    assert.commandWorked(mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
+                    assert.commandWorked(
+                        mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}),
+                    );
                     lastUpdated = id;
                 }
             }

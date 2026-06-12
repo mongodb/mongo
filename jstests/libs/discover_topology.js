@@ -38,7 +38,8 @@ export var DiscoverTopology = (function () {
 
             if (!shardMap.hasOwnProperty("map")) {
                 throw new Error(
-                    'Expected "getShardMap" command to return an object with a "map" field: ' + tojson(shardMap),
+                    'Expected "getShardMap" command to return an object with a "map" field: ' +
+                        tojson(shardMap),
                 );
             }
 
@@ -53,7 +54,9 @@ export var DiscoverTopology = (function () {
             return shardMap.map.config;
         }
 
-        const connectFn = options.hasOwnProperty("connectFn") ? options.connectFn : kDefaultConnectFn;
+        const connectFn = options.hasOwnProperty("connectFn")
+            ? options.connectFn
+            : kDefaultConnectFn;
 
         const configsvrConn = connectFn(getConfigServerConnectionString());
         const configsvrHosts = getDataMemberConnectionStrings(configsvrConn);

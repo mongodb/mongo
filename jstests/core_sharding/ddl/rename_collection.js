@@ -17,8 +17,12 @@ const dbName = jsTestName();
 
 {
     const testDB = setupTestDatabase(db, dbName);
-    jsTest.log("Testing unshardedColl.renameCollection to a sharded collection without dropTarget=true");
-    assert.commandWorked(testDB.adminCommand({shardCollection: `${dbName}.shardedColl`, key: {_id: "hashed"}}));
+    jsTest.log(
+        "Testing unshardedColl.renameCollection to a sharded collection without dropTarget=true",
+    );
+    assert.commandWorked(
+        testDB.adminCommand({shardCollection: `${dbName}.shardedColl`, key: {_id: "hashed"}}),
+    );
 
     assert.commandWorked(testDB.unshardedColl.insert({_id: 1}));
     assert.commandFailed(testDB.unshardedColl.renameCollection("shardedColl"));
@@ -40,19 +44,27 @@ const dbName = jsTestName();
 }
 
 {
-    jsTest.log("Testing renameCollection to existing sharded target collection with dropTarget=true");
+    jsTest.log(
+        "Testing renameCollection to existing sharded target collection with dropTarget=true",
+    );
     const dbName = "testRenameToExistingShardedCollection";
     const testDB = setupTestDatabase(db, dbName);
     const fromCollName = "fromColl";
     const targetCollName = "targetColl";
 
-    assert.commandWorked(testDB.adminCommand({shardCollection: `${dbName}.${fromCollName}`, key: {_id: "hashed"}}));
+    assert.commandWorked(
+        testDB.adminCommand({shardCollection: `${dbName}.${fromCollName}`, key: {_id: "hashed"}}),
+    );
     assert.commandWorked(testDB[fromCollName].insertOne({sentinel: "createdWithinFromColl"}));
 
-    assert.commandWorked(testDB.adminCommand({shardCollection: `${dbName}.${targetCollName}`, key: {_id: "hashed"}}));
+    assert.commandWorked(
+        testDB.adminCommand({shardCollection: `${dbName}.${targetCollName}`, key: {_id: "hashed"}}),
+    );
     assert.commandWorked(testDB[targetCollName].insertOne({sentinel: "createdWithinTargetColl"}));
 
-    assert.commandWorked(testDB[fromCollName].renameCollection(targetCollName, true /* dropTarget */));
+    assert.commandWorked(
+        testDB[fromCollName].renameCollection(targetCollName, true /* dropTarget */),
+    );
 
     assert.eq(1, testDB[targetCollName].countDocuments({sentinel: "createdWithinFromColl"}));
     assert.eq(0, testDB[targetCollName].countDocuments({sentinel: "createdWithinTargetColl"}));

@@ -79,8 +79,12 @@ coll.createIndexes([
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "c", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}));
+assert.commandWorked(
+    coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}),
+);
+assert.commandWorked(
+    coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}),
+);
 assert.commandWorked(coll.runCommand({analyze: collName, key: "mixed", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "bool_field", numberBuckets: 10}));
 
@@ -204,7 +208,10 @@ function assertCbrExplain(plan, isSamplingCE = false) {
     } else if (plan.hasOwnProperty("inputStages")) {
         plan.inputStages.forEach((p) => assertCbrExplain(p, isSamplingCE));
     } else {
-        assert(plan.hasOwnProperty("numKeysEstimate") || plan.hasOwnProperty("numDocsEstimate"), plan);
+        assert(
+            plan.hasOwnProperty("numKeysEstimate") || plan.hasOwnProperty("numDocsEstimate"),
+            plan,
+        );
     }
 }
 
@@ -292,7 +299,11 @@ function verifyCollectionCardinalityEstimate() {
     coll.drop();
     assert.commandWorked(coll.insertMany(Array.from({length: card}, () => ({a: 1}))));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "automaticCE",
+        }),
     );
     // This query should not have any predicates, as they are taken into account
     // by CE, and estimated cardinality will be less than the total.
@@ -310,7 +321,11 @@ function verifyHeuristicEstimateSource() {
     assert.commandWorked(coll.insertMany(Array.from({length: 100}, (_, i) => ({a: i}))));
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "heuristicCE",
+        }),
     );
     const e1 = coll.find({a: 1}).explain();
     const w1 = getWinningPlanFromExplain(e1);
@@ -348,7 +363,11 @@ function verifySamplingCEIndexSeekEstimate() {
     const winningPoint = getWinningPlanFromExplain(explainPoint);
     assertCbrExplain(winningPoint, true /* isSamplingCE */);
     const ixscanPoint = getPlanStage(winningPoint, "IXSCAN");
-    assert.eq(ixscanPoint.indexSeekEstimate, 1, "Point query IXSCAN should have indexSeekEstimate = 1");
+    assert.eq(
+        ixscanPoint.indexSeekEstimate,
+        1,
+        "Point query IXSCAN should have indexSeekEstimate = 1",
+    );
 }
 
 function verifyFetchOverFetchDoesNotAssert() {
@@ -357,10 +376,16 @@ function verifyFetchOverFetchDoesNotAssert() {
     assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
 
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "heuristicCE",
+        }),
     );
 
-    const explain = coll.find({a: 1, $or: [{a: 2}, {b: {$elemMatch: {$or: [{c: 4}, {c: 5}]}}}]}).explain();
+    const explain = coll
+        .find({a: 1, $or: [{a: 2}, {b: {$elemMatch: {$or: [{c: 4}, {c: 5}]}}}]})
+        .explain();
     // At least one plan should contain a FETCH over FETCH stages and that should not raise an
     // assertion in FETCH's cardinality estimation.
     let foundFetchOverFetch = false;
@@ -414,7 +439,11 @@ try {
     assert.commandWorked(coll1.insertOne({a: 1}));
 
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
 
     // Request histogam CE while the collection has no histogram
@@ -425,7 +454,10 @@ try {
 
     // Request histogam CE on a field that doesn't have a histogram
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);
-    assert.throwsWithCode(() => coll1.find({$and: [{b: 1}, {a: 3}]}).explain(), ErrorCodes.HistogramCEFailure);
+    assert.throwsWithCode(
+        () => coll1.find({$and: [{b: 1}, {a: 3}]}).explain(),
+        ErrorCodes.HistogramCEFailure,
+    );
 
     // $or cannot fail because QueryPlanner::planSubqueries() falls back to choosePlanWholeQuery()
     // when one of the subqueries could not be planned. In this way the CE error is masked.
@@ -433,7 +465,10 @@ try {
     assert(isCollscan(db, getWinningPlanFromExplain(orExpl)));
 
     // Histogram CE fails because of inestimable interval
-    assert.throwsWithCode(() => coll1.find({b: {$gte: {foo: 1}}}).explain(), ErrorCodes.HistogramCEFailure);
+    assert.throwsWithCode(
+        () => coll1.find({b: {$gte: {foo: 1}}}).explain(),
+        ErrorCodes.HistogramCEFailure,
+    );
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));

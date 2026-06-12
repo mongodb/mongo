@@ -15,11 +15,15 @@ const testDb = db.getSiblingDB(dbName);
 const coll = testDb.getCollection("collTest");
 
 // Detect if collections are implicitly sharded
-const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+const isImplicitlyShardedCollection =
+    typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
 function getIndexesFromListIndexes(collection) {
     const targetColl = collection || coll;
-    return new DBCommandCursor(testDb, testDb.runCommand({listIndexes: targetColl.getName()})).toArray();
+    return new DBCommandCursor(
+        testDb,
+        testDb.runCommand({listIndexes: targetColl.getName()}),
+    ).toArray();
 }
 
 function getIndexesMustFail(errorCode, collection) {
@@ -42,12 +46,14 @@ function findIndexByName(indexes, indexName) {
 
 function dropCollection(coll) {
     if (isImplicitlyShardedCollection) {
-        const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+        const originalImplicitlyShardOnCreateCollectionOnly =
+            TestData.implicitlyShardOnCreateCollectionOnly;
         try {
             TestData.implicitlyShardOnCreateCollectionOnly = true;
             assert(coll.drop());
         } finally {
-            TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+            TestData.implicitlyShardOnCreateCollectionOnly =
+                originalImplicitlyShardOnCreateCollectionOnly;
         }
     } else {
         assert(coll.drop());
@@ -155,7 +161,11 @@ describe("ListIndexesCorrectness", function () {
         // Verify index {c:1} now has expireAfterSeconds = 7200
         indexC = findIndexByKey(getIndexesFromListIndexes(), {c: 1});
         assert.neq(undefined, indexC);
-        assert.eq(7200, indexC.expireAfterSeconds, "Index should have expireAfterSeconds = 7200 after collMod");
+        assert.eq(
+            7200,
+            indexC.expireAfterSeconds,
+            "Index should have expireAfterSeconds = 7200 after collMod",
+        );
     });
 
     // TODO (SERVER-61182): Enable this test case with the in-memory storage engine.
@@ -195,11 +205,18 @@ describe("ListIndexesCorrectness", function () {
         indexE = findIndexByKey(getIndexesFromListIndexes(), {e: 1});
         assert.neq(undefined, indexE);
         assert.eq(true, indexE.unique, "Index should be unique after conversion");
-        assert.eq(undefined, indexE.prepareUnique, "Index should no longer have prepareUnique property");
+        assert.eq(
+            undefined,
+            indexE.prepareUnique,
+            "Index should no longer have prepareUnique property",
+        );
     };
     jsTest.options().storageEngine === "inMemory"
         ? it.skip
-        : it("should list indexes correctly after collMod converts an index to unique", collModConvertIndexToUnique);
+        : it(
+              "should list indexes correctly after collMod converts an index to unique",
+              collModConvertIndexToUnique,
+          );
 
     it("should list only _id index after createCollection", () => {
         assert.commandWorked(testDb.createCollection(coll.getName()));
@@ -320,7 +337,9 @@ describe("ListIndexesCorrectness", function () {
             db.getSiblingDB("config").tags.findOne({ns: targetColl.getFullName()})
         ) {
             // There are suites that implicitly shard collections and then add tags to them.
-            jsTest.log.info("Skipping rename because the target collection is sharded and has tags");
+            jsTest.log.info(
+                "Skipping rename because the target collection is sharded and has tags",
+            );
             return;
         }
 
@@ -375,8 +394,16 @@ describe("ListIndexesCorrectness", function () {
         assert.eq(true, indexY.unique, "Index on {y: 1} should still be unique after rename");
 
         // Verify the old target indexes (z and w) no longer exist
-        assert.eq(undefined, findIndexByKey(indexesAfter, {z: 1}), "Target's old index on {z: 1} should not exist");
-        assert.eq(undefined, findIndexByKey(indexesAfter, {w: 1}), "Target's old index on {w: 1} should not exist");
+        assert.eq(
+            undefined,
+            findIndexByKey(indexesAfter, {z: 1}),
+            "Target's old index on {z: 1} should not exist",
+        );
+        assert.eq(
+            undefined,
+            findIndexByKey(indexesAfter, {w: 1}),
+            "Target's old index on {w: 1} should not exist",
+        );
 
         // Verify listIndexes fails on the source collection name
         getIndexesMustFail(ErrorCodes.NamespaceNotFound, coll);

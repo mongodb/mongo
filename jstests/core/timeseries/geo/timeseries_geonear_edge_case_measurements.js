@@ -132,7 +132,15 @@ for (const minOrMax of ["maxDistance", "minDistance"]) {
     const result = coll.aggregate(pipeline).toArray();
     // In most cases we expect the query to find some but not all the points.
     // In rare cases (at a pole) the points could be clamped together.
-    jsTestLog("Spherical " + minOrMax + " query included " + result.length + " out of " + docs.length + " points.");
+    jsTestLog(
+        "Spherical " +
+            minOrMax +
+            " query included " +
+            result.length +
+            " out of " +
+            docs.length +
+            " points.",
+    );
 
     // Make sure the time-series results match.
     const tsResult = tsColl.aggregate(pipeline).toArray();
@@ -162,7 +170,15 @@ for (const minOrMax of ["maxDistance", "minDistance"]) {
     const result = coll.aggregate(pipeline).toArray();
     // In most cases we expect the query to find some but not all the points.
     // In rare cases (at a pole) the points could be clamped together.
-    jsTestLog("Flat " + minOrMax + " query included " + result.length + " out of " + docs.length + " points.");
+    jsTestLog(
+        "Flat " +
+            minOrMax +
+            " query included " +
+            result.length +
+            " out of " +
+            docs.length +
+            " points.",
+    );
 
     // Make sure the time-series results match.
     const tsResult = tsColl.aggregate(pipeline).toArray();

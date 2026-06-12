@@ -63,7 +63,10 @@ const negativeRangeExpectedResult = [
     {"city": "Reno", "Rest stops": [0, -25, -50, -75, -100, -125, -150, -175, -200]},
     {
         "city": "Los Angeles",
-        "Rest stops": [0, -25, -50, -75, -100, -125, -150, -175, -200, -225, -250, -275, -300, -325, -350, -375],
+        "Rest stops": [
+            0, -25, -50, -75, -100, -125, -150, -175, -200, -225, -250, -275, -300, -325, -350,
+            -375,
+        ],
     },
 ];
 
@@ -74,7 +77,9 @@ const negativeRangeResult = coll
             $project: {
                 _id: 0,
                 city: 1,
-                "Rest stops": {$range: [NumberInt(0), {"$multiply": ["$distance", -1]}, NumberInt(-25)]},
+                "Rest stops": {
+                    $range: [NumberInt(0), {"$multiply": ["$distance", -1]}, NumberInt(-25)],
+                },
             },
         },
     ])
@@ -96,7 +101,9 @@ const nothingRangeResult = coll
             $project: {
                 _id: 0,
                 city: 1,
-                "Rest stops": {$range: [NumberInt(0), {"$multiply": ["$distance", -1]}, NumberInt(25)]},
+                "Rest stops": {
+                    $range: [NumberInt(0), {"$multiply": ["$distance", -1]}, NumberInt(25)],
+                },
             },
         },
     ])
@@ -108,7 +115,11 @@ assert(arrayEq(nothingRangeExpectedResult, nothingRangeResult));
 const nothingRangeResult2 = coll
     .aggregate([
         {
-            $project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", "$distance", NumberInt(25)]}},
+            $project: {
+                _id: 0,
+                city: 1,
+                "Rest stops": {$range: ["$distance", "$distance", NumberInt(25)]},
+            },
         },
     ])
     .toArray();
@@ -193,15 +204,21 @@ assert(arrayEq(overflowRangeExpectedResult, overflowRangeResult));
 let pipeline;
 
 // Start value is too big.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: [NumberLong("12147483647"), "$distance"]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: [NumberLong("12147483647"), "$distance"]}}},
+];
 assertErrorCode(coll, pipeline, 34444);
 
 // Start value is a decimal.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: [NumberDecimal("0.35"), "$distance"]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: [NumberDecimal("0.35"), "$distance"]}}},
+];
 assertErrorCode(coll, pipeline, 34444);
 
 // Start value is not a number.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: ["String is not a number", "$distance"]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: ["String is not a number", "$distance"]}}},
+];
 assertErrorCode(coll, pipeline, 34443);
 
 // Start value is null.
@@ -209,15 +226,21 @@ pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: [null, "$distanc
 assertErrorCode(coll, pipeline, 34443);
 
 // End value is too big.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", NumberLong("12147483647")]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", NumberLong("12147483647")]}}},
+];
 assertErrorCode(coll, pipeline, 34446);
 
 // End value is a decimal.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", NumberDecimal("0.35")]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", NumberDecimal("0.35")]}}},
+];
 assertErrorCode(coll, pipeline, 34446);
 
 // End value is not a number.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", "String is not a number"]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", "String is not a number"]}}},
+];
 assertErrorCode(coll, pipeline, 34445);
 
 // End value is null.
@@ -261,7 +284,9 @@ pipeline = [
 assertErrorCode(coll, pipeline, 34447);
 
 // Step value is null.
-pipeline = [{$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", NumberInt(100), null]}}}];
+pipeline = [
+    {$project: {_id: 0, city: 1, "Rest stops": {$range: ["$distance", NumberInt(100), null]}}},
+];
 assertErrorCode(coll, pipeline, 34447);
 
 // Step value is zero.
@@ -278,7 +303,9 @@ const decimalRangeResult = coll
             $project: {
                 _id: 0,
                 city: 1,
-                "Rest stops": {$range: ["$distance", NumberDecimal("201.0"), NumberDecimal("100.0")]},
+                "Rest stops": {
+                    $range: ["$distance", NumberDecimal("201.0"), NumberDecimal("100.0")],
+                },
             },
         },
     ])
@@ -288,7 +315,14 @@ assert(arrayEq(decimalRangeExpectedResult, decimalRangeResult));
 
 assert(coll.drop());
 assert.commandWorked(coll.insertOne({_id: 1}));
-assertErrorCode(coll, [{$project: {result: {$range: [0, 1073741924]}}}], ErrorCodes.ExceededMemoryLimit);
+assertErrorCode(
+    coll,
+    [{$project: {result: {$range: [0, 1073741924]}}}],
+    ErrorCodes.ExceededMemoryLimit,
+);
 assert(
-    arrayEq([{_id: 1, result: []}], coll.aggregate([{$project: {result: {$range: [0, 1073741924, -1]}}}]).toArray()),
+    arrayEq(
+        [{_id: 1, result: []}],
+        coll.aggregate([{$project: {result: {$range: [0, 1073741924, -1]}}}]).toArray(),
+    ),
 );

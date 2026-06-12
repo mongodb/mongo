@@ -8,9 +8,13 @@ const collName = "coll";
 const testDB = st.s.getDB(testDBName);
 
 assert.commandWorked(testDB.adminCommand({enableSharding: testDBName}));
-assert.commandWorked(testDB.adminCommand({shardCollection: testDB[collName].getFullName(), key: {x: 1}}));
+assert.commandWorked(
+    testDB.adminCommand({shardCollection: testDB[collName].getFullName(), key: {x: 1}}),
+);
 
 st.s.setSecondaryOk();
-assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]}));
+assert.commandWorked(
+    testDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]}),
+);
 
 st.stop();

@@ -27,7 +27,11 @@ function checkCountForObject(obj) {
                 );
 
                 // Check limit(x) = limit(-x)
-                assert.eq(t.find(query).limit(limit).count(true), t.find(query).limit(-limit).count(true), "C1");
+                assert.eq(
+                    t.find(query).limit(limit).count(true),
+                    t.find(query).limit(-limit).count(true),
+                    "C1",
+                );
                 assert.eq(
                     t.find(query).skip(skip).limit(limit).count(true),
                     t.find(query).skip(skip).limit(-limit).count(true),
@@ -38,8 +42,16 @@ function checkCountForObject(obj) {
 
         // Check limit(0) has no effect
         assert.eq(expected, t.find(query).limit(0).count(true), "D1");
-        assert.eq(Math.max(expected - skip, 0), t.find(query).skip(skip).limit(0).count(true), "D2");
-        assert.eq(expected, t.getDB().runCommand({count: t.getName(), query: query, limit: 0}).n, "D3");
+        assert.eq(
+            Math.max(expected - skip, 0),
+            t.find(query).skip(skip).limit(0).count(true),
+            "D2",
+        );
+        assert.eq(
+            expected,
+            t.getDB().runCommand({count: t.getName(), query: query, limit: 0}).n,
+            "D3",
+        );
         assert.eq(
             Math.max(expected - skip, 0),
             t.getDB().runCommand({count: t.getName(), query: query, limit: 0, skip: skip}).n,

@@ -7,7 +7,10 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {makeCommitTransactionCmdObj, makeLsidFilter} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {
+    makeCommitTransactionCmdObj,
+    makeLsidFilter,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // This test runs the reapLogicalSessionCacheNow command. That can lead to direct writes to the
 // config.transactions collection, which cannot be performed on a session.
@@ -94,7 +97,9 @@ let numTransactionsCollEntriesReaped = 0;
             autocommit: false,
         }),
     );
-    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+    );
 
     assert.eq({_id: 0, x: 0, y: 0}, testColl.findOne({_id: 0}));
 
@@ -164,7 +169,9 @@ let numTransactionsCollEntriesReaped = 0;
             autocommit: false,
         }),
     );
-    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+    );
 
     assert.eq({_id: 1, x: 1, y: 1}, testColl.findOne({_id: 1}));
 
@@ -200,7 +207,9 @@ let numTransactionsCollEntriesReaped = 0;
     assert.eq(1, imageColl.find(parentLsidFilter).itcount());
     assert.eq(1, imageColl.find(childLsidFilter).itcount());
 
-    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, parentTxnNumber)));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, parentTxnNumber)),
+    );
     assert.eq({_id: 1, x: 1, y: 1}, testColl.findOne({_id: 1}));
     assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
     assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());

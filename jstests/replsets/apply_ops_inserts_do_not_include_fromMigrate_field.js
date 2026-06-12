@@ -34,7 +34,9 @@ const secondaryChangeStream = secondaryCST.startWatchingAllChangesForCluster();
 primaryDB.createCollection(collName);
 
 // Test applyOps inserts.
-assert.commandWorked(primaryDB.runCommand({applyOps: [{op: "i", ns: nss(dbName, collName), o: {_id: 0}}]}));
+assert.commandWorked(
+    primaryDB.runCommand({applyOps: [{op: "i", ns: nss(dbName, collName), o: {_id: 0}}]}),
+);
 assert.commandWorked(
     primaryDB.runCommand({
         applyOps: [
@@ -47,14 +49,28 @@ assert.commandWorked(
 // Test applyOps upserts. These will be logged as insert oplog entries.
 assert.commandWorked(
     primaryDB.runCommand({
-        applyOps: [{op: "u", ns: nss(dbName, collName), o2: {_id: 2}, o: {$v: 2, diff: {u: {x: 2}}}, b: true}],
+        applyOps: [
+            {
+                op: "u",
+                ns: nss(dbName, collName),
+                o2: {_id: 2},
+                o: {$v: 2, diff: {u: {x: 2}}},
+                b: true,
+            },
+        ],
     }),
 );
 
 assert.commandWorked(
     primaryDB.runCommand({
         applyOps: [
-            {op: "u", ns: nss(dbName, collName), o2: {_id: 3}, o: {$v: 2, diff: {u: {x: 3}}}, b: true},
+            {
+                op: "u",
+                ns: nss(dbName, collName),
+                o2: {_id: 3},
+                o: {$v: 2, diff: {u: {x: 3}}},
+                b: true,
+            },
             {op: "c", ns: nss(dbName, "$cmd"), o: {create: "other2"}},
         ],
     }),

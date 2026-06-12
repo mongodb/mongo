@@ -20,7 +20,9 @@ assert(db.coll.drop());
 assert(db.foreignColl.drop());
 
 assert.commandWorked(db.coll.insert(Array.from({length: 10}, (_, i) => ({_id: i, a: i, b: i}))));
-assert.commandWorked(db.foreignColl.insert(Array.from({length: 1}, (_, i) => ({_id: i, a: i, b: i}))));
+assert.commandWorked(
+    db.foreignColl.insert(Array.from({length: 1}, (_, i) => ({_id: i, a: i, b: i}))),
+);
 
 assert.commandWorked(db.coll.createIndexes([{a: 1}, {b: 1}]));
 assert.commandWorked(db.foreignColl.createIndex({x: 1}));

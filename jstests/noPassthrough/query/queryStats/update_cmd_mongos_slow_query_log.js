@@ -43,7 +43,10 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
 
         this.dbName = jsTestName();
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         this.routerDB = this.st.s.getDB(this.dbName);
@@ -85,7 +88,10 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
                 }),
             );
 
-            const hash = getQueryShapeHashFromSlowLogs({testDB: this.routerDB, queryComment: comment});
+            const hash = getQueryShapeHashFromSlowLogs({
+                testDB: this.routerDB,
+                queryComment: comment,
+            });
             assert.neq(
                 hash,
                 null,
@@ -104,7 +110,10 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
                 }),
             );
 
-            const hash = getQueryShapeHashFromSlowLogs({testDB: this.routerDB, queryComment: comment});
+            const hash = getQueryShapeHashFromSlowLogs({
+                testDB: this.routerDB,
+                queryComment: comment,
+            });
             assert.neq(
                 hash,
                 null,
@@ -134,7 +143,11 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
             // Check both "Slow query" and "Slow in-progress query" logs.
             const mongosLogs = getSlowQueryLogs(this.routerDB, comment, {includeInProgress: true});
 
-            assert.gte(mongosLogs.length, 1, "At least one log - there may be a slow in-progress log");
+            assert.gte(
+                mongosLogs.length,
+                1,
+                "At least one log - there may be a slow in-progress log",
+            );
             for (const log of mongosLogs) {
                 assert.eq(
                     log.attr.queryShapeHash,
@@ -163,7 +176,11 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
             // Check both "Slow query" and "Slow in-progress query" logs.
             const mongosLogs = getSlowQueryLogs(this.routerDB, comment, {includeInProgress: true});
 
-            assert.gte(mongosLogs.length, 1, "At least one log - there may be a slow in-progress log");
+            assert.gte(
+                mongosLogs.length,
+                1,
+                "At least one log - there may be a slow in-progress log",
+            );
             for (const log of mongosLogs) {
                 assert.eq(
                     log.attr.queryShapeHash,

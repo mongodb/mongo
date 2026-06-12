@@ -16,7 +16,10 @@ const testColl = testDB.getCollection(collName);
 
 // Test scenario where a WriteConflictException is caught during createIndexes.
 assert.commandWorked(
-    db.adminCommand({configureFailPoint: "createIndexesWriteConflict", mode: {activationProbability: 0.5}}),
+    db.adminCommand({
+        configureFailPoint: "createIndexesWriteConflict",
+        mode: {activationProbability: 0.5},
+    }),
 );
 
 // Make sure at least one execution occurs where the failpoint activates.
@@ -27,7 +30,9 @@ for (let i = 0; i < 20; i++) {
     assert(res.createdCollectionAutomatically);
     testColl.drop();
 }
-assert.commandWorked(db.adminCommand({configureFailPoint: "createIndexesWriteConflict", mode: "off"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "createIndexesWriteConflict", mode: "off"}),
+);
 
 // Test scenario where a conflicting collection creation occurs, and createIndexes "loses" to the
 // create collection.
@@ -50,13 +55,19 @@ function runSuccessfulIndexBuild(dbName, collName) {
 function runConflictingCollectionCreate(testDB, dbName, collName) {
     testColl.drop();
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangBeforeCreateIndexesCollectionCreate", mode: "alwaysOn"}),
+        testDB.adminCommand({
+            configureFailPoint: "hangBeforeCreateIndexesCollectionCreate",
+            mode: "alwaysOn",
+        }),
     );
     let joinCollectionCreate;
     let joinIndexBuild;
     try {
         jsTest.log("Starting a parallel shell to run index build request...");
-        joinIndexBuild = startParallelShell(funWithArgs(runSuccessfulIndexBuild, dbName, collName), db.getMongo().port);
+        joinIndexBuild = startParallelShell(
+            funWithArgs(runSuccessfulIndexBuild, dbName, collName),
+            db.getMongo().port,
+        );
         jsTest.log("Waiting for create collection hang during index build...");
         checkLog.contains(
             db.getMongo(),
@@ -69,7 +80,10 @@ function runConflictingCollectionCreate(testDB, dbName, collName) {
         assert.commandWorked(res);
     } finally {
         assert.commandWorked(
-            testDB.adminCommand({configureFailPoint: "hangBeforeCreateIndexesCollectionCreate", mode: "off"}),
+            testDB.adminCommand({
+                configureFailPoint: "hangBeforeCreateIndexesCollectionCreate",
+                mode: "off",
+            }),
         );
     }
 

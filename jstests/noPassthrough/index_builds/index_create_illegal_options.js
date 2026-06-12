@@ -20,7 +20,11 @@ withOrWithoutAuth.forEach((withAuth) => {
             this.conn = MongoRunner.runMongod(options);
             this.admin = this.conn.getDB("admin");
             if (withAuth) {
-                this.admin.createUser({user: testUser, pwd: testPass, roles: jsTest.adminUserRoles});
+                this.admin.createUser({
+                    user: testUser,
+                    pwd: testPass,
+                    roles: jsTest.adminUserRoles,
+                });
                 this.admin.logout();
                 this.admin.auth({user: testUser, pwd: testPass});
             }
@@ -46,7 +50,9 @@ withOrWithoutAuth.forEach((withAuth) => {
         legalIndexTypesForTimeseries.forEach(function (indexType) {
             it(`Can create a '${indexType == 1 ? "btree" : indexType}' index on a timeseries collection auth=${withAuth}`, function () {
                 this.testCollName = collName + "." + indexType;
-                assert.commandWorked(this.db.runCommand({create: this.testCollName, timeseries: {timeField: "t"}}));
+                assert.commandWorked(
+                    this.db.runCommand({create: this.testCollName, timeseries: {timeField: "t"}}),
+                );
                 assert.commandWorked(this.db[this.testCollName].createIndex({"foo": indexType}));
             });
         });

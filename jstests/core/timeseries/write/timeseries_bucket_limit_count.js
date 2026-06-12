@@ -57,7 +57,11 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check buckets.
-        const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
+            .find()
+            .rawData()
+            .sort({"control.min._id": 1})
+            .toArray();
 
         jsTestLog("Collection stats for " + coll.getFullName() + ": " + tojson(coll.stats()));
 
@@ -132,17 +136,36 @@ TimeseriesTest.run((insert) => {
             assert.lte(2, bucketDocs.length, tojson(bucketDocs));
             let currMin = 0;
             bucketDocs.forEach((doc) => {
-                assert.eq(currMin, doc.control.min._id, "invalid control.min for _id in bucket: " + tojson(doc));
-                assert.eq(currMin, doc.control.min.x, "invalid control.min for x in bucket: " + tojson(doc));
+                assert.eq(
+                    currMin,
+                    doc.control.min._id,
+                    "invalid control.min for _id in bucket: " + tojson(doc),
+                );
+                assert.eq(
+                    currMin,
+                    doc.control.min.x,
+                    "invalid control.min for x in bucket: " + tojson(doc),
+                );
                 let bucketMaxId = doc.control.max._id;
                 let bucketMaxX = doc.control.max.x;
-                assert.lte(bucketMaxId - currMin, bucketMaxCount, "Too high _id range in bucket: " + tojson(doc));
-                assert.lte(bucketMaxX - currMin, bucketMaxCount, "Too high x range in bucket: " + tojson(doc));
+                assert.lte(
+                    bucketMaxId - currMin,
+                    bucketMaxCount,
+                    "Too high _id range in bucket: " + tojson(doc),
+                );
+                assert.lte(
+                    bucketMaxX - currMin,
+                    bucketMaxCount,
+                    "Too high x range in bucket: " + tojson(doc),
+                );
                 assert(
                     TimeseriesTest.isBucketCompressed(doc.control.version),
                     "unexpected control.version in bucket: " + tojson(doc),
                 );
-                assert(!doc.control.hasOwnProperty("closed"), "unexpected control.closed in bucket: " + tojson(doc));
+                assert(
+                    !doc.control.hasOwnProperty("closed"),
+                    "unexpected control.closed in bucket: " + tojson(doc),
+                );
                 currMin = bucketMaxId + 1;
             });
         }

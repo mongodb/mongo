@@ -10,7 +10,11 @@
  */
 
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStage, getShardsFromExplain, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getShardsFromExplain,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();

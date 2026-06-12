@@ -5,10 +5,15 @@ import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
-import {assertForDbCheckErrorsForAllNodes, runDbCheckForDatabase} from "jstests/replsets/libs/dbcheck_utils.js";
+import {
+    assertForDbCheckErrorsForAllNodes,
+    runDbCheckForDatabase,
+} from "jstests/replsets/libs/dbcheck_utils.js";
 
 if (typeof db === "undefined") {
-    throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
+    throw new Error(
+        "Expected mongo shell to be connected a server, but global 'db' object isn't defined",
+    );
 }
 
 TestData = TestData || {};
@@ -30,7 +35,9 @@ const exceptionFilteredBackgroundDbCheck = function (newMongoWithRetry, hosts) {
     hosts.forEach((host) => {
         const hostConn = newMongoWithRetry(host);
         assert.commandWorkedOrFailedWithCode(
-            hostConn.getDB("admin").adminCommand({setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 50000}),
+            hostConn
+                .getDB("admin")
+                .adminCommand({setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 50000}),
             ErrorCodes.InvalidOptions,
         );
         hostConn.close();
@@ -58,8 +65,9 @@ const exceptionFilteredBackgroundDbCheck = function (newMongoWithRetry, hosts) {
         const dbs = new Map();
         const primary = rst.getPrimary();
 
-        const version = assert.commandWorked(primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-            .featureCompatibilityVersion.version;
+        const version = assert.commandWorked(
+            primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+        ).featureCompatibilityVersion.version;
         if (version != latestFCV) {
             print("Not running dbCheck in FCV " + version);
             return {ok: 1};
@@ -115,7 +123,11 @@ const exceptionFilteredBackgroundDbCheck = function (newMongoWithRetry, hosts) {
             jsTestLog("dbCheck is done on database " + db.name + " for RS: " + rst.getURL());
         });
 
-        assertForDbCheckErrorsForAllNodes(rst, true /*assertForErrors*/, false /*assertForWarnings*/);
+        assertForDbCheckErrorsForAllNodes(
+            rst,
+            true /*assertForErrors*/,
+            false /*assertForWarnings*/,
+        );
 
         return {ok: 1};
     };
@@ -148,7 +160,11 @@ if (topology.type === Topology.kReplicaSet) {
     const threads = [];
     try {
         if (topology.configsvr.type === Topology.kReplicaSet) {
-            const thread = new Thread(exceptionFilteredBackgroundDbCheck, newMongoWithRetry, topology.configsvr.nodes);
+            const thread = new Thread(
+                exceptionFilteredBackgroundDbCheck,
+                newMongoWithRetry,
+                topology.configsvr.nodes,
+            );
             threads.push(thread);
             thread.start();
         }
@@ -156,7 +172,11 @@ if (topology.type === Topology.kReplicaSet) {
         for (let shardName of Object.keys(topology.shards)) {
             const shard = topology.shards[shardName];
             if (shard.type === Topology.kReplicaSet) {
-                const thread = new Thread(exceptionFilteredBackgroundDbCheck, newMongoWithRetry, shard.nodes);
+                const thread = new Thread(
+                    exceptionFilteredBackgroundDbCheck,
+                    newMongoWithRetry,
+                    shard.nodes,
+                );
                 threads.push(thread);
                 thread.start();
             } else {
@@ -182,7 +202,10 @@ if (topology.type === Topology.kReplicaSet) {
         }
 
         returnData.forEach((res) => {
-            assert.commandWorked(res, () => "dbCheck replication consistency check failed: " + tojson(res));
+            assert.commandWorked(
+                res,
+                () => "dbCheck replication consistency check failed: " + tojson(res),
+            );
         });
     }
 } else {

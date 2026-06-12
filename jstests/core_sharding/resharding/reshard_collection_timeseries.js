@@ -39,9 +39,16 @@ const collOptions = {
 };
 
 jsTestLog("Setting up the timeseries collection.");
-assert.commandWorked(sourceDB.adminCommand({enableSharding: sourceDB.getName(), primaryShard: shardNames[0]}));
+assert.commandWorked(
+    sourceDB.adminCommand({enableSharding: sourceDB.getName(), primaryShard: shardNames[0]}),
+);
 
-CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, shardKeyPattern, chunks, collOptions);
+CreateShardedCollectionUtil.shardCollectionWithChunks(
+    sourceCollection,
+    shardKeyPattern,
+    chunks,
+    collOptions,
+);
 
 let timeseriesCollDoc = mongos
     .getDB("config")

@@ -30,7 +30,10 @@ function runTest(connInfo, isSharded) {
     const db = connInfo.conn.getDB("test");
     connInfo.awaitReplication();
 
-    for (const failpoint of ["hangWhileBuildingDocumentSourceOutBatch", "hangDollarOutAfterInsert"]) {
+    for (const failpoint of [
+        "hangWhileBuildingDocumentSourceOutBatch",
+        "hangDollarOutAfterInsert",
+    ]) {
         // Test both general $out and $out to a timeseries collection, with 'apiStrict' true and
         // false.
         for (const isTimeseries of [false, true]) {
@@ -88,7 +91,9 @@ function runTest(connInfo, isSharded) {
                     jsTest.log.info("Stepping down primary");
                     // Stepdown the primary.
                     let initialPrimary = connInfo.getPrimary();
-                    assert.commandWorked(initialPrimary.adminCommand({replSetStepDown: 60, force: true}));
+                    assert.commandWorked(
+                        initialPrimary.adminCommand({replSetStepDown: 60, force: true}),
+                    );
 
                     // Wait for a new primary to be elected.
                     const newPrimary = connInfo.getPrimary();
@@ -101,11 +106,14 @@ function runTest(connInfo, isSharded) {
 
                 // No temporary collections should be left behind after $out fails.
                 const collNames = db.getCollectionNames();
-                const temporaryAggCollections = collNames.filter((coll) => coll.includes("tmp.agg_out"));
+                const temporaryAggCollections = collNames.filter((coll) =>
+                    coll.includes("tmp.agg_out"),
+                );
                 assert.eq(
                     temporaryAggCollections.length,
                     0,
-                    "Temporary agg collection unexpectedly left behind: " + tojson(temporaryAggCollections),
+                    "Temporary agg collection unexpectedly left behind: " +
+                        tojson(temporaryAggCollections),
                 );
             }
         }

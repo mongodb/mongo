@@ -50,13 +50,17 @@ function getTestCasesForUnset(field, value) {
 
 // Test that $setField fails with the provided 'code' for invalid arguments 'setFieldArgs'.
 function assertSetFieldFailedWithCode(setFieldArgs, code) {
-    const error = assert.throws(() => coll.aggregate([{$project: {test: {$setField: setFieldArgs}}}]));
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {test: {$setField: setFieldArgs}}}]),
+    );
     assert.commandFailedWithCode(error, code);
 }
 
 // Test that $unsetField fails with the provided 'code' for invalid arguments 'unsetFieldArgs'.
 function assertUnsetFieldFailedWithCode(unsetFieldArgs, code) {
-    const error = assert.throws(() => coll.aggregate([{$project: {test: {$unsetField: unsetFieldArgs}}}]));
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {test: {$unsetField: unsetFieldArgs}}}]),
+    );
     assert.commandFailedWithCode(error, code);
 }
 
@@ -160,7 +164,10 @@ assertSetFieldFailedWithCode(
 // Test that $unsetField fails when 'field' is not a constant string argument.
 assertUnsetFieldFailedWithCode({field: null, input: {}}, 4161107);
 assertUnsetFieldFailedWithCode({field: "$field_path", input: {}}, 4161108);
-assertUnsetFieldFailedWithCode({field: {$concat: ["a.b", ".", "c"]}, input: {$const: {"a.b.c": 5}}}, 4161106);
+assertUnsetFieldFailedWithCode(
+    {field: {$concat: ["a.b", ".", "c"]}, input: {$const: {"a.b.c": 5}}},
+    4161106,
+);
 
 // $setField does not accept an argument that is not an object.
 assertSetFieldFailedWithCode(5, 4161100);
@@ -323,7 +330,9 @@ assertSetFieldResultsEq(
 assertSetFieldResultsEq(
     {
         field: "x",
-        input: {$setField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}, value: "forget-me-not"}},
+        input: {
+            $setField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}, value: "forget-me-not"},
+        },
         value: "something",
     },
     [
@@ -335,7 +344,9 @@ assertSetFieldResultsEq(
 assertSetFieldResultsEq(
     {
         field: "a",
-        input: {$setField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}, value: "forget-me-not"}},
+        input: {
+            $setField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}, value: "forget-me-not"},
+        },
         value: "$_id",
     },
     [
@@ -391,7 +402,11 @@ assertSetFieldResultsEq(
         field: {$const: "$x..$y"},
         input: {},
         value: {
-            $setField: {field: {$const: "$a"}, input: {$getField: {$const: "$x..$y"}}, value: "forget-me-not"},
+            $setField: {
+                field: {$const: "$a"},
+                input: {$getField: {$const: "$x..$y"}},
+                value: "forget-me-not",
+            },
         },
     },
     [

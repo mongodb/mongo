@@ -49,7 +49,10 @@ Date.prototype.tojson = function () {
         // NaN.
         time = this.getTime();
     } catch (e) {
-        if (e instanceof TypeError && e.message.includes("Date.prototype.getTime called on incompatible")) {
+        if (
+            e instanceof TypeError &&
+            e.message.includes("Date.prototype.getTime called on incompatible")
+        ) {
             return new Date(NaN).tojson();
         }
         throw e;
@@ -472,7 +475,9 @@ DBPointer.prototype.toString = function () {
 DBRef.prototype.fetch = function () {
     assert(this.$ref, "need a ns");
     assert(this.$id, "need an id");
-    let coll = this.$db ? globalThis.db.getSiblingDB(this.$db).getCollection(this.$ref) : globalThis.db[this.$ref];
+    let coll = this.$db
+        ? globalThis.db.getSiblingDB(this.$db).getCollection(this.$ref)
+        : globalThis.db[this.$ref];
     return coll.findOne({_id: this.$id});
 };
 
@@ -500,7 +505,14 @@ DBRef.prototype.getId = function () {
 };
 
 DBRef.prototype.toString = function () {
-    return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + (this.$db ? ", " + tojson(this.$db) : "") + ")";
+    return (
+        "DBRef(" +
+        tojson(this.$ref) +
+        ", " +
+        tojson(this.$id) +
+        (this.$db ? ", " + tojson(this.$db) : "") +
+        ")"
+    );
 };
 
 // BinData
@@ -649,7 +661,11 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
         return x.tojson(indent, nolint, depth, sortKeys);
     }
 
-    if (x.constructor && typeof x.constructor.tojson == "function" && x.constructor.tojson != tojson) {
+    if (
+        x.constructor &&
+        typeof x.constructor.tojson == "function" &&
+        x.constructor.tojson != tojson
+    ) {
         return x.constructor.tojson(x, indent, nolint, depth, sortKeys);
     }
 
@@ -693,7 +709,9 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
         if (val == globalThis.DB?.prototype) continue;
         if (val == globalThis.DBCollection?.prototype) continue;
 
-        fieldStrings.push(`${leadingPad}${indent}"${key}" : ` + tojson(val, indent, nolint, depth + 1, sortKeys));
+        fieldStrings.push(
+            `${leadingPad}${indent}"${key}" : ` + tojson(val, indent, nolint, depth + 1, sortKeys),
+        );
     }
 
     if (fieldStrings.length === 0) {

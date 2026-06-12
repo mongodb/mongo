@@ -41,7 +41,14 @@ assert.eq(0, shard1Coll1.find().itcount());
 assert.eq(0, shard2Coll1.find().itcount());
 assert.eq(3, coll1.find().itcount());
 
-assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    admin.runCommand({
+        moveChunk: ns1,
+        find: {a: 10},
+        to: st.shard2.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Shard0:
 //      coll1:     [-inf, 0) [0, 10)

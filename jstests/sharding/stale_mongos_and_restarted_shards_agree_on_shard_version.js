@@ -52,9 +52,13 @@ function setupCollectionForTest(collName) {
     ]);
 
     // This document will go to shard 0
-    assert.commandWorked(st.s0.getDB(kDatabaseName).getCollection(collName).insert({Key: -1, inc: 0}));
+    assert.commandWorked(
+        st.s0.getDB(kDatabaseName).getCollection(collName).insert({Key: -1, inc: 0}),
+    );
     // This document will go to shard 1
-    assert.commandWorked(st.s0.getDB(kDatabaseName).getCollection(collName).insert({Key: 0, inc: 0}));
+    assert.commandWorked(
+        st.s0.getDB(kDatabaseName).getCollection(collName).insert({Key: 0, inc: 0}),
+    );
 
     st.restartShardRS(0, /* waitForPrimary */ true);
     st.restartShardRS(1, /* waitForPrimary */ true);
@@ -79,7 +83,9 @@ const staleMongoS = st.s1;
     jsTest.log("Testing: Multi-update with sharded collection unknown on a stale mongos");
     setupCollectionForTest("TestUpdateColl");
 
-    assert.commandWorked(staleMongoS.getDB(kDatabaseName).TestUpdateColl.update({}, {$inc: {inc: 1}}, {multi: true}));
+    assert.commandWorked(
+        staleMongoS.getDB(kDatabaseName).TestUpdateColl.update({}, {$inc: {inc: 1}}, {multi: true}),
+    );
 
     let s0Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: -1});
     assert.eq(1, s0Doc.inc);
@@ -90,7 +96,9 @@ const staleMongoS = st.s1;
     jsTest.log("Testing: Multi-remove with sharded collection unknown on a stale mongos");
     setupCollectionForTest("TestRemoveColl");
 
-    assert.commandWorked(staleMongoS.getDB(kDatabaseName).TestRemoveColl.remove({}, {justOne: false}));
+    assert.commandWorked(
+        staleMongoS.getDB(kDatabaseName).TestRemoveColl.remove({}, {justOne: false}),
+    );
 
     assert.eq(0, freshMongoS.getDB(kDatabaseName).TestRemoveColl.find().itcount());
 }
@@ -107,7 +115,10 @@ const staleMongoS = st.s1;
         }),
     );
 
-    assert.eq({Key: -2}, freshMongoS.getDB(kDatabaseName).TestFindAndModifyColl.findOne({Key: -2}, {_id: 0}));
+    assert.eq(
+        {Key: -2},
+        freshMongoS.getDB(kDatabaseName).TestFindAndModifyColl.findOne({Key: -2}, {_id: 0}),
+    );
 }
 {
     jsTest.log("Testing: Find with sharded collection unknown on a stale mongos");
@@ -129,7 +140,9 @@ const staleMongoS = st.s1;
 let session = null;
 withRetryOnTransientTxnError(
     () => {
-        jsTest.log("Testing: Transactions with unsharded collection, which is unknown on the shard");
+        jsTest.log(
+            "Testing: Transactions with unsharded collection, which is unknown on the shard",
+        );
         st.restartShardRS(0, /* waitForPrimary */ true);
         st.restartShardRS(1, /* waitForPrimary */ true);
 
@@ -205,7 +218,10 @@ withRetryOnTransientTxnError(
 
     for (let i = 1; i <= kNumThreadsForConvoyTest; ++i) {
         updateShells.push(
-            startParallelShell(funWithArgs(parallelCommand, kDatabaseName, "TestConvoyColl", -i), staleMongoS.port),
+            startParallelShell(
+                funWithArgs(parallelCommand, kDatabaseName, "TestConvoyColl", -i),
+                staleMongoS.port,
+            ),
         );
     }
 
@@ -216,7 +232,10 @@ withRetryOnTransientTxnError(
         const filter = {"command.update": "TestConvoyColl"};
         matchingOps = st.shard0
             .getDB("admin")
-            .aggregate([{$currentOp: {"allUsers": true, "idleConnections": true}}, {$match: filter}])
+            .aggregate([
+                {$currentOp: {"allUsers": true, "idleConnections": true}},
+                {$match: filter},
+            ])
             .toArray();
         // Wait until all operations are blocked waiting for the refresh.
         return kNumThreadsForConvoyTest === matchingOps.length && matchingOps[0].opid != null;
@@ -240,7 +259,10 @@ withRetryOnTransientTxnError(
     });
 
     // All updates must succeed on all documents.
-    assert.eq(kNumThreadsForConvoyTest, freshMongoS.getDB(kDatabaseName).TestConvoyColl.countDocuments({a: 1}));
+    assert.eq(
+        kNumThreadsForConvoyTest,
+        freshMongoS.getDB(kDatabaseName).TestConvoyColl.countDocuments({a: 1}),
+    );
 }
 
 st.stop();

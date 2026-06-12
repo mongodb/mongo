@@ -22,7 +22,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let overrideMaxAwaitTimeMS = {"mode": "alwaysOn", "data": {maxAwaitTimeMS: 5 * 60 * 1000}};
 let st = new ShardingTest({
-    mongos: {s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": tojson(overrideMaxAwaitTimeMS)}}},
+    mongos: {
+        s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": tojson(overrideMaxAwaitTimeMS)}},
+    },
     shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}},
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
@@ -49,7 +51,13 @@ jsTestLog("Stepping up a new primary node.");
 st.rs0.stepUp(electableRsSecondary);
 assert.eq(electableRsSecondary, st.rs0.getPrimary());
 st.rs0.awaitSecondaryNodes(null, [rsPrimary]);
-awaitRSClientHosts(mongos, {host: electableRsSecondary.name}, {ok: true, ismaster: true}, st.rs0, timeoutMS);
+awaitRSClientHosts(
+    mongos,
+    {host: electableRsSecondary.name},
+    {ok: true, ismaster: true},
+    st.rs0,
+    timeoutMS,
+);
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: false}, st.rs0, timeoutMS);
 
 // Get connections to the new primary and electable secondary. Also, update the primary's member
@@ -74,7 +82,13 @@ jsTestLog("Killing the primary.");
 st.rs0.stop(rsPrimary);
 st.rs0.waitForState(electableRsSecondary, ReplSetTest.State.PRIMARY);
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: false}, st.rs0, timeoutMS);
-awaitRSClientHosts(mongos, {host: electableRsSecondary.name}, {ok: true, ismaster: true}, st.rs0, timeoutMS);
+awaitRSClientHosts(
+    mongos,
+    {host: electableRsSecondary.name},
+    {ok: true, ismaster: true},
+    st.rs0,
+    timeoutMS,
+);
 
 // Restart the node we shut down
 jsTestLog("Restarting the node that was just killed.");
@@ -95,6 +109,12 @@ jsTestLog("Terminating the primary.");
 st.rs0.stop(rsPrimary, 15);
 st.rs0.waitForState(electableRsSecondary, ReplSetTest.State.PRIMARY);
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: false}, st.rs0, timeoutMS);
-awaitRSClientHosts(mongos, {host: electableRsSecondary.name}, {ok: true, ismaster: true}, st.rs0, timeoutMS);
+awaitRSClientHosts(
+    mongos,
+    {host: electableRsSecondary.name},
+    {ok: true, ismaster: true},
+    st.rs0,
+    timeoutMS,
+);
 
 st.stop();

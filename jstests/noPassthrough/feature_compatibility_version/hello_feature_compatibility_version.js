@@ -23,7 +23,10 @@ const adminDB = conn.getDB("admin");
 // And we need to use a side connection to do so in order to prevent the test connection from
 // being closed on FCV changes.
 function cmdAsInternalClient(cmd) {
-    const command = {[cmd]: 1, internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}};
+    const command = {
+        [cmd]: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    };
     const connInternal = new Mongo(adminDB.getMongo().host);
     const res = assert.commandWorked(connInternal.adminCommand(command));
     connInternal.close();
@@ -45,7 +48,9 @@ function withFCVFailPoint(conn, failPointName, fcvVersion, bodyFn) {
     const thread = new Thread(
         function (host, version) {
             const connThread = new Mongo(host);
-            assert.commandWorked(connThread.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
+            assert.commandWorked(
+                connThread.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}),
+            );
         },
         conn.host,
         fcvVersion,
@@ -63,7 +68,9 @@ function withFCVFailPoint(conn, failPointName, fcvVersion, bodyFn) {
 // Test wire version for upgrade/downgrade.
 function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
     // Set the FCV to the downgrade version, then pause right after transitioning to upgrading.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
     withFCVFailPoint(conn, "hangWhileUpgrading", latestFCV, () => {
         // When the featureCompatibilityVersion is upgrading, running hello/isMaster with
         // internalClient returns a response with minWireVersion == maxWireVersion.
@@ -72,7 +79,9 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
         assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
     });
     // Safe re-assertion that the FCV is fully upgraded before proceeding.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Pause right after transitioning to downgrading.
     withFCVFailPoint(conn, "hangBeforeTransitioningToDowngraded", downgradeFCV, () => {
@@ -86,7 +95,9 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
     // When the featureCompatibilityVersion is equal to the downgrade version, running
     // hello/isMaster with internalClient returns a response with minWireVersion + 1 ==
     // maxWireVersion.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
     let res = cmdAsInternalClient(cmd);
     assert.eq(downgradeWireVersion, res.minWireVersion, tojson(res));
     assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
@@ -94,7 +105,9 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
     // When the internalClient field is missing from the hello/isMaster command, the response
     // returns the full wire version range from minWireVersion == 0 to maxWireVersion == latest
     // version, even if the featureCompatibilityVersion is equal to the upgrade version.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     res = adminDB.runCommand({[cmd]: 1});
     assert.commandWorked(res);
     assert.eq(res.minWireVersion, 0, tojson(res));

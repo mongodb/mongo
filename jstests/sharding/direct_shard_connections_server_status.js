@@ -18,7 +18,10 @@ function assertNoDirectShardConnectionsMetrics(conn) {
 function assertDirectShardConnectionsMetrics(conn, expected) {
     const res = conn.adminCommand({serverStatus: 1});
     assert(res.hasOwnProperty("directShardConnections"), res);
-    assert.eq(res.directShardConnections.current, expected.current, {expected, actual: res.directShardConnections});
+    assert.eq(res.directShardConnections.current, expected.current, {
+        expected,
+        actual: res.directShardConnections,
+    });
     assert.eq(res.directShardConnections.totalCreated, expected.totalCreated, {
         expected,
         actual: res.directShardConnections,

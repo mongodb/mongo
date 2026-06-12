@@ -194,7 +194,10 @@ const expectedCommand = mongotCommandForQuery({
     mongot.setMockResponses(mergingPipelineHistory, 1);
 }
 
-let cursor = testColl.aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}]);
+let cursor = testColl.aggregate([
+    {$search: searchQuery},
+    {$project: {_id: 1, meta: "$$SEARCH_META"}},
+]);
 
 const metaDoc = {
     type: 1,

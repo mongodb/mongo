@@ -18,7 +18,9 @@ TimeseriesTest.run((insert) => {
     const timeFieldName = "time";
 
     tsColl.drop();
-    assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     if (areViewlessTimeseriesEnabled(db)) {
         assert.eq(testDB.system.views.find().toArray().length, 0);

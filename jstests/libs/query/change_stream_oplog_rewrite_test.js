@@ -37,7 +37,9 @@ function traverseEvent(event, outputMap, prefixPath = "") {
 
         // Helper function to add a new value into the fields list.
         function addToPredicatesList(fieldPath, fieldVal) {
-            const alreadyExists = outputMap[fieldPath].values.some((elem) => friendlyEqual(elem, fieldVal));
+            const alreadyExists = outputMap[fieldPath].values.some((elem) =>
+                friendlyEqual(elem, fieldVal),
+            );
             const numValues = outputMap[fieldPath].values.length;
             if (!alreadyExists && numValues < maxValuesPerPath) {
                 outputMap[fieldPath].values.push(fieldVal);
@@ -76,7 +78,12 @@ export function generateEventsAndFieldsToBeTestedForOplogRewrites(db, dbName, co
     const numDocs = 8;
 
     // Generate a write workload for the change stream to consume.
-    generateChangeStreamWriteWorkload(testDB, collName, numDocs, false /* includeInvalidatingEvents */);
+    generateChangeStreamWriteWorkload(
+        testDB,
+        collName,
+        numDocs,
+        false /* includeInvalidatingEvents */,
+    );
 
     // Obtain a list of all events that occurred during the write workload.
     const allEvents = getAllChangeStreamEvents(
@@ -116,7 +123,12 @@ export function generateEventsAndFieldsToBeTestedForOplogRewrites(db, dbName, co
 }
 
 // Confirm that the output of an optimized change stream matches an unoptimized stream.
-export function compareOptimizedAndNonOptimizedChangeStreamResults(db, dbName, predicatesToTest, startPoint) {
+export function compareOptimizedAndNonOptimizedChangeStreamResults(
+    db,
+    dbName,
+    predicatesToTest,
+    startPoint,
+) {
     const endPoint = getClusterTime(db);
     const testDB = db.getSiblingDB(dbName);
 
@@ -143,7 +155,9 @@ export function compareOptimizedAndNonOptimizedChangeStreamResults(db, dbName, p
             return config;
         })();
 
-        jsTestLog(`Testing filter ${tojsononeline(matchExpr)} with ${tojsononeline(actualCsConfig)}`);
+        jsTestLog(
+            `Testing filter ${tojsononeline(matchExpr)} with ${tojsononeline(actualCsConfig)}`,
+        );
 
         // Extract all results from each of the pipelines.
         const nonOptimizedOutput = getAllChangeStreamEvents(
@@ -173,7 +187,10 @@ export function compareOptimizedAndNonOptimizedChangeStreamResults(db, dbName, p
         for (let i = 0; i < nonOptimizedOutput.length; ++i) {
             try {
                 assert(i < optimizedOutput.length);
-                if (optimizedOutput[i].hasOwnProperty("wallTime") && nonOptimizedOutput[i].hasOwnProperty("wallTime")) {
+                if (
+                    optimizedOutput[i].hasOwnProperty("wallTime") &&
+                    nonOptimizedOutput[i].hasOwnProperty("wallTime")
+                ) {
                     optimizedOutput[i].wallTime = nonOptimizedOutput[i].wallTime;
                 }
                 assert(friendlyEqual(optimizedOutput[i], nonOptimizedOutput[i]));

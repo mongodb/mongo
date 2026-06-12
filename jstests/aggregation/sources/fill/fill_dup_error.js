@@ -34,5 +34,9 @@ const testCases = [
 
 for (let i = 0; i < testCases.length; i++) {
     const result = coll.aggregate(testCases[i][0]).toArray();
-    assertArrayEq({actual: result, expected: testCases[i][1], extraErrorMsg: " during testCase " + i});
+    assertArrayEq({
+        actual: result,
+        expected: testCases[i][1],
+        extraErrorMsg: " during testCase " + i,
+    });
 }

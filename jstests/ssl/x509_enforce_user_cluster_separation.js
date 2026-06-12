@@ -8,7 +8,8 @@ const CLIENT_CERT = getX509Path("client.pem");
 const CA_CERT = getX509Path("ca.pem");
 
 const SERVER_USER = "CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
-const SERVER_SAN_USER = "CN=Kernel Client Peer Role,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+const SERVER_SAN_USER =
+    "CN=Kernel Client Peer Role,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 
 function authAndTest(cert, user) {
@@ -21,8 +22,14 @@ function authAndTest(cert, user) {
         !external.auth({user: INVALID_USER, mechanism: "MONGODB-X509"}),
         "authentication with invalid user should fail",
     );
-    assert(external.auth({user: user, mechanism: "MONGODB-X509"}), "authentication with valid user failed");
-    assert(external.auth({mechanism: "MONGODB-X509"}), "authentication with valid cert and no user field failed");
+    assert(
+        external.auth({user: user, mechanism: "MONGODB-X509"}),
+        "authentication with valid user failed",
+    );
+    assert(
+        external.auth({mechanism: "MONGODB-X509"}),
+        "authentication with valid cert and no user field failed",
+    );
     assert(
         external.runCommand({authenticate: 1, mechanism: "MONGODB-X509", user: user}).ok,
         "runCommand authentication with valid cert and user field failed",
@@ -35,7 +42,11 @@ function authAndTest(cert, user) {
     test.foo.findOne();
 
     // Check that we can add a user and read data.
-    test.createUser({user: "test", pwd: "test", roles: [{"role": "readWriteAnyDatabase", "db": "admin"}]});
+    test.createUser({
+        user: "test",
+        pwd: "test",
+        roles: [{"role": "readWriteAnyDatabase", "db": "admin"}],
+    });
     test.foo.findOne();
 
     // Reads are not allowed after logout.
@@ -94,9 +105,14 @@ const x509_options = {
     tlsCAFile: CA_CERT,
 };
 
-const mongodOptions = Object.merge(x509_options, {auth: "", setParameter: {enforceUserClusterSeparation: false}});
+const mongodOptions = Object.merge(x509_options, {
+    auth: "",
+    setParameter: {enforceUserClusterSeparation: false},
+});
 
-const mongosOptions = Object.merge(x509_options, {setParameter: {enforceUserClusterSeparation: false}});
+const mongosOptions = Object.merge(x509_options, {
+    setParameter: {enforceUserClusterSeparation: false},
+});
 
 function runMongodTest(desc, func) {
     print(desc);
@@ -185,9 +201,13 @@ runMongodTest("1c. Testing x.509 auth to mongod with a cluster user/cert", funct
     runSubShell(conn, SERVER_SAN_CERT, SERVER_SAN_USER, authAndTest);
 });
 
-runMongodFailTest('1d. Testing x.509 cluster auth on mongod with "x509" option', {clusterAuthMode: "x509"});
+runMongodFailTest('1d. Testing x.509 cluster auth on mongod with "x509" option', {
+    clusterAuthMode: "x509",
+});
 
-runMongodFailTest('1e. Testing x.509 cluster auth on mongod with "sendX509" option', {clusterAuthMode: "sendX509"});
+runMongodFailTest('1e. Testing x.509 cluster auth on mongod with "sendX509" option', {
+    clusterAuthMode: "sendX509",
+});
 
 runMongodFailTest('1e. Testing x.509 cluster auth on mongod with "sendKeyFile" option', {
     clusterAuthMode: "sendKeyFile",
@@ -216,7 +236,9 @@ runMongosFailTest('2d. Testing x.509 cluster auth on mongos with "x509" option',
     clusterAuthMode: "x509",
 });
 
-runMongosFailTest('2e. Testing x.509 cluster auth on mongos with "sendX509" option', {clusterAuthMode: "sendX509"});
+runMongosFailTest('2e. Testing x.509 cluster auth on mongos with "sendX509" option', {
+    clusterAuthMode: "sendX509",
+});
 
 runMongosFailTest('2f. Testing x.509 cluster auth on mongos with "sendKeyFile" option', {
     clusterAuthMode: "sendKeyFile",

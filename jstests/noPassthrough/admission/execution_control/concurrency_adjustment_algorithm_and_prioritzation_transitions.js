@@ -30,14 +30,32 @@ describe("Execution control concurrency adjustment algorithm", function () {
     /**
      * Helper to check for the presence of specific warning log messages.
      */
-    function assertWarningLogs(mongod, logId, readParamName, writeParamName, expectedCount, warningType) {
+    function assertWarningLogs(
+        mongod,
+        logId,
+        readParamName,
+        writeParamName,
+        expectedCount,
+        warningType,
+    ) {
         assert.soon(
-            () => checkLog.checkContainsWithCountJson(mongod, logId, {"serverParameter": readParamName}, expectedCount),
+            () =>
+                checkLog.checkContainsWithCountJson(
+                    mongod,
+                    logId,
+                    {"serverParameter": readParamName},
+                    expectedCount,
+                ),
             `Expected ${expectedCount} ${warningType} warning(s) for ${readParamName} not found`,
         );
         assert.soon(
             () =>
-                checkLog.checkContainsWithCountJson(mongod, logId, {"serverParameter": writeParamName}, expectedCount),
+                checkLog.checkContainsWithCountJson(
+                    mongod,
+                    logId,
+                    {"serverParameter": writeParamName},
+                    expectedCount,
+                ),
             `Expected ${expectedCount} ${warningType} warning(s) for ${writeParamName} not found`,
         );
     }
@@ -104,7 +122,10 @@ describe("Execution control concurrency adjustment algorithm", function () {
             replTest.initiate();
             const mongod = replTest.getPrimary();
 
-            assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true, expectPrioritizationWarnings: true});
+            assertTicketSizing(mongod, {
+                expectDynamicAdjustmentWarnings: true,
+                expectPrioritizationWarnings: true,
+            });
         });
 
         it("should allow ticket resizing when using the fixed concurrency adjustment algorithm", function () {
@@ -112,7 +133,8 @@ describe("Execution control concurrency adjustment algorithm", function () {
                 nodes: 1,
                 nodeOptions: {
                     setParameter: {
-                        executionControlConcurrencyAdjustmentAlgorithm: kFixedConcurrentTransactionsAlgorithm,
+                        executionControlConcurrencyAdjustmentAlgorithm:
+                            kFixedConcurrentTransactionsAlgorithm,
                     },
                 },
             });
@@ -191,7 +213,8 @@ describe("Execution control concurrency adjustment algorithm", function () {
                     nodes: 1,
                     nodeOptions: {
                         setParameter: {
-                            executionControlConcurrencyAdjustmentAlgorithm: kFixedConcurrentTransactionsAlgorithm,
+                            executionControlConcurrencyAdjustmentAlgorithm:
+                                kFixedConcurrentTransactionsAlgorithm,
                         },
                     },
                 });
@@ -269,7 +292,8 @@ describe("Execution control concurrency adjustment algorithm", function () {
                     nodes: 1,
                     nodeOptions: {
                         setParameter: {
-                            executionControlConcurrencyAdjustmentAlgorithm: kThroughputProbingAlgorithm,
+                            executionControlConcurrencyAdjustmentAlgorithm:
+                                kThroughputProbingAlgorithm,
                         },
                     },
                 });
@@ -288,7 +312,10 @@ describe("Execution control concurrency adjustment algorithm", function () {
             });
 
             it("should allow transitions to other algorithms and enabling/disabling prioritization", function () {
-                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true, expectPrioritizationWarnings: true});
+                assertTicketSizing(mongod, {
+                    expectDynamicAdjustmentWarnings: true,
+                    expectPrioritizationWarnings: true,
+                });
 
                 setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
                 assertTicketSizing(mongod, {expectPrioritizationWarnings: true});
@@ -330,7 +357,10 @@ describe("Execution control concurrency adjustment algorithm", function () {
             setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
 
             const res = assert.commandWorked(
-                mongod.adminCommand({getParameter: 1, executionControlConcurrentReadTransactions: 1}),
+                mongod.adminCommand({
+                    getParameter: 1,
+                    executionControlConcurrentReadTransactions: 1,
+                }),
             );
             assert.eq(
                 customTicketCount,
@@ -362,7 +392,12 @@ describe("Execution control concurrency adjustment algorithm", function () {
 
         it("should preserve throughput probing parameter values across algorithm changes", function () {
             const customRatio = 0.75;
-            assert.commandWorked(mongod.adminCommand({setParameter: 1, throughputProbingReadWriteRatio: customRatio}));
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    throughputProbingReadWriteRatio: customRatio,
+                }),
+            );
 
             setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
             setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);

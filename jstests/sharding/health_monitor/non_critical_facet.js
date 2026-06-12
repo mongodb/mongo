@@ -26,7 +26,9 @@ let st = new ShardingTest({
     shards: 1,
 });
 
-assert.commandWorked(st.s0.adminCommand({"setParameter": 1, activeFaultDurationSecs: ACTIVE_FAULT_DURATION_SECS}));
+assert.commandWorked(
+    st.s0.adminCommand({"setParameter": 1, activeFaultDurationSecs: ACTIVE_FAULT_DURATION_SECS}),
+);
 
 let result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;
 assert.eq(result.state, "Ok");

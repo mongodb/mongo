@@ -26,7 +26,9 @@ const testColl = testDB.getCollection(collName);
 const foreignColl = testDB.getCollection(foreignCollName);
 
 // Ensure primary shard is shard1 so we only set the correct mongot to have history.
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.name}),
+);
 
 assert.commandWorked(testColl.insert({_id: 1, shardKey: 0, x: "ow"}));
 assert.commandWorked(testColl.insert({_id: 2, shardKey: 0, x: "now", y: "lorem"}));
@@ -71,7 +73,11 @@ const searchCmd = {
 mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
 let cursor = testColl.aggregate(
-    [{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}, {$out: foreignColl.getName()}],
+    [
+        {$search: searchQuery},
+        {$project: {_id: 1, meta: "$$SEARCH_META"}},
+        {$out: foreignColl.getName()},
+    ],
     {cursor: {}},
 );
 

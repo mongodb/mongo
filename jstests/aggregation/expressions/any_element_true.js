@@ -29,7 +29,9 @@ function testOp(expression, expected) {
 }
 
 function assertThrows(expression) {
-    const error = assert.throws(() => coll.aggregate([{$project: {_id: 0, result: expression}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {_id: 0, result: expression}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, 5159200);
 }
 

@@ -51,7 +51,11 @@ describe("Execution control deprioritization mechanisms", function () {
             db = primary.getDB(jsTestName());
             coll = db.coll;
 
-            insertTestDocuments(coll, kNumDocs, {payloadSize: 256, includeRandomString: true, randomStringLength: 100});
+            insertTestDocuments(coll, kNumDocs, {
+                payloadSize: 256,
+                includeRandomString: true,
+                randomStringLength: 100,
+            });
 
             assert.commandWorked(coll.createIndex({payload: 1}));
             assert.commandWorked(coll.createIndex({randomStr: 1}));
@@ -341,7 +345,9 @@ describe("Execution control deprioritization mechanisms", function () {
         }
 
         function enableTTLMonitor(enabled) {
-            assert.commandWorked(primary.adminCommand({setParameter: 1, ttlMonitorEnabled: enabled}));
+            assert.commandWorked(
+                primary.adminCommand({setParameter: 1, ttlMonitorEnabled: enabled}),
+            );
         }
 
         it("should use low priority for TTL deletions when deprioritization is enabled", function () {
@@ -401,7 +407,9 @@ describe("Execution control deprioritization mechanisms", function () {
             coll = st.s.getDB(dbName).coll;
             ns = coll.getFullName();
 
-            assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
             insertTestDocuments(coll, kNumDocs, {
@@ -438,7 +446,9 @@ describe("Execution control deprioritization mechanisms", function () {
         });
 
         it("should use normal priority for range deletions when deprioritization is disabled", function () {
-            assert.commandWorked(recipient.adminCommand({setParameter: 1, disableResumableRangeDeleter: true}));
+            assert.commandWorked(
+                recipient.adminCommand({setParameter: 1, disableResumableRangeDeleter: true}),
+            );
 
             assert.commandWorked(
                 st.s.adminCommand({
@@ -454,7 +464,9 @@ describe("Execution control deprioritization mechanisms", function () {
 
             const recipientBefore = getLowPriorityWriteCount(recipient);
 
-            assert.commandWorked(recipient.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}));
+            assert.commandWorked(
+                recipient.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}),
+            );
 
             const recipientDB = recipient.getDB(dbName);
             assert.soon(

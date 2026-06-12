@@ -69,7 +69,10 @@ assert.sameMembers(
         .aggregate([
             {$group: {_id: "$x", numOccurrences: {$sum: 1}}},
             {
-                $setWindowFields: {sortBy: {"numOccurrences.missing": 1}, output: {rank: {$rank: {}}}},
+                $setWindowFields: {
+                    sortBy: {"numOccurrences.missing": 1},
+                    output: {rank: {$rank: {}}},
+                },
             },
             {$project: {_id: 1, numOccurrences: 1, rank: 1}},
         ])

@@ -66,7 +66,10 @@ assert(kKilledByDropErrorCodes.includes(error.code), tojson(error));
 // rename.
 const droppedMsg = "collection dropped";
 const renamedMsg = "collection renamed";
-assert(-1 !== error.message.indexOf(droppedMsg) || -1 !== error.message.indexOf(renamedMsg), error.message);
+assert(
+    -1 !== error.message.indexOf(droppedMsg) || -1 !== error.message.indexOf(renamedMsg),
+    error.message,
+);
 
 // Test that dropping an index between a find and a getMore has no effect on the query if the
 // query is not using the index.
@@ -91,8 +94,9 @@ assert.neq(-1, error.message.indexOf("index 'x_1' dropped"), error.message);
 
 setupCollection();
 // Use the find command so that we can extract the cursor id to pass to the killCursors command.
-let cursorId = assert.commandWorked(testDB.runCommand({find: coll.getName(), filter: {}, batchSize: batchSize})).cursor
-    .id;
+let cursorId = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {}, batchSize: batchSize}),
+).cursor.id;
 assert.commandWorked(testDB.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));
 assert.commandFailedWithCode(
     testDB.runCommand({getMore: cursorId, collection: coll.getName()}),

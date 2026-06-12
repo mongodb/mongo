@@ -48,4 +48,6 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
     return res;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/retry_writes_at_least_once.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/retry_writes_at_least_once.js",
+);

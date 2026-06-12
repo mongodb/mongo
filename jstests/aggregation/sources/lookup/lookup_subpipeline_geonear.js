@@ -33,4 +33,6 @@ let pipeline = [
     },
 ];
 
-assert.eq(coll.aggregate(pipeline).toArray(), [{"_id": 4, "x": 4, "c": [{"_id": 1, "geo": [0, 0], "distance": 0}]}]);
+assert.eq(coll.aggregate(pipeline).toArray(), [
+    {"_id": 4, "x": 4, "c": [{"_id": 1, "geo": [0, 0], "distance": 0}]},
+]);

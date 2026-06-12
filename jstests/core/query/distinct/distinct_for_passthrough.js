@@ -183,7 +183,11 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: {b: [1, 2, 3]}}));
     assert.commandWorked(coll.insert({a: {b: [2, 3, 4]}}));
 
-    testCmd({distinct: coll.getName(), key: "a.b", query: {"a.b": 3}}, [1, 2, 3, 4], [{"a.b": 1}, {$natural: 1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "a.b", query: {"a.b": 3}},
+        [1, 2, 3, 4],
+        [{"a.b": 1}, {$natural: 1}],
+    );
 
     // Test a distinct which can use a multikey index, where the field being distinct'ed is not
     // multikey.
@@ -193,10 +197,18 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: 8, b: [3, 4]}));
     assert.commandWorked(coll.insert({a: 7, b: [4, 5]}));
 
-    testCmd({distinct: coll.getName(), key: "a", query: {a: {$gte: 2}}}, [7, 8], [{a: 1, b: 1}, {$natural: -1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "a", query: {a: {$gte: 2}}},
+        [7, 8],
+        [{a: 1, b: 1}, {$natural: -1}],
+    );
 
     // Test distinct over a trailing multikey field.
-    testCmd({distinct: coll.getName(), key: "b", query: {a: {$gte: 2}}}, [3, 4, 5], [{a: 1, b: 1}, {$natural: 1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "b", query: {a: {$gte: 2}}},
+        [3, 4, 5],
+        [{a: 1, b: 1}, {$natural: 1}],
+    );
 
     // Test distinct over a trailing non-multikey field, where the leading field is multikey.
     assert(coll.drop());
@@ -205,7 +217,11 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: [3, 4], b: 8}));
     assert.commandWorked(coll.insert({a: [3, 5], b: 7}));
 
-    testCmd({distinct: coll.getName(), key: "b", query: {a: 3}}, [1, 7, 8], [{a: 1, b: 1}, {$natural: 1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "b", query: {a: 3}},
+        [1, 7, 8],
+        [{a: 1, b: 1}, {$natural: 1}],
+    );
 
     // Test distinct over a trailing non-multikey dotted path where the leading field is multikey.
     assert(coll.drop());
@@ -214,7 +230,11 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: [3, 4], b: {c: 8}}));
     assert.commandWorked(coll.insert({a: [3, 5], b: {c: 7}}));
 
-    testCmd({distinct: coll.getName(), key: "b.c", query: {a: 3}}, [1, 7, 8], [{a: 1, "b.c": 1}, {$natural: 1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "b.c", query: {a: 3}},
+        [1, 7, 8],
+        [{a: 1, "b.c": 1}, {$natural: 1}],
+    );
 }
 
 assert(coll.drop());
@@ -259,7 +279,11 @@ assert(coll.drop());
     // testCmd({distinct: coll.getName(), key: "a.b.c"}, [1, 2, 3, 4, 5, 6, null, undefined],
     // [{"a.b.c": 1}]);
 
-    testCmd({distinct: coll.getName(), key: "a.b.c", query: {"a.b.c": 4}}, [4, 5, 6], [{"a.b.c": 1}, {$natural: 1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "a.b.c", query: {"a.b.c": 4}},
+        [4, 5, 6],
+        [{"a.b.c": 1}, {$natural: 1}],
+    );
 
     // Index where last component of path is multikey.
     assert.commandWorked(coll.createIndex({"a.b": 1}));
@@ -292,5 +316,7 @@ assert(coll.drop());
     // Will not attempt the equivalent query with aggregation, since $group by "a.b.0" will
     // only treat '0' as a field name (not array index).
     testCmd({distinct: coll.getName(), key: "a.b.0"}, [{c: 4}, "hello world"]);
-    testCmd({distinct: coll.getName(), key: "a.b.0", query: {"a.b.0": {$type: "object"}}}, [{c: 4}]);
+    testCmd({distinct: coll.getName(), key: "a.b.0", query: {"a.b.0": {$type: "object"}}}, [
+        {c: 4},
+    ]);
 }

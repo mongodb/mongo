@@ -8,7 +8,9 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-assert.commandWorked(st.s0.adminCommand({enablesharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: dbName, primaryShard: st.shard1.shardName}),
+);
 
 let testDB = st.s0.getDB(dbName);
 let configDB = st.s0.getDB("config");

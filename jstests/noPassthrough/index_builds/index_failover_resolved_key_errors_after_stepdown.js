@@ -48,16 +48,24 @@ const secondaryColl = secondaryDB.getCollection(coll.getName());
 // before the index builder is able to observe the invalid geo document. By comparison,
 // IndexBuildTest.pauseIndexBuilds() stalls the index build in the middle of the collection scan.
 assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "alwaysOn"}),
+    testDB.adminCommand({
+        configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked",
+        mode: "alwaysOn",
+    }),
 );
 // Prevent the index build from scanning on the secondary.
 assert.commandWorked(
-    secondaryDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "alwaysOn"}),
+    secondaryDB.adminCommand({
+        configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked",
+        mode: "alwaysOn",
+    }),
 );
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1, b: 1});
 
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {
+    includeBuildUUIDs: true,
+});
 
 // Step down the primary.
 const stepDown = startParallelShell(() => {
@@ -85,9 +93,14 @@ assert.commandWorked(newPrimaryColl.update({_id: 0}, {a: 1, b: 1}));
 
 // Unblock the index build on both nodes so they can finish.
 assert.commandWorked(
-    secondaryDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "off"}),
+    secondaryDB.adminCommand({
+        configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked",
+        mode: "off",
+    }),
 );
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "off"}),
+);
 
 // A new index should be present on the old primary after processing the commitIndexBuild oplog
 // entry from the new primary.

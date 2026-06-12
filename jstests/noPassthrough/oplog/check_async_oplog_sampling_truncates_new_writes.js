@@ -115,7 +115,9 @@ checkLog.containsJson(restartedPrimary, 8423403); // Log ID for startup finished
 
 // Resume oplog truncate marker creation
 jsTest.log.info("Resuming oplog truncate marker creation.");
-assert.commandWorked(restartedPrimary.adminCommand({configureFailPoint: "hangDuringOplogSampling", mode: "off"}));
+assert.commandWorked(
+    restartedPrimary.adminCommand({configureFailPoint: "hangDuringOplogSampling", mode: "off"}),
+);
 
 // Verify truncate markers are created and logged
 checkLog.containsJson(restartedPrimary, 22382); // Log ID: Oplog truncate markers calculated
@@ -149,7 +151,9 @@ assert.soon(() => {
         if (e.code !== ErrorCodes.CappedPositionLost) {
             throw e;
         }
-        print(`Failed to fully iterate over collection due to conflict with oplog cap maintainer, retrying`);
+        print(
+            `Failed to fully iterate over collection due to conflict with oplog cap maintainer, retrying`,
+        );
         return false;
     }
 });

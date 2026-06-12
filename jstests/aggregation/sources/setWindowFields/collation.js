@@ -21,7 +21,9 @@ let results = coll
             {
                 $setWindowFields: {
                     sortBy: {valStr: -1},
-                    output: {arr: {$push: "$valStr", window: {documents: ["unbounded", "unbounded"]}}},
+                    output: {
+                        arr: {$push: "$valStr", window: {documents: ["unbounded", "unbounded"]}},
+                    },
                 },
             },
         ],

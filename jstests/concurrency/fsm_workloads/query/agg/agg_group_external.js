@@ -38,9 +38,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.query = function query(db, collName) {
         let otherCollName = this.getOutputCollPrefix(collName) + this.tid;
-        let cursor = db[collName].aggregate([{$group: {_id: "$randInt", count: {$sum: 1}}}, {$out: otherCollName}], {
-            allowDiskUse: true,
-        });
+        let cursor = db[collName].aggregate(
+            [{$group: {_id: "$randInt", count: {$sum: 1}}}, {$out: otherCollName}],
+            {
+                allowDiskUse: true,
+            },
+        );
         assert.eq(0, cursor.itcount());
         // sum the .count fields in the output coll
         let sum = db[otherCollName]

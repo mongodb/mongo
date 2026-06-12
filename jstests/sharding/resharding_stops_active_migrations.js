@@ -32,7 +32,9 @@ for (let i = 0; i < 10; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+);
 
 jsTest.log("Configure failpoints.");
 

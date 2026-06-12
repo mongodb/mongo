@@ -67,7 +67,9 @@ function prepareForSearch() {
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(1), history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(1), history: history}),
+    );
 }
 prepareForSearch();
 

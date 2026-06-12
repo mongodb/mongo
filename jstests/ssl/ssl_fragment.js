@@ -38,8 +38,12 @@ let mongosOptions = {
 if (_isWindows()) {
     // Force the ASIO stack to do small reads which will excerise the schannel buffering code
     // and significantly slow down the test
-    options = Object.extend(options, {setParameter: {"failpoint.smallTLSReads": "{'mode':'alwaysOn'}"}});
-    mongosOptions = Object.extend(mongosOptions, {setParameter: {"failpoint.smallTLSReads": "{'mode':'alwaysOn'}"}});
+    options = Object.extend(options, {
+        setParameter: {"failpoint.smallTLSReads": "{'mode':'alwaysOn'}"},
+    });
+    mongosOptions = Object.extend(mongosOptions, {
+        setParameter: {"failpoint.smallTLSReads": "{'mode':'alwaysOn'}"},
+    });
 }
 
 const mongod = MongoRunner.runMongod(options);

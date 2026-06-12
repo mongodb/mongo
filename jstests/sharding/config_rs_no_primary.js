@@ -41,10 +41,11 @@ if (TestData.configShard) {
     // Ensure that the surviving node has up-to-date filtering metadata to keep serving reads on the tested namespace.
     assert.eq(
         1,
-        st.s
-            .getDB("test")
-            .runCommand({find: "foo", $readPreference: {mode: "secondary"}, readConcern: {"level": "local"}}).cursor
-            .firstBatch.length,
+        st.s.getDB("test").runCommand({
+            find: "foo",
+            $readPreference: {mode: "secondary"},
+            readConcern: {"level": "local"},
+        }).cursor.firstBatch.length,
     );
 }
 
@@ -56,7 +57,9 @@ let mongos2 = MongoRunner.runMongos({configdb: st.configRS.getURL()});
 assert.neq(null, mongos2);
 
 let testOps = function (mongos) {
-    jsTestLog("Doing ops that don't require metadata writes and thus should succeed against: " + mongos);
+    jsTestLog(
+        "Doing ops that don't require metadata writes and thus should succeed against: " + mongos,
+    );
     if (TestData.configShard) {
         // In config shard mode there's also only one shard node up with no primary, so just verify
         // we can still do ops on a secondary that don't require metadata.

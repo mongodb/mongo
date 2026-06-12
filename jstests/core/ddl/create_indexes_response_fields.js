@@ -27,7 +27,10 @@ function checkResponse(res, coll, checkFunc) {
     }
 
     // On sharded clusters, check the 'raw' field for each shard.
-    assert(res.hasOwnProperty("raw"), "Expected 'raw' field in createIndexes response: " + tojson(res));
+    assert(
+        res.hasOwnProperty("raw"),
+        "Expected 'raw' field in createIndexes response: " + tojson(res),
+    );
 
     for (const shardField in res.raw) {
         checkFunc(res.raw[shardField]);
@@ -41,12 +44,15 @@ function checkResponse(res, coll, checkFunc) {
 
 // Database does not exist
 const collDbNotExist = dbTest.create_indexes_no_db;
-let res = assert.commandWorked(collDbNotExist.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}]}));
+let res = assert.commandWorked(
+    collDbNotExist.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}]}),
+);
 checkResponse(res, collDbNotExist, (res) => {
     assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
     assert.isnull(
         res.note,
-        "createIndexes.note should not be present in results when adding a new index: " + tojson(res),
+        "createIndexes.note should not be present in results when adding a new index: " +
+            tojson(res),
     );
 });
 
@@ -57,7 +63,8 @@ checkResponse(res, t, (res) => {
     assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
     assert.isnull(
         res.note,
-        "createIndexes.note should not be present in results when adding a new index: " + tojson(res),
+        "createIndexes.note should not be present in results when adding a new index: " +
+            tojson(res),
     );
 });
 
@@ -67,9 +74,14 @@ checkResponse(res, t, (res) => {
     assert.eq(
         res.numIndexesBefore,
         res.numIndexesAfter,
-        "numIndexesAfter missing from createIndexes result when adding a duplicate index: " + tojson(res),
+        "numIndexesAfter missing from createIndexes result when adding a duplicate index: " +
+            tojson(res),
     );
-    assert(res.note, "createIndexes.note should be present in results when adding a duplicate index: " + tojson(res));
+    assert(
+        res.note,
+        "createIndexes.note should be present in results when adding a duplicate index: " +
+            tojson(res),
+    );
 });
 
 res = t.runCommand("createIndexes", {
@@ -94,7 +106,8 @@ checkResponse(res, t, (res) => {
     assert.eq(res.numIndexesAfter, res.numIndexesBefore + 2);
     assert.isnull(
         res.note,
-        "createIndexes.note should not be present in results when adding new indexes: " + tojson(res),
+        "createIndexes.note should not be present in results when adding new indexes: " +
+            tojson(res),
     );
 });
 
@@ -111,7 +124,12 @@ checkResponse(res, t, (res) => {
     assert.eq(
         res.numIndexesBefore,
         res.numIndexesAfter,
-        "numIndexesAfter missing from createIndexes result when adding duplicate indexes: " + tojson(res),
+        "numIndexesAfter missing from createIndexes result when adding duplicate indexes: " +
+            tojson(res),
     );
-    assert(res.note, "createIndexes.note should be present in results when adding a duplicate index: " + tojson(res));
+    assert(
+        res.note,
+        "createIndexes.note should be present in results when adding a duplicate index: " +
+            tojson(res),
+    );
 });

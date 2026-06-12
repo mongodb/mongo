@@ -33,7 +33,8 @@ let databasesFound = false;
 for (let c of userDBlist) {
     assert(
         !c.hasOwnProperty("info") || !c.info.hasOwnProperty("configDebugDump"),
-        "Found the configDebugDump field for the listCollection entry on a non-config db. Entry : " + tojson(c),
+        "Found the configDebugDump field for the listCollection entry on a non-config db. Entry : " +
+            tojson(c),
     );
 
     if (c.name == dummyCollectionName) {
@@ -78,11 +79,13 @@ databasesFound = false;
 for (let c of configList) {
     assert(
         c.hasOwnProperty("info"),
-        "Missing the info entry field for a listCollection entry on the config db. Entry : " + tojson(c),
+        "Missing the info entry field for a listCollection entry on the config db. Entry : " +
+            tojson(c),
     );
     assert(
         c.info.hasOwnProperty("configDebugDump"),
-        "Missing the configDebugDump field for the listCollection entry on the config db. Entry : " + tojson(c),
+        "Missing the configDebugDump field for the listCollection entry on the config db. Entry : " +
+            tojson(c),
     );
     assert.eq("boolean", typeof c.info.configDebugDump);
 

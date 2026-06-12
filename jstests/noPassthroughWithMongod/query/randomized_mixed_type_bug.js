@@ -68,7 +68,11 @@ let testMixedTypeQuerying = () => {
                     );
                     return true;
                 } catch (e) {
-                    printjson({info: "test failed", error: e, scenario: [docs, val, pathArray, compare]});
+                    printjson({
+                        info: "test failed",
+                        error: e,
+                        scenario: [docs, val, pathArray, compare],
+                    });
                     return false;
                 }
             },

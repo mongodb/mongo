@@ -23,7 +23,9 @@ function runTest(isOrderedWrite) {
     // Setup
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
 
     const timestamp = ISODate("2025-01-01T12:00:00Z");
@@ -64,7 +66,10 @@ function runTest(isOrderedWrite) {
 
     // This insert is not insertable, due to the 3x inflation of metric size + large meta,
     // this measurement is too large for bucket update and bucket insert.
-    assert.commandFailedWithCode(coll.insert(measurement2, {ordered: isOrderedWrite}), ErrorCodes.BSONObjectTooLarge);
+    assert.commandFailedWithCode(
+        coll.insert(measurement2, {ordered: isOrderedWrite}),
+        ErrorCodes.BSONObjectTooLarge,
+    );
 
     stats = coll.stats().timeseries;
     assert.eq(2, stats.numBucketInserts, tojson(stats));

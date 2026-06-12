@@ -59,7 +59,12 @@ function writeStarted(opType) {
         return false;
     }
     return result.inprog.some((op) => {
-        return op.active && op.ns === testColl.getFullName() && op.op === opType && op.writeConflicts > 0;
+        return (
+            op.active &&
+            op.ns === testColl.getFullName() &&
+            op.op === opType &&
+            op.writeConflicts > 0
+        );
     });
 }
 
@@ -102,7 +107,8 @@ function TWriteFirst(txnOp, nonTxnOp, nonTxnOpType, expectedDocs, initOp) {
             assert.commandWorked(sessionColl.runCommand(txnOp));
 
             jsTestLog("Doing conflicting single document write in separate thread.");
-            const writeConflictsBefore = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            const writeConflictsBefore =
+                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
             let thread = new Thread(singleDocWrite, dbName, collName, nonTxnOp);
             thread.start();
 
@@ -117,7 +123,8 @@ function TWriteFirst(txnOp, nonTxnOp, nonTxnOpType, expectedDocs, initOp) {
             assert.commandWorked(thread.returnData());
 
             // Validate that a write conflict was detected
-            const writeConflictsAfter = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            const writeConflictsAfter =
+                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
             validateWriteConflictsBeforeAndAfter(writeConflictsBefore, writeConflictsAfter);
         },
         () => {
@@ -157,11 +164,20 @@ function TWriteSecond(txnOp, nonTxnOp, expectedDocs, initOp) {
             assert.commandWorked(testColl.runCommand(nonTxnOp));
 
             jsTestLog("Executing a conflicting document Op inside the multi-document transaction.");
-            const writeConflictsBefore = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            const writeConflictsBefore =
+                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
             assert.commandFailedWithCode(sessionColl.runCommand(txnOp), ErrorCodes.WriteConflict);
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
-            const writeConflictsAfter = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
-            validateWriteConflictsBeforeAndAfter(writeConflictsBefore, writeConflictsAfter, true /*exact*/);
+            assert.commandFailedWithCode(
+                session.commitTransaction_forTesting(),
+                ErrorCodes.NoSuchTransaction,
+            );
+            const writeConflictsAfter =
+                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            validateWriteConflictsBeforeAndAfter(
+                writeConflictsBefore,
+                writeConflictsAfter,
+                true /*exact*/,
+            );
         },
         () => {
             session.abortTransaction_forTesting();

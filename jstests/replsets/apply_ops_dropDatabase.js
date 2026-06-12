@@ -30,7 +30,9 @@ const dropDatabaseOp = {
 
 // Verify that dropDatabase is only supported if it's the only op entry.
 assert.commandFailedWithCode(
-    primaryDB.adminCommand({applyOps: [{op: "c", ns: cmdNss, o: {create: "collection"}}, dropDatabaseOp]}),
+    primaryDB.adminCommand({
+        applyOps: [{op: "c", ns: cmdNss, o: {create: "collection"}}, dropDatabaseOp],
+    }),
     6275900,
 );
 
@@ -49,7 +51,9 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
     );
 
     assert.commandFailedWithCode(
-        primaryDB.adminCommand({applyOps: [createApplyOpsOplogEntry([createApplyOpsOplogEntry([dropDatabaseOp])])]}),
+        primaryDB.adminCommand({
+            applyOps: [createApplyOpsOplogEntry([createApplyOpsOplogEntry([dropDatabaseOp])])],
+        }),
         9585500,
     );
 

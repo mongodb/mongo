@@ -24,7 +24,9 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         testDb = st.s.getDB(dbName);
 
         // Pin the coordinator to shard0 by making it the primary shard.
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
         assert.commandWorked(
             testDb.createCollection(collName, {
                 validator: validator,
@@ -56,19 +58,31 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
             }),
             12370902,
         );
-        assert(res.errmsg.includes("Cannot upgrade validationLevel to 'constraint'"), "expected scan-based error", {
+        assert(
+            res.errmsg.includes("Cannot upgrade validationLevel to 'constraint'"),
+            "expected scan-based error",
+            {
+                res,
+            },
+        );
+        assert(res.errmsg.includes("db." + collName + ".find("), "expected find-query suggestion", {
             res,
         });
-        assert(res.errmsg.includes("db." + collName + ".find("), "expected find-query suggestion", {res});
 
         assert.commandWorked(testDb[collName].deleteOne({_id: 2}));
     });
 
     it("allows upgrade when all documents conform", function () {
         assert.commandWorked(
-            testDb.runCommand({collMod: collName, validationLevel: "strict", validationAction: "warn"}),
+            testDb.runCommand({
+                collMod: collName,
+                validationLevel: "strict",
+                validationAction: "warn",
+            }),
         );
-        assert.commandWorked(testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
+        assert.commandWorked(
+            testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+        );
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,
@@ -81,7 +95,10 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         assert.commandWorked(testDb[collName].insert({_id: 3, a: 1}));
 
         // After upgrade, non-compliant inserts are rejected.
-        assert.commandFailedWithCode(testDb[collName].insert({_id: 4, b: 1}), ErrorCodes.DocumentValidationFailure);
+        assert.commandFailedWithCode(
+            testDb[collName].insert({_id: 4, b: 1}),
+            ErrorCodes.DocumentValidationFailure,
+        );
     });
 
     it("blocks upgrade when a document on the coordinator shard violates the validator", function () {
@@ -106,7 +123,9 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         );
 
         assert.commandWorked(testDb[collName].deleteOne({_id: -2}));
-        assert.commandWorked(testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
+        assert.commandWorked(
+            testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+        );
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,

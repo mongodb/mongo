@@ -76,7 +76,10 @@ fp.off();
 const collUUID = bucketsColl.getUUID();
 
 // A root user should not be able to applyOps an internal-only oplog entry.
-assert.commandFailedWithCode(testDB.adminCommand(makeUpgradeDowngradeCmd(true, collUUID)), ErrorCodes.Unauthorized);
+assert.commandFailedWithCode(
+    testDB.adminCommand(makeUpgradeDowngradeCmd(true, collUUID)),
+    ErrorCodes.Unauthorized,
+);
 
 adminDB.logout();
 
@@ -88,7 +91,9 @@ rst.asCluster(primary, () => {
 
     // Downgrade: viewless -> viewful via applyOps.
     // First downgrade FCV so the feature flag is disabled (required for downgrade path).
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     assert.commandWorked(testDB.adminCommand(makeUpgradeDowngradeCmd(false, collUUID)));
     assert.neq(null, bucketsColl.exists(), "Expected system.buckets collection after downgrade");
 });

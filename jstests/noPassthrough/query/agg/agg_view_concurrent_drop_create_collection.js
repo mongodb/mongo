@@ -28,7 +28,9 @@ describe("View pipeline should apply when the collections change during aggregat
         const dbName = jsTestName();
         db = mongos.getDB(dbName);
 
-        assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
     });
 
     beforeEach(function () {
@@ -55,7 +57,9 @@ describe("View pipeline should apply when the collections change during aggregat
                 {_id: 3, val: "A", color: "blue", active: false},
             ]),
         );
-        assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {active: 1}}));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {active: 1}}),
+        );
         assert.commandWorked(
             db.adminCommand({
                 moveChunk: shardedColl.getFullName(),
@@ -77,7 +81,12 @@ describe("View pipeline should apply when the collections change during aggregat
                 {_id: 5, val: "A", color: "blue"},
             ]),
         );
-        assert.commandWorked(st.s.adminCommand({shardCollection: shardedCollWithView.getFullName(), key: {color: 1}}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                shardCollection: shardedCollWithView.getFullName(),
+                key: {color: 1},
+            }),
+        );
         assert.commandWorked(
             db.adminCommand({
                 moveChunk: shardedCollWithView.getFullName(),
@@ -88,7 +97,9 @@ describe("View pipeline should apply when the collections change during aggregat
 
         // View on a sharded collection to raise 'CommandOnShardedViewNotSupportedOnMongod'.
         db[viewName].drop();
-        assert.commandWorked(db.createView(viewName, shardedCollWithView.getName(), [{$addFields: {"oldView": 2}}]));
+        assert.commandWorked(
+            db.createView(viewName, shardedCollWithView.getName(), [{$addFields: {"oldView": 2}}]),
+        );
     });
 
     after(function () {

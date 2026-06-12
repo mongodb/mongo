@@ -30,9 +30,13 @@ rst.awaitReplication();
 // index build is registered, but not yet replicated.
 const fp = configureFailPoint(primary, "hangIndexBuildOnSetupBeforeTakingLocks");
 
-const waitForIndexBuildToErrorOut = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, {}, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+const waitForIndexBuildToErrorOut = IndexBuildTest.startIndexBuild(
+    primary,
+    primaryColl.getFullName(),
+    {a: 1},
+    {},
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 
 fp.wait();
 

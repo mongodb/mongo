@@ -36,7 +36,11 @@ function assertIndexesCreated(cmd, numIndexes) {
     if (isShardedNS) {
         cmdResult = cmdResult["raw"][Object.getOwnPropertyNames(cmdResult["raw"])[0]];
     }
-    assert.eq(cmdResult.numIndexesAfter - cmdResult.numIndexesBefore, numIndexes, tojson(cmdResult));
+    assert.eq(
+        cmdResult.numIndexesAfter - cmdResult.numIndexesBefore,
+        numIndexes,
+        tojson(cmdResult),
+    );
 }
 
 /**
@@ -73,12 +77,18 @@ assertIndexNotCreated(() => coll.createIndex({a: 1}, {name: "fr2", collation: {l
 
 // Options can differ on indexes with different collations.
 assertIndexesCreated(() =>
-    coll.createIndex({a: 1}, {name: "fr1_sparse", collation: {locale: "fr", strength: 1}, sparse: true}),
+    coll.createIndex(
+        {a: 1},
+        {name: "fr1_sparse", collation: {locale: "fr", strength: 1}, sparse: true},
+    ),
 );
 
 // The requested index already exists, but with different options, so the command fails.
 assert.commandFailed(
-    coll.createIndex({a: 1}, {name: "fr_expire", collation: {locale: "fr"}, expireAfterSeconds: 3600}),
+    coll.createIndex(
+        {a: 1},
+        {name: "fr_expire", collation: {locale: "fr"}, expireAfterSeconds: 3600},
+    ),
 );
 
 coll.drop();
@@ -104,7 +114,9 @@ assert.commandWorked(db.createCollection(coll.getName()));
 
 // Create multiple indexes with the same key pattern and collation.
 assertIndexesCreated(() => coll.createIndex({a: 1}, {name: "foo", collation: {locale: "en_US"}}));
-assertIndexesCreated(() => coll.createIndex({a: 1}, {name: "bar", collation: {locale: "en_US", strength: 1}}));
+assertIndexesCreated(() =>
+    coll.createIndex({a: 1}, {name: "bar", collation: {locale: "en_US", strength: 1}}),
+);
 
 // Indexes cannot be dropped by an ambiguous key pattern.
 assert.commandFailed(coll.dropIndex({a: 1}));
@@ -126,7 +138,9 @@ assert.commandWorked(coll.insert([{a: "a"}, {a: "A"}, {a: 20}]));
 
 // An ambiguous hint pattern fails.
 assert.throws(() => coll.find({a: 1}).hint({a: 1}).itcount());
-assert.throws(() => coll.find({a: 1}).collation({locale: "en_US", strength: 2}).hint({a: 1}).itcount());
+assert.throws(() =>
+    coll.find({a: 1}).collation({locale: "en_US", strength: 2}).hint({a: 1}).itcount(),
+);
 
 // Index hint by name succeeds.
 assert.eq(coll.find({a: "a"}).hint("sbc").itcount(), 1);

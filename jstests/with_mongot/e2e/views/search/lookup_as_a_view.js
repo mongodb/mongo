@@ -56,7 +56,9 @@ const viewDefinitionWithLookup = [
             localField: "_id", // Field from users collection.
             foreignField: "userId", // Field from totalSocialMediaReactions view.
             as: "socialMediaPostsAboutIdol", // Name of the output array.
-            pipeline: [{$search: {index: "totalReactionsIndex", text: {query: "idol", path: "content"}}}],
+            pipeline: [
+                {$search: {index: "totalReactionsIndex", text: {query: "idol", path: "content"}}},
+            ],
         },
     },
 ];
@@ -81,7 +83,8 @@ const lookupAsAViewTestCases = (isStoredSource) => {
                 {
                     _id: 100,
                     userId: 1,
-                    content: "Behind these hazel eyes is someone who wants to audition for American idol",
+                    content:
+                        "Behind these hazel eyes is someone who wants to audition for American idol",
                     likes: 6,
                     comments: 10,
                     totalReactions: 16,
@@ -113,7 +116,12 @@ const lookupAsAViewTestCases = (isStoredSource) => {
         },
     ];
 
-    validateSearchExplain(usersTotalPostsViewWithMetrics, [], isStoredSource, viewDefinitionWithLookup);
+    validateSearchExplain(
+        usersTotalPostsViewWithMetrics,
+        [],
+        isStoredSource,
+        viewDefinitionWithLookup,
+    );
 
     let results = usersTotalPostsViewWithMetrics.aggregate([]).toArray();
     assertArrayEq({actual: results, expected: expectedResults});
@@ -131,7 +139,8 @@ const lookupAsAViewTestCases = (isStoredSource) => {
                 {
                     _id: 100,
                     userId: 1,
-                    content: "Behind these hazel eyes is someone who wants to audition for American idol",
+                    content:
+                        "Behind these hazel eyes is someone who wants to audition for American idol",
                     likes: 6,
                     comments: 10,
                     totalReactions: 16,
@@ -148,7 +157,12 @@ const lookupAsAViewTestCases = (isStoredSource) => {
         },
     ];
 
-    validateSearchExplain(usersTotalPostsViewWithMetrics, userPipeline, isStoredSource, viewDefinitionWithLookup);
+    validateSearchExplain(
+        usersTotalPostsViewWithMetrics,
+        userPipeline,
+        isStoredSource,
+        viewDefinitionWithLookup,
+    );
 
     results = usersTotalPostsViewWithMetrics.aggregate(userPipeline).toArray();
     assertArrayEq({actual: results, expected: expectedResults});

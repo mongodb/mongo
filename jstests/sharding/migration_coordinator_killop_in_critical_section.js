@@ -28,7 +28,9 @@ const recipientShard = st.shard1;
 const numDocs = 1000;
 const middle = numDocs / 2;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}),
+);
 
 function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     const [collName, ns] = getNewNs(dbName);
@@ -36,8 +38,12 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: middle}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: donorShard.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: middle}, to: donorShard.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: donorShard.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: middle}, to: donorShard.shardName}),
+    );
 
     // Insert some docs into the collection.
     let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
@@ -55,7 +61,9 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     const awaitResult = startParallelShell(
         funWithArgs(
             function (ns, toShardName, middle) {
-                let ret = assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: middle}, to: toShardName}));
+                let ret = assert.commandWorked(
+                    db.adminCommand({moveChunk: ns, find: {_id: middle}, to: toShardName}),
+                );
                 jsTest.log("moveChunk res: " + tojson(ret));
             },
             ns,
@@ -106,9 +114,15 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     });
 }
 
-testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible", "RecoverRefreshThread");
+testKillOpAfterFailPoint(
+    "hangInEnsureChunkVersionIsGreaterThanInterruptible",
+    "RecoverRefreshThread",
+);
 testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible", "RecoverRefreshThread");
-testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible", "RecoverRefreshThread");
+testKillOpAfterFailPoint(
+    "hangInDeleteRangeDeletionOnRecipientInterruptible",
+    "RecoverRefreshThread",
+);
 testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible", "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible", "RecoverRefreshThread");
 

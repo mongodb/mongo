@@ -34,7 +34,10 @@ const coll = db[collName];
 function assertExpireAfterSeconds(coll, indexName, expectedExpireAfterSeconds) {
     const indexes = coll.aggregate({$listCatalog: {}}).toArray()[0].md.indexes;
     const index = indexes.find((index) => index.spec.name === indexName);
-    assert(index, `Expected to find index with ${indexName} in the catalog. Found catalog indexes: ${tojson(index)}`);
+    assert(
+        index,
+        `Expected to find index with ${indexName} in the catalog. Found catalog indexes: ${tojson(index)}`,
+    );
     const actualExpireAfterSeconds = index.spec.expireAfterSeconds;
     assert.eq(
         expectedExpireAfterSeconds,
@@ -91,7 +94,9 @@ function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireA
     // Ensure the non-int value is stored in the catalog for both the primary and the secondaries.
     assertExpireAfterSecondsAcrossNodes("t_1", nonIntVal);
 
-    assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {t: 1}, expireAfterSeconds: intVal}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {keyPattern: {t: 1}, expireAfterSeconds: intVal}}),
+    );
     assertExpireAfterSecondsAcrossNodes("t_1", intVal);
 
     assert.commandWorked(coll.dropIndex("t_1"));

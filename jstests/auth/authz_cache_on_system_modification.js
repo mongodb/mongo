@@ -19,7 +19,10 @@ db.auth("root", "pwd");
 
 // creates a unique role, a user who has that role, and a collection upon which they can exercise
 // that role
-assert.commandWorked(db.createCollection("admin.test", {}), "Could not create test collection in admin db");
+assert.commandWorked(
+    db.createCollection("admin.test", {}),
+    "Could not create test collection in admin db",
+);
 assert.commandWorked(
     db.runCommand({
         createRole: "writeCustom",

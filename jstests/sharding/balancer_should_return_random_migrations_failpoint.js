@@ -26,7 +26,9 @@ let st = new ShardingTest({
                 "balancerMigrationsThrottlingMs": 0,
             },
         },
-        rsOptions: {setParameter: {"failpoint.balancerShouldReturnRandomMigrations": "{mode: 'alwaysOn'}"}},
+        rsOptions: {
+            setParameter: {"failpoint.balancerShouldReturnRandomMigrations": "{mode: 'alwaysOn'}"},
+        },
     },
 });
 
@@ -58,7 +60,9 @@ const isReshardingForTimeseriesEnabled = FeatureFlagUtil.isPresentAndEnabled(
         // TODO (SERVER-84744): Remove check for feature flag
         if (isReshardingForTimeseriesEnabled) {
             // Create timeseries collection
-            assert.commandWorked(db.createCollection("timeseries", {timeseries: {timeField: timeFieldName}}));
+            assert.commandWorked(
+                db.createCollection("timeseries", {timeseries: {timeField: timeFieldName}}),
+            );
         }
 
         // Create view

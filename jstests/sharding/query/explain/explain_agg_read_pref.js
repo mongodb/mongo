@@ -30,7 +30,9 @@ const config = mongos.getDB("config");
 const mongosDB = mongos.getDB("agg_explain_readPref");
 assert.commandWorked(mongosDB.dropDatabase());
 
-assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    config.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const coll = mongosDB.getCollection("coll");
 const rs0Primary = st.rs0.getPrimary();
@@ -149,7 +151,9 @@ confirmReadPreference(rs0Primary.getDB(mongosDB.getName()), rs0Secondary.getDB(m
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
-assert.commandWorked(mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}),
+);
 
 // Sharded tests are run against the non-primary shard for the "agg_explain_readPref" db.
 confirmReadPreference(rs1Primary.getDB(mongosDB.getName()), rs1Secondary.getDB(mongosDB.getName()));

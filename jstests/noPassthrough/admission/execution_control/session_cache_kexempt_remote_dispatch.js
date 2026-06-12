@@ -84,9 +84,14 @@ describe("Secondary session cache remote dispatch uses kExempt admission priorit
         // Confirm the session is actually in the secondary's cache before we proceed.
         // If this is zero the refresh would be a no-op and the test proves nothing.
         const cacheStats = secondary.getDB("admin").serverStatus().logicalSessionRecordCache;
-        assert.gte(cacheStats.activeSessionsCount, 1, "expected at least one session in the secondary's cache", {
-            cacheStats,
-        });
+        assert.gte(
+            cacheStats.activeSessionsCount,
+            1,
+            "expected at least one session in the secondary's cache",
+            {
+                cacheStats,
+            },
+        );
 
         // Snapshot the session collection size so we can verify a write was forwarded.
         const sessionDocsBefore = primary.getDB("config").system.sessions.countDocuments({});
@@ -96,14 +101,18 @@ describe("Secondary session cache remote dispatch uses kExempt admission priorit
         ).executionControlConcurrentWriteTransactions;
 
         // Block all non-exempt writes on the primary.
-        assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}));
+        assert.commandWorked(
+            primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}),
+        );
 
         try {
             // The session upsert forwarded from the secondary to the primary must carry
             // kExempt admission priority so it bypasses the ticket queue and returns.
             // Without kExempt this hangs: the primary queues the write waiting for a
             // ticket that is never granted, and the secondary blocks on the response.
-            assert.commandWorked(secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+            assert.commandWorked(
+                secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+            );
         } finally {
             assert.commandWorked(
                 primary.adminCommand({
@@ -133,28 +142,41 @@ describe("Secondary session cache remote dispatch uses kExempt admission priorit
     it("should complete session delete on secondary even when primary write tickets are zero", function () {
         // Create a session and immediately refresh it so a document exists in
         // config.system.sessions to delete.
-        const startRes = assert.commandWorked(secondary.getDB("admin").runCommand({startSession: 1}));
-        assert.commandWorked(secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+        const startRes = assert.commandWorked(
+            secondary.getDB("admin").runCommand({startSession: 1}),
+        );
+        assert.commandWorked(
+            secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+        );
 
         // Explicitly end the session.  This populates the secondary's _endingSessions so
         // that the next refresh calls removeRecords with a non-empty delete batch.
         assert.commandWorked(secondary.getDB("admin").runCommand({endSessions: [startRes.id]}));
 
         const sessionDocsBefore = primary.getDB("config").system.sessions.countDocuments({});
-        assert.gte(sessionDocsBefore, 1, "expected at least one session document to exist before delete", {
+        assert.gte(
             sessionDocsBefore,
-        });
+            1,
+            "expected at least one session document to exist before delete",
+            {
+                sessionDocsBefore,
+            },
+        );
 
         const origWriteTickets = assert.commandWorked(
             primary.adminCommand({getParameter: 1, executionControlConcurrentWriteTransactions: 1}),
         ).executionControlConcurrentWriteTransactions;
 
-        assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}));
+        assert.commandWorked(
+            primary.adminCommand({setParameter: 1, executionControlConcurrentWriteTransactions: 0}),
+        );
 
         try {
             // The delete forwarded from the secondary to the primary must be kExempt so it
             // bypasses the ticket queue.  Without kExempt this hangs indefinitely.
-            assert.commandWorked(secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+            assert.commandWorked(
+                secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+            );
         } finally {
             assert.commandWorked(
                 primary.adminCommand({
@@ -185,7 +207,9 @@ describe("Secondary session cache remote dispatch uses kExempt admission priorit
         // Seed two sessions so config.system.sessions has at least two documents.
         assert.commandWorked(secondary.getDB("admin").runCommand({startSession: 1}));
         assert.commandWorked(secondary.getDB("admin").runCommand({startSession: 1}));
-        assert.commandWorked(secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+        assert.commandWorked(
+            secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+        );
 
         // Open a cursor on config.system.sessions within a shell session.  With batchSize(1)
         // and 2+ docs, one document remains after the initial batch so the server keeps the
@@ -193,26 +217,39 @@ describe("Secondary session cache remote dispatch uses kExempt admission priorit
         // will appear in getOpenCursorSessions, causing findRemovedSessions to send a find
         // to the primary.
         const cursorSession = secondary.startSession();
-        const cursor = cursorSession.getDatabase("config").getCollection("system.sessions").find({}).batchSize(1);
+        const cursor = cursorSession
+            .getDatabase("config")
+            .getCollection("system.sessions")
+            .find({})
+            .batchSize(1);
         assert(cursor.hasNext(), "expected at least one session document so the cursor stays open");
 
         // Verify the cursor is registered as open on the secondary.
         const openCursorsBefore = secondary.getDB("admin").serverStatus().metrics.cursor.open.total;
-        assert.gte(openCursorsBefore, 1, "expected an open server-side cursor so findRemovedSessions has work to do", {
+        assert.gte(
             openCursorsBefore,
-        });
+            1,
+            "expected an open server-side cursor so findRemovedSessions has work to do",
+            {
+                openCursorsBefore,
+            },
+        );
 
         const origReadTickets = assert.commandWorked(
             primary.adminCommand({getParameter: 1, executionControlConcurrentReadTransactions: 1}),
         ).executionControlConcurrentReadTransactions;
 
-        assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlConcurrentReadTransactions: 0}));
+        assert.commandWorked(
+            primary.adminCommand({setParameter: 1, executionControlConcurrentReadTransactions: 0}),
+        );
 
         try {
             // findRemovedSessions forwards a find to the primary to check which open-cursor
             // sessions are no longer in config.system.sessions.  The find must be kExempt
             // to bypass the read ticket queue.  Without kExempt this hangs indefinitely.
-            assert.commandWorked(secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+            assert.commandWorked(
+                secondary.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+            );
         } finally {
             assert.commandWorked(
                 primary.adminCommand({

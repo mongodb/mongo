@@ -56,7 +56,9 @@ assert.eq(3, testColl.findOne({x: 1}).y);
 assert.eq(1, testColl.findOne({x: 2}).y);
 
 // Test that $where rejects a system.js script of type CodeWithScope.
-assert.commandWorked(systemJsColl.insert({_id: "code_with_scope", value: Code("function(){return 1;}", {})}));
+assert.commandWorked(
+    systemJsColl.insert({_id: "code_with_scope", value: Code("function(){return 1;}", {})}),
+);
 
 assert.commandFailedWithCode(
     testDB.runCommand({find: testColl.getName(), filter: {$where: "code_with_scope(this.x)"}}),

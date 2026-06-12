@@ -26,7 +26,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     if (timeseries) {
         assert.commandWorked(
             testDB.createCollection(collName, {
-                timeseries: {timeField: "timestamp", bucketMaxSpanSeconds: 1, bucketRoundingSeconds: 1},
+                timeseries: {
+                    timeField: "timestamp",
+                    bucketMaxSpanSeconds: 1,
+                    bucketRoundingSeconds: 1,
+                },
             }),
         );
     }
@@ -34,7 +38,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     if (isMongos) {
         assert.commandWorked(testDB.adminCommand({"enableSharding": dbName}));
 
-        assert.commandWorked(testDB.adminCommand({shardCollection: namespace, key: {timestamp: 1}}));
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: namespace, key: {timestamp: 1}}),
+        );
     }
 
     const coll = testDB[collName];

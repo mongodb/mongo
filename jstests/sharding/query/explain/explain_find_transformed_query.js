@@ -47,7 +47,9 @@ const findCmd = {
     limit: 2,
 };
 assert.commandWorked(db.runCommand(findCmd));
-const explain = assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
+const explain = assert.commandWorked(
+    db.runCommand({explain: findCmd, verbosity: "executionStats"}),
+);
 
 // Assert that the plan cache shape hash from the explain is the same as the one in the plan cache.
 const planCacheKey = getPlanCacheKeyFromExplain(explain);
@@ -56,18 +58,27 @@ const planCacheEntry = coll
     .toArray()
     .at(0);
 assert.neq(planCacheEntry, undefined);
-assert.eq(getPlanCacheShapeHashFromObject(planCacheEntry), getPlanCacheShapeHashFromExplain(explain));
+assert.eq(
+    getPlanCacheShapeHashFromObject(planCacheEntry),
+    getPlanCacheShapeHashFromExplain(explain),
+);
 
 // Assert that the top stage of the winning plan in the explain is the same as the top stage
 // in the executed cached plan.
 const engine = getEngine(explain);
 switch (engine) {
     case "classic": {
-        assert.eq(getWinningPlanFromExplain(explain, false /*isSBEPlan*/).stage, planCacheEntry.cachedPlan.stage);
+        assert.eq(
+            getWinningPlanFromExplain(explain, false /*isSBEPlan*/).stage,
+            planCacheEntry.cachedPlan.stage,
+        );
         break;
     }
     case "sbe": {
-        assert.eq(getWinningPlanFromExplain(explain, false /*isSBEPlan*/).stage, planCacheEntry.cachedPlan.stage);
+        assert.eq(
+            getWinningPlanFromExplain(explain, false /*isSBEPlan*/).stage,
+            planCacheEntry.cachedPlan.stage,
+        );
         break;
     }
     default: {

@@ -13,7 +13,10 @@ coll.drop();
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
-const wildcardIndexes = [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}}];
+const wildcardIndexes = [
+    {keyPattern: {"$**": 1}},
+    {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}},
+];
 
 for (const indexSpec of wildcardIndexes) {
     coll.drop();
@@ -49,5 +52,7 @@ for (const indexSpec of wildcardIndexes) {
     ]);
 
     // $** index matches empty array nested within an array.
-    assertArrayEq(coll.find({"b": []}, {_id: 0}).hint(indexSpec.keyPattern).toArray(), [{a: 2, b: [[]], c: 1, d: 4}]);
+    assertArrayEq(coll.find({"b": []}, {_id: 0}).hint(indexSpec.keyPattern).toArray(), [
+        {a: 2, b: [[]], c: 1, d: 4},
+    ]);
 }

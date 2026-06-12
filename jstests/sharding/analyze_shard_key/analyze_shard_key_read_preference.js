@@ -103,7 +103,10 @@ function assertReadPreferenceBasedOnProfiling(
 
     const configAggregateProfilerDocs = node
         .getDB("config")
-        .system.profile.find({"command.aggregate": "analyzeShardKeySplitPoints", "ts": {$gte: startTime}})
+        .system.profile.find({
+            "command.aggregate": "analyzeShardKeySplitPoints",
+            "ts": {$gte: startTime},
+        })
         .toArray();
     for (let doc of configAggregateProfilerDocs) {
         assert.eq(0, bsonWoCompare(doc.command.$readPreference, expectedReadPref), {
@@ -115,7 +118,9 @@ function assertReadPreferenceBasedOnProfiling(
 }
 
 {
-    jsTest.log(`Test the analyzeShardKey command respects the readPreference specified by the client`);
+    jsTest.log(
+        `Test the analyzeShardKey command respects the readPreference specified by the client`,
+    );
     const {dbName, collName} = setUpCollection();
     const ns = dbName + "." + collName;
     // Used to identify the commands performed by the analyzeShardKey command in this test case.
@@ -190,7 +195,9 @@ function assertReadPreferenceBasedOnProfiling(
 }
 
 {
-    jsTest.log(`Test the analyzeShardKey command uses readPreference "secondaryPreferred" by default`);
+    jsTest.log(
+        `Test the analyzeShardKey command uses readPreference "secondaryPreferred" by default`,
+    );
     const {dbName, collName} = setUpCollection();
     const ns = dbName + "." + collName;
     // Used to identify the commands performed by the analyzeShardKey command in this test case.

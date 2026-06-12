@@ -8,7 +8,11 @@
  *   requires_fcv_80
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator,
+} from "jstests/libs/bulk_write_utils.js";
 
 let coll = db.getCollection("coll");
 let coll1 = db.getCollection("coll1");
@@ -24,9 +28,19 @@ let res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
-assert(res.cursor.id == 0, "Unexpectedly found non-zero cursor ID in bulkWrite command response: " + tojson(res));
+assert(
+    res.cursor.id == 0,
+    "Unexpectedly found non-zero cursor ID in bulkWrite command response: " + tojson(res),
+);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 
 assert.eq(coll.find().itcount(), 1);
@@ -46,9 +60,19 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
-assert(res.cursor.id == 0, "Unexpectedly found non-zero cursor ID in bulkWrite command response: " + tojson(res));
+assert(
+    res.cursor.id == 0,
+    "Unexpectedly found non-zero cursor ID in bulkWrite command response: " + tojson(res),
+);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, n: 1, idx: 1});
 
@@ -69,7 +93,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res, "bulkWrite command response: " + tojson(res));
 cursorSizeValidator(res, 0);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 assert(res.cursor.id == 0, "bulkWrite command response: " + tojson(res));
 assert(!res.cursor.firstBatch[0], "bulkWrite command response: " + tojson(res));

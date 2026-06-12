@@ -62,7 +62,10 @@ TimeseriesTest.run((insert) => {
     //   --CLUSTERED_IDXSCAN
 
     const filter = {
-        $or: [{time: {$lte: new Date(datePrefix + 100)}}, {$and: [{x: {$lt: 3}}, {x: {$in: [1, 2, 4]}}]}],
+        $or: [
+            {time: {$lte: new Date(datePrefix + 100)}},
+            {$and: [{x: {$lt: 3}}, {x: {$in: [1, 2, 4]}}]},
+        ],
     };
 
     const testcases = [
@@ -81,7 +84,10 @@ TimeseriesTest.run((insert) => {
             expected: [{time: new Date(datePrefix + 100)}, {time: new Date(datePrefix + 450)}],
         },
         {
-            pipeline: [{$match: filter}, {$group: {_id: null, count: {$sum: NumberInt(1)}, x: {$max: "$x"}}}],
+            pipeline: [
+                {$match: filter},
+                {$group: {_id: null, count: {$sum: NumberInt(1)}, x: {$max: "$x"}}},
+            ],
             expected: [{_id: null, count: NumberInt(2), x: 1}],
         },
         {
@@ -95,6 +101,9 @@ TimeseriesTest.run((insert) => {
         const pipeline = testcase.pipeline;
         const expected = testcase.expected;
 
-        assert.eq(coll.aggregate(pipeline).toArray().sort(compareResultEntries), expected.sort(compareResultEntries));
+        assert.eq(
+            coll.aggregate(pipeline).toArray().sort(compareResultEntries),
+            expected.sort(compareResultEntries),
+        );
     }
 });

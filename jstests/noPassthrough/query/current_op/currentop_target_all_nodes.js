@@ -25,6 +25,10 @@ const targetAllNodesFalse = runCurrentOpAgg(false);
 assert.eq(shardCount, targetAllNodesFalse.itcount(), tojson(targetAllNodesFalse));
 
 const targetAllNodesTrue = runCurrentOpAgg(true);
-assert.eq(shardCount * rsNodesPerShardCount, targetAllNodesTrue.itcount(), tojson(targetAllNodesTrue));
+assert.eq(
+    shardCount * rsNodesPerShardCount,
+    targetAllNodesTrue.itcount(),
+    tojson(targetAllNodesTrue),
+);
 
 st.stop();

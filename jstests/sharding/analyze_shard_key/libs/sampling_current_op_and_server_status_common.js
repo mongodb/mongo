@@ -5,14 +5,19 @@
 export function getCurrentOpAndServerStatusMongos(conn) {
     const currentOp = conn
         .getDB("admin")
-        .aggregate([{$currentOp: {allUsers: true, localOps: true}}, {$match: {desc: "query analyzer"}}])
+        .aggregate([
+            {$currentOp: {allUsers: true, localOps: true}},
+            {$match: {desc: "query analyzer"}},
+        ])
         .toArray();
     const serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1})).queryAnalyzers;
     return {currentOp, serverStatus};
 }
 
 export function getCurrentOpAndServerStatusMongod(conn) {
-    const currentOp = assert.commandWorked(conn.adminCommand({currentOp: true, desc: "query analyzer"})).inprog;
+    const currentOp = assert.commandWorked(
+        conn.adminCommand({currentOp: true, desc: "query analyzer"}),
+    ).inprog;
     const serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1})).queryAnalyzers;
     return {currentOp, serverStatus};
 }
@@ -99,7 +104,13 @@ export const opKindNoop = 2;
  * just executed the operation 'opKind' and its currentOp and serverStatus prior to that are as
  * attached in 'oldState'.
  */
-export function assertCurrentOpAndServerStatusMongos(ns, opKind, oldState, newState, {expectedSamplesPerSecond} = {}) {
+export function assertCurrentOpAndServerStatusMongos(
+    ns,
+    opKind,
+    oldState,
+    newState,
+    {expectedSamplesPerSecond} = {},
+) {
     const errMsg = {opKind, oldState, newState};
 
     validateCurrentOpMongos(newState.currentOp[0]);
@@ -116,35 +127,83 @@ export function assertCurrentOpAndServerStatusMongos(ns, opKind, oldState, newSt
     }
 
     validateServerStatusMongos(newState.serverStatus);
-    assert.eq(newState.serverStatus.activeCollections, oldState.serverStatus.activeCollections, errMsg);
-    assert.eq(newState.serverStatus.totalCollections, oldState.serverStatus.totalCollections, errMsg);
+    assert.eq(
+        newState.serverStatus.activeCollections,
+        oldState.serverStatus.activeCollections,
+        errMsg,
+    );
+    assert.eq(
+        newState.serverStatus.totalCollections,
+        oldState.serverStatus.totalCollections,
+        errMsg,
+    );
 
     if (opKind === opKindRead) {
-        assert.eq(newState.currentOp[0].sampledReadsCount, oldState.currentOp[0].sampledReadsCount + 1, errMsg);
-        assert.eq(newState.currentOp[0].sampledWritesCount, oldState.currentOp[0].sampledWritesCount, errMsg);
+        assert.eq(
+            newState.currentOp[0].sampledReadsCount,
+            oldState.currentOp[0].sampledReadsCount + 1,
+            errMsg,
+        );
+        assert.eq(
+            newState.currentOp[0].sampledWritesCount,
+            oldState.currentOp[0].sampledWritesCount,
+            errMsg,
+        );
 
         assert.eq(
             newState.serverStatus.totalSampledReadsCount,
             oldState.serverStatus.totalSampledReadsCount + 1,
             errMsg,
         );
-        assert.eq(newState.serverStatus.totalSampledWritesCount, oldState.serverStatus.totalSampledWritesCount, errMsg);
+        assert.eq(
+            newState.serverStatus.totalSampledWritesCount,
+            oldState.serverStatus.totalSampledWritesCount,
+            errMsg,
+        );
     } else if (opKind === opKindWrite) {
-        assert.eq(newState.currentOp[0].sampledReadsCount, oldState.currentOp[0].sampledReadsCount, errMsg);
-        assert.eq(newState.currentOp[0].sampledWritesCount, oldState.currentOp[0].sampledWritesCount + 1, errMsg);
+        assert.eq(
+            newState.currentOp[0].sampledReadsCount,
+            oldState.currentOp[0].sampledReadsCount,
+            errMsg,
+        );
+        assert.eq(
+            newState.currentOp[0].sampledWritesCount,
+            oldState.currentOp[0].sampledWritesCount + 1,
+            errMsg,
+        );
 
-        assert.eq(newState.serverStatus.totalSampledReadsCount, oldState.serverStatus.totalSampledReadsCount, errMsg);
+        assert.eq(
+            newState.serverStatus.totalSampledReadsCount,
+            oldState.serverStatus.totalSampledReadsCount,
+            errMsg,
+        );
         assert.eq(
             newState.serverStatus.totalSampledWritesCount,
             oldState.serverStatus.totalSampledWritesCount + 1,
             errMsg,
         );
     } else if (opKind === opKindNoop) {
-        assert.eq(newState.currentOp[0].sampledReadsCount, oldState.currentOp[0].sampledReadsCount, errMsg);
-        assert.eq(newState.currentOp[0].sampledWritesCount, oldState.currentOp[0].sampledWritesCount, errMsg);
+        assert.eq(
+            newState.currentOp[0].sampledReadsCount,
+            oldState.currentOp[0].sampledReadsCount,
+            errMsg,
+        );
+        assert.eq(
+            newState.currentOp[0].sampledWritesCount,
+            oldState.currentOp[0].sampledWritesCount,
+            errMsg,
+        );
 
-        assert.eq(newState.serverStatus.totalSampledReadsCount, oldState.serverStatus.totalSampledReadsCount, errMsg);
-        assert.eq(newState.serverStatus.totalSampledWritesCount, oldState.serverStatus.totalSampledWritesCount, errMsg);
+        assert.eq(
+            newState.serverStatus.totalSampledReadsCount,
+            oldState.serverStatus.totalSampledReadsCount,
+            errMsg,
+        );
+        assert.eq(
+            newState.serverStatus.totalSampledWritesCount,
+            oldState.serverStatus.totalSampledWritesCount,
+            errMsg,
+        );
     } else {
         throw new Error("Unknown operation kind " + opKind);
     }
@@ -165,42 +224,100 @@ export function assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newSt
     assert.eq(newState.currentOp[0].ns, ns, errMsg);
 
     validateServerStatusMongod(newState.serverStatus);
-    assert.eq(newState.serverStatus.activeCollections, oldState.serverStatus.activeCollections, errMsg);
-    assert.eq(newState.serverStatus.totalCollections, oldState.serverStatus.totalCollections, errMsg);
+    assert.eq(
+        newState.serverStatus.activeCollections,
+        oldState.serverStatus.activeCollections,
+        errMsg,
+    );
+    assert.eq(
+        newState.serverStatus.totalCollections,
+        oldState.serverStatus.totalCollections,
+        errMsg,
+    );
 
     if (opKind == opKindRead) {
         // On a mongod, the counters are incremented asynchronously so they might not be up-to-date
         // after the command returns.
-        if (bsonWoCompare(newState.currentOp[0].sampledReadsCount, oldState.currentOp[0].sampledReadsCount) == 0) {
+        if (
+            bsonWoCompare(
+                newState.currentOp[0].sampledReadsCount,
+                oldState.currentOp[0].sampledReadsCount,
+            ) == 0
+        ) {
             return false;
         }
-        assert.eq(newState.currentOp[0].sampledReadsCount, oldState.currentOp[0].sampledReadsCount + 1, errMsg);
-        assert.eq(newState.currentOp[0].sampledWritesCount, oldState.currentOp[0].sampledWritesCount, errMsg);
+        assert.eq(
+            newState.currentOp[0].sampledReadsCount,
+            oldState.currentOp[0].sampledReadsCount + 1,
+            errMsg,
+        );
+        assert.eq(
+            newState.currentOp[0].sampledWritesCount,
+            oldState.currentOp[0].sampledWritesCount,
+            errMsg,
+        );
 
         assert.eq(
             newState.serverStatus.totalSampledReadsCount,
             oldState.serverStatus.totalSampledReadsCount + 1,
             errMsg,
         );
-        assert.eq(newState.serverStatus.totalSampledWritesCount, oldState.serverStatus.totalSampledWritesCount, errMsg);
+        assert.eq(
+            newState.serverStatus.totalSampledWritesCount,
+            oldState.serverStatus.totalSampledWritesCount,
+            errMsg,
+        );
 
         // Instead of figuring out the size of the sampled query document, just make sure that the
         // byte counter is greater than before.
-        assert.gt(newState.currentOp[0].sampledReadsBytes, oldState.currentOp[0].sampledReadsBytes, errMsg);
-        assert.eq(newState.currentOp[0].sampledWritesBytes, oldState.currentOp[0].sampledWritesBytes, errMsg);
+        assert.gt(
+            newState.currentOp[0].sampledReadsBytes,
+            oldState.currentOp[0].sampledReadsBytes,
+            errMsg,
+        );
+        assert.eq(
+            newState.currentOp[0].sampledWritesBytes,
+            oldState.currentOp[0].sampledWritesBytes,
+            errMsg,
+        );
 
-        assert.gt(newState.serverStatus.totalSampledReadsBytes, oldState.serverStatus.totalSampledReadsBytes, errMsg);
-        assert.eq(newState.serverStatus.totalSampledWritesBytes, oldState.serverStatus.totalSampledWritesBytes, errMsg);
+        assert.gt(
+            newState.serverStatus.totalSampledReadsBytes,
+            oldState.serverStatus.totalSampledReadsBytes,
+            errMsg,
+        );
+        assert.eq(
+            newState.serverStatus.totalSampledWritesBytes,
+            oldState.serverStatus.totalSampledWritesBytes,
+            errMsg,
+        );
     } else if (opKind == opKindWrite) {
         // On a mongod, the counters are incremented asynchronously so they might not be up-to-date
         // after the command returns.
-        if (bsonWoCompare(newState.currentOp[0].sampledWritesCount, oldState.currentOp[0].sampledWritesCount) == 0) {
+        if (
+            bsonWoCompare(
+                newState.currentOp[0].sampledWritesCount,
+                oldState.currentOp[0].sampledWritesCount,
+            ) == 0
+        ) {
             return false;
         }
-        assert.eq(newState.currentOp[0].sampledReadsCount, oldState.currentOp[0].sampledReadsCount, errMsg);
-        assert.eq(newState.currentOp[0].sampledWritesCount, oldState.currentOp[0].sampledWritesCount + 1, errMsg);
+        assert.eq(
+            newState.currentOp[0].sampledReadsCount,
+            oldState.currentOp[0].sampledReadsCount,
+            errMsg,
+        );
+        assert.eq(
+            newState.currentOp[0].sampledWritesCount,
+            oldState.currentOp[0].sampledWritesCount + 1,
+            errMsg,
+        );
 
-        assert.eq(newState.serverStatus.totalSampledReadsCount, oldState.serverStatus.totalSampledReadsCount, errMsg);
+        assert.eq(
+            newState.serverStatus.totalSampledReadsCount,
+            oldState.serverStatus.totalSampledReadsCount,
+            errMsg,
+        );
         assert.eq(
             newState.serverStatus.totalSampledWritesCount,
             oldState.serverStatus.totalSampledWritesCount + 1,
@@ -209,11 +326,27 @@ export function assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newSt
 
         // Instead of figuring out the size of the sampled query document, just make sure that the
         // byte counter is greater than before.
-        assert.eq(newState.currentOp[0].sampledReadsBytes, oldState.currentOp[0].sampledReadsBytes, errMsg);
-        assert.gt(newState.currentOp[0].sampledWritesBytes, oldState.currentOp[0].sampledWritesBytes, errMsg);
+        assert.eq(
+            newState.currentOp[0].sampledReadsBytes,
+            oldState.currentOp[0].sampledReadsBytes,
+            errMsg,
+        );
+        assert.gt(
+            newState.currentOp[0].sampledWritesBytes,
+            oldState.currentOp[0].sampledWritesBytes,
+            errMsg,
+        );
 
-        assert.eq(newState.serverStatus.totalSampledReadsBytes, oldState.serverStatus.totalSampledReadsBytes, errMsg);
-        assert.gt(newState.serverStatus.totalSampledWritesBytes, oldState.serverStatus.totalSampledWritesBytes, errMsg);
+        assert.eq(
+            newState.serverStatus.totalSampledReadsBytes,
+            oldState.serverStatus.totalSampledReadsBytes,
+            errMsg,
+        );
+        assert.gt(
+            newState.serverStatus.totalSampledWritesBytes,
+            oldState.serverStatus.totalSampledWritesBytes,
+            errMsg,
+        );
     } else {
         throw new Error("Unknown operation kind " + opKind);
     }

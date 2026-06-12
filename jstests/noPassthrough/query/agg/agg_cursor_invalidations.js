@@ -194,7 +194,10 @@ res = assert.commandWorked(testDB.runCommand(aggregateAndLookupCmdSmallBatch));
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf(".") + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandWorked(res, "expected getMore to succeed despite the foreign collection being dropped");
+assert.commandWorked(
+    res,
+    "expected getMore to succeed despite the foreign collection being dropped",
+);
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
@@ -226,7 +229,10 @@ res = assert.commandWorked(testDB.runCommand(aggregateAndGraphLookupCmdSmallBatc
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf(".") + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandWorked(res, "expected getMore to succeed despite the foreign collection being dropped");
+assert.commandWorked(
+    res,
+    "expected getMore to succeed despite the foreign collection being dropped",
+);
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
@@ -278,8 +284,14 @@ try {
             const runExplainTest = (verbosity, cmd, expectedToFailAtLeast) => {
                 const assertExplainWorked = (res) => {
                     assert.commandWorked(res);
-                    assert.eq(cmd.aggregate, res.command.aggregate, "Unexpected explain response", {cmd, res});
-                    assert.eq(cmd.pipeline, res.command.pipeline, "Unexpected explain response", {cmd, res});
+                    assert.eq(cmd.aggregate, res.command.aggregate, "Unexpected explain response", {
+                        cmd,
+                        res,
+                    });
+                    assert.eq(cmd.pipeline, res.command.pipeline, "Unexpected explain response", {
+                        cmd,
+                        res,
+                    });
                 };
 
                 return runTest(expectedToFailAtLeast, () => {
@@ -301,7 +313,10 @@ try {
                         // leave any cursors open.
                         while (res.cursor && res.cursor.id > 0) {
                             getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf(".") + 1);
-                            res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
+                            res = testDB.runCommand({
+                                getMore: res.cursor.id,
+                                collection: getMoreCollName,
+                            });
                             assert.commandWorked(res);
                         }
                     } catch (err) {
@@ -322,7 +337,10 @@ try {
 
             // Turn off fail point.
             const res = assert.commandWorked(
-                testDB.adminCommand({configureFailPoint: "WTWriteConflictExceptionForReads", mode: "off"}),
+                testDB.adminCommand({
+                    configureFailPoint: "WTWriteConflictExceptionForReads",
+                    mode: "off",
+                }),
             );
 
             assert.gte(
@@ -335,7 +353,10 @@ try {
 } finally {
     // Restore original query framework used.
     assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: originalFrameworkControl}),
+        testDB.adminCommand({
+            setParameter: 1,
+            internalQueryFrameworkControl: originalFrameworkControl,
+        }),
     );
 }
 
@@ -370,7 +391,10 @@ res = assert.commandWorked(
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf(".") + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandWorked(res, "expected getMore to succeed despite the foreign collection being dropped");
+assert.commandWorked(
+    res,
+    "expected getMore to succeed despite the foreign collection being dropped",
+);
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
@@ -398,7 +422,12 @@ foreignCollection.drop();
 const maxCappedSizeBytes = 64 * 1024;
 const maxNumDocs = 10;
 assert.commandWorked(
-    testDB.runCommand({create: sourceCollection.getName(), capped: true, size: maxCappedSizeBytes, max: maxNumDocs}),
+    testDB.runCommand({
+        create: sourceCollection.getName(),
+        capped: true,
+        size: maxCappedSizeBytes,
+        max: maxNumDocs,
+    }),
 );
 // Fill up about half of the collection.
 for (let i = 0; i < maxNumDocs / 2; ++i) {
@@ -424,7 +453,9 @@ setup();
 res = assert.commandWorked(testDB.runCommand(defaultAggregateCmdSmallBatch));
 
 const killCursorsNamespace = res.cursor.ns.substr(res.cursor.ns.indexOf(".") + 1);
-assert.commandWorked(testDB.runCommand({killCursors: killCursorsNamespace, cursors: [res.cursor.id]}));
+assert.commandWorked(
+    testDB.runCommand({killCursors: killCursorsNamespace, cursors: [res.cursor.id]}),
+);
 
 assertNoOpenCursorsOnSourceCollection();
 
@@ -441,7 +472,10 @@ res = assert.commandWorked(testDB.runCommand(defaultAggregateCmdSmallBatch));
 
 // Use a failpoint to cause a getMore to hang indefinitely.
 assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}),
+    testDB.adminCommand({
+        configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
+        mode: "alwaysOn",
+    }),
 );
 const curOpFilter = {
     "command.getMore": res.cursor.id,
@@ -471,7 +505,10 @@ waitForCurOpByFailPointNoNS(testDB, "waitAfterPinningCursorBeforeGetMoreBatch");
 const opId = assert.commandWorked(testDB.currentOp(curOpFilter)).inprog[0].opid;
 assert.commandWorked(testDB.killOp(opId));
 assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "off"}),
+    testDB.adminCommand({
+        configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
+        mode: "off",
+    }),
 );
 assert.eq(0, awaitParallelShell());
 
@@ -495,7 +532,10 @@ const expectedNumTimedOutCursors = serverStatus.metrics.cursor.timedOut + 1;
 assert.commandWorked(testDB.adminCommand({setParameter: 1, cursorTimeoutMillis: 10}));
 const cursorTimeoutFrequencySeconds = 1;
 assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, clientCursorMonitorFrequencySecs: cursorTimeoutFrequencySeconds}),
+    testDB.adminCommand({
+        setParameter: 1,
+        clientCursorMonitorFrequencySecs: cursorTimeoutFrequencySeconds,
+    }),
 );
 assert.soon(
     function () {

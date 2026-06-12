@@ -41,7 +41,9 @@ function testForReplicaSet() {
     let db = rst.getPrimary().getDB(dbName);
 
     // Ensure we are in last LTS FCV (8.0).
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     assert.commandWorked(
         db.runCommand({
@@ -56,7 +58,11 @@ function testForReplicaSet() {
     // Check bits is stored as a non-integer in lastLTS FCV.
     rst.nodes.forEach((node) => {
         const bitsValue = getIndexBits(node);
-        assert.eq(11.6, bitsValue, "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV");
+        assert.eq(
+            11.6,
+            bitsValue,
+            "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV",
+        );
         assert(!Number.isInteger(bitsValue));
     });
 
@@ -67,12 +73,18 @@ function testForReplicaSet() {
     // The upgrade process has not been called yet, so the bits parameter should still be stored as a non-integer.
     rst.nodes.forEach((node) => {
         const bitsValue = getIndexBits(node);
-        assert.eq(11.6, bitsValue, "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV");
+        assert.eq(
+            11.6,
+            bitsValue,
+            "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV",
+        );
         assert(!Number.isInteger(bitsValue));
     });
 
     // Upgrade to latest FCV.
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Ensure changes are replicated to all nodes before asserting.
     rst.awaitReplication();
@@ -94,7 +106,11 @@ function testForReplicaSet() {
     rst.awaitReplication();
     rst.nodes.forEach((node) => {
         const bitsValue = getIndexBits(node, "loc2_2d");
-        assert.eq(9, bitsValue, "Expected bits=9 (integer) to be stored as an integer for index loc2_2d");
+        assert.eq(
+            9,
+            bitsValue,
+            "Expected bits=9 (integer) to be stored as an integer for index loc2_2d",
+        );
         assert(Number.isInteger(bitsValue));
     });
 
@@ -112,12 +128,16 @@ function testForShardedCluster() {
     });
 
     // Ensure we are in last LTS FCV (8.0).
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     let db = st.s.getDB(dbName);
     const fullCollName = dbName + "." + collName;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: fullCollName, key: {x: 1}}));
 
     assert.commandWorked(
@@ -132,7 +152,11 @@ function testForShardedCluster() {
 
     // Check bits is stored as a non-integer in lastLTS FCV.
     st.rs0.nodes.forEach((node) => {
-        assert.eq(11.6, getIndexBits(node), "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV");
+        assert.eq(
+            11.6,
+            getIndexBits(node),
+            "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV",
+        );
     });
 
     // Upgrade all nodes to latest binary version.
@@ -142,12 +166,18 @@ function testForShardedCluster() {
     // The upgrade process has not been called yet, so the bits parameter should still be stored as a non-integer.
     st.rs0.nodes.forEach((node) => {
         const bitsValue = getIndexBits(node);
-        assert.eq(11.6, bitsValue, "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV");
+        assert.eq(
+            11.6,
+            bitsValue,
+            "Expected bits=11.6 (non-integer) to be stored as-is in lastLTS FCV",
+        );
         assert(!Number.isInteger(bitsValue));
     });
 
     // Upgrade to latest FCV.
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Ensure changes are replicated to all nodes before asserting.
     st.rs0.awaitReplication();
@@ -169,7 +199,11 @@ function testForShardedCluster() {
     st.rs0.awaitReplication();
     st.rs0.nodes.forEach((node) => {
         const bitsValue = getIndexBits(node, "loc2_2d");
-        assert.eq(9, bitsValue, "Expected bits=9 (integer) to be stored as an integer for index loc2_2d");
+        assert.eq(
+            9,
+            bitsValue,
+            "Expected bits=9 (integer) to be stored as an integer for index loc2_2d",
+        );
         assert(Number.isInteger(bitsValue));
     });
 

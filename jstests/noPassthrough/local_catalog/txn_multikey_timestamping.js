@@ -32,7 +32,16 @@ const IndexType = Object.freeze({
  * For wildcard indexes, reads the multiKeyPaths from the query planner (explain with atClusterTime),
  * which reflects the actual metadata key entries in the index.
  */
-function getMultikeyMetadata(node, indexType, dbName, collName, indexId, multiPathsKey, wildcardHint, ts) {
+function getMultikeyMetadata(
+    node,
+    indexType,
+    dbName,
+    collName,
+    indexId,
+    multiPathsKey,
+    wildcardHint,
+    ts,
+) {
     if (indexType == IndexType.REGULAR) {
         const catalog = node
             .getDB("admin")
@@ -157,7 +166,12 @@ function walkAndAssertReplicaMultikeyConsistency({
     // Ensure primaries have caught up before walking.
     rst.awaitReplication();
 
-    const latestTs = primary.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).toArray()[0].ts;
+    const latestTs = primary
+        .getDB("local")
+        .oplog.rs.find()
+        .sort({$natural: -1})
+        .limit(1)
+        .toArray()[0].ts;
     jsTestLog("Latest oplog timestamp for " + context + ": " + tojson(latestTs));
 
     let currentTs = latestTs;
@@ -165,7 +179,11 @@ function walkAndAssertReplicaMultikeyConsistency({
 
     while (true) {
         jsTestLog(
-            "Checking replica set multikey consistency at timestamp: " + tojson(currentTs) + " (" + context + ")",
+            "Checking replica set multikey consistency at timestamp: " +
+                tojson(currentTs) +
+                " (" +
+                context +
+                ")",
         );
         const primaryMultikeyMetadata = getMultikeyMetadata(
             primary,
@@ -203,7 +221,10 @@ function walkAndAssertReplicaMultikeyConsistency({
             assert.gte(
                 timestampsWithMultikeyness,
                 expectedMinTimestamps,
-                "Expected at least " + expectedMinTimestamps + " timestamp(s) with multikey metadata for " + context,
+                "Expected at least " +
+                    expectedMinTimestamps +
+                    " timestamp(s) with multikey metadata for " +
+                    context,
             );
             break;
         }

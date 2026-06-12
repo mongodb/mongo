@@ -10,7 +10,9 @@ let st = new ShardingTest({});
 const statsFields = ["numDatabaseEntries", "numCollectionEntries"];
 
 function getCatalogCacheStats() {
-    return assert.commandWorked(st.s.adminCommand({serverStatus: 1}))["shardingStatistics"]["catalogCache"];
+    return assert.commandWorked(st.s.adminCommand({serverStatus: 1}))["shardingStatistics"][
+        "catalogCache"
+    ];
 }
 
 function buildStatsDeltas(dbEntries, collEntries) {

@@ -27,7 +27,9 @@ const st = new ShardingTest({
     },
     // Disable query sampling on mongos to verify that the nested aggregate queries are sampled by
     // the shard that routes them.
-    mongosOptions: {setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})}},
+    mongosOptions: {
+        setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})},
+    },
 });
 
 const dbName = "testDb";
@@ -49,23 +51,44 @@ assert.commandWorked(mongosDB.getCollection(localCollName).insert([{a: 0}]));
 assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 1000}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: st.shard1.shardName}));
-assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 1000}, to: st.shard2.name}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: foreignNs, find: {x: 1000}, to: st.shard2.name}),
+);
 
 // Refresh the routing information for the foreign collection in shard0.
-mongosDB.getCollection(localCollName).aggregate([{$lookup: {from: foreignCollName, pipeline: [], as: "out"}}]);
+mongosDB
+    .getCollection(localCollName)
+    .aggregate([{$lookup: {from: foreignCollName, pipeline: [], as: "out"}}]);
 
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}),
+);
 const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
-QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, foreignNs, foreignCollUUid, {skipMongoses: true});
+QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, foreignNs, foreignCollUUid, {
+    skipMongoses: true,
+});
 
-for (let {name, makeOuterPipelineFunc, requireShardToRouteFunc, supportCustomPipeline} of outerAggTestCases) {
-    const requireShardToRoute = requireShardToRouteFunc(mongosDB, foreignCollName, true /* isShardedColl */);
+for (let {
+    name,
+    makeOuterPipelineFunc,
+    requireShardToRouteFunc,
+    supportCustomPipeline,
+} of outerAggTestCases) {
+    const requireShardToRoute = requireShardToRouteFunc(
+        mongosDB,
+        foreignCollName,
+        true /* isShardedColl */,
+    );
     if (supportCustomPipeline) {
         for (let {makeInnerPipelineFunc, containInitialFilter} of innerAggTestCases) {
             const filter0 = {x: 1, name};
             // If the aggregation doesn't have an initial filter, it would be routed to all shards.
-            const shardNames0 = containInitialFilter ? [st.rs1.name] : [st.rs0.name, st.rs1.name, st.rs2.name];
+            const shardNames0 = containInitialFilter
+                ? [st.rs1.name]
+                : [st.rs0.name, st.rs1.name, st.rs2.name];
             testCustomInnerPipeline(
                 makeOuterPipelineFunc,
                 makeInnerPipelineFunc,

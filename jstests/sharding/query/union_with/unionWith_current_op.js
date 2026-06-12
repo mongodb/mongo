@@ -15,7 +15,9 @@ const shardedColl1 = testDB.shardedColl1;
 const shardedColl2 = testDB.shardedColl2;
 const unshardedColl = testDB.unsharded;
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 function setupShardColl(shardedColl) {
     // Shard shardedColl on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1.
@@ -65,7 +67,12 @@ function runTest({command, expectedRunningOps, collToPause}) {
     // Wait for the parallel shell to hit the failpoint and verify that the 'comment' field is
     // present in $currentOp.
     assert.soon(() => {
-        const results = waitForCurOpByFailPoint(testDB, collToPause.getFullName(), kFailPointName, filter);
+        const results = waitForCurOpByFailPoint(
+            testDB,
+            collToPause.getFullName(),
+            kFailPointName,
+            filter,
+        );
         return results.length == deepestUnion.count;
     });
 
@@ -142,7 +149,10 @@ runTest({
                     coll: unshardedColl.getName(),
                     pipeline: [
                         {
-                            $unionWith: {coll: shardedColl2.getName(), pipeline: [{$group: {_id: "$x"}}]},
+                            $unionWith: {
+                                coll: shardedColl2.getName(),
+                                pipeline: [{$group: {_id: "$x"}}],
+                            },
                         },
                     ],
                 },
@@ -173,7 +183,10 @@ runTest({
                     coll: shardedColl1.getName(),
                     pipeline: [
                         {
-                            $unionWith: {coll: shardedColl2.getName(), pipeline: [{$group: {_id: "$x"}}]},
+                            $unionWith: {
+                                coll: shardedColl2.getName(),
+                                pipeline: [{$group: {_id: "$x"}}],
+                            },
                         },
                     ],
                 },

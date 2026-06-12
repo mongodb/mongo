@@ -71,7 +71,9 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
     }
 }
 
-const coll = assertDropAndRecreateCollection(testDB, "coll", {changeStreamPreAndPostImages: {enabled: true}});
+const coll = assertDropAndRecreateCollection(testDB, "coll", {
+    changeStreamPreAndPostImages: {enabled: true},
+});
 const otherColl = assertDropAndRecreateCollection(testDB, "coll_regular");
 
 // Returns 'timestamp' - 1 increment for Timestamp type value.
@@ -88,8 +90,17 @@ function getPreviousTimestampValue(timestamp) {
 // collection 'coll'.
 function assertDocumentInsertedAtTimestamp(commitTimestamp, insertedDocumentId) {
     const beforeCommitTimestamp = getPreviousTimestampValue(commitTimestamp);
-    assert.eq(0, coll.find({_id: insertedDocumentId}).readConcern("snapshot", beforeCommitTimestamp).itcount());
-    assert.eq(1, coll.find({_id: insertedDocumentId}).readConcern("snapshot", commitTimestamp).itcount());
+    assert.eq(
+        0,
+        coll
+            .find({_id: insertedDocumentId})
+            .readConcern("snapshot", beforeCommitTimestamp)
+            .itcount(),
+    );
+    assert.eq(
+        1,
+        coll.find({_id: insertedDocumentId}).readConcern("snapshot", commitTimestamp).itcount(),
+    );
 }
 
 // Verifies that the change stream pre-image corresponding to a write operation on the document with
@@ -97,7 +108,12 @@ function assertDocumentInsertedAtTimestamp(commitTimestamp, insertedDocumentId) 
 // 'commitTimestamp'.
 function assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, modifiedDocumentId) {
     const preImagesCollection = getPreImagesCollection(testDB.getMongo());
-    assert.eq(1, preImagesCollection.find({"preImage._id": modifiedDocumentId, "_id.ts": commitTimestamp}).itcount());
+    assert.eq(
+        1,
+        preImagesCollection
+            .find({"preImage._id": modifiedDocumentId, "_id.ts": commitTimestamp})
+            .itcount(),
+    );
 }
 
 // Gets collections used in the test for database 'db'. In some passthroughs the collections get
@@ -122,13 +138,17 @@ function getCollections(db) {
     assertPreImagesWrittenForOps(
         testDB,
         function () {
-            const result = TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
-                assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
-                assert.commandWorked(otherColl.updateOne({_id: 1}, {$inc: {a: 1}}));
-                assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
-                assert.commandWorked(coll.deleteOne({_id: 3}));
-                assert.commandWorked(coll.insert({_id: 4}));
-            });
+            const result = TxnUtil.runInTransaction(
+                testDB,
+                getCollections,
+                function (db, {coll, otherColl}) {
+                    assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
+                    assert.commandWorked(otherColl.updateOne({_id: 1}, {$inc: {a: 1}}));
+                    assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
+                    assert.commandWorked(coll.deleteOne({_id: 3}));
+                    assert.commandWorked(coll.insert({_id: 4}));
+                },
+            );
             commitTimestamp = result.operationTime;
         },
         [
@@ -153,16 +173,20 @@ function getCollections(db) {
     assertPreImagesWrittenForOps(
         testDB,
         function () {
-            const result = TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
-                assert.commandWorked(otherColl.insert({b: largeString}));
-                assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
-                // We're expecting a split transaction here.
-                assert.commandWorked(otherColl.insert({b: largeString}));
-                assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
-                assert.commandWorked(coll.deleteOne({_id: 3}));
-                assert.commandWorked(coll.insert({_id: 5}));
-                assert.commandWorked(coll.deleteOne({_id: 10}));
-            });
+            const result = TxnUtil.runInTransaction(
+                testDB,
+                getCollections,
+                function (db, {coll, otherColl}) {
+                    assert.commandWorked(otherColl.insert({b: largeString}));
+                    assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
+                    // We're expecting a split transaction here.
+                    assert.commandWorked(otherColl.insert({b: largeString}));
+                    assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
+                    assert.commandWorked(coll.deleteOne({_id: 3}));
+                    assert.commandWorked(coll.insert({_id: 5}));
+                    assert.commandWorked(coll.deleteOne({_id: 10}));
+                },
+            );
             commitTimestamp = result.operationTime;
         },
         [{_id: 1, a: 2}, {_id: 2, a: 2}, {_id: 3, a: 1}, {_id: 10}],
@@ -214,7 +238,12 @@ function getCollections(db) {
             assert.commandWorked(
                 testDB.runCommand({
                     applyOps: [
-                        {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$v: 2, diff: {u: {a: 2}}}},
+                        {
+                            op: "u",
+                            ns: coll.getFullName(),
+                            o2: {_id: 1},
+                            o: {$v: 2, diff: {u: {a: 2}}},
+                        },
                         {op: "d", ns: coll.getFullName(), o: {_id: 2}},
                     ],
                     allowAtomic: false,

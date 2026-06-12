@@ -43,7 +43,10 @@ function assertWriteError(we, opts) {
     });
 
     for (const fragment of [].concat(errmsgContains)) {
-        assert(we.errmsg.includes(fragment), "expected fragment in errmsg", {fragment, errmsg: we.errmsg});
+        assert(we.errmsg.includes(fragment), "expected fragment in errmsg", {
+            fragment,
+            errmsg: we.errmsg,
+        });
     }
 
     for (const forbidden of [].concat(errmsgForbids)) {
@@ -61,16 +64,24 @@ function assertWriteError(we, opts) {
     }
 
     if (underlyingReasonEndsWith !== undefined) {
-        assert(we.underlyingReason.endsWith(underlyingReasonEndsWith), "underlyingReason should end with marker", {
-            underlyingReason: we.underlyingReason,
-        });
+        assert(
+            we.underlyingReason.endsWith(underlyingReasonEndsWith),
+            "underlyingReason should end with marker",
+            {
+                underlyingReason: we.underlyingReason,
+            },
+        );
     }
 
     if (maxUnderlyingReasonLength !== undefined) {
-        assert(we.underlyingReason.length < maxUnderlyingReasonLength, "underlyingReason over limit", {
-            underlyingReasonLength: we.underlyingReason.length,
-            underlyingReason: we.underlyingReason,
-        });
+        assert(
+            we.underlyingReason.length < maxUnderlyingReasonLength,
+            "underlyingReason over limit",
+            {
+                underlyingReasonLength: we.underlyingReason.length,
+                underlyingReason: we.underlyingReason,
+            },
+        );
     }
 
     if (failingElement !== undefined) {
@@ -86,7 +97,9 @@ describe("Geo key-extraction structured ExtraInfo (insert path)", function () {
     before(function () {
         coll = db[jsTestName()];
         coll.drop();
-        assert.commandWorked(coll.createIndex({"features.geometry": "2dsphere"}, {"2dsphereIndexVersion": 3}));
+        assert.commandWorked(
+            coll.createIndex({"features.geometry": "2dsphere"}, {"2dsphereIndexVersion": 3}),
+        );
     });
 
     it("attaches structured ExtraInfo with bounded errmsg", function () {
@@ -130,9 +143,14 @@ describe("Geo key-extraction structured ExtraInfo (insert path)", function () {
             underlyingReasonEndsWith: "...",
             failingElement: {type: "Polygon"},
         });
-        assert.eq(we.failingElement.coordinates[0].length, 500, "failingElement should carry full coords", {
-            coordLength: we.failingElement.coordinates[0].length,
-        });
+        assert.eq(
+            we.failingElement.coordinates[0].length,
+            500,
+            "failingElement should carry full coords",
+            {
+                coordLength: we.failingElement.coordinates[0].length,
+            },
+        );
     });
 
     it("reports missing 'type' field", function () {

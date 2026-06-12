@@ -35,7 +35,9 @@ const invalidMixedVersionsToCheck = [
 for (let config of invalidMixedVersionsToCheck) {
     jsTest.log("Testing invalid mixed versions: " + tojson(config));
 
-    let err = assert.throws(() => new ShardingTest({shouldFailInit: true, shards: config.shards, other: config.other}));
+    let err = assert.throws(
+        () => new ShardingTest({shouldFailInit: true, shards: config.shards, other: config.other}),
+    );
     assert.eq(
         true,
         formatErrorMsg(err.message, err.extraAttr).includes(

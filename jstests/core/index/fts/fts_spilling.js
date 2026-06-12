@@ -77,7 +77,9 @@ let price = 0;
 for (let word1 of words1) {
     for (let word2 of words2) {
         for (let word3 of words3) {
-            assert.commandWorked(coll.insertOne({desc: word1 + " " + word2 + " " + word3, price: price}));
+            assert.commandWorked(
+                coll.insertOne({desc: word1 + " " + word2 + " " + word3, price: price}),
+            );
             price = (price + 2) % 7;
         }
     }

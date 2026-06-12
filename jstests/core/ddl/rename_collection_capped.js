@@ -27,7 +27,9 @@ db.createCollection("jstests_rename_a", {capped: true, size: 10000});
 for (let i = 0.1; i < 10; ++i) {
     a.save({i: i});
 }
-assert.commandWorked(db.adminCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_b"}));
+assert.commandWorked(
+    db.adminCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_b"}),
+);
 assert.eq(1, b.countDocuments({i: 9.1}));
 printjson(b.stats());
 for (var i = 10.1; i < 1000; ++i) {
@@ -54,7 +56,10 @@ assert.throws(
 
 // Users should not be able to create a collection beginning with '.' through renameCollection.
 // Auth suites throw InvalidNamespace and others throw IllegalOperation error.
-assert.commandFailedWithCode(b.renameCollection(".foo"), [ErrorCodes.InvalidNamespace, ErrorCodes.IllegalOperation]);
+assert.commandFailedWithCode(b.renameCollection(".foo"), [
+    ErrorCodes.InvalidNamespace,
+    ErrorCodes.IllegalOperation,
+]);
 
 db.jstests_rename_d.drop();
 db.jstests_rename_e.drop();
@@ -66,7 +71,9 @@ assert(db.getCollectionNames().indexOf("jstests_rename_d") < 0);
 assert(db.getCollectionNames().indexOf("jstests_rename_e") >= 0);
 assert.eq(db.jstests_rename_e.findOne().a, 222);
 
-assert.commandWorked(db.jstests_rename_e.renameCollection({to: "jstests_rename_d", dropTarget: true}));
+assert.commandWorked(
+    db.jstests_rename_e.renameCollection({to: "jstests_rename_d", dropTarget: true}),
+);
 
 assert(db.getCollectionNames().indexOf("jstests_rename_d") >= 0);
 assert(db.getCollectionNames().indexOf("jstests_rename_e") < 0);

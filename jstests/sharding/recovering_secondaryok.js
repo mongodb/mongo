@@ -11,7 +11,12 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-let shardTest = new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
+let shardTest = new ShardingTest({
+    name: "recovering_secondaryok",
+    shards: 2,
+    mongos: 2,
+    other: {rs: true},
+});
 
 let mongos = shardTest.s0;
 let mongosSOK = shardTest.s1;

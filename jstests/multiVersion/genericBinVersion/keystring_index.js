@@ -128,7 +128,11 @@ let mongodOptionsCurrent = Object.extend({binVersion: "latest"}, defaultOptions)
 jsTestLog("Starting version: last-lts");
 let conn = MongoRunner.runMongod(mongodOptionsLastLTS);
 
-assert.neq(null, conn, "mongod was unable able to start with version " + tojson(mongodOptionsLastLTS));
+assert.neq(
+    null,
+    conn,
+    "mongod was unable able to start with version " + tojson(mongodOptionsLastLTS),
+);
 
 let testDb = conn.getDB("test");
 
@@ -143,7 +147,10 @@ assert.neq(null, conn, "mongod was unable to start with the latest version");
 testDb = conn.getDB("test");
 assert.gt(testDb.getCollectionInfos().length, 0);
 
-jsTestLog("Validating indexes created with a 'last-lts' version binary using a 'latest' version " + "binary");
+jsTestLog(
+    "Validating indexes created with a 'last-lts' version binary using a 'latest' version " +
+        "binary",
+);
 
 // Validate all the indexes.
 assert.commandWorked(validateCollections(testDb, {full: true}));
@@ -154,12 +161,18 @@ populateDb(testDb);
 MongoRunner.stopMongod(conn);
 
 conn = MongoRunner.runMongod(mongodOptionsLastLTS);
-assert.neq(null, conn, "mongod was unable able to start with version " + tojson(mongodOptionsLastLTS));
+assert.neq(
+    null,
+    conn,
+    "mongod was unable able to start with version " + tojson(mongodOptionsLastLTS),
+);
 
 testDb = conn.getDB("test");
 assert.gt(testDb.getCollectionInfos().length, 0);
 
-jsTestLog("Validating indexes created with 'latest' version binary using a 'last-lts' version binary");
+jsTestLog(
+    "Validating indexes created with 'latest' version binary using a 'last-lts' version binary",
+);
 
 assert.commandWorked(validateCollections(testDb, {full: true}));
 MongoRunner.stopMongod(conn);
@@ -176,7 +189,10 @@ function populateDb(testDb) {
 
                 // We only run V2 non-unique for hashed and wildCard because they don't exist in
                 // v1.
-                if ((indexName == "hashed" || indexName == "wildCard") && (unique === true || indexVersion === 1))
+                if (
+                    (indexName == "hashed" || indexName == "wildCard") &&
+                    (unique === true || indexVersion === 1)
+                )
                     return;
 
                 indexName += unique === true ? "Unique" : "NotUnique";
@@ -186,8 +202,14 @@ function populateDb(testDb) {
                 assert.commandWorked(testDb.createCollection(collectionName));
 
                 print(`${indexName}: Inserting Documents`);
-                if (unique) insertDocumentsUnique(testDb[collectionName], kNumDocs, indexOptions.createDoc);
-                else insertDocumentsNotUnique(testDb[collectionName], kNumDocs, indexOptions.createDoc);
+                if (unique)
+                    insertDocumentsUnique(testDb[collectionName], kNumDocs, indexOptions.createDoc);
+                else
+                    insertDocumentsNotUnique(
+                        testDb[collectionName],
+                        kNumDocs,
+                        indexOptions.createDoc,
+                    );
 
                 let extraCreateIndexOptions = {
                     name: indexName,
@@ -196,10 +218,15 @@ function populateDb(testDb) {
                 };
 
                 if ("createIndexOptions" in indexOptions)
-                    extraCreateIndexOptions = Object.extend(extraCreateIndexOptions, indexOptions.createIndexOptions);
+                    extraCreateIndexOptions = Object.extend(
+                        extraCreateIndexOptions,
+                        indexOptions.createIndexOptions,
+                    );
                 print(JSON.stringify(extraCreateIndexOptions));
                 print(`${indexName}: Creating Index`);
-                assert.commandWorked(testDb[collectionName].createIndex(indexOptions.spec, extraCreateIndexOptions));
+                assert.commandWorked(
+                    testDb[collectionName].createIndex(indexOptions.spec, extraCreateIndexOptions),
+                );
 
                 // Assert that the correct index type was created.
                 let indexSpec = getIndexSpecByName(testDb[collectionName], indexName);
@@ -221,7 +248,11 @@ function dropAllUserCollections(testDb) {
 function getIndexSpecByName(coll, indexName) {
     const indexes = coll.getIndexes();
     const indexesFilteredByName = indexes.filter((spec) => spec.name === indexName);
-    assert.eq(1, indexesFilteredByName.length, "index '" + indexName + "' not found: " + tojson(indexes));
+    assert.eq(
+        1,
+        indexesFilteredByName.length,
+        "index '" + indexName + "' not found: " + tojson(indexes),
+    );
     return indexesFilteredByName[0];
 }
 

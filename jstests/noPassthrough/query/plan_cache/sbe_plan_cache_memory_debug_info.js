@@ -25,12 +25,19 @@ function createTestCollection(collectionName) {
 
 function getPlanCacheEntryForQueryShape(coll, queryShape) {
     const planCacheKey = getPlanCacheKeyFromShape({query: queryShape, collection: coll, db});
-    const allPlanCacheEntries = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}]).toArray();
+    const allPlanCacheEntries = coll
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}])
+        .toArray();
     assert.eq(allPlanCacheEntries.length, 1, allPlanCacheEntries);
     return allPlanCacheEntries[0];
 }
 
-const debugInfoFields = ["createdFromQuery", "cachedPlan", "creationExecStats", "candidatePlanScores"];
+const debugInfoFields = [
+    "createdFromQuery",
+    "cachedPlan",
+    "creationExecStats",
+    "candidatePlanScores",
+];
 
 function assertCacheEntryHasDebugInfo(coll, queryShape) {
     const entry = getPlanCacheEntryForQueryShape(coll, queryShape);
@@ -48,7 +55,12 @@ function assertCacheEntryIsMissingDebugInfo(coll, queryShape) {
 
 // Set a large value to internalQueryCacheMaxSizeBytesBeforeStripDebugInfo to make sure that Debug
 // Info wouldn't be stripped off.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: 536870912}));
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: 536870912,
+    }),
+);
 
 const initialPlanCacheSize = getPlanCacheSize(db);
 
@@ -61,7 +73,9 @@ const planCacheSizeAfterSbeStep = getPlanCacheSize(db);
 assert.lt(initialPlanCacheSize, planCacheSizeAfterSbeStep);
 
 // Force classic plan cache.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 // Create a new collection for classic queries so we can easily assess its plan cache.
 const classicColl = createTestCollection("classic");

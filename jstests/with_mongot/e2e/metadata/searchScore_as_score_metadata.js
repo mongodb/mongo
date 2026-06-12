@@ -19,7 +19,11 @@ coll.drop();
 // score (i.e. 'searchScore' / 'vectorSearchScore') value.
 // Takes in the prefix stages of an aggregation pipeline that should generate documents with the
 // legacy and 'score' fields as metadata, as well as the argument name of the legacy metadata.
-function assertScoreMetadataPresentAndEqual({pipelinePrefix, legacyMetadataArg, forceProjectionOnMerger}) {
+function assertScoreMetadataPresentAndEqual({
+    pipelinePrefix,
+    legacyMetadataArg,
+    forceProjectionOnMerger,
+}) {
     function buildPipeline(projections) {
         let pipeline = pipelinePrefix;
 
@@ -47,7 +51,9 @@ function assertScoreMetadataPresentAndEqual({pipelinePrefix, legacyMetadataArg, 
         assert.eq(
             result[legacyMetadataArg],
             result[kScoreMetadataArg],
-            "the legacy metadata value '" + legacyMetadataArg + "' is not equal to the 'score' metadata value",
+            "the legacy metadata value '" +
+                legacyMetadataArg +
+                "' is not equal to the 'score' metadata value",
         );
     }
 
@@ -108,7 +114,9 @@ function assertScoreMetadataPresentAndEqual({pipelinePrefix, legacyMetadataArg, 
         name: indexName,
         type: "vectorSearch",
         definition: {
-            "fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}],
+            "fields": [
+                {"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"},
+            ],
         },
     };
 

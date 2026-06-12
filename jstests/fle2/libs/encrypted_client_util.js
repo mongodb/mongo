@@ -128,7 +128,8 @@ export var EncryptedClient = class {
     constructor(conn, dbName, userName = undefined, adminPwd = undefined) {
         // Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
         // use
-        this.useImplicitSharding = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+        this.useImplicitSharding =
+            typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
         if (conn.isAutoEncryptionEnabled()) {
             this._keyVault = conn.getKeyVault();
@@ -252,7 +253,11 @@ export var EncryptedClient = class {
             }
         });
 
-        assert.neq(options, undefined, `createEncryptedCollection expected an options object, it is undefined`);
+        assert.neq(
+            options,
+            undefined,
+            `createEncryptedCollection expected an options object, it is undefined`,
+        );
         assert(
             options.hasOwnProperty("encryptedFields") && typeof options.encryptedFields == "object",
             `options must contain an encryptedFields document'`,
@@ -264,12 +269,19 @@ export var EncryptedClient = class {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
         const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
 
-        assert.eq(cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
+        assert.eq(
+            cis.cursor.firstBatch.length,
+            1,
+            `Expected to find one collection named '${name}'`,
+        );
 
         const ci = cis.cursor.firstBatch[0];
         assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
         const storedOptions = ci.options;
-        assert(options.hasOwnProperty("encryptedFields"), `Expected collection '${name}' to have 'encryptedFields'`);
+        assert(
+            options.hasOwnProperty("encryptedFields"),
+            `Expected collection '${name}' to have 'encryptedFields'`,
+        );
         const ef = storedOptions.encryptedFields;
 
         // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
@@ -307,16 +319,29 @@ export var EncryptedClient = class {
      * @param {number} esc Number of documents in ESC
      * @param {number} ecoc Number of documents in ECOC
      */
-    assertEncryptedCollectionCountsByObject(sessionDB, name, expectedEdc, expectedEsc, expectedEcoc) {
+    assertEncryptedCollectionCountsByObject(
+        sessionDB,
+        name,
+        expectedEdc,
+        expectedEsc,
+        expectedEcoc,
+    ) {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
 
         const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
-        assert.eq(cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
+        assert.eq(
+            cis.cursor.firstBatch.length,
+            1,
+            `Expected to find one collection named '${name}'`,
+        );
 
         const ci = cis.cursor.firstBatch[0];
         assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
         const options = ci.options;
-        assert(options.hasOwnProperty("encryptedFields"), `Expected collection '${name}' to have 'encryptedFields'`);
+        assert(
+            options.hasOwnProperty("encryptedFields"),
+            `Expected collection '${name}' to have 'encryptedFields'`,
+        );
 
         function countDocuments(sessionDB, name) {
             // FLE2 tests are testing transactions and using the count command is not supported.
@@ -358,7 +383,13 @@ export var EncryptedClient = class {
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc) {
-        this.assertEncryptedCollectionCountsByObject(this._db, name, expectedEdc, expectedEsc, expectedEcoc);
+        this.assertEncryptedCollectionCountsByObject(
+            this._db,
+            name,
+            expectedEdc,
+            expectedEsc,
+            expectedEcoc,
+        );
     }
 
     /**
@@ -370,7 +401,9 @@ export var EncryptedClient = class {
      */
     assertESCNonAnchorCount(name, expectedCount) {
         const escName = this.getStateCollectionNamespaces(name).esc;
-        const actualCount = this._db.getCollection(escName).countDocuments({"value": {"$exists": false}});
+        const actualCount = this._db
+            .getCollection(escName)
+            .countDocuments({"value": {"$exists": false}});
         assert.eq(
             actualCount,
             expectedCount,
@@ -406,7 +439,10 @@ export var EncryptedClient = class {
         assert(encryptedDoc[kSafeContentField] !== undefined);
 
         for (let field in fields) {
-            assert(encryptedDoc.hasOwnProperty(field), `Could not find ${field} in encrypted ${tojson(encryptedDoc)}`);
+            assert(
+                encryptedDoc.hasOwnProperty(field),
+                `Could not find ${field} in encrypted ${tojson(encryptedDoc)}`,
+            );
             assert(
                 unEncryptedDoc.hasOwnProperty(field),
                 `Could not find ${field} in unEncrypted ${tojson(unEncryptedDoc)}`,
@@ -543,7 +579,9 @@ export function runEncryptedTest(db, dbName, collNames, encryptedFields, runTest
     }
 
     for (let collName of collNames) {
-        assert.commandWorked(client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
+        assert.commandWorked(
+            client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}),
+        );
     }
 
     let edb = client.getDB();
@@ -579,7 +617,9 @@ export function assertIsIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
     assert(
-        value.hex().startsWith("0e") || value.hex().startsWith("0f") || value.hex().startsWith("11"),
+        value.hex().startsWith("0e") ||
+            value.hex().startsWith("0f") ||
+            value.hex().startsWith("11"),
         "Expected subtype 14, 15, or 17 but found the wrong type: " + value.hex(),
     );
 }
@@ -592,7 +632,10 @@ export function assertIsIndexedEncryptedField(value) {
 export function assertIsEqualityIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("0e"), "Expected subtype 14 but found the wrong type: " + value.hex());
+    assert(
+        value.hex().startsWith("0e"),
+        "Expected subtype 14 but found the wrong type: " + value.hex(),
+    );
 }
 
 /**
@@ -603,7 +646,10 @@ export function assertIsEqualityIndexedEncryptedField(value) {
 export function assertIsRangeIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("0f"), "Expected subtype 15 but found the wrong type: " + value.hex());
+    assert(
+        value.hex().startsWith("0f"),
+        "Expected subtype 15 but found the wrong type: " + value.hex(),
+    );
 }
 
 /**
@@ -614,7 +660,10 @@ export function assertIsRangeIndexedEncryptedField(value) {
 export function assertIsTextIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("11"), "Expected subtype 17 but found the wrong type: " + value.hex());
+    assert(
+        value.hex().startsWith("11"),
+        "Expected subtype 17 but found the wrong type: " + value.hex(),
+    );
 }
 
 /**
@@ -625,7 +674,10 @@ export function assertIsTextIndexedEncryptedField(value) {
 export function assertIsUnindexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("10"), "Expected subtype 16 but found the wrong type: " + value.hex());
+    assert(
+        value.hex().startsWith("10"),
+        "Expected subtype 16 but found the wrong type: " + value.hex(),
+    );
 }
 
 /**

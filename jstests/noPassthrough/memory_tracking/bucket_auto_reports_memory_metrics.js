@@ -43,7 +43,11 @@ assert.commandWorked(coll.insertMany(docs));
             $bucketAuto: {
                 groupBy: "$value",
                 buckets: 5,
-                output: {"count": {$sum: 1}, "valueList": {$push: "$value"}, "avgValue": {$avg: "$value"}},
+                output: {
+                    "count": {$sum: 1},
+                    "valueList": {$push: "$value"},
+                    "avgValue": {$avg: "$value"},
+                },
             },
         },
     ];
@@ -114,7 +118,9 @@ assert.commandWorked(coll.insertMany(docs));
     jsTest.log.info("Running pipeline that will spill : " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 100}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 100}),
+    );
 
     runMemoryStatsTest({
         db: db,

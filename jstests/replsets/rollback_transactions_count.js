@@ -25,7 +25,9 @@ assert.commandWorked(sessionColl1.insert({b: 1}));
 assert.commandWorked(session1.commitTransaction_forTesting());
 
 rollbackTest.awaitLastOpCommitted();
-assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 const session2 = primary.startSession();
 const sessionDb2 = session2.getDatabase(dbName);
@@ -54,7 +56,9 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations();
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}),
+    );
 }
 
 assert.eq(sessionColl1.find().itcount(), 3);

@@ -225,7 +225,10 @@ testCases.forEach((testCase) => {
     withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
         testCase.cmdObj.txnNumber = NumberLong(txnNum);
         if (testCase.errorCode) {
-            assert.commandFailedWithCode(st.getDB(dbName).runCommand(testCase.cmdObj), testCase.errorCode);
+            assert.commandFailedWithCode(
+                st.getDB(dbName).runCommand(testCase.cmdObj),
+                testCase.errorCode,
+            );
         } else {
             const res = assert.commandWorked(st.getDB(dbName).runCommand(testCase.cmdObj));
             assert.eq(res.upsertRequired, testCase.upsertRequired, res);

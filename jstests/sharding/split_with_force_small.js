@@ -14,7 +14,9 @@ assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
-jsTest.log("Insert a bunch of data into the low chunk of a collection," + " to prevent relying on stats.");
+jsTest.log(
+    "Insert a bunch of data into the low chunk of a collection," + " to prevent relying on stats.",
+);
 
 let data128k = "x";
 for (let i = 0; i < 7; i++) data128k += data128k;

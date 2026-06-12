@@ -25,7 +25,9 @@ const valueFieldName = "value";
 
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 // Insert enough documents with large enough metadata so that the bucket catalog memory

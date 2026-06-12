@@ -45,7 +45,9 @@ for (let j = 0; j < 200000; j++) {
 assert.commandWorked(db.c.insertOne(doc));
 
 // Shrink the WiredTiger cache so as to reliably get a TemporarilyUnavailableException.
-assert.commandWorked(db.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=32M"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=32M"}),
+);
 
 function temporarilyUnavailableNonTransaction(op) {
     jsTestLog("Temporarily unavailable error on non-transactional " + op);

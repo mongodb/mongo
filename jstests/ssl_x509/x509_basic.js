@@ -26,7 +26,11 @@ function runTest() {
         ext.runCommand({
             hello: 1,
             saslSupportedMechs: "local.__system",
-            speculativeAuthenticate: {authenticate: "1", mechanism: "MONGODB-X509", db: "$external"},
+            speculativeAuthenticate: {
+                authenticate: "1",
+                mechanism: "MONGODB-X509",
+                db: "$external",
+            },
         }),
     );
 

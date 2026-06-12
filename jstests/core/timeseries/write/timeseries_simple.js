@@ -75,10 +75,18 @@ TimeseriesTest.run((insert) => {
         jsTestLog("Inserting doc into time-series collection: " + i + ": " + tojson(doc));
         let start = new Date();
         assert.commandWorked(insert(coll, doc));
-        jsTestLog("Insertion took " + (new Date().getTime() - start.getTime()) + " ms. Retrieving doc: " + i);
+        jsTestLog(
+            "Insertion took " +
+                (new Date().getTime() - start.getTime()) +
+                " ms. Retrieving doc: " +
+                i,
+        );
         start = new Date();
         const docFromView = coll.findOne({_id: doc._id});
-        assert(docFromView, "inserted doc missing from time-series collection: " + i + ": " + tojson(doc));
+        assert(
+            docFromView,
+            "inserted doc missing from time-series collection: " + i + ": " + tojson(doc),
+        );
         jsTestLog(
             "Doc retrieval took " +
                 (new Date().getTime() - start.getTime()) +
@@ -118,8 +126,16 @@ TimeseriesTest.run((insert) => {
     TimeseriesTest.decompressBucket(bucketDoc);
 
     jsTestLog("Bucket document: " + tojson(bucketDoc));
-    assert.docEq(expectedBucketDoc.control.min, bucketDoc.control.min, "invalid min in bucket: " + tojson(bucketDoc));
-    assert.docEq(expectedBucketDoc.control.max, bucketDoc.control.max, "invalid max in bucket: " + tojson(bucketDoc));
+    assert.docEq(
+        expectedBucketDoc.control.min,
+        bucketDoc.control.min,
+        "invalid min in bucket: " + tojson(bucketDoc),
+    );
+    assert.docEq(
+        expectedBucketDoc.control.max,
+        bucketDoc.control.max,
+        "invalid max in bucket: " + tojson(bucketDoc),
+    );
     Object.keys(expectedBucketDoc.data).forEach((key) => {
         assert.docEq(
             expectedBucketDoc.data[key],

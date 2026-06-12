@@ -12,7 +12,16 @@ import {
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 // List of commands which this script will override to first construct histograms.
-const queryCommands = ["aggregate", "count", "delete", "distinct", "explain", "find", "findAndModify", "update"];
+const queryCommands = [
+    "aggregate",
+    "count",
+    "delete",
+    "distinct",
+    "explain",
+    "find",
+    "findAndModify",
+    "update",
+];
 
 // Predicate function which returns true if a histogram over the given path can be constructed.
 function isPathHistogrammable(path) {
@@ -82,7 +91,9 @@ export function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunctio
                 .forEach((path) => indexedPaths.add(path)),
         );
         // Create histogram for each path
-        indexedPaths.forEach((path) => assert.commandWorked(db.runCommand({analyze: collectionName, key: path})));
+        indexedPaths.forEach((path) =>
+            assert.commandWorked(db.runCommand({analyze: collectionName, key: path})),
+        );
     }
 
     // Dispatch to original command after creating histograms.

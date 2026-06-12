@@ -35,7 +35,11 @@ function assertAcceptsValidLogicalTime(db) {
 }
 
 // Start the sharding test with auth on.
-const st = new ShardingTest({mongos: 1, manualAddShard: true, other: {keyFile: "jstests/libs/key1"}});
+const st = new ShardingTest({
+    mongos: 1,
+    manualAddShard: true,
+    other: {keyFile: "jstests/libs/key1"},
+});
 
 // Create admin user and authenticate as them.
 st.s.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
@@ -56,7 +60,9 @@ assertAcceptsValidLogicalTime(testDB);
 
 // Initialize sharding.
 assert.commandWorked(testDB.adminCommand({enableSharding: "test"}));
-assert.commandWorked(testDB.adminCommand({shardCollection: testDB.foo.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    testDB.adminCommand({shardCollection: testDB.foo.getFullName(), key: {_id: 1}}),
+);
 
 // Sharded collections reject mismatching cluster times and accept valid ones.
 assertRejectsMismatchingLogicalTime(testDB);

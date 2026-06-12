@@ -53,7 +53,14 @@ const insertOptions = {
     dateRange: {min: minDate, max: maxDate},
 };
 const [minFields, maxFields, minDocs, maxDocs] = [1, 3, 0, 100];
-const insertArb = makeInsertCommandArb(timeField, metaField, metaValue, minFields, maxFields, insertOptions);
+const insertArb = makeInsertCommandArb(
+    timeField,
+    metaField,
+    metaValue,
+    minFields,
+    maxFields,
+    insertOptions,
+);
 const batchInsertArb = makeBatchInsertCommandArb(
     timeField,
     metaField,

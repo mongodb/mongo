@@ -1,7 +1,10 @@
 /*
  * Utility functions to help run a property-based test in a jstest.
  */
-import {LeafParameter, leafParametersPerFamily} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    LeafParameter,
+    leafParametersPerFamily,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
@@ -191,7 +194,14 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples, counterexamplePath) {
+export function testProperty(
+    propertyFn,
+    namespaces,
+    workloadModel,
+    numRuns,
+    examples,
+    counterexamplePath,
+) {
     assert.eq(typeof propertyFn, "function");
     assert.eq(typeof numRuns, "number");
 
@@ -216,7 +226,14 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns, exa
     assert(Object.keys(namespaces).every(isValidNamespaceKey));
 
     const seed = 4;
-    jsTest.log.info("Running property `" + propertyFn.name + "` from test file `" + jsTestName() + "`, seed = " + seed);
+    jsTest.log.info(
+        "Running property `" +
+            propertyFn.name +
+            "` from test file `" +
+            jsTestName() +
+            "`, seed = " +
+            seed,
+    );
     // PBTs can throw (and then catch) exceptions for a few reasons. For example it's hard to model
     // indexes exactly, so we end up trying to create some invalid indexes which throw exceptions.
     // These exceptions make the logs hard to read and can be ignored, so we turn off
@@ -241,7 +258,9 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns, exa
             // If it failed for the first time, print that out so we have the first failure available
             // in case shrinking fails.
             if (!passed && alwaysPassed) {
-                jsTest.log.info("The property " + propertyFn.name + " from " + jsTestName() + " failed");
+                jsTest.log.info(
+                    "The property " + propertyFn.name + " from " + jsTestName() + " failed",
+                );
                 jsTest.log.info("Initial inputs **before minimization**");
                 jsTest.log.info(workload);
                 jsTest.log.info("Initial failure details **before minimization**");

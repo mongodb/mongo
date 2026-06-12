@@ -36,7 +36,10 @@ describe("Promote replica set to shard adds authoritative data", function () {
         };
 
         this.getDbMetadataFromShardCatalog = function (dbName) {
-            return this.rs1.getPrimary().getDB("config").shard.catalog.databases.findOne({_id: dbName});
+            return this.rs1
+                .getPrimary()
+                .getDB("config")
+                .shard.catalog.databases.findOne({_id: dbName});
         };
 
         this.validateShardCatalogCache = function (dbName, shard, expectedDbMetadata) {
@@ -177,7 +180,9 @@ describe("Promote replica set to embedded config server adds authoritative data"
 
         this.mongos = MongoRunner.runMongos({configdb: this.configRS.getURL()});
 
-        assert.commandWorked(this.mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}));
+        assert.commandWorked(
+            this.mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}),
+        );
         this.configRS.awaitReplication();
 
         this.getDbMetadataFromGlobalCatalog = function (dbName) {
@@ -185,7 +190,10 @@ describe("Promote replica set to embedded config server adds authoritative data"
         };
 
         this.getDbMetadataFromShardCatalog = function (dbName) {
-            return this.configRS.getPrimary().getDB("config").shard.catalog.databases.findOne({_id: dbName});
+            return this.configRS
+                .getPrimary()
+                .getDB("config")
+                .shard.catalog.databases.findOne({_id: dbName});
         };
 
         this.validateShardCatalogCache = function (dbName, shard, expectedDbMetadata) {

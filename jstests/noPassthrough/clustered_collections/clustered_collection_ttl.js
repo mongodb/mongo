@@ -97,7 +97,9 @@ replicatedColl.drop();
 jsTest.log(`Test TTL on secondary index`);
 // The collection is clustered, but not TTL on cluster key _id.
 assert.commandWorked(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {_id: 1}, unique: true},
+    }),
 );
 assert.commandWorked(replicatedColl.createIndex({ttlField: 1}, {expireAfterSeconds}));
 insertAndValidateTTL(replicatedColl, "ttlField");

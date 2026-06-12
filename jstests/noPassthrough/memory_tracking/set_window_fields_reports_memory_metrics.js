@@ -25,7 +25,9 @@ const db = conn.getDB("test");
 // The tests expect that memory metrics appear right after memory is used. Decrease the threshold
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
 // limit.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
+);
 
 // Since this test is run against all execution engine variants, we don't have to force both SBE and
 // classic in this test and save a bit of compute.
@@ -117,7 +119,12 @@ const pipeline = [
 }
 
 {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 5000}));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 5000,
+        }),
+    );
 
     jsTest.log.info("Running pipeline " + tojson(pipeline));
 

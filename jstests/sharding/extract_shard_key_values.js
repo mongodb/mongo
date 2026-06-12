@@ -160,7 +160,9 @@ const sessionColl = sessionDB[kCollName];
 
 assert.commandWorked(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}));
 
-let res = assert.commandWorked(mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}));
+let res = assert.commandWorked(
+    mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}),
+);
 assert.eq(0, res.nMatched);
 assert.eq(1, res.nUpserted);
 docsArr = mongos.getCollection(kNsName).find({b: 2}).toArray();
@@ -168,7 +170,12 @@ assert.eq(1, docsArr.length);
 
 assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
 res = assert.commandWorked(
-    sessionDB.runCommand({findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}),
+    sessionDB.runCommand({
+        findAndModify: kCollName,
+        query: {a: 2},
+        update: {$set: {updated: true}},
+        upsert: true,
+    }),
 );
 assert.eq(1, res.lastErrorObject.n);
 assert.eq(0, res.lastErrorObject.updatedExisting);

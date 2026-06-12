@@ -22,7 +22,9 @@ db.foreignColl.drop();
 assert.commandWorked(db.localColl.insert({_id: 1, a: 5}));
 assert.commandWorked(db.foreignColl.insert({_id: 2, b: 5}));
 
-const pipeline = [{$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}}];
+const pipeline = [
+    {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}},
+];
 let explain = db.localColl.explain().aggregate(pipeline);
 assert(aggPlanHasStage(explain, "EQ_LOOKUP"), explain);
 

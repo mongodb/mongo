@@ -74,15 +74,20 @@ for (let i = 0; i < 19; ++i) {
                 [`transformation_${i}`]: i,
                 nested_tags: {$concatArrays: ["$tags", [`level_${i}`]]},
                 nested_category: {$concat: ["$category", `_level_${i}`]},
-                dependent_transformation: {$add: [{$ifNull: [`$transformation_${i > 0 ? i - 1 : 0}`, 0]}, i]},
+                dependent_transformation: {
+                    $add: [{$ifNull: [`$transformation_${i > 0 ? i - 1 : 0}`, 0]}, i],
+                },
             },
         },
     ];
 
     // On the final iteration, create a separate view for office potential.
     if (i == 18) {
-        officePotentialViewFullDefinition = maxNestedViewFullDefinition.concat(officePotentialPipeline);
-        assert.commandWorked(testDb.createView("officePotentialView", parentName, officePotentialPipeline));
+        officePotentialViewFullDefinition =
+            maxNestedViewFullDefinition.concat(officePotentialPipeline);
+        assert.commandWorked(
+            testDb.createView("officePotentialView", parentName, officePotentialPipeline),
+        );
     }
 
     maxNestedViewFullDefinition = maxNestedViewFullDefinition.concat(viewPipeline);
@@ -103,7 +108,10 @@ const indexConfigs = [
             name: "maxNestedViewIndex",
             definition: {
                 "mappings": {"dynamic": true},
-                "fields": {"nested_tags": {"type": "string"}, "nested_category": {"type": "string"}},
+                "fields": {
+                    "nested_tags": {"type": "string"},
+                    "nested_category": {"type": "string"},
+                },
             },
         },
     },
@@ -111,7 +119,10 @@ const indexConfigs = [
         coll: officePotentialView,
         definition: {
             name: "officePotentialViewIndex",
-            definition: {"mappings": {"dynamic": true}, "fields": {"office_potential": {"type": "string"}}},
+            definition: {
+                "mappings": {"dynamic": true},
+                "fields": {"office_potential": {"type": "string"}},
+            },
         },
     },
 ];
@@ -151,7 +162,10 @@ const maxNestedViewTestCases = (isStoredSource) => {
             validateFn: (results) => {
                 assert(results.length == 5, "Deepest level tag search should return 5 results");
                 for (let i = 0; i < results.length; ++i) {
-                    assert(results[i].nested_tags.includes("level_18"), "Deepest level tag should be present");
+                    assert(
+                        results[i].nested_tags.includes("level_18"),
+                        "Deepest level tag should be present",
+                    );
                     assert(
                         results[i].dependent_transformation == 35,
                         "Dependent transformation should have a value of 35.",
@@ -171,7 +185,10 @@ const maxNestedViewTestCases = (isStoredSource) => {
             validateFn: (results) => {
                 assert(results.length == 2, "Search for large_level_18 should return 2 documents");
                 for (let i = 0; i < results.length; ++i) {
-                    assert(results[i].nested_category == "large_level_18", "Nested category should be large_level_18");
+                    assert(
+                        results[i].nested_category == "large_level_18",
+                        "Nested category should be large_level_18",
+                    );
                     assert(
                         results[i].dependent_transformation == 35,
                         "Dependent transformation should have a value of 35.",
@@ -192,7 +209,10 @@ const maxNestedViewTestCases = (isStoredSource) => {
                 assert(results.length == 2, "Category medium should be present in 2 results");
                 // Ensure that the deepest field still exists on these results.
                 for (let i = 0; i < results.length; ++i) {
-                    assert(results[i].nested_tags.includes("level_18"), "Deepest level tag should be present");
+                    assert(
+                        results[i].nested_tags.includes("level_18"),
+                        "Deepest level tag should be present",
+                    );
                     assert(
                         results[i].dependent_transformation == 35,
                         "Dependent transformation should have a value of 35.",
@@ -212,11 +232,23 @@ const maxNestedViewTestCases = (isStoredSource) => {
                 },
             },
             validateFn: (results) => {
-                assert(results.length == 1, "High office potential should only be present in 1 result");
+                assert(
+                    results.length == 1,
+                    "High office potential should only be present in 1 result",
+                );
                 for (let i = 0; i < results.length; ++i) {
-                    assert(results[i].office_potential == "high", "Office potential should be high");
-                    assert(results[i].nested_tags.includes("tech"), "Nested tags should include tech");
-                    assert(results[i].nested_category == "large_level_17", "Nested category should be large_level_17");
+                    assert(
+                        results[i].office_potential == "high",
+                        "Office potential should be high",
+                    );
+                    assert(
+                        results[i].nested_tags.includes("tech"),
+                        "Nested tags should include tech",
+                    );
+                    assert(
+                        results[i].nested_category == "large_level_17",
+                        "Nested category should be large_level_17",
+                    );
                 }
             },
         },
@@ -229,10 +261,19 @@ const maxNestedViewTestCases = (isStoredSource) => {
                 },
             },
             validateFn: (results) => {
-                assert(results.length == 1, "Medium office potential should only be present in 1 result");
+                assert(
+                    results.length == 1,
+                    "Medium office potential should only be present in 1 result",
+                );
                 for (let i = 0; i < results.length; ++i) {
-                    assert(results[i].office_potential == "medium", "Office potential should be medium");
-                    assert(results[i].nested_tags.includes("tech"), "Nested tags should include tech");
+                    assert(
+                        results[i].office_potential == "medium",
+                        "Office potential should be medium",
+                    );
+                    assert(
+                        results[i].nested_tags.includes("tech"),
+                        "Nested tags should include tech",
+                    );
                     assert(
                         results[i].nested_category == "medium_level_17",
                         "Nested category should be medium_level_17",
@@ -249,10 +290,19 @@ const maxNestedViewTestCases = (isStoredSource) => {
                 },
             },
             validateFn: (results) => {
-                assert(results.length == 1, "Emerging office potential should only be present in 1 result");
+                assert(
+                    results.length == 1,
+                    "Emerging office potential should only be present in 1 result",
+                );
                 for (let i = 0; i < results.length; ++i) {
-                    assert(results[i].office_potential == "emerging", "Office potential should be emerging");
-                    assert(results[i].nested_category == "large_level_17", "Nested category should be large_level_17");
+                    assert(
+                        results[i].office_potential == "emerging",
+                        "Office potential should be emerging",
+                    );
+                    assert(
+                        results[i].nested_category == "large_level_17",
+                        "Nested category should be large_level_17",
+                    );
                 }
             },
         },
@@ -265,7 +315,10 @@ const maxNestedViewTestCases = (isStoredSource) => {
                 },
             },
             validateFn: (results) => {
-                assert(results.length == 2, "Low office potential should only be present in 2 results");
+                assert(
+                    results.length == 2,
+                    "Low office potential should only be present in 2 results",
+                );
                 for (let i = 0; i < results.length; ++i) {
                     assert(results[i].office_potential == "low", "Office potential should be low");
                 }
@@ -275,7 +328,12 @@ const maxNestedViewTestCases = (isStoredSource) => {
 
     // Run each test query for maxNestedView using validateSearchExplain.
     maxNestedViewTestQueries.forEach(({searchQuery, validateFn}) => {
-        validateSearchExplain(maxNestedView, [searchQuery], isStoredSource, maxNestedViewFullDefinition);
+        validateSearchExplain(
+            maxNestedView,
+            [searchQuery],
+            isStoredSource,
+            maxNestedViewFullDefinition,
+        );
 
         const results = maxNestedView.aggregate([searchQuery]).toArray();
         validateFn(results);

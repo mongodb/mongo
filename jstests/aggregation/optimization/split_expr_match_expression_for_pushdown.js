@@ -21,7 +21,11 @@
  * ]
  */
 
-import {getAggPlanStages, getPlanStages, getQueryPlanners} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getPlanStages,
+    getQueryPlanners,
+} from "jstests/libs/query/analyze_plan.js";
 
 let outerColl = db.outer_coll;
 let innerColl = db.inner_coll;
@@ -46,7 +50,11 @@ assert.commandWorked(innerColl.createIndex({inner_id: 1}));
         {
             $match: {
                 $expr: {
-                    $and: [{$eq: ["$x", 2]}, {$eq: ["$computed", 5]}, {$eq: [{$mod: ["$z", 2]}, 0]}],
+                    $and: [
+                        {$eq: ["$x", 2]},
+                        {$eq: ["$computed", 5]},
+                        {$eq: [{$mod: ["$z", 2]}, 0]},
+                    ],
                 },
             },
         },
@@ -73,7 +81,10 @@ assert.commandWorked(innerColl.createIndex({inner_id: 1}));
                 $and: [
                     {
                         $expr: {
-                            $and: [{$eq: ["$x", {$const: 2}]}, {$eq: [{$mod: ["$z", {$const: 2}]}, {$const: 0}]}],
+                            $and: [
+                                {$eq: ["$x", {$const: 2}]},
+                                {$eq: [{$mod: ["$z", {$const: 2}]}, {$const: 0}]},
+                            ],
                         },
                     },
                     {x: {$_internalExprEq: 2}},

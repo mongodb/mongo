@@ -26,7 +26,11 @@ assert(
 );
 
 // Now initialize the same parameter correctly on startup.
-let rst = new ReplSetTest({name: testName, nodes: 1, nodeOptions: {setParameter: "rollbackTimeLimitSecs=1000"}});
+let rst = new ReplSetTest({
+    name: testName,
+    nodes: 1,
+    nodeOptions: {setParameter: "rollbackTimeLimitSecs=1000"},
+});
 rst.startSet();
 rst.initiate();
 
@@ -46,7 +50,13 @@ let valueSetAtRuntime = assert.commandWorked(
 assert.eq(NumberLong(2000), valueSetAtRuntime);
 
 // Make sure that we reject non-positive values for this parameter set at runtime.
-assert.commandFailedWithCode(primary.adminCommand({setParameter: 1, rollbackTimeLimitSecs: -5}), ErrorCodes.BadValue);
-assert.commandFailedWithCode(primary.adminCommand({setParameter: 1, rollbackTimeLimitSecs: 0}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    primary.adminCommand({setParameter: 1, rollbackTimeLimitSecs: -5}),
+    ErrorCodes.BadValue,
+);
+assert.commandFailedWithCode(
+    primary.adminCommand({setParameter: 1, rollbackTimeLimitSecs: 0}),
+    ErrorCodes.BadValue,
+);
 
 rst.stopSet();

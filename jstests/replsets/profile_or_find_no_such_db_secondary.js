@@ -59,18 +59,27 @@ describe("setProfilingLevel on secondary with non-existent database", function (
             secondaryDB.system.profile.findOne(),
             "no profile events are expected to be caputred before the db exists",
         );
-        assert(!secondary.getDBNames().includes(dbName), "database should not exist on secondary before read");
+        assert(
+            !secondary.getDBNames().includes(dbName),
+            "database should not exist on secondary before read",
+        );
 
         // Test secondary reads
         assert.commandWorked(secondaryDB.runCommand({find: "coll", filter: {}}));
-        assert(!secondary.getDBNames().includes(dbName), "database should not be created by find on a secondary");
+        assert(
+            !secondary.getDBNames().includes(dbName),
+            "database should not be created by find on a secondary",
+        );
     });
 
     it("should lazily create system.profile when a profiled operation runs", function () {
         assert.commandWorked(primary.getDB(dbName).createCollection("coll"));
         rst.awaitReplication();
 
-        assert(secondary.getDBNames().includes(dbName), "database should exist on secondary after replication");
+        assert(
+            secondary.getDBNames().includes(dbName),
+            "database should exist on secondary after replication",
+        );
 
         let collNames = secondaryDB.getCollectionNames();
         assert(
@@ -86,7 +95,13 @@ describe("setProfilingLevel on secondary with non-existent database", function (
             "system.profile should be lazily created after a profiled operation",
         );
 
-        const profileEntries = secondaryDB.system.profile.find({op: "query", ns: dbName + ".coll"}).toArray();
-        assert.gt(profileEntries.length, 0, "expected at least one profile entry after reading on secondary");
+        const profileEntries = secondaryDB.system.profile
+            .find({op: "query", ns: dbName + ".coll"})
+            .toArray();
+        assert.gt(
+            profileEntries.length,
+            0,
+            "expected at least one profile entry after reading on secondary",
+        );
     });
 });

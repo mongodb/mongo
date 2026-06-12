@@ -58,8 +58,18 @@ export const $config = (function () {
             const pipeName1 = this.pipeName1 + "_scan";
             const pipeName2 = this.pipeName2 + "_scan";
 
-            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
-            _writeTestPipeObjects(pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(
+                pipeName1,
+                this.localCollObjs.length,
+                this.localCollObjs,
+                this.kDefaultPipePath,
+            );
+            _writeTestPipeObjects(
+                pipeName2,
+                this.localCollObjs.length,
+                this.localCollObjs,
+                this.kDefaultPipePath,
+            );
 
             const expectedRes = this.localCollObjs.concat(this.localCollObjs);
 
@@ -86,7 +96,11 @@ export const $config = (function () {
                 .toArray();
             assert.eq(resArr.length, expectedRes.length);
             for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
+                assert.eq(
+                    resArr[i],
+                    expectedRes[i],
+                    `Unexpected obj = ${tojson(resArr[i])} at ${i}`,
+                );
             }
 
             jsTestLog(`thread_num ${this.tid} scan_case_end`);
@@ -97,7 +111,12 @@ export const $config = (function () {
 
             const pipeName1 = this.pipeName1 + "_match";
 
-            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(
+                pipeName1,
+                this.localCollObjs.length,
+                this.localCollObjs,
+                this.kDefaultPipePath,
+            );
 
             const expectedRes = this.localCollObjs.filter((obj) => obj.g < 50);
 
@@ -119,7 +138,11 @@ export const $config = (function () {
                 .toArray();
             assert.eq(resArr.length, expectedRes.length);
             for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
+                assert.eq(
+                    resArr[i],
+                    expectedRes[i],
+                    `Unexpected obj = ${tojson(resArr[i])} at ${i}`,
+                );
             }
 
             jsTestLog(`thread_num ${this.tid} match_case_end`);
@@ -131,8 +154,18 @@ export const $config = (function () {
             const pipeName1 = this.pipeName1 + "_unionWith";
             const pipeName2 = this.pipeName2 + "_unionWith";
 
-            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
-            _writeTestPipeObjects(pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(
+                pipeName1,
+                this.localCollObjs.length,
+                this.localCollObjs,
+                this.kDefaultPipePath,
+            );
+            _writeTestPipeObjects(
+                pipeName2,
+                this.localCollObjs.length,
+                this.localCollObjs,
+                this.kDefaultPipePath,
+            );
 
             const expectedRes = this.localCollObjs.concat(this.localCollObjs);
 
@@ -164,7 +197,11 @@ export const $config = (function () {
                 .toArray();
             assert.eq(resArr.length, expectedRes.length);
             for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
+                assert.eq(
+                    resArr[i],
+                    expectedRes[i],
+                    `Unexpected obj = ${tojson(resArr[i])} at ${i}`,
+                );
             }
 
             jsTestLog(`thread_num ${this.tid} unionWith_case_end`);
@@ -175,7 +212,12 @@ export const $config = (function () {
 
             const pipeName1 = this.pipeName1 + "_group";
 
-            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(
+                pipeName1,
+                this.localCollObjs.length,
+                this.localCollObjs,
+                this.kDefaultPipePath,
+            );
 
             const countPerGroup = [];
             for (let i = 0; i < 100; ++i) {

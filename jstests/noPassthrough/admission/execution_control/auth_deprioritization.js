@@ -18,10 +18,11 @@ describe("Authentication commands are non-deprioritizable", function () {
         this.rst.startSet();
         this.rst.initiate();
 
-        this.rst
-            .getPrimary()
-            .getDB(this.testUser.db)
-            .createUser({user: this.testUser.username, pwd: this.testUser.password, roles: jsTest.basicUserRoles});
+        this.rst.getPrimary().getDB(this.testUser.db).createUser({
+            user: this.testUser.username,
+            pwd: this.testUser.password,
+            roles: jsTest.basicUserRoles,
+        });
     });
 
     after(() => {
@@ -29,7 +30,9 @@ describe("Authentication commands are non-deprioritizable", function () {
     });
 
     it("Login command is marked as non-deprioritizable", () => {
-        const initialNonDeprioritizableCount = getTotalMarkedNonDeprioritizableCount(this.rst.getPrimary());
+        const initialNonDeprioritizableCount = getTotalMarkedNonDeprioritizableCount(
+            this.rst.getPrimary(),
+        );
 
         this.login(this.testUser);
 

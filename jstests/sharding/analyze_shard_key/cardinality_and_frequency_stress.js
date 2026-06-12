@@ -22,38 +22,40 @@ const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
 function assertAggregationPlan(mongodConns, dbName, collName, isShardedColl, comment) {
     mongodConns.forEach((conn) => {
         const profilerColl = conn.getDB(dbName).system.profile;
-        profilerColl.find({"command.aggregate": collName, "command.comment": comment}).forEach((doc) => {
-            if (doc.hasOwnProperty("ok") && doc.ok === 0) {
-                return;
-            }
+        profilerColl
+            .find({"command.aggregate": collName, "command.comment": comment})
+            .forEach((doc) => {
+                if (doc.hasOwnProperty("ok") && doc.ok === 0) {
+                    return;
+                }
 
-            const firstStage = doc.command.pipeline[0];
+                const firstStage = doc.command.pipeline[0];
 
-            if (firstStage.hasOwnProperty("$collStats")) {
-                return;
-            }
+                if (firstStage.hasOwnProperty("$collStats")) {
+                    return;
+                }
 
-            if (isShardedColl) {
-                if (firstStage.hasOwnProperty("$mergeCursors")) {
-                    // The profiler output for $mergeCursors aggregate commands is not expected
-                    // to have a "planSummary" field.
-                    assert(doc.usedDisk, doc);
+                if (isShardedColl) {
+                    if (firstStage.hasOwnProperty("$mergeCursors")) {
+                        // The profiler output for $mergeCursors aggregate commands is not expected
+                        // to have a "planSummary" field.
+                        assert(doc.usedDisk, doc);
+                    } else {
+                        assert(doc.hasOwnProperty("planSummary"), doc);
+                        assert(doc.planSummary.includes("IXSCAN"), doc);
+                        assert(!doc.usedDisk, doc);
+                    }
                 } else {
                     assert(doc.hasOwnProperty("planSummary"), doc);
                     assert(doc.planSummary.includes("IXSCAN"), doc);
-                    assert(!doc.usedDisk, doc);
+                    assert(doc.usedDisk, doc);
                 }
-            } else {
-                assert(doc.hasOwnProperty("planSummary"), doc);
-                assert(doc.planSummary.includes("IXSCAN"), doc);
-                assert(doc.usedDisk, doc);
-            }
 
-            // Verify that it did not fetch any documents.
-            assert.eq(doc.docsExamined, 0, doc);
-            // Verify that it opted out of shard filtering.
-            assert.eq(doc.readConcern.level, "available", doc);
-        });
+                // Verify that it did not fetch any documents.
+                assert.eq(doc.docsExamined, 0, doc);
+                // Verify that it opted out of shard filtering.
+                assert.eq(doc.readConcern.level, "available", doc);
+            });
     });
 }
 
@@ -69,7 +71,9 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${tojson({dbName, collName})}`);
+    jsTest.log(
+        `Testing analyzing a shard key for an unsharded collection: ${tojson({dbName, collName})}`,
+    );
 
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
@@ -131,12 +135,20 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
     const db = st.s.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    jsTest.log(`Testing analyzing a shard key for a sharded collection: ${tojson({dbName, collName})}`);
+    jsTest.log(
+        `Testing analyzing a shard key for a sharded collection: ${tojson({dbName, collName})}`,
+    );
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: currentShardKeySplitPoint,
+            to: st.shard1.shardName,
+        }),
+    );
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
     const docs = [];
@@ -209,7 +221,10 @@ const setParameterOpts = {
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Remove block
-    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({
+        nodes: numNodesPerRS,
+        nodeOptions: {setParameter: setParameterOpts},
+    });
     rst.startSet();
     rst.initiate();
     const mongodConns = rst.nodes;

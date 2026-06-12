@@ -36,7 +36,11 @@ function runTest({description, command}) {
     const connAssert = st.rs0.getPrimary();
     jsTestLog("Running test case: " + tojson({description, command}));
     runWithFailpoint(connAssert.getDB(dbName), failpointName, failpointOpts, () => {
-        assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(command), errorCode, description);
+        assert.commandFailedWithCode(
+            st.s.getDB(dbName).runCommand(command),
+            errorCode,
+            description,
+        );
     });
 
     assertOnDiagnosticLogContents({

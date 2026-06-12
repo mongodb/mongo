@@ -37,7 +37,9 @@ const majorityInsert = async function (num, host, dbName, collName, latch) {
 };
 
 assert.commandWorked(primary.setLogLevel(2, "replication"));
-assert.commandWorked(coll.insert({a: 1}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    coll.insert({a: 1}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 // Turn on a fail point to force the first thread to receive an optime from the optime
 // generator to wait a few seconds before storage-committing the insert.

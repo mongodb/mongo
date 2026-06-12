@@ -31,12 +31,18 @@ tests.forEach(function (test) {
         chunkKeys.max[k] = MaxKey;
     }
 
-    assert.commandWorked(configDB.adminCommand({shardCollection: "test." + collName, key: test.key}));
+    assert.commandWorked(
+        configDB.adminCommand({shardCollection: "test." + collName, key: test.key}),
+    );
 
     let res = configDB.adminCommand({split: "test." + collName, middle: midKey});
     assert(res.ok, "Split: " + collName + " " + res.errmsg);
 
-    assert.eq(2, findChunksUtil.findChunksByNs(configDB, "test." + collName).count(), "Chunks count split");
+    assert.eq(
+        2,
+        findChunksUtil.findChunksByNs(configDB, "test." + collName).count(),
+        "Chunks count split",
+    );
 
     st.s0.getCollection("test." + collName).drop();
 });

@@ -25,7 +25,10 @@ function runTest(conn, rst = undefined) {
     const unsignedToken = _createTenantToken({tenant: tenantID});
     Object.keys(users).forEach((user) =>
         assert.commandWorked(
-            runCommandWithSecurityToken(unsignedToken, external, {createUser: user, roles: users[user].roles}),
+            runCommandWithSecurityToken(unsignedToken, external, {
+                createUser: user,
+                roles: users[user].roles,
+            }),
         ),
     );
     if (rst) {
@@ -34,19 +37,25 @@ function runTest(conn, rst = undefined) {
 
     Object.keys(users).forEach(function (user) {
         const tokenConn = new Mongo(conn.host);
-        tokenConn._setSecurityToken(_createSecurityToken({user: user, db: "$external", tenant: tenantID}, kVTSKey));
+        tokenConn._setSecurityToken(
+            _createSecurityToken({user: user, db: "$external", tenant: tenantID}, kVTSKey),
+        );
         const tokenDB = tokenConn.getDB("test");
         if (users[user].prohibited) {
             assert.commandFailed(tokenDB.adminCommand({connectionStatus: 1}));
         } else {
-            const authInfo = assert.commandWorked(tokenDB.adminCommand({connectionStatus: 1})).authInfo;
+            const authInfo = assert.commandWorked(
+                tokenDB.adminCommand({connectionStatus: 1}),
+            ).authInfo;
             jsTest.log(authInfo);
 
             assert.eq(authInfo.authenticatedUsers.length, 1);
             assert.eq(authInfo.authenticatedUsers[0].user, user);
             assert.eq(authInfo.authenticatedUsers[0].db, "$external");
 
-            const authedRoles = authInfo.authenticatedUserRoles.map((role) => role.db + "." + role.role);
+            const authedRoles = authInfo.authenticatedUserRoles.map(
+                (role) => role.db + "." + role.role,
+            );
             const expectRoles = users[user].roles.map((role) => role.db + "." + role.role);
             const unexpectedRoles = authedRoles.filter((role) => !expectRoles.includes(role));
             assert.eq(unexpectedRoles.length, 0, "Unexpected roles: " + tojson(unexpectedRoles));

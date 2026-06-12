@@ -25,7 +25,9 @@ export const MissingIndexIdent = class {
         assert.commandWorked(coll().insert({a: 0}));
 
         const fp = configureFailPoint(primary(), "hangIndexBuildBeforeCommit");
-        const awaitCreateIndex = IndexBuildTest.startIndexBuild(primary(), coll().getFullName(), {a: 1});
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(primary(), coll().getFullName(), {
+            a: 1,
+        });
         fp.wait();
 
         // Get a timestamp before the commit timestamp of the index build.
@@ -46,7 +48,10 @@ export const MissingIndexIdent = class {
                 // Set minSnapshotHistoryWindowInSeconds to 0 so that the the oldest timestamp can
                 // move forward, despite the stable timestamp being held steady.
                 minSnapshotHistoryWindowInSeconds: 0,
-                "failpoint.holdStableTimestampAtSpecificTimestamp": tojson({mode: "alwaysOn", data: {timestamp: ts}}),
+                "failpoint.holdStableTimestampAtSpecificTimestamp": tojson({
+                    mode: "alwaysOn",
+                    data: {timestamp: ts},
+                }),
             },
         });
 
@@ -68,7 +73,12 @@ export const MissingIndexIdent = class {
         // On startup, the node will recover from before the index commit timestamp.
         checkLog.containsJson(conn, 23987, {
             recoveryTimestamp: (recoveryTs) => {
-                return timestampCmp(Timestamp(recoveryTs["$timestamp"]["t"], recoveryTs["$timestamp"]["i"]), ts) <= 0;
+                return (
+                    timestampCmp(
+                        Timestamp(recoveryTs["$timestamp"]["t"], recoveryTs["$timestamp"]["i"]),
+                        ts,
+                    ) <= 0
+                );
             },
         });
 

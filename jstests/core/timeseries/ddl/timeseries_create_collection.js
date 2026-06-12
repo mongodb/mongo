@@ -31,7 +31,10 @@ function assertCollExists(exists, db, collName) {
     if (exists) {
         assert(collInfo, `Collection '${collName}' was not found`);
     } else {
-        assert(!collInfo, `Collection '${collName}' should not exists, but it was found: ${tojson(collInfo)}`);
+        assert(
+            !collInfo,
+            `Collection '${collName}' should not exists, but it was found: ${tojson(collInfo)}`,
+        );
     }
 }
 
@@ -53,7 +56,9 @@ describe("Non existing collection", () => {
     it("Create timeseries coll", () => {
         // Create a timeseries collection
         assert.commandWorked(
-            testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
         assertCollExists(true, testDB, collName);
         if (isViewlessTimeseriesOnlySuite(db)) {
@@ -63,7 +68,9 @@ describe("Non existing collection", () => {
         }
     });
     it("Create view", () => {
-        assert.commandWorked(testDB.runCommand({create: collName, viewOn: otherName, pipeline: viewPipeline}));
+        assert.commandWorked(
+            testDB.runCommand({create: collName, viewOn: otherName, pipeline: viewPipeline}),
+        );
         assertCollExists(true, testDB, collName);
         assertCollExists(false, testDB, bucketsName);
         assertCollExists(false, testDB, otherName);
@@ -90,7 +97,9 @@ describe("Non-timeseries coll exists", () => {
         // Create timeseries collection when regular collection already exist on namespace. Command should
         // fail with NamespaceExists
         assert.commandFailedWithCode(
-            testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
             ErrorCodes.NamespaceExists,
         );
     });
@@ -105,7 +114,9 @@ describe("Non-timeseries coll exists", () => {
 describe("Timeseries coll exists", () => {
     beforeEach(() => {
         assert.commandWorked(
-            testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
         assertCollExists(true, testDB, collName);
     });
@@ -118,12 +129,16 @@ describe("Timeseries coll exists", () => {
     });
     it("Create timeseries coll - same options", () => {
         assert.commandWorked(
-            testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
     });
     it("Create timeseries coll - different options", () => {
         assert.commandFailedWithCode(
-            testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: "differentMeta"}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: "differentMeta"},
+            }),
             ErrorCodes.NamespaceExists,
         );
     });
@@ -137,7 +152,9 @@ describe("Timeseries coll exists", () => {
 
 describe("view exists", () => {
     beforeEach(() => {
-        assert.commandWorked(testDB.runCommand({create: collName, viewOn: otherName, pipeline: viewPipeline}));
+        assert.commandWorked(
+            testDB.runCommand({create: collName, viewOn: otherName, pipeline: viewPipeline}),
+        );
         assertCollExists(true, testDB, collName);
         assertCollExists(false, testDB, bucketsName);
         assertCollExists(false, testDB, otherName);
@@ -156,16 +173,24 @@ describe("view exists", () => {
         // Create timeseries collection when a view already exists on namespace.
         // Command should fail with NamespaceExists
         assert.commandFailedWithCode(
-            testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
             ErrorCodes.NamespaceExists,
         );
     });
     it("Create view - idempotent", () => {
-        assert.commandWorked(testDB.runCommand({create: collName, viewOn: otherName, pipeline: viewPipeline}));
+        assert.commandWorked(
+            testDB.runCommand({create: collName, viewOn: otherName, pipeline: viewPipeline}),
+        );
     });
     it("Create view - different target namespace", () => {
         assert.commandFailedWithCode(
-            testDB.runCommand({create: collName, viewOn: "differentNamespace", pipeline: viewPipeline}),
+            testDB.runCommand({
+                create: collName,
+                viewOn: "differentNamespace",
+                pipeline: viewPipeline,
+            }),
             ErrorCodes.NamespaceExists,
         );
     });

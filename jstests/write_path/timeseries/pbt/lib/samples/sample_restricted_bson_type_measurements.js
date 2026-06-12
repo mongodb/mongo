@@ -17,7 +17,9 @@ const metaValue = "metavalue";
 describe("Restricted BSON types", () => {
     it("creates measurements with restricted BSON types 'double' and 'decimal'", () => {
         const samples = fc.sample(
-            makeMeasurementDocArb(timeField, metaField, metaValue, 5, 5, {types: ["double", "decimal"]}),
+            makeMeasurementDocArb(timeField, metaField, metaValue, 5, 5, {
+                types: ["double", "decimal"],
+            }),
             30,
         );
         jsTest.log.info({samples});

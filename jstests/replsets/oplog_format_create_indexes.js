@@ -16,10 +16,16 @@ const oplogColl = primary.getDB("local").oplog.rs;
 
 function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
-    const allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(coll.getIndexes());
+    const allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(
+        coll.getIndexes(),
+    );
     const indexSpec = IndexCatalogHelpers.findByKeyPattern(allIndexes, keyPattern);
 
-    assert.neq(null, indexSpec, "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
+    assert.neq(
+        null,
+        indexSpec,
+        "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes),
+    );
 
     const indexCreationOplogQuery = {
         op: "c",
@@ -80,7 +86,9 @@ testOplogEntryContainsIndexInfoObj(
 
 // Test that the representation of an index's collation in the oplog on a collection with a
 // non-simple default collation exactly matches that of the index's full specification.
-assert.commandWorked(testDB.runCommand({create: "oplog_format_collation", collation: {locale: "fr"}}));
+assert.commandWorked(
+    testDB.runCommand({create: "oplog_format_collation", collation: {locale: "fr"}}),
+);
 
 // Insert document into collection to avoid optimization for index creation on an empty collection.
 assert.commandWorked(testDB.oplog_format_collation.insert({a: 1}));

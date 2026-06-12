@@ -72,7 +72,11 @@ TestData.skipCheckOrphans = true;
 
     // Have the other shard clone the DB from the primary.
     assert.commandWorked(
-        toShard.adminCommand({_shardsvrCloneCatalogData: "test", from: fromShard.host, writeConcern: {w: "majority"}}),
+        toShard.adminCommand({
+            _shardsvrCloneCatalogData: "test",
+            from: fromShard.host,
+            writeConcern: {w: "majority"},
+        }),
     );
 
     // Ask the shard that just called _shardsvrCloneCatalogData for the collections.
@@ -89,12 +93,20 @@ TestData.skipCheckOrphans = true;
     [c1, c2] = collections;
 
     function checkName(c, expectedName) {
-        assert.eq(c.name, expectedName, "Expected collection to be " + expectedName + ", got " + c.name);
+        assert.eq(
+            c.name,
+            expectedName,
+            "Expected collection to be " + expectedName + ", got " + c.name,
+        );
     }
 
     function checkOptions(c, expectedOptions) {
         assert.hasFields(c, ["options"], "Missing options field for collection " + c.name);
-        assert.hasFields(c.options, expectedOptions, "Missing expected option(s) for collection " + c.name);
+        assert.hasFields(
+            c.options,
+            expectedOptions,
+            "Missing expected option(s) for collection " + c.name,
+        );
     }
 
     function checkUUID(c, expectedUUID) {
@@ -202,7 +214,11 @@ TestData.skipCheckOrphans = true;
 
     // Check that the command fails when failing to specify a source.
     assert.commandFailedWithCode(
-        toShard.adminCommand({_shardsvrCloneCatalogData: "test", from: "", writeConcern: {w: "majority"}}),
+        toShard.adminCommand({
+            _shardsvrCloneCatalogData: "test",
+            from: "",
+            writeConcern: {w: "majority"},
+        }),
         ErrorCodes.InvalidOptions,
     );
 

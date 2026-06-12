@@ -24,14 +24,20 @@ assert.commandWorked(coll.insert({a: 1}));
 const res = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
 assert(res.cursor.firstBatch.length == 1);
 
-assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}));
+assert.commandWorked(
+    db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}),
+);
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: true, background: true}));
+assert.commandWorked(
+    db.runCommand({validate: collName, checkBSONConformance: true, background: true}),
+);
 
 assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: true, full: true}));
 
-assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}));
+assert.commandWorked(
+    db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}),
+);
 
 assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: false, full: true}));
 
@@ -45,6 +51,8 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions,
 );
 
-assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: false, enforceFastCount: true}));
+assert.commandWorked(
+    db.runCommand({validate: collName, checkBSONConformance: false, enforceFastCount: true}),
+);
 
 rst.stopSet();

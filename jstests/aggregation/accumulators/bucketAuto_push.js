@@ -15,7 +15,10 @@ coll.insertMany(docs);
     // One bucket, all the documents coming out of the $bucketAuto stage should be in the same
     // order as they came in (i.e. sorted by _id).
     const res = coll
-        .aggregate([{$sort: {_id: 1}}, {$bucketAuto: {groupBy: "$n", buckets: 1, output: {docs: {$push: "$$ROOT"}}}}])
+        .aggregate([
+            {$sort: {_id: 1}},
+            {$bucketAuto: {groupBy: "$n", buckets: 1, output: {docs: {$push: "$$ROOT"}}}},
+        ])
         .toArray();
     const expected = [
         {
@@ -34,13 +37,20 @@ coll.insertMany(docs);
             ],
         },
     ];
-    assert.eq(res, expected, "$bucketAuto with 1 bucket & $push does not obey sort order of incoming docs.");
+    assert.eq(
+        res,
+        expected,
+        "$bucketAuto with 1 bucket & $push does not obey sort order of incoming docs.",
+    );
 }
 
 {
     // Two buckets, the documents in each bucket should be sorted by _id as well.
     const res = coll
-        .aggregate([{$sort: {_id: 1}}, {$bucketAuto: {groupBy: "$n", buckets: 2, output: {docs: {$push: "$$ROOT"}}}}])
+        .aggregate([
+            {$sort: {_id: 1}},
+            {$bucketAuto: {groupBy: "$n", buckets: 2, output: {docs: {$push: "$$ROOT"}}}},
+        ])
         .toArray();
     const expected = [
         {
@@ -64,7 +74,11 @@ coll.insertMany(docs);
             ],
         },
     ];
-    assert.eq(res, expected, "$bucketAuto with 2 buckets & $push does not obey sort order of incoming docs.");
+    assert.eq(
+        res,
+        expected,
+        "$bucketAuto with 2 buckets & $push does not obey sort order of incoming docs.",
+    );
 }
 
 {

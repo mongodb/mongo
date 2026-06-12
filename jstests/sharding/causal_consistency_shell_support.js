@@ -22,11 +22,13 @@ function runCommandAndCheckLogicalTimes(cmdObj, db, shouldAdvance) {
     if (shouldAdvance) {
         assert(
             bsonWoCompare(session.getOperationTime(), operationTime) > 0,
-            "expected the shell's operationTime to increase after running command: " + tojson(cmdObj),
+            "expected the shell's operationTime to increase after running command: " +
+                tojson(cmdObj),
         );
         assert(
             bsonWoCompare(session.getClusterTime().clusterTime, clusterTimeObj.clusterTime) > 0,
-            "expected the shell's clusterTime value to increase after running command: " + tojson(cmdObj),
+            "expected the shell's clusterTime value to increase after running command: " +
+                tojson(cmdObj),
         );
     } else {
         // Don't expect either clusterTime or operationTime to not change, because they may be
@@ -76,7 +78,11 @@ const testDB = st.s.getDB("test");
 const session = testDB.getSession();
 
 // Verify causal consistency is disabled unless explicitly set.
-assert.eq(testDB.getMongo()._causalConsistency, false, "causal consistency should be disabled by default");
+assert.eq(
+    testDB.getMongo()._causalConsistency,
+    false,
+    "causal consistency should be disabled by default",
+);
 testDB.getMongo().setCausalConsistency(true);
 
 // Verify causal consistency is enabled for the connection and for each supported command.
@@ -102,7 +108,11 @@ assert.neq(session.getClusterTime(), null);
 
 // Test that write commands advance both operation and cluster time.
 runCommandAndCheckLogicalTimes({insert: "foo", documents: [{x: 2}]}, testDB, true);
-runCommandAndCheckLogicalTimes({update: "foo", updates: [{q: {x: 2}, u: {$set: {x: 3}}}]}, testDB, true);
+runCommandAndCheckLogicalTimes(
+    {update: "foo", updates: [{q: {x: 2}, u: {$set: {x: 3}}}]},
+    testDB,
+    true,
+);
 
 // Test that each supported command works as expected and the shell's cluster times are properly
 // forwarded to the server and updated based on the response.

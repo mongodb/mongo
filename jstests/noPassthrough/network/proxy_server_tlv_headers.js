@@ -44,7 +44,8 @@ const kDN = "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York Cit
 
 // DER-encoded roles from client_roles.pem: backup@admin, readAnyDatabase@admin.
 // This is the value of the mongodbRoles extension (OID 1.3.6.1.4.1.34601.2.1.1).
-const kRolesDer = "\x31\x2b\x30\x0f\x0c\x06backup\x0c\x05admin\x30\x18\x0c\x0freadAnyDatabase\x0c\x05admin";
+const kRolesDer =
+    "\x31\x2b\x30\x0f\x0c\x06backup\x0c\x05admin\x30\x18\x0c\x0freadAnyDatabase\x0c\x05admin";
 
 const kSNI = "my.mongodb.com";
 

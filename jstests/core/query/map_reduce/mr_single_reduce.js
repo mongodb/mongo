@@ -20,5 +20,7 @@ const reduce = function (key, values) {
     return "reduced value";
 };
 
-const res = assert.commandWorked(db.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}));
+const res = assert.commandWorked(
+    db.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}),
+);
 assert.eq(res.results[0], {_id: 0, value: "reduced value"});

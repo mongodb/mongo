@@ -58,7 +58,12 @@ const insertTimestamp = insertResponse.operationTime;
 
 // Set up a hangBeforeRSTLOnDrainComplete failpoint on node 0 to make it hang
 // during drain mode.
-const node0DrainModeFailpoint = configureFailPoint(nodes[0], "hangBeforeRSTLOnDrainComplete", {}, "alwaysOn");
+const node0DrainModeFailpoint = configureFailPoint(
+    nodes[0],
+    "hangBeforeRSTLOnDrainComplete",
+    {},
+    "alwaysOn",
+);
 
 // Wait for node 0 to become aware of the insert via heartbeats.
 assert.soon(() => {

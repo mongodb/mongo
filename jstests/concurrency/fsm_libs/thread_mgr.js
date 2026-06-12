@@ -38,9 +38,17 @@ export const ThreadManager = function (clusterOptions) {
     let _workloads, _context;
 
     this.init = function init(workloads, context, maxAllowedThreads) {
-        assert.eq("number", typeof maxAllowedThreads, "the maximum allowed threads must be a number");
+        assert.eq(
+            "number",
+            typeof maxAllowedThreads,
+            "the maximum allowed threads must be a number",
+        );
         assert.gt(maxAllowedThreads, 0, "the maximum allowed threads must be positive");
-        assert.eq(maxAllowedThreads, Math.floor(maxAllowedThreads), "the maximum allowed threads must be an integer");
+        assert.eq(
+            maxAllowedThreads,
+            Math.floor(maxAllowedThreads),
+            "the maximum allowed threads must be an integer",
+        );
 
         function computeNumThreads() {
             // If we don't have any workloads, return 0.
@@ -86,7 +94,9 @@ export const ThreadManager = function (clusterOptions) {
         errorLatch = new CountDownLatch(numThreads);
 
         let plural = numThreads === 1 ? "" : "s";
-        print("Using " + numThreads + " thread" + plural + " (requested " + requestedNumThreads + ")");
+        print(
+            "Using " + numThreads + " thread" + plural + " (requested " + requestedNumThreads + ")",
+        );
 
         _workloads = workloads;
         _context = context;

@@ -18,7 +18,9 @@ ts.drop();
 const coll = db[jsTestName() + "_regular_collection"];
 coll.drop();
 
-assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "m"}}),
+);
 
 const numTimes = 100;
 const numSymbols = 10;
@@ -87,7 +89,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({
         aggregate: jsTestName() + "_regular_collection",
-        pipeline: [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}, $monotonicIdFields: ["_id"]}}],
+        pipeline: [
+            {$_internalStreamingGroup: {_id: null, count: {$sum: 1}, $monotonicIdFields: ["_id"]}},
+        ],
         cursor: {},
     }),
     7026708,
@@ -97,7 +101,10 @@ const runTest = function (pipeline, expectedMonotonicIdFields) {
     const explain = assert.commandWorked(ts.explain().aggregate(pipeline));
     const streamingGroupStage = getAggPlanStage(explain, "$_internalStreamingGroup");
     assert.neq(streamingGroupStage, null);
-    assert.eq(streamingGroupStage.$_internalStreamingGroup.$monotonicIdFields, expectedMonotonicIdFields);
+    assert.eq(
+        streamingGroupStage.$_internalStreamingGroup.$monotonicIdFields,
+        expectedMonotonicIdFields,
+    );
 
     const found = ts.aggregate(pipeline).toArray();
     const expected = coll.aggregate(pipeline).toArray();

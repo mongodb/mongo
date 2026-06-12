@@ -92,10 +92,18 @@ export const $config = (function () {
         // coverage we want. We will end up intermixing queries which observe the flag on and off in
         // various combinations across the cluster.
         toggleFlagOn: function toggleFlagOn(db, collName) {
-            setParameterOnAllNonConfigNodes(db.getMongo(), "featureFlagVectorSearchExtension", true);
+            setParameterOnAllNonConfigNodes(
+                db.getMongo(),
+                "featureFlagVectorSearchExtension",
+                true,
+            );
         },
         toggleFlagOff: function toggleFlagOff(db, collName) {
-            setParameterOnAllNonConfigNodes(db.getMongo(), "featureFlagVectorSearchExtension", false);
+            setParameterOnAllNonConfigNodes(
+                db.getMongo(),
+                "featureFlagVectorSearchExtension",
+                false,
+            );
         },
 
         basicVectorSearch: function basicVectorSearch(db, collName) {
@@ -118,7 +126,9 @@ export const $config = (function () {
 
         vectorSearchOnNestedView: function vectorSearchOnNestedView(db, collName) {
             const nestedView = db[kNestedViewName];
-            const pipeline = [{$vectorSearch: {...this.vectorSearchQuery, index: "nested_view_index"}}];
+            const pipeline = [
+                {$vectorSearch: {...this.vectorSearchQuery, index: "nested_view_index"}},
+            ];
 
             const result = assertExpectedResult(nestedView.aggregate(pipeline).toArray());
             assert(result.hasOwnProperty("nested"), "Expected nested view to be applied");
@@ -149,7 +159,9 @@ export const $config = (function () {
                 {
                     $unionWith: {
                         coll: this.viewName,
-                        pipeline: [{$vectorSearch: {...this.vectorSearchQuery, index: "view_index"}}],
+                        pipeline: [
+                            {$vectorSearch: {...this.vectorSearchQuery, index: "view_index"}},
+                        ],
                     },
                 },
             ];
@@ -165,7 +177,12 @@ export const $config = (function () {
                     $unionWith: {
                         coll: kNestedViewName,
                         pipeline: [
-                            {$vectorSearch: {...this.vectorSearchQuery, index: "nested_view_index"}},
+                            {
+                                $vectorSearch: {
+                                    ...this.vectorSearchQuery,
+                                    index: "nested_view_index",
+                                },
+                            },
                             {$addFields: {my_nested: true}},
                         ],
                     },
@@ -256,7 +273,10 @@ export const $config = (function () {
         createSearchIndex(db[kUnionTargetCollName], kVectorSearchIndexSpec);
 
         createSearchIndex(db[kViewName], {...kVectorSearchIndexSpec, name: "view_index"});
-        createSearchIndex(db[kNestedViewName], {...kVectorSearchIndexSpec, name: "nested_view_index"});
+        createSearchIndex(db[kNestedViewName], {
+            ...kVectorSearchIndexSpec,
+            name: "nested_view_index",
+        });
 
         jsTest.log.info("Setup complete.");
     }
@@ -264,7 +284,11 @@ export const $config = (function () {
     function teardown(db, collName, cluster) {
         jsTest.log.info("Teardown: Ensuring feature flag is reset to default state (on)");
         try {
-            setParameterOnAllNonConfigNodes(db.getMongo(), "featureFlagVectorSearchExtension", true);
+            setParameterOnAllNonConfigNodes(
+                db.getMongo(),
+                "featureFlagVectorSearchExtension",
+                true,
+            );
         } catch (e) {
             jsTest.log.warning(`Could not reset feature flag in teardown: ${e.message}`);
         }

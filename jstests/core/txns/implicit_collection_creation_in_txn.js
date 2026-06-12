@@ -31,7 +31,9 @@ jsTest.log("Implicitly create a collection in a transaction using insert.");
 
 // Insert succeeds when the collection exists.
 withRetry(() => {
-    assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}),
+    );
 
     session.startTransaction({writeConcern: {w: "majority"}});
     assert.commandWorked(sessionColl.insert({_id: "doc"}));
@@ -54,7 +56,9 @@ jsTest.log("Implicitly create a collection in a transaction using update.");
 
 // Update with upsert=true succeeds when the collection exists.
 withRetry(() => {
-    assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}),
+    );
 
     session.startTransaction({writeConcern: {w: "majority"}});
     sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: true});
@@ -75,7 +79,9 @@ withRetry(() => {
 assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 withRetry(() => {
     session.startTransaction({writeConcern: {w: "majority"}});
-    assert.commandWorked(sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: false}));
+    assert.commandWorked(
+        sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: false}),
+    );
     assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(null, testColl.findOne({_id: "doc"}));
 });
@@ -84,7 +90,9 @@ jsTest.log("Implicitly create a collection in a transaction using findAndModify.
 
 // findAndModify with upsert=true succeeds when the collection exists.
 withRetry(() => {
-    assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}),
+    );
 
     session.startTransaction({writeConcern: {w: "majority"}});
     const res = sessionDb.runCommand({

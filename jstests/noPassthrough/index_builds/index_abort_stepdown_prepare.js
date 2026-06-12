@@ -43,7 +43,9 @@ assert.commandWorked(primaryColl.insert({_id: 1, a: 1}));
 
 // Enable fail point which makes index build hang in an interruptible state.
 const failPoint = "hangAfterIndexBuildDumpsInsertsFromBulk";
-let res = assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+let res = assert.commandWorked(
+    primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}),
+);
 let timesEntered = res.count;
 
 const indexName = "a_1";

@@ -17,7 +17,10 @@ function assertGLEOK(status) {
 }
 
 function assertGLENotOK(status) {
-    assert(status.ok && status.err !== null, "Expected not-OK status object; found " + tojson(status));
+    assert(
+        status.ok && status.err !== null,
+        "Expected not-OK status object; found " + tojson(status),
+    );
 }
 
 mydb.dropDatabase();
@@ -28,10 +31,14 @@ mydb.dropAllUsers();
 //
 
 // V0 user document document; insert should fail.
-assert.commandFailed(mydb.runCommand({createUser: 1, user: "spencer", pwd: "password", readOnly: true}));
+assert.commandFailed(
+    mydb.runCommand({createUser: 1, user: "spencer", pwd: "password", readOnly: true}),
+);
 
 // V1 user document; insert should fail.
-assert.commandFailed(mydb.runCommand({createUser: 1, user: "spencer", userSource: "test2", roles: ["dbAdmin"]}));
+assert.commandFailed(
+    mydb.runCommand({createUser: 1, user: "spencer", userSource: "test2", roles: ["dbAdmin"]}),
+);
 
 // Valid V2 user document; insert should succeed.
 assert.commandWorked(mydb.runCommand({createUser: "spencer", pwd: "password", roles: ["dbAdmin"]}));
@@ -41,7 +48,9 @@ assert.commandWorked(
     mydb.runCommand({
         createUser: "andy",
         pwd: "password",
-        roles: [{role: "dbAdmin", db: "validate_user_documents", hasRole: true, canDelegate: false}],
+        roles: [
+            {role: "dbAdmin", db: "validate_user_documents", hasRole: true, canDelegate: false},
+        ],
     }),
 );
 

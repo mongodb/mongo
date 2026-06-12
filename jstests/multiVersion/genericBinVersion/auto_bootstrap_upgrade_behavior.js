@@ -16,12 +16,17 @@ function fetchShardIdentityDoc(conn) {
     replSet.startSet();
     replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-    replSet.upgradeSet({binVersion: "latest", setParameter: {featureFlagAllMongodsAreSharded: true}});
+    replSet.upgradeSet({
+        binVersion: "latest",
+        setParameter: {featureFlagAllMongodsAreSharded: true},
+    });
 
     let primary = replSet.getPrimary();
     assert.eq(null, fetchShardIdentityDoc(primary));
 
-    assert.commandWorked(primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}),
+    );
 
     assert.neq(null, fetchShardIdentityDoc(primary));
     assert.neq(null, primary.getDB("config").shards.findOne());

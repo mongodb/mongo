@@ -102,7 +102,10 @@ function compareCovarianceOfflineAndOnline(bounds) {
                     sortBy: {_id: 1},
                     output: {
                         popCovariance: {$covariancePop: ["$x", "$y"], window: {documents: bounds}},
-                        sampCovariance: {$covarianceSamp: ["$x", "$y"], window: {documents: bounds}},
+                        sampCovariance: {
+                            $covarianceSamp: ["$x", "$y"],
+                            window: {documents: bounds},
+                        },
                     },
                 },
             },
@@ -115,7 +118,8 @@ function compareCovarianceOfflineAndOnline(bounds) {
             offlineRes[i].popCovariance != null ? offlineRes[i].popCovariance.toFixed(5) : null;
         offlineRes[i].sampCovariance =
             offlineRes[i].sampCovariance != null ? offlineRes[i].sampCovariance.toFixed(5) : null;
-        onlineRes[i].popCovariance = onlineRes[i].popCovariance != null ? onlineRes[i].popCovariance.toFixed(5) : null;
+        onlineRes[i].popCovariance =
+            onlineRes[i].popCovariance != null ? onlineRes[i].popCovariance.toFixed(5) : null;
         onlineRes[i].sampCovariance =
             onlineRes[i].sampCovariance != null ? onlineRes[i].sampCovariance.toFixed(5) : null;
 

@@ -21,7 +21,9 @@ const docsPerMetaField = 3;
 const initializeData = function () {
     testColl = testDB[collectionNamePrefix + ++collectionCounter];
     assert.commandWorked(
-        testDB.createCollection(testColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(testColl.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     let docs = [];
@@ -253,7 +255,10 @@ const initializeData = function () {
     // We expect the deleteOne on transaction B to fail, causing the transaction to abort.
     // Sidenote: avoiding the deleteOne method from 'crud_api.js' because it throws.
     assert.commandFailedWithCode(collB.runCommand(deleteCommand), ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(sessionB.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        sessionB.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
     sessionB.endSession();
 
     // Ensure the document does not exist in the snapshot of transaction A.

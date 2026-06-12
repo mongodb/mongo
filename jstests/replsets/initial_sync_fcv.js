@@ -24,13 +24,19 @@ const dbName = "foo";
 const collName = "bar";
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 assert.commandWorked(primary.getDB(dbName).getCollection(collName).insert({a: 1}));
 
 function runInitialSync(cmd, initialFCV) {
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}),
+    );
 
     jsTestLog("Testing setting fCV with " + tojson(cmd));
 
@@ -65,7 +71,9 @@ function runInitialSync(cmd, initialFCV) {
 
     // Let initial sync finish, making sure that it fails due to the feature compatibility
     // version change.
-    assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangBeforeClonerStage", mode: "off"}));
+    assert.commandWorked(
+        secondary.adminCommand({configureFailPoint: "hangBeforeClonerStage", mode: "off"}),
+    );
     checkLog.contains(secondary, "Applying operation on feature compatibility version document");
 
     jsTestLog("Wait for both nodes to be up-to-date");
@@ -82,10 +90,16 @@ function runInitialSync(cmd, initialFCV) {
 
 // Ensure that attempting to downgrade the featureCompatibilityVersion during initial sync
 // fails.
-runInitialSync({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}, /*initialFCV*/ latestFCV);
+runInitialSync(
+    {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true},
+    /*initialFCV*/ latestFCV,
+);
 
 // Ensure that attempting to upgrade the featureCompatibilityVersion during initial sync fails.
-runInitialSync({setFeatureCompatibilityVersion: latestFCV, confirm: true}, /*initialFCV*/ lastLTSFCV);
+runInitialSync(
+    {setFeatureCompatibilityVersion: latestFCV, confirm: true},
+    /*initialFCV*/ lastLTSFCV,
+);
 
 // Modifications to the featureCompatibilityVersion document during initial sync should be
 // caught and cause initial sync to fail.

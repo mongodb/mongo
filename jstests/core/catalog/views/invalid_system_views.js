@@ -39,7 +39,9 @@ function runTest(badViewDefinition) {
     assert.commandWorked(viewsDB.collection.createIndex({x: 1}));
     assert.commandWorked(viewsDB.createCollection("system.views"));
     assert.commandWorked(
-        viewsDB.adminCommand({applyOps: [{op: "i", ns: viewsDB.getName() + ".system.views", o: badViewDefinition}]}),
+        viewsDB.adminCommand({
+            applyOps: [{op: "i", ns: viewsDB.getName() + ".system.views", o: badViewDefinition}],
+        }),
         "failed to insert " + tojson(badViewDefinition),
     );
 
@@ -53,7 +55,9 @@ function runTest(badViewDefinition) {
     // Helper function to create a message to use if an assertion fails.
     function makeErrorMessage(msg) {
         return (
-            msg + " should work on a valid, existing collection, despite the presence of bad views" + " in system.views"
+            msg +
+            " should work on a valid, existing collection, despite the presence of bad views" +
+            " in system.views"
         );
     }
 
@@ -71,7 +75,10 @@ function runTest(badViewDefinition) {
 
     assert.commandWorked(viewsDB.collection.insert({y: "baz"}), makeErrorMessage("insert"));
 
-    assert.commandWorked(viewsDB.collection.update({y: "baz"}, {$set: {y: "qux"}}), makeErrorMessage("update"));
+    assert.commandWorked(
+        viewsDB.collection.update({y: "baz"}, {$set: {y: "qux"}}),
+        makeErrorMessage("update"),
+    );
 
     assert.commandWorked(viewsDB.collection.remove({y: "baz"}), makeErrorMessage("remove"));
 
@@ -148,12 +155,18 @@ function runTest(badViewDefinition) {
 
     // Drop the offending view so that the validate hook succeeds.
     assert.commandWorked(
-        viewsDB.adminCommand({applyOps: [{op: "d", ns: viewsDB.getName() + ".system.views", o: badViewDefinition}]}),
+        viewsDB.adminCommand({
+            applyOps: [{op: "d", ns: viewsDB.getName() + ".system.views", o: badViewDefinition}],
+        }),
     );
 }
 
 runTest({_id: "invalid_system_views.badViewStringPipeline", viewOn: "collection", pipeline: "bad"});
-runTest({_id: "invalid_system_views.badViewEmptyObjectPipeline", viewOn: "collection", pipeline: {}});
+runTest({
+    _id: "invalid_system_views.badViewEmptyObjectPipeline",
+    viewOn: "collection",
+    pipeline: {},
+});
 runTest({_id: "invalid_system_views.badViewNumericalPipeline", viewOn: "collection", pipeline: 7});
 runTest({
     _id: "invalid_system_views.badViewArrayWithIntegerPipeline",

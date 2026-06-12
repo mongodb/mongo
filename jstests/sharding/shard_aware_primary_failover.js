@@ -8,7 +8,11 @@ let st = new ShardingTest({shards: 1});
 
 // Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let replTest = new ReplSetTest({nodes: 3});
@@ -47,9 +51,10 @@ let shardIdentityUpdate = {
     $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString},
 };
 assert.commandWorked(
-    primaryConn
-        .getDB("admin")
-        .system.version.update(shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: "majority"}}),
+    primaryConn.getDB("admin").system.version.update(shardIdentityQuery, shardIdentityUpdate, {
+        upsert: true,
+        writeConcern: {w: "majority"},
+    }),
 );
 
 replTest.stopPrimary();
@@ -63,7 +68,9 @@ assert(res.enabled);
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 assert.soon(
-    () => shardIdentityDoc.configsvrConnectionString == primaryConn.adminCommand({shardingState: 1}).configServer,
+    () =>
+        shardIdentityDoc.configsvrConnectionString ==
+        primaryConn.adminCommand({shardingState: 1}).configServer,
 );
 
 replTest.stopSet();

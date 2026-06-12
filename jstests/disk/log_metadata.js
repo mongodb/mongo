@@ -8,7 +8,11 @@
  * ]
  */
 
-import {getUriForIndex, runWiredTigerTool, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
+import {
+    getUriForIndex,
+    runWiredTigerTool,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 // Because this test intentionally crashes the server, we instruct the
 // the shell to clean up after us and remove the core dump.

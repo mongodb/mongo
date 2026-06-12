@@ -56,7 +56,11 @@ line("Inserting documents");
 code(tojson(docs));
 assert.commandWorked(coll.insert(docs));
 
-const pipeline = [{"$sort": {"m": 1}}, {"$addFields": {"a": NumberInt(0)}}, {"$project": {"_id": 0, "a": 1}}];
+const pipeline = [
+    {"$sort": {"m": 1}},
+    {"$addFields": {"a": NumberInt(0)}},
+    {"$project": {"_id": 0, "a": 1}},
+];
 
 subSection("Pipeline");
 code(tojson(pipeline));

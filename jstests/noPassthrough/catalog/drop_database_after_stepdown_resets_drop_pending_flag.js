@@ -36,7 +36,10 @@ let awaitIndexBuild = startParallelShell(() => {
 IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), "a_1");
 
 let awaitDropDatabase = startParallelShell(() => {
-    assert.commandFailedWithCode(db.getSiblingDB("test").dropDatabase(), ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        db.getSiblingDB("test").dropDatabase(),
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 }, primary.port);
 
 failPoint.wait();

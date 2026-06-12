@@ -99,7 +99,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
             rs.startSet({shardsvr: ""});
             rs.initiate();
 
-            assert.commandWorked(this.mongos.getDB("admin").runCommand({"addShard": rs.getURL(), name}));
+            assert.commandWorked(
+                this.mongos.getDB("admin").runCommand({"addShard": rs.getURL(), name}),
+            );
 
             this.shards.push(rs);
         };
@@ -137,9 +139,13 @@ describe("promote and demote replicaset to sharded cluster", function () {
 
         assert.commandWorked(this.testDBDirectConnection.foo.insertOne({bar: 42}));
         assert.commandWorked(
-            this.testDBDirectConnection.createCollection("testTsColl", {timeseries: {timeField: "time"}}),
+            this.testDBDirectConnection.createCollection("testTsColl", {
+                timeseries: {timeField: "time"},
+            }),
         );
-        assert.commandWorked(this.testDBDirectConnection.testTsColl.insertOne({time: new Date(), temperature: 25.0}));
+        assert.commandWorked(
+            this.testDBDirectConnection.testTsColl.insertOne({time: new Date(), temperature: 25.0}),
+        );
 
         this.doRollingRestart(this.configRS, {
             configsvr: "",
@@ -147,7 +153,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
         });
 
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
-            const res = assert.commandWorked(this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}));
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}),
+            );
             assert.eq(res.enabled, false);
         });
 
@@ -164,7 +172,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
         this.configRS.asCluster(
             this.configRS.getPrimary(),
             () => {
-                assert.commandWorked(this.configRS.getPrimary().adminCommand({replSetReconfig: config}));
+                assert.commandWorked(
+                    this.configRS.getPrimary().adminCommand({replSetReconfig: config}),
+                );
             },
             this.keyFile,
         );
@@ -173,18 +183,27 @@ describe("promote and demote replicaset to sharded cluster", function () {
         });
 
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
-            const res = assert.commandWorked(this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}));
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}),
+            );
             assert.eq(res.enabled, false);
         });
 
-        this.mongos = MongoRunner.runMongos({keyFile: this.keyFile, configdb: this.configRS.getURL()});
+        this.mongos = MongoRunner.runMongos({
+            keyFile: this.keyFile,
+            configdb: this.configRS.getURL(),
+        });
 
         this.adminDBMongosConnection = this.mongos.getDB("admin");
         assert(this.adminDBMongosConnection.auth("admin", "x"), "Authentication failed");
-        assert.commandWorked(this.adminDBMongosConnection.runCommand({"transitionFromDedicatedConfigServer": 1}));
+        assert.commandWorked(
+            this.adminDBMongosConnection.runCommand({"transitionFromDedicatedConfigServer": 1}),
+        );
 
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
-            const res = assert.commandWorked(this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}));
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}),
+            );
             assert.eq(res.enabled, true);
         });
 
@@ -220,7 +239,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
                     collections.add("test.system.buckets.testTsColl");
                 }
                 collections.forEach((collection) => {
-                    assert.commandWorked(adminDB.runCommand({_flushRoutingTableCacheUpdates: collection}));
+                    assert.commandWorked(
+                        adminDB.runCommand({_flushRoutingTableCacheUpdates: collection}),
+                    );
                 });
             },
             this.keyFile,
@@ -228,7 +249,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
         assert.commandWorked(this.testDBDirectConnection.foo.insertOne({baz: -1}));
         assert.eq(this.testDBDirectConnection.foo.count({baz: -1}), 1);
         assert.eq(this.mongos.getDB("test").foo.count({baz: -1}), 1);
-        assert.commandWorked(this.testDBDirectConnection.testTsColl.insertOne({time: new Date(), temperature: 35.0}));
+        assert.commandWorked(
+            this.testDBDirectConnection.testTsColl.insertOne({time: new Date(), temperature: 35.0}),
+        );
         assert.eq(this.testDBDirectConnection.testTsColl.count({temperature: 35.0}), 1);
         assert.eq(this.mongos.getDB("test").testTsColl.count({temperature: 35.0}), 1);
     });
@@ -244,8 +267,12 @@ describe("promote and demote replicaset to sharded cluster", function () {
 
     it("moving to dedicated", () => {
         this.addNewShard();
-        assert.commandWorked(this.adminDBMongosConnection.runCommand({"transitionToDedicatedConfigServer": 1}));
-        assert.commandWorked(this.adminDBMongosConnection.runCommand({movePrimary: "test", to: "shard-0"}));
+        assert.commandWorked(
+            this.adminDBMongosConnection.runCommand({"transitionToDedicatedConfigServer": 1}),
+        );
+        assert.commandWorked(
+            this.adminDBMongosConnection.runCommand({movePrimary: "test", to: "shard-0"}),
+        );
         assert.soon(() => {
             const res = assert.commandWorked(
                 this.adminDBMongosConnection.runCommand({"transitionToDedicatedConfigServer": 1}),
@@ -258,7 +285,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
 
     it("demoting keeps data", () => {
         assert.commandWorked(this.mongos.getDB("test").foo.insertOne({baz: -1}));
-        assert.commandWorked(this.mongos.getDB("test").testTsColl.insertOne({time: new Date(), temperature: 35.0}));
+        assert.commandWorked(
+            this.mongos.getDB("test").testTsColl.insertOne({time: new Date(), temperature: 35.0}),
+        );
 
         this.doRollingRestart(this.configRS, {
             replSet: "replica_set_promotion_demotion",
@@ -278,7 +307,9 @@ describe("promote and demote replicaset to sharded cluster", function () {
         this.configRS.asCluster(
             this.configRS.getPrimary(),
             () => {
-                assert.commandWorked(this.configRS.getPrimary().adminCommand({replSetReconfig: config}));
+                assert.commandWorked(
+                    this.configRS.getPrimary().adminCommand({replSetReconfig: config}),
+                );
             },
             this.keyFile,
         );

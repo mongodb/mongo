@@ -88,7 +88,14 @@ function withSlowMs(admin, ms, fn) {
  */
 function assertLogEntry(logFile, logId, attrs) {
     assert(
-        checkLog.checkContainsWithAtLeastCountJson(logFile, logId, attrs, 1, null, /*isRelaxed=*/ true),
+        checkLog.checkContainsWithAtLeastCountJson(
+            logFile,
+            logId,
+            attrs,
+            1,
+            null,
+            /*isRelaxed=*/ true,
+        ),
         `Expected at least one log ID ${logId} entry`,
     );
 }
@@ -99,14 +106,24 @@ function assertLogEntry(logFile, logId, attrs) {
  */
 function hasEntry(logFile, logID, parameterName, expectedValue) {
     const attrs = {parameterName, newValue: expectedValue};
-    return checkLog.checkContainsWithAtLeastCountJson(logFile, logID, attrs, 1, null, /*isRelaxed=*/ true);
+    return checkLog.checkContainsWithAtLeastCountJson(
+        logFile,
+        logID,
+        attrs,
+        1,
+        null,
+        /*isRelaxed=*/ true,
+    );
 }
 
 /**
  * Asserts that kSensitiveValue does not appear anywhere in the log file.
  */
 function assertNoLeak(logFile) {
-    assert(!checkLog.checkContainsOnce(logFile, kSensitiveValue), `Sensitive value found unredacted in log`);
+    assert(
+        !checkLog.checkContainsOnce(logFile, kSensitiveValue),
+        `Sensitive value found unredacted in log`,
+    );
 }
 
 /**
@@ -137,7 +154,12 @@ function testSensitiveParameterIsRedacted(conn) {
     // If the command succeeded, the success log entry must show "###" as the new value.
     // If it failed (e.g. no LDAP server is reachable), confirm the appropriate failure log
     // entry was written and that the sentinel value did not leak into it.
-    let hasSuccess = hasEntry(logFile, kSetSuccessWithOldValueId, "ldapQueryPassword", kRedactedMask);
+    let hasSuccess = hasEntry(
+        logFile,
+        kSetSuccessWithOldValueId,
+        "ldapQueryPassword",
+        kRedactedMask,
+    );
     if (!hasSuccess) {
         if (isMongosConn(conn)) {
             // mongos records command failures without commandArgs; verify the failure
@@ -315,7 +337,10 @@ function testNonSensitiveFieldsPreservedInSlowQueryLog(conn) {
         // Redaction must target only sensitive and conservatively-masked fields, leaving
         // non-sensitive parameters with their real values.
         assert(
-            checkLog.checkContainsOnce(logFile, '"internalQueryStatsCacheSize":"' + kCacheSize3 + '"'),
+            checkLog.checkContainsOnce(
+                logFile,
+                '"internalQueryStatsCacheSize":"' + kCacheSize3 + '"',
+            ),
             "Non-sensitive internalQueryStatsCacheSize was incorrectly masked - over-redaction detected",
         );
     });

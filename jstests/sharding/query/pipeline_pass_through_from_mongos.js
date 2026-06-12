@@ -4,12 +4,17 @@
  * exercises the fix for SERVER-41290.
  * @tags: [requires_sharding, requires_profiling]
  */
-import {profilerHasSingleMatchingEntryOrThrow, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const mongosDB = st.s0.getDB(jsTestName());
-assert.commandWorked(st.s0.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}),
+);
 const mongosColl = mongosDB.test;
 const mongosOtherColl = mongosDB.otherEmptyCollection;
 const primaryShard = st.shard0.getDB(jsTestName());
@@ -28,7 +33,9 @@ let testName = "sub_pipeline_can_be_passed_through";
 assert.commandWorked(
     mongosDB.runCommand({
         aggregate: mongosColl.getName(),
-        pipeline: [{$lookup: {pipeline: [{$match: {a: "val"}}], from: mongosOtherColl.getName(), as: "c"}}],
+        pipeline: [
+            {$lookup: {pipeline: [{$match: {a: "val"}}], from: mongosOtherColl.getName(), as: "c"}},
+        ],
         cursor: {},
         comment: testName,
     }),
@@ -155,7 +162,9 @@ const pipelineForNestedFacet = [
     {
         $facet: {
             field0: [{$match: {a: "val"}}],
-            field1: [{$facet: {field2: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}]}}],
+            field1: [
+                {$facet: {field2: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}]}},
+            ],
         },
     },
 ];

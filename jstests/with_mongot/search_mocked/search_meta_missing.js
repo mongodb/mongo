@@ -62,12 +62,16 @@ const cursorId = NumberLong(123);
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 // Verify that a $search query SEARCH_META evaluates to missing if no collector results are returned
 // from mongot.
-let cursor = coll.aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}], {cursor: {}});
+let cursor = coll.aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}], {
+    cursor: {},
+});
 
 const expected = [{"_id": 2}, {"_id": 1}, {"_id": 3}];
 assert.eq(expected, cursor.toArray());

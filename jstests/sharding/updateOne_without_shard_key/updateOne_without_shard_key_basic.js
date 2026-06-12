@@ -38,7 +38,9 @@ WriteWithoutShardKeyTestUtil.setupShardedCollection(
 
 const testCases = [
     {
-        logMessage: "Running single set style updateOne without shard key for documents " + "on different shards.",
+        logMessage:
+            "Running single set style updateOne without shard key for documents " +
+            "on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal},
@@ -54,7 +56,9 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running multiple set style updateOnes without shard key for " + "documents on different shards.",
+        logMessage:
+            "Running multiple set style updateOnes without shard key for " +
+            "documents on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal},
@@ -90,13 +94,19 @@ const testCases = [
             ],
         },
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{"a": setFieldVal}, {"z": setFieldVal}, {"b": setFieldVal}, {"c": setFieldVal}],
+        expectedMods: [
+            {"a": setFieldVal},
+            {"z": setFieldVal},
+            {"b": setFieldVal},
+            {"c": setFieldVal},
+        ],
         expectedResponse: {n: 4, nModified: 4},
         dbName: dbName,
         collName: collName,
     },
     {
-        logMessage: "Running single $set updateOne without shard key for documents " + "on the same shard.",
+        logMessage:
+            "Running single $set updateOne without shard key for documents " + "on the same shard.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard0_2, y: yFieldVal},
@@ -113,7 +123,9 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running multiple $set updateOnes without shard key for " + "documents on the same shard.",
+        logMessage:
+            "Running multiple $set updateOnes without shard key for " +
+            "documents on the same shard.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard0_2, y: yFieldVal},
@@ -151,14 +163,20 @@ const testCases = [
             ],
         },
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{"a": setFieldVal}, {"z": setFieldVal}, {"b": setFieldVal}, {"c": setFieldVal}],
+        expectedMods: [
+            {"a": setFieldVal},
+            {"z": setFieldVal},
+            {"b": setFieldVal},
+            {"c": setFieldVal},
+        ],
         expectedResponse: {n: 4, nModified: 4},
         dbName: dbName,
         collName: collName,
     },
     {
         logMessage:
-            "Running single aggregation pipeline updateOne without shard key for" + " documents on different shards.",
+            "Running single aggregation pipeline updateOne without shard key for" +
+            " documents on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal},
@@ -175,7 +193,8 @@ const testCases = [
     },
     {
         logMessage:
-            "Running multiple aggregation pipeline updateOne without shard key for " + "documents on different shards.",
+            "Running multiple aggregation pipeline updateOne without shard key for " +
+            "documents on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal},
@@ -188,7 +207,12 @@ const testCases = [
             ],
         },
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{"a": setFieldVal}, {"b": setFieldVal}, {"c": setFieldVal}, {"d": setFieldVal}],
+        expectedMods: [
+            {"a": setFieldVal},
+            {"b": setFieldVal},
+            {"c": setFieldVal},
+            {"d": setFieldVal},
+        ],
         expectedResponse: {n: 2, nModified: 2},
         dbName: dbName,
         collName: collName,
@@ -232,7 +256,9 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running single aggregation updateOne without shard key for documents " + "on the same shard.",
+        logMessage:
+            "Running single aggregation updateOne without shard key for documents " +
+            "on the same shard.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard0_2, y: yFieldVal},
@@ -249,7 +275,9 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running multiple aggregation updateOnes without shard key for " + "documents on the same shard.",
+        logMessage:
+            "Running multiple aggregation updateOnes without shard key for " +
+            "documents on the same shard.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
             {_id: 1, x: xFieldValShard0_2, y: yFieldVal},
@@ -263,7 +291,12 @@ const testCases = [
             ],
         },
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{"a": setFieldVal}, {"b": setFieldVal}, {"c": setFieldVal}, {"d": setFieldVal}],
+        expectedMods: [
+            {"a": setFieldVal},
+            {"b": setFieldVal},
+            {"c": setFieldVal},
+            {"d": setFieldVal},
+        ],
         expectedResponse: {n: 2, nModified: 2},
         dbName: dbName,
         collName: collName,
@@ -321,7 +354,9 @@ const testCases = [
         mustBeInRetryableWriteOrTransaction: true,
         cmdObj: {
             update: collName,
-            updates: [{q: {y: yFieldVal}, u: {x: xFieldValShard0_2 - 1, y: yFieldVal, a: setFieldVal}}],
+            updates: [
+                {q: {y: yFieldVal}, u: {x: xFieldValShard0_2 - 1, y: yFieldVal, a: setFieldVal}},
+            ],
         },
         options: [{ordered: true}, {ordered: false}],
         expectedMods: [{x: xFieldValShard0_2 - 1, y: yFieldVal, a: setFieldVal}],
@@ -379,7 +414,8 @@ const testCases = [
         collName: collName,
     },
     {
-        logMessage: "Running a single update where no document matches on the query and {upsert: true}",
+        logMessage:
+            "Running a single update where no document matches on the query and {upsert: true}",
         docsToInsert: [],
         cmdObj: {
             update: collName,

@@ -90,6 +90,9 @@ export function getConfigSvrAllowChunkOperations(st, ns) {
  * observe the per-shard state from a test.
  */
 export function getShardAllowChunkOperations(shardConn, ns) {
-    const doc = shardConn.getDB("config").getCollection("shard.catalog.collections").findOne({_id: ns});
+    const doc = shardConn
+        .getDB("config")
+        .getCollection("shard.catalog.collections")
+        .findOne({_id: ns});
     return doc === null ? undefined : doc.allowChunkOperations;
 }

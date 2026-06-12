@@ -37,7 +37,9 @@ describe("Tests validate command checks indexes in the time-series buckets data 
 
         // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
         assert.commandWorked(
-            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+            this.conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
         );
     });
 

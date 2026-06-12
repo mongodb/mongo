@@ -104,10 +104,19 @@ let st = new ShardingTest({
         rs1: {nodes: [{rsConfig: {}}, {rsConfig: {}}]},
     },
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 
 tests.forEach(function (test) {
-    testMoveChunkWithSession(st, test.coll, test.cmd, test.setup, test.checkRetryResult, test.checkDocuments);
+    testMoveChunkWithSession(
+        st,
+        test.coll,
+        test.cmd,
+        test.setup,
+        test.checkRetryResult,
+        test.checkDocuments,
+    );
 });
 
 st.stop();

@@ -146,7 +146,11 @@ validateFindCmdOutputAndPlan({
 });
 
 // Verify that query can use index for matching 'null' on hashed field.
-validateFindCmdOutputAndPlan({filter: {a: 12, b: null}, expectedOutput: [], expectedStages: ["FETCH", "IXSCAN"]});
+validateFindCmdOutputAndPlan({
+    filter: {a: 12, b: null},
+    expectedOutput: [],
+    expectedStages: ["FETCH", "IXSCAN"],
+});
 
 // Verify that $not queries on non-hashed prefixes can use a compound hashed index.
 validateFindCmdOutputAndPlan({

@@ -25,7 +25,9 @@ testDB.dropDatabase();
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Create two users. Alice will be given the 'internal' privilege.
-assert.commandWorked(adminDB.runCommand({createUser: "Alice", pwd: "pwd", roles: ["root", "__system"]}));
+assert.commandWorked(
+    adminDB.runCommand({createUser: "Alice", pwd: "pwd", roles: ["root", "__system"]}),
+);
 assert.commandWorked(adminDB.runCommand({createUser: "Mallory", pwd: "pwd", roles: ["root"]}));
 adminDB.logout();
 

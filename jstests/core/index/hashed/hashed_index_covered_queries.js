@@ -33,7 +33,11 @@ function validateFindCmdOutputAndPlan({filter, projection, expectedOutput, expec
         assert(arrayEq(expectedOutput, ouputArray), ouputArray);
     }
 
-    return assertStagesForExplainOfCommand({coll: coll, cmdObj: cmdObj, expectedStages: expectedStages});
+    return assertStagesForExplainOfCommand({
+        coll: coll,
+        cmdObj: cmdObj,
+        expectedStages: expectedStages,
+    });
 }
 
 /**
@@ -54,7 +58,11 @@ function validateCountCmdOutputAndPlan({filter, expectedOutput, expectedStages})
 assert.commandWorked(coll.createIndex({b: "hashed", c: -1, a: 1}));
 
 // Verify that queries cannot be covered with hashed field is a prefix.
-validateFindCmdOutputAndPlan({filter: {c: 1}, projection: {a: 1, _id: 0}, expectedStages: ["COLLSCAN"]});
+validateFindCmdOutputAndPlan({
+    filter: {c: 1},
+    projection: {a: 1, _id: 0},
+    expectedStages: ["COLLSCAN"],
+});
 
 /**
  * Tests when hashed field is not a prefix.
@@ -88,11 +96,23 @@ validateFindCmdOutputAndPlan({
 });
 
 // Verify that an empty query with a coverable projection always uses a COLLSCAN.
-validateFindCmdOutputAndPlan({filter: {}, projection: {a: 1, _id: 0}, expectedStages: ["COLLSCAN"]});
+validateFindCmdOutputAndPlan({
+    filter: {},
+    projection: {a: 1, _id: 0},
+    expectedStages: ["COLLSCAN"],
+});
 
 // Verify that COUNT_SCAN cannot be used when query is on a hashed field.
-validateCountCmdOutputAndPlan({filter: {a: 26, b: 0}, expectedStages: ["FETCH", "IXSCAN"], expectedOutput: 1});
+validateCountCmdOutputAndPlan({
+    filter: {a: 26, b: 0},
+    expectedStages: ["FETCH", "IXSCAN"],
+    expectedOutput: 1,
+});
 
 // Verify that a count operation with range query on a non-hashed prefix field can use
 // COUNT_SCAN.
-validateCountCmdOutputAndPlan({filter: {a: {$gt: 25, $lt: 29}}, expectedStages: ["COUNT_SCAN"], expectedOutput: 3});
+validateCountCmdOutputAndPlan({
+    filter: {a: {$gt: 25, $lt: 29}},
+    expectedStages: ["COUNT_SCAN"],
+    expectedOutput: 3,
+});

@@ -66,7 +66,9 @@ describe("Index-ineligible predicates under $not do not get tagged with an index
 
     it("should not use an index with $elemMatch + $_internalEqHash", function () {
         assertUsesCollScan({a: {$elemMatch: {$not: {$_internalEqHash: NumberLong(2)}}}});
-        assertUsesCollScan({$or: [{b: {$eq: 5}}, {a: {$elemMatch: {$not: {$_internalEqHash: NumberLong(2)}}}}]});
+        assertUsesCollScan({
+            $or: [{b: {$eq: 5}}, {a: {$elemMatch: {$not: {$_internalEqHash: NumberLong(2)}}}}],
+        });
     });
 
     // These hit uassert 40353 with SBE fully enabled.
@@ -109,7 +111,10 @@ describe("Index-eligible predicates under $not do get tagged with an index", fun
     const assertDoesNotUseCollScan = (pred) => {
         const explain = assert.commandWorked(coll.find(pred).explain());
         assert(!isCollscan(db, getWinningPlanFromExplain(explain)), tojson(explain));
-        assertArrayEq({expected: coll.find(pred).hint({$natural: 1}).toArray(), actual: coll.find(pred).toArray()});
+        assertArrayEq({
+            expected: coll.find(pred).hint({$natural: 1}).toArray(),
+            actual: coll.find(pred).toArray(),
+        });
     };
 
     it("should use index with $not under object $elemMatch", function () {

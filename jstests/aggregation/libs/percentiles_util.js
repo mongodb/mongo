@@ -14,7 +14,9 @@
 export function testWithSingleGroup({coll, docs, percentileSpec, letSpec, expectedResult, msg}) {
     coll.drop();
     coll.insertMany(docs);
-    const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}], {let: letSpec}).toArray();
+    const res = coll
+        .aggregate([{$group: {_id: null, p: percentileSpec}}], {let: letSpec})
+        .toArray();
 
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     assert.eq(expectedResult, res[0].p, msg + `; Result: ${tojson(res)}`);
@@ -42,7 +44,9 @@ export function testWithSingleGroupMedian({coll, docs, medianSpec, expectedResul
 export function testWithMultipleGroups({coll, docs, percentileSpec, expectedResult, msg}) {
     coll.drop();
     coll.insertMany(docs);
-    const res = coll.aggregate([{$group: {_id: "$k", p: percentileSpec}}, {$sort: {_id: 1}}]).toArray();
+    const res = coll
+        .aggregate([{$group: {_id: "$k", p: percentileSpec}}, {$sort: {_id: 1}}])
+        .toArray();
 
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     for (let i = 0; i < res.length; i++) {
@@ -113,14 +117,16 @@ function testWithAccuracyError({coll, docs, percentileSpec, sorted, error, msg})
                 assert.eq(
                     res[0].p[i],
                     sorted[trueRank],
-                    msg + `; Computed: ${res[0].p[i]} but the true value is ${sorted[trueRank]} in ${tojson(res)}`,
+                    msg +
+                        `; Computed: ${res[0].p[i]} but the true value is ${sorted[trueRank]} in ${tojson(res)}`,
                 );
             } else {
                 const truePercentile = (cr - trueRank) * sorted[fr] + (trueRank - fr) * sorted[cr];
                 assert.close(
                     res[0].p[i],
                     truePercentile,
-                    msg + `; Computed: ${res[0].p[i]} but the true value is ${truePercentile} in ${tojson(res)}`,
+                    msg +
+                        `; Computed: ${res[0].p[i]} but the true value is ${truePercentile} in ${tojson(res)}`,
                 );
             }
         }
@@ -142,7 +148,14 @@ export function testLargeUniformDataset(coll, samples, sortedSamples, p, accurac
     });
 }
 
-export function testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, method) {
+export function testLargeUniformDataset_WithInfinities(
+    coll,
+    samples,
+    sortedSamples,
+    p,
+    accuracyError,
+    method,
+) {
     let docs = [];
     for (let i = 0; i < samples.length; i++) {
         docs.push({_id: i * 10, x: samples[i]});
@@ -152,7 +165,10 @@ export function testLargeUniformDataset_WithInfinities(coll, samples, sortedSamp
         }
     }
 
-    let sortedSamplesWithInfinities = Array(5).fill(-Infinity).concat(sortedSamples).concat(Array(5).fill(Infinity));
+    let sortedSamplesWithInfinities = Array(5)
+        .fill(-Infinity)
+        .concat(sortedSamples)
+        .concat(Array(5).fill(Infinity));
 
     testWithAccuracyError({
         coll: coll,
@@ -164,7 +180,14 @@ export function testLargeUniformDataset_WithInfinities(coll, samples, sortedSamp
     });
 }
 
-export function testLargeUniformDataset_Decimal(coll, samples, sortedSamples, p, accuracyError, method) {
+export function testLargeUniformDataset_Decimal(
+    coll,
+    samples,
+    sortedSamples,
+    p,
+    accuracyError,
+    method,
+) {
     let docs = [];
     for (let i = 0; i < samples.length; i++) {
         docs.push({_id: i * 10, x: NumberDecimal(samples[i])});
@@ -229,7 +252,9 @@ export function testLargeInput(coll, method) {
     coll.drop();
     coll.insert({x: samples});
     const ps = [0.5, 0.999, 0.0001];
-    const res = coll.aggregate([{$project: {p: {$percentile: {p: ps, input: "$x", method: method}}}}]).toArray();
+    const res = coll
+        .aggregate([{$project: {p: {$percentile: {p: ps, input: "$x", method: method}}}}])
+        .toArray();
 
     for (let i = 0; i < ps.length; i++) {
         let pctl = res[0].p[i];

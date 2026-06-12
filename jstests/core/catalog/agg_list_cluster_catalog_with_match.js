@@ -28,7 +28,11 @@ function setupUserCollections(dbTest) {
     assert.commandWorked(dbTest.createCollection("coll1"));
     assert.commandWorked(dbTest.createCollection("coll2"));
     assert.commandWorked(dbTest.createCollection("view", {viewOn: "coll1", pipeline: []}));
-    assert.commandWorked(dbTest.createCollection("timeseries", {timeseries: {metaField: "m", timeField: "timestamp"}}));
+    assert.commandWorked(
+        dbTest.createCollection("timeseries", {
+            timeseries: {metaField: "m", timeField: "timestamp"},
+        }),
+    );
 }
 
 function arrayContainsValueOnField(listClusterArrayResponse, field, value) {
@@ -70,7 +74,10 @@ function testMatchStage(matchStage, expectedResults) {
             .toArray();
 
         // If blacklisting databases/namespaces:
-        if (expRes.notExpectedNamespaces !== undefined || expRes.notExpectedDatabases !== undefined) {
+        if (
+            expRes.notExpectedNamespaces !== undefined ||
+            expRes.notExpectedDatabases !== undefined
+        ) {
             // Verify that the NON expected namespaces/databases are not returned by
             // $listClusterCatalog.
             const notExpectedNamespaces = expRes.notExpectedNamespaces ?? [];
@@ -145,7 +152,9 @@ function testMatchStage(matchStage, expectedResults) {
         else {
             assert(
                 expRes.expectedNamespaces !== undefined && Array.isArray(expRes.expectedNamespaces),
-                "`expectedNamespaces` should be specified for db " + dbName + " and must be an array.",
+                "`expectedNamespaces` should be specified for db " +
+                    dbName +
+                    " and must be an array.",
             );
             assert.eq(
                 expRes.expectedNamespaces.length,

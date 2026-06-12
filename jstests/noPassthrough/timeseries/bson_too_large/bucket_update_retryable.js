@@ -24,7 +24,9 @@ function runTest(isOrderedWrite) {
     // Setup
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
 
     const timestamp = ISODate("2025-01-01T12:00:00Z");

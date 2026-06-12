@@ -42,7 +42,8 @@ sh._dataFormat = function (bytes) {
 
     if (bytes < 1024) return Math.floor(bytes) + "B";
     if (bytes < 1024 * 1024) return Math.floor(bytes / 1024) + "KiB";
-    if (bytes < 1024 * 1024 * 1024) return Math.floor((Math.floor(bytes / 1024) / 1024) * 100) / 100 + "MiB";
+    if (bytes < 1024 * 1024 * 1024)
+        return Math.floor((Math.floor(bytes / 1024) / 1024) * 100) / 100 + "MiB";
     return Math.floor((Math.floor(bytes / (1024 * 1024)) / 1024) * 100) / 100 + "GiB";
 };
 
@@ -129,17 +130,33 @@ sh.help = function () {
         "\tsh.enableSharding(dbname, shardName)      enables sharding on the database dbname, optionally use shardName as primary",
     );
     print("\tsh.getBalancerState()                     returns whether the balancer is enabled");
-    print("\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
-    print("\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
+    print(
+        "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos",
+    );
+    print(
+        "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)",
+    );
     print("\tsh.removeShardFromZone(shard,zone)      removes the shard from zone");
-    print("\tsh.removeRangeFromZone(fullName,min,max)   removes the range of the given collection from any zone");
+    print(
+        "\tsh.removeRangeFromZone(fullName,min,max)   removes the range of the given collection from any zone",
+    );
     print("\tsh.shardCollection(fullName,key,unique,options)   shards the collection");
-    print("\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle");
-    print("\tsh.splitFind(fullName,find)               splits the chunk that find is in at the median");
-    print("\tsh.startBalancer()                        starts the balancer so chunks are balanced automatically");
+    print(
+        "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle",
+    );
+    print(
+        "\tsh.splitFind(fullName,find)               splits the chunk that find is in at the median",
+    );
+    print(
+        "\tsh.startBalancer()                        starts the balancer so chunks are balanced automatically",
+    );
     print("\tsh.status()                               prints a general overview of the cluster");
-    print("\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
-    print("\tsh.startAutoMerger()                      globally enable auto-merger (active only if balancer is up)");
+    print(
+        "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically",
+    );
+    print(
+        "\tsh.startAutoMerger()                      globally enable auto-merger (active only if balancer is up)",
+    );
     print("\tsh.stopAutoMerger()                     globally disable auto-merger");
     print("\tsh.shouldAutoMerge()                    returns whether the auto-merger is enabled");
     print("\tsh.disableAutoMerger(coll)              disable auto-merging on one collection");
@@ -448,8 +465,9 @@ sh.awaitCollectionBalance = function (coll, timeout, interval) {
             function () {
                 assert.soon(
                     function () {
-                        return assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
-                            .balancerCompliant;
+                        return assert.commandWorked(
+                            sh._adminCommand({balancerCollectionStatus: ns}, true),
+                        ).balancerCompliant;
                     },
                     "Timed out waiting for the collection to be balanced",
                     timeout,
@@ -461,7 +479,9 @@ sh.awaitCollectionBalance = function (coll, timeout, interval) {
                 sh.disableBalancing(coll);
                 assert.soon(
                     function () {
-                        return coll.aggregate(orphanDocsPipeline).toArray()[0].totalNumOrphanDocs === 0;
+                        return (
+                            coll.aggregate(orphanDocsPipeline).toArray()[0].totalNumOrphanDocs === 0
+                        );
                     },
                     "Timed out waiting for orphans counter to be 0",
                     timeout,
@@ -475,7 +495,8 @@ sh.awaitCollectionBalance = function (coll, timeout, interval) {
                     sh.awaitBalancerRound(timeout, interval);
                 }
 
-                return assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true)).balancerCompliant;
+                return assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
+                    .balancerCompliant;
             },
             "Timed out waiting for collection to be balanced and orphans counter to be 0",
             timeout,
@@ -510,20 +531,29 @@ sh.verifyCollectionIsBalanced = function (coll) {
             {
                 "$project": {
                     "shard": true,
-                    "storageStats": {"count": true, "size": true, "avgObjSize": true, "numOrphanDocs": true},
+                    "storageStats": {
+                        "count": true,
+                        "size": true,
+                        "avgObjSize": true,
+                        "numOrphanDocs": true,
+                    },
                 },
             },
             {"$sort": {"shard": 1}},
         ];
 
-        let kChunkSize = 1024 * 1024 * assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns})).chunkSize;
+        let kChunkSize =
+            1024 *
+            1024 *
+            assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns})).chunkSize;
 
         // Get coll size per shard
         const storageStats = coll.aggregate(collStatsPipeline).toArray();
         coll.aggregate(collStatsPipeline).forEach((shardStats) => {
             shards.push(shardStats["shard"]);
             const collSize =
-                (shardStats["storageStats"]["count"] - shardStats["storageStats"]["numOrphanDocs"]) *
+                (shardStats["storageStats"]["count"] -
+                    shardStats["storageStats"]["numOrphanDocs"]) *
                 shardStats["storageStats"]["avgObjSize"];
             collSizeOnShards.push(collSize);
         });
@@ -540,7 +570,11 @@ sh.verifyCollectionIsBalanced = function (coll) {
             ", kChunkSize=" +
             tojson(kChunkSize);
 
-        assert.lte(Math.max(...collSizeOnShards) - Math.min(...collSizeOnShards), 3 * kChunkSize, errorMsg);
+        assert.lte(
+            Math.max(...collSizeOnShards) - Math.min(...collSizeOnShards),
+            3 * kChunkSize,
+            errorMsg,
+        );
     } finally {
         globalThis.db = oldDb;
     }
@@ -599,7 +633,11 @@ sh.addShardTag = function (shard, tag) {
         throw Error("can't find a shard with name: " + shard);
     }
     return assert.commandWorked(
-        config.shards.update({_id: shard}, {$addToSet: {tags: tag}}, {writeConcern: {w: "majority", wtimeout: 60000}}),
+        config.shards.update(
+            {_id: shard},
+            {$addToSet: {tags: tag}},
+            {writeConcern: {w: "majority", wtimeout: 60000}},
+        ),
     );
 };
 
@@ -614,7 +652,11 @@ sh.removeShardTag = function (shard, tag) {
         throw Error("can't find a shard with name: " + shard);
     }
     return assert.commandWorked(
-        config.shards.update({_id: shard}, {$pull: {tags: tag}}, {writeConcern: {w: "majority", wtimeout: 60000}}),
+        config.shards.update(
+            {_id: shard},
+            {$pull: {tags: tag}},
+            {writeConcern: {w: "majority", wtimeout: 60000}},
+        ),
     );
 };
 
@@ -733,7 +775,10 @@ sh.getRecentMigrations = function (configDB) {
                     $match: {
                         time: {$gt: yesterday},
                         what: "moveChunk.from",
-                        $or: [{"details.errmsg": {$exists: true}}, {"details.note": {$ne: "success"}}],
+                        $or: [
+                            {"details.errmsg": {$exists: true}},
+                            {"details.note": {$ne: "success"}},
+                        ],
                     },
                 },
                 {
@@ -875,7 +920,8 @@ function printShardingStatus(configDB, verbose) {
         // being enabled is currently unknown, since CommandNotFound implies we're running this
         // command on a standalone mongod. All other error statuses return "no" for historical
         // reasons.
-        balancerEnabledString = balancerStatus.code == ErrorCodes.CommandNotFound ? "unknown" : "no";
+        balancerEnabledString =
+            balancerStatus.code == ErrorCodes.CommandNotFound ? "unknown" : "no";
         balancerRunning = false;
     } else {
         balancerEnabledString = sh.getBalancerState(configDB, balancerStatus) ? "yes" : "no";
@@ -942,7 +988,16 @@ function printShardingStatus(configDB, verbose) {
                 if (x._id === "Success") {
                     output(3, x.count + " : " + x._id);
                 } else {
-                    output(3, x.count + " : Failed with error '" + x._id + "', from " + x.from + " to " + x.to);
+                    output(
+                        3,
+                        x.count +
+                            " : Failed with error '" +
+                            x._id +
+                            "', from " +
+                            x.from +
+                            " to " +
+                            x.to,
+                    );
                 }
             });
         } else {
@@ -986,11 +1041,21 @@ function printShardingStatus(configDB, verbose) {
                 if (!coll.dropped) {
                     output(3, coll._id);
                     output(4, "shard key: " + tojson(coll.key));
-                    output(4, "unique: " + truthy(coll.unique) + nonBooleanNote("unique", coll.unique));
-                    output(4, "balancing: " + !truthy(coll.noBalance) + nonBooleanNote("noBalance", coll.noBalance));
+                    output(
+                        4,
+                        "unique: " + truthy(coll.unique) + nonBooleanNote("unique", coll.unique),
+                    );
+                    output(
+                        4,
+                        "balancing: " +
+                            !truthy(coll.noBalance) +
+                            nonBooleanNote("noBalance", coll.noBalance),
+                    );
                     output(4, "chunks:");
 
-                    const chunksMatchPredicate = coll.hasOwnProperty("timestamp") ? {uuid: coll.uuid} : {ns: coll._id};
+                    const chunksMatchPredicate = coll.hasOwnProperty("timestamp")
+                        ? {uuid: coll.uuid}
+                        : {ns: coll._id};
 
                     const res = configDB.chunks
                         .aggregate(
@@ -1026,14 +1091,25 @@ function printShardingStatus(configDB, verbose) {
                                 );
                             });
                     } else {
-                        output(4, "too many chunks to print, use verbose if you want to force print");
+                        output(
+                            4,
+                            "too many chunks to print, use verbose if you want to force print",
+                        );
                     }
 
                     configDB.tags
                         .find({ns: coll._id})
                         .sort({min: 1})
                         .forEach(function (tag) {
-                            output(4, " tag: " + tag.tag + "  " + tojson(tag.min) + " -->> " + tojson(tag.max));
+                            output(
+                                4,
+                                " tag: " +
+                                    tag.tag +
+                                    "  " +
+                                    tojson(tag.min) +
+                                    " -->> " +
+                                    tojson(tag.max),
+                            );
                         });
                 }
             });

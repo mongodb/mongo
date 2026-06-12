@@ -20,7 +20,9 @@ function testBottomNNoSort(n, inputArray, expArray) {
 }
 
 function testBottomNWithSort(n, inputArray, sortBy, expArray) {
-    let pipeline = [{$project: {_id: 0, bottomN: {$bottomN: {n: n, input: inputArray, sortBy: sortBy}}}}];
+    let pipeline = [
+        {$project: {_id: 0, bottomN: {$bottomN: {n: n, input: inputArray, sortBy: sortBy}}}},
+    ];
     assert.eq(coll.aggregate(pipeline).toArray(), [{bottomN: expArray}]);
 }
 
@@ -86,4 +88,8 @@ assertErrorCode(coll, [{$project: {x: {$bottomN: {n: 2, input: "one"}}}}], 72121
 assertErrorCode(coll, [{$project: {x: {$bottomN: {n: 2, input: 1}}}}], 721215);
 
 // Third argument is not a sort spec
-assertErrorCode(coll, [{$project: {x: {$bottomN: {n: 2, input: [1, 2, 3], sortBy: "a"}}}}], 2942507);
+assertErrorCode(
+    coll,
+    [{$project: {x: {$bottomN: {n: 2, input: [1, 2, 3], sortBy: "a"}}}}],
+    2942507,
+);

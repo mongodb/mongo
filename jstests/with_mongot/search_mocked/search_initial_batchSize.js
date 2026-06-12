@@ -118,8 +118,8 @@ function runTest(db, mockRequestFn) {
     function assertOversubscriptionSetAsExpected(expectedOversubscription) {
         assert.eq(
             expectedOversubscription,
-            assert.commandWorked(db.adminCommand({getClusterParameter: "internalSearchOptions"})).clusterParameters[0]
-                .oversubscriptionFactor,
+            assert.commandWorked(db.adminCommand({getClusterParameter: "internalSearchOptions"}))
+                .clusterParameters[0].oversubscriptionFactor,
         );
     }
 
@@ -128,7 +128,12 @@ function runTest(db, mockRequestFn) {
      * then asserts that the results are correct. This will fail (via the mongotMock internals) if
      * the batchSize sent to mongot is different than expected.
      */
-    function runInitialBatchSizeTest({pipeline, expectedDocs, expectedBatchSize, isStoredSource = false}) {
+    function runInitialBatchSizeTest({
+        pipeline,
+        expectedDocs,
+        expectedBatchSize,
+        isStoredSource = false,
+    }) {
         mockRequestFn(expectedBatchSize, isStoredSource);
         let res = coll.aggregate(pipeline).toArray();
         assert.eq(expectedDocs, res);
@@ -157,7 +162,11 @@ function runTest(db, mockRequestFn) {
 
         // Runs a pipeline with an extractable limit less than 10; we still request at least 10.
         runInitialBatchSizeTest({
-            pipeline: [{$search: mongotQuery}, {$project: {_id: 0, artist: 0, streams: 0}}, {$limit: 5}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$project: {_id: 0, artist: 0, streams: 0}},
+                {$limit: 5},
+            ],
             expectedBatchSize: 10,
             expectedDocs: relevantDocsOnlyTitle.slice(0, 5),
         });
@@ -178,7 +187,11 @@ function runTest(db, mockRequestFn) {
 
         // Runs a pipeline that applies a filter before a blocking stage $sort.
         runInitialBatchSizeTest({
-            pipeline: [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$sort: {streams: -1}}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$match: {streams: {$gt: 1500}}},
+                {$sort: {streams: -1}},
+            ],
             expectedBatchSize: Math.ceil(kDefaultMongotBatchSize * kDefaultOversubscriptionFactor),
             // There are 4 relevant documents with > 1500 streams.
             expectedDocs: relevantDocsSortedByStreams.slice(0, 4),
@@ -193,7 +206,12 @@ function runTest(db, mockRequestFn) {
 
         // Runs a pipeline with a non-extractable limit (due to the $match before $limit).
         runInitialBatchSizeTest({
-            pipeline: [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$limit: 98}, {$sort: {streams: -1}}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$match: {streams: {$gt: 1500}}},
+                {$limit: 98},
+                {$sort: {streams: -1}},
+            ],
             expectedBatchSize: Math.ceil(98 * kDefaultOversubscriptionFactor),
             expectedDocs: relevantDocsSortedByStreams.slice(0, 4),
         });
@@ -201,7 +219,12 @@ function runTest(db, mockRequestFn) {
         // Runs a pipeline with a non-extractable limit, where the computed batchSize is less than
         // the default batchSize; in that case, we round up to default batchSize.
         runInitialBatchSizeTest({
-            pipeline: [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$limit: 50}, {$sort: {streams: -1}}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$match: {streams: {$gt: 1500}}},
+                {$limit: 50},
+                {$sort: {streams: -1}},
+            ],
             expectedBatchSize: kDefaultMongotBatchSize,
             expectedDocs: relevantDocsSortedByStreams.slice(0, 4),
         });
@@ -251,7 +274,11 @@ function runTest(db, mockRequestFn) {
 
         // Run pipelines with overSubscriptionFactor set to 1.
         let oversubscriptionFactor = 1;
-        assert.commandWorked(db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
+        assert.commandWorked(
+            db.adminCommand({
+                setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}},
+            }),
+        );
         assertOversubscriptionSetAsExpected(oversubscriptionFactor);
         runInitialBatchSizeTest({
             pipeline: [{$search: mongotQuery}, {$project: {_id: 0, title: 1}}],
@@ -266,7 +293,11 @@ function runTest(db, mockRequestFn) {
 
         // Run pipelines with overSubscriptionFactor set to 1.8.
         oversubscriptionFactor = 1.8;
-        assert.commandWorked(db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
+        assert.commandWorked(
+            db.adminCommand({
+                setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}},
+            }),
+        );
         assertOversubscriptionSetAsExpected(oversubscriptionFactor);
         runInitialBatchSizeTest({
             pipeline: [{$search: mongotQuery}, {$project: {_id: 0, title: 1}}],
@@ -310,7 +341,10 @@ function runTest(db, mockRequestFn) {
     let coll = db.getCollection(collName);
     coll.drop();
 
-    if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
+    if (
+        checkSbeRestrictedOrFullyEnabled(db) &&
+        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")
+    ) {
         jsTestLog("Skipping the test because it only applies to $search in classic engine.");
         MongoRunner.stopMongod(conn);
         mongotMock.stop();
@@ -336,7 +370,12 @@ function runTest(db, mockRequestFn) {
                     collectionUUID: collUUID,
                     cursorOptions: {batchSize},
                 }),
-                response: mongotResponseForBatch(docsToReturn, NumberLong(0), coll.getFullName(), responseOk),
+                response: mongotResponseForBatch(
+                    docsToReturn,
+                    NumberLong(0),
+                    coll.getFullName(),
+                    responseOk,
+                ),
             },
         ];
         mongotMock.setMockResponses(history, cursorId);
@@ -371,7 +410,9 @@ function runTest(db, mockRequestFn) {
     let coll = db.getCollection(collName);
     coll.drop();
 
-    assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+    );
 
     assert.commandWorked(coll.insertMany(docs));
     // Shard the collection, split it at {_id: chunkBoundary}, and move the higher chunk to
@@ -445,7 +486,13 @@ function runTest(db, mockRequestFn) {
         const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
         s1Mongot.setMockResponses(historyShard1, cursorId, metaId);
 
-        mockPlanShardedSearchResponse(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(
+            collName,
+            mongotQuery,
+            dbName,
+            undefined /*sortSpec*/,
+            stWithMock,
+        );
     };
 
     runTest(db, mockRequestFn);

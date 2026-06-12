@@ -51,10 +51,12 @@ function runTest(name, conns, restartCallback) {
     assert.commandWorked(admin.runCommand(CREATE_USER2));
 
     // We can even drop the collection and our login session will be invalidated.
-    const preDrop = assert.commandWorked(admin.runCommand({connectionStatus: 1})).authInfo.authenticatedUsers;
+    const preDrop = assert.commandWorked(admin.runCommand({connectionStatus: 1})).authInfo
+        .authenticatedUsers;
     assert.eq(preDrop.length, 1);
     assert.writeOK(admin.system.users.remove({}, {writeConcern: conns.wc}));
-    const postDrop = assert.commandWorked(admin.runCommand({connectionStatus: 1})).authInfo.authenticatedUsers;
+    const postDrop = assert.commandWorked(admin.runCommand({connectionStatus: 1})).authInfo
+        .authenticatedUsers;
     assert.eq(postDrop.length, 0);
 
     // Can't recreate ourselves because localhost auth bypass is still disabled.
@@ -72,7 +74,13 @@ let standalone = MongoRunner.runMongod({auth: "", useHostName: false});
 runTest("Standalone", {primary: standalone, wc: standaloneWC}, function () {
     const dbpath = standalone.dbpath;
     MongoRunner.stopMongod(standalone);
-    standalone = MongoRunner.runMongod({auth: "", restart: true, cleanData: false, dbpath: dbpath, useHostName: false});
+    standalone = MongoRunner.runMongod({
+        auth: "",
+        restart: true,
+        cleanData: false,
+        dbpath: dbpath,
+        useHostName: false,
+    });
     return {primary: standalone, wc: standaloneWC};
 });
 MongoRunner.stopMongod(standalone);

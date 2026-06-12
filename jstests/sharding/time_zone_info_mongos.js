@@ -42,26 +42,45 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
         "expected launching mongos with bad timezone rules to fail",
     );
     // Look for either old or new error message
-    let output = rawMongoProgramOutput("(Error creating service context|Failed to create service context)");
-    assert(output.includes("Error creating service context") || output.includes("Failed to create service context"));
+    let output = rawMongoProgramOutput(
+        "(Error creating service context|Failed to create service context)",
+    );
+    assert(
+        output.includes("Error creating service context") ||
+            output.includes("Failed to create service context"),
+    );
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+    assert.commandWorked(
+        mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+    );
 
     // Shard the test collection on _id.
-    assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+    );
 
     // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey).
-    assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
+    assert.commandWorked(
+        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}),
+    );
 
     // Move the [0, MaxKey) chunk to st.shard1.shardName.
     assert.commandWorked(
-        mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}),
+        mongosDB.adminCommand({
+            moveChunk: mongosColl.getFullName(),
+            find: {_id: 1},
+            to: st.rs1.getURL(),
+        }),
     );
 
     // Write a document containing a 'date' field to each chunk.
-    assert.commandWorked(mongosColl.insert({_id: -1, date: ISODate("2017-11-13T12:00:00.000+0000")}));
-    assert.commandWorked(mongosColl.insert({_id: 1, date: ISODate("2017-11-13T03:00:00.000+0600")}));
+    assert.commandWorked(
+        mongosColl.insert({_id: -1, date: ISODate("2017-11-13T12:00:00.000+0000")}),
+    );
+    assert.commandWorked(
+        mongosColl.insert({_id: 1, date: ISODate("2017-11-13T03:00:00.000+0600")}),
+    );
     assert.commandWorked(mongosColl.insert({_id: 2, date: ISODate("2020-10-20T19:49:47.634Z")}));
     // The test below failed on timelib-2018.01 on slim timezone format, as it's not supported.
     assert.commandWorked(mongosColl.insert({_id: 3, date: ISODate("2020-12-14T12:00:00Z")}));

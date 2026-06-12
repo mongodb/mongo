@@ -4,7 +4,11 @@
 
 "use strict";
 
-import {getEngine, getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getEngine,
+    getPlanStages,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -79,7 +83,12 @@ function setParamsAndRunCommand(isTieBreakingHeuristicEnabled, filter) {
     return explain;
 }
 
-function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKeyPatterns, explain = null) {
+function assertIndexScan(
+    isTieBreakingHeuristicEnabled,
+    filter,
+    expectedIndexKeyPatterns,
+    explain = null,
+) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -100,7 +109,12 @@ function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKey
     }
 }
 
-function assertIndexScanWithSort(isTieBreakingHeuristicEnabled, filter, sorting, expectedIndexKeyPatterns) {
+function assertIndexScanWithSort(
+    isTieBreakingHeuristicEnabled,
+    filter,
+    sorting,
+    expectedIndexKeyPatterns,
+) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -336,7 +350,10 @@ function preferLongestPrefixWithIndexesOfSameLength() {
 // Running tests, with index pruning disabled and then enabled.
 function testWithPruningSetting(indexPruningActive) {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: indexPruningActive}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlannerEnableIndexPruning: indexPruningActive,
+        }),
     );
 
     preferLongestIndexPrefix();

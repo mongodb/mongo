@@ -15,7 +15,11 @@ for (let nullishValue of [null, undefined, "$missing"]) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateToString: {date: nullishValue, format: "%Y-%m-%d %H:%M:%S", onNull: onNullValue},
+                        $dateToString: {
+                            date: nullishValue,
+                            format: "%Y-%m-%d %H:%M:%S",
+                            onNull: onNullValue,
+                        },
                     },
                 },
             })
@@ -51,7 +55,11 @@ for (let onNullValue of [{}, 5, "Not a date", null, undefined]) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateToString: {date: "$missing", format: "%Y-%m-%d %H:%M:%S", onNull: onNullValue},
+                        $dateToString: {
+                            date: "$missing",
+                            format: "%Y-%m-%d %H:%M:%S",
+                            onNull: onNullValue,
+                        },
                     },
                 },
             })
@@ -67,7 +75,11 @@ assert.eq(
         .aggregate({
             $project: {
                 date: {
-                    $dateToString: {date: "$missing", format: "%Y-%m-%d %H:%M:%S", onNull: "$missing"},
+                    $dateToString: {
+                        date: "$missing",
+                        format: "%Y-%m-%d %H:%M:%S",
+                        onNull: "$missing",
+                    },
                 },
             },
         })

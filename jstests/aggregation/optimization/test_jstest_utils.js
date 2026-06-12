@@ -26,8 +26,20 @@ assert(anyEq(NumberDecimal("0.1"), NumberDecimal("0.100"), verbose));
 assert(!anyEq({a: new Date(Date.UTC(1984, 0, 1))}, {a: new Date(Date.UTC(1990, 0, 1))}, verbose));
 assert(anyEq({a: new Date(Date.UTC(1984, 0, 1))}, {a: new Date(Date.UTC(1984, 0, 1))}, verbose));
 
-assert(!anyEq({a: ObjectId("4dc07fedd8420ab8d0d4066d")}, {a: ObjectId("4dc07fedd8420ab8d0d4066e")}, verbose));
-assert(anyEq({a: ObjectId("4dc07fedd8420ab8d0d4066d")}, {a: ObjectId("4dc07fedd8420ab8d0d4066d")}, verbose));
+assert(
+    !anyEq(
+        {a: ObjectId("4dc07fedd8420ab8d0d4066d")},
+        {a: ObjectId("4dc07fedd8420ab8d0d4066e")},
+        verbose,
+    ),
+);
+assert(
+    anyEq(
+        {a: ObjectId("4dc07fedd8420ab8d0d4066d")},
+        {a: ObjectId("4dc07fedd8420ab8d0d4066d")},
+        verbose,
+    ),
+);
 
 assert(!anyEq({a: new Timestamp(1, 0)}, {a: new Timestamp(0, 0)}, verbose));
 assert(anyEq({a: new Timestamp(0, 1)}, {a: new Timestamp(0, 1)}, verbose));
@@ -155,11 +167,27 @@ assert(!arrayEq([{a: NumberDecimal("1.0")}], [{a: NumberDecimal("5.0")}], verbos
 assert(arrayEq([{a: NumberDecimal("1.0")}], [{a: NumberDecimal("1.0")}], verbose));
 assert(arrayEq([NumberDecimal("0.1")], [NumberDecimal("0.100")], verbose));
 
-assert(!arrayEq([{a: new Date(Date.UTC(1984, 0, 1))}], [{a: new Date(Date.UTC(1990, 0, 1))}], verbose));
-assert(arrayEq([{a: new Date(Date.UTC(1984, 0, 1))}], [{a: new Date(Date.UTC(1984, 0, 1))}], verbose));
+assert(
+    !arrayEq([{a: new Date(Date.UTC(1984, 0, 1))}], [{a: new Date(Date.UTC(1990, 0, 1))}], verbose),
+);
+assert(
+    arrayEq([{a: new Date(Date.UTC(1984, 0, 1))}], [{a: new Date(Date.UTC(1984, 0, 1))}], verbose),
+);
 
-assert(!arrayEq([{a: ObjectId("4dc07fedd8420ab8d0d4066d")}], [{a: ObjectId("4dc07fedd8420ab8d0d4066e")}], verbose));
-assert(arrayEq([{a: ObjectId("4dc07fedd8420ab8d0d4066d")}], [{a: ObjectId("4dc07fedd8420ab8d0d4066d")}], verbose));
+assert(
+    !arrayEq(
+        [{a: ObjectId("4dc07fedd8420ab8d0d4066d")}],
+        [{a: ObjectId("4dc07fedd8420ab8d0d4066e")}],
+        verbose,
+    ),
+);
+assert(
+    arrayEq(
+        [{a: ObjectId("4dc07fedd8420ab8d0d4066d")}],
+        [{a: ObjectId("4dc07fedd8420ab8d0d4066d")}],
+        verbose,
+    ),
+);
 
 assert(!arrayEq([{a: new Timestamp(1, 0)}], [{a: new Timestamp(0, 0)}], verbose));
 assert(arrayEq([{a: new Timestamp(0, 1)}], [{a: new Timestamp(0, 1)}], verbose));

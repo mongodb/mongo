@@ -11,7 +11,10 @@ const checkShardingStateInitialized = function (conn, configConnStr, shardName, 
     assert.commandWorked(res);
     assert(res.enabled);
     assert.eq(shardName, res.shardName);
-    assert(clusterId.equals(res.clusterId), "cluster id: " + tojson(clusterId) + " != " + tojson(res.clusterId));
+    assert(
+        clusterId.equals(res.clusterId),
+        "cluster id: " + tojson(clusterId) + " != " + tojson(res.clusterId),
+    );
     assert.soon(() => configConnStr == conn.adminCommand({shardingState: 1}).configServer);
 };
 

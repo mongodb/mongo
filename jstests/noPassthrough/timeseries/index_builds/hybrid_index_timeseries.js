@@ -20,7 +20,11 @@ const runTest = (config) => {
     // Populate the collection.
     tsColl.drop();
 
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        testDB.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
+    );
 
     let nDocs = 10;
     for (let i = 0; i < nDocs; i++) {

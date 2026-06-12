@@ -203,7 +203,9 @@ let resultTypes = {
         );
     },
     "sphere": function (loc) {
-        return query.sphereRadius >= 0 ? Geo.sphereDistance(query.sphereCenter, loc) <= query.sphereRadius : false;
+        return query.sphereRadius >= 0
+            ? Geo.sphereDistance(query.sphereCenter, loc) <= query.sphereRadius
+            : false;
     },
     "poly": function (loc) {
         return (
@@ -249,9 +251,12 @@ let queryResults = function (locs, query, results) {
 let randQueryAdditions = function (doc, indResults) {
     for (let type in resultTypes) {
         let choice = Random.rand();
-        if (Random.rand() < 0.25) doc[type] = indResults[type].docIn ? {docIn: "yes"} : {docIn: "no"};
-        else if (Random.rand() < 0.5) doc[type] = indResults[type].docIn ? {docIn: ["yes"]} : {docIn: ["no"]};
-        else if (Random.rand() < 0.75) doc[type] = indResults[type].docIn ? [{docIn: "yes"}] : [{docIn: "no"}];
+        if (Random.rand() < 0.25)
+            doc[type] = indResults[type].docIn ? {docIn: "yes"} : {docIn: "no"};
+        else if (Random.rand() < 0.5)
+            doc[type] = indResults[type].docIn ? {docIn: ["yes"]} : {docIn: ["no"]};
+        else if (Random.rand() < 0.75)
+            doc[type] = indResults[type].docIn ? [{docIn: "yes"}] : [{docIn: "no"}];
         else doc[type] = indResults[type].docIn ? [{docIn: ["yes"]}] : [{docIn: ["no"]}];
     }
 };
@@ -335,7 +340,13 @@ for (let test = 0; test < numTests; test++) {
     let paddingSize = Math.floor(Random.rand() * 10 + 1);
     let results = {};
     let totalPoints = 0;
-    print("Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs ");
+    print(
+        "Calculating target results for " +
+            data.numDocs +
+            " docs with max " +
+            data.maxLocs +
+            " locs ",
+    );
 
     let bulk = t.initializeUnorderedBulkOp();
     for (var i = 0; i < data.numDocs; i++) {
@@ -425,7 +436,9 @@ for (let test = 0; test < numTests; test++) {
             results.sphere.docsIn,
             t
                 .find({
-                    "locs.loc": {$within: {$centerSphere: [query.sphereCenter, query.sphereRadius]}},
+                    "locs.loc": {
+                        $within: {$centerSphere: [query.sphereCenter, query.sphereRadius]},
+                    },
                     "sphere.docIn": randYesQuery(),
                 })
                 .count(),
@@ -435,7 +448,10 @@ for (let test = 0; test < numTests; test++) {
         res = t.update(
             {
                 "locs.loc": {
-                    $within: {$centerSphere: [query.sphereCenter, query.sphereRadius], $uniqueDocs: true},
+                    $within: {
+                        $centerSphere: [query.sphereCenter, query.sphereRadius],
+                        $uniqueDocs: true,
+                    },
                 },
                 "sphere.docIn": randYesQuery(),
             },
@@ -545,7 +561,10 @@ for (let test = 0; test < numTests; test++) {
 
     // $polygon
     print("Polygon remove...");
-    res = t.remove({"locs.loc": {$within: {$polygon: query.boxPoly}}, "poly.docIn": randYesQuery()});
+    res = t.remove({
+        "locs.loc": {$within: {$polygon: query.boxPoly}},
+        "poly.docIn": randYesQuery(),
+    });
     assert.eq(results.poly.docsIn, res.nRemoved);
 }
 

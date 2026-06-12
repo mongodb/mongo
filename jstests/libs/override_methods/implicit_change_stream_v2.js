@@ -8,7 +8,10 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 let featureFlagEnabled = null;
 function isFeatureFlagEnabled(conn) {
     if (featureFlagEnabled === null) {
-        featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(conn, "ChangeStreamPreciseShardTargeting");
+        featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            conn,
+            "ChangeStreamPreciseShardTargeting",
+        );
     }
     return featureFlagEnabled;
 }
@@ -33,5 +36,7 @@ function runChangeStreamWithV2Version(conn, _dbName, _commandName, commandObj, f
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicit_change_stream_v2.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicit_change_stream_v2.js",
+);
 OverrideHelpers.overrideRunCommand(runChangeStreamWithV2Version);

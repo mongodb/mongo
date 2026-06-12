@@ -14,7 +14,9 @@ function fillToLimit(conn, collName, limit, idPrefix) {
     for (let i = 0; i < limit; i++) {
         const session = conn.startSession();
         session.startTransaction();
-        assert.commandWorked(session.getDatabase("test")[collName].insert({_id: `${idPrefix}_${i}`}));
+        assert.commandWorked(
+            session.getDatabase("test")[collName].insert({_id: `${idPrefix}_${i}`}),
+        );
         sessions.push(session);
     }
     return sessions;
@@ -38,7 +40,10 @@ describe("transaction open limit on replica set", function () {
         this.collName = "transaction_open_limit";
         assert.commandWorked(this.primary.getDB("test").createCollection(this.collName));
         assert.commandWorked(
-            this.primary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: limit}),
+            this.primary.adminCommand({
+                setParameter: 1,
+                maxConcurrentMultiDocumentTransactions: limit,
+            }),
         );
     });
 
@@ -66,7 +71,9 @@ describe("transaction open limit on replica set", function () {
         {
             const session = this.primary.startSession();
             session.startTransaction();
-            assert.commandWorked(session.getDatabase("test")[this.collName].insert({_id: "after_abort"}));
+            assert.commandWorked(
+                session.getDatabase("test")[this.collName].insert({_id: "after_abort"}),
+            );
             sessions.push(session);
         }
 
@@ -75,7 +82,10 @@ describe("transaction open limit on replica set", function () {
 
     it("limits all session types from user connections", function () {
         assert.commandWorked(
-            this.primary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: limit}),
+            this.primary.adminCommand({
+                setParameter: 1,
+                maxConcurrentMultiDocumentTransactions: limit,
+            }),
         );
 
         const sessions = fillToLimit(this.primary, this.collName, limit, "stype");
@@ -127,7 +137,10 @@ describe("transaction open limit on replica set", function () {
 
     it("allows process-internal transactions to bypass the limit", function () {
         assert.commandWorked(
-            this.primary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: limit}),
+            this.primary.adminCommand({
+                setParameter: 1,
+                maxConcurrentMultiDocumentTransactions: limit,
+            }),
         );
 
         const sessions = fillToLimit(this.primary, this.collName, limit, "itxn");
@@ -136,7 +149,9 @@ describe("transaction open limit on replica set", function () {
         {
             const session = this.primary.startSession();
             session.startTransaction();
-            const res = session.getDatabase("test")[this.collName].insert({_id: "itxn_user_over_limit"});
+            const res = session
+                .getDatabase("test")
+                [this.collName].insert({_id: "itxn_user_over_limit"});
             assert.commandFailedWithCode(res, ErrorCodes.TooManyOpenTransactions);
             session.endSession();
         }
@@ -159,13 +174,18 @@ describe("transaction open limit on replica set", function () {
     });
 
     it("disables enforcement when limit is 0", function () {
-        assert.commandWorked(this.primary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: 0}));
+        assert.commandWorked(
+            this.primary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: 0}),
+        );
 
         const sessions = fillToLimit(this.primary, this.collName, 200, "unlimited");
         abortAll(sessions);
 
         assert.commandWorked(
-            this.primary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: limit}),
+            this.primary.adminCommand({
+                setParameter: 1,
+                maxConcurrentMultiDocumentTransactions: limit,
+            }),
         );
     });
 });
@@ -181,7 +201,10 @@ describe("transaction open limit on sharded cluster", function () {
 
         const shardedLimit = 10;
         assert.commandWorked(
-            shardPrimary.adminCommand({setParameter: 1, maxConcurrentMultiDocumentTransactions: shardedLimit}),
+            shardPrimary.adminCommand({
+                setParameter: 1,
+                maxConcurrentMultiDocumentTransactions: shardedLimit,
+            }),
         );
 
         const sessions = fillToLimit(mongos, collName, shardedLimit, "mongos");

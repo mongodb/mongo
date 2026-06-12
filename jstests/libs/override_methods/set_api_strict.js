@@ -96,7 +96,11 @@ function isOperationPartOfStableAPI(commandName, commandObj) {
                 commandObj.storageEngine)
         ) {
             return false;
-        } else if (commandName == "createIndexes" && commandObj.indexes && Array.isArray(commandObj.indexes)) {
+        } else if (
+            commandName == "createIndexes" &&
+            commandObj.indexes &&
+            Array.isArray(commandObj.indexes)
+        ) {
             for (let i = 0; i < commandObj.indexes.length; i++) {
                 if (
                     commandObj.indexes[i].key.text ||

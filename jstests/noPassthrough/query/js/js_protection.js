@@ -17,7 +17,11 @@
  */
 
 let testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
-assert.neq(null, testServer, "failed to start mongod with --setParameter=javascriptProtection=true");
+assert.neq(
+    null,
+    testServer,
+    "failed to start mongod with --setParameter=javascriptProtection=true",
+);
 
 var db = testServer.getDB("test");
 let t = db.js_protection;
@@ -28,7 +32,11 @@ function assertMongoClientCorrect() {
         var doc = db.js_protection.findOne({_id: 0});
         assert.neq(null, doc);
         assert(doc.hasOwnProperty("myFunc"));
-        assert.neq("function", typeof doc.myFunc, "value of BSON type Code shouldn't have been eval()ed automatically");
+        assert.neq(
+            "function",
+            typeof doc.myFunc,
+            "value of BSON type Code shouldn't have been eval()ed automatically",
+        );
 
         assert.eq("undefined", typeof addOne, "addOne function has already been defined");
         db.loadServerScripts();

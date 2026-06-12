@@ -13,7 +13,9 @@ const dbName = "test";
 const collName = "start_or_continue_does_not_restart_aborted";
 
 const st = new ShardingTest({shards: 1});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
 
 const shard0Primary = st.rs0.getPrimary();
@@ -75,7 +77,10 @@ assert(
     {res},
 );
 
-jsTest.log.info("No silent data loss: X was discarded by the abort and Y was rejected, so " + "neither persisted.");
+jsTest.log.info(
+    "No silent data loss: X was discarded by the abort and Y was rejected, so " +
+        "neither persisted.",
+);
 const docs = st.s.getDB(dbName)[collName].find({}, {_id: 1}).sort({_id: 1}).toArray();
 assert.eq([], docs, "collection should be empty", {docs});
 

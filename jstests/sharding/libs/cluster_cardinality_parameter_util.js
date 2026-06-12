@@ -4,7 +4,9 @@
  */
 export function checkClusterParameter(rst, expectedValue) {
     let res = assert.commandWorked(
-        rst.getPrimary().adminCommand({getClusterParameter: "shardedClusterCardinalityForDirectConns"}),
+        rst
+            .getPrimary()
+            .adminCommand({getClusterParameter: "shardedClusterCardinalityForDirectConns"}),
     );
     assert.eq(res.clusterParameters[0].hasTwoOrMoreShards, expectedValue);
 }
@@ -19,7 +21,9 @@ export function interruptAdminCommand(node, cmdNames) {
         cmdNameFilter.push({["command." + cmdName]: {$exists: true}});
     });
     const results = adminDB
-        .aggregate([{$currentOp: {}}, {$match: {$or: cmdNameFilter}}], {$readPreference: {mode: "primaryPreferred"}}) // specify secondary ok.
+        .aggregate([{$currentOp: {}}, {$match: {$or: cmdNameFilter}}], {
+            $readPreference: {mode: "primaryPreferred"},
+        }) // specify secondary ok.
         .toArray();
     results.forEach((result) => {
         adminDB.killOp(result.opid);
@@ -27,9 +31,15 @@ export function interruptAdminCommand(node, cmdNames) {
 }
 
 export function interruptConfigsvrAddShard(configPrimary) {
-    interruptAdminCommand(configPrimary, ["_configsvrAddShard", "_configsvrTransitionToDedicatedConfigServer"]);
+    interruptAdminCommand(configPrimary, [
+        "_configsvrAddShard",
+        "_configsvrTransitionToDedicatedConfigServer",
+    ]);
 }
 
 export function interruptConfigsvrRemoveShard(configPrimary) {
-    interruptAdminCommand(configPrimary, ["_configsvrRemoveShard", "_configsvrTransitionToDedicatedConfigServer"]);
+    interruptAdminCommand(configPrimary, [
+        "_configsvrRemoveShard",
+        "_configsvrTransitionToDedicatedConfigServer",
+    ]);
 }

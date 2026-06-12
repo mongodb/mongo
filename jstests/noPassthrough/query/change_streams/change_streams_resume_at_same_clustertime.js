@@ -14,7 +14,9 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1, setParameter: {writePerio
 const mongosDB = st.s.startSession({causalConsistency: true}).getDatabase(jsTestName());
 const mongosColl = mongosDB.test;
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard on {_id:1}, split at {_id:0}, and move the upper chunk to shard1.
 st.shardColl(mongosColl, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName(), true);

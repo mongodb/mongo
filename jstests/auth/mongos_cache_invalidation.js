@@ -166,7 +166,9 @@ assert(db3.auth("spencer", "pwd"));
  * changes.
  */
 (function testKeepingCacheIfNoChange() {
-    jsTestLog("Testing cache generation stays the same and the user cache is not flushed if there are no changes");
+    jsTestLog(
+        "Testing cache generation stays the same and the user cache is not flushed if there are no changes",
+    );
 
     const cacheIntervalBeforeTest = assert.commandWorked(
         db1.adminCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1}),
@@ -212,7 +214,10 @@ assert(db3.auth("spencer", "pwd"));
 
     // Set userCacheInvalidationInterval back to value before the test
     assert.commandWorked(
-        db1.adminCommand({setParameter: 1, userCacheInvalidationIntervalSecs: cacheIntervalBeforeTest}),
+        db1.adminCommand({
+            setParameter: 1,
+            userCacheInvalidationIntervalSecs: cacheIntervalBeforeTest,
+        }),
     );
 })();
 
@@ -302,7 +307,9 @@ assert(db3.auth("spencer", "pwd"));
     assert(cfg1.auth("root", "pwd"));
 
     // Create a previously unauthenticated user which is not in the authorization cached
-    assert.commandWorked(cfg1.runCommand({createUser: "previouslyUncached", pwd: "pwd", roles: []}));
+    assert.commandWorked(
+        cfg1.runCommand({createUser: "previouslyUncached", pwd: "pwd", roles: []}),
+    );
 
     const oldRes = assert.commandWorked(cfg1.runCommand({_getUserCacheGeneration: 1}));
 

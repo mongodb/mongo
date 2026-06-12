@@ -62,7 +62,9 @@ assert.commandWorked(local.insertOne({start: 1}));
 const docCount = 64;
 const string1MB = Array(1024 * 1024).toString();
 for (let i = 1; i <= docCount; ++i) {
-    assert.commandWorked(foreign.insertOne({index: i, children: [2 * i, 2 * i + 1], payload: string1MB}));
+    assert.commandWorked(
+        foreign.insertOne({index: i, children: [2 * i, 2 * i + 1], payload: string1MB}),
+    );
 }
 
 const pipeline = [
@@ -87,7 +89,9 @@ function sortPipelineResults(results) {
 }
 
 // Get all the results to use as a reference.
-const expectedResults = sortPipelineResults(local.aggregate(pipeline, {"allowDiskUse": false}).toArray());
+const expectedResults = sortPipelineResults(
+    local.aggregate(pipeline, {"allowDiskUse": false}).toArray(),
+);
 
 {
     jsTest.log(`Running releaseMemory after first batch`);

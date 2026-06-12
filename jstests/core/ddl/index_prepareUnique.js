@@ -17,7 +17,10 @@ assert.commandWorked(coll1.insert({_id: 1, a: 1}));
 assert.commandWorked(coll1.createIndex({a: 1}, {prepareUnique: true}));
 
 // Disallows creating another index on the same key with a different option.
-assert.commandFailedWithCode(coll1.createIndex({a: 1}, {prepareUnique: false}), ErrorCodes.IndexOptionsConflict);
+assert.commandFailedWithCode(
+    coll1.createIndex({a: 1}, {prepareUnique: false}),
+    ErrorCodes.IndexOptionsConflict,
+);
 
 // Checks the index is rejecting duplicates but accepting other keys.
 assert.commandFailedWithCode(coll1.insert({_id: 2, a: 1}), ErrorCodes.DuplicateKey);
@@ -30,7 +33,9 @@ let indexesWithPrepareUnique = coll1.getIndexes().filter(function (doc) {
 assert.eq(1, indexesWithPrepareUnique.length);
 
 // Removes the field and checks the index works as a regular index.
-assert.commandWorked(coll1.runCommand({collMod: coll1.getName(), index: {keyPattern: {a: 1}, prepareUnique: false}}));
+assert.commandWorked(
+    coll1.runCommand({collMod: coll1.getName(), index: {keyPattern: {a: 1}, prepareUnique: false}}),
+);
 assert.commandWorked(coll1.insert({_id: 2, a: 1}));
 
 // Checks that the prepareUnique field is removed.
@@ -44,7 +49,9 @@ const coll2 = db.getCollection(collName_prefix + count++);
 coll2.drop();
 
 assert.commandWorked(coll2.createIndex({a: 1}, {unique: true}));
-assert.commandWorked(db.runCommand({collMod: coll2.getName(), index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: coll2.getName(), index: {keyPattern: {a: 1}, prepareUnique: true}}),
+);
 // Checks that the prepareUnique field does not exist when getIndexes is called.
 indexesWithPrepareUnique = coll2.getIndexes().filter(function (doc) {
     return friendlyEqual(doc.prepareUnique, true);

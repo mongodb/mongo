@@ -39,7 +39,9 @@ rst.awaitReplication();
 
 jsTestLog("Hang primary on step down");
 const joinStepDownThread = startParallelShell(() => {
-    assert.commandWorked(db.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "alwaysOn"}),
+    );
 
     const freezeSecs = 24 * 60 * 60; // 24 hours
     assert.commandFailedWithCode(
@@ -84,7 +86,9 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Get a cluster time for afterClusterTime reads");
 TestData.clusterTimeAfterPrepare = assert.commandWorked(
-    newPrimary.getDB(dbName)[collName].runCommand("insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}),
+    newPrimary
+        .getDB(dbName)
+        [collName].runCommand("insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}),
 ).operationTime;
 
 // Make sure the insert gets replicated to the old primary (current secondary) so that its
@@ -112,7 +116,9 @@ jsTestLog("Wait to hit a prepare conflict");
 wTPrintPrepareConflictLogFailPoint.wait();
 
 jsTestLog("Allow step down to complete");
-assert.commandWorked(primary.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "off"}),
+);
 
 jsTestLog("Wait for step down to start killing operations");
 checkLog.contains(primary, "Starting to kill user operations");

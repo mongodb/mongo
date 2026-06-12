@@ -45,10 +45,15 @@ export var HybridGeoIndexTest = class {
         // IndexBuildTest.pauseIndexBuilds() stalls the index build in the middle of the collection
         // scan.
         assert.commandWorked(
-            testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}),
+            testDB.adminCommand({
+                configureFailPoint: "hangAfterSettingUpIndexBuild",
+                mode: "alwaysOn",
+            }),
         );
 
-        const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {b: "2dsphere"});
+        const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {
+            b: "2dsphere",
+        });
         IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "b_2dsphere");
 
         switch (op) {
@@ -102,7 +107,9 @@ export var HybridGeoIndexTest = class {
                 break;
         }
 
-        assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}));
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}),
+        );
 
         // Wait for the index build to finish. Since the invalid geo document is removed before the
         // index build scans the collection, the index should be built successfully.

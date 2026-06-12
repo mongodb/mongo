@@ -5,7 +5,10 @@
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForVectorSearchQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mongotCommandForVectorSearchQuery,
+    MongotMock,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {prepCollection, prepMongotResponse} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Set up mongotmock and point the mongod to it.
@@ -34,7 +37,12 @@ const vectorSearchQuery = {
     numCandidates: 10,
     limit: 5,
 };
-const vectorSearchCmd = mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID});
+const vectorSearchCmd = mongotCommandForVectorSearchQuery({
+    ...vectorSearchQuery,
+    collName,
+    dbName,
+    collectionUUID,
+});
 // Give mongotmock some stuff to return.
 const expected = prepMongotResponse(vectorSearchCmd, coll, mongotConn);
 

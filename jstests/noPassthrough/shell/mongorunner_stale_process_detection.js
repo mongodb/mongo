@@ -44,7 +44,14 @@ describe("MongoRunner.awaitConnection stale-process detection", function () {
             caughtError = e;
         }
 
-        assert(caughtError instanceof MongoRunner.StopError, "Expected MongoRunner.StopError", {caughtError});
-        assert.eq(MongoRunner.EXIT_NET_ERROR, caughtError.returnCode, "Expected EXIT_NET_ERROR (48)", {caughtError});
+        assert(caughtError instanceof MongoRunner.StopError, "Expected MongoRunner.StopError", {
+            caughtError,
+        });
+        assert.eq(
+            MongoRunner.EXIT_NET_ERROR,
+            caughtError.returnCode,
+            "Expected EXIT_NET_ERROR (48)",
+            {caughtError},
+        );
     });
 });

@@ -25,7 +25,12 @@ printjson(collUn.createIndex({ukey: 1}, {unique: true}));
 assert.commandWorked(admin.runCommand({shardCollection: collSh + "", key: {ukey: 1}}));
 assert.commandWorked(admin.runCommand({split: collSh + "", middle: {ukey: 0}}));
 assert.commandWorked(
-    admin.runCommand({moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: collSh + "",
+        find: {ukey: 0},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 let resetColls = function () {
@@ -125,7 +130,15 @@ assert.eq(4, collUn.find().itcount());
 jsTest.log("Bulk insert to third shard (no COE) with mongod error...");
 
 resetColls();
-var inserts = [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {ukey: 4}, {ukey: 4}, {hello: "world"}];
+var inserts = [
+    {ukey: 0},
+    {ukey: 1},
+    {ukey: -2},
+    {ukey: -3},
+    {ukey: 4},
+    {ukey: 4},
+    {hello: "world"},
+];
 
 res = assert.writeError(collSh.insert(inserts));
 assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
@@ -153,7 +166,15 @@ assert.eq(2, collUn.find().itcount());
 jsTest.log("Bulk insert to third shard (yes COE) with mongod error...");
 
 resetColls();
-var inserts = [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {ukey: 4}, {ukey: 4}, {hello: "world"}];
+var inserts = [
+    {ukey: 0},
+    {ukey: 1},
+    {ukey: -2},
+    {ukey: -3},
+    {ukey: 4},
+    {ukey: 4},
+    {hello: "world"},
+];
 
 // Extra insert goes through
 res = assert.writeError(collSh.insert(inserts, 1));
@@ -177,10 +198,20 @@ let staleCollSh = staleMongos.getCollection(collSh + "");
 assert.eq(null, staleCollSh.findOne(), "Collections should be empty");
 
 assert.commandWorked(
-    admin.runCommand({moveChunk: collSh + "", find: {ukey: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: collSh + "",
+        find: {ukey: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 assert.commandWorked(
-    admin.runCommand({moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: collSh + "",
+        find: {ukey: 0},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 assert.commandWorked(staleCollSh.insert(inserts));
@@ -206,10 +237,20 @@ staleCollSh = staleMongos.getCollection(collSh + "");
 assert.eq(null, staleCollSh.findOne(), "Collections should be empty");
 
 assert.commandWorked(
-    admin.runCommand({moveChunk: collSh + "", find: {ukey: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: collSh + "",
+        find: {ukey: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 assert.commandWorked(
-    admin.runCommand({moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: collSh + "",
+        find: {ukey: 0},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 assert.commandWorked(staleCollSh.insert(inserts));

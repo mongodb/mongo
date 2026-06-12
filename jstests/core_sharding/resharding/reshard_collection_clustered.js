@@ -33,7 +33,9 @@ const shardKey = {
 const numDocs = 4000;
 
 jsTestLog("Setting up the clustered collection.");
-db.createCollection(collName, {clusteredIndex: {"key": shardKey, "unique": true, "name": "clustered collection"}});
+db.createCollection(collName, {
+    clusteredIndex: {"key": shardKey, "unique": true, "name": "clustered collection"},
+});
 assert.commandWorked(db.adminCommand({shardCollection: ns, key: shardKey}));
 
 let bulk = coll.initializeUnorderedBulkOp();
@@ -59,7 +61,10 @@ newChunks.forEach((_, idx) => {
     newChunks[idx]["recipientShardId"] = newChunks[idx]["shard"];
     delete newChunks[idx]["shard"];
 });
-reshardCmdTest.assertReshardCollOkWithPreset({reshardCollection: ns, key: {shardKey: 1}}, newChunks);
+reshardCmdTest.assertReshardCollOkWithPreset(
+    {reshardCollection: ns, key: {shardKey: 1}},
+    newChunks,
+);
 assert.eq(numDocs, coll.countDocuments({}));
 
 // Reshard to a different shard key.
@@ -69,7 +74,10 @@ newChunks.forEach((_, idx) => {
     delete newChunks[idx]["shard"];
 });
 
-reshardCmdTest.assertReshardCollOkWithPreset({reshardCollection: ns, key: {newShardKey: 1}}, newChunks);
+reshardCmdTest.assertReshardCollOkWithPreset(
+    {reshardCollection: ns, key: {newShardKey: 1}},
+    newChunks,
+);
 assert.eq(numDocs, coll.countDocuments({}));
 
 coll.drop();

@@ -17,7 +17,11 @@ assert.commandWorked(
             coordinates: [-25.0, -60.0],
             extra: {breeds: "Scottish Highland", feeling: "bullish"},
         },
-        {_id: "puppyhouse", coordinates: [-25.0, 60.0], extra: {breeds: 1, feeling: ["cute", "small"]}},
+        {
+            _id: "puppyhouse",
+            coordinates: [-25.0, 60.0],
+            extra: {breeds: 1, feeling: ["cute", "small"]},
+        },
     ]),
 );
 

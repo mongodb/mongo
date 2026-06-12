@@ -16,7 +16,9 @@ assert.commandWorked(coll.insert({_id: "sentinel", a: 1}));
 function assertCollapsed(expanded, expectedCollapsed) {
     assert(coll.drop());
     assert.commandWorked(coll.insert({expanded: expanded}));
-    const result = coll.aggregate([{$project: {collapsed: {$arrayToObject: "$expanded"}}}]).toArray()[0].collapsed;
+    const result = coll
+        .aggregate([{$project: {collapsed: {$arrayToObject: "$expanded"}}}])
+        .toArray()[0].collapsed;
     assert.eq(result, expectedCollapsed);
 }
 
@@ -129,8 +131,16 @@ assertPipelineErrors(NaN, 40386);
 assertPipelineErrors([["a\0b", "abra cadabra"]], 4940400);
 assertPipelineErrors([{k: "a\0b", v: "blah"}], 4940401);
 
-assertErrorCode(coll, [{$replaceWith: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}], 4940400);
-assertErrorCode(coll, [{$replaceWith: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}], 4940401);
+assertErrorCode(
+    coll,
+    [{$replaceWith: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}],
+    4940400,
+);
+assertErrorCode(
+    coll,
+    [{$replaceWith: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}],
+    4940401,
+);
 assertErrorCode(
     coll,
     [{$replaceWith: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}, {$out: "output"}],

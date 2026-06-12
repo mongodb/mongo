@@ -15,11 +15,17 @@
  */
 
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {CursorList} from "jstests/libs/query/change_stream_util.js";
-import {ServerStatusMetrics, TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
+import {
+    ServerStatusMetrics,
+    TestDataModifyGuard,
+} from "jstests/change_streams/change_stream_metrics_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const testColl = testDB.getCollection("test");
@@ -109,7 +115,10 @@ describe("change stream cursor open gauge metrics in serverStatus", function () 
 
             const csMetricsAfter = ServerStatusMetrics.getCsMetrics(db);
             assert.eq(csMetricsBefore.cursor.open.pinned, csMetricsAfter.cursor.open.pinned);
-            assert.eq(csMetricsBefore.cursor.open.total + this.cursorList.length(), csMetricsAfter.cursor.open.total);
+            assert.eq(
+                csMetricsBefore.cursor.open.total + this.cursorList.length(),
+                csMetricsAfter.cursor.open.total,
+            );
         });
     });
 
@@ -144,7 +153,10 @@ describe("change stream cursor open gauge metrics in serverStatus", function () 
                 joinGetMore = startParallelShell(
                     funWithArgs(
                         function (dbName, collName) {
-                            const csCursor = db.getSiblingDB(dbName).getCollection(collName).watch();
+                            const csCursor = db
+                                .getSiblingDB(dbName)
+                                .getCollection(collName)
+                                .watch();
                             csCursor.hasNext();
                             csCursor.close();
                         },
@@ -172,7 +184,10 @@ describe("change stream cursor open gauge metrics in serverStatus", function () 
             }
 
             // Assert the pinned metric has returned to the original value after the cursor is unpinned.
-            assert.eq(csMetricsBefore.cursor.open.pinned, ServerStatusMetrics.getCsMetrics(db).cursor.open.pinned);
+            assert.eq(
+                csMetricsBefore.cursor.open.pinned,
+                ServerStatusMetrics.getCsMetrics(db).cursor.open.pinned,
+            );
         });
     });
 
@@ -187,7 +202,9 @@ describe("change stream cursor open gauge metrics in serverStatus", function () 
             const cursor = this.cursorList.push(
                 new DBCommandCursor(
                     testDB,
-                    assert.commandWorked(testDB.runCommand({find: testColl.getName(), filter: {}, batchSize: 0})),
+                    assert.commandWorked(
+                        testDB.runCommand({find: testColl.getName(), filter: {}, batchSize: 0}),
+                    ),
                     0,
                 ),
             );

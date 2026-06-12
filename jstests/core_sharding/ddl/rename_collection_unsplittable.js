@@ -13,7 +13,10 @@
  * ]
  */
 
-import {getRandomShardName, setupTestDatabase} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
+import {
+    getRandomShardName,
+    setupTestDatabase,
+} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 function checkRenameSucceeded(configDb, nssFrom, nssTo, expectedUuid, shard) {
     const collEntryFrom = configDb.collections.findOne({_id: nssFrom});
@@ -77,19 +80,27 @@ function testRenameUnsplittableCollection(
     jsTestLog(msg);
 
     // Create collFrom collection
-    assert.commandWorked(dbFrom.runCommand({createUnsplittableCollection: collNameFrom, dataShard: shardName}));
+    assert.commandWorked(
+        dbFrom.runCommand({createUnsplittableCollection: collNameFrom, dataShard: shardName}),
+    );
     const coll = dbFrom[collNameFrom];
     const uuidFrom = getUuid(configDb, nssFrom);
 
     // Create collTo collection if requested
     if (collToShouldExist) {
         assert.neq("", collToShardName);
-        assert.commandWorked(dbTo.runCommand({createUnsplittableCollection: collNameTo, dataShard: collToShardName}));
+        assert.commandWorked(
+            dbTo.runCommand({createUnsplittableCollection: collNameTo, dataShard: collToShardName}),
+        );
     }
 
     // Rename collection
     assert.commandWorked(
-        dbFrom.adminCommand({renameCollection: coll.getFullName(), to: nssTo, dropTarget: dropTarget}),
+        dbFrom.adminCommand({
+            renameCollection: coll.getFullName(),
+            to: nssTo,
+            dropTarget: dropTarget,
+        }),
     );
 
     const resUuid = getUuid(configDb, nssTo);
@@ -156,10 +167,24 @@ testRenameUnsplittableCollection(
 );
 
 // 6. Rename collection  test:located on the primary shard across DBs
-testRenameUnsplittableCollection(configDb, testDB, "collFrom6", anotherTestDB, "collTo6", primaryShard);
+testRenameUnsplittableCollection(
+    configDb,
+    testDB,
+    "collFrom6",
+    anotherTestDB,
+    "collTo6",
+    primaryShard,
+);
 
 // 7. Rename collection  test:not located on the primary shard across DBs
-testRenameUnsplittableCollection(configDb, testDB, "collFrom7", anotherTestDB, "collTo7", nonPrimaryShard);
+testRenameUnsplittableCollection(
+    configDb,
+    testDB,
+    "collFrom7",
+    anotherTestDB,
+    "collTo7",
+    nonPrimaryShard,
+);
 
 // 8. Rename collection  test:located on the primary shard across DBs when target exists
 testRenameUnsplittableCollection(

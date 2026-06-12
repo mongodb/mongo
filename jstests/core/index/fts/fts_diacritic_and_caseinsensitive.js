@@ -7,7 +7,10 @@ let coll = db.fts_diacritic_and_caseinsensitive;
 coll.drop();
 
 assert.commandWorked(
-    coll.insert({_id: 0, a: "O próximo Vôo à Noite sobre o Atlântico, Põe Freqüentemente o único Médico."}),
+    coll.insert({
+        _id: 0,
+        a: "O próximo Vôo à Noite sobre o Atlântico, Põe Freqüentemente o único Médico.",
+    }),
 );
 
 assert.commandWorked(coll.createIndex({a: "text"}, {default_language: "portuguese"}));

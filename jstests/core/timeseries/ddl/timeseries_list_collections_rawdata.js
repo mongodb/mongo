@@ -19,14 +19,18 @@ const timeFieldName = "time";
 const coll = testDB.getCollection(jsTestName());
 coll.drop();
 
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+);
 
 (function assertHasCollectionTypeAndAdditionalProperties() {
     if (!isViewfulTimeseriesOnlySuite(testDB) && !isViewlessTimeseriesOnlySuite(testDB)) {
         return;
     }
 
-    const collectionDocument = getTimeseriesCollForDDLOps(testDB, coll).getMetadata(kRawOperationSpec);
+    const collectionDocument = getTimeseriesCollForDDLOps(testDB, coll).getMetadata(
+        kRawOperationSpec,
+    );
 
     const expectedCollectionDocument = getTimeseriesCollForDDLOps(testDB, coll).getMetadata();
     // In rawData mode, the type is reported as 'collection', rather than 'timeseries'.
@@ -50,7 +54,10 @@ assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeF
         }),
     ).cursor.firstBatch[0];
 
-    assert.docEq(getTimeseriesCollForDDLOps(testDB, coll).getMetadata(kRawOperationSpec), collectionDocument);
+    assert.docEq(
+        getTimeseriesCollForDDLOps(testDB, coll).getMetadata(kRawOperationSpec),
+        collectionDocument,
+    );
 })();
 
 (function assertLegacyTimeseriesNotAffectedByRawData() {

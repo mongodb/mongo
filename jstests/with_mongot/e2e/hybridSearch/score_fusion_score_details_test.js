@@ -103,9 +103,22 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
         });
 
         const searchDetails = subDetails[0];
-        const searchScore = checkSearchScoreDetails(stageType, assertFieldPresent, searchDetails, "search", 2, true);
+        const searchScore = checkSearchScoreDetails(
+            stageType,
+            assertFieldPresent,
+            searchDetails,
+            "search",
+            2,
+            true,
+        );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore = checkVectorScoreDetails(stageType, assertFieldPresent, vectorDetails, "vector", 1);
+        const vectorSearchScore = checkVectorScoreDetails(
+            stageType,
+            assertFieldPresent,
+            vectorDetails,
+            "vector",
+            1,
+        );
         assert.eq(score, (searchScore + vectorSearchScore) / 2);
     }
 })();
@@ -164,7 +177,13 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
             2.8,
         );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore = checkVectorScoreDetails(stageType, assertFieldPresent, vectorDetails, "vector", 0.5);
+        const vectorSearchScore = checkVectorScoreDetails(
+            stageType,
+            assertFieldPresent,
+            vectorDetails,
+            "vector",
+            0.5,
+        );
         assert.eq(score, (secondVectorScore + vectorSearchScore) / 2);
     }
 })();
@@ -224,7 +243,13 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
             false,
         );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore = checkVectorScoreDetails(stageType, assertFieldPresent, vectorDetails, "vector", 1);
+        const vectorSearchScore = checkVectorScoreDetails(
+            stageType,
+            assertFieldPresent,
+            vectorDetails,
+            "vector",
+            1,
+        );
         assert.eq(score, (secondVectorScore + vectorSearchScore) / 2);
     }
 })();
@@ -259,7 +284,10 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
         {
             $scoreFusion: {
                 input: {
-                    pipelines: {vector: [vectorStage], search: [searchStageWithDetails, limitStage]},
+                    pipelines: {
+                        vector: [vectorStage],
+                        search: [searchStageWithDetails, limitStage],
+                    },
                     normalization: "none",
                 },
                 combination: {weights: {search: 2}},
@@ -292,7 +320,9 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
         projectOutPlotEmbeddingStage,
     ];
 
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: testQuery, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: testQuery, cursor: {}}),
+    );
 })();
 
 dropDefaultMovieSearchAndOrVectorIndexes();
@@ -343,7 +373,12 @@ dropDefaultMovieSearchAndOrVectorIndexes();
                                     index: getRentalSearchIndexSpec().name,
                                     text: {
                                         query: "brooklyn",
-                                        path: ["name", "summary", "description", "neighborhood_overview"],
+                                        path: [
+                                            "name",
+                                            "summary",
+                                            "description",
+                                            "neighborhood_overview",
+                                        ],
                                     },
                                 },
                             },
@@ -366,7 +401,9 @@ dropDefaultMovieSearchAndOrVectorIndexes();
         },
         projectScoreAndScoreDetailsStage,
     ];
-    assert.commandWorked(db.runCommand({aggregate: geoNearCollName, pipeline: testQuery, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: geoNearCollName, pipeline: testQuery, cursor: {}}),
+    );
     const results = geoNearColl.aggregate(testQuery).toArray();
     for (const foundDoc of results) {
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, {
@@ -377,10 +414,23 @@ dropDefaultMovieSearchAndOrVectorIndexes();
         });
 
         // Check geoNear input pipeline details.
-        const geoNearScore = checkGeoNearScoreDetails(stageType, assertFieldPresent, subDetails[0], "geoNear", 2);
+        const geoNearScore = checkGeoNearScoreDetails(
+            stageType,
+            assertFieldPresent,
+            subDetails[0],
+            "geoNear",
+            2,
+        );
 
         // Check search input pipeline details.
-        const searchScore = checkSearchScoreDetails(stageType, assertFieldPresent, subDetails[1], "search", 1, false);
+        const searchScore = checkSearchScoreDetails(
+            stageType,
+            assertFieldPresent,
+            subDetails[1],
+            "search",
+            1,
+            false,
+        );
 
         assert.eq(score, (geoNearScore + searchScore) / 2);
     }

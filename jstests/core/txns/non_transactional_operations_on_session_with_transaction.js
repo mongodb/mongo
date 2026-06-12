@@ -77,7 +77,12 @@ assert.eq(null, sessionColl.findOne(doc2));
 // Test that we observe the insert inside of the transaction.
 assertCursorBatchContents(
     assert.commandWorked(
-        sessionDb.runCommand({find: collName, batchSize: 10, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        sessionDb.runCommand({
+            find: collName,
+            batchSize: 10,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     ),
     [doc1],
     false,
@@ -95,7 +100,12 @@ assert.docEq(doc2, sessionColl.findOne(doc2));
 // Test that we do not observe the new insert inside of the transaction.
 assertCursorBatchContents(
     assert.commandWorked(
-        sessionDb.runCommand({find: collName, batchSize: 10, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        sessionDb.runCommand({
+            find: collName,
+            batchSize: 10,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     ),
     [doc1],
     false,

@@ -117,7 +117,10 @@ function getSearchWithSetWindowFieldsPipeline() {
         },
         {$limit: limit},
         {
-            $setWindowFields: {sortBy: {score: {$meta: "searchScore"}}, output: {fts_rank: {$rank: {}}}},
+            $setWindowFields: {
+                sortBy: {score: {$meta: "searchScore"}},
+                output: {fts_rank: {$rank: {}}},
+            },
         },
         {
             $addFields: {
@@ -143,7 +146,10 @@ function getVectorSearchWithSetWindowFieldsPipeline() {
         },
         {$limit: limit},
         {
-            $setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {vs_rank: {$rank: {}}}},
+            $setWindowFields: {
+                sortBy: {score: {$meta: "vectorSearchScore"}},
+                output: {vs_rank: {$rank: {}}},
+            },
         },
         {
             $addFields: {
@@ -203,7 +209,9 @@ function runTest(expectedResultIds, searchPipeline, vectorSearchPipeline) {
             },
         },
     ];
-    let hybridSearchQuery = vectorSearchPipeline.concat(unionWithSearch).concat(hybridSearchProcessingPipeline);
+    let hybridSearchQuery = vectorSearchPipeline
+        .concat(unionWithSearch)
+        .concat(hybridSearchProcessingPipeline);
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
     assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);
@@ -221,7 +229,9 @@ function runTestFlipped(expectedResultIds, searchPipeline, vectorSearchPipeline)
             },
         },
     ];
-    let hybridSearchQuery = searchPipeline.concat(unionWithVectorSearch).concat(hybridSearchProcessingPipeline);
+    let hybridSearchQuery = searchPipeline
+        .concat(unionWithVectorSearch)
+        .concat(hybridSearchProcessingPipeline);
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
     assert.eq(results, buildExpectedResults(expectedResultIds, datasets.MOVIES));

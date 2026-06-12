@@ -11,7 +11,12 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 // appended to this array and the result returned to the caller, otherwise an array with a
 // single $merge stage is returned. An output collection for the $merge stage is specified
 // in the 'target', and the $merge stage 'on' fields in the 'on' parameter.
-function makeMergePipeline({target = "", initialStages = [], updatePipeline = [], on = "_id"} = {}) {
+function makeMergePipeline({
+    target = "",
+    initialStages = [],
+    updatePipeline = [],
+    on = "_id",
+} = {}) {
     return initialStages.concat([
         {$merge: {into: target, on: on, whenMatched: updatePipeline, whenNotMatched: "discard"}},
     ]);
@@ -25,7 +30,10 @@ target.drop();
 // Test $merge when some documents in the source collection don't have a matching document in
 // the target collection. The merge operation should succeed and unmatched documents discarded.
 (function testMergeIfMatchingDocumentNotFound() {
-    const pipeline = makeMergePipeline({target: target.getName(), updatePipeline: [{$set: {x: 1, y: 2}}]});
+    const pipeline = makeMergePipeline({
+        target: target.getName(),
+        updatePipeline: [{$set: {x: 1, y: 2}}],
+    });
 
     // Single document without a match.
     assert.commandWorked(
@@ -60,7 +68,10 @@ target.drop();
 // Test $merge when all documents in the source collection have a matching document in the
 // target collection.
 (function testMergeWhenAllDocumentsHaveMatch() {
-    const pipeline = makeMergePipeline({target: target.getName(), updatePipeline: [{$set: {x: 1, y: 2}}]});
+    const pipeline = makeMergePipeline({
+        target: target.getName(),
+        updatePipeline: [{$set: {x: 1, y: 2}}],
+    });
 
     // Source has a single element with a match in the target.
     assert(source.drop());
@@ -111,7 +122,10 @@ target.drop();
 // Test $merge when the source collection is empty. The target collection should not be
 // modified.
 (function testMergeWhenSourceIsEmpty() {
-    const pipeline = makeMergePipeline({target: target.getName(), updatePipeline: [{$set: {x: 1, y: 2}}]});
+    const pipeline = makeMergePipeline({
+        target: target.getName(),
+        updatePipeline: [{$set: {x: 1, y: 2}}],
+    });
 
     assert.commandWorked(source.deleteMany({}));
     assert(target.drop());
@@ -134,7 +148,10 @@ target.drop();
 // Test $merge does not insert a new document into the target collection if it was inserted
 // into the source collection.
 (function testMergeDoesNotInsertNewDocument() {
-    const pipeline = makeMergePipeline({target: target.getName(), updatePipeline: [{$set: {x: 1, y: 2}}]});
+    const pipeline = makeMergePipeline({
+        target: target.getName(),
+        updatePipeline: [{$set: {x: 1, y: 2}}],
+    });
 
     // Insert and merge a single document.
     assert.commandWorked(source.insert({_id: 3, a: 3, b: "c"}));
@@ -165,7 +182,10 @@ target.drop();
 // Test $merge doesn't modify the target collection if a document has been removed from the
 // source collection.
 (function testMergeDoesNotUpdateDeletedDocument() {
-    const pipeline = makeMergePipeline({target: target.getName(), updatePipeline: [{$set: {x: 1, y: 2}}]});
+    const pipeline = makeMergePipeline({
+        target: target.getName(),
+        updatePipeline: [{$set: {x: 1, y: 2}}],
+    });
 
     assert.commandWorked(source.deleteOne({_id: 1}));
     assert.doesNotThrow(() => source.aggregate(pipeline));

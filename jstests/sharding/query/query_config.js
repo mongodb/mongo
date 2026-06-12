@@ -7,11 +7,19 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let getListCollectionsCursor = function (database, options, subsequentBatchSize) {
-    return new DBCommandCursor(database, database.runCommand("listCollections", options), subsequentBatchSize);
+    return new DBCommandCursor(
+        database,
+        database.runCommand("listCollections", options),
+        subsequentBatchSize,
+    );
 };
 
 let getListIndexesCursor = function (coll, options, subsequentBatchSize) {
-    return new DBCommandCursor(coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+    return new DBCommandCursor(
+        coll.getDB(),
+        coll.runCommand("listIndexes", options),
+        subsequentBatchSize,
+    );
 };
 
 let arrayGetNames = function (array) {
@@ -61,7 +69,9 @@ let setupTestCollections = function (st) {
         return testDB.getName() + "." + e;
     });
     for (let i = 0; i < testKeys.length; i++) {
-        assert.commandWorked(st.s.adminCommand({shardcollection: testNamespaces[i], key: testKeys[i]}));
+        assert.commandWorked(
+            st.s.adminCommand({shardcollection: testNamespaces[i], key: testKeys[i]}),
+        );
     }
 
     return testNamespaces;
@@ -131,7 +141,10 @@ let queryConfigCollections = function (st, testNamespaces) {
     let cursor;
 
     // Find query.
-    cursor = configDB.collections.find({"key.a": 1}, {"key.a": 1, "key.c": 1}).sort({"_id": 1}).batchSize(2);
+    cursor = configDB.collections
+        .find({"key.a": 1}, {"key.a": 1, "key.c": 1})
+        .sort({"_id": 1})
+        .batchSize(2);
     assert.eq(cursor.objsLeftInBatch(), 2);
     assert.eq(cursor.next(), {_id: testNamespaces[1], key: {a: 1}});
     assert.eq(cursor.next(), {_id: testNamespaces[3], key: {a: 1, c: 1}});
@@ -143,7 +156,11 @@ let queryConfigCollections = function (st, testNamespaces) {
 
     // Aggregate query.
     cursor = configDB.collections.aggregate(
-        [{$match: {"key.b": 1}}, {$sort: {"_id": 1}}, {$project: {"keyb": "$key.b", "keyc": "$key.c"}}],
+        [
+            {$match: {"key.b": 1}},
+            {$sort: {"_id": 1}},
+            {$project: {"keyb": "$key.b", "keyc": "$key.c"}},
+        ],
         {cursor: {batchSize: 2}},
     );
     assert.eq(cursor.objsLeftInBatch(), 2);
@@ -172,7 +189,9 @@ let queryConfigChunks = function (st) {
     let shard1 = cursor.next()._id;
     let shard2 = cursor.next()._id;
     assert(!cursor.hasNext());
-    assert.commandWorked(st.s.adminCommand({enablesharding: testDB.getName(), primaryShard: shard1}));
+    assert.commandWorked(
+        st.s.adminCommand({enablesharding: testDB.getName(), primaryShard: shard1}),
+    );
 
     // Setup.
     assert.commandWorked(st.s.adminCommand({shardcollection: testColl.getFullName(), key: {e: 1}}));
@@ -183,9 +202,15 @@ let queryConfigChunks = function (st) {
     assert.commandWorked(st.s.adminCommand({split: testColl.getFullName(), middle: {e: 6}}));
     assert.commandWorked(st.s.adminCommand({split: testColl.getFullName(), middle: {e: 8}}));
     assert.commandWorked(st.s.adminCommand({split: testColl.getFullName(), middle: {e: 11}}));
-    assert.commandWorked(st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 1}, to: shard2}));
-    assert.commandWorked(st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 9}, to: shard2}));
-    assert.commandWorked(st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 12}, to: shard2}));
+    assert.commandWorked(
+        st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 1}, to: shard2}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 9}, to: shard2}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 12}, to: shard2}),
+    );
 
     // Find query.
     cursor = findChunksUtil
@@ -301,7 +326,12 @@ let queryUserCreated = function (database) {
 
     // Aggregate query.
     cursor = userColl.aggregate(
-        [{$match: {c: {$gt: 1}}}, {$unwind: "$u"}, {$group: {_id: "$u", sum: {$sum: "$c"}}}, {$sort: {_id: 1}}],
+        [
+            {$match: {c: {$gt: 1}}},
+            {$unwind: "$u"},
+            {$group: {_id: "$u", sum: {$sum: "$c"}}},
+            {$sort: {_id: 1}},
+        ],
         {cursor: {batchSize: 2}},
     );
     assert.eq(cursor.objsLeftInBatch(), 2);

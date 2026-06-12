@@ -26,7 +26,8 @@ function allChunksWithUUID() {
     assert.eq(
         0,
         config.chunks.countDocuments(matchChunksWithoutUUID),
-        "Found chunks with wrong UUID " + tojson(config.chunks.find(matchChunksWithoutUUID).toArray()),
+        "Found chunks with wrong UUID " +
+            tojson(config.chunks.find(matchChunksWithoutUUID).toArray()),
     );
 }
 

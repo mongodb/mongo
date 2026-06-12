@@ -53,7 +53,11 @@ assert.commandWorked(createSearchIndex(inputColl, indexDefinition));
 // Flush router config to ensure catalog cache reflects that collection is untracked
 assert.commandWorked(db.adminCommand({flushRouterConfig: 1}));
 const configDb = db.getSiblingDB("config");
-assert.eq(configDb.collections.findOne({_id: inputColl.getFullName()}), null, "Input collection should be untracked");
+assert.eq(
+    configDb.collections.findOne({_id: inputColl.getFullName()}),
+    null,
+    "Input collection should be untracked",
+);
 
 const testSearchResult = inputColl
     .aggregate([{$search: {index: "default", text: {query: "action", path: "plot"}}}])
@@ -76,7 +80,11 @@ assert.eq(outputResults.length, 2, "$out should have written at least one docume
 // Verify the documents in output collection match search results
 const outputIds = outputResults.map((doc) => doc._id).sort();
 const searchIds = testSearchResult.map((doc) => doc._id).sort();
-assert.eq(outputIds.length, searchIds.length, "Output collection should have same number of documents as search");
+assert.eq(
+    outputIds.length,
+    searchIds.length,
+    "Output collection should have same number of documents as search",
+);
 assert.eq(outputIds, searchIds, "Output collection documents should match search results");
 
 dropSearchIndex(inputColl, {name: "default"});

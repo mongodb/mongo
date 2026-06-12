@@ -15,11 +15,23 @@ assert.commandWorked(collection.save({_id: 1}));
 
 let oplogEntry = getLatestOp(primary);
 assert(oplogEntry, "unexpected empty oplog");
-assert.eq(collection.getFullName(), oplogEntry.ns, "unexpected namespace in oplog entry: " + tojson(oplogEntry));
-assert.eq(1, oplogEntry.o._id, "oplog entry does not refer to most recently inserted document: " + tojson(oplogEntry));
+assert.eq(
+    collection.getFullName(),
+    oplogEntry.ns,
+    "unexpected namespace in oplog entry: " + tojson(oplogEntry),
+);
+assert.eq(
+    1,
+    oplogEntry.o._id,
+    "oplog entry does not refer to most recently inserted document: " + tojson(oplogEntry),
+);
 assert(oplogEntry.hasOwnProperty("t"), "oplog entry must contain term: " + tojson(oplogEntry));
 
 let status = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-assert.eq(status.term, oplogEntry.t, "term in oplog entry does not match term in status: " + tojson(oplogEntry));
+assert.eq(
+    status.term,
+    oplogEntry.t,
+    "term in oplog entry does not match term in status: " + tojson(oplogEntry),
+);
 
 replSet.stopSet();

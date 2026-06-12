@@ -36,7 +36,12 @@ assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
 
-const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1, b: "2dsphere"}, {sparse: true});
+const createIdx = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    {a: 1, b: "2dsphere"},
+    {sparse: true},
+);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1_b_2dsphere");
 
 assert.commandWorked(coll.insert({a: [1, 2]}));

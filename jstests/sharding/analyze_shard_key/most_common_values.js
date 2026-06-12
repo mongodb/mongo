@@ -48,7 +48,9 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
 
     const dbName = "testDb";
     if (st) {
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
     }
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -65,7 +67,10 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
     // in casing.
     assert.commandWorked(db.createCollection(collName, {collation: caseInsensitiveCollation}));
 
-    const indexOptions = Object.assign({collation: simpleCollation}, isUnique ? {unique: true} : {});
+    const indexOptions = Object.assign(
+        {collation: simpleCollation},
+        isUnique ? {unique: true} : {},
+    );
     assert.commandWorked(coll.createIndex({a: isHashed ? "hashed" : 1}, indexOptions));
     assert.commandWorked(coll.createIndex({"a.y": isHashed ? "hashed" : 1}, indexOptions));
     assert.commandWorked(coll.createIndex({"a.y.ii": isHashed ? "hashed" : 1}, indexOptions));
@@ -82,21 +87,38 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         // Make the collection have two chunks:
         // shard0: [MinKey, 1]
         // shard1: [1, MaxKey]
-        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {b: 1}, collation: simpleCollation}));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: ns, key: {b: 1}, collation: simpleCollation}),
+        );
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {b: 1}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {b: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {b: 1}, to: st.shard1.shardName}),
+        );
     }
 
-    assert.commandWorked(coll.insert({a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}, b: -2}, {writeConcern}));
-    assert.commandWorked(coll.insert({a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}, b: -1}, {writeConcern}));
     assert.commandWorked(
-        coll.insert({a: {x: 0, y: {i: 0, ii: "B".repeat(kSize10MB - 1), iii: 0}, z: 0}, b: 0}, {writeConcern}),
+        coll.insert({a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}, b: -2}, {writeConcern}),
     );
     assert.commandWorked(
-        coll.insert({a: {x: 1, y: {i: 1, ii: "C".repeat(kSize10MB - 1), iii: 1}, z: 1}, b: 1}, {writeConcern}),
+        coll.insert({a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}, b: -1}, {writeConcern}),
     );
     assert.commandWorked(
-        coll.insert({a: {x: 2, y: {i: 2, ii: "D".repeat(kSize10MB - 1), iii: 2}, z: 2}, b: 2}, {writeConcern}),
+        coll.insert(
+            {a: {x: 0, y: {i: 0, ii: "B".repeat(kSize10MB - 1), iii: 0}, z: 0}, b: 0},
+            {writeConcern},
+        ),
+    );
+    assert.commandWorked(
+        coll.insert(
+            {a: {x: 1, y: {i: 1, ii: "C".repeat(kSize10MB - 1), iii: 1}, z: 1}, b: 1},
+            {writeConcern},
+        ),
+    );
+    assert.commandWorked(
+        coll.insert(
+            {a: {x: 2, y: {i: 2, ii: "D".repeat(kSize10MB - 1), iii: 2}, z: 2}, b: 2},
+            {writeConcern},
+        ),
     );
 
     const testCases = [];
@@ -199,15 +221,21 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
             {value: {a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}}, frequency: 1},
             {value: {a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}}, frequency: 1},
             {
-                value: {a: {x: 0, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 0}},
+                value: {
+                    a: {x: 0, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 0},
+                },
                 frequency: 1,
             },
             {
-                value: {a: {x: 1, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 1}},
+                value: {
+                    a: {x: 1, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 1},
+                },
                 frequency: 1,
             },
             {
-                value: {a: {x: 2, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 2}},
+                value: {
+                    a: {x: 2, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 2},
+                },
                 frequency: 1,
             },
         ],
@@ -228,13 +256,19 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         setMongodServerParameters({st, rst, params: sufficientAccumulatorBytesLimitParams});
         let res = conn.adminCommand(cmdObj);
         assert.commandWorked(res);
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, expectedMetrics);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(
+            res.keyCharacteristics,
+            expectedMetrics,
+        );
 
         setMongodServerParameters({st, rst, params: insufficientAccumulatorBytesLimitParams});
         res = conn.adminCommand(cmdObj);
         if (isUnique || isHashed) {
             assert.commandWorked(res);
-            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, expectedMetrics);
+            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(
+                res.keyCharacteristics,
+                expectedMetrics,
+            );
         } else {
             // The aggregation pipeline that the analyzeShardKey command uses to calculate the
             // cardinality and frequency metrics when the supporting index is not unique contains
@@ -253,7 +287,10 @@ const setParameterOpts = {
 };
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
+    });
 
     runTest(st.s, {isHashed: false, isUnique: true, isShardedColl: false, st});
     runTest(st.s, {isHashed: false, isUnique: false, isShardedColl: false, st});
@@ -271,7 +308,10 @@ const setParameterOpts = {
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Remove block
-    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({
+        nodes: numNodesPerRS,
+        nodeOptions: {setParameter: setParameterOpts},
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

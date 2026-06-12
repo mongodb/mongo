@@ -15,13 +15,23 @@ const date1 = new Date();
 function runTest({docs, pipeline, expectedResults}) {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
     assert.commandWorked(coll.insertMany(docs));
     const results = coll.aggregate(pipeline).toArray();
-    assert.eq(expectedResults.length, results.length, `Expected ${tojson(expectedResults)} but got ${tojson(results)}`);
+    assert.eq(
+        expectedResults.length,
+        results.length,
+        `Expected ${tojson(expectedResults)} but got ${tojson(results)}`,
+    );
     for (let i = 0; i < results.length; ++i) {
-        assert.docEq(expectedResults[i], results[i], `Expected ${tojson(expectedResults)} but got ${tojson(results)}`);
+        assert.docEq(
+            expectedResults[i],
+            results[i],
+            `Expected ${tojson(expectedResults)} but got ${tojson(results)}`,
+        );
     }
 }
 
@@ -41,7 +51,11 @@ function runTest({docs, pipeline, expectedResults}) {
         docs: [{_id: 1, [timeField]: date1, [metaField]: 2, meta: 100}],
         pipeline: [
             {
-                $addFields: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"},
+                $addFields: {
+                    [metaField]: `\$${metaField}`,
+                    [timeField]: `\$${timeField}`,
+                    _id: "$_id",
+                },
             },
         ],
         expectedResults: [{[timeField]: date1, [metaField]: 2, _id: 1, meta: 100}],
@@ -59,7 +73,9 @@ function runTest({docs, pipeline, expectedResults}) {
 (function testProjectShadowingMetaByItselfWithOtherFields() {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: 2, meta: 100}],
-        pipeline: [{$project: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"}}],
+        pipeline: [
+            {$project: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"}},
+        ],
         expectedResults: [{[metaField]: 2, [timeField]: date1, _id: 1}],
     });
 })();
@@ -101,7 +117,11 @@ function runTest({docs, pipeline, expectedResults}) {
         docs: [{_id: 1, [timeField]: date1, [metaField]: {a: 1, b: 2}, meta: 100}],
         pipeline: [
             {
-                $project: {[metaField]: {$add: [`\$${metaField}.a`, `\$${metaField}.b`]}, meta: 1, _id: 0},
+                $project: {
+                    [metaField]: {$add: [`\$${metaField}.a`, `\$${metaField}.b`]},
+                    meta: 1,
+                    _id: 0,
+                },
             },
         ],
         expectedResults: [{[metaField]: 3, meta: 100}],

@@ -50,7 +50,13 @@ for (let i = 0; i < numDatabases; ++i) {
 //    collections.
 st.startBalancer();
 
-function doBatchInserts(numDatabases, dbNamePrefix, numCollInDB, collNamePrefix, clusterMaxChunkSizeMB) {
+function doBatchInserts(
+    numDatabases,
+    dbNamePrefix,
+    numCollInDB,
+    collNamePrefix,
+    clusterMaxChunkSizeMB,
+) {
     Random.setRandomSeed();
     const numOfBatchInserts = 8;
     const bigString = "X".repeat(1024 * 1024 - 30); // Almost 1MB, to create documents of exactly 1MB
@@ -76,7 +82,14 @@ let backgroundBatchInserters = [];
 for (let i = 0; i < numBackgroundBatchInserters; ++i) {
     backgroundBatchInserters.push(
         startParallelShell(
-            funWithArgs(doBatchInserts, numDatabases, dbNamePrefix, numCollInDB, collNamePrefix, clusterMaxChunkSizeMB),
+            funWithArgs(
+                doBatchInserts,
+                numDatabases,
+                dbNamePrefix,
+                numCollInDB,
+                collNamePrefix,
+                clusterMaxChunkSizeMB,
+            ),
             st.s.port,
         ),
     );

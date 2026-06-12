@@ -31,7 +31,9 @@ function runTest(m, failPointName, altFailPointName) {
     t.save({x: 1});
 
     if (!FixtureHelpers.isMongos(db)) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+        );
     }
 
     admin.logout();
@@ -99,7 +101,11 @@ function runTest(m, failPointName, altFailPointName) {
 
     jsTestLog("Waiting for ops to terminate");
     let exitCode = s1({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected shell to exit abnormally due to operation execution being terminated");
+    assert.neq(
+        0,
+        exitCode,
+        "expected shell to exit abnormally due to operation execution being terminated",
+    );
 
     // don't want to pass if timeout killed the js function.
     let end = new Date();
@@ -137,7 +143,11 @@ function runTest(m, failPointName, altFailPointName) {
     fp2.off();
     jsTestLog("Waiting for ops to terminate");
     exitCode = s2({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
+    assert.neq(
+        0,
+        exitCode,
+        "expected shell to exit abnormally due to JS execution being terminated",
+    );
 
     end = new Date();
     diff = end - start;

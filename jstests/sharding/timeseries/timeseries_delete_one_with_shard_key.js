@@ -20,10 +20,14 @@ const testDB = mongos.getDB(dbName);
 const primary = st.shard0;
 const otherShard = st.shard1;
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}),
+);
 
 assert.commandWorked(
-    testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}),
+    testDB.createCollection(collName, {
+        timeseries: {timeField: "time", metaField: "location", granularity: "hours"},
+    }),
 );
 
 const testColl = testDB[collName];
@@ -77,7 +81,10 @@ const data = [
 // Set up a sharded time-series collection and split up the data points across 2 shards.
 {
     assert.commandWorked(
-        testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"location.shardNumber": 1}}),
+        testDB.adminCommand({
+            shardCollection: testColl.getFullName(),
+            key: {"location.shardNumber": 1},
+        }),
     );
     assert.commandWorked(testColl.insertMany(data, {ordered: false}));
 

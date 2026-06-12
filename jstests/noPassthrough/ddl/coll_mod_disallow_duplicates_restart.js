@@ -24,7 +24,9 @@ let coll_primary = db_primary.getCollection(collName);
 coll_primary.drop();
 assert.commandWorked(coll_primary.createIndex({a: 1}));
 assert.commandWorked(coll_primary.insert({_id: 0, a: 1}));
-assert.commandWorked(db_primary.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    db_primary.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}),
+);
 assert.commandFailedWithCode(coll_primary.insert({_id: 1, a: 1}), ErrorCodes.DuplicateKey);
 
 // Restarts the primary and checks the index spec is persisted.
@@ -36,7 +38,9 @@ coll_primary = db_primary.getCollection(collName);
 assert.commandFailedWithCode(coll_primary.insert({_id: 1, a: 1}), ErrorCodes.DuplicateKey);
 
 // Converts the index to unique.
-assert.commandWorked(db_primary.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
+assert.commandWorked(
+    db_primary.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
+);
 
 const uniqueIndexes = coll_primary.getIndexes().filter(function (doc) {
     return doc.unique && friendlyEqual(doc.key, {a: 1});

@@ -34,7 +34,9 @@ const st = new ShardingTest({shards: numShards});
 const db = st.s.getDB(`${jsTest.name()}_db`);
 
 // Enable sharding on the database and use shard0 as the primary shard.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Test that the explain's 'executionStats' section includes all relevant fields for each shard
 // when the 'explain' command is executed against a sharded collection.
@@ -84,8 +86,12 @@ assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard
     ];
     sortedExpectedStats.sort((a, b) => a.expectedShardName.localeCompare(b.expectedShardName));
 
-    verifyExecStatsOnShard(Object.merge(sortedExpectedStats[0], {explain: executionStages.shards[0]}));
-    verifyExecStatsOnShard(Object.merge(sortedExpectedStats[1], {explain: executionStages.shards[1]}));
+    verifyExecStatsOnShard(
+        Object.merge(sortedExpectedStats[0], {explain: executionStages.shards[0]}),
+    );
+    verifyExecStatsOnShard(
+        Object.merge(sortedExpectedStats[1], {explain: executionStages.shards[1]}),
+    );
 
     // Ensure that execution stats accumulated across all shards matches the values in the
     // top-level 'executionStages' section of the explain output.

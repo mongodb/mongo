@@ -62,12 +62,19 @@ function prepareMongotResponse(searchCmd, coll) {
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 function makeSearchCmd(db, coll, searchQuery) {
     const collUUID = getUUIDFromListCollections(db, coll.getName());
-    const searchCmd = {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: "test"};
+    const searchCmd = {
+        search: coll.getName(),
+        collectionUUID: collUUID,
+        query: searchQuery,
+        $db: "test",
+    };
     return searchCmd;
 }
 
@@ -93,13 +100,19 @@ insertDataForSearch(coll);
 // Perform a $search query. We expect the command to fail because mongot will attempt
 // to authenticate with mongot, which will not support authentication.
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), pipeline: [{$search: searchQuery}], cursor: {batchSize: 2}}),
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$search: searchQuery}],
+        cursor: {batchSize: 2},
+    }),
     ErrorCodes.AuthenticationFailed,
 );
 
 // Restart mongod with the option to not authenticate mongod <--> mongot connections.
 MongoRunner.stopMongod(conn);
-conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host, skipAuthenticationToMongot: true}});
+conn = MongoRunner.runMongod({
+    setParameter: {mongotHost: mongotConn.host, skipAuthenticationToMongot: true},
+});
 db = conn.getDB("test");
 coll = db.search;
 coll.drop();

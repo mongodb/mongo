@@ -68,7 +68,11 @@ describe("$merge with runtimeConstants.userRoles", function () {
     });
 
     it("accepts a valid userRoles array of objects", function () {
-        assert.commandWorked(internalDb.runCommand(mergeCmd([{_id: "test.readWrite", role: "readWrite", db: "test"}])));
+        assert.commandWorked(
+            internalDb.runCommand(
+                mergeCmd([{_id: "test.readWrite", role: "readWrite", db: "test"}]),
+            ),
+        );
 
         // Verify the document was merged into dst.
         assert.eq(1, db.dst.find({_id: 1}).count(), "Expected merged document in dst");

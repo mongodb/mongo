@@ -30,7 +30,10 @@ function runTest(metadataSortFieldName) {
         // Get the embedding for 'Beauty and the Beast', which has _id = 14.
         makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
         {
-            $setWindowFields: {sortBy: {score: {$meta: metadataSortFieldName}}, output: {rank: {$rank: {}}}},
+            $setWindowFields: {
+                sortBy: {score: {$meta: metadataSortFieldName}},
+                output: {rank: {$rank: {}}},
+            },
         },
         {$sort: {score: {$meta: metadataSortFieldName}, _id: 1}},
         {$project: {rank: 1, score: {$meta: metadataSortFieldName}, _id: 1}},
@@ -84,12 +87,16 @@ function runTest(metadataSortFieldName) {
         // Now insert a duplicate record of 'Beauty and the Beast' - we should see two records with
         // rank 1, the rest should be in order now starting at rank 3.
         assert.commandWorked(
-            coll.insertOne(coll.aggregate([{$match: {_id: 14}}, {$set: {_id: {$const: "duplicate"}}}]).next()),
+            coll.insertOne(
+                coll.aggregate([{$match: {_id: 14}}, {$set: {_id: {$const: "duplicate"}}}]).next(),
+            ),
         );
         waitUntilDocIsVisibleByQuery({
             docId: "duplicate",
             coll: coll,
-            queryPipeline: [makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})],
+            queryPipeline: [
+                makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
+            ],
         });
 
         const results = coll.aggregate(testRankingPipeline).toArray();

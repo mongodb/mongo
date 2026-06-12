@@ -60,7 +60,8 @@ describe("fast count server status metric", function () {
                     const metrics = getMetrics(this.db);
                     return metrics.flush.successCount >= 1 && metrics.flushTime.total >= 500;
                 },
-                () => `Expected flush time metrics after 500ms delay, got ${tojson(getMetrics(this.db))}`,
+                () =>
+                    `Expected flush time metrics after 500ms delay, got ${tojson(getMetrics(this.db))}`,
                 kServerStatusAssertTimeoutMs,
             );
         }
@@ -74,7 +75,8 @@ describe("fast count server status metric", function () {
                     const metrics = getMetrics(this.db);
                     return metrics.flush.successCount >= 2 && metrics.flushTime.total >= 600;
                 },
-                () => `Expected flush time metrics after second flush, got ${tojson(getMetrics(this.db))}`,
+                () =>
+                    `Expected flush time metrics after second flush, got ${tojson(getMetrics(this.db))}`,
                 kServerStatusAssertTimeoutMs,
             );
         }
@@ -87,7 +89,8 @@ describe("fast count server status metric", function () {
 
         assert.soon(
             () => getMetrics(this.db).flush.failureCount == 1,
-            () => `Expected flushFailureCount to be incremented, got ${tojson(getMetrics(this.db))}}`,
+            () =>
+                `Expected flushFailureCount to be incremented, got ${tojson(getMetrics(this.db))}}`,
             kServerStatusAssertTimeoutMs,
         );
     });
@@ -158,7 +161,8 @@ describe("is running", function () {
 
         assert.soon(
             () => getMetrics(this.db).isRunning != 1,
-            () => `Expected isRunning to not be 1 after stepdown, got ${tojson(getMetrics(this.db))}`,
+            () =>
+                `Expected isRunning to not be 1 after stepdown, got ${tojson(getMetrics(this.db))}`,
             kServerStatusAssertTimeoutMs,
         );
     });

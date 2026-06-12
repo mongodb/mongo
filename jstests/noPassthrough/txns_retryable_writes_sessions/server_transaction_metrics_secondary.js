@@ -41,7 +41,9 @@ jsTestLog("Trying to start transaction on secondary.");
 secondarySession.startTransaction();
 
 // Initially there are no transactions in the system.
-metrics = assert.commandWorked(secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0})).transactions;
+metrics = assert.commandWorked(
+    secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0}),
+).transactions;
 assert.eq(0, metrics.currentActive);
 assert.eq(0, metrics.currentInactive);
 assert.eq(0, metrics.currentOpen);
@@ -50,10 +52,15 @@ assert.eq(0, metrics.totalCommitted);
 assert.eq(0, metrics.totalStarted);
 
 jsTestLog("Run transaction statement.");
-assert.eq(assert.throws(() => secDb[collName].findOne({_id: 0})).code, ErrorCodes.NotWritablePrimary);
+assert.eq(
+    assert.throws(() => secDb[collName].findOne({_id: 0})).code,
+    ErrorCodes.NotWritablePrimary,
+);
 
 // The metrics are not affected.
-metrics = assert.commandWorked(secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0})).transactions;
+metrics = assert.commandWorked(
+    secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0}),
+).transactions;
 assert.eq(0, metrics.currentActive);
 assert.eq(0, metrics.currentInactive);
 assert.eq(0, metrics.currentOpen);
@@ -62,10 +69,15 @@ assert.eq(0, metrics.totalCommitted);
 assert.eq(0, metrics.totalStarted);
 
 jsTestLog("Abort the transaction.");
-assert.commandFailedWithCode(secondarySession.abortTransaction_forTesting(), ErrorCodes.NotWritablePrimary);
+assert.commandFailedWithCode(
+    secondarySession.abortTransaction_forTesting(),
+    ErrorCodes.NotWritablePrimary,
+);
 
 // The metrics are not affected.
-metrics = assert.commandWorked(secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0})).transactions;
+metrics = assert.commandWorked(
+    secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0}),
+).transactions;
 assert.eq(0, metrics.currentActive);
 assert.eq(0, metrics.currentInactive);
 assert.eq(0, metrics.currentOpen);
@@ -84,4 +96,6 @@ const supportsCheckDBHash = PersistenceProviderUtil.allNodesHavePropertyWithValu
     "supportsLocalCollections",
     true,
 );
-replTest.stopSet(undefined /* signal */, undefined /* forRestart */, {skipCheckDBHashes: !supportsCheckDBHash});
+replTest.stopSet(undefined /* signal */, undefined /* forRestart */, {
+    skipCheckDBHashes: !supportsCheckDBHash,
+});

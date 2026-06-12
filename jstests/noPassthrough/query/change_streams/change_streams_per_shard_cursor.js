@@ -31,7 +31,9 @@ const setupShardedCluster = (shards = 1) => {
     } else {
         assert(shards === 1, "only 1 or 2 shards supported");
         assert.commandWorked(st.s.adminCommand({shardCollection: dbName + ".coll", key: {_id: 1}}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: dbName + ".coll2", key: {_id: 1}}));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: dbName + ".coll2", key: {_id: 1}}),
+        );
     }
 
     const shardId = st.shard0.shardName;
@@ -80,7 +82,12 @@ assert.commandFailedWithCode(
 
 // Shard option should be specified.
 assert.commandFailedWithCode(
-    sdb.runCommand({aggregate: "coll", cursor: {}, pipeline: [{$changeStream: {}}], $_passthroughToShard: {}}),
+    sdb.runCommand({
+        aggregate: "coll",
+        cursor: {},
+        pipeline: [{$changeStream: {}}],
+        $_passthroughToShard: {},
+    }),
     ErrorCodes.IDLFailedToParse,
 );
 

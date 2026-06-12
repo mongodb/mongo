@@ -27,7 +27,8 @@ assert.commandWorked(coll.insert({geo: json90Pt}));
 let earthRadiusMeters = 6378.1 * 1000;
 let result = null;
 
-const runQuery = (point) => coll.find({geo: {$nearSphere: point}}, {dis: {$meta: "geoNearDistance"}}).toArray();
+const runQuery = (point) =>
+    coll.find({geo: {$nearSphere: point}}, {dis: {$meta: "geoNearDistance"}}).toArray();
 
 result = runQuery(legacyZeroPt);
 assert.close(result[0].dis, Math.PI / 2);

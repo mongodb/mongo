@@ -37,7 +37,11 @@ describe("secondary port in a 3-node replica set", function () {
 
         const primary = this.rst.getPrimary();
         this.host = primary.hostNoPort;
-        assert.eq(this.rst.getNodeId(primary), 0, "node 0 should be primary due to higher priority");
+        assert.eq(
+            this.rst.getNodeId(primary),
+            0,
+            "node 0 should be primary due to higher priority",
+        );
     });
 
     after(function () {

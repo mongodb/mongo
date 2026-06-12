@@ -6,7 +6,9 @@
 const coll = db.always_true_false;
 coll.drop();
 
-assert.commandWorked(coll.insert([{a: []}, {a: false}, {a: null}, {}, {a: false, b: 2}, {a: false, b: 1}]));
+assert.commandWorked(
+    coll.insert([{a: []}, {a: false}, {a: null}, {}, {a: false, b: 2}, {a: false, b: 1}]),
+);
 
 // Check alwaysFalse.
 assert.eq(0, coll.find({$alwaysFalse: 1}).itcount());
@@ -44,7 +46,10 @@ assert.eq(coll.find({$or: [{$alwaysFalse: 1}, {$alwaysFalse: 1}]}).itcount(), 0)
 assert.eq(coll.find({$or: [{$alwaysFalse: 1}, {a: {$all: []}}, {$alwaysFalse: 1}]}).itcount(), 0);
 
 // Check failure cases.
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {$alwaysTrue: 0}}), ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    db.runCommand({find: coll.getName(), filter: {$alwaysTrue: 0}}),
+    ErrorCodes.FailedToParse,
+);
 assert.commandFailedWithCode(
     db.runCommand({find: coll.getName(), filter: {$alwaysFalse: 0}}),
     ErrorCodes.FailedToParse,

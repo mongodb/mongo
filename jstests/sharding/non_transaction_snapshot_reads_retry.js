@@ -31,17 +31,24 @@ const st = new ShardingTest({
 const primary = st.rs0.getPrimary();
 const primaryAdmin = primary.getDB("admin");
 assert.eq(
-    assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-        .minSnapshotHistoryWindowInSeconds,
+    assert.commandWorked(
+        primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}),
+    ).minSnapshotHistoryWindowInSeconds,
     historyWindowSecs,
 );
 
 const mongosDB = st.s.getDB("test");
 const mongosColl = mongosDB.test;
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 st.shardColl(mongosColl, {_id: 1}, false);
-let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}], writeConcern: {w: "majority"}});
+let result = mongosDB.runCommand({
+    insert: "test",
+    documents: [{_id: 0}],
+    writeConcern: {w: "majority"},
+});
 const insertTS = assert.commandWorked(result).operationTime;
 jsTestLog(`Inserted document at ${tojson(insertTS)}`);
 
@@ -87,8 +94,14 @@ function read(insertTS, enableCausal, updatedValue, retries) {
 }
 
 const updatedValue = "updatedValue";
-const waitForShell = startParallelShell(funWithArgs(read, insertTS, false, updatedValue, 0), st.s.port);
-const waitForShellCausal = startParallelShell(funWithArgs(read, insertTS, true, updatedValue, 0), st.s.port);
+const waitForShell = startParallelShell(
+    funWithArgs(read, insertTS, false, updatedValue, 0),
+    st.s.port,
+);
+const waitForShellCausal = startParallelShell(
+    funWithArgs(read, insertTS, true, updatedValue, 0),
+    st.s.port,
+);
 
 jsTestLog("Wait for shells to hit waitInFindBeforeMakingBatch failpoint");
 fp.wait(kDefaultWaitForFailPointTimeout, 2);

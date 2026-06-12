@@ -19,6 +19,8 @@ function runCommand(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/config_transitions.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/config_transitions.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommand);

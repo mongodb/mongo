@@ -30,11 +30,15 @@ assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: k
 // reference these collections in each test.
 const sourceColl = testDB[kSourceCollName];
 assert.commandWorked(sourceColl.insert(kSourceDocument));
-assert.commandWorked(st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kOther}));
+assert.commandWorked(
+    st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kOther}),
+);
 
 const lookUpColl = testDB[kLookUpCollName];
 assert.commandWorked(lookUpColl.insert([{x: 1, t: ISODate(), lookup: 2}]));
-assert.commandWorked(st.s.adminCommand({moveCollection: lookUpColl.getFullName(), toShard: kOther}));
+assert.commandWorked(
+    st.s.adminCommand({moveCollection: lookUpColl.getFullName(), toShard: kOther}),
+);
 
 // Run an $out aggregation pipeline where the $out runs on the non-primary shard and the collection
 // that $out is trying to replace is on the primary shard. Because we have the 'timeseries' option,
@@ -43,7 +47,9 @@ assert.commandWorked(st.s.adminCommand({moveCollection: lookUpColl.getFullName()
 function validateAggOutFailed(createCommand, expectedErrors) {
     assert(testDB[kOutCollName].drop());
     assert.commandWorked(testDB.runCommand(createCommand));
-    assert.commandWorked(st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kPrimary}));
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kPrimary}),
+    );
 
     // Must reset the profiler for all shards before running the aggregation.
     const kOtherShardDB = st.shard1.getDB(kDbName);
@@ -76,14 +82,18 @@ function validateAggOutFailed(createCommand, expectedErrors) {
 
     // Validate the conflicting view or collection remains after $out failed.
     const collections = testDB.getCollectionNames().filter((coll) => !coll.startsWith("system."));
-    assert.sameMembers([kSourceCollName, kLookUpCollName, kOutCollName], collections, tojson(collections));
+    assert.sameMembers(
+        [kSourceCollName, kLookUpCollName, kOutCollName],
+        collections,
+        tojson(collections),
+    );
 }
 
 validateAggOutFailed({create: kOutCollName}, [7268700]);
 // TODO SERVER-111600: Remove error code 7268700 once 9.0 becomes last LTS.
-validateAggOutFailed({create: kOutCollName, viewOn: kLookUpCollName, pipeline: [{$project: {val: 1}}]}, [
-    ErrorCodes.CommandNotSupportedOnView,
-    7268700,
-]);
+validateAggOutFailed(
+    {create: kOutCollName, viewOn: kLookUpCollName, pipeline: [{$project: {val: 1}}]},
+    [ErrorCodes.CommandNotSupportedOnView, 7268700],
+);
 
 st.stop();

@@ -34,7 +34,10 @@ testExpr({$let: {vars: {a: {$add: ["$one", "$two"]}, b: 10}, in: {$multiply: ["$
 // Verify that the outer level variable works in inner level $let.
 testExpr(
     {
-        $let: {vars: {var1: 1}, in: {$let: {vars: {var2: "$$var1"}, in: {$sum: ["$$var1", "$$var2"]}}}},
+        $let: {
+            vars: {var1: 1},
+            in: {$let: {vars: {var2: "$$var1"}, in: {$sum: ["$$var1", "$$var2"]}}},
+        },
     },
     2,
 );
@@ -113,17 +116,45 @@ coll.drop();
 coll.insert({_id: "obj"});
 assert.eq(coll.aggregate({$project: {_id: 0, obj: "$$ROOT"}}).toArray(), [{obj: {_id: "obj"}}]);
 assert.eq(coll.aggregate({$project: {_id: 0, obj: "$$CURRENT"}}).toArray(), [{obj: {_id: "obj"}}]);
-assert.eq(coll.aggregate({$group: {_id: 0, objs: {$push: "$$ROOT"}}}).toArray(), [{_id: 0, objs: [{_id: "obj"}]}]);
-assert.eq(coll.aggregate({$group: {_id: 0, objs: {$push: "$$CURRENT"}}}).toArray(), [{_id: 0, objs: [{_id: "obj"}]}]);
+assert.eq(coll.aggregate({$group: {_id: 0, objs: {$push: "$$ROOT"}}}).toArray(), [
+    {_id: 0, objs: [{_id: "obj"}]},
+]);
+assert.eq(coll.aggregate({$group: {_id: 0, objs: {$push: "$$CURRENT"}}}).toArray(), [
+    {_id: 0, objs: [{_id: "obj"}]},
+]);
 
 // Check name validity checks.
-assertErrorCode(coll, {$project: {a: {$let: {vars: {ROOT: 1}, in: "$$ROOT"}}}}, ErrorCodes.FailedToParse);
-assertErrorCode(coll, {$project: {a: {$let: {vars: {FOO: 1}, in: "$$FOO"}}}}, ErrorCodes.FailedToParse);
-assertErrorCode(coll, {$project: {a: {$let: {vars: {_underbar: 1}, in: "$$FOO"}}}}, ErrorCodes.FailedToParse);
-assertErrorCode(coll, {$project: {a: {$let: {vars: {"a.b": 1}, in: "$$FOO"}}}}, ErrorCodes.FailedToParse);
-assertErrorCode(coll, {$project: {a: {$let: {vars: {"a b": 1}, in: "$$FOO"}}}}, ErrorCodes.FailedToParse);
+assertErrorCode(
+    coll,
+    {$project: {a: {$let: {vars: {ROOT: 1}, in: "$$ROOT"}}}},
+    ErrorCodes.FailedToParse,
+);
+assertErrorCode(
+    coll,
+    {$project: {a: {$let: {vars: {FOO: 1}, in: "$$FOO"}}}},
+    ErrorCodes.FailedToParse,
+);
+assertErrorCode(
+    coll,
+    {$project: {a: {$let: {vars: {_underbar: 1}, in: "$$FOO"}}}},
+    ErrorCodes.FailedToParse,
+);
+assertErrorCode(
+    coll,
+    {$project: {a: {$let: {vars: {"a.b": 1}, in: "$$FOO"}}}},
+    ErrorCodes.FailedToParse,
+);
+assertErrorCode(
+    coll,
+    {$project: {a: {$let: {vars: {"a b": 1}, in: "$$FOO"}}}},
+    ErrorCodes.FailedToParse,
+);
 assertErrorCode(coll, {$project: {a: "$$_underbar"}}, ErrorCodes.FailedToParse);
 assertErrorCode(coll, {$project: {a: "$$with spaces"}}, ErrorCodes.FailedToParse);
 
 // Verify that variables defined in '$let' cannot be used to initialize other variables.
-assertErrorCode(coll, [{$project: {output: {$let: {vars: {var1: "$one", var2: "$$var1"}, in: "$$var1"}}}}], 17276);
+assertErrorCode(
+    coll,
+    [{$project: {output: {$let: {vars: {var1: "$one", var2: "$$var1"}, in: "$$var1"}}}}],
+    17276,
+);

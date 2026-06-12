@@ -21,7 +21,9 @@ const testNode = rst.getSecondaries()[1];
 // Set up a failpoint that forces the original primary to vote no in this election. This guarantees
 // that 'testNode' will be a participant in this election, since its vote will be needed for the new
 // primary to win.
-assert.commandWorked(originalPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
+assert.commandWorked(
+    originalPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}),
+);
 
 // Step up the new primary.
 rst.stepUp(newPrimary);
@@ -53,11 +55,18 @@ assert(
 
 // Set up a failpoint that forces newPrimary and testNode to vote no in the election, in addition to
 // the new primary above. This will cause the dry run to fail for the original primary.
-assert.commandWorked(newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
-assert.commandWorked(testNode.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
+assert.commandWorked(
+    newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}),
+);
+assert.commandWorked(
+    testNode.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}),
+);
 
 // Attempt to step up the original primary.
-assert.commandFailedWithCode(originalPrimary.adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(
+    originalPrimary.adminCommand({replSetStepUp: 1}),
+    ErrorCodes.CommandFailed,
+);
 
 testNodeReplSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 testNodeElectionParticipantMetrics = testNodeReplSetGetStatus.electionParticipantMetrics;
@@ -84,17 +93,28 @@ assert.eq(originalNewTermAppliedDate, testNodeElectionParticipantMetrics.newTerm
 // Clear the previous failpoint and set up a new one that forces the two current secondaries to vote
 // yes for the candidate in the dry run election and no in the real election. This will cause the
 // real election to fail.
-assert.commandWorked(newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "off"}));
 assert.commandWorked(
-    newPrimary.adminCommand({configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}),
+    newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "off"}),
+);
+assert.commandWorked(
+    newPrimary.adminCommand({
+        configureFailPoint: "voteYesInDryRunButNoInRealElection",
+        mode: "alwaysOn",
+    }),
 );
 assert.commandWorked(testNode.adminCommand({configureFailPoint: "voteNoInElection", mode: "off"}));
 assert.commandWorked(
-    testNode.adminCommand({configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}),
+    testNode.adminCommand({
+        configureFailPoint: "voteYesInDryRunButNoInRealElection",
+        mode: "alwaysOn",
+    }),
 );
 
 // Attempt to step up the original primary.
-assert.commandFailedWithCode(originalPrimary.adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(
+    originalPrimary.adminCommand({replSetStepUp: 1}),
+    ErrorCodes.CommandFailed,
+);
 
 testNodeReplSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 testNodeElectionParticipantMetrics = testNodeReplSetGetStatus.electionParticipantMetrics;

@@ -408,10 +408,16 @@ ABC"y" : null
             let json;
 
             json = JSON.stringify(x);
-            assert.eq(json, '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
+            assert.eq(
+                json,
+                '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}',
+            );
 
             json = toJsonForLog(x);
-            assert.eq(json, '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
+            assert.eq(
+                json,
+                '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}',
+            );
         });
 
         it("regex", function () {
@@ -630,8 +636,14 @@ ABC"y" : null
             assert.eq(toJsonForLog(new Error(stringThatNeedsEscaping)), '{"$error":"ho\\"la"}');
 
             assert.eq("{}", JSON.stringify(new SyntaxError(stringThatNeedsEscaping)));
-            assert.eq(tojson(new SyntaxError(stringThatNeedsEscaping)), 'new SyntaxError("ho\\"la")');
-            assert.eq(toJsonForLog(new SyntaxError(stringThatNeedsEscaping)), '{"$error":"ho\\"la"}');
+            assert.eq(
+                tojson(new SyntaxError(stringThatNeedsEscaping)),
+                'new SyntaxError("ho\\"la")',
+            );
+            assert.eq(
+                toJsonForLog(new SyntaxError(stringThatNeedsEscaping)),
+                '{"$error":"ho\\"la"}',
+            );
         });
     });
 
@@ -727,7 +739,10 @@ describe("tojsonObject", () => {
 	}
 }`,
         );
-        assert.eq(tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", true), '{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }');
+        assert.eq(
+            tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", true),
+            '{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }',
+        );
         assert.eq(
             tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "\t\t", false),
             `\

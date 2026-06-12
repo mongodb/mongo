@@ -21,24 +21,36 @@ const db = st.getDB(jsTestName());
 const dbAtShard = st.shard0.getDB(jsTestName());
 
 // Makes sure that the test db is sharded and the data is stored into the only shard.
-assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 let assertShardedGroupResultsMatch = (coll, pipeline) => {
     // Turns to the classic engine at the shard before figuring out its result.
     assert.commandWorked(
-        dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        dbAtShard.adminCommand({
+            setParameter: 1,
+            internalQueryFrameworkControl: "forceClassicEngine",
+        }),
     );
 
     // Collects the classic engine's result as the expected result, executing the pipeline at the
     // mongos.
-    const classicalRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}).cursor.firstBatch;
+    const classicalRes = coll.runCommand({
+        aggregate: coll.getName(),
+        pipeline: pipeline,
+        cursor: {},
+    }).cursor.firstBatch;
 
     // Turns to the SBE engine at the shard.
-    assert.commandWorked(dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(
+        dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+    );
 
     // Verifies that the SBE engine's results are same as the expected results, executing the
     // pipeline at the mongos.
-    const sbeRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}).cursor.firstBatch;
+    const sbeRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}})
+        .cursor.firstBatch;
 
     assert.sameMembers(sbeRes, classicalRes);
 };

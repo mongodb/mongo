@@ -21,7 +21,11 @@ const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 const primaryDB = primary.getDB(dbName);
 const secondaryDB = secondary.getDB(dbName);
-assert.commandWorked(primaryDB.coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primaryDB.coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}], {
+        writeConcern: {w: "majority"},
+    }),
+);
 
 function checkTopologyVersion(res, topologyVersionField) {
     assert(res.hasOwnProperty("topologyVersion"), res);
@@ -72,23 +76,37 @@ res = assert.commandWorked(secondary.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 let topologyVersionField = res.topologyVersion;
 let helloFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
-let hello = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), secondary.port);
+let hello = startParallelShell(
+    funWithArgs(runAwaitableHello, topologyVersionField),
+    secondary.port,
+);
 helloFailPoint.wait();
 assert.eq(1, secondary.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
 jsTestLog("Transition the secondary to quiesce mode.");
 let quiesceModeFailPoint = configureFailPoint(secondary, "hangDuringQuiesceMode");
 // We must skip validation due to the failpoint that hangs find commands.
-replTest.stop(secondary, null /*signal*/, {skipValidation: true}, {forRestart: true, waitpid: false});
+replTest.stop(
+    secondary,
+    null /*signal*/,
+    {skipValidation: true},
+    {forRestart: true, waitpid: false},
+);
 quiesceModeFailPoint.wait();
 
 jsTestLog("The waiting hello returns a ShutdownInProgress error.");
 hello();
 // We cannot check the metrics because serverStatus returns ShutdownInProgress.
-assert.commandFailedWithCode(secondaryDB.adminCommand({serverStatus: 1}), ErrorCodes.ShutdownInProgress);
+assert.commandFailedWithCode(
+    secondaryDB.adminCommand({serverStatus: 1}),
+    ErrorCodes.ShutdownInProgress,
+);
 
 jsTestLog("New hello commands return a ShutdownInProgress error.");
-res = assert.commandFailedWithCode(secondary.adminCommand({hello: 1}), ErrorCodes.ShutdownInProgress);
+res = assert.commandFailedWithCode(
+    secondary.adminCommand({hello: 1}),
+    ErrorCodes.ShutdownInProgress,
+);
 checkTopologyVersion(res, topologyVersionField);
 checkRemainingQuiesceTime(res);
 
@@ -117,7 +135,10 @@ jsTestLog("New operations are allowed.");
 assert.eq(4, secondaryDB.coll.find().itcount());
 
 jsTestLog("Let shutdown progress to start killing operations.");
-let pauseWhileKillingOperationsFailPoint = configureFailPoint(secondary, "pauseWhileKillingOperationsAtShutdown");
+let pauseWhileKillingOperationsFailPoint = configureFailPoint(
+    secondary,
+    "pauseWhileKillingOperationsAtShutdown",
+);
 quiesceModeFailPoint.off();
 
 // The waitForFailPoint command can fail with InterruptedAtShutdown if killed by the shutdown.
@@ -125,7 +146,10 @@ pauseWhileKillingOperationsFailPoint.wait({expectedErrorCodes: [ErrorCodes.Inter
 
 jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
 checkTopologyVersion(
-    assert.commandFailedWithCode(secondaryDB.runCommand({find: collName}), ErrorCodes.InterruptedAtShutdown),
+    assert.commandFailedWithCode(
+        secondaryDB.runCommand({find: collName}),
+        ErrorCodes.InterruptedAtShutdown,
+    ),
     topologyVersionField,
 );
 
@@ -173,7 +197,10 @@ quiesceModeFailPoint.wait();
 jsTestLog("The waiting hello returns a ShutdownInProgress error.");
 hello();
 // We cannot check the metrics because serverStatus returns ShutdownInProgress.
-assert.commandFailedWithCode(primaryDB.adminCommand({serverStatus: 1}), ErrorCodes.ShutdownInProgress);
+assert.commandFailedWithCode(
+    primaryDB.adminCommand({serverStatus: 1}),
+    ErrorCodes.ShutdownInProgress,
+);
 
 jsTestLog("New hello commands return a ShutdownInProgress error.");
 res = assert.commandFailedWithCode(primary.adminCommand({hello: 1}), ErrorCodes.ShutdownInProgress);
@@ -205,14 +232,20 @@ jsTestLog("New operations are allowed.");
 assert.eq(4, primaryDB.coll.find().itcount());
 
 jsTestLog("Let shutdown progress to start killing operations.");
-pauseWhileKillingOperationsFailPoint = configureFailPoint(primary, "pauseWhileKillingOperationsAtShutdown");
+pauseWhileKillingOperationsFailPoint = configureFailPoint(
+    primary,
+    "pauseWhileKillingOperationsAtShutdown",
+);
 quiesceModeFailPoint.off();
 // The waitForFailPoint command can fail with InterruptedAtShutdown if killed by the shutdown.
 pauseWhileKillingOperationsFailPoint.wait({expectedErrorCodes: [ErrorCodes.InterruptedAtShutdown]});
 
 jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
 checkTopologyVersion(
-    assert.commandFailedWithCode(primaryDB.runCommand({find: collName}), ErrorCodes.InterruptedAtShutdown),
+    assert.commandFailedWithCode(
+        primaryDB.runCommand({find: collName}),
+        ErrorCodes.InterruptedAtShutdown,
+    ),
     topologyVersionField,
 );
 

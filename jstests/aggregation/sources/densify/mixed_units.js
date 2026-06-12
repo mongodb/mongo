@@ -24,7 +24,11 @@ coll.drop();
 
 // Densification on a date collection with a numeric step.
 assert.commandWorked(
-    coll.insert([{val: new ISODate("2021-01-01")}, {val: new ISODate("2021-01-03")}, {val: new ISODate("2021-01-05")}]),
+    coll.insert([
+        {val: new ISODate("2021-01-01")},
+        {val: new ISODate("2021-01-03")},
+        {val: new ISODate("2021-01-05")},
+    ]),
 );
 assert.commandFailedWithCode(
     db.runCommand({

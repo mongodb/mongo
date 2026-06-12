@@ -19,7 +19,11 @@ function getMetrics(db) {
 function assertNoCreateCounterChange(db, snap, msg) {
     const result = getMetrics(db);
     for (const level of ["default", "strict", "moderate", "off", "constraint"]) {
-        assert.eq(delta(snap, result, "create", level), 0, `${msg}: ${level} counter must not change`);
+        assert.eq(
+            delta(snap, result, "create", level),
+            0,
+            `${msg}: ${level} counter must not change`,
+        );
     }
 }
 
@@ -39,7 +43,9 @@ function defineTests(getDb) {
         db[tsName].drop();
         assert.commandWorked(db.createCollection(collName, {validator: {a: {$type: "string"}}}));
         assert.commandWorked(db.createView(viewName, collName, []));
-        assert.commandWorked(db.createCollection(tsName, {timeseries: {timeField: "t", metaField: "m"}}));
+        assert.commandWorked(
+            db.createCollection(tsName, {timeseries: {timeField: "t", metaField: "m"}}),
+        );
     });
 
     afterEach(function () {
@@ -56,7 +62,10 @@ function defineTests(getDb) {
             db[coll].drop();
             const snap = getMetrics(db);
             assert.commandWorked(
-                db.createCollection(coll, {validator: {a: {$type: "string"}}, validationLevel: level}),
+                db.createCollection(coll, {
+                    validator: {a: {$type: "string"}},
+                    validationLevel: level,
+                }),
             );
             assert.eq(
                 delta(snap, getMetrics(db), "create", level),
@@ -80,7 +89,11 @@ function defineTests(getDb) {
             "no-level create with validator must increment default counter",
         );
         for (const level of ["strict", "moderate", "off"]) {
-            assert.eq(delta(snap, result, "create", level), 0, `no-level create must not affect ${level} counter`);
+            assert.eq(
+                delta(snap, result, "create", level),
+                0,
+                `no-level create must not affect ${level} counter`,
+            );
         }
         db[coll].drop();
     });
@@ -99,7 +112,10 @@ function defineTests(getDb) {
         const db = getDb();
         const snap = getMetrics(db);
         assert.commandFailed(
-            db.createCollection(jsTestName() + "_fail", {validator: {$invalidOp: 1}, validationLevel: "strict"}),
+            db.createCollection(jsTestName() + "_fail", {
+                validator: {$invalidOp: 1},
+                validationLevel: "strict",
+            }),
         );
         assertNoCreateCounterChange(db, snap, "failed create");
     });
@@ -163,7 +179,10 @@ function defineTests(getDb) {
 
         const snap = getMetrics(db);
         assert.commandWorked(
-            db.createCollection(coll, {validator: {a: {$type: "string"}}, validationLevel: "constraint"}),
+            db.createCollection(coll, {
+                validator: {a: {$type: "string"}},
+                validationLevel: "constraint",
+            }),
         );
         assert.eq(
             delta(snap, getMetrics(db), "create", "constraint"),
@@ -173,7 +192,9 @@ function defineTests(getDb) {
 
         // Downgrade to strict so we can do the prepare+upgrade cycle to test the collMod counter.
         assert.commandWorked(db.runCommand({collMod: coll, validationLevel: "strict"}));
-        assert.commandWorked(db.runCommand({collMod: coll, prepareConstraintValidationLevel: true}));
+        assert.commandWorked(
+            db.runCommand({collMod: coll, prepareConstraintValidationLevel: true}),
+        );
 
         const snap2 = getMetrics(db);
         assert.commandWorked(db.runCommand({collMod: coll, validationLevel: "constraint"}));
@@ -208,7 +229,9 @@ describe("sharded", function () {
 
     before(function () {
         st = new ShardingTest({shards: 2});
-        assert.commandWorked(st.s.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}),
+        );
     });
 
     after(function () {
@@ -225,10 +248,10 @@ describe("sharded", function () {
         fanoutDb[fanoutColl].drop();
 
         function totalCreateStrict() {
-            const m0 = assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1})).metrics.commands.create
-                .validationLevel.strict;
-            const m1 = assert.commandWorked(st.rs1.getPrimary().adminCommand({serverStatus: 1})).metrics.commands.create
-                .validationLevel.strict;
+            const m0 = assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
+                .metrics.commands.create.validationLevel.strict;
+            const m1 = assert.commandWorked(st.rs1.getPrimary().adminCommand({serverStatus: 1}))
+                .metrics.commands.create.validationLevel.strict;
             return m0 + m1;
         }
 
@@ -256,14 +279,16 @@ describe("sharded", function () {
         const fanoutDb = st.s.getDB(fanoutDbName);
 
         fanoutDb[fanoutColl].drop();
-        assert.commandWorked(fanoutDb.createCollection(fanoutColl, {validator: {a: {$type: "string"}}}));
+        assert.commandWorked(
+            fanoutDb.createCollection(fanoutColl, {validator: {a: {$type: "string"}}}),
+        );
         st.shardColl(fanoutDb[fanoutColl], {_id: 1}, {_id: 0}, {_id: 0});
 
         function totalCollModStrict() {
-            const m0 = assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1})).metrics.commands
-                .collMod.validationLevel.strict;
-            const m1 = assert.commandWorked(st.rs1.getPrimary().adminCommand({serverStatus: 1})).metrics.commands
-                .collMod.validationLevel.strict;
+            const m0 = assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
+                .metrics.commands.collMod.validationLevel.strict;
+            const m1 = assert.commandWorked(st.rs1.getPrimary().adminCommand({serverStatus: 1}))
+                .metrics.commands.collMod.validationLevel.strict;
             return m0 + m1;
         }
 

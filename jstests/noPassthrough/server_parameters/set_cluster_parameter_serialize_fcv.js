@@ -27,8 +27,9 @@ assert.commandFailedWithCode(
 function runReplSetTest(fixture) {
     // Assert that the cluster parameter is initially at default value of 0.
     fixture.asAdmin(({admin}) => {
-        const intData = assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
-            .clusterParameters[0].intData;
+        const intData = assert.commandWorked(
+            admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
+        ).clusterParameters[0].intData;
         assert.eq(intData, 0);
     });
 
@@ -60,11 +61,14 @@ function runReplSetTest(fixture) {
     // Verify that FCV upgrade succeeds when there are no ongoing setClusterParameter operations.
     // The cluster parameter should also reenable.
     fixture.asAdmin(({admin}) =>
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true})),
+        assert.commandWorked(
+            admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        ),
     );
     fixture.asAdmin(({admin}) => {
-        const intData = assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
-            .clusterParameters[0].intData;
+        const intData = assert.commandWorked(
+            admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
+        ).clusterParameters[0].intData;
         assert.eq(intData, 0);
     });
 
@@ -99,8 +103,9 @@ function runReplSetTest(fixture) {
 function runShardedTest(fixture) {
     // Check that the starting value of cwspTestNeedsLatestFCV is the default of 0.
     fixture.asAdmin(({admin}) => {
-        const intData = assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
-            .clusterParameters[0].intData;
+        const intData = assert.commandWorked(
+            admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
+        ).clusterParameters[0].intData;
         assert.eq(intData, 0);
     });
 
@@ -141,11 +146,14 @@ function runShardedTest(fixture) {
     // After the failpoint is turned off, FCV upgrade should occur normally.
     // cwspTestNeedsLatestFCV should also become available.
     fixture.asAdmin(({admin}) =>
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true})),
+        assert.commandWorked(
+            admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        ),
     );
     fixture.asAdmin(({admin}) => {
-        const intData = assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
-            .clusterParameters[0].intData;
+        const intData = assert.commandWorked(
+            admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
+        ).clusterParameters[0].intData;
         assert.eq(intData, 0);
     });
 
@@ -169,8 +177,9 @@ function runShardedTest(fixture) {
     // Verify that the cluster parameter was correctly set and FCV remains at latestFCV.
     fixture.assertFCV(latestFCV);
     fixture.asAdmin(({admin}) => {
-        const intData = assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
-            .clusterParameters[0].intData;
+        const intData = assert.commandWorked(
+            admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
+        ).clusterParameters[0].intData;
         assert.eq(intData, 107);
     });
 }

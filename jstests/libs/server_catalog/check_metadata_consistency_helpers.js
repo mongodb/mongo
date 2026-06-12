@@ -86,7 +86,11 @@ export var MetadataConsistencyChecker = (function () {
                 }
             }
 
-            assert.eq(0, inconsistencies.length, `Found metadata inconsistencies: ${tojson(inconsistencies)}`);
+            assert.eq(
+                0,
+                inconsistencies.length,
+                `Found metadata inconsistencies: ${tojson(inconsistencies)}`,
+            );
 
             jsTest.log("Completed metadata consistency check");
         };
@@ -100,19 +104,25 @@ export var MetadataConsistencyChecker = (function () {
             } else if (e.code === ErrorCodes.LockBusy) {
                 const buildInfo = adminDB.getServerBuildInfo();
                 const slowBuild =
-                    buildInfo.isAddressSanitizerActive() || buildInfo.isThreadSanitizerActive() || buildInfo.isDebug();
+                    buildInfo.isAddressSanitizerActive() ||
+                    buildInfo.isThreadSanitizerActive() ||
+                    buildInfo.isDebug();
                 if (slowBuild) {
                     jsTest.log(
                         `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`,
                     );
                 } else {
-                    jsTest.log("Caught error during check metadata consistency hook: " + errorWithCode);
+                    jsTest.log(
+                        "Caught error during check metadata consistency hook: " + errorWithCode,
+                    );
                     throw e;
                 }
             } else if (e.code === ErrorCodes.ConflictingOperationInProgress) {
                 // If this were an unexpected collection disappearance, the test would tassert so
                 // simply accept the error here.
-                jsTest.log("Ignoring ConflictingOperationInProgress error during checkMetadataConsistency");
+                jsTest.log(
+                    "Ignoring ConflictingOperationInProgress error during checkMetadataConsistency",
+                );
             } else {
                 // For all the other errors re-throw the exception
                 jsTest.log("Caught error during check metadata consistency hook: " + errorWithCode);

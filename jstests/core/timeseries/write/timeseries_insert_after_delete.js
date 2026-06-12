@@ -21,13 +21,18 @@ TimeseriesTest.run((insert) => {
     const objB = {[timeFieldName]: ISODate("2021-01-01T01:01:00Z"), [metaFieldName]: "A"};
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     assert.commandWorked(insert(coll, objA));
     assert.eq(
         assert.commandWorked(
-            testDB.runCommand({delete: coll.getName(), deletes: [{q: {[metaFieldName]: "A"}, limit: 0}]}),
+            testDB.runCommand({
+                delete: coll.getName(),
+                deletes: [{q: {[metaFieldName]: "A"}, limit: 0}],
+            }),
         )["n"],
         1,
     );

@@ -28,7 +28,10 @@ export const $config = (function () {
     let transitions = {init: {insert: 1}, insert: {insert: 1}};
 
     function setup(db, collName, cluster) {
-        let res = db[collName].createIndex({indexed_insert_ttl: 1}, {expireAfterSeconds: this.ttlSeconds});
+        let res = db[collName].createIndex(
+            {indexed_insert_ttl: 1},
+            {expireAfterSeconds: this.ttlSeconds},
+        );
         assert.commandWorked(res);
     }
 
@@ -48,7 +51,8 @@ export const $config = (function () {
         // right after the TTL thread has started to sleep, which requires us to wait at least ~60
         // seconds for it to wake up and delete the expired documents. We wait at least another
         // minute just to avoid race-prone tests on overloaded test hosts.
-        let timeoutMS = (TestData.inEvergreen ? 10 : 2) * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
+        let timeoutMS =
+            (TestData.inEvergreen ? 10 : 2) * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
 
         assert.soon(
             function checkTTLCount() {

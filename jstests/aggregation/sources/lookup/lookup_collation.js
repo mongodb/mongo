@@ -19,7 +19,8 @@ import {
 
 // ToDo: SERVER-103530. Remove multiversion check when 9.0 becomes last-lts
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -66,7 +67,12 @@ const lookupWithPipeline = (foreignColl) => {
 };
 const lookupNoPipeline = (foreignColl) => {
     return {
-        $lookup: {from: foreignColl.getName(), localField: "key", foreignField: "key", as: "matched"},
+        $lookup: {
+            from: foreignColl.getName(),
+            localField: "key",
+            foreignField: "key",
+            as: "matched",
+        },
     };
 };
 
@@ -119,7 +125,9 @@ let explain;
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on local, disk use allowed, running: " + tojson(lookupInto),
+            extraErrorMsg:
+                " Case-insensitive collation on local, disk use allowed, running: " +
+                tojson(lookupInto),
         });
     }
 })();
@@ -157,7 +165,11 @@ let explain;
             if (winningPlan.stage === "EQ_LOOKUP") {
                 assert.eq(strategyName, winningPlan.strategy, explain);
                 if (indexName !== null) {
-                    assert.eq(indexName, getLookupStageIndexStrategy(winningPlan).indexName, explain);
+                    assert.eq(
+                        indexName,
+                        getLookupStageIndexStrategy(winningPlan).indexName,
+                        explain,
+                    );
                 }
             }
         }
@@ -168,7 +180,9 @@ let explain;
         if (getAggPlanStages(explain, "$cursor").length === 0) {
             const winningPlan = getWinningPlanFromExplain(explain);
             if (winningPlan.stage === "EQ_LOOKUP") {
-                const strategies = Array.isArray(expectedStrategies) ? expectedStrategies : [expectedStrategies];
+                const strategies = Array.isArray(expectedStrategies)
+                    ? expectedStrategies
+                    : [expectedStrategies];
 
                 let foundMatch = false;
                 for (const expectedStrategy of strategies) {
@@ -198,9 +212,14 @@ let explain;
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " + tojson(lookupInto),
+            extraErrorMsg:
+                " Case-insensitive collation on local, foreign is indexed, running: " +
+                tojson(lookupInto),
         });
-        let areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
+        let areCollectionsColocated = FixtureHelpers.areCollectionsColocated([
+            collAA,
+            collAa_indexed,
+        ]);
         if (areCollectionsColocated) {
             explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
             assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
@@ -208,33 +227,43 @@ let explain;
 
         // Command-level collation overrides the local collation and foreign has an index with
         // compatible collation (case insensitive).
-        results = collAa.aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive}).toArray();
+        results = collAa
+            .aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive})
+            .toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running:" + tojson(lookupInto),
+            extraErrorMsg:
+                " Case-insensitive collation on command, foreign is indexed, running:" +
+                tojson(lookupInto),
         });
         areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
         if (areCollectionsColocated) {
-            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive});
+            explain = collAa
+                .explain()
+                .aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive});
             assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
         }
 
         // Command-level collation, {locale: "fr"}, overrides the local collation and foreign has an
         // index with incompatible collation.
-        results = collAa.aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}}).toArray();
+        results = collAa
+            .aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}})
+            .toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseSensitive,
-            extraErrorMsg: " locale fr collation on local, foreign is indexed,running: " + tojson(lookupInto),
+            extraErrorMsg:
+                " locale fr collation on local, foreign is indexed,running: " + tojson(lookupInto),
         });
         areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
         if (areCollectionsColocated) {
             // If there is an index but it is not compatible with the requested collation and disk
             // usage is not allowed, dynamic indexed loop join will be chosen.
-            explain = collAa
-                .explain()
-                .aggregate([lookupInto(collAa_indexed)], {allowDiskUse: false, collation: {locale: "fr"}});
+            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)], {
+                allowDiskUse: false,
+                collation: {locale: "fr"},
+            });
             if (isMultiversion) {
                 assertJoinStrategyMulti(explain, [
                     {name: "NestedLoopJoin", index: null},
@@ -248,9 +277,10 @@ let explain;
         if (areCollectionsColocated) {
             // If there is an index but it is not compatible with the requested collation and disk
             // usage is allowed, hash join will be chosen.
-            explain = collAa
-                .explain()
-                .aggregate([lookupInto(collAa_indexed)], {allowDiskUse: true, collation: {locale: "fr"}});
+            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)], {
+                allowDiskUse: true,
+                collation: {locale: "fr"},
+            });
             assertJoinStrategy(explain, "HashJoin", null);
         }
 

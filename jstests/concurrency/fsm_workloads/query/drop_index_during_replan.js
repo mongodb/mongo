@@ -54,8 +54,12 @@ export const $config = (function () {
         });
 
         for (let i = 0; i < 200; ++i) {
-            assert.commandWorked(db[collName].insert({a: "common_value_a", b: "unique_value_" + i}));
-            assert.commandWorked(db[collName].insert({a: "unique_value_" + i, b: "common_value_b"}));
+            assert.commandWorked(
+                db[collName].insert({a: "common_value_a", b: "unique_value_" + i}),
+            );
+            assert.commandWorked(
+                db[collName].insert({a: "unique_value_" + i, b: "common_value_b"}),
+            );
         }
     }
 

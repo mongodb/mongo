@@ -16,7 +16,8 @@ function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allo
         if (
             RetryableWritesUtil.isRetryableCode(res.code) ||
             RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-            (res.writeConcernError && RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
+            (res.writeConcernError &&
+                RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
         ) {
             return false; // Retry
         }
@@ -37,7 +38,10 @@ st.s.adminCommand({shardCollection: ns, key: {x: 1}});
 
 let lsid = assert.commandWorked(st.s.getDB("admin").runCommand({startSession: 1})).id;
 
-assert.eq(false, st.s.getCollection("config.collections").findOne({_id: ns}).hasOwnProperty("allowMigrations"));
+assert.eq(
+    false,
+    st.s.getCollection("config.collections").findOne({_id: ns}).hasOwnProperty("allowMigrations"),
+);
 
 assert.commandWorked(runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, NumberLong(1), false));
 

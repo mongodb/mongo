@@ -22,7 +22,9 @@ let shards = [st.shard0, st.shard1, st.shard2];
 
 jsTest.log("Enabling sharding for the first time...");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 let bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();

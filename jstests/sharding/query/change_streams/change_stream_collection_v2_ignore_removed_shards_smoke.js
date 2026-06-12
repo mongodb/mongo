@@ -21,7 +21,10 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, it, before, after, beforeEach, afterEach} from "jstests/libs/mochalite.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {
     ChangeStreamTest,
     assertOpenCursors,
@@ -45,7 +48,8 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
     before(() => {
         // Store the current value of 'skipCheckingIndexesConsistentAcrossCluster' so that we can
         // restore it later.
-        skipCheckingIndexesConsistentAcrossClusterWas = TestData.skipCheckingIndexesConsistentAcrossCluster;
+        skipCheckingIndexesConsistentAcrossClusterWas =
+            TestData.skipCheckingIndexesConsistentAcrossCluster;
 
         // Temporarily turn off this check because it fails when at least one of the shards of the
         // `ShardingTest` Fixture has been removed. It is fine to skip the index consistency in this
@@ -77,7 +81,8 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         st.stop();
         // Restore the previous value of 'skipCheckingIndexesConsistentAcrossCluster' so that the
         // change does not leak into any following tests running in the same instance.
-        TestData.skipCheckingIndexesConsistentAcrossCluster = skipCheckingIndexesConsistentAcrossClusterWas;
+        TestData.skipCheckingIndexesConsistentAcrossCluster =
+            skipCheckingIndexesConsistentAcrossClusterWas;
     });
 
     beforeEach(function () {
@@ -116,10 +121,17 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
     function getCollDataDistribution() {
         let docs = {};
         [st.shard0, st.shard1, st.shard2, st.shard3].forEach((shardConn) => {
-            docs[shardConn.shardName] = shardConn.getDB(db.getName())[coll.getName()].find().itcount();
+            docs[shardConn.shardName] = shardConn
+                .getDB(db.getName())
+                [coll.getName()].find()
+                .itcount();
         });
         extraReplicaSetsToRemove.forEach((shard) => {
-            docs[shard.shardName] = shard.getPrimary().getDB(db.getName())[coll.getName()].find().itcount();
+            docs[shard.shardName] = shard
+                .getPrimary()
+                .getDB(db.getName())
+                [coll.getName()].find()
+                .itcount();
         });
         return docs;
     }
@@ -222,7 +234,11 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             // returned document keys for the events to include the new shard key field.
             jsTest.log.info("Resharding collection to {shard1, shard2}");
             assert.commandWorked(
-                st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+                st.s.adminCommand({
+                    reshardCollection: coll.getFullName(),
+                    key: {a: 1},
+                    numInitialChunks: 1,
+                }),
             );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {a: 0},
@@ -259,7 +275,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
                 jsTest.log.info(`Decommissioning shard ${shardToDecommission.shardName}`);
                 removeShard(st, shardToDecommission.shardName);
                 st.restartShardClean(shardToDecommission);
-                jsTest.log.info(`Shard ${shardToDecommission.shardName} successfully decommissioned`);
+                jsTest.log.info(
+                    `Shard ${shardToDecommission.shardName} successfully decommissioned`,
+                );
             });
         });
 
@@ -599,7 +617,12 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         csTest.assertNoChange(csCursor);
 
         // The collection is not present, so we expect only its primary shard to be tracked.
-        assertOpenCursors(st, [st.shard3.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [st.shard3.shardName],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
 
         // Recreate the collection.
         assertCreateCollection(db, coll.getName());
@@ -620,7 +643,12 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
 
         csTest.assertNoChange(csCursor);
 
-        assertOpenCursors(st, [st.shard2.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [st.shard2.shardName],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
     });
 
     it("does not observe invalidate event when collection was dropped before its last shard was removed", () => {
@@ -690,7 +718,12 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
 
         csTest.assertNoChange(csCursor);
 
-        assertOpenCursors(st, [st.shard0.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(
+            st,
+            [st.shard0.shardName],
+            /*expectedConfigCursor=*/ false,
+            cursorCommentFilter(comment),
+        );
     });
 
     it("does not return events in ignoreRemovedShards mode for a non-existing collection", () => {

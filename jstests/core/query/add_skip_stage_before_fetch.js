@@ -44,7 +44,12 @@ assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 100);
 
 // This sort can also be computed using the index.
-explainResult = coll.find({a: 0, b: 2}).hint(testIndex).sort({c: 1}).skip(2400).explain("executionStats");
+explainResult = coll
+    .find({a: 0, b: 2})
+    .hint(testIndex)
+    .sort({c: 1})
+    .skip(2400)
+    .explain("executionStats");
 assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 100);
 
@@ -61,6 +66,11 @@ assert(isIndexOnly(db, explainResult.queryPlanner.winningPlan));
 
 // This sort requires a field that is not in the index, so we should be fetching all 2500
 // documents that match the find predicate.
-explainResult = coll.find({a: 0, b: 2}).hint(testIndex).sort({d: 1}).skip(2400).explain("executionStats");
+explainResult = coll
+    .find({a: 0, b: 2})
+    .hint(testIndex)
+    .sort({d: 1})
+    .skip(2400)
+    .explain("executionStats");
 assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 2500);

@@ -19,7 +19,11 @@ replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let priConn = replTest.getPrimary();
@@ -46,9 +50,10 @@ let shardIdentityDoc = {
 
 // Do this explicitly with w:1 so that we don't hang waiting for replication that will never happen.
 assert.commandWorked(
-    priConn
-        .getDB("admin")
-        .system.version.update({_id: "shardIdentity"}, shardIdentityDoc, {upsert: true, writeConcern: {w: 1}}),
+    priConn.getDB("admin").system.version.update({_id: "shardIdentity"}, shardIdentityDoc, {
+        upsert: true,
+        writeConcern: {w: 1},
+    }),
 );
 
 // Ensure sharding state on the primary was initialized
@@ -56,7 +61,11 @@ let res = priConn.getDB("admin").runCommand({shardingState: 1});
 assert(res.enabled, tojson(res));
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
-assert.soon(() => shardIdentityDoc.configsvrConnectionString == priConn.adminCommand({shardingState: 1}).configServer);
+assert.soon(
+    () =>
+        shardIdentityDoc.configsvrConnectionString ==
+        priConn.adminCommand({shardingState: 1}).configServer,
+);
 
 // Ensure sharding state on the secondaries was *not* initialized
 secondaries.forEach(function (secondary) {
@@ -105,7 +114,10 @@ assert.soon(() => {
 
 // Restart the original primary again.  This time, the shardIdentity document should already be
 // rolled back, so there shouldn't be any rollback and the node should stay online.
-jsTest.log("Restarting original primary a second time and waiting for it to successfully become " + "secondary");
+jsTest.log(
+    "Restarting original primary a second time and waiting for it to successfully become " +
+        "secondary",
+);
 try {
     // Join() with the crashed mongod and ignore its bad exit status.
     MongoRunner.stopMongod(priConn);

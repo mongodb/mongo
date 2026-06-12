@@ -24,7 +24,9 @@ const nonSimpleCollationOptions = {
 assert.commandWorked(db.createCollection(coll.getName(), {collation: nonSimpleCollationOptions}));
 
 // Create an index that doesn't specify the collation option. This should use the default value.
-assert.commandWorked(db.runCommand({createIndexes: coll.getName(), indexes: [{key: {x: 1}, name: "x_1"}]}));
+assert.commandWorked(
+    db.runCommand({createIndexes: coll.getName(), indexes: [{key: {x: 1}, name: "x_1"}]}),
+);
 
 assert.commandWorked(
     db.runCommand({

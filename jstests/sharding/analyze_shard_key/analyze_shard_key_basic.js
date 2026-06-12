@@ -31,11 +31,19 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 
     testCases.forEach((testCase) => {
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey, readConcern: {level: "available"}}),
+            testCase.conn.adminCommand({
+                analyzeShardKey: ns,
+                key: candidateKey,
+                readConcern: {level: "available"},
+            }),
             ErrorCodes.InvalidOptions,
         );
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey, writeConcern: {w: "majority"}}),
+            testCase.conn.adminCommand({
+                analyzeShardKey: ns,
+                key: candidateKey,
+                writeConcern: {w: "majority"},
+            }),
             ErrorCodes.InvalidOptions,
         );
     });
@@ -44,7 +52,9 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2, setParameter: setParameterOpts}});
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbNameBase, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbNameBase, primaryShard: st.shard0.name}),
+    );
 
     const testCases = [];
     // The analyzeShardKey command is supported on mongos and all shardsvr mongods (both primary and
@@ -121,7 +131,9 @@ if (!TestData.auth) {
 
     // Prepare an authenticated user for testing.
     // Must be authenticated as a user with ActionType::useTenant in order to use security token
-    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}),
+    );
     assert(adminDb.auth("admin", "pwd"));
 
     // The analyzeShardKey command is not supported in multitenancy.

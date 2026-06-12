@@ -24,7 +24,11 @@ let checkInterrupt = function (cursor) {
         [],
         "expected interrupt error due to maxTimeMS being exceeded",
     );
-    assert.commandFailedWithCode(err, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError]);
+    assert.commandFailedWithCode(err, [
+        ErrorCodes.MaxTimeMSExpired,
+        ErrorCodes.Interrupted,
+        ErrorCodes.InternalError,
+    ]);
 };
 
 let tests = [
@@ -51,7 +55,9 @@ let tests = [
     {
         // Test that $function can be interrupted by a query knob of 100 ms.
         pre: function () {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}),
+            );
         },
         query: {
             $expr: {

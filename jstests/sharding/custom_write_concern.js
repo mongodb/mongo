@@ -32,7 +32,9 @@ const coll = st.s.getDB("db").getCollection("test_custom_write_concern_coll");
 assert.commandWorked(coll.insert({a: 1}));
 
 // Ensure that after setting the write concern validly, subsequent writes will succeed.
-assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}),
+);
 assert.commandWorked(coll.insert({a: 1}));
 
 // Ensure that setting the write concern to a nonexistent custom value will fail.
@@ -106,7 +108,9 @@ assert.commandFailedWithCode(
 
 // Ensure that setting the write concern to a custom value that exists on all shards and the
 // CSRS works, and subsequent writes succeed.
-assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}),
+);
 assert.commandWorked(coll.insert({a: 1}));
 
 st.stop();

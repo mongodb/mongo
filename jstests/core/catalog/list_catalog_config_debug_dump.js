@@ -22,7 +22,9 @@ assert.commandWorked(myDB[databasesCollectionName].insertOne({x: 1}));
 
 // In suites with tenantID, the test would replace a simple {$match: {db: myDBName}}
 // with {$match: {db: tenantID + "_" + myDBName}}, hence the workaround with a regex.
-const userDBlist = admin.aggregate([{$listCatalog: {}}, {$match: {db: {$regex: `^${myDBName}\$`}}}]).toArray();
+const userDBlist = admin
+    .aggregate([{$listCatalog: {}}, {$match: {db: {$regex: `^${myDBName}\$`}}}])
+    .toArray();
 assert.gte(userDBlist.length, 2);
 
 let dummyFound = false;

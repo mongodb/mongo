@@ -28,15 +28,41 @@ describe("commit chunk operations honor allowChunkOperations under the chunk loc
 
         // Let mergeAllChunksOnShard merge chunks no matter how recently they were created;
         // otherwise it returns early before reaching the check this test exercises.
-        configureFailPointForRS(this.st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPointForRS(this.st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPointForRS(this.st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-
-        assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+        configureFailPointForRS(
+            this.st.configRS.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPointForRS(
+            this.st.rs0.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPointForRS(
+            this.st.rs1.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
         );
 
-        this.countChunks = (ns) => findChunksUtil.findChunksByNs(this.st.s.getDB("config"), ns).itcount();
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
+        );
+
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
+        );
+
+        this.countChunks = (ns) =>
+            findChunksUtil.findChunksByNs(this.st.s.getDB("config"), ns).itcount();
     });
 
     after(() => {
@@ -130,7 +156,9 @@ describe("commit chunk operations honor allowChunkOperations under the chunk loc
         assert.eq(3, this.countChunks(this.ns), "mergeChunks must not have committed");
 
         setAllowChunkOperations(this.st, this.ns, true);
-        assert.commandWorked(this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}));
+        assert.commandWorked(
+            this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}),
+        );
         assert.eq(2, this.countChunks(this.ns));
     });
 
@@ -140,13 +168,17 @@ describe("commit chunk operations honor allowChunkOperations under the chunk loc
         assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 10}}));
         assert.eq(3, this.countChunks(this.ns));
 
-        assert.commandWorked(this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}));
+        assert.commandWorked(
+            this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}),
+        );
         assert.eq(2, this.countChunks(this.ns));
 
         setAllowChunkOperations(this.st, this.ns, false);
 
         // Repeating the exact same merge while disabled is accepted as a no-op.
-        assert.commandWorked(this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}));
+        assert.commandWorked(
+            this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}),
+        );
         assert.eq(2, this.countChunks(this.ns));
 
         // A different merge still fails.
@@ -172,13 +204,21 @@ describe("commit chunk operations honor allowChunkOperations under the chunk loc
         setAllowChunkOperations(this.st, this.ns, false);
 
         assert.commandFailedWithCode(
-            this.st.s.adminCommand({mergeAllChunksOnShard: this.ns, shard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                mergeAllChunksOnShard: this.ns,
+                shard: this.st.shard0.shardName,
+            }),
             ErrorCodes.ConflictingOperationInProgress,
         );
         assert.eq(3, this.countChunks(this.ns), "mergeAllChunksOnShard must not have committed");
 
         setAllowChunkOperations(this.st, this.ns, true);
-        assert.commandWorked(this.st.s.adminCommand({mergeAllChunksOnShard: this.ns, shard: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                mergeAllChunksOnShard: this.ns,
+                shard: this.st.shard0.shardName,
+            }),
+        );
         assert.eq(1, this.countChunks(this.ns));
     });
 });

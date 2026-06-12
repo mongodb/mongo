@@ -11,13 +11,19 @@ function runTest(st, badViewDefinition) {
     const db = mongos.getDB("invalid_system_views");
     assert.commandWorked(db.dropDatabase());
 
-    assert.commandWorked(config.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        config.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     // Create sharded and unsharded collections, then insert an invalid view into system.views.
     const viewsCollection = db.getCollection("coll");
     const staticCollection = db.getCollection("staticCollection");
-    assert.commandWorked(config.adminCommand({shardCollection: viewsCollection.getFullName(), key: {a: 1}}));
-    assert.commandWorked(config.adminCommand({shardCollection: staticCollection.getFullName(), key: {a: 1}}));
+    assert.commandWorked(
+        config.adminCommand({shardCollection: viewsCollection.getFullName(), key: {a: 1}}),
+    );
+    assert.commandWorked(
+        config.adminCommand({shardCollection: staticCollection.getFullName(), key: {a: 1}}),
+    );
 
     assert.commandWorked(viewsCollection.createIndex({x: 1}));
 
@@ -29,7 +35,9 @@ function runTest(st, badViewDefinition) {
     [st.shard0, st.shard1].forEach((shard) => {
         assert.commandWorked(shard.getDB(db.getName()).createCollection("system.views"));
         assert.commandWorked(
-            shard.adminCommand({applyOps: [{op: "i", ns: db.getName() + ".system.views", o: badViewDefinition}]}),
+            shard.adminCommand({
+                applyOps: [{op: "i", ns: db.getName() + ".system.views", o: badViewDefinition}],
+            }),
             "failed to insert " + tojson(badViewDefinition),
         );
     });
@@ -44,28 +52,46 @@ function runTest(st, badViewDefinition) {
     // Helper function to create a message to use if an assertion fails.
     function makeErrorMessage(msg) {
         return (
-            msg + " should work on a valid, existing collection, despite the presence of bad views" + " in system.views"
+            msg +
+            " should work on a valid, existing collection, despite the presence of bad views" +
+            " in system.views"
         );
     }
 
     assert.commandWorked(viewsCollection.insert({y: "baz", a: 5}), makeErrorMessage("insert"));
 
-    assert.commandWorked(viewsCollection.update({y: "baz"}, {$set: {y: "qux"}}), makeErrorMessage("update"));
+    assert.commandWorked(
+        viewsCollection.update({y: "baz"}, {$set: {y: "qux"}}),
+        makeErrorMessage("update"),
+    );
 
     assert.commandWorked(viewsCollection.remove({y: "baz"}), makeErrorMessage("remove"));
 
     assert.commandWorked(
-        db.runCommand({findAndModify: viewsCollection.getName(), query: {x: 1, a: 1}, update: {x: 2}}),
+        db.runCommand({
+            findAndModify: viewsCollection.getName(),
+            query: {x: 1, a: 1},
+            update: {x: 2},
+        }),
         makeErrorMessage("findAndModify with update"),
     );
 
     assert.commandWorked(
-        db.runCommand({findAndModify: viewsCollection.getName(), query: {x: 2, a: 1}, remove: true}),
+        db.runCommand({
+            findAndModify: viewsCollection.getName(),
+            query: {x: 2, a: 1},
+            remove: true,
+        }),
         makeErrorMessage("findAndModify with remove"),
     );
 
     const lookup = {
-        $lookup: {from: unshardedColl.getName(), localField: "_id", foreignField: "_id", as: "match"},
+        $lookup: {
+            from: unshardedColl.getName(),
+            localField: "_id",
+            foreignField: "_id",
+            as: "match",
+        },
     };
     assert.commandWorked(
         db.runCommand({aggregate: viewsCollection.getName(), pipeline: [lookup], cursor: {}}),
@@ -98,12 +124,21 @@ function runTest(st, badViewDefinition) {
         makeErrorMessage("collMod"),
     );
 
-    assert.commandWorked(db.runCommand({drop: viewsCollection.getName()}), makeErrorMessage("drop"));
-    assert.commandWorked(db.runCommand({drop: staticCollection.getName()}), makeErrorMessage("drop"));
+    assert.commandWorked(
+        db.runCommand({drop: viewsCollection.getName()}),
+        makeErrorMessage("drop"),
+    );
+    assert.commandWorked(
+        db.runCommand({drop: staticCollection.getName()}),
+        makeErrorMessage("drop"),
+    );
 
     // An invalid view in the view catalog should not interfere with attempting to run operations on
     // nonexistent collections.
-    assert.commandWorked(db.runCommand({drop: staticCollection.getName()}), makeErrorMessage("drop"));
+    assert.commandWorked(
+        db.runCommand({drop: staticCollection.getName()}),
+        makeErrorMessage("drop"),
+    );
 
     assert.commandWorked(db.runCommand({drop: unshardedColl.getName()}), makeErrorMessage("drop"));
 
@@ -118,7 +153,11 @@ const st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBal
 runTest(st, {_id: "invalid_system_views.badViewStringPipeline", viewOn: "coll", pipeline: "bad"});
 runTest(st, {_id: "invalid_system_views.badViewEmptyObjectPipeline", viewOn: "coll", pipeline: {}});
 runTest(st, {_id: "invalid_system_views.badViewNumericalPipeline", viewOn: "coll", pipeline: 7});
-runTest(st, {_id: "invalid_system_views.badViewArrayWithIntegerPipeline", viewOn: "coll", pipeline: [1]});
+runTest(st, {
+    _id: "invalid_system_views.badViewArrayWithIntegerPipeline",
+    viewOn: "coll",
+    pipeline: [1],
+});
 runTest(st, {
     _id: "invalid_system_views.badViewArrayWithEmptyArrayPipeline",
     viewOn: "coll",

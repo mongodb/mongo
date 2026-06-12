@@ -15,7 +15,9 @@ export function moveDatabaseAndUnshardedColls(db, destinationShard) {
                 .find({uuid: coll.uuid, shard: originShard})
                 .forEach(() => {
                     // Move unsplittable collection data.
-                    assert.commandWorked(db.adminCommand({moveCollection: coll._id, toShard: destinationShard}));
+                    assert.commandWorked(
+                        db.adminCommand({moveCollection: coll._id, toShard: destinationShard}),
+                    );
                 });
         });
     // Next, move all untracked collections via moveCollection. This can fail with InvalidOptions if
@@ -29,12 +31,15 @@ export function moveDatabaseAndUnshardedColls(db, destinationShard) {
     localCollections.forEach((coll) => {
         let ns = db.getName() + "." + coll.name;
         if (configDB.getCollection("collections").countDocuments({_id: ns}) == 0) {
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({moveCollection: ns, toShard: destinationShard}), [
-                ErrorCodes.InvalidOptions,
-                ErrorCodes.IllegalOperation,
-                ErrorCodes.NamespaceNotFound,
-                ErrorCodes.CommandNotFound,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({moveCollection: ns, toShard: destinationShard}),
+                [
+                    ErrorCodes.InvalidOptions,
+                    ErrorCodes.IllegalOperation,
+                    ErrorCodes.NamespaceNotFound,
+                    ErrorCodes.CommandNotFound,
+                ],
+            );
         }
     });
     // Always call movePrimary at the end. This will move all untracked collections and change the

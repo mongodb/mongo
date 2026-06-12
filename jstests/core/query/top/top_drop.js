@@ -37,7 +37,10 @@ function checkTopEntries(expectedEntries) {
     if (!entriesAreEqual) {
         // TODO(SERVER-26750): This block can be removed once SERVER-26750 is resolved.
         jsTest.log(
-            "Warning: expected to see " + tojson(expectedEntryNames) + " in top, but got " + tojson(entriesInTop),
+            "Warning: expected to see " +
+                tojson(expectedEntryNames) +
+                " in top, but got " +
+                tojson(entriesInTop),
         );
 
         assert.lt(
@@ -63,7 +66,9 @@ function checkTopEntries(expectedEntries) {
             assert.eq(
                 0,
                 res.totals[coll].insert.count,
-                coll + " has unexpected insert entries in top. Full top output:\n" + tojson(res.totals),
+                coll +
+                    " has unexpected insert entries in top. Full top output:\n" +
+                    tojson(res.totals),
             );
         });
     }

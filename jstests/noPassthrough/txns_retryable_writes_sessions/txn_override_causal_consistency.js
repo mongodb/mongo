@@ -70,14 +70,23 @@ function inspectFirstCommandForAfterClusterTime(conn, cmdName, isCausal, expectR
 
     for (let cmd of cmds) {
         if (isCausal) {
-            assert(cmd.hasOwnProperty("$clusterTime"), "Expected " + tojson(cmd) + " to have a $clusterTime.");
-            assert(cmd.hasOwnProperty("readConcern"), "Expected " + tojson(cmd) + " to have a read concern.");
+            assert(
+                cmd.hasOwnProperty("$clusterTime"),
+                "Expected " + tojson(cmd) + " to have a $clusterTime.",
+            );
+            assert(
+                cmd.hasOwnProperty("readConcern"),
+                "Expected " + tojson(cmd) + " to have a read concern.",
+            );
             assert(
                 cmd.readConcern.hasOwnProperty("afterClusterTime"),
                 "Expected " + tojson(cmd) + " to have an afterClusterTime.",
             );
         } else {
-            assert(cmd.hasOwnProperty("readConcern"), "Expected " + tojson(cmd) + " to have a read concern.");
+            assert(
+                cmd.hasOwnProperty("readConcern"),
+                "Expected " + tojson(cmd) + " to have a read concern.",
+            );
             assert(
                 !cmd.readConcern.hasOwnProperty("afterClusterTime"),
                 "Expected " + tojson(cmd) + " to not have an afterClusterTime.",

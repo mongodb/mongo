@@ -26,5 +26,7 @@ if (!isViewfulTimeseriesOnlySuite(db) && !isViewlessTimeseriesOnlySuite(db)) {
 const collName = `coll_${UUID()}`;
 
 for (const dbName of internal_dbs) {
-    assert.commandWorked(db.getSiblingDB(dbName).runCommand({create: collName, timeseries: {timeField: "time"}}));
+    assert.commandWorked(
+        db.getSiblingDB(dbName).runCommand({create: collName, timeseries: {timeField: "time"}}),
+    );
 }

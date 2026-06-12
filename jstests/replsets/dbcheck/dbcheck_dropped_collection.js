@@ -30,8 +30,12 @@ import {
     const collName = "coll_view";
 
     const runTest = (failpoint, mode, dbCheckParameters) => {
-        jsTestLog(`Running with failpoint: ${failpoint}, mode: ${mode}, and parameters: ${dbCheckParameters}`);
-        jsTestLog("Reset the health log and delete the collection/view, then create a new collection.");
+        jsTestLog(
+            `Running with failpoint: ${failpoint}, mode: ${mode}, and parameters: ${dbCheckParameters}`,
+        );
+        jsTestLog(
+            "Reset the health log and delete the collection/view, then create a new collection.",
+        );
         resetAndInsert(rst, testDB, collName, 10);
         assert.commandWorked(
             testDB.runCommand({
@@ -61,7 +65,9 @@ import {
                 break;
             case "createView":
                 jsTestLog("Creating a view with the same name.");
-                assert.commandWorked(testDB.createCollection(collName, {viewOn: "nil", pipeline: []}));
+                assert.commandWorked(
+                    testDB.createCollection(collName, {viewOn: "nil", pipeline: []}),
+                );
                 break;
         }
 
@@ -80,7 +86,10 @@ import {
             assert.eq(warnings.length, 1);
             assert.eq(warnings[0]["severity"], "warning");
             assert.eq(warnings[0]["namespace"], testDB[collName].getFullName());
-            assert.includes(warnings[0]["msg"], "abandoning dbCheck batch because collection no longer exists");
+            assert.includes(
+                warnings[0]["msg"],
+                "abandoning dbCheck batch because collection no longer exists",
+            );
             if (
                 mode == "createView" &&
                 (failpoint == "hangBeforeProcessingDbCheckRun" ||
@@ -122,7 +131,9 @@ import {
         {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
         {validateMode: "extraIndexKeysCheck", indexName: "a_1"},
     ];
-    fps.forEach((fb) => modes.forEach((mode) => params.forEach((param) => runTest(fb, mode, param))));
+    fps.forEach((fb) =>
+        modes.forEach((mode) => params.forEach((param) => runTest(fb, mode, param))),
+    );
 
     rst.stopSet();
 })();

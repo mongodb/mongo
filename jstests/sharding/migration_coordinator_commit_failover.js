@@ -23,7 +23,9 @@ let st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,

@@ -165,7 +165,11 @@ function getMoreMongosTimeout(allowPartialResults, batchSize) {
     // Eventually we should get either a MaxTimeMS error or partial results because a shard is down.
     let numReturned = batchSize; // One batch was returned so far.
     while (true) {
-        const res2 = coll.runCommand({getMore: res.cursor.id, collection: collName, batchSize: batchSize});
+        const res2 = coll.runCommand({
+            getMore: res.cursor.id,
+            collection: collName,
+            batchSize: batchSize,
+        });
         if (isError(res2)) {
             assert.commandFailedWithCode(
                 res2,
@@ -178,7 +182,11 @@ function getMoreMongosTimeout(allowPartialResults, batchSize) {
         // are returned even if MaxTimeMS expired on mongos.
         numReturned += res2.cursor.nextBatch.length;
         print(numReturned + " docs returned so far");
-        assert.neq(numReturned, nDocs, "Got full results even through mongos had MaxTimeMSExpired.");
+        assert.neq(
+            numReturned,
+            nDocs,
+            "Got full results even through mongos had MaxTimeMSExpired.",
+        );
         if (res2.cursor.partialResultsReturned) {
             assert(allowPartialResults);
             assert.lt(numReturned, nDocs);
@@ -340,7 +348,11 @@ function getMoreShardTimeout(allowPartialResults, failureController, batchSize) 
     while (true) {
         // Run getmores repeatedly until we exhaust the cache on mongos.
         // Eventually we should get partial results or an error because a shard is down.
-        const res2 = coll.runCommand({getMore: res.cursor.id, collection: collName, batchSize: batchSize});
+        const res2 = coll.runCommand({
+            getMore: res.cursor.id,
+            collection: collName,
+            batchSize: batchSize,
+        });
         if (allowPartialResults) {
             assert.commandWorked(res2);
         } else {
@@ -370,7 +382,9 @@ function getMoreShardTimeout(allowPartialResults, failureController, batchSize) 
 shard0SleepFailure.enable();
 withEachValueOfAllowPartialResults((allowPartialResults) =>
     withEachBatchSize((batchSize) =>
-        withEachSingleShardFailure((failure) => getMoreShardTimeout(allowPartialResults, failure, batchSize)),
+        withEachSingleShardFailure((failure) =>
+            getMoreShardTimeout(allowPartialResults, failure, batchSize),
+        ),
     ),
 );
 

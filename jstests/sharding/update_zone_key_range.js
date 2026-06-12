@@ -25,7 +25,12 @@ function testZoneOnShard(ns, testParameters) {
 
     if (errorCodes.length === 0) {
         assert.commandWorked(
-            st.s.adminCommand({updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: chunkMinBoundary,
+                max: chunkMaxBoundary,
+                zone: zone,
+            }),
         );
         let tagDoc = configDB.tags.findOne();
         if (zone === null) {
@@ -40,7 +45,12 @@ function testZoneOnShard(ns, testParameters) {
         }
     } else {
         assert.commandFailedWithCode(
-            st.s.adminCommand({updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: chunkMinBoundary,
+                max: chunkMaxBoundary,
+                zone: zone,
+            }),
             errorCodes,
         );
 

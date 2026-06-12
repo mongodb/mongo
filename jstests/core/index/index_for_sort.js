@@ -27,7 +27,9 @@ import {
 const originalKnobValue = assert.commandWorked(
     db.adminCommand({getParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: 1}),
 ).internalQueryPlannerPushdownFilterToIxscanForSort;
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: true}),
+);
 
 try {
     const collName = "index_for_sort";
@@ -70,7 +72,9 @@ try {
     const secondIndexKey = "b";
     const thirdIndexKey = "c";
 
-    assert.commandWorked(coll.createIndex({[firstIndexKey]: 1, [secondIndexKey]: 1, [thirdIndexKey]: 1}));
+    assert.commandWorked(
+        coll.createIndex({[firstIndexKey]: 1, [secondIndexKey]: 1, [thirdIndexKey]: 1}),
+    );
 
     const predicates = [
         {covered: true, filteredOnIndexStage: false, predicate: {}},
@@ -164,7 +168,11 @@ try {
             filteredOnIndexStage: false,
             predicate: {[secondIndexKey]: {$elemMatch: {$gt: 0}}},
         },
-        {covered: true, filteredOnIndexStage: true, predicate: {[secondIndexKey]: {$type: "number"}}},
+        {
+            covered: true,
+            filteredOnIndexStage: true,
+            predicate: {[secondIndexKey]: {$type: "number"}},
+        },
         {
             covered: false,
             filteredOnIndexStage: true,
@@ -198,8 +206,16 @@ try {
             predicate: {[secondIndexKey]: {$exists: true}},
         },
         // NOT-wrapped indexed-safe predicates: pushed to IXSCAN
-        {covered: true, filteredOnIndexStage: true, predicate: {[secondIndexKey]: {$not: {$gt: 0}}}},
-        {covered: true, filteredOnIndexStage: true, predicate: {[secondIndexKey]: {$not: {$lt: 0}}}},
+        {
+            covered: true,
+            filteredOnIndexStage: true,
+            predicate: {[secondIndexKey]: {$not: {$gt: 0}}},
+        },
+        {
+            covered: true,
+            filteredOnIndexStage: true,
+            predicate: {[secondIndexKey]: {$not: {$lt: 0}}},
+        },
         // NOT-wrapped index-unsafe predicates: stay in FETCH
         {
             covered: false,
@@ -251,7 +267,10 @@ try {
         {
             covered: false,
             filteredOnIndexStage: true,
-            predicate: {[secondIndexKey]: {$eq: 0}, $or: [{unindexedField: 0}, {anotherUnindexed: 1}]},
+            predicate: {
+                [secondIndexKey]: {$eq: 0},
+                $or: [{unindexedField: 0}, {anotherUnindexed: 1}],
+            },
         },
         // Multiple unsafe predicates together → nothing pushed, all in FETCH
         {
@@ -277,7 +296,11 @@ try {
             predicate: {unindexedField: {$eq: 0}, anotherUnindexed: {$gt: 0}},
         },
         // $type: "string" (non-null type) on indexed field → safe, pushed to IXSCAN
-        {covered: true, filteredOnIndexStage: true, predicate: {[thirdIndexKey]: {$type: "number"}}},
+        {
+            covered: true,
+            filteredOnIndexStage: true,
+            predicate: {[thirdIndexKey]: {$type: "number"}},
+        },
     ];
     predicates.forEach(({covered, predicate, filteredOnIndexStage}) => {
         jsTest.log.info(
@@ -287,16 +310,27 @@ try {
         );
         const query = () =>
             coll
-                .find(predicate, {[firstIndexKey]: 1, [secondIndexKey]: 1, [thirdIndexKey]: 1, "_id": 0})
+                .find(predicate, {
+                    [firstIndexKey]: 1,
+                    [secondIndexKey]: 1,
+                    [thirdIndexKey]: 1,
+                    "_id": 0,
+                })
                 .sort({[firstIndexKey]: 1});
         // Ensure index is used for sorting.
         const indexScanPlan = query().explain();
         let winningPlan = getWinningPlanFromExplain(indexScanPlan.queryPlanner);
         if (FixtureHelpers.isSharded(coll)) {
             assert(isIxscan(db, winningPlan), `Expected index scan ${tojson(indexScanPlan)}`);
-            assert(!isIndexOnly(db, winningPlan), `Expected not only index scan ${tojson(indexScanPlan)}`);
+            assert(
+                !isIndexOnly(db, winningPlan),
+                `Expected not only index scan ${tojson(indexScanPlan)}`,
+            );
             const fetchStages = getPlanStages(winningPlan, "FETCH");
-            assert(fetchStages.length >= 1, `Expected at least one FETCH stages, got ${tojson(fetchStages)}`);
+            assert(
+                fetchStages.length >= 1,
+                `Expected at least one FETCH stages, got ${tojson(fetchStages)}`,
+            );
             if (covered) {
                 // In sharded collections we cannot get a covered index scan unless filtering on the
                 // shard key so a fetch is needed, but it'd be empty.
@@ -311,7 +345,10 @@ try {
                 );
             }
             const ixScanStages = getPlanStages(winningPlan, "IXSCAN");
-            assert(ixScanStages.length >= 1, `Expected at least one IXSCAN stages, got ${tojson(ixScanStages)}`);
+            assert(
+                ixScanStages.length >= 1,
+                `Expected at least one IXSCAN stages, got ${tojson(ixScanStages)}`,
+            );
             if (filteredOnIndexStage) {
                 assert(
                     ixScanStages.every(
@@ -329,10 +366,16 @@ try {
             }
         } else {
             if (covered) {
-                assert(isIndexOnly(db, winningPlan), `Expected index scan ${tojson(indexScanPlan)}`);
+                assert(
+                    isIndexOnly(db, winningPlan),
+                    `Expected index scan ${tojson(indexScanPlan)}`,
+                );
             } else {
                 assert(isIxscan(db, winningPlan), `Expected index scan ${tojson(indexScanPlan)}`);
-                assert(!isIndexOnly(db, winningPlan), `Expected not only index scan ${tojson(indexScanPlan)}`);
+                assert(
+                    !isIndexOnly(db, winningPlan),
+                    `Expected not only index scan ${tojson(indexScanPlan)}`,
+                );
                 const fetchStage = getPlanStage(winningPlan, "FETCH");
                 assert(
                     fetchStage.hasOwnProperty("filter"),
@@ -646,10 +689,14 @@ try {
             coll.drop();
             assert.commandWorked(coll.createIndex(index, indexOptions));
             assert.commandWorked(coll.insertMany(docs));
-            const plan = getWinningPlanFromExplain(coll.find(query, projection).sort({a: 1}).explain().queryPlanner);
+            const plan = getWinningPlanFromExplain(
+                coll.find(query, projection).sort({a: 1}).explain().queryPlanner,
+            );
             if (FixtureHelpers.isSharded(coll)) {
                 const ixScanStages = getPlanStages(plan, "IXSCAN");
-                const stagesToCheck = shardedIxscanFilter ? ixScanStages.filter(shardedIxscanFilter) : ixScanStages;
+                const stagesToCheck = shardedIxscanFilter
+                    ? ixScanStages.filter(shardedIxscanFilter)
+                    : ixScanStages;
                 assert(
                     stagesToCheck.every((s) => !s.hasOwnProperty("filter")),
                     `Expected no filter on IXSCAN for ${description}: ${tojson(stagesToCheck)}`,
@@ -667,6 +714,9 @@ try {
     );
 } finally {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: originalKnobValue}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlannerPushdownFilterToIxscanForSort: originalKnobValue,
+        }),
     );
 }

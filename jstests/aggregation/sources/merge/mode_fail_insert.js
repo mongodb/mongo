@@ -9,7 +9,9 @@ coll.drop();
 const targetColl = db.merge_insert_only_out;
 targetColl.drop();
 
-const pipeline = [{$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}];
+const pipeline = [
+    {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+];
 
 //
 // Test $merge with a non-existent output collection.

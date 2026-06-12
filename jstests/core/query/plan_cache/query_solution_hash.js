@@ -96,7 +96,8 @@
             (param) => coll.find({a: {$size: param}}),
             (param) => coll.aggregate([{$match: {a: param, b: 1}}]),
             () => coll.aggregate([{$project: {_id: 0, a: 1, b: 1}}]),
-            (param) => coll.aggregate([{$match: {a: param, b: 1}}, {$project: {_id: 0, a: 1, b: 1}}]),
+            (param) =>
+                coll.aggregate([{$match: {a: param, b: 1}}, {$project: {_id: 0, a: 1, b: 1}}]),
             (param) => coll.aggregate([{$match: {a: param, b: 1}}, {$sort: {a: 1, b: 1}}]),
             () => coll.aggregate([{$project: {a: 1, b: 1}}, {$sort: {a: 1, b: 1}}]),
         ];

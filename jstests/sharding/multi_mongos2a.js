@@ -3,7 +3,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2, mongos: 2});
 
-assert.commandWorked(st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}),
+);
 
 assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 

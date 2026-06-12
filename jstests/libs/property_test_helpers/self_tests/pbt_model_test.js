@@ -11,9 +11,15 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {addFieldsConstArb, getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    addFieldsConstArb,
+    getQueryAndOptionsModel,
+} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {concreteQueryFromFamily, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {
+    concreteQueryFromFamily,
+    testProperty,
+} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -87,7 +93,10 @@ function testMatchedDocsMetrics(allowOrs) {
     const testCases = [
         {
             name: "single $match queries",
-            aggModel: getMatchArb(allowOrs).map((matchStage) => ({"pipeline": [matchStage], "options": {}})),
+            aggModel: getMatchArb(allowOrs).map((matchStage) => ({
+                "pipeline": [matchStage],
+                "options": {},
+            })),
             minimumAcceptedAvgNumDocs: 5,
         },
         {
@@ -124,7 +133,9 @@ function testMatchedDocsMetrics(allowOrs) {
 
         const avgNumDocsReturned = avg(numDocsReturned);
         assert.gt(avgNumDocsReturned, minimumAcceptedAvgNumDocs, name);
-        jsTestLog("Average number of documents returned for " + name + " was: " + avgNumDocsReturned);
+        jsTestLog(
+            "Average number of documents returned for " + name + " was: " + avgNumDocsReturned,
+        );
     }
 }
 

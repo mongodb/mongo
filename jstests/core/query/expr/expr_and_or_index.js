@@ -8,7 +8,11 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.jstests_expr_and_or_index;
 coll.drop();
@@ -44,7 +48,8 @@ function assertIndexBounds(explain, stage, expectedBounds, testId) {
     assert.eq(
         ixscans.length,
         1,
-        `Plan is missing ${stage} stage in test ${testId}: ${tojson(winningPlan)}` + tojson(explain),
+        `Plan is missing ${stage} stage in test ${testId}: ${tojson(winningPlan)}` +
+            tojson(explain),
     );
     if (stage == "IXSCAN") {
         assert.eq(

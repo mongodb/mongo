@@ -52,7 +52,9 @@ assert.eq(currentOpEntry.clientMetadata.driver.name, "MongoDB Internal Client");
 // Create a new Client and run another operation on the same session.
 const otherClient = new Mongo(rst.getPrimary().host);
 assert.commandWorked(
-    otherClient.getDB(dbName).runCommand({find: collName, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+    otherClient
+        .getDB(dbName)
+        .runCommand({find: collName, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
 );
 
 currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: currentOpFilter}]).toArray();

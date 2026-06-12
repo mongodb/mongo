@@ -43,7 +43,9 @@ assert.eq(enabledPlan.stages.length, 3);
 const enabledResult = coll.aggregate(pipeline).toArray();
 
 // Enable a failpoint that will cause pipeline optimizations to be skipped.
-assert.commandWorked(testDb.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDb.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}),
+);
 
 const disabledPlan = coll.explain().aggregate(pipeline);
 // Test that the $limit still exists and hasn't been optimized away.

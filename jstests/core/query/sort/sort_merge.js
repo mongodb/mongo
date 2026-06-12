@@ -7,7 +7,12 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, getPlanStages, isIndexOnly, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getPlanStages,
+    isIndexOnly,
+    isIxscan,
+} from "jstests/libs/query/analyze_plan.js";
 
 const collNamePrefix = "sort_merge_";
 let collCount = 0;
@@ -293,7 +298,13 @@ function runTest(sorts, filters, verifyCallback) {
 (function testDeduplication() {
     assert.commandWorked(
         coll.insert([
-            {_id: 100, filterFieldA: [1, 2], filterFieldB: "multikeydoc", sortFieldA: 1, sortFieldB: 1},
+            {
+                _id: 100,
+                filterFieldA: [1, 2],
+                filterFieldB: "multikeydoc",
+                sortFieldA: 1,
+                sortFieldB: 1,
+            },
             {_id: 101, sortFieldA: [1, 2], filterFieldA: "multikeydoc"},
         ]),
     );

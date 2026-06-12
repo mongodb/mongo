@@ -51,7 +51,9 @@ function setup() {
     assert(db[collName].drop());
     assert(db[tsCollName].drop());
     assert.commandWorked(
-        db.createCollection(tsCollName, {timeseries: {timeField: "ts", metaField: "m", granularity: "seconds"}}),
+        db.createCollection(tsCollName, {
+            timeseries: {timeField: "ts", metaField: "m", granularity: "seconds"},
+        }),
     );
     insertData();
 }

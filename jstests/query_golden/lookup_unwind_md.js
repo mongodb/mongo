@@ -5,7 +5,9 @@
 import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
 import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 
-const lookups = [{$lookup: {from: "cities", localField: "_id", foreignField: "countryId", as: "cities"}}];
+const lookups = [
+    {$lookup: {from: "cities", localField: "_id", foreignField: "countryId", as: "cities"}},
+];
 
 const unwinds = [
     {$unwind: "$cities"},
@@ -87,7 +89,11 @@ countryDocs.forEach((countries) => {
                         aggOptions.forEach((options) => {
                             for (let i = 0; i < 3; ++i) {
                                 subSection(`Options: ${tojsononeline(options)} - Iteration ${i}`);
-                                code(normalizeArray(db.countries.aggregate(pipeline, options).toArray()));
+                                code(
+                                    normalizeArray(
+                                        db.countries.aggregate(pipeline, options).toArray(),
+                                    ),
+                                );
                                 ++counter;
                             }
                         });

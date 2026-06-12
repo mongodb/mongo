@@ -40,7 +40,11 @@ let st = new ShardingTest({
 // We can't run this command on a shard server (configured with --shardsvr) which is why we must run
 // it on mongos.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Even though implicitDefaultWC is set to w:1, addShard will work as CWWC is set.

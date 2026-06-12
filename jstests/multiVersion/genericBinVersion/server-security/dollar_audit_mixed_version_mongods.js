@@ -10,10 +10,17 @@ const oldVersion = "last-lts";
 const newVersion = "latest";
 
 function verifyProfilerEntries(testDB, comment, expectedSchema) {
-    const profileEntry = testDB.system.profile.find({"command.comment": comment}).hint({$natural: 1}).toArray()[0];
+    const profileEntry = testDB.system.profile
+        .find({"command.comment": comment})
+        .hint({$natural: 1})
+        .toArray()[0];
 
     assert.neq(profileEntry, null, `No matching profile entry found on shard`);
-    assert.docEq(expectedSchema, profileEntry.command.$audit, `Expected metadata doesn't match on shard`);
+    assert.docEq(
+        expectedSchema,
+        profileEntry.command.$audit,
+        `Expected metadata doesn't match on shard`,
+    );
 }
 
 function forceMetadataPropagation(testDB, comment) {
@@ -65,7 +72,9 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
     assert.commandWorked(shard.setProfilingLevel(2));
 
-    assert.commandWorked(testDB.runCommand({createUser: "testUser", pwd: "testUser", roles: ["readWrite"]}));
+    assert.commandWorked(
+        testDB.runCommand({createUser: "testUser", pwd: "testUser", roles: ["readWrite"]}),
+    );
     assert.eq(1, testDB.auth("testUser", "testUser"));
 
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));
@@ -115,7 +124,9 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
 {
     // Test the expected metadata is propagated in a cluster using the lastLTS fcv.
-    jsTest.log(`Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`);
+    jsTest.log(
+        `Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`,
+    );
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
@@ -133,7 +144,9 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
 {
     // Test the expected metadata is propagated in a cluster using the lastLTS fcv.
-    jsTest.log(`Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`);
+    jsTest.log(
+        `Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`,
+    );
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,

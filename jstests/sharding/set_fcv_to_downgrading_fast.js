@@ -22,7 +22,11 @@ const timeoutSeconds = _isWindows() ? 6 : 3;
 function runStandaloneTest() {
     jsTestLog("Running standalone test");
     const conn = MongoRunner.runMongod({binVersion: latest});
-    assert.neq(null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable to start up with version=" + latest + " and no data files",
+    );
     const adminDB = conn.getDB("admin");
 
     const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
@@ -31,11 +35,17 @@ function runStandaloneTest() {
 
     const hangAtSetFCVStartFailpoint = configureFailPoint(conn, "hangAtSetFCVStart");
     assert.commandWorked(
-        conn.adminCommand({configureFailPoint: "failAfterReachingTransitioningState", mode: "alwaysOn"}),
+        conn.adminCommand({
+            configureFailPoint: "failAfterReachingTransitioningState",
+            mode: "alwaysOn",
+        }),
     );
 
     const parallelShell = startParallelShell(function () {
-        db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true});
+        db.getSiblingDB("admin").runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+        });
     }, conn.port);
 
     // Make sure the setFCV command has started running.
@@ -69,11 +79,17 @@ function runReplicaSetTest() {
 
     const hangAtSetFCVStartFailpoint = configureFailPoint(primary, "hangAtSetFCVStart");
     assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "failAfterReachingTransitioningState", mode: "alwaysOn"}),
+        primary.adminCommand({
+            configureFailPoint: "failAfterReachingTransitioningState",
+            mode: "alwaysOn",
+        }),
     );
 
     const parallelShell = startParallelShell(function () {
-        db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true});
+        db.getSiblingDB("admin").runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+        });
     }, primary.port);
 
     // Make sure the setFCV command has started running.
@@ -107,7 +123,9 @@ function runShardingTest() {
     const shard1PrimaryAdminDB = shard1Primary.getDB("admin");
 
     // Make sure all servers start as latest version.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     checkFCV(mongosAdminDB, latestFCV);
     checkFCV(configPrimaryAdminDB, latestFCV);
     checkFCV(shard0PrimaryAdminDB, latestFCV);
@@ -122,7 +140,10 @@ function runShardingTest() {
     );
 
     const parallelShell = startParallelShell(function () {
-        db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true});
+        db.getSiblingDB("admin").runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+        });
     }, st.s.port);
 
     // Make sure the setFCV command has started running.
@@ -144,7 +165,9 @@ function runShardingTest() {
 
             return configFCVEqual && shard0FCVEqual && shard1FCVEqual && mongosFCVEqual;
         },
-        "sharded cluster FCV failed to reach downgrading state within " + shardingTimeoutSeconds + " seconds",
+        "sharded cluster FCV failed to reach downgrading state within " +
+            shardingTimeoutSeconds +
+            " seconds",
         shardingTimeoutSeconds * 1000,
     );
 

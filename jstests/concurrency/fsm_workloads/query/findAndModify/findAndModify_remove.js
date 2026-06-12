@@ -26,7 +26,10 @@ export const $config = (function () {
             assert.commandWorked(res);
 
             let doc = res.value;
-            assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
+            assert(
+                doc !== null,
+                "query spec should have matched a document, returned " + tojson(res),
+            );
 
             if (doc !== null) {
                 assert.eq(this.tid, doc.tid);

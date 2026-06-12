@@ -61,7 +61,13 @@ while (shouldLoopForever || numLoops > 0) {
 
     let info = db.hostInfo();
     let serverStatus = db.serverStatus();
-    print("(" + collectionName + ") dbHostInfo status:", info.ok, serverStatus.version, "uptime:", serverStatus.uptime);
+    print(
+        "(" + collectionName + ") dbHostInfo status:",
+        info.ok,
+        serverStatus.version,
+        "uptime:",
+        serverStatus.uptime,
+    );
     let match = Random.randInt(baseNum);
     let matchQuery = {$gte: match, $lt: match + baseNum * 0.01};
 
@@ -73,7 +79,9 @@ while (shouldLoopForever || numLoops > 0) {
             "(" + collectionName + ") Upsert multi docs",
             tojsononeline(matchQuery),
             tojsononeline(updateOpts),
-            tojsononeline(coll.update({x: matchQuery}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts)),
+            tojsononeline(
+                coll.update({x: matchQuery}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts),
+            ),
         );
     } else if (operation == "upsert one") {
         var updateOpts = {upsert: true, multi: false};
@@ -81,14 +89,21 @@ while (shouldLoopForever || numLoops > 0) {
             "(" + collectionName + ") Upsert single doc",
             match,
             tojsononeline(updateOpts),
-            tojsononeline(coll.update({x: match}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts)),
+            tojsononeline(
+                coll.update({x: match}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts),
+            ),
         );
     } else if (operation == "bulk insert") {
         let bulk = coll.initializeUnorderedBulkOp();
         for (let i = 0; i < bulkNum; i++) {
             bulk.insert({x: (match + i) % baseNum, doc: randString()});
         }
-        print("(" + collectionName + ") Bulk insert", bulkNum, "docs", tojsononeline(bulk.execute()));
+        print(
+            "(" + collectionName + ") Bulk insert",
+            bulkNum,
+            "docs",
+            tojsononeline(bulk.execute()),
+        );
     } else if (operation == "count") {
         let countOpts = {count: collectionName, query: {x: matchQuery}};
         print(

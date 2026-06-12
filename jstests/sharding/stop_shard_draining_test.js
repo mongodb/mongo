@@ -14,7 +14,9 @@ describe("stopShardDraining correct functionality test", function () {
     });
 
     beforeEach(() => {
-        assert.commandWorked(this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}),
+        );
     });
 
     after(() => {
@@ -40,6 +42,9 @@ describe("stopShardDraining correct functionality test", function () {
     });
 
     it("can't stop draining a non existent shard", () => {
-        assert.commandFailedWithCode(this.st.s.adminCommand({stopShardDraining: "shard1"}), ErrorCodes.ShardNotFound);
+        assert.commandFailedWithCode(
+            this.st.s.adminCommand({stopShardDraining: "shard1"}),
+            ErrorCodes.ShardNotFound,
+        );
     });
 });

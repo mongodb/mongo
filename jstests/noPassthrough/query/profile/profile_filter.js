@@ -44,25 +44,39 @@ function runTest(conn) {
     // Setting the filter to null is an error: we don't want people to assume that {filter: null}
     // unsets the filter, and we don't want people to assume {filter: null} is equivalent to not
     // specifying a new filter.
-    assert.throws(() => db.setProfilingLevel(0, {filter: null}), [], "Expected an object, or the string 'unset'.");
+    assert.throws(
+        () => db.setProfilingLevel(0, {filter: null}),
+        [],
+        "Expected an object, or the string 'unset'.",
+    );
 
     // While the filter is set, slow-query log lines ignore slowms and sampleRate.
     // For example:
     // 1. An always-true filter of {} will always log.
     //    This shows we don't AND all the settings together.
-    assert.commandWorked(db.setProfilingLevel(isMongos ? 0 : 1, {filter: {}, slowms: 9999, sampleRate: 0}));
+    assert.commandWorked(
+        db.setProfilingLevel(isMongos ? 0 : 1, {filter: {}, slowms: 9999, sampleRate: 0}),
+    );
     const comment1 = "profile_filter_example_1";
     assert.eq(0, coll.find().comment(comment1).itcount());
 
     let log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-    assert(findMatchingLogLine(log, {msg: "Slow query", comment: comment1}), `No log line for comment: ${comment1}`);
+    assert(
+        findMatchingLogLine(log, {msg: "Slow query", comment: comment1}),
+        `No log line for comment: ${comment1}`,
+    );
     if (!isMongos) {
-        assert(db.system.profile.findOne({"command.comment": comment1}), `No profiler entry for comment: ${comment1}`);
+        assert(
+            db.system.profile.findOne({"command.comment": comment1}),
+            `No profiler entry for comment: ${comment1}`,
+        );
     }
 
     // 2. An always-false filter of {$expr: false} will never log.
     //    This shows we don't OR all the settings together.
-    assert.commandWorked(db.setProfilingLevel(isMongos ? 0 : 1, {filter: {$expr: false}, slowms: -1, sampleRate: 1}));
+    assert.commandWorked(
+        db.setProfilingLevel(isMongos ? 0 : 1, {filter: {$expr: false}, slowms: -1, sampleRate: 1}),
+    );
     const comment2 = "profile_filter_example_2";
     assert.eq(0, coll.find().comment(comment2).itcount());
 
@@ -111,7 +125,9 @@ function runTest(conn) {
             if (expectedMissingFields.includes(field)) continue;
 
             // Set a filter that requires `field` to exist.
-            assert.commandWorked(db.setProfilingLevel(isMongos ? 0 : 1, {filter: {[field]: {$exists: true}}}));
+            assert.commandWorked(
+                db.setProfilingLevel(isMongos ? 0 : 1, {filter: {[field]: {$exists: true}}}),
+            );
             const comment = "profile_filter_input_has_field_" + field;
             assert.eq(100, coll.find().comment(comment).itcount());
             // If the profile filter's input didn't contain `field`, then this operation wouldn't be
@@ -148,7 +164,9 @@ function runTest(conn) {
 
     // It is allowed for the filter to depend on the entire document.
     assert.commandWorked(
-        db.setProfilingLevel(isMongos ? 0 : 1, {filter: {$expr: {$gt: [3, {$size: {$objectToArray: "$$ROOT"}}]}}}),
+        db.setProfilingLevel(isMongos ? 0 : 1, {
+            filter: {$expr: {$gt: [3, {$size: {$objectToArray: "$$ROOT"}}]}},
+        }),
     );
     const entireDocFilterComment = "profile_filter_depends_on_entire_document";
     assert.eq(1, coll.find().limit(1).comment(entireDocFilterComment).itcount());

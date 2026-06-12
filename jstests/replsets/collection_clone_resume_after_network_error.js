@@ -43,7 +43,11 @@ const primaryDb = primary.getDB("test");
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Add some data to be cloned.
@@ -81,7 +85,12 @@ rst.reInitiate();
 rst.waitForState(secondary, ReplSetTest.State.STARTUP_2);
 
 // Enable command logging on the primary so we can verify what commands we send over.
-assert.commandWorked(primary.adminCommand({"setParameter": 1, "logComponentVerbosity": {"command": {"verbosity": 1}}}));
+assert.commandWorked(
+    primary.adminCommand({
+        "setParameter": 1,
+        "logComponentVerbosity": {"command": {"verbosity": 1}},
+    }),
+);
 
 jsTestLog("Beginning tests for collection cloner stage query");
 
@@ -92,12 +101,19 @@ const failPointData = {
     stage: "query",
     nss: "test.test",
 };
-const beforeStageFailPoint = configureFailPoint(secondaryDb, "hangBeforeClonerStage", failPointData);
+const beforeStageFailPoint = configureFailPoint(
+    secondaryDb,
+    "hangBeforeClonerStage",
+    failPointData,
+);
 let beforeRetryFailPoint = configureFailPoint(secondaryDb, beforeRetryFailPointName, failPointData);
 
 // Release the initial failpoint. We won't be needing it anymore.
 assert.commandWorked(
-    secondaryDb.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondaryDb.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 // We are still waiting to begin the query stage.
@@ -189,17 +205,25 @@ assert.commandWorked(
 // Make sure we have cloned exactly four batches and have never requested the same batch more
 // than once.
 const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
-assert(res.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+assert(
+    res.initialSyncStatus,
+    () => "Response should have an 'initialSyncStatus' field: " + tojson(res),
+);
 assert.eq(res.initialSyncStatus.databases.test["test.test"].fetchedBatches, 4);
 
 // Release the last cloner failpoint.
 assert.commandWorked(
-    secondaryDb.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}),
+    secondaryDb.adminCommand({
+        configureFailPoint: "initialSyncHangDuringCollectionClone",
+        mode: "off",
+    }),
 );
 
 // Also let the oplog fetcher run so we can complete initial sync.
 jsTestLog("Releasing the oplog fetcher failpoint.");
-assert.commandWorked(secondaryDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
+assert.commandWorked(
+    secondaryDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+);
 
 jsTestLog("Waiting for initial sync to complete.");
 rst.awaitSecondaryNodes(null, [secondary]);

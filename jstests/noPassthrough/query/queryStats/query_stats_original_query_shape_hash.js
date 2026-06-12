@@ -53,11 +53,15 @@ assert.commandWorked(
     assert.eq(coll.find({x: {$gt: 0}}).itcount(), 3);
 
     // Shard's query stats key should include originalQueryShapeHash.
-    const shardEntries = getQueryStats(shard0, {collName, extraMatch: {"key.originalQueryShapeHash": {$exists: true}}});
+    const shardEntries = getQueryStats(shard0, {
+        collName,
+        extraMatch: {"key.originalQueryShapeHash": {$exists: true}},
+    });
     assert.eq(
         shardEntries.length,
         1,
-        "Expected exactly one shard entry with originalQueryShapeHash for find: " + tojson(shardEntries),
+        "Expected exactly one shard entry with originalQueryShapeHash for find: " +
+            tojson(shardEntries),
     );
 
     const shardEntry = shardEntries[0];
@@ -81,11 +85,15 @@ assert.commandWorked(
     // Run an aggregate via the router.
     assert.eq(coll.aggregate([{$match: {x: {$gt: 0}}}]).toArray().length, 3);
 
-    const shardEntries = getQueryStats(shard0, {collName, extraMatch: {"key.originalQueryShapeHash": {$exists: true}}});
+    const shardEntries = getQueryStats(shard0, {
+        collName,
+        extraMatch: {"key.originalQueryShapeHash": {$exists: true}},
+    });
     assert.eq(
         shardEntries.length,
         1,
-        "Expected exactly one shard entry with originalQueryShapeHash for agg: " + tojson(shardEntries),
+        "Expected exactly one shard entry with originalQueryShapeHash for agg: " +
+            tojson(shardEntries),
     );
 
     const shardEntry = shardEntries[0];
@@ -105,14 +113,20 @@ assert.commandWorked(
     resetQueryStatsStore(shard0, "1MB");
 
     // Run a count via the router.
-    const countResult = assert.commandWorked(mongosDB.runCommand({count: collName, query: {x: {$gt: 0}}}));
+    const countResult = assert.commandWorked(
+        mongosDB.runCommand({count: collName, query: {x: {$gt: 0}}}),
+    );
     assert.eq(countResult.n, 3);
 
-    const shardEntries = getQueryStats(shard0, {collName, extraMatch: {"key.originalQueryShapeHash": {$exists: true}}});
+    const shardEntries = getQueryStats(shard0, {
+        collName,
+        extraMatch: {"key.originalQueryShapeHash": {$exists: true}},
+    });
     assert.eq(
         shardEntries.length,
         1,
-        "Expected exactly one shard entry with originalQueryShapeHash for count: " + tojson(shardEntries),
+        "Expected exactly one shard entry with originalQueryShapeHash for count: " +
+            tojson(shardEntries),
     );
 
     const shardEntry = shardEntries[0];
@@ -134,18 +148,26 @@ assert.commandWorked(
     // Run a distinct via the router.
     assert.commandWorked(mongosDB.runCommand({distinct: collName, key: "x", query: {x: {$gt: 0}}}));
 
-    const shardEntries = getQueryStats(shard0, {collName, extraMatch: {"key.originalQueryShapeHash": {$exists: true}}});
+    const shardEntries = getQueryStats(shard0, {
+        collName,
+        extraMatch: {"key.originalQueryShapeHash": {$exists: true}},
+    });
     assert.eq(
         shardEntries.length,
         1,
-        "Expected exactly one shard entry with originalQueryShapeHash for distinct: " + tojson(shardEntries),
+        "Expected exactly one shard entry with originalQueryShapeHash for distinct: " +
+            tojson(shardEntries),
     );
 
     const shardEntry = shardEntries[0];
     assert.eq(shardEntry.key.queryShape.command, "distinct");
 
     const routerEntries = getQueryStats(mongos, {collName});
-    assert.gt(routerEntries.length, 0, "Expected at least one router query stats entry for distinct");
+    assert.gt(
+        routerEntries.length,
+        0,
+        "Expected at least one router query stats entry for distinct",
+    );
     assert.eq(
         shardEntry.key.originalQueryShapeHash,
         routerEntries[0].queryShapeHash,

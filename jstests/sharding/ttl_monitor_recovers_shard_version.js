@@ -31,7 +31,9 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 let ns = kDbName + "." + kCollName;
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {a: 1}}));
-assert.commandWorked(mongos.getDB(kDbName)[kCollName].createIndex({b: 1}, {expireAfterSeconds: 20}));
+assert.commandWorked(
+    mongos.getDB(kDbName)[kCollName].createIndex({b: 1}, {expireAfterSeconds: 20}),
+);
 
 for (let i = 0; i < 20; ++i) {
     mongos.getDB(kDbName)[kCollName].insert({a: i, b: new Date()});

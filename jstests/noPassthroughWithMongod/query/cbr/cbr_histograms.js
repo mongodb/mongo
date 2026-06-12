@@ -57,7 +57,11 @@ function assertQueryUsesHistograms({query, expectedCE}) {
 try {
     // Use histogram CE
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
     const testCases = [
         // IndexScan should use histogram
@@ -119,7 +123,11 @@ try {
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
     assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
     const explain = coll.find({a: null, b: {$lte: 6}}).explain();
     [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach((plan) => {
@@ -145,7 +153,11 @@ try {
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
 
     const query = {a: {$gt: 10, $lt: 20}};
@@ -189,7 +201,11 @@ try {
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
     assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
 
     const testCases = [
@@ -217,7 +233,9 @@ try {
         }),
     );
     assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
-    assert.commandWorked(coll.insert({t: new Date(), meta: {s: 1}, loc: {type: "Point", coordinates: [0, 0]}}));
+    assert.commandWorked(
+        coll.insert({t: new Date(), meta: {s: 1}, loc: {type: "Point", coordinates: [0, 0]}}),
+    );
 
     assert.commandWorked(
         db.adminCommand({

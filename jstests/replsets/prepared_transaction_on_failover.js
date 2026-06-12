@@ -15,7 +15,13 @@ const dbName = jsTest.name();
 const collName = "coll";
 const otherDbName = dbName + "_other";
 
-function testTransactionsWithFailover(doWork, stepDown, postCommit, dropCollection, recreateCollection) {
+function testTransactionsWithFailover(
+    doWork,
+    stepDown,
+    postCommit,
+    dropCollection,
+    recreateCollection,
+) {
     const primary = replTest.getPrimary();
     const newPrimary = replTest.getSecondary();
     const testDB = primary.getDB(dbName);
@@ -73,7 +79,9 @@ function testTransactionsWithFailover(doWork, stepDown, postCommit, dropCollecti
     jsTestLog("Running another transaction on the new primary");
     const secondSession = newPrimary.startSession({causalConsistency: false});
     secondSession.startTransaction({writeConcern: {w: "majority"}});
-    assert.commandWorked(secondSession.getDatabase(dbName).getCollection(collName).insert({_id: "second-doc"}));
+    assert.commandWorked(
+        secondSession.getDatabase(dbName).getCollection(collName).insert({_id: "second-doc"}),
+    );
     assert.commandWorked(secondSession.commitTransaction_forTesting());
 
     // Unfreeze the original primary so that it can stand for election again for the next test.
@@ -97,7 +105,9 @@ function doInsertTextSearch(primary, session) {
 
     // Do the followings in a transaction.
     jsTestLog("Inserting a document in a transaction.");
-    assert.commandWorked(session.getDatabase(dbName).getCollection(collName).insert({text: "text"}));
+    assert.commandWorked(
+        session.getDatabase(dbName).getCollection(collName).insert({text: "text"}),
+    );
     // Text search will recursively acquire the global lock. This tests that yielding
     // recursively held locks works on step down.
     jsTestLog("Doing a text search in a transaction.");

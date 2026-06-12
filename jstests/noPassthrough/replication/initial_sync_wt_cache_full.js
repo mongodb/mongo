@@ -53,12 +53,19 @@ const batchOpsLimit = assert.commandWorked(
     secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}),
 ).replBatchLimitOperations;
 jsTestLog(
-    "Oplog application on secondary " + secondary.host + " is limited to " + batchOpsLimit + " operations per batch.",
+    "Oplog application on secondary " +
+        secondary.host +
+        " is limited to " +
+        batchOpsLimit +
+        " operations per batch.",
 );
 
 const numUpdates = 400;
 jsTestLog("Buffering " + numUpdates + " updates to " + numDocs + " documents on secondary.");
-checkLog.contains(secondary, "initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled");
+checkLog.contains(
+    secondary,
+    "initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled",
+);
 for (let i = 0; i < numDocs; ++i) {
     for (let j = 0; j < numUpdates; ++j) {
         assert.commandWorked(coll.update({_id: i}, {$inc: {i: 1}}));
@@ -67,7 +74,10 @@ for (let i = 0; i < numDocs; ++i) {
 
 jsTestLog("Applying updates on secondary " + secondary.host);
 assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 rst.awaitReplication();
 rst.awaitSecondaryNodes();

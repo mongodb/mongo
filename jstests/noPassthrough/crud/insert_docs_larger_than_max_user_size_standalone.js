@@ -22,7 +22,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
     // Trying to insert an object that is the maximum size will fail.
     let obj = {x: "x".repeat(bsonMaxUserSize)};
-    assert.commandFailedWithCode(coll.insert(obj), ErrorCodes.BSONObjectTooLarge, "object to insert too large");
+    assert.commandFailedWithCode(
+        coll.insert(obj),
+        ErrorCodes.BSONObjectTooLarge,
+        "object to insert too large",
+    );
 
     // The string value in the field is a number of bytes smaller than the max, to account for other
     // data in the BSON object. This value below will create an object very close to the maximum user

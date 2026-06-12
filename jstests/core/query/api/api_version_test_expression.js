@@ -44,7 +44,13 @@ for (let i = 0; i < 5; i++) {
 // true}.
 let pipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];
 assert.commandFailedWithCode(
-    testDb.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}, apiStrict: true, apiVersion: "1"}),
+    testDb.runCommand({
+        aggregate: collName,
+        pipeline: pipeline,
+        cursor: {},
+        apiStrict: true,
+        apiVersion: "1",
+    }),
     ErrorCodes.APIStrictError,
 );
 
@@ -68,7 +74,9 @@ const unstableInnerPipeline = [{$project: {v: {$_testApiVersion: {unstable: true
 assert.commandFailedWithCode(
     testDb.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}},
+        ],
         cursor: {},
         apiStrict: true,
         apiVersion: "1",
@@ -91,7 +99,9 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     testDb.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}},
+        ],
         cursor: {},
         apiStrict: false,
         apiVersion: "1",
@@ -113,7 +123,9 @@ const deprecatedInnerPipeline = [{$project: {v: {$_testApiVersion: {deprecated: 
 assert.commandFailedWithCode(
     testDb.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}},
+        ],
         cursor: {},
         apiDeprecationErrors: true,
         apiVersion: "1",
@@ -136,7 +148,9 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     testDb.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}},
+        ],
         cursor: {},
         apiDeprecationErrors: false,
         apiVersion: "1",
@@ -159,14 +173,26 @@ assert.commandWorked(testDb.runCommand({aggregate: collName, pipeline: pipeline,
 // Create a view with {apiStrict: true}.
 testDb.view.drop();
 assert.commandWorked(
-    testDb.runCommand({create: "view", viewOn: collName, pipeline: [], apiStrict: true, apiVersion: "1"}),
+    testDb.runCommand({
+        create: "view",
+        viewOn: collName,
+        pipeline: [],
+        apiStrict: true,
+        apiVersion: "1",
+    }),
 );
 // find() on views should work normally if 'apiStrict' is true.
 assert.commandWorked(testDb.runCommand({find: "view", apiStrict: true, apiVersion: "1"}));
 // This command will work because API parameters are not inherited from views.
 assert.commandWorked(testDb.runCommand({aggregate: "view", pipeline: pipeline, cursor: {}}));
 assert.commandFailedWithCode(
-    testDb.runCommand({aggregate: "view", pipeline: pipeline, cursor: {}, apiVersion: "1", apiStrict: true}),
+    testDb.runCommand({
+        aggregate: "view",
+        pipeline: pipeline,
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
     ErrorCodes.APIStrictError,
 );
 
@@ -197,7 +223,13 @@ assert.commandWorked(testDb.runCommand({aggregate: "unstableView", pipeline: [],
 
 // This commmand will fail even with the empty pipeline because of the view.
 assert.commandFailedWithCode(
-    testDb.runCommand({aggregate: "unstableView", pipeline: [], cursor: {}, apiVersion: "1", apiStrict: true}),
+    testDb.runCommand({
+        aggregate: "unstableView",
+        pipeline: [],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
     ErrorCodes.APIStrictError,
 );
 
@@ -209,16 +241,28 @@ if (!useShardingCoordinatorForCreate()) {
     // Creating a collection with the unstable validator is not allowed with apiStrict:true.
     testDb[validatedCollName].drop();
     assert.commandFailedWithCode(
-        testDb.runCommand({create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: true}),
+        testDb.runCommand({
+            create: validatedCollName,
+            validator: validator,
+            apiVersion: "1",
+            apiStrict: true,
+        }),
         ErrorCodes.APIStrictError,
     );
 }
 
 // Run create and insert commands without apiStrict:true and verify that it is successful.
 assert.commandWorked(
-    testDb.runCommand({create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: false}),
+    testDb.runCommand({
+        create: validatedCollName,
+        validator: validator,
+        apiVersion: "1",
+        apiStrict: false,
+    }),
 );
-assert.commandWorked(testDb[validatedCollName].runCommand({insert: validatedCollName, documents: [{num: 1}]}));
+assert.commandWorked(
+    testDb[validatedCollName].runCommand({insert: validatedCollName, documents: [{num: 1}]}),
+);
 
 // Specifying apiStrict: true results in an error.
 assert.commandFailedWithCode(
@@ -261,7 +305,9 @@ assert.commandWorked(
         apiDeprecationErrors: false,
     }),
 );
-assert.commandWorked(testDb[validatedCollName].runCommand({insert: validatedCollName, documents: [{num: 1}]}));
+assert.commandWorked(
+    testDb[validatedCollName].runCommand({insert: validatedCollName, documents: [{num: 1}]}),
+);
 
 // Specifying apiDeprecationErrors: true results in an error.
 assert.commandFailedWithCode(
@@ -277,12 +323,21 @@ assert.commandFailedWithCode(
 // Test that API version parameters are inherited into the inner command of the explain command.
 function checkExplainInnerCommandGetsAPIVersionParameters(explainedCmd, errCode) {
     assert.commandFailedWithCode(
-        testDb.runCommand({explain: explainedCmd, apiVersion: "1", apiDeprecationErrors: true, apiStrict: true}),
+        testDb.runCommand({
+            explain: explainedCmd,
+            apiVersion: "1",
+            apiDeprecationErrors: true,
+            apiStrict: true,
+        }),
         errCode,
     );
 
     // If 'apiStrict: false' the inner aggregate command will execute successfully.
-    const explainRes = testDb.runCommand({explain: explainedCmd, apiVersion: "1", apiStrict: false});
+    const explainRes = testDb.runCommand({
+        explain: explainedCmd,
+        apiVersion: "1",
+        apiStrict: false,
+    });
     const executionStats = getExecutionStats(explainRes)[0];
     assert.eq(executionStats.executionSuccess, true, {explainRes, executionStats});
 }

@@ -94,7 +94,9 @@ async function bgValidateFunc(rs_name, ports, has_stapling_logs, expected_logid,
 }
 
 let pshell = startParallelShell(
-    funWithArgs(bgValidateFunc, repl_set, [conn1.port, conn2.port], false, 23225, {"error": revoked_status}),
+    funWithArgs(bgValidateFunc, repl_set, [conn1.port, conn2.port], false, 23225, {
+        "error": revoked_status,
+    }),
     conn1.port,
     false,
     "--tls",
@@ -113,7 +115,9 @@ pshell();
 // Expect conn2 connects to conn1, does OCSP on-demand status checking,
 // and fails because peer cert is revoked.
 pshell = startParallelShell(
-    funWithArgs(bgValidateFunc, repl_set, [conn1.port, conn2.port], true, 8464502, {"status": revoked_status}),
+    funWithArgs(bgValidateFunc, repl_set, [conn1.port, conn2.port], true, 8464502, {
+        "status": revoked_status,
+    }),
     conn2.port,
     false,
     "--tls",

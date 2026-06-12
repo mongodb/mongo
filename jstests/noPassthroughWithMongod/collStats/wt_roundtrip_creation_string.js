@@ -32,7 +32,10 @@ assert.commandWorked(
     "unable to create collection using the sanitised creation string of another collection",
 );
 
-const sanitisedIndexConfigString = collStats.indexDetails.a_1.creationString.replace(encryptionRegex, ",");
+const sanitisedIndexConfigString = collStats.indexDetails.a_1.creationString.replace(
+    encryptionRegex,
+    ",",
+);
 
 assert.commandWorked(
     db.runCommand({

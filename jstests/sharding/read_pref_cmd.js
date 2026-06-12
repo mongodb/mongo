@@ -32,7 +32,9 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
  */
 let setUp = function (rst) {
     let configDB = st.s.getDB("config");
-    assert.commandWorked(configDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        configDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
 
@@ -49,10 +51,17 @@ let setUp = function (rst) {
         });
         if (getProfilingLockDeadlineRes.ok) {
             assert.commandWorked(
-                node.adminCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+                node.adminCommand({
+                    setParameter: 1,
+                    internalQueryGlobalProfilingLockDeadlineMs: 1000,
+                }),
             );
         } else {
-            assert.eq(getProfilingLockDeadlineRes.code, ErrorCodes.InvalidOptions, tojson(getProfilingLockDeadlineRes));
+            assert.eq(
+                getProfilingLockDeadlineRes.code,
+                ErrorCodes.InvalidOptions,
+                tojson(getProfilingLockDeadlineRes),
+            );
             assert.eq(
                 getProfilingLockDeadlineRes.errmsg,
                 "no option found to get",
@@ -134,7 +143,13 @@ let assertCmdRanOnExpectedNodes = function (conn, isMongos, rsNodes, cmdTestCase
  *          tagSets {Array.<Object>} list of tag sets to use.
  * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
  */
-let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActive, rst, {readPref, expectedNode}) {
+let testConnReadPreference = function (
+    conn,
+    isMongos,
+    isReplicaSetEndpointActive,
+    rst,
+    {readPref, expectedNode},
+) {
     let rsNodes = rst.nodes;
     jsTest.log(
         `Testing ${isMongos ? "mongos" : "mongod"} connection with readPreference mode: ${
@@ -171,7 +186,13 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
             assert.commandWorked(cmdResult);
         };
 
-        assertCmdRanOnExpectedNodes(conn, isMongos, rsNodes, {expectedNode, cmdFunc, secOk, profileQuery, dbName});
+        assertCmdRanOnExpectedNodes(conn, isMongos, rsNodes, {
+            expectedNode,
+            cmdFunc,
+            secOk,
+            profileQuery,
+            dbName,
+        });
     };
 
     // Test command that can be sent to secondary
@@ -302,7 +323,12 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
         true,
         formatProfileQuery(kShardedNs, {collStats: kShardedCollName}),
     );
-    cmdTest({dbStats: 1}, allowedOnSecondary.kAlways, true, formatProfileQuery(kDbName, {dbStats: 1}));
+    cmdTest(
+        {dbStats: 1},
+        allowedOnSecondary.kAlways,
+        true,
+        formatProfileQuery(kDbName, {dbStats: 1}),
+    );
 
     assert.commandWorked(
         testDB.runCommand({
@@ -325,7 +351,8 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
 
     const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 
-    const isValidMongos = !isMongos || MongoRunner.compareBinVersions(conn.fullOptions.binVersion, "7.1") >= 0;
+    const isValidMongos =
+        !isMongos || MongoRunner.compareBinVersions(conn.fullOptions.binVersion, "7.1") >= 0;
     if (!isMultiversion && isValidMongos) {
         // Test on non-sharded. Skip testing in a multiversion scenario as the format of the
         // profiler entry will depend on the binary version of each shard as well as mongos.
@@ -351,7 +378,14 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
                 aggregate: 1,
                 pipeline: [
                     {$currentOp: {}},
-                    {$lookup: {from: "dummy", localField: "dummy", foreignField: "dummy", as: "dummy"}},
+                    {
+                        $lookup: {
+                            from: "dummy",
+                            localField: "dummy",
+                            foreignField: "dummy",
+                            as: "dummy",
+                        },
+                    },
                 ],
                 comment: curOpComment,
                 cursor: {},
@@ -388,7 +422,9 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
  * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
  */
 let testCursorReadPreference = function (conn, isMongos, rsNodes, {readPref, expectedNode}) {
-    jsTest.log(`Testing cursor with readPreference mode: ${readPref.mode}, tag sets: ${tojson(readPref.tagSets)}`);
+    jsTest.log(
+        `Testing cursor with readPreference mode: ${readPref.mode}, tag sets: ${tojson(readPref.tagSets)}`,
+    );
 
     let testColl = conn.getCollection(kShardedNs);
     conn.setSecondaryOk(false); // purely rely on readPref
@@ -409,10 +445,20 @@ let testCursorReadPreference = function (conn, isMongos, rsNodes, {readPref, exp
     const cmdFunc = () => cursor.toArray();
     const secOk = allowedOnSecondary.kAlways;
 
-    const profileQuery = formatProfileQuery(kShardedNs, {find: kShardedCollName, filter: {x: {$gte: 0}}}, true);
+    const profileQuery = formatProfileQuery(
+        kShardedNs,
+        {find: kShardedCollName, filter: {x: {$gte: 0}}},
+        true,
+    );
     const dbName = kDbName;
 
-    assertCmdRanOnExpectedNodes(conn, isMongos, rsNodes, {expectedNode, cmdFunc, secOk, profileQuery, dbName});
+    assertCmdRanOnExpectedNodes(conn, isMongos, rsNodes, {
+        expectedNode,
+        cmdFunc,
+        secOk,
+        profileQuery,
+        dbName,
+    });
 };
 
 /**
@@ -428,7 +474,9 @@ let testCursorReadPreference = function (conn, isMongos, rsNodes, {readPref, exp
  * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
  */
 let testBadMode = function (conn, isMongos, rsNodes, readPref) {
-    jsTest.log(`Expecting failure for mode: ${readPref.mode}, tag sets: ${tojson(readPref.tagSets)}`);
+    jsTest.log(
+        `Expecting failure for mode: ${readPref.mode}, tag sets: ${tojson(readPref.tagSets)}`,
+    );
     // use setReadPrefUnsafe to bypass client-side validation
     conn._setReadPrefUnsafe(readPref.mode, readPref.tagSets);
     let testDB = conn.getDB(kDbName);
@@ -610,10 +658,14 @@ _awaitRSHostViaRSMonitor(secondary1.name, {ok: true, tags: kSecondaryTag1}, st.r
 _awaitRSHostViaRSMonitor(secondary2.name, {ok: true, tags: kSecondaryTag2}, st.rs0.name);
 
 st.rs0.nodes.forEach(function (conn) {
-    assert.commandWorked(conn.adminCommand({setParameter: 1, logComponentVerbosity: {command: {verbosity: 1}}}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, logComponentVerbosity: {command: {verbosity: 1}}}),
+    );
 });
 
-assert.commandWorked(st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 3}}}));
+assert.commandWorked(
+    st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 3}}}),
+);
 
 testAllModes(replConn, st.rs0, false, isReplicaSetEndpointActive);
 

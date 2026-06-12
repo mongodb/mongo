@@ -76,7 +76,9 @@ const invalidArgAndError = [
     },
     {
         benchArg: {
-            ops: [{op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: "invalidPref"}],
+            ops: [
+                {op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: "invalidPref"},
+            ],
             parallel: 1,
             host: primary.host,
         },
@@ -84,7 +86,9 @@ const invalidArgAndError = [
     },
     {
         benchArg: {
-            ops: [{op: "insert", writeCmd: true, doc: {a: 1}, ns: collName, readPrefMode: "primary"}],
+            ops: [
+                {op: "insert", writeCmd: true, doc: {a: 1}, ns: collName, readPrefMode: "primary"},
+            ],
             parallel: 1,
             host: primary.host,
         },

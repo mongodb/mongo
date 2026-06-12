@@ -53,7 +53,9 @@ const extractShardReplyFromResponse = (shard, mongosResponse) => {
     return mongosResponse.raw[shardURL];
 };
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 jsTest.log("Testing setIndexCommitQuorum from a mongos can succeed");
 // Create a sharded collection where only shard0 owns chunks.
@@ -68,7 +70,13 @@ createIndexThread.start();
 createIndexFailpoint.wait();
 
 // Confirm mongos succeeds when only one shard owns chunks (and data for the collection).
-assert.commandWorked(mongosDB.runCommand({setIndexCommitQuorum: collName, indexNames: ["idxKey_1"], commitQuorum: 2}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        setIndexCommitQuorum: collName,
+        indexNames: ["idxKey_1"],
+        commitQuorum: 2,
+    }),
+);
 createIndexFailpoint.off();
 createIndexThread.join();
 assert(mongosDB[collName].drop());
@@ -91,7 +99,11 @@ createIndexThread.start();
 createIndexFailpoint.wait();
 
 const res = assert.commandFailedWithCode(
-    mongosDB.runCommand({setIndexCommitQuorum: collName, indexNames: ["idxKey_1"], commitQuorum: 2}),
+    mongosDB.runCommand({
+        setIndexCommitQuorum: collName,
+        indexNames: ["idxKey_1"],
+        commitQuorum: 2,
+    }),
     ErrorCodes.IndexNotFound,
 );
 

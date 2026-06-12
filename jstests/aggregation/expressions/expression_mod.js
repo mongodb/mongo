@@ -52,7 +52,10 @@ let result = coll
                 long_dublong: {type: {$type: "$long_dublong"}, value: "$long_dublong"},
                 long_int: {type: {$type: "$long_int"}, value: "$long_int"},
                 long_long: {type: {$type: "$long_long"}, value: "$long_long"},
-                verylong_verylong: {type: {$type: "$verylong_verylong"}, value: "$verylong_verylong"},
+                verylong_verylong: {
+                    type: {$type: "$verylong_verylong"},
+                    value: "$verylong_verylong",
+                },
             },
         },
     )

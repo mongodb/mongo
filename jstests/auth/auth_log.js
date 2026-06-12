@@ -78,7 +78,12 @@ function runClientAttrTests(connectionHealthLoggingOn) {
     proxyServer.start();
 
     try {
-        mongod.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-256"]});
+        mongod.getDB("admin").createUser({
+            user: "admin",
+            pwd: "pwd",
+            roles: ["root"],
+            mechanisms: ["SCRAM-SHA-256"],
+        });
 
         // Connection via standard unix socket should emit "anonymous unix socket" as remote addr.
         const unixConn = new Mongo(unixSocketPath);
@@ -87,7 +92,12 @@ function runClientAttrTests(connectionHealthLoggingOn) {
 
         // Connection via the proxy unix socket should emit the source ip address as remote addr.
         const proxiedConn = new Mongo(`mongodb://127.0.0.1:${ingressPort}`);
-        testClientAttr(mongod, proxiedConn.getDB("admin"), /^127\.0\.0\.1:\d{1,5}$/, connectionHealthLoggingOn);
+        testClientAttr(
+            mongod,
+            proxiedConn.getDB("admin"),
+            /^127\.0\.0\.1:\d{1,5}$/,
+            connectionHealthLoggingOn,
+        );
     } finally {
         MongoRunner.stopMongod(mongod);
         proxyServer.stop();

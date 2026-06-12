@@ -32,8 +32,12 @@ if (!checkSbeFullyEnabled(db)) {
 // The tests expect that memory metrics appear right after memory is used. Decrease the threshold
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used is
 // less than the limit.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 16}));
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 16}),
+);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}),
+);
 
 const normalColl = db[jsTestName() + "_normal"];
 normalColl.drop();
@@ -138,7 +142,9 @@ const pipeline = [
 
 // Set up a clustered collection to force usage of the more general UniqueStage.
 clusteredColl.drop();
-assert.commandWorked(db.createCollection(clusteredColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    db.createCollection(clusteredColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 assert.commandWorked(clusteredColl.insertMany(docs));
 assert.commandWorked(clusteredColl.createIndex({category: 1, priority: 1}));
 assert.commandWorked(clusteredColl.createIndex({status: 1, value: 1}));

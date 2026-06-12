@@ -52,7 +52,9 @@ export var FeatureFlagUtil = (function () {
 
             // Create a new connection and cache it.
             return retryOnRetryableError(() => {
-                const conn = new Mongo(connString, undefined /*encryptedDBClientCallback */, {gRPC: false});
+                const conn = new Mongo(connString, undefined /*encryptedDBClientCallback */, {
+                    gRPC: false,
+                });
                 _connectionCache.set(connString, conn);
                 return conn;
             });
@@ -98,12 +100,14 @@ export var FeatureFlagUtil = (function () {
     }
 
     function _getStatusLegacy(conn, ignoreFCV, flagDoc) {
-        const adminDB = typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
+        const adminDB =
+            typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
         const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
         assert(fcvDoc, "FCV document not found");
 
         const flagIsEnabled = flagDoc.value;
-        const flagVersionIsValid = MongoRunner.compareBinVersions(fcvDoc.version, flagDoc.version) >= 0;
+        const flagVersionIsValid =
+            MongoRunner.compareBinVersions(fcvDoc.version, flagDoc.version) >= 0;
 
         const flagShouldBeFCVGated = flagDoc.fcv_gated;
 

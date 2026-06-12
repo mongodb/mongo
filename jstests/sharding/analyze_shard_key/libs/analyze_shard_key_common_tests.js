@@ -22,13 +22,17 @@ export function testNonExistingCollection(dbName, testCases) {
     const candidateKey = {candidateKey: 1};
 
     testCases.forEach((testCase) => {
-        jsTest.log(`Running analyzeShardKey command against a non-existing collection: ${tojson(testCase)}`);
+        jsTest.log(
+            `Running analyzeShardKey command against a non-existing collection: ${tojson(testCase)}`,
+        );
         const cmdObj = {analyzeShardKey: ns, key: candidateKey};
         const res = testCase.conn.adminCommand(cmdObj);
         // If the command is not supported, it should fail even before the collection validation
         // step. That is, it should fail with an IllegalOperation error instead of a
         // NamespaceNotFound error.
-        const expectedErrorCode = testCase.isSupported ? ErrorCodes.NamespaceNotFound : ErrorCodes.IllegalOperation;
+        const expectedErrorCode = testCase.isSupported
+            ? ErrorCodes.NamespaceNotFound
+            : ErrorCodes.IllegalOperation;
         assert.commandFailedWithCode(res, expectedErrorCode);
     });
 }
@@ -48,7 +52,9 @@ export function testExistingUnshardedCollection(dbName, writeConn, testCases) {
 
     // Analyze shard keys while the collection is empty.
     testCases.forEach((testCase) => {
-        jsTest.log(`Running analyzeShardKey command against an empty unsharded collection: ${tojson(testCase)}`);
+        jsTest.log(
+            `Running analyzeShardKey command against an empty unsharded collection: ${tojson(testCase)}`,
+        );
 
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
@@ -82,7 +88,9 @@ export function testExistingUnshardedCollection(dbName, writeConn, testCases) {
     }
 
     testCases.forEach((testCase) => {
-        jsTest.log(`Running analyzeShardKey command against a non-empty unsharded collection: ${tojson(testCase)}`);
+        jsTest.log(
+            `Running analyzeShardKey command against a non-empty unsharded collection: ${tojson(testCase)}`,
+        );
 
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
@@ -114,7 +122,9 @@ export function testExistingShardedCollection(dbName, mongos, testCases) {
     const currentKeySplitPoint = {currentKey: 0};
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: currentKey}));
     assert.commandWorked(mongos.adminCommand({split: ns, middle: currentKeySplitPoint}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: currentKeySplitPoint, to: nonPrimaryShard}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: currentKeySplitPoint, to: nonPrimaryShard}),
+    );
 
     const candidateKey0 = {candidateKey0: 1};
     const candidateKey1 = {candidateKey1: 1}; // does not have a supporting index
@@ -123,7 +133,9 @@ export function testExistingShardedCollection(dbName, mongos, testCases) {
 
     // Analyze shard keys while the collection is empty.
     testCases.forEach((testCase) => {
-        jsTest.log(`Running analyzeShardKey command against an empty sharded collection: ${tojson(testCase)}`);
+        jsTest.log(
+            `Running analyzeShardKey command against an empty sharded collection: ${tojson(testCase)}`,
+        );
 
         const res = testCase.conn.adminCommand({analyzeShardKey: ns, key: currentKey});
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
@@ -157,7 +169,9 @@ export function testExistingShardedCollection(dbName, mongos, testCases) {
     FixtureHelpers.awaitReplication(db);
 
     testCases.forEach((testCase) => {
-        jsTest.log(`Running analyzeShardKey command against a non-empty sharded collection: ${tojson(testCase)}`);
+        jsTest.log(
+            `Running analyzeShardKey command against a non-empty sharded collection: ${tojson(testCase)}`,
+        );
 
         const res = testCase.conn.adminCommand({analyzeShardKey: ns, key: currentKey});
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});

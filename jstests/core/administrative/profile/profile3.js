@@ -38,12 +38,16 @@ try {
     // Don't profile the setFCV command, which could be run during this test in the
     // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
     assert.commandWorked(
-        db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+        db.setProfilingLevel(1, {
+            filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+        }),
     );
 
     // Increase this deadline in order to prevent flakiness in this test.
     assert.commandWorked(
-        db.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+        db
+            .getSiblingDB("admin")
+            .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
     );
 
     db.createCollection(t.getName());

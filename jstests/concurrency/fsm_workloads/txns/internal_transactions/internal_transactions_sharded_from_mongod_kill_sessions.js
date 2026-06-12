@@ -56,7 +56,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         try {
             $super.data.runInternalTransaction.apply(this, arguments);
         } catch (e) {
-            if (KilledSessionUtil.hasKilledSessionError(e) || KilledSessionUtil.hasKilledSessionWCError(e)) {
+            if (
+                KilledSessionUtil.hasKilledSessionError(e) ||
+                KilledSessionUtil.hasKilledSessionWCError(e)
+            ) {
                 return;
             }
             throw e;

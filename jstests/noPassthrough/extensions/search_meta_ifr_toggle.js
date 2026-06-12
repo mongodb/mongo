@@ -6,7 +6,10 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 

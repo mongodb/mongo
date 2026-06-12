@@ -37,11 +37,18 @@ jsTestLog("Deleting all documents where _id <= 0");
 assert.commandWorked(coll.deleteMany({_id: {$lte: 0}}));
 
 let ops = rst
-    .findOplog(primary, {op: "c", ns: "admin.$cmd", "o.applyOps": {$exists: true}, ts: {$gt: startTime}})
+    .findOplog(primary, {
+        op: "c",
+        ns: "admin.$cmd",
+        "o.applyOps": {$exists: true},
+        ts: {$gt: startTime},
+    })
     .toArray();
 assert.eq(0, ops.length, "Should not have an applyOps oplog entry: " + tojson(ops));
 
-ops = rst.findOplog(primary, {op: "d", ns: coll.getFullName(), o: {_id: 0}, ts: {$gt: startTime}}).toArray();
+ops = rst
+    .findOplog(primary, {op: "d", ns: coll.getFullName(), o: {_id: 0}, ts: {$gt: startTime}})
+    .toArray();
 assert.eq(1, ops.length, "Should have a delete oplog entry: " + tojson(ops));
 
 rst.stopSet();

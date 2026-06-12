@@ -42,7 +42,10 @@ results = coll
     .toArray();
 assert(
     resultsEq(
-        [{_id: {exprFieldName: 3, secondGroupByField: 5}}, {_id: {exprFieldName: 4, secondGroupByField: 10}}],
+        [
+            {_id: {exprFieldName: 3, secondGroupByField: 5}},
+            {_id: {exprFieldName: 4, secondGroupByField: 10}},
+        ],
         results,
     ),
     results,
@@ -68,11 +71,27 @@ assert(resultsEq([{_id: 1, sum: 0}], results), results);
 
 // $sum with $expr and field name (error case).
 assert.throwsWithCode(
-    () => coll.aggregate([{$group: {_id: 1, sum: {$sum: {$expr: {$eq: ["$x", 1]}, secondAccumulatorField: "$y"}}}}]),
+    () =>
+        coll.aggregate([
+            {
+                $group: {
+                    _id: 1,
+                    sum: {$sum: {$expr: {$eq: ["$x", 1]}, secondAccumulatorField: "$y"}},
+                },
+            },
+        ]),
     15983,
 );
 assert.throwsWithCode(
-    () => coll.aggregate([{$group: {_id: 1, sum: {$sum: {secondAccumulatorField: "$y", $expr: {$eq: ["$x", 1]}}}}}]),
+    () =>
+        coll.aggregate([
+            {
+                $group: {
+                    _id: 1,
+                    sum: {$sum: {secondAccumulatorField: "$y", $expr: {$eq: ["$x", 1]}}},
+                },
+            },
+        ]),
     16410,
 );
 
@@ -85,7 +104,9 @@ results = coll.aggregate([{$group: {_id: 1, sum: {$sum: {$expr: {a: 5}}}}}]).toA
 assert(resultsEq([{_id: 1, sum: 0}], results), results);
 
 // $sum with non-empty non-constant $expr.
-results = coll.aggregate([{$group: {_id: 1, sum: {$sum: {$expr: {$add: ["$x", "$y"]}}}}}]).toArray();
+results = coll
+    .aggregate([{$group: {_id: 1, sum: {$sum: {$expr: {$add: ["$x", "$y"]}}}}}])
+    .toArray();
 assert(resultsEq([{_id: 1, sum: 18}], results), results);
 
 // $sum with non-constant $expr with nested $expr.

@@ -14,7 +14,9 @@ const timeFieldName = "time";
 const metaFieldName = "m";
 
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 // first test a good doc just in case
@@ -37,7 +39,11 @@ assert.eq(1, coll.count());
 assert.docEq([goodDocs[0]], coll.find().toArray());
 
 // now make sure we reject if timeField is missing or isn't a valid BSON datetime
-let mixedDocs = [{[metaFieldName]: "B", data: true}, goodDocs[1], {time: "invalid", [metaFieldName]: "B", data: false}];
+let mixedDocs = [
+    {[metaFieldName]: "B", data: true},
+    goodDocs[1],
+    {time: "invalid", [metaFieldName]: "B", data: false},
+];
 assert.commandFailedWithCode(coll.insert(mixedDocs, {ordered: false}), ErrorCodes.BadValue);
 assert.eq(coll.count(), 2);
 assert.docEq(goodDocs, coll.find().toArray());

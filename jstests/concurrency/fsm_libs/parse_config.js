@@ -47,7 +47,8 @@ export function parseConfig(config) {
             assert.eq(
                 2,
                 config.states[k].length,
-                "if passConnectionCache is false, state functions should " + "accept 2 parameters: db and collName",
+                "if passConnectionCache is false, state functions should " +
+                    "accept 2 parameters: db and collName",
             );
         }
     });
@@ -65,7 +66,10 @@ export function parseConfig(config) {
         Object.keys(config.transitions[fromState]).forEach(function (toState) {
             assert(
                 config.states.hasOwnProperty(toState),
-                "config.transitions." + fromState + " contains a state not in config.states: " + toState,
+                "config.transitions." +
+                    fromState +
+                    " contains a state not in config.states: " +
+                    toState,
             );
             assert.eq(
                 "number",
@@ -88,8 +92,16 @@ export function parseConfig(config) {
     config.data = config.data || {};
     assert.eq("object", typeof config.data);
     assert.eq(false, config.data.hasOwnProperty("tid"), 'data object cannot redefine "tid"');
-    assert.eq(false, config.data.hasOwnProperty("iterations"), 'data object cannot redefine "iterations"');
-    assert.eq(false, config.data.hasOwnProperty("threadCount"), 'data object cannot redefine "threadCount"');
+    assert.eq(
+        false,
+        config.data.hasOwnProperty("iterations"),
+        'data object cannot redefine "iterations"',
+    );
+    assert.eq(
+        false,
+        config.data.hasOwnProperty("threadCount"),
+        'data object cannot redefine "threadCount"',
+    );
 
     config.passConnectionCache = config.passConnectionCache || false;
     assert.eq("boolean", typeof config.passConnectionCache);

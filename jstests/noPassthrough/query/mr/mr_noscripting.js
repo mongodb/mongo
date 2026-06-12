@@ -13,6 +13,9 @@ const reduce = function (key, values) {
     return 1;
 };
 
-assert.commandFailedWithCode(testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}), 31264);
+assert.commandFailedWithCode(
+    testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}),
+    31264,
+);
 
 MongoRunner.stopMongod(conn);

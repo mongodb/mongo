@@ -39,7 +39,9 @@ function assertQuorumMaintained(mongos, message, timeoutMs = 30000) {
 function testIndividualConfigUpgrade() {
     testPerformIndividualConfigUpgrade({
         setupFn: (mongos, st) => {
-            assert.commandWorked(mongos.getDB(databaseName)[collectionName].insert({initial: true}));
+            assert.commandWorked(
+                mongos.getDB(databaseName)[collectionName].insert({initial: true}),
+            );
 
             // Verify all 3 config servers are up
             assert.eq(st.configRS.nodes.length, 3);
@@ -63,27 +65,37 @@ function testIndividualConfigUpgrade() {
 
         beforeRestart: (mongos) => {
             // Verify cluster is fully operational before upgrades
-            assert.commandWorked(mongos.getDB(databaseName)[collectionName].insert({beforeUpgrade: true}));
+            assert.commandWorked(
+                mongos.getDB(databaseName)[collectionName].insert({beforeUpgrade: true}),
+            );
             assert.commandWorked(mongos.adminCommand({listDatabases: 1}));
         },
 
         afterFirstConfigUpgraded: (mongos) => {
-            jsTest.log.info("Testing cluster operations with 1 upgraded config server (mixed versions)");
+            jsTest.log.info(
+                "Testing cluster operations with 1 upgraded config server (mixed versions)",
+            );
 
             // Verify primary is still elected
             assertQuorumMaintained(mongos, "Failed to maintain quorum after first config upgrade");
 
-            assert.commandWorked(mongos.getDB(databaseName)[collectionName].insert({afterFirstConfig: true}));
+            assert.commandWorked(
+                mongos.getDB(databaseName)[collectionName].insert({afterFirstConfig: true}),
+            );
             assert.eq(mongos.getDB(databaseName)[collectionName].count(), 3);
         },
 
         afterSecondConfigUpgraded: (mongos) => {
-            jsTest.log.info("Testing cluster operations with 2 upgraded config servers (majority new version)");
+            jsTest.log.info(
+                "Testing cluster operations with 2 upgraded config servers (majority new version)",
+            );
 
             // Verify quorum maintained on new version
             assertQuorumMaintained(mongos, "Failed to maintain quorum after second config upgrade");
 
-            assert.commandWorked(mongos.getDB(databaseName)[collectionName].insert({afterSecondConfig: true}));
+            assert.commandWorked(
+                mongos.getDB(databaseName)[collectionName].insert({afterSecondConfig: true}),
+            );
             assert.eq(mongos.getDB(databaseName)[collectionName].count(), 4);
         },
 
@@ -91,15 +103,26 @@ function testIndividualConfigUpgrade() {
             jsTest.log.info("Testing cluster operations with all config servers upgraded");
 
             // Verify cluster is fully operational
-            assert.commandWorked(mongos.getDB(databaseName)[collectionName].insert({allConfigsUpgraded: true}));
+            assert.commandWorked(
+                mongos.getDB(databaseName)[collectionName].insert({allConfigsUpgraded: true}),
+            );
             assert.eq(mongos.getDB(databaseName)[collectionName].count(), 5);
 
             // Verify all documents inserted during upgrade are present
             assert.eq(mongos.getDB(databaseName)[collectionName].count({initial: true}), 1);
             assert.eq(mongos.getDB(databaseName)[collectionName].count({beforeUpgrade: true}), 1);
-            assert.eq(mongos.getDB(databaseName)[collectionName].count({afterFirstConfig: true}), 1);
-            assert.eq(mongos.getDB(databaseName)[collectionName].count({afterSecondConfig: true}), 1);
-            assert.eq(mongos.getDB(databaseName)[collectionName].count({allConfigsUpgraded: true}), 1);
+            assert.eq(
+                mongos.getDB(databaseName)[collectionName].count({afterFirstConfig: true}),
+                1,
+            );
+            assert.eq(
+                mongos.getDB(databaseName)[collectionName].count({afterSecondConfig: true}),
+                1,
+            );
+            assert.eq(
+                mongos.getDB(databaseName)[collectionName].count({allConfigsUpgraded: true}),
+                1,
+            );
         },
     });
 }

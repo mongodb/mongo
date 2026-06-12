@@ -145,11 +145,15 @@ export function measureQueueStats(exemptConn, operationFn) {
  * afterwards.
  */
 export function withRateLimitingDisabled(exemptConn, fn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 0}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 0}),
+    );
     try {
         fn();
     } finally {
-        assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}));
+        assert.commandWorked(
+            exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}),
+        );
     }
 }
 
@@ -160,11 +164,15 @@ export function withRateLimitingDisabled(exemptConn, fn) {
  * (which is racy under parallel admit attempts).
  */
 export function withForcedQueueing(exemptConn, fn) {
-    assert.commandWorked(exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "alwaysOn"}));
+    assert.commandWorked(
+        exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "alwaysOn"}),
+    );
     try {
         fn();
     } finally {
-        assert.commandWorked(exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "off"}));
+        assert.commandWorked(
+            exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "off"}),
+        );
     }
 }
 
@@ -172,7 +180,11 @@ export function withForcedQueueing(exemptConn, fn) {
  * Expected error labels present in command responses when requests are rejected by the
  * ingress request rate limiter.
  */
-export const kExpectedErrorLabels = ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"];
+export const kExpectedErrorLabels = [
+    "SystemOverloadedError",
+    "RetryableError",
+    "NoWritesPerformed",
+];
 
 /**
  * Returns true if the expected rate limiting error labels are encountered in the command response.
@@ -236,7 +248,9 @@ export function runTestReplSet({startupParams, auth, cmdParams = {}}, testFuncti
 
     const {ingressRequestRateLimiterEnabled} = startupParams;
     if ((ingressRequestRateLimiterEnabled ?? 0) !== 0) {
-        assert.commandWorked(exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}));
+        assert.commandWorked(
+            exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}),
+        );
     }
 
     testFunction(primary, exemptConn);
@@ -248,7 +262,10 @@ export function runTestReplSet({startupParams, auth, cmdParams = {}}, testFuncti
 /**
  * Runs a test for the ingress admission rate limiter using sharding.
  */
-export function runTestSharded({startupParams, auth, cmdParamsMongos = {}, cmdParamsMongod = {}}, testFunction) {
+export function runTestSharded(
+    {startupParams, auth, cmdParamsMongos = {}, cmdParamsMongod = {}},
+    testFunction,
+) {
     const st = new ShardingTest({
         mongos: 1,
         shards: 1,
@@ -280,7 +297,9 @@ export function runTestSharded({startupParams, auth, cmdParamsMongos = {}, cmdPa
 
     const {ingressRequestRateLimiterEnabled} = startupParams;
     if ((ingressRequestRateLimiterEnabled ?? 0) !== 0) {
-        assert.commandWorked(exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}));
+        assert.commandWorked(
+            exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}),
+        );
     }
 
     testFunction(st.s, exemptConn);

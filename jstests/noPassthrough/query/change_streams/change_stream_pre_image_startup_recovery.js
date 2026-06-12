@@ -100,9 +100,14 @@ describe("change stream pre-image truncation persists across crash + recovery", 
         for (const node of rst.nodes) {
             try {
                 assert.commandWorked(
-                    node.adminCommand({configureFailPoint: "changeStreamPreImageRemoverCurrentTime", mode: "off"}),
+                    node.adminCommand({
+                        configureFailPoint: "changeStreamPreImageRemoverCurrentTime",
+                        mode: "off",
+                    }),
                 );
-                assert.commandWorked(node.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+                assert.commandWorked(
+                    node.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}),
+                );
             } catch (e) {
                 // Node may be stopped after a crash test.
             }
@@ -122,11 +127,17 @@ describe("change stream pre-image truncation persists across crash + recovery", 
 
     /** Returns the operationTime of the latest pre-image, or the current cluster time if none. */
     function getLatestPreImageTime() {
-        const preImages = getPreImagesCollection(primary).find().sort({"_id.ts": -1}).limit(1).toArray();
+        const preImages = getPreImagesCollection(primary)
+            .find()
+            .sort({"_id.ts": -1})
+            .limit(1)
+            .toArray();
         if (preImages.length > 0) {
             return preImages[0].operationTime.getTime();
         }
-        return assert.commandWorked(primary.getDB(dbName).runCommand({ping: 1})).operationTime.getTime();
+        return assert
+            .commandWorked(primary.getDB(dbName).runCommand({ping: 1}))
+            .operationTime.getTime();
     }
 
     /**
@@ -181,7 +192,11 @@ describe("change stream pre-image truncation persists across crash + recovery", 
     function waitForPreImageTruncation(node, remaining) {
         assert.soon(
             () => getPreImages(node).length === remaining,
-            () => "timed out waiting for remover to truncate on " + node.host + ": " + tojson(getPreImages(node)),
+            () =>
+                "timed out waiting for remover to truncate on " +
+                node.host +
+                ": " +
+                tojson(getPreImages(node)),
         );
     }
 

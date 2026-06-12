@@ -12,7 +12,10 @@
  */
 
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
-import {makeGeoArbFactory, makeGeoPointArb} from "jstests/write_path/timeseries/pbt/geodata/geodata_arbitraries.js";
+import {
+    makeGeoArbFactory,
+    makeGeoPointArb,
+} from "jstests/write_path/timeseries/pbt/geodata/geodata_arbitraries.js";
 import {getFcParams} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 
 import {Fixture} from "jstests/write_path/timeseries/pbt/geodata/generate_pbt_fixture.js";
@@ -45,4 +48,7 @@ const programArb = makeTimeseriesCommandSequenceArb(
     /* replayPath    */ fcParams.replayPath,
 );
 
-fixture.run(programArb, "keeps tsColl and ctrlColl in sync under insert/batch-insert/delete of GeoPoint data");
+fixture.run(
+    programArb,
+    "keeps tsColl and ctrlColl in sync under insert/batch-insert/delete of GeoPoint data",
+);

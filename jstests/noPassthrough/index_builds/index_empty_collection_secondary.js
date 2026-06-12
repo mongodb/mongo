@@ -30,7 +30,10 @@ const coll = testDB.getCollection("test");
 assert.commandWorked(coll.insert({a: 1}));
 
 const res = assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "alwaysOn"}),
+    primary.adminCommand({
+        configureFailPoint: "hangBeforeInitializingIndexBuild",
+        mode: "alwaysOn",
+    }),
 );
 const failpointTimesEntered = res.count;
 
@@ -48,7 +51,9 @@ try {
     // Remove the document from the collection so that the secondary sees an empty collection.
     assert.commandWorked(coll.remove({a: 1}));
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "off"}),
+    );
 }
 
 // Expect successful createIndex command invocation in parallel shell. A new index should be

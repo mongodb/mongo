@@ -53,9 +53,18 @@ assert.soon(() => {
     );
 });
 
-assert.commandFailedWithCode(mongos.adminCommand({abortUnshardCollection: ns}), ErrorCodes.IllegalOperation);
-assert.commandFailedWithCode(mongos.adminCommand({abortMoveCollection: ns}), ErrorCodes.IllegalOperation);
-assert.commandFailedWithCode(mongos.adminCommand({abortRewriteCollection: ns}), ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    mongos.adminCommand({abortUnshardCollection: ns}),
+    ErrorCodes.IllegalOperation,
+);
+assert.commandFailedWithCode(
+    mongos.adminCommand({abortMoveCollection: ns}),
+    ErrorCodes.IllegalOperation,
+);
+assert.commandFailedWithCode(
+    mongos.adminCommand({abortRewriteCollection: ns}),
+    ErrorCodes.IllegalOperation,
+);
 
 assert.commandWorked(mongos.adminCommand({abortReshardCollection: ns}));
 

@@ -58,7 +58,11 @@ let runTest = function (testDB, primaryConn) {
     primaryConn.getDB(dbName).parallelShellStarted.drop();
     oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
     let insertFunc = startParallelShell(
-        'let testDB = db.getSiblingDB("' + dbName + '"); ' + "sleep(3000); " + "testDB.user.insert({y: 1});",
+        'let testDB = db.getSiblingDB("' +
+            dbName +
+            '"); ' +
+            "sleep(3000); " +
+            "testDB.user.insert({y: 1});",
         primaryConn.port,
     );
 

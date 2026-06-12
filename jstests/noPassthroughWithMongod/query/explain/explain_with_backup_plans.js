@@ -22,7 +22,9 @@ assert.commandWorked(coll.createIndex({t: 1}));
 
 function runAndAssertExplain(verbosity) {
     const explain =
-        verbosity === undefined ? coll.explain().aggregate(pipeline) : coll.explain(verbosity).aggregate(pipeline);
+        verbosity === undefined
+            ? coll.explain().aggregate(pipeline)
+            : coll.explain(verbosity).aggregate(pipeline);
 
     const label = verbosity === undefined ? "default(queryPlanner)" : verbosity;
     jsTest.log.info("Explain (" + label + "): " + tojson(explain));
@@ -30,7 +32,10 @@ function runAndAssertExplain(verbosity) {
     const qp = getQueryPlanner(explain);
 
     assert(qp.winningPlan, "Expected a winningPlan in queryPlanner, got: " + tojson(qp));
-    assert(planHasStage(db, qp.winningPlan, "SORT"), "Expected winning plan to have a SORT stage, got: " + tojson(qp));
+    assert(
+        planHasStage(db, qp.winningPlan, "SORT"),
+        "Expected winning plan to have a SORT stage, got: " + tojson(qp),
+    );
     assert(qp.rejectedPlans, "Expected rejectedPlans in queryPlanner, got: " + tojson(qp));
     assert.eq(
         qp.rejectedPlans.length,
@@ -111,7 +116,9 @@ try {
     // Step 1: Verify the backup plan exists via queryPlanner explain.
     // With queryPlanner verbosity the plan is NOT executed, so the backup switch doesn't happen.
     {
-        const explain = assert.commandWorked(coll.find({a: 1, b: 1}).sort({b: 1}).explain("queryPlanner"));
+        const explain = assert.commandWorked(
+            coll.find({a: 1, b: 1}).sort({b: 1}).explain("queryPlanner"),
+        );
         const qp = getQueryPlanner(explain);
         assert(qp.winningPlan, "Expected a winningPlan, got: " + tojson(qp));
         // The intersection+sort plan should be the winner (it has the +3 boost).
@@ -133,10 +140,14 @@ try {
         assert.eq(
             result.length,
             N,
-            "Expected all " + N + " documents to be returned by the backup plan after the sort plan failed",
+            "Expected all " +
+                N +
+                " documents to be returned by the backup plan after the sort plan failed",
         );
 
-        const explain = assert.commandWorked(coll.find({a: 1, b: 1}).sort({b: 1}).explain("allPlansExecution"));
+        const explain = assert.commandWorked(
+            coll.find({a: 1, b: 1}).sort({b: 1}).explain("allPlansExecution"),
+        );
         const qp = getQueryPlanner(explain);
         assert(qp.winningPlan, "Expected a winningPlan, got: " + tojson(qp));
         // The backup plan should be the winner after the sort plan fails during execution.
@@ -147,7 +158,8 @@ try {
         // Plans containing blocking sort should appear as rejected plans.
         assert.eq(qp.rejectedPlans.length, 2, "Expected two rejected plan. Got: " + tojson(qp));
         assert(
-            planHasStage(db, qp.rejectedPlans[0], "SORT") && planHasStage(db, qp.rejectedPlans[1], "SORT"),
+            planHasStage(db, qp.rejectedPlans[0], "SORT") &&
+                planHasStage(db, qp.rejectedPlans[1], "SORT"),
             "Expected rejected plans to have a SORT stage, got: " + tojson(qp),
         );
     }

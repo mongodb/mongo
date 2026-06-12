@@ -19,7 +19,11 @@ const assertAddShardSucceeded = function (res, shardName) {
     // If a shard name was specified, make sure that the name the addShard command reports the
     // shard was added with matches the specified name.
     if (shardName) {
-        assert.eq(shardName, res.shardAdded, "name returned by addShard does not match name specified in addShard");
+        assert.eq(
+            shardName,
+            res.shardAdded,
+            "name returned by addShard does not match name specified in addShard",
+        );
     }
 
     // Make sure the shard shows up in config.shards with the shardName reported by the
@@ -46,7 +50,9 @@ const assertAddShardFailed = function (res, shardName) {
             assert.eq(
                 null,
                 st.s.getDB("config").shards.findOne({_id: shardName}),
-                "addShard for " + shardName + " reported failure, but shard shows up in config.shards",
+                "addShard for " +
+                    shardName +
+                    " reported failure, but shard shows up in config.shards",
             );
         }
     }
@@ -81,7 +87,9 @@ assert.eq(rst1.name, addShardRes.shardAdded);
 removeShard(st, addShardRes.shardAdded);
 rst1.stopSet();
 
-jsTest.log("Adding a replica set with a specified shardName that matches the set's name should succeed.");
+jsTest.log(
+    "Adding a replica set with a specified shardName that matches the set's name should succeed.",
+);
 const rst2 = new ReplSetTest({nodes: 1});
 rst2.startSet({shardsvr: ""});
 rst2.initiate();
@@ -94,7 +102,9 @@ let rst3 = new ReplSetTest({nodes: 1});
 rst3.startSet({shardsvr: ""});
 rst3.initiate();
 
-jsTest.log("Adding a replica set with a specified shardName that differs from the set's name should succeed.");
+jsTest.log(
+    "Adding a replica set with a specified shardName that differs from the set's name should succeed.",
+);
 addShardRes = st.s.adminCommand({addShard: rst3.getURL(), name: "differentShardName"});
 assertAddShardSucceeded(addShardRes, "differentShardName");
 removeShard(st, addShardRes.shardAdded);
@@ -106,12 +116,15 @@ assertAddShardFailed(addShardRes, "config");
 // 1.b. with invalid hostnames.
 
 jsTest.log("Adding a replica set with only non-existing hosts should fail.");
-addShardRes = st.s.adminCommand({addShard: rst3.name + "/NonExistingHost:" + portWithoutHostRunning});
+addShardRes = st.s.adminCommand({
+    addShard: rst3.name + "/NonExistingHost:" + portWithoutHostRunning,
+});
 assertAddShardFailed(addShardRes);
 
 jsTest.log("Adding a replica set with mixed existing/non-existing hosts should fail.");
 addShardRes = st.s.adminCommand({
-    addShard: rst3.name + "/" + rst3.getPrimary().name + ",NonExistingHost:" + portWithoutHostRunning,
+    addShard:
+        rst3.name + "/" + rst3.getPrimary().name + ",NonExistingHost:" + portWithoutHostRunning,
 });
 assertAddShardFailed(addShardRes);
 
@@ -124,15 +137,21 @@ let rst4 = new ReplSetTest({name: "config", nodes: 1});
 rst4.startSet({shardsvr: ""});
 rst4.initiate();
 
-jsTest.log("Adding a replica set whose setName is config without specifying shardName should fail.");
+jsTest.log(
+    "Adding a replica set whose setName is config without specifying shardName should fail.",
+);
 addShardRes = st.s.adminCommand({addShard: rst4.getURL()});
 assertAddShardFailed(addShardRes);
 
-jsTest.log("Adding a replica set whose setName is config with specified shardName 'config' should fail.");
+jsTest.log(
+    "Adding a replica set whose setName is config with specified shardName 'config' should fail.",
+);
 addShardRes = st.s.adminCommand({addShard: rst4.getURL(), name: rst4.name});
 assertAddShardFailed(addShardRes, rst4.name);
 
-jsTest.log("Adding a replica set whose setName is config with a non-'config' shardName should succeed");
+jsTest.log(
+    "Adding a replica set whose setName is config with a non-'config' shardName should succeed",
+);
 addShardRes = st.s.adminCommand({addShard: rst4.getURL(), name: "nonConfig"});
 assertAddShardSucceeded(addShardRes, "nonConfig");
 removeShard(st, addShardRes.shardAdded);
@@ -151,7 +170,9 @@ addShardRes = st.s.adminCommand({addShard: rst5.getURL()});
 assertAddShardSucceeded(addShardRes);
 
 // Ensure the write goes to the newly added shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: addShardRes.shardAdded}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: addShardRes.shardAdded}),
+);
 assert.commandWorked(st.s.getDB("test").runCommand({create: "foo"}));
 const res = st.s.getDB("config").getCollection("databases").findOne({_id: "test"});
 assert.neq(null, res);

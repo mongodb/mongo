@@ -27,7 +27,11 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let testDB = rst.getPrimary().getDB("indexRebuild");
@@ -53,7 +57,9 @@ rst.startSet(undefined, true);
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
 nodes.forEach((node) =>
-    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+    ),
 );
 
 // Dropping the index would normally modify the collection metadata and drop the

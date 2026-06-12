@@ -28,7 +28,10 @@ function assertValidSyntax({pSpec, letSpec, msg}) {
 /**
  * Test missing or unexpected fields in $percentile spec.
  */
-assertInvalidSyntax({pSpec: {$percentile: 0.5}, msg: "Should fail if $percentile is not an object"});
+assertInvalidSyntax({
+    pSpec: {$percentile: 0.5},
+    msg: "Should fail if $percentile is not an object",
+});
 
 assertInvalidSyntax({
     pSpec: {$percentile: {input: ["$k1", "$k2"], method: "approximate"}},
@@ -205,7 +208,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
  */
 assertValidSyntax({
     pSpec: {
-        $percentile: {p: [0.0, 0.0001, 0.5, 0.995, 1.0], input: ["$k1", "$k2"], method: "approximate"},
+        $percentile: {
+            p: [0.0, 0.0001, 0.5, 0.995, 1.0],
+            input: ["$k1", "$k2"],
+            method: "approximate",
+        },
     },
     msg: "Should be able to specify an array of percentiles",
 });

@@ -44,7 +44,10 @@ const setParams = {
     "maxNumberOfInsertsBatchInsertsForRenameAcrossDatabases": maxInsertsCount,
     "maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes": maxInsertsSize,
 };
-let rst = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}], nodeOptions: {setParameter: setParams}});
+let rst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {votes: 0, priority: 0}}],
+    nodeOptions: {setParameter: setParams},
+});
 rst.startSet();
 rst.initiate();
 
@@ -74,7 +77,11 @@ applyOpsOpEntries = opEntries[0].o.applyOps;
 for (const op of applyOpsOpEntries) {
     assert.eq(op.op, "i", "Each applyOps operation should be an insert");
 }
-assert.eq(collCount, applyOpsOpEntries.length, "Should have " + collCount + " applyOps insert ops.");
+assert.eq(
+    collCount,
+    applyOpsOpEntries.length,
+    "Should have " + collCount + " applyOps insert ops.",
+);
 
 // Check prior collection gone
 assert(!db.getCollectionNames().includes(collName));
@@ -115,7 +122,11 @@ opEntries = db
     })
     .sort({$natural: -1})
     .toArray();
-assert.eq(0, opEntries.length, "Should be no applyOps oplog entries for an unbatched single insert.");
+assert.eq(
+    0,
+    opEntries.length,
+    "Should be no applyOps oplog entries for an unbatched single insert.",
+);
 
 //
 // 3. Too many documents
@@ -188,7 +199,14 @@ assert.eq(
 testNum = 4;
 jsTestLog(testNum + ". Too many documents, in size, testing the defaults");
 
-let defaultMaxBatchSize, serverParam, sampleDoc, sampleDocFull, sampleDocSize, testCollName, insertOps, applyOps;
+let defaultMaxBatchSize,
+    serverParam,
+    sampleDoc,
+    sampleDocFull,
+    sampleDocSize,
+    testCollName,
+    insertOps,
+    applyOps;
 
 rst.stopSet();
 rst = new ReplSetTest({
@@ -239,7 +257,9 @@ jsTestLog("Inserting [" + numDocsToInsert + "] docs.");
 srcColl = srcDb.getCollection(testCollName);
 
 assert.commandWorked(
-    srcColl.insertMany([...Array(numDocsToInsert).keys()].map((x) => ({_id: ObjectId(), doc: sampleDoc}))),
+    srcColl.insertMany(
+        [...Array(numDocsToInsert).keys()].map((x) => ({_id: ObjectId(), doc: sampleDoc})),
+    ),
 );
 
 // Rename Collection Across Databases
@@ -259,7 +279,11 @@ applyOps = rst
     .toArray();
 jsTestLog("applyOps oplog entries num: " + applyOps.length);
 jsTestLog("applyOps oplog entries: " + tojson(applyOps));
-assert.eq(numDocsToInsert, applyOps[0].o.applyOps.length, "Expect all inserts to land in one applyOps batch.");
+assert.eq(
+    numDocsToInsert,
+    applyOps[0].o.applyOps.length,
+    "Expect all inserts to land in one applyOps batch.",
+);
 assert.eq(0, insertOps.length, "Expect no plain insert ops.");
 
 //

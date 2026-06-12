@@ -3,7 +3,10 @@
  *   requires_scripting,
  * ]
  */
-import {testGetCmdLineOptsMongod, testGetCmdLineOptsMongos} from "jstests/libs/command_line/test_parsed_options.js";
+import {
+    testGetCmdLineOptsMongod,
+    testGetCmdLineOptsMongos,
+} from "jstests/libs/command_line/test_parsed_options.js";
 
 let expectedResult = {"parsed": {"security": {"javascriptEnabled": false}}};
 testGetCmdLineOptsMongod({noscripting: ""}, expectedResult);
@@ -15,8 +18,14 @@ expectedResult = {
         "security": {"javascriptEnabled": true},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_noscripting.ini"}, expectedResult);
-testGetCmdLineOptsMongos({config: "jstests/libs/config_files/disable_noscripting.ini"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/disable_noscripting.ini"},
+    expectedResult,
+);
+testGetCmdLineOptsMongos(
+    {config: "jstests/libs/config_files/disable_noscripting.ini"},
+    expectedResult,
+);
 
 expectedResult = {
     "parsed": {
@@ -24,5 +33,11 @@ expectedResult = {
         "security": {"javascriptEnabled": true},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_scripting.json"}, expectedResult);
-testGetCmdLineOptsMongos({config: "jstests/libs/config_files/enable_scripting.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/enable_scripting.json"},
+    expectedResult,
+);
+testGetCmdLineOptsMongos(
+    {config: "jstests/libs/config_files/enable_scripting.json"},
+    expectedResult,
+);

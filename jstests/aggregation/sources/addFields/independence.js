@@ -48,7 +48,11 @@ function testIndependent({inputDoc, stage1, stage2}) {
     jsTestLog(`Test independent stages: ${tojson(stage1)}, ${tojson(stage2)}`);
     const {output, swappedOutput, message} = runBothOrders({input: [inputDoc], stage1, stage2});
     jsTestLog(message);
-    assert.eq(output, swappedOutput, `Stages are not independent: ${tojson(stage1)}, ${tojson(stage2)}`);
+    assert.eq(
+        output,
+        swappedOutput,
+        `Stages are not independent: ${tojson(stage1)}, ${tojson(stage2)}`,
+    );
 }
 
 /**
@@ -98,7 +102,11 @@ function testEquivalent({inputDoc, pipeline1, pipeline2}) {
         ${tojson(pipeline2)}
             ${tojson(result2)}
 `);
-    assert.eq(result1, result2, `Pipelines ${tojson(pipeline1)} vs ${tojson(pipeline2)} are not equivalent`);
+    assert.eq(
+        result1,
+        result2,
+        `Pipelines ${tojson(pipeline1)} vs ${tojson(pipeline2)} are not equivalent`,
+    );
 }
 
 /**
@@ -107,8 +115,12 @@ function testEquivalent({inputDoc, pipeline1, pipeline2}) {
  */
 function testNotEquivalent({inputDoc, correct, incorrect}) {
     jsTestLog(`Test non-equivalent pipelines: ${tojson(correct)} vs ${tojson(incorrect)}`);
-    const correctResult = db.aggregate([{$documents: [inputDoc]}, ...unoptimized(correct)]).toArray();
-    const incorrectResult = db.aggregate([{$documents: [inputDoc]}, ...unoptimized(incorrect)]).toArray();
+    const correctResult = db
+        .aggregate([{$documents: [inputDoc]}, ...unoptimized(correct)])
+        .toArray();
+    const incorrectResult = db
+        .aggregate([{$documents: [inputDoc]}, ...unoptimized(incorrect)])
+        .toArray();
 
     const optimizedResult = db.aggregate([{$documents: [inputDoc]}, ...correct]).toArray();
 

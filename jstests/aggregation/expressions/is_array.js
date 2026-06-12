@@ -18,7 +18,9 @@ assert.commandWorked(coll.insert({_id: 9, x: [0]}));
 assert.commandWorked(coll.insert({_id: 10, x: ["0"]}));
 
 // Project field is_array to represent whether the field x was an array.
-let results = coll.aggregate([{$sort: {_id: 1}}, {$project: {isArray: {$isArray: "$x"}}}]).toArray();
+let results = coll
+    .aggregate([{$sort: {_id: 1}}, {$project: {isArray: {$isArray: "$x"}}}])
+    .toArray();
 let expectedResults = [
     {_id: 0, isArray: false},
     {_id: 1, isArray: false},

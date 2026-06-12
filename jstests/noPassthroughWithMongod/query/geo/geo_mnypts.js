@@ -49,5 +49,11 @@ for (var i = 0; i < 2; i++) {
 // Check that all but corner set of points in radius
 let circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
 
-assert.eq(totalPts - totalPts / (100 * 100), coll.find({loc: {$within: {$center: circle}}}).count());
-assert.eq(totalPts - totalPts / (100 * 100), coll.find({loc: {$within: {$center: circle}}}).itcount());
+assert.eq(
+    totalPts - totalPts / (100 * 100),
+    coll.find({loc: {$within: {$center: circle}}}).count(),
+);
+assert.eq(
+    totalPts - totalPts / (100 * 100),
+    coll.find({loc: {$within: {$center: circle}}}).itcount(),
+);

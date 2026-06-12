@@ -20,7 +20,9 @@ var db = st.getDB("test");
 //
 
 // Turn on sharding on the 'test.foo' collection and generate a large chunk
-assert.commandWorked(st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}),
+);
 
 let bigString = "";
 while (bigString.length < 10000) {
@@ -38,7 +40,11 @@ assert.commandWorked(bulk.execute());
 
 assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 
-assert.eq(1, findChunksUtil.countChunksForNs(st.config, "test.foo"), "step 1 - need one large chunk");
+assert.eq(
+    1,
+    findChunksUtil.countChunksForNs(st.config, "test.foo"),
+    "step 1 - need one large chunk",
+);
 
 let primary = st.getPrimaryShard("test").getDB("test");
 let secondary = st.getOther(primary).getDB("test");
@@ -48,7 +54,9 @@ let secondary = st.getOther(primary).getDB("test");
 jsTest.log("moveChunk expected to fail due to excessive size");
 let maxMB = 200;
 
-assert.commandWorked(st.s.adminCommand({configureCollectionBalancing: "test.foo", chunkSize: maxMB}));
+assert.commandWorked(
+    st.s.adminCommand({configureCollectionBalancing: "test.foo", chunkSize: maxMB}),
+);
 
 assert.throws(function () {
     st.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name});
@@ -64,7 +72,9 @@ assert.commandWorked(
 
 jsTest.log("moveChunk expected to succeed");
 let before = findChunksUtil.findChunksByNs(st.config, "test.foo").toArray();
-assert.commandWorked(st.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}));
+assert.commandWorked(
+    st.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}),
+);
 
 let after = findChunksUtil.findChunksByNs(st.config, "test.foo").toArray();
 assert.neq(before[0].shard, after[0].shard, "move chunk did not work");

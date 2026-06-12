@@ -56,7 +56,9 @@ export var ClusteredCappedUtils = class {
 
     static testClusteredTailableCursorCreation(db, collName, clusterKey, isReplicated) {
         jsTest.log(
-            "Validating tailable cursor creation on capped clustered collection (isReplicated: " + isReplicated + ")",
+            "Validating tailable cursor creation on capped clustered collection (isReplicated: " +
+                isReplicated +
+                ")",
         );
 
         assert.commandWorked(
@@ -76,10 +78,16 @@ export var ClusteredCappedUtils = class {
                 db.runCommand({find: collName, tailable: true, readConcern: {level: "available"}}),
                 6049203,
             );
-            assert.commandWorked(db.runCommand({find: collName, tailable: true, readConcern: {level: "majority"}}));
+            assert.commandWorked(
+                db.runCommand({find: collName, tailable: true, readConcern: {level: "majority"}}),
+            );
         } else {
-            assert.commandWorked(db.runCommand({find: collName, tailable: true, readConcern: {level: "local"}}));
-            assert.commandWorked(db.runCommand({find: collName, tailable: true, readConcern: {level: "available"}}));
+            assert.commandWorked(
+                db.runCommand({find: collName, tailable: true, readConcern: {level: "local"}}),
+            );
+            assert.commandWorked(
+                db.runCommand({find: collName, tailable: true, readConcern: {level: "available"}}),
+            );
         }
         db.getCollection(collName).drop();
     }
@@ -116,12 +124,20 @@ export var ClusteredCappedUtils = class {
                 expireAfterSeconds: oneDayInSeconds,
             }),
         );
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: tenDaysAgo, info: "10 days ago"}));
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: nineDaysAgo, info: "9 days ago"}));
         assert.commandWorked(
-            db.getCollection(collName).insertOne({[clusterKey]: oneHourAgo, info: "1 hour ago - surviving"}),
+            db.getCollection(collName).insertOne({[clusterKey]: tenDaysAgo, info: "10 days ago"}),
         );
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: now, info: "now - surviving"}));
+        assert.commandWorked(
+            db.getCollection(collName).insertOne({[clusterKey]: nineDaysAgo, info: "9 days ago"}),
+        );
+        assert.commandWorked(
+            db
+                .getCollection(collName)
+                .insertOne({[clusterKey]: oneHourAgo, info: "1 hour ago - surviving"}),
+        );
+        assert.commandWorked(
+            db.getCollection(collName).insertOne({[clusterKey]: now, info: "now - surviving"}),
+        );
 
         // Tail just past the first two documents, so the cursor can survive the upcoming TTL
         // deletion.
@@ -172,7 +188,13 @@ export var ClusteredCappedUtils = class {
     }
 
     // Validate tailable cursor not keeping up with TTL deletion - CappedPositionLost.
-    static testClusteredTailableCursorCappedPositionLostWithTTL(db, collName, clusterKey, isReplicated, awaitData) {
+    static testClusteredTailableCursorCappedPositionLostWithTTL(
+        db,
+        collName,
+        clusterKey,
+        isReplicated,
+        awaitData,
+    ) {
         jsTest.log(
             "Validating tailable cursor falling behind with TTL deletion on capped clustered collection (isReplicated: " +
                 isReplicated +
@@ -201,9 +223,15 @@ export var ClusteredCappedUtils = class {
                 expireAfterSeconds: oneDayInSeconds,
             }),
         );
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: tenDaysAgo, info: "10 days ago"}));
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: nineDaysAgo, info: "9 days ago"}));
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: today, info: "today - surviving"}));
+        assert.commandWorked(
+            db.getCollection(collName).insertOne({[clusterKey]: tenDaysAgo, info: "10 days ago"}),
+        );
+        assert.commandWorked(
+            db.getCollection(collName).insertOne({[clusterKey]: nineDaysAgo, info: "9 days ago"}),
+        );
+        assert.commandWorked(
+            db.getCollection(collName).insertOne({[clusterKey]: today, info: "today - surviving"}),
+        );
 
         // Tail up to and including the first document, before it gets TTL reaped.
         let tailCommand = {find: collName, batchSize: 1, tailable: true, awaitData: awaitData};
@@ -238,7 +266,13 @@ export var ClusteredCappedUtils = class {
 
     // Validate that by design, a cursor on a clustered capped collection can miss documents if they
     // are not inserted in cluster key order.
-    static testClusteredTailableCursorOutOfOrderInsertion(db, collName, clusterKey, isReplicated, awaitData) {
+    static testClusteredTailableCursorOutOfOrderInsertion(
+        db,
+        collName,
+        clusterKey,
+        isReplicated,
+        awaitData,
+    ) {
         jsTest.log(
             "Validating clustered tailable cursor with out-of-order insertions (isReplicated: " +
                 isReplicated +
@@ -262,7 +296,9 @@ export var ClusteredCappedUtils = class {
                 expireAfterSeconds: oneDayInSeconds,
             }),
         );
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: now, info: "now"}));
+        assert.commandWorked(
+            db.getCollection(collName).insertOne({[clusterKey]: now, info: "now"}),
+        );
 
         // Create a tailable cursor and fetch the document inserted.
 
@@ -280,7 +316,11 @@ export var ClusteredCappedUtils = class {
 
         // Now insert a document with a cluster key value equal to a minute ago, and verify
         // that the tailable cursor is unable to fetch it.
-        assert.commandWorked(db.getCollection(collName).insertOne({[clusterKey]: oneMinuteAgo, info: "1 minute ago"}));
+        assert.commandWorked(
+            db
+                .getCollection(collName)
+                .insertOne({[clusterKey]: oneMinuteAgo, info: "1 minute ago"}),
+        );
 
         const getMore = db.runCommand({getMore: cursorId, collection: collName, batchSize: 1});
         assert.commandWorked(getMore);
@@ -326,7 +366,10 @@ export var ClusteredCappedUtils = class {
         const ns = db.getName() + "." + collName;
         const oplog = db.getSiblingDB("local").oplog.rs;
         for (const id of [tenDaysAgo, earlierTenDaysAgo]) {
-            const standalone = oplog.find({op: "d", ns: ns, "o._id": id}).sort({$natural: -1}).itcount();
+            const standalone = oplog
+                .find({op: "d", ns: ns, "o._id": id})
+                .sort({$natural: -1})
+                .itcount();
             const insideApplyOps = oplog
                 .find({
                     op: "c",
@@ -335,7 +378,11 @@ export var ClusteredCappedUtils = class {
                 })
                 .sort({$natural: -1})
                 .itcount();
-            assert.eq(1, standalone + insideApplyOps, `expected exactly one oplog delete for ${tojson(id)}`);
+            assert.eq(
+                1,
+                standalone + insideApplyOps,
+                `expected exactly one oplog delete for ${tojson(id)}`,
+            );
         }
 
         db.getCollection(collName).drop();

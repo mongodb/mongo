@@ -12,14 +12,19 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({
     shards: 2,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
     other: {
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+        configOptions: {
+            setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000},
+        },
     },
 });
 
@@ -84,7 +89,9 @@ function moveCollectionCmd() {
 }
 
 function unshardCollectionCmd() {
-    assert.commandWorked(mongos.adminCommand({unshardCollection: kNsName, toShard: nonPrimaryShard}));
+    assert.commandWorked(
+        mongos.adminCommand({unshardCollection: kNsName, toShard: nonPrimaryShard}),
+    );
 }
 
 function assertExpectedEventObserved(cursor, expectedEvent) {
@@ -98,7 +105,12 @@ function assertExpectedEventObserved(cursor, expectedEvent) {
     return event._id;
 }
 
-function validateExpectedEventAndConfirmResumability(setupFn, userCmdFn, collParam, expectedOutput) {
+function validateExpectedEventAndConfirmResumability(
+    setupFn,
+    userCmdFn,
+    collParam,
+    expectedOutput,
+) {
     setupFn();
     let collectionUUID = getCollectionUuid(kCollName);
 
@@ -140,7 +152,9 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard:
 
 for (let watchCollectionParameter of [kCollName, 1]) {
     const watchLevel = watchCollectionParameter === 1 ? kDbName : watchCollectionParameter;
-    jsTest.log(`Validate behavior of reshardCollection against a change stream watching at '${watchLevel}' level`);
+    jsTest.log(
+        `Validate behavior of reshardCollection against a change stream watching at '${watchLevel}' level`,
+    );
 
     // The values of 'collectionUUID' and 'reshardUUID' will be filled in by the validate function.
     validateExpectedEventAndConfirmResumability(
@@ -170,7 +184,9 @@ for (let watchCollectionParameter of [kCollName, 1]) {
         },
     );
 
-    jsTest.log(`Validate behavior of rewriteCollection against a change stream watching at '${watchLevel}' level`);
+    jsTest.log(
+        `Validate behavior of rewriteCollection against a change stream watching at '${watchLevel}' level`,
+    );
     validateExpectedEventAndConfirmResumability(
         prepareShardedCollection,
         rewriteCollectionCmd,
@@ -197,7 +213,9 @@ for (let watchCollectionParameter of [kCollName, 1]) {
         },
     );
 
-    jsTest.log(`Validate behavior of moveCollection against a change stream watching at '${watchLevel}' level`);
+    jsTest.log(
+        `Validate behavior of moveCollection against a change stream watching at '${watchLevel}' level`,
+    );
     validateExpectedEventAndConfirmResumability(
         prepareUnshardedCollection,
         moveCollectionCmd,
@@ -217,7 +235,9 @@ for (let watchCollectionParameter of [kCollName, 1]) {
         },
     );
 
-    jsTest.log(`Validate behavior of unshardCollection against a change stream watching at '${watchLevel}' level`);
+    jsTest.log(
+        `Validate behavior of unshardCollection against a change stream watching at '${watchLevel}' level`,
+    );
     validateExpectedEventAndConfirmResumability(
         prepareShardedCollection,
         unshardCollectionCmd,

@@ -118,7 +118,11 @@ function testCoordinateCommitTransactionFails(userConnection, directConnection) 
 }
 
 jsTestLog("Running test on replica set.");
-const rs = new ReplSetTest({nodes: 1, setParameter: {logComponentVerbosity: {transaction: 4}}, keyFile: keyFile});
+const rs = new ReplSetTest({
+    nodes: 1,
+    setParameter: {logComponentVerbosity: {transaction: 4}},
+    keyFile: keyFile,
+});
 rs.startSet();
 rs.initiate();
 testCoordinateCommitTransactionFails(rs.getPrimary(), rs.getPrimary());

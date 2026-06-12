@@ -29,7 +29,10 @@ const initialSyncNode = rst.add({
         "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
         "numInitialSyncAttempts": 1,
         "logComponentVerbosity": tojson({replication: {verbosity: 1}}),
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: initialSyncSource.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: initialSyncSource.host},
+        }),
     },
 });
 rst.reInitiate();
@@ -67,7 +70,10 @@ assert.soonNoExcept(function () {
 
 // Release the initial failpoint.
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 jsTestLog("Waiting for initial sync to complete.");
@@ -103,7 +109,10 @@ beforeFinishFailPoint.off();
 checkLog.containsJson(initialSyncNode, 4853000);
 
 // Make sure the node is still REMOVED.
-assert.commandFailedWithCode(initialSyncNode.adminCommand({replSetGetStatus: 1}), ErrorCodes.InvalidReplicaSetConfig);
+assert.commandFailedWithCode(
+    initialSyncNode.adminCommand({replSetGetStatus: 1}),
+    ErrorCodes.InvalidReplicaSetConfig,
+);
 
 jsTestLog("Re-adding initial sync node a final time");
 config.members[1].host = origHost;

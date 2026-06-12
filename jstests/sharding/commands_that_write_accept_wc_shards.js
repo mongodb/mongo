@@ -510,7 +510,10 @@ function testValidWriteConcern(cmd) {
     cmd.setupFunc();
     let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
-    assert(!res.writeConcernError, "command on a full cluster had writeConcernError: " + tojson(res));
+    assert(
+        !res.writeConcernError,
+        "command on a full cluster had writeConcernError: " + tojson(res),
+    );
     cmd.confirmFunc();
 }
 
@@ -528,14 +531,20 @@ function testInvalidWriteConcern(cmd) {
     // written is bounded only by the number of documents produced by the pipeline, which could lead
     // a writeConcernError object to exceed maximum BSON size.
     if (cmd.req.aggregate || cmd.req.mapReduce) {
-        assert.commandFailedWithCode(res, [ErrorCodes.WriteConcernTimeout, ErrorCodes.UnknownReplWriteConcern]);
+        assert.commandFailedWithCode(res, [
+            ErrorCodes.WriteConcernTimeout,
+            ErrorCodes.UnknownReplWriteConcern,
+        ]);
 
         cmd.confirmFunc(cmd.isExpectedToWriteOnWriteConcernFailure);
     } else if (cmd.req.renameCollection) {
         // The renameCollection spans multiple nodes and potentially performs writes to the config
         // server, so the user-specified write concern has no effect.
         assert.commandWorked(res);
-        assert(!res.writeConcernError, "command on a full cluster had writeConcernError: " + tojson(res));
+        assert(
+            !res.writeConcernError,
+            "command on a full cluster had writeConcernError: " + tojson(res),
+        );
         cmd.confirmFunc();
     } else {
         assert.commandWorkedIgnoringWriteConcernErrors(res);

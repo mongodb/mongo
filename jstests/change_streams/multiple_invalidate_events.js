@@ -7,7 +7,10 @@
  * do_not_run_in_whole_db_passthrough
  * ]
  */
-import {assertCreateCollection, assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropAndRecreateCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {describe, it, afterEach} from "jstests/libs/mochalite.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
@@ -133,7 +136,12 @@ describe("changeStream resumability with multiple invalidate events", () => {
         csCursor = openChangeStream({collection: kCollName, resumeToken});
         csTest.assertNextChangesEqual({
             cursor: csCursor,
-            expectedChanges: [kCollectionCreateEvent, kInsertDocId1Event, kCollectionDropEvent, kInvalidateEvent],
+            expectedChanges: [
+                kCollectionCreateEvent,
+                kInsertDocId1Event,
+                kCollectionDropEvent,
+                kInvalidateEvent,
+            ],
             expectInvalidate: true,
         });
 
@@ -151,7 +159,12 @@ describe("changeStream resumability with multiple invalidate events", () => {
         csCursor = openChangeStream({collection: kCollName, resumeToken});
         csTest.assertNextChangesEqual({
             cursor: csCursor,
-            expectedChanges: [kCollectionCreateEvent, kInsertDocId2Event, kCollectionDropEvent, kInvalidateEvent],
+            expectedChanges: [
+                kCollectionCreateEvent,
+                kInsertDocId2Event,
+                kCollectionDropEvent,
+                kInvalidateEvent,
+            ],
             expectInvalidate: true,
         });
 

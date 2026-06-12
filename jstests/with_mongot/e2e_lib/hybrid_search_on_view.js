@@ -127,7 +127,12 @@ const mongotInputPipelines = new Set([
     vectorSearchPipelineZ,
 ]);
 
-export function createHybridSearchPipeline(inputPipelines, viewPipeline = null, stage, isRankFusion = true) {
+export function createHybridSearchPipeline(
+    inputPipelines,
+    viewPipeline = null,
+    stage,
+    isRankFusion = true,
+) {
     let hybridSearchStage = stage.$rankFusion;
     if (!isRankFusion) {
         hybridSearchStage = stage.$scoreFusion;
@@ -140,7 +145,11 @@ export function createHybridSearchPipeline(inputPipelines, viewPipeline = null, 
             // cannot be moved to the beginning. Placing the view pipeline and the rest of the
             // pipeline after this first stage achieves the same behavior.
             if (mongotInputPipelines.has(pipeline[0])) {
-                hybridSearchStage.input.pipelines[key] = [pipeline[0], ...viewPipeline, ...pipeline.splice(1)];
+                hybridSearchStage.input.pipelines[key] = [
+                    pipeline[0],
+                    ...viewPipeline,
+                    ...pipeline.splice(1),
+                ];
             }
         } else {
             // Otherwise, just use the input pipeline as is.
@@ -153,11 +162,19 @@ export function createHybridSearchPipeline(inputPipelines, viewPipeline = null, 
 
 const createSearchIndexes = (collOrView, indexNameSuffix = "") => {
     const searchIndexDef = {"mappings": {"dynamic": true}};
-    createSearchIndex(collOrView, {name: searchIndex1Name + indexNameSuffix, definition: searchIndexDef});
-    createSearchIndex(collOrView, {name: searchIndex2Name + indexNameSuffix, definition: searchIndexDef});
+    createSearchIndex(collOrView, {
+        name: searchIndex1Name + indexNameSuffix,
+        definition: searchIndexDef,
+    });
+    createSearchIndex(collOrView, {
+        name: searchIndex2Name + indexNameSuffix,
+        definition: searchIndexDef,
+    });
     const vectorSearchIndexDef = (path) => {
         return {
-            "fields": [{"type": "vector", "numDimensions": 5, "path": path, "similarity": "euclidean"}],
+            "fields": [
+                {"type": "vector", "numDimensions": 5, "path": path, "similarity": "euclidean"},
+            ],
         };
     };
     createSearchIndex(collOrView, {
@@ -218,19 +235,15 @@ const runAggregationsWithDifferentSearchIndexCombinations = (
     // on the view's underlying collection when the view does not have a search index is
     // allowed.
     createSearchIndexes(coll);
-    const [expectedResultsNoSearchIndexOnView, expectedExplainNoSearchIndexOnView] = generateResults(
-        coll,
-        pipelineWithViewPrepended,
-    );
+    const [expectedResultsNoSearchIndexOnView, expectedExplainNoSearchIndexOnView] =
+        generateResults(coll, pipelineWithViewPrepended);
 
     // Running a hybrid search query with a $search input pipeline that specifies a search index
     // on the view's underlying collection when the view ALSO has a search index of a different
     // name is allowed.
     createSearchIndexes(view, "_view");
-    const [expectedResultsWithSearchIndexOnView, expectedExplainWithSearchIndexOnView] = generateResults(
-        coll,
-        pipelineWithViewPrepended,
-    );
+    const [expectedResultsWithSearchIndexOnView, expectedExplainWithSearchIndexOnView] =
+        generateResults(coll, pipelineWithViewPrepended);
 
     // The expected results and expected explain results should be the same since the above
     // aggregation queries only specify indexes on the underlying collection. Thus, the
@@ -248,7 +261,10 @@ const runAggregationsWithDifferentSearchIndexCombinations = (
     // on the view when the view's underlying collection does not have a search index is
     // allowed.
     createSearchIndexes(view);
-    const [viewResultsNoSearchIndexOnColl, viewExplainNoSearchIndexOnColl] = generateResults(view, pipelineWithoutView);
+    const [viewResultsNoSearchIndexOnColl, viewExplainNoSearchIndexOnColl] = generateResults(
+        view,
+        pipelineWithoutView,
+    );
 
     // Running a hybrid search query with a $search input pipeline that specifies a search index
     // on the view when the view's underlying collection has a search index of a different name
@@ -332,10 +348,8 @@ export const runHybridSearchViewTest = (
     } else {
         // Running a hybrid search query over the main collection with the view stage prepended
         // succeeds.
-        const [expectedResultsNoSearchIndexOnView, expectedExplainNoSearchIndexOnView] = generateResults(
-            coll,
-            pipelineWithViewPrepended,
-        );
+        const [expectedResultsNoSearchIndexOnView, expectedExplainNoSearchIndexOnView] =
+            generateResults(coll, pipelineWithViewPrepended);
 
         // Running a hybrid search query against the view succeeds too.
         const [viewResultsNoSearchIndexOnColl, viewExplainNoSearchIndexOnColl] = generateResults(
@@ -344,7 +358,10 @@ export const runHybridSearchViewTest = (
         );
 
         // Verify the explain stages match.
-        verifyExplainStagesAreEqual(viewExplainNoSearchIndexOnColl, expectedExplainNoSearchIndexOnView);
+        verifyExplainStagesAreEqual(
+            viewExplainNoSearchIndexOnColl,
+            expectedExplainNoSearchIndexOnView,
+        );
 
         // Verify the results match.
         if (checkCorrectness) {
@@ -358,7 +375,10 @@ export const runHybridSearchViewTest = (
 
 // Test a $unionWith following a hybrid search stage ($rankFusion or $scoreFusion) to verify that
 // the stage's desugaring doesn't interfere with view resolution of the user provided $unionWith.
-export function testHybridSearchViewWithSubsequentUnionOnSameView(inputPipelines, createStagePipelineFn) {
+export function testHybridSearchViewWithSubsequentUnionOnSameView(
+    inputPipelines,
+    createStagePipelineFn,
+) {
     const viewPipeline = [{$sort: {x: -1}}, {$limit: 5}];
 
     // Create a view with viewStage.
@@ -367,7 +387,10 @@ export function testHybridSearchViewWithSubsequentUnionOnSameView(inputPipelines
     const view = db[viewName];
 
     // Create the pipeline with the view stage manually prepended.
-    const hybridSearchPipelineWithViewPrepended = createStagePipelineFn(inputPipelines, viewPipeline);
+    const hybridSearchPipelineWithViewPrepended = createStagePipelineFn(
+        inputPipelines,
+        viewPipeline,
+    );
 
     // Create the pipeline without the view stage
     const hybridSearchPipelineWithoutView = createStagePipelineFn(inputPipelines);
@@ -387,24 +410,45 @@ export function testHybridSearchViewWithSubsequentUnionOnSameView(inputPipelines
     // search stage runs against the base collection and $unionWith runs against a view.
     const filterPipeline = [{$sort: {_id: 1}}, {$limit: 3}];
 
-    const pipelineWithViewPrepended = [...hybridSearchPipelineWithViewPrepended, ...filterPipeline, ...[unionWithSpec]];
-    let resultsFromViewPrependedHybridSearchQuery = coll.aggregate(pipelineWithViewPrepended).toArray();
+    const pipelineWithViewPrepended = [
+        ...hybridSearchPipelineWithViewPrepended,
+        ...filterPipeline,
+        ...[unionWithSpec],
+    ];
+    let resultsFromViewPrependedHybridSearchQuery = coll
+        .aggregate(pipelineWithViewPrepended)
+        .toArray();
 
     // This query will contain a pipeline of [hybrid search stage, $unionWith] where the hybrid
     // search stage AND the $unionWith are run against the same view.
-    const pipelineWithoutViewPrepended = [...hybridSearchPipelineWithoutView, ...filterPipeline, ...[unionWithSpec]];
-    let resultsFromViewlessHybridSearchQuery = view.aggregate(pipelineWithoutViewPrepended).toArray();
+    const pipelineWithoutViewPrepended = [
+        ...hybridSearchPipelineWithoutView,
+        ...filterPipeline,
+        ...[unionWithSpec],
+    ];
+    let resultsFromViewlessHybridSearchQuery = view
+        .aggregate(pipelineWithoutViewPrepended)
+        .toArray();
 
     // Verify the results match.
-    assert.eq(resultsFromViewPrependedHybridSearchQuery.length, resultsFromViewlessHybridSearchQuery.length);
+    assert.eq(
+        resultsFromViewPrependedHybridSearchQuery.length,
+        resultsFromViewlessHybridSearchQuery.length,
+    );
     assert.eq(resultsFromViewPrependedHybridSearchQuery.length, 5);
-    assertDocArrExpectedFuzzy(resultsFromViewPrependedHybridSearchQuery, resultsFromViewlessHybridSearchQuery);
+    assertDocArrExpectedFuzzy(
+        resultsFromViewPrependedHybridSearchQuery,
+        resultsFromViewlessHybridSearchQuery,
+    );
 }
 
 // Test a $unionWith following a hybrid search stage ($rankFusion or $scoreFusion) to verify that
 // the stage's desugaring doesn't interfere with view resolution of the user provided $unionWith on
 // a different view.
-export function testHybridSearchViewWithSubsequentUnionOnDifferentView(inputPipelines, createStagePipelineFn) {
+export function testHybridSearchViewWithSubsequentUnionOnDifferentView(
+    inputPipelines,
+    createStagePipelineFn,
+) {
     const viewPipeline = [{$sort: {x: -1}}, {$limit: 5}];
 
     // Create a view with viewStage.
@@ -413,14 +457,18 @@ export function testHybridSearchViewWithSubsequentUnionOnDifferentView(inputPipe
     const view = db[viewName];
 
     // Create the hybrid search pipeline with the view stage manually prepended.
-    const hybridSearchPipelineWithViewPrepended = createStagePipelineFn(inputPipelines, viewPipeline);
+    const hybridSearchPipelineWithViewPrepended = createStagePipelineFn(
+        inputPipelines,
+        viewPipeline,
+    );
 
     // Create the hybrid search pipeline without the view stage
     const hybridSearchPipelineWithoutView = createStagePipelineFn(inputPipelines);
 
     // Create the subsequent $unionWith, on a different view as the query.
     const unionWithViewPipeline = [{$sort: {_id: 1, x: 1}}, {$limit: 5}];
-    const unionWithViewName = jsTestName() + "_subsequent_union_with_on_different_view_union_with_view";
+    const unionWithViewName =
+        jsTestName() + "_subsequent_union_with_on_different_view_union_with_view";
     assert.commandWorked(db.createView(unionWithViewName, coll.getName(), unionWithViewPipeline));
     const unionWithSpec = {
         $unionWith: {coll: unionWithViewName, pipeline: [{$match: {x: {$lt: 15}}}]},
@@ -433,16 +481,29 @@ export function testHybridSearchViewWithSubsequentUnionOnDifferentView(inputPipe
 
     // This query will contain a pipeline of [hybrid search stage, $unionWith] where the hybrid
     // search stage runs against the base collection and $unionWith runs against its own view.
-    const pipelineWithViewPrepended = [...hybridSearchPipelineWithViewPrepended, ...[unionWithSpec]];
-    let resultsFromViewPrependedHybridSearchQuery = coll.aggregate(pipelineWithViewPrepended).toArray();
+    const pipelineWithViewPrepended = [
+        ...hybridSearchPipelineWithViewPrepended,
+        ...[unionWithSpec],
+    ];
+    let resultsFromViewPrependedHybridSearchQuery = coll
+        .aggregate(pipelineWithViewPrepended)
+        .toArray();
 
     // This query will contain a pipeline of [hybrid search stage, $unionWith] where the hybrid
     // search stage runs against one view and the $unionWith runs against another view.
     const pipelineWithoutViewPrepended = [...hybridSearchPipelineWithoutView, ...[unionWithSpec]];
-    let resultsFromViewlessHybridSearchQuery = view.aggregate(pipelineWithoutViewPrepended).toArray();
+    let resultsFromViewlessHybridSearchQuery = view
+        .aggregate(pipelineWithoutViewPrepended)
+        .toArray();
 
     // Verify the results match.
-    assert.eq(resultsFromViewPrependedHybridSearchQuery.length, resultsFromViewlessHybridSearchQuery.length);
+    assert.eq(
+        resultsFromViewPrependedHybridSearchQuery.length,
+        resultsFromViewlessHybridSearchQuery.length,
+    );
     assert.eq(resultsFromViewPrependedHybridSearchQuery.length, 10);
-    assertDocArrExpectedFuzzy(resultsFromViewPrependedHybridSearchQuery, resultsFromViewlessHybridSearchQuery);
+    assertDocArrExpectedFuzzy(
+        resultsFromViewPrependedHybridSearchQuery,
+        resultsFromViewlessHybridSearchQuery,
+    );
 }

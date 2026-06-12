@@ -12,7 +12,9 @@ const collName = "ts";
 testDB.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata"}});
 
 assert.commandWorked(testDB.runCommand({drop: collName}));
-assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 const coll = testDB[collName];
 
 const bucket = {
@@ -47,7 +49,9 @@ const bucket = {
     },
 };
 
-assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}),
+);
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(coll), true);
 
 // There should be no reason to have validation errors in the empty collection.
@@ -62,7 +66,9 @@ assert(res.valid);
 assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
 assert.eq(res.warnings.length, 0, "Validation warnings detected when there should be none.");
 
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)),
+);
 // Even though a mixed schema bucket has been inserted, since the mixed schema data is allowed there
 // should be no errors.
 res = assert.commandWorked(coll.validate());
@@ -72,7 +78,9 @@ assert.eq(res.errors.length, 0, "Validation errors detected when there should be
 assert.eq(res.warnings.length, 1);
 assert.containsPrefix("Detected a time-series bucket with mixed schema data", res.warnings);
 
-assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}),
+);
 
 // Now that the allow mixed schema flag is false, an error should be returned after validating.
 res = assert.commandWorked(coll.validate());

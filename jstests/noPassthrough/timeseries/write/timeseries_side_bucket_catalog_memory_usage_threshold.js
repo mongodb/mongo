@@ -45,10 +45,15 @@ const runSideBucketTest = (setAtRuntime) => {
     const coll = db.timeseries_idle_buckets;
 
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     let stats = assert.commandWorked(coll.stats());
-    assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToMemoryThreshold"), 0);
+    assert.eq(
+        TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToMemoryThreshold"),
+        0,
+    );
 
     const numDocs = 100;
     const metaValue = "a";
@@ -88,7 +93,11 @@ const runSideBucketTest = (setAtRuntime) => {
 
     // Check that some buckets were archived due to memory pressure.
     stats = assert.commandWorked(coll.stats());
-    assert.gt(stats.timeseries.numBucketsArchivedDueToMemoryThreshold, 0, "Did not find an archived bucket");
+    assert.gt(
+        stats.timeseries.numBucketsArchivedDueToMemoryThreshold,
+        0,
+        "Did not find an archived bucket",
+    );
 
     // It is possible that archiving buckets alone was not enough to get the side bucket catalog
     // below the memory usage threshold. In this case, archived buckets will then also be closed.

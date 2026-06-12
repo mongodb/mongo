@@ -43,7 +43,10 @@ runTest({$filter: {input: {$range: [0, 15]}, cond: "a"}});
 // should not use more than 100mb of memory
 assertErrorCode(
     db,
-    [{$documents: [{}]}, {$project: {a: {$map: {input: {$range: [0, 200]}, in: "a".repeat(1024 * 1024)}}}}],
+    [
+        {$documents: [{}]},
+        {$project: {a: {$map: {input: {$range: [0, 200]}, in: "a".repeat(1024 * 1024)}}}},
+    ],
     ErrorCodes.ExceededMemoryLimit,
 );
 

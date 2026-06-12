@@ -51,7 +51,9 @@ const shardsvrReshardingOperationTimeFailpoint = configureFailPoint(recipient, "
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {"metaTest.y": 1},
-        newChunks: [{min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]}],
+        newChunks: [
+            {min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]},
+        ],
     },
     () => {
         // We wait until cloneTimestamp has been chosen to guarantee that any subsequent writes will

@@ -61,7 +61,14 @@ function benchrun_sub_remove() {
     const t = db.benchrun_sub;
     t.drop();
 
-    const ops = [{op: "remove", ns: "test.benchrun_sub", query: {x: {"#RAND_INT": [0, 100]}}, writeCmd: true}];
+    const ops = [
+        {
+            op: "remove",
+            ns: "test.benchrun_sub",
+            query: {x: {"#RAND_INT": [0, 100]}},
+            writeCmd: true,
+        },
+    ];
 
     for (let i = 0; i < 100; ++i) {
         assert.commandWorked(t.insert({x: i}));

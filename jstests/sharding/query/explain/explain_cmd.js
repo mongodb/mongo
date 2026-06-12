@@ -13,7 +13,9 @@ let st = new ShardingTest({shards: 2});
 var db = st.s.getDB("test");
 let explain;
 
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}),
+);
 
 // Setup a collection that will be sharded. The shard key will be 'a'. There's also an index on
 // 'b'.
@@ -27,10 +29,14 @@ db.adminCommand({shardCollection: collSharded.getFullName(), key: {a: 1}});
 // Pre-split the collection to ensure that both shards have chunks. Explicitly
 // move chunks since the balancer is disabled.
 assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: {a: 1}}));
-printjson(db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: 1}, to: st.shard0.shardName}));
+printjson(
+    db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: 1}, to: st.shard0.shardName}),
+);
 
 assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: {a: 2}}));
-printjson(db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: 2}, to: st.shard1.shardName}));
+printjson(
+    db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: 2}, to: st.shard1.shardName}),
+);
 
 // Put data on each shard.
 for (let i = 0; i < 3; i++) {
@@ -43,7 +49,10 @@ st.printShardingStatus();
 assert.eq(3, collSharded.count({b: 1}));
 
 // Explain the scatter-gather count.
-explain = db.runCommand({explain: {count: collSharded.getName(), query: {b: 1}}, verbosity: "allPlansExecution"});
+explain = db.runCommand({
+    explain: {count: collSharded.getName(), query: {b: 1}},
+    verbosity: "allPlansExecution",
+});
 
 // Validate some basic properties of the result.
 printjson(explain);
@@ -56,7 +65,10 @@ assert("serverInfo" in explain, explain);
 assert.hasFields(explain.serverInfo, ["host", "port", "version", "gitVersion"]);
 
 // An explain of a command that doesn't exist should fail gracefully.
-explain = db.runCommand({explain: {nonexistent: collSharded.getName(), query: {b: 1}}, verbosity: "allPlansExecution"});
+explain = db.runCommand({
+    explain: {nonexistent: collSharded.getName(), query: {b: 1}},
+    verbosity: "allPlansExecution",
+});
 printjson(explain);
 assert.commandFailed(explain);
 

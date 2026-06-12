@@ -47,7 +47,10 @@ function getSpillingAttrs(obj) {
 function outputPipelineAndSlowQueryLog(coll, pipeline, comment) {
     coll.aggregate(pipeline, {comment: comment}).itcount();
     const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-    const slowQueryLogLine = findMatchingLogLine(globalLog.log, {msg: "Slow query", comment: comment});
+    const slowQueryLogLine = findMatchingLogLine(globalLog.log, {
+        msg: "Slow query",
+        comment: comment,
+    });
     assert(slowQueryLogLine, "Failed to find a log line matching the comment: " + comment);
 
     const {spillingStats, spillStorageStats} = getSpillingAttrs(JSON.parse(slowQueryLogLine));
@@ -67,7 +70,9 @@ function outputPipelineAndSlowQueryLog(coll, pipeline, comment) {
 }
 
 function initTimeseriesColl(coll) {
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}),
+    );
     const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries
         .bucketMaxSpanSeconds;
 
@@ -200,7 +205,9 @@ outputPipelineAndSlowQueryLog(
 
 coll.drop();
 
-saveParameterToRestore("internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill");
+saveParameterToRestore(
+    "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+);
 section("HashLookup");
 setServerParameter("internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1);
 
@@ -233,7 +240,12 @@ outputPipelineAndSlowQueryLog(
     people,
     [
         {
-            $lookup: {from: students.getName(), localField: "name", foreignField: "name", as: "matched"},
+            $lookup: {
+                from: students.getName(),
+                localField: "name",
+                foreignField: "name",
+                as: "matched",
+            },
         },
     ],
     "$lookup",
@@ -323,7 +335,12 @@ outputPipelineAndSlowQueryLog(
     animals,
     [
         {
-            $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
+            $lookup: {
+                from: locations.getName(),
+                localField: "locationName",
+                foreignField: "name",
+                as: "location",
+            },
         },
         {$unwind: "$location"},
         {
@@ -353,7 +370,9 @@ assert.commandWorked(
     ]),
 );
 
-const setWindowFieldsPipeline = [{$setWindowFields: {partitionBy: "$a", sortBy: {b: 1}, output: {sum: {$sum: "$b"}}}}];
+const setWindowFieldsPipeline = [
+    {$setWindowFields: {partitionBy: "$a", sortBy: {b: 1}, output: {sum: {$sum: "$b"}}}},
+];
 
 function getSetWindowFieldsMemoryLimit() {
     const explain = coll.explain().aggregate(setWindowFieldsPipeline);
@@ -367,10 +386,17 @@ function getSetWindowFieldsMemoryLimit() {
     }
 }
 
-setServerParameter("internalDocumentSourceSetWindowFieldsMaxMemoryBytes", getSetWindowFieldsMemoryLimit());
+setServerParameter(
+    "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+    getSetWindowFieldsMemoryLimit(),
+);
 
 outputPipelineAndSlowQueryLog(coll, setWindowFieldsPipeline, "$setWindowFields");
-outputPipelineAndSlowQueryLog(coll, setWindowFieldsPipeline.concat([{$limit: 1}]), "$setWindowFields + $limit");
+outputPipelineAndSlowQueryLog(
+    coll,
+    setWindowFieldsPipeline.concat([{$limit: 1}]),
+    "$setWindowFields + $limit",
+);
 
 coll.drop();
 

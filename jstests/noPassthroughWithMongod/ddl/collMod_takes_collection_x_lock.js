@@ -30,7 +30,11 @@ assert.soon(() => {
     for (let i = 0; i < lockInfo.length; i++) {
         let resourceId = lockInfo[i].resourceId;
         const mode = lockInfo[i].granted[0].mode;
-        if (resourceId.includes("Collection") && resourceId.includes("test." + collectionName) && mode === "X") {
+        if (
+            resourceId.includes("Collection") &&
+            resourceId.includes("test." + collectionName) &&
+            mode === "X"
+        ) {
             return true;
         }
     }

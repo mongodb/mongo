@@ -21,10 +21,14 @@ if (lastLTSFCV != "8.0") {
 function runTest(db, hangIndexBuildConn, startFCV, targetFCV) {
     const coll = db.ts;
 
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: startFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: startFCV, confirm: true}),
+    );
 
     assert(coll.drop());
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     // Force a two-phase index build to hang.
     assert.commandWorked(coll.insertOne({t: ISODate(), m: 1}));
@@ -33,7 +37,11 @@ function runTest(db, hangIndexBuildConn, startFCV, targetFCV) {
         createIndexes: coll.getName(),
         indexes: [{key: {m: 1}, name: "m_1"}],
     });
-    IndexBuildTest.waitForIndexBuildToStart(hangIndexBuildConn.getDB(db.getName()), coll.getName(), "m_1");
+    IndexBuildTest.waitForIndexBuildToStart(
+        hangIndexBuildConn.getDB(db.getName()),
+        coll.getName(),
+        "m_1",
+    );
 
     // setFCV fails while an index build is in progress.
     assert.commandFailedWithCode(
@@ -44,7 +52,9 @@ function runTest(db, hangIndexBuildConn, startFCV, targetFCV) {
     // The FCV transition succeeds after the index build finishes.
     IndexBuildTest.resumeIndexBuilds(hangIndexBuildConn);
     awaitBuild();
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+    );
 }
 
 // Replica set

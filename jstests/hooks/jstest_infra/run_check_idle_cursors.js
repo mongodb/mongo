@@ -46,7 +46,10 @@ function assertNoIdleCursors(conn) {
         jsTest.log.info("Killing idle cursors for connection", {conn, idleCursors});
         idleCursors.forEach(function (idleCursor) {
             assert.commandWorked(
-                conn.getDB("admin").runCommand({killCursors: idleCursor.ns, cursors: [idleCursor.cursor.cursorId]}),
+                conn.getDB("admin").runCommand({
+                    killCursors: idleCursor.ns,
+                    cursors: [idleCursor.cursor.cursorId],
+                }),
             );
         });
 
@@ -60,7 +63,9 @@ function assertNoIdleCursors(conn) {
     const nodesToConnectTo = (function () {
         const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
         if (topology.mongos) {
-            const shardConnStrings = Object.values(topology.shards).flatMap((shardInfo) => shardInfo.nodes);
+            const shardConnStrings = Object.values(topology.shards).flatMap(
+                (shardInfo) => shardInfo.nodes,
+            );
             return topology.mongos.nodes.concat(shardConnStrings);
         }
 

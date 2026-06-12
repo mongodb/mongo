@@ -30,10 +30,14 @@ describe("commitShardRemoval correct functionality test", function () {
         assert.commandWorked(this.st.s.adminCommand({addShard: this.rs2.getURL()}));
 
         // Create DB
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: "repl2"}));
+        assert.commandWorked(
+            this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: "repl2"}),
+        );
 
         // Add unsharded collections
-        assert.commandWorked(this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}));
+        assert.commandWorked(
+            this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}),
+        );
 
         // Start draining the shards
         assert.commandWorked(this.st.s.adminCommand({startShardDraining: "repl1"}));

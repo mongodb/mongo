@@ -105,7 +105,9 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     assertDropCollection(testDB, collName);
 
     if (clustered) {
-        assert.commandWorked(testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+        );
     }
 
     const collCount = 5032; // Intentionally not a multiple of the default batch size.
@@ -120,7 +122,9 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     assert.commandWorked(coll.createIndex({b: 1}));
 
     const hangAfterApproxNDocs = Random.randInt(collCount);
-    jsTestLog(`About to hang batched delete after evaluating approximately ${hangAfterApproxNDocs} documents`);
+    jsTestLog(
+        `About to hang batched delete after evaluating approximately ${hangAfterApproxNDocs} documents`,
+    );
 
     // When the delete fails, the failpoint will automatically unpause. If the connection is killed,
     // it is unsafe to try and disable the failpoint tied to testDB's original connection.
@@ -137,7 +141,10 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
                 const coll = testDB.getCollection(collName);
                 try {
                     assert.commandFailed(
-                        testDB.runCommand({delete: collName, deletes: [{q: {_id: {$gte: 0}}, limit: 0}]}),
+                        testDB.runCommand({
+                            delete: collName,
+                            deletes: [{q: {_id: {$gte: 0}}, limit: 0}],
+                        }),
                     );
                 } catch (e) {
                     if (!isNetworkError(e) || !expectNetworkErrorOnDelete) {

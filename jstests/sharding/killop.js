@@ -40,7 +40,9 @@ function runKillOpTest(expectedErrorCode) {
     assert.commandWorked(adminDB.runCommand(command));
 
     // Ensure that the operation gets marked kill pending while it's still hanging.
-    let result = adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: curOpFilter}]).toArray();
+    let result = adminDB
+        .aggregate([{$currentOp: {localOps: true}}, {$match: curOpFilter}])
+        .toArray();
     assert(result.length === 1, tojson(result));
     assert(result[0].hasOwnProperty("killPending"));
     assert.eq(true, result[0].killPending);

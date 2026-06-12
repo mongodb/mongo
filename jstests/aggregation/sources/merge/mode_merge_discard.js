@@ -240,7 +240,10 @@ const pipeline = [mergeStage];
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: "a"}, mergeStage.$merge)}]),
+        source.aggregate([
+            {$project: {_id: 0}},
+            {$merge: Object.assign({on: "a"}, mergeStage.$merge)},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -271,7 +274,10 @@ const pipeline = [mergeStage];
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: ["a", "b"]}, mergeStage.$merge)}]),
+        source.aggregate([
+            {$project: {_id: 0}},
+            {$merge: Object.assign({on: ["a", "b"]}, mergeStage.$merge)},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -307,7 +313,10 @@ const pipeline = [mergeStage];
     );
     assert.commandWorked(target.insert({_id: 2, a: {b: "c"}, d: "z"}));
     assert.doesNotThrow(() =>
-        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: "a.b"}, mergeStage.$merge)}]),
+        source.aggregate([
+            {$project: {_id: 0}},
+            {$merge: Object.assign({on: "a.b"}, mergeStage.$merge)},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -337,7 +346,10 @@ const pipeline = [mergeStage];
     assert.commandWorked(source.createIndex({_id: 1, a: -1}, {unique: true}));
     assert.commandWorked(target.createIndex({_id: 1, a: -1}, {unique: true}));
     assert.doesNotThrow(() =>
-        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: ["_id", "a"]}, mergeStage.$merge)}]),
+        source.aggregate([
+            {$project: {_id: 0}},
+            {$merge: Object.assign({on: ["_id", "a"]}, mergeStage.$merge)},
+        ]),
     );
     assertArrayEq({actual: target.find({}, {_id: 0}).toArray(), expected: [{b: "c"}]});
     assert.commandWorked(source.dropIndex({_id: 1, a: -1}));

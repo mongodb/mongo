@@ -51,7 +51,9 @@ const lookupPipeline = [
     {$match: {_id: 100}},
     {$lookup: {from: coll.getName(), pipeline: [countQuery], as: "meta_facet"}},
 ];
-let expectedLookup = [{"_id": 100, "localField": "cakes", "weird": false, "meta_facet": expectedBasic}];
+let expectedLookup = [
+    {"_id": 100, "localField": "cakes", "weird": false, "meta_facet": expectedBasic},
+];
 let resultLookup = collBase.aggregate(lookupPipeline).toArray();
 assert.sameMembers(resultLookup, expectedLookup);
 
@@ -96,7 +98,10 @@ const superNestPipeline = [
     {
         $unionWith: {
             coll: coll.getName(),
-            pipeline: [countQuery, {$lookup: {from: coll.getName(), pipeline: [countQuery], as: "union_then_lookup"}}],
+            pipeline: [
+                countQuery,
+                {$lookup: {from: coll.getName(), pipeline: [countQuery], as: "union_then_lookup"}},
+            ],
         },
     },
     {
@@ -104,7 +109,13 @@ const superNestPipeline = [
             from: coll.getName(),
             pipeline: [
                 countQuery,
-                {$lookup: {from: coll.getName(), pipeline: [countQuery], as: "lookup_then_lookup(nested)"}},
+                {
+                    $lookup: {
+                        from: coll.getName(),
+                        pipeline: [countQuery],
+                        as: "lookup_then_lookup(nested)",
+                    },
+                },
             ],
             as: "lookup_then_lookup(top)",
         },
@@ -122,7 +133,10 @@ const superNestPipeline = [
 let expectedSuperNested = [
     {
         "localField": "cakes",
-        "lookup_then_unionWith": [{"count": {"total": NumberLong(9000)}}, {"count": {"total": NumberLong(9000)}}],
+        "lookup_then_unionWith": [
+            {"count": {"total": NumberLong(9000)}},
+            {"count": {"total": NumberLong(9000)}},
+        ],
         "lookup_then_lookup(top)": [
             {
                 "count": {"total": NumberLong(9000)},

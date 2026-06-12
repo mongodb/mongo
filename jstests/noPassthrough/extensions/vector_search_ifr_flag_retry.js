@@ -5,7 +5,10 @@
  *
  * @tags: [ featureFlagExtensionsAPI ]
  */
-import {getParameter, setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    getParameter,
+    setParameterOnAllNonConfigNodes,
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkPlatformCompatibleWithExtensions,
@@ -91,7 +94,9 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
         expectedLegacyDelta,
         queries: [
             () => {
-                assert.commandWorked(view.explain("executionStats").aggregate([{$vectorSearch: vectorSearchQuery}]));
+                assert.commandWorked(
+                    view.explain("executionStats").aggregate([{$vectorSearch: vectorSearchQuery}]),
+                );
             },
             () => {
                 view.aggregate([{$vectorSearch: vectorSearchQuery}]).toArray();
@@ -200,7 +205,9 @@ function runUnionWithVectorSearchTests({
             ...(shouldExplain
                 ? [
                       () => {
-                          assert.commandWorked(coll.explain("executionStats").aggregate([unionWithStage]));
+                          assert.commandWorked(
+                              coll.explain("executionStats").aggregate([unionWithStage]),
+                          );
                       },
                   ]
                 : []),
@@ -211,7 +218,12 @@ function runUnionWithVectorSearchTests({
     });
 }
 
-function runUnionWithOnViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
+function runUnionWithOnViewVectorSearchTests(
+    conn,
+    mongotMock,
+    featureFlagValue,
+    shardingTest = null,
+) {
     // The test driver will set up the view for us. We just need to provide parameters to indicate that
     // we should use it. Skipping explain because $unionWith + a view + explain + legacy $vectorSearch
     // fails (SERVER-117879).
@@ -240,7 +252,9 @@ function runUnionWithOnViewWithVectorSearchInViewDefinitionTests(
     // resolution instead of during parsing.
     const vectorSearchViewPipeline = [{$vectorSearch: vectorSearchQuery}];
     const vectorSearchViewName = kTestViewName + "_vectorSearch";
-    assert.commandWorked(testDb.createView(vectorSearchViewName, kTestCollName, vectorSearchViewPipeline));
+    assert.commandWorked(
+        testDb.createView(vectorSearchViewName, kTestCollName, vectorSearchViewPipeline),
+    );
 
     const unionWithStage = {
         $unionWith: {

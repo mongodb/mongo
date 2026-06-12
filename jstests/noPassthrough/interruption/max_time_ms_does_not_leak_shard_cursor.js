@@ -70,7 +70,11 @@ assertNoIdleCursors(st.shard0, collName);
     assert.eq(getIdleCursors(st.shard0, collName).length, 0);
     assert.throwsWithCode(
         () => curs.itcount(),
-        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit, ErrorCodes.Interrupted],
+        [
+            ErrorCodes.MaxTimeMSExpired,
+            ErrorCodes.NetworkInterfaceExceededTimeLimit,
+            ErrorCodes.Interrupted,
+        ],
     );
     assertNoIdleCursors(st.shard0, collName, curs);
 }
@@ -79,9 +83,13 @@ assertNoIdleCursors(st.shard0, collName);
 // occasionally return the 'NetworkInterfaceExceededTimeLimit' error.
 {
     const curs = coll.find().batchSize(2).maxTimeMS(100);
-    const fp = configureFailPoint(st.shard0, "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch", {
-        shouldCheckForInterrupt: true,
-    });
+    const fp = configureFailPoint(
+        st.shard0,
+        "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
+        {
+            shouldCheckForInterrupt: true,
+        },
+    );
     assert.throwsWithCode(
         () => curs.itcount(),
         [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit],

@@ -25,7 +25,13 @@ const sleepFunction = function (sleepDB) {
     // If oplog application of any of the DDLs below needs to wait on this lock,
     // holding this lock will trigger a test timeout.
     assert.commandFailedWithCode(
-        db.adminCommand({sleep: 1, secs: 18000, lockTarget: sleepDB, lock: "ir", $comment: "Lock sleep"}),
+        db.adminCommand({
+            sleep: 1,
+            secs: 18000,
+            lockTarget: sleepDB,
+            lock: "ir",
+            $comment: "Lock sleep",
+        }),
         ErrorCodes.Interrupted,
     );
 };
@@ -42,7 +48,9 @@ const sleepID = waitForCommand(
     const testDB = primary.getDB(testDBName);
     assert.commandWorked(testDB.runCommand({create: testCollName, writeConcern: {w: 2}}));
 
-    assert.commandWorked(testDB.runCommand({collMod: testCollName, validator: {v: 1}, writeConcern: {w: 2}}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: testCollName, validator: {v: 1}, writeConcern: {w: 2}}),
+    );
 
     assert.commandWorked(
         testDB.runCommand({
@@ -52,7 +60,9 @@ const sleepID = waitForCommand(
         }),
     );
 
-    assert.commandWorked(testDB.runCommand({dropIndexes: testCollName, index: "x_1", writeConcern: {w: 2}}));
+    assert.commandWorked(
+        testDB.runCommand({dropIndexes: testCollName, index: "x_1", writeConcern: {w: 2}}),
+    );
 
     assert.commandWorked(
         primary.getDB("admin").runCommand({

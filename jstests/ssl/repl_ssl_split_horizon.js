@@ -25,7 +25,9 @@ if (rc != 0) {
     clearRawMongoProgramOutput();
     rc = runProgram("getconf", "GNU_LIBC_VERSION");
     if (rc != 0) {
-        jsTestLog(`Failed the check for GLIBC version, we are probably on a non-GNU platform. Skipping this test.`);
+        jsTestLog(
+            `Failed the check for GLIBC version, we are probably on a non-GNU platform. Skipping this test.`,
+        );
         quit();
     }
 
@@ -40,7 +42,9 @@ if (rc != 0) {
 
     rc = runProgram("cat", "/etc/os-release");
     if (rc != 0) {
-        jsTestLog(`Failed the check for /etc/os-release, we are probably not on a *nix. Skipping this test.`);
+        jsTestLog(
+            `Failed the check for /etc/os-release, we are probably not on a *nix. Skipping this test.`,
+        );
         quit();
     }
 
@@ -117,7 +121,11 @@ let checkExpectedHorizon = function (url, memberIndex, expectedHostname) {
     const assertion =
         memberIndex === "me"
             ? "assert(db.runCommand({isMaster: 1})['me'] == '" + expectedHostname + "')"
-            : "assert(db.runCommand({isMaster: 1})['hosts'][" + memberIndex + "] == '" + expectedHostname + "')";
+            : "assert(db.runCommand({isMaster: 1})['hosts'][" +
+              memberIndex +
+              "] == '" +
+              expectedHostname +
+              "')";
 
     let argv = [
         "env",
@@ -137,27 +145,59 @@ let checkExpectedHorizon = function (url, memberIndex, expectedHostname) {
 // Using localhost should use the default horizon
 let defaultURL = `mongodb://${node0localHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL without horizon: ${defaultURL}`);
-assert.eq(checkExpectedHorizon(defaultURL, 0, node0localHostname), 0, "localhost does not return horizon");
-assert.eq(checkExpectedHorizon(defaultURL, "me", node0localHostname), 0, "localhost does not return horizon");
-assert.eq(checkExpectedHorizon(defaultURL, 1, node1localHostname), 0, "localhost does not return horizon");
+assert.eq(
+    checkExpectedHorizon(defaultURL, 0, node0localHostname),
+    0,
+    "localhost does not return horizon",
+);
+assert.eq(
+    checkExpectedHorizon(defaultURL, "me", node0localHostname),
+    0,
+    "localhost does not return horizon",
+);
+assert.eq(
+    checkExpectedHorizon(defaultURL, 1, node1localHostname),
+    0,
+    "localhost does not return horizon",
+);
 
 // Using 'splithorizon1' should use that horizon
 let horizonURL = `mongodb://${node0horizonHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL with horizon: ${horizonURL}`);
-assert.eq(checkExpectedHorizon(horizonURL, 0, node0horizonHostname), 0, "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonURL, "me", node0horizonHostname), 0, "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonURL, 1, node1horizonHostname), 0, "does not return horizon as expected");
+assert.eq(
+    checkExpectedHorizon(horizonURL, 0, node0horizonHostname),
+    0,
+    "does not return horizon as expected",
+);
+assert.eq(
+    checkExpectedHorizon(horizonURL, "me", node0horizonHostname),
+    0,
+    "does not return horizon as expected",
+);
+assert.eq(
+    checkExpectedHorizon(horizonURL, 1, node1horizonHostname),
+    0,
+    "does not return horizon as expected",
+);
 
 // Using 'splithorizon2' does not have a horizon so it should return default
 let horizonMissingURL = `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL with horizon: ${horizonMissingURL}`);
-assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0localHostname), 0, "does not return localhost as expected");
+assert.eq(
+    checkExpectedHorizon(horizonMissingURL, 0, node0localHostname),
+    0,
+    "does not return localhost as expected",
+);
 assert.eq(
     checkExpectedHorizon(horizonMissingURL, "me", node0localHostname),
     0,
     "does not return localhost as expected",
 );
-assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1localHostname), 0, "does not return localhost as expected");
+assert.eq(
+    checkExpectedHorizon(horizonMissingURL, 1, node1localHostname),
+    0,
+    "does not return localhost as expected",
+);
 
 // Check so we can replSetReconfig to add another horizon.
 // Add 2 to the config version to account for the 'newlyAdded' removal reconfig.

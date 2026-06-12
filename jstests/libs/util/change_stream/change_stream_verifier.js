@@ -23,7 +23,10 @@
  * It reads events from the Connector storage and validates them against matchers.
  */
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
-import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
+import {
+    ChangeStreamReader,
+    ChangeStreamReadingMode,
+} from "jstests/libs/util/change_stream/change_stream_reader.js";
 
 /**
  * Format a change event record for debugging output.
@@ -83,7 +86,12 @@ class VerifierContext {
      * @returns {Array} Array of change event records
      */
     readChangeEventsFromClusterTime(conn, instanceName, clusterTime, limit) {
-        const readerInstanceName = this.launchReaderFromClusterTime(conn, instanceName, clusterTime, limit);
+        const readerInstanceName = this.launchReaderFromClusterTime(
+            conn,
+            instanceName,
+            clusterTime,
+            limit,
+        );
         return this.getChangeEvents(conn, readerInstanceName);
     }
 
@@ -152,7 +160,10 @@ class VerifierContext {
                 filter.ts.$lte = endTime;
             }
 
-            const oplogCursor = shardConn.getDB("local").oplog.rs.find(filter, {ts: 1}).sort({ts: 1});
+            const oplogCursor = shardConn
+                .getDB("local")
+                .oplog.rs.find(filter, {ts: 1})
+                .sort({ts: 1});
 
             while (oplogCursor.hasNext()) {
                 const entry = oplogCursor.next();
@@ -211,7 +222,9 @@ function assertMatcherDone(matcher, events, ctx, readerInstanceName) {
     const expectedGroups = matcher.getExpectedOperationTypes();
 
     const totalExpected = expectedGroups.reduce((s, g) => s + g.length, 0);
-    const expectedLines = expectedGroups.map((g, i) => `  stream ${i}(${g.length}): [${g.join(", ")}]`).join("\n");
+    const expectedLines = expectedGroups
+        .map((g, i) => `  stream ${i}(${g.length}): [${g.join(", ")}]`)
+        .join("\n");
     const actualInline = `[${actualTypes.join(", ")}]`;
 
     jsTest.log.info("FSM command trace (on mismatch)", {
@@ -346,10 +359,17 @@ class PrefixReadTestCase {
     _buildWorkItems(events, clusterTimes) {
         const items = [];
         for (const ts of clusterTimes) {
-            const startIdx = events.findIndex((rec) => bsonWoCompare(rec.changeEvent.clusterTime, ts) >= 0);
-            assert(startIdx >= 0, `No event found with clusterTime >= ${tojson(ts)}, but ts is within event range`);
+            const startIdx = events.findIndex(
+                (rec) => bsonWoCompare(rec.changeEvent.clusterTime, ts) >= 0,
+            );
+            assert(
+                startIdx >= 0,
+                `No event found with clusterTime >= ${tojson(ts)}, but ts is within event range`,
+            );
 
-            const expected = events.slice(startIdx, startIdx + this._limit).map(PrefixReadTestCase._extractComparable);
+            const expected = events
+                .slice(startIdx, startIdx + this._limit)
+                .map(PrefixReadTestCase._extractComparable);
             if (expected.length > 0) {
                 items.push({ts, expected});
             }
@@ -370,7 +390,9 @@ class PrefixReadTestCase {
     }
 
     _verifyReader(conn, ctx, item) {
-        const actual = ctx.getChangeEvents(conn, item.readerInstanceName).map(PrefixReadTestCase._extractComparable);
+        const actual = ctx
+            .getChangeEvents(conn, item.readerInstanceName)
+            .map(PrefixReadTestCase._extractComparable);
         const expected = item.expected.slice(0, actual.length);
         assert(
             bsonUnorderedFieldsCompare(expected, actual) === 0,
@@ -384,7 +406,10 @@ class PrefixReadTestCase {
         if (events.length === 0) {
             // IRS (ignoreRemovedShards) drain readers can legitimately see zero
             // events when the removed shard held all data for this collection.
-            assert(this._allowSkips, "No events captured but allowSkips is false — this indicates a real bug");
+            assert(
+                this._allowSkips,
+                "No events captured but allowSkips is false — this indicates a real bug",
+            );
             return;
         }
 
@@ -404,7 +429,10 @@ class PrefixReadTestCase {
         // As each reader completes verification, the next one is launched.
         const inflight = [];
         let next = 0;
-        while (next < workItems.length && inflight.length < PrefixReadTestCase.kParallelReadersCount) {
+        while (
+            next < workItems.length &&
+            inflight.length < PrefixReadTestCase.kParallelReadersCount
+        ) {
             inflight.push(this._launchReader(conn, ctx, workItems[next++]));
         }
         while (inflight.length > 0) {

@@ -42,7 +42,11 @@ try {
         const adminDB = conn.getDB("admin");
 
         // $listExtensions should fail when the feature flag is off.
-        const res = adminDB.runCommand({aggregate: 1, pipeline: [{$listExtensions: {}}], cursor: {}});
+        const res = adminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$listExtensions: {}}],
+            cursor: {},
+        });
         assert.commandFailedWithCode(res, ErrorCodes.QueryFeatureNotAllowed);
 
         MongoRunner.stopMongod(conn);

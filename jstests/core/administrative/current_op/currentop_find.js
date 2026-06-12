@@ -35,7 +35,11 @@ function assertPlanSummary(collection, expected) {
 
     const batch = currOpResult.cursor.firstBatch;
     assert.eq(1, batch.length, `Expected only one operation in batch: \n${tojson(batch)}`);
-    assert.eq(batch[0].planSummary, expected, `Response included incorrect planSummary:\n${tojson(batch)}`);
+    assert.eq(
+        batch[0].planSummary,
+        expected,
+        `Response included incorrect planSummary:\n${tojson(batch)}`,
+    );
 }
 
 const coll = assertDropAndRecreateCollection(testDB, "coll");

@@ -5,7 +5,12 @@ import * as GroupingWorkloads from "jstests/product_limits/libs/grouping.js";
 
 export class WorkloadAndOverSingleField extends MatchWorkloads.WorkloadAndOverSingleField {
     pipeline(dataset) {
-        return [{$sort: {f0: 1}}, {$limit: 20}, {$match: {f0: {$gte: 0, $lt: 20}}}, ...super.pipeline(dataset)];
+        return [
+            {$sort: {f0: 1}},
+            {$limit: 20},
+            {$match: {f0: {$gte: 0, $lt: 20}}},
+            ...super.pipeline(dataset),
+        ];
     }
 
     result() {

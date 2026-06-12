@@ -29,7 +29,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // Server-side JS does not support Random.randInt, so use Math.floor/random instead
             {
                 $where:
-                    "this.x === Math.floor(Math.random() * " + this.randomBound + ") " + "&& this.tid === " + this.tid,
+                    "this.x === Math.floor(Math.random() * " +
+                    this.randomBound +
+                    ") " +
+                    "&& this.tid === " +
+                    this.tid,
             },
             {$set: {x: Random.randInt(this.randomBound)}},
             {multi: true},

@@ -3,7 +3,12 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getPlanStage, getWinningPlanFromExplain, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getWinningPlanFromExplain,
+    isCollscan,
+    isIxscan,
+} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
@@ -24,7 +29,8 @@ function assertFullIXScan(explain) {
     assert(isIxscan(db, winningPlan), explain);
     const ixscan = getPlanStage(winningPlan, "IXSCAN");
     assert(
-        ixscan.indexBounds.value[0] == '["", {})' || ixscan.indexBounds.value[0] == "[CollationKey(0x), {})",
+        ixscan.indexBounds.value[0] == '["", {})' ||
+            ixscan.indexBounds.value[0] == "[CollationKey(0x), {})",
         `Expected full IXSCAN plan!\n${JSON.stringify(explain, null, 2)}`,
     );
 }
@@ -138,7 +144,10 @@ assert.commandWorked(collection.insertMany([{value: "c"}, {value: "d"}, {value: 
 
         let explain = collection.find({value: {$regex: "^c"}}).explain();
         let winningPlan = getWinningPlanFromExplain(explain);
-        assert(isCollscan(db, winningPlan), `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`);
+        assert(
+            isCollscan(db, winningPlan),
+            `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`,
+        );
 
         jsTestLog("Testing that non prefix regexes use collscan");
 
@@ -147,12 +156,17 @@ assert.commandWorked(collection.insertMany([{value: "c"}, {value: "d"}, {value: 
 
         explain = collection.find({value: {$regex: "c"}}).explain();
         winningPlan = getWinningPlanFromExplain(explain);
-        assert(isCollscan(db, winningPlan), `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`);
+        assert(
+            isCollscan(db, winningPlan),
+            `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`,
+        );
     }
 }
 
 {
-    jsTestLog("Testing regex filters with not simple collation on index with not simple collation too...");
+    jsTestLog(
+        "Testing regex filters with not simple collation on index with not simple collation too...",
+    );
     assert.commandWorked(collection.dropIndex({value: 1}));
     assert.commandWorked(collection.createIndex({value: 1}, {collation: {locale: "fr"}}));
 
@@ -216,7 +230,10 @@ assert.commandWorked(collection.insertMany([{value: "c"}, {value: "d"}, {value: 
             .collation({locale: "fr"})
             .explain();
         let winningPlan = getWinningPlanFromExplain(explain);
-        assert(isCollscan(db, winningPlan), `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`);
+        assert(
+            isCollscan(db, winningPlan),
+            `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`,
+        );
 
         jsTestLog("Testing that non prefix regexes use collscan");
 
@@ -231,7 +248,10 @@ assert.commandWorked(collection.insertMany([{value: "c"}, {value: "d"}, {value: 
             .collation({locale: "fr"})
             .explain();
         winningPlan = getWinningPlanFromExplain(explain);
-        assert(isCollscan(db, winningPlan), `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`);
+        assert(
+            isCollscan(db, winningPlan),
+            `Expected COLLSCAN plan\n${JSON.stringify(explain, null, 2)}`,
+        );
     }
 }
 

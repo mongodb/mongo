@@ -4,7 +4,9 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: "test.tag_range", key: {_id: 1}}));
 
 function countTags(num, message) {
@@ -39,7 +41,9 @@ try {
 }
 
 // Test that a dotted path is allowed in a tag range if it includes the shard key.
-assert.commandWorked(st.s0.adminCommand({shardCollection: "test.tag_range_dotted", key: {"_id.a": 1}}));
+assert.commandWorked(
+    st.s0.adminCommand({shardCollection: "test.tag_range_dotted", key: {"_id.a": 1}}),
+);
 assert.commandWorked(st.addTagRange("test.tag_range_dotted", {"_id.a": 5}, {"_id.a": 10}, "c"));
 countTags(2, "Dotted path tag range not successfully added.");
 

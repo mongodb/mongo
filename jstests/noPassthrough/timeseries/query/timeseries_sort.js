@@ -40,7 +40,10 @@ const splitPoint = {
     [`control.min.${timeField}`]: new Date(50 * 1000),
 };
 assert.commandWorked(
-    sDB.adminCommand({split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}),
+    sDB.adminCommand({
+        split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+        middle: splitPoint,
+    }),
 );
 
 // // Move one of the chunks into the second shard.
@@ -83,7 +86,9 @@ const assertNoRewrite = (pipeline) => {
 };
 
 for (let i = 0; i < 100; i++) {
-    assert.commandWorked(sDB.getCollection(collName).insert({t: new Date(i * 1000), m: i % 4, k: i}));
+    assert.commandWorked(
+        sDB.getCollection(collName).insert({t: new Date(i * 1000), m: i % 4, k: i}),
+    );
 }
 
 // Ensure that each shard owns one chunk.

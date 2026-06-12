@@ -58,7 +58,9 @@ const countIndexKeysDeletedByMetrics = function (db) {
 
 const disableTTLBatchDeletes = function (conn) {
     // Disable TTL batch deletion.
-    assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, ttlMonitorBatchDeletes: false}));
+    assert.commandWorked(
+        conn.getDB("admin").runCommand({setParameter: 1, ttlMonitorBatchDeletes: false}),
+    );
 };
 
 const triggerIndexScanTTL = function (db, doShardCollection = false) {
@@ -67,7 +69,9 @@ const triggerIndexScanTTL = function (db, doShardCollection = false) {
 
     if (doShardCollection) {
         assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+        assert.commandWorked(
+            db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
+        );
     }
 
     // Insert 50 docs with timestamp 'now - 24h'.
@@ -130,7 +134,9 @@ const triggerCollectionScanTTL = function (testDB, doShardCollection = false) {
 
     if (doShardCollection) {
         assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
-        assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}),
+        );
     }
 
     const maxTime = new Date(new Date().getTime() - 1000 * defaultBucketMaxRange);

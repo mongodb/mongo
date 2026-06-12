@@ -31,7 +31,9 @@ export var ShardVersioningUtil = (function () {
             assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: ns}));
         }
 
-        let res = assert.commandWorked(shard.adminCommand({getShardVersion: ns, fullMetadata: true}));
+        let res = assert.commandWorked(
+            shard.adminCommand({getShardVersion: ns, fullMetadata: true}),
+        );
         return res.metadata;
     };
 
@@ -78,7 +80,12 @@ export var ShardVersioningUtil = (function () {
         let failPoint = configureFailPoint(toShard, "migrationRecipientFailPostCommitRefresh");
 
         assert.commandWorked(
-            mongos.adminCommand({moveChunk: ns, find: findQuery, to: toShard.shardName, _waitForDelete: true}),
+            mongos.adminCommand({
+                moveChunk: ns,
+                find: findQuery,
+                to: toShard.shardName,
+                _waitForDelete: true,
+            }),
         );
 
         failPoint.off();

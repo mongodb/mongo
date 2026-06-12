@@ -47,7 +47,10 @@ col.drop();
 
 // Maximum and Minimum Values
 assert.commandWorked(
-    col.insert([{"max": NumberDecimal("9999999999999999999999999999999999E6111")}, {"min": NumberDecimal("1E-6176")}]),
+    col.insert([
+        {"max": NumberDecimal("9999999999999999999999999999999999E6111")},
+        {"min": NumberDecimal("1E-6176")},
+    ]),
 );
 
 assert.eq(col.find({"max": NumberDecimal("9999999999999999999999999999999999E6111")}).count(), 1);

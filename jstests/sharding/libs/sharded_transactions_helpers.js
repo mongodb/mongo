@@ -67,7 +67,9 @@ export function setFailCommandOnShards(st, mode, data, numShards) {
 export function unsetFailCommandOnEachShard(st, numShards) {
     for (let i = 0; i < numShards; i++) {
         const shardConn = st["rs" + i].getPrimary();
-        assert.commandWorked(shardConn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+        assert.commandWorked(
+            shardConn.adminCommand({configureFailPoint: "failCommand", mode: "off"}),
+        );
     }
 }
 
@@ -151,9 +153,10 @@ export function enableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
     st._rs.forEach(function (replTest) {
         replTest.nodes.forEach(function (node) {
             assert.commandWorked(
-                node
-                    .getDB("admin")
-                    .runCommand({configureFailPoint: "dontRemoveTxnCoordinatorOnAbort", mode: "alwaysOn"}),
+                node.getDB("admin").runCommand({
+                    configureFailPoint: "dontRemoveTxnCoordinatorOnAbort",
+                    mode: "alwaysOn",
+                }),
             );
         });
     });
@@ -173,7 +176,10 @@ export function disableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
     st._rs.forEach(function (replTest) {
         replTest.nodes.forEach(function (node) {
             assert.commandWorked(
-                node.getDB("admin").runCommand({configureFailPoint: "dontRemoveTxnCoordinatorOnAbort", mode: "off"}),
+                node.getDB("admin").runCommand({
+                    configureFailPoint: "dontRemoveTxnCoordinatorOnAbort",
+                    mode: "off",
+                }),
             );
         });
     });
@@ -208,12 +214,16 @@ export function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {},
         }
 
         if (ns) {
-            assert.commandWorked(rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+            assert.commandWorked(
+                rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}),
+            );
         }
 
         if (!FeatureFlagUtil.isPresentAndEnabled(rs.test.getPrimary(), "AuthoritativeShardsCRUD")) {
             dbNames.forEach((dbName) => {
-                assert.commandWorked(rs.test.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName}));
+                assert.commandWorked(
+                    rs.test.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName}),
+                );
             });
         }
     });
@@ -241,7 +251,11 @@ export function getOplogEntriesForTxn(rs, lsid, txnNumber) {
 }
 
 export function getTxnEntriesForSessionOnNode(node, lsid) {
-    return node.getCollection("config.transactions").find(makeLsidFilter(lsid, "_id")).sort({_id: 1}).toArray();
+    return node
+        .getCollection("config.transactions")
+        .find(makeLsidFilter(lsid, "_id"))
+        .sort({_id: 1})
+        .toArray();
 }
 
 export function getTxnEntriesForSession(rs, lsid) {

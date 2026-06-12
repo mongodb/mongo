@@ -32,13 +32,20 @@ let getCollectionNames = (db, filter) =>
         .sort();
 
 // Function that checks that all array elements are equal, and returns the unique element.
-let checkEqual = (array, what) => array.reduce((x, y) => assert.eq(x, y, "nodes don't have matching " + what) || x);
+let checkEqual = (array, what) =>
+    array.reduce((x, y) => assert.eq(x, y, "nodes don't have matching " + what) || x);
 
 // Helper function for verifying database contents at the end of the test.
 let checkFinalResults = (dbs, expectedColls, expectedViews) => ({
     dbname: checkEqual(dbs, "names"),
-    colls: checkEqual(dbs.map((db) => getCollectionNames(db, {type: "collection"})).concat([expectedColls]), "colls"),
-    views: checkEqual(dbs.map((db) => getCollectionNames(db, {type: "view"})).concat([expectedViews]), "views"),
+    colls: checkEqual(
+        dbs.map((db) => getCollectionNames(db, {type: "collection"})).concat([expectedColls]),
+        "colls",
+    ),
+    views: checkEqual(
+        dbs.map((db) => getCollectionNames(db, {type: "view"})).concat([expectedViews]),
+        "views",
+    ),
     md5: checkEqual(
         dbs.map((db) => checkedRunCommand(db, {dbHash: 1}).md5),
         "hashes",
@@ -72,7 +79,11 @@ let arbiter = conns[2];
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    nodeA.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    nodeA.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let a1 = nodeA.getDB("test1");
@@ -109,7 +120,9 @@ assert.commandWorked(b2.createView("y", "coll", [{$match: {y: 2}}]));
 let b3 = b1.getSiblingDB("test3");
 assert.commandWorked(b3.createView("z", "coll", []));
 assert.commandWorked(
-    b3.adminCommand({applyOps: [{op: "d", ns: b3.getName() + ".system.views", o: {_id: b3.getName() + ".z"}}]}),
+    b3.adminCommand({
+        applyOps: [{op: "d", ns: b3.getName() + ".system.views", o: {_id: b3.getName() + ".z"}}],
+    }),
 );
 assert.commandWorked(b3.z.insert([{z: 1}, {z: 2}, {z: 3}]));
 assert.commandWorked(b3.z.remove({z: 1}));

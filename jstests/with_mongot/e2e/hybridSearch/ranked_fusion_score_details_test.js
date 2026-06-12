@@ -63,7 +63,10 @@ const stageType = "rank";
         {
             $rankFusion: {
                 input: {
-                    pipelines: {vector: [vectorStage], search: [searchStageWithDetails, limitStage]},
+                    pipelines: {
+                        vector: [vectorStage],
+                        search: [searchStageWithDetails, limitStage],
+                    },
                 },
                 combination: {weights: {search: 2}},
                 scoreDetails: true,
@@ -81,9 +84,22 @@ const stageType = "rank";
         });
 
         const searchDetails = subDetails[0];
-        const searchScore = checkSearchScoreDetails(stageType, assertFieldPresent, searchDetails, "search", 2, true);
+        const searchScore = checkSearchScoreDetails(
+            stageType,
+            assertFieldPresent,
+            searchDetails,
+            "search",
+            2,
+            true,
+        );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore = checkVectorScoreDetails(stageType, assertFieldPresent, vectorDetails, "vector", 1);
+        const vectorSearchScore = checkVectorScoreDetails(
+            stageType,
+            assertFieldPresent,
+            vectorDetails,
+            "vector",
+            1,
+        );
         assert.eq(score, searchScore + vectorSearchScore);
     }
 })();
@@ -141,7 +157,13 @@ const stageType = "rank";
             2.8,
         );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore = checkVectorScoreDetails(stageType, assertFieldPresent, vectorDetails, "vector", 0.5);
+        const vectorSearchScore = checkVectorScoreDetails(
+            stageType,
+            assertFieldPresent,
+            vectorDetails,
+            "vector",
+            0.5,
+        );
         assert.eq(score, secondVectorSearchScore + vectorSearchScore);
     }
 })();
@@ -192,9 +214,22 @@ const stageType = "rank";
         });
 
         const searchDetails = subDetails[0];
-        const searchScore = checkSearchScoreDetails(stageType, assertFieldPresent, searchDetails, "search", 1, false);
+        const searchScore = checkSearchScoreDetails(
+            stageType,
+            assertFieldPresent,
+            searchDetails,
+            "search",
+            1,
+            false,
+        );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore = checkVectorScoreDetails(stageType, assertFieldPresent, vectorDetails, "vector", 1);
+        const vectorSearchScore = checkVectorScoreDetails(
+            stageType,
+            assertFieldPresent,
+            vectorDetails,
+            "vector",
+            1,
+        );
         assert.eq(score, searchScore + vectorSearchScore);
     }
 })();
@@ -239,7 +274,14 @@ const stageType = "rank";
         });
 
         const searchDetails = subDetails[0];
-        const searchScore = checkSearchScoreDetails(stageType, assertFieldPresent, searchDetails, "search", 1, true);
+        const searchScore = checkSearchScoreDetails(
+            stageType,
+            assertFieldPresent,
+            searchDetails,
+            "search",
+            1,
+            true,
+        );
         assert.eq(score, searchScore);
     }
 })();
@@ -280,7 +322,10 @@ const stageType = "rank";
         {
             $rankFusion: {
                 input: {
-                    pipelines: {vector: [vectorStage], search: [searchStageWithDetails, limitStage]},
+                    pipelines: {
+                        vector: [vectorStage],
+                        search: [searchStageWithDetails, limitStage],
+                    },
                 },
                 combination: {weights: {search: 2}},
                 scoreDetails: false,
@@ -309,7 +354,9 @@ const stageType = "rank";
         projectOutPlotEmbeddingStage,
     ];
 
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: testQuery, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: testQuery, cursor: {}}),
+    );
 })();
 
 /**
@@ -321,7 +368,9 @@ const stageType = "rank";
         {
             $rankFusion: {
                 input: {
-                    pipelines: {matchAndSort: [{$match: {fullplot: "ape"}}, {$sort: {fullplot: 1}}]},
+                    pipelines: {
+                        matchAndSort: [{$match: {fullplot: "ape"}}, {$sort: {fullplot: 1}}],
+                    },
                 },
                 combination: {weights: {matchAndSort: 2}},
                 scoreDetails: true,
@@ -329,7 +378,9 @@ const stageType = "rank";
         },
         projectOutPlotEmbeddingStage,
     ];
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: testQuery, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: testQuery, cursor: {}}),
+    );
     const results = coll.aggregate(testQuery).toArray();
     assert.eq(results, []);
 })();
@@ -385,7 +436,12 @@ dropDefaultMovieSearchAndOrVectorIndexes();
                                     index: getRentalSearchIndexSpec().name,
                                     text: {
                                         query: "brooklyn",
-                                        path: ["name", "summary", "description", "neighborhood_overview"],
+                                        path: [
+                                            "name",
+                                            "summary",
+                                            "description",
+                                            "neighborhood_overview",
+                                        ],
                                     },
                                 },
                             },
@@ -406,7 +462,9 @@ dropDefaultMovieSearchAndOrVectorIndexes();
         },
         projectScoreAndScoreDetailsStage,
     ];
-    assert.commandWorked(db.runCommand({aggregate: geoNearCollName, pipeline: testQuery, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: geoNearCollName, pipeline: testQuery, cursor: {}}),
+    );
     const results = geoNearColl.aggregate(testQuery).toArray();
     for (const foundDoc of results) {
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, {
@@ -415,10 +473,23 @@ dropDefaultMovieSearchAndOrVectorIndexes();
         });
 
         // Check geoNear input pipeline details.
-        const geoNearScore = checkGeoNearScoreDetails(stageType, assertFieldPresent, subDetails[0], "geoNear", 2);
+        const geoNearScore = checkGeoNearScoreDetails(
+            stageType,
+            assertFieldPresent,
+            subDetails[0],
+            "geoNear",
+            2,
+        );
 
         // Check search input pipeline details.
-        const searchScore = checkSearchScoreDetails(stageType, assertFieldPresent, subDetails[1], "search", 1, false);
+        const searchScore = checkSearchScoreDetails(
+            stageType,
+            assertFieldPresent,
+            subDetails[1],
+            "search",
+            1,
+            false,
+        );
 
         assert.eq(score, geoNearScore + searchScore);
     }

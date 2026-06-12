@@ -47,7 +47,9 @@ var result;
 // Mongos _id autogeneration tests for sharded collections
 
 let coll = st.s.getCollection("foo.bar");
-assert.commandWorked(st.s.adminCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.toString(), key: {_id: 1}}));
 
 //

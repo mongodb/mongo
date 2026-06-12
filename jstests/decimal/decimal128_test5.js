@@ -41,12 +41,16 @@ let testData = [
     },
     {"description": "[decq084] Nmin and below (Subnormal)", "input": "1E-6176"},
     {
-        "description": "[decq090] underflows cannot be tested for simple copies, " + "check edge cases (Subnormal)",
+        "description":
+            "[decq090] underflows cannot be tested for simple copies, " +
+            "check edge cases (Subnormal)",
         "input": "1e-6176",
         "expected": "1E-6176",
     },
     {
-        "description": "[decq100] underflows cannot be tested for simple copies, " + "check edge cases (Subnormal)",
+        "description":
+            "[decq100] underflows cannot be tested for simple copies, " +
+            "check edge cases (Subnormal)",
         "input": "999999999999999999999999999999999e-6176",
         "expected": "9.99999999999999999999999999999999E-6144",
     },

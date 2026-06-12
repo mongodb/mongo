@@ -67,7 +67,10 @@ const afterBatchResponseFailPoint = configureFailPoint(
 const beforeFinishFailPoint = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
 // Release the initial failpoint.
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 jsTestLog("Waiting for CollectionCloner to reach " + dbName + ".test collection");
@@ -88,7 +91,9 @@ afterBatchResponseFailPoint.off();
 
 jsTestLog("Releasing the oplog fetcher failpoint.");
 assert.commandWorked(
-    initialSyncNode.getDB("test").adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+    initialSyncNode
+        .getDB("test")
+        .adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
 );
 
 beforeFinishFailPoint.wait();

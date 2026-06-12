@@ -57,9 +57,15 @@ replSet.stop(secondary);
         // not advancing the stable timestamp to the top of the oplog.
         {setParameter: "recoverFromOplogAsStandalone=true"},
     );
-    IndexBuildTest.assertIndexes(mongod.getDB(dbName).getCollection(collName), 2, ["_id_"], ["a_1"], {
-        includeBuildUUIDs: true,
-    });
+    IndexBuildTest.assertIndexes(
+        mongod.getDB(dbName).getCollection(collName),
+        2,
+        ["_id_"],
+        ["a_1"],
+        {
+            includeBuildUUIDs: true,
+        },
+    );
     MongoRunner.stopMongod(mongod);
 })();
 
@@ -82,7 +88,11 @@ assertRepairSucceeds(secondaryDbpath, secondaryPort);
 })();
 
 // The secondary may not be reintroduced because data was modified.
-assertErrorOnStartupWhenStartingAsReplSet(secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
+assertErrorOnStartupWhenStartingAsReplSet(
+    secondaryDbpath,
+    secondaryPort,
+    replSet.getReplSetConfig()._id,
+);
 
 (function reSyncSecondary() {
     jsTestLog("Wiping dbpath and re-syncing secondary");
@@ -98,7 +108,10 @@ assertErrorOnStartupWhenStartingAsReplSet(secondaryDbpath, secondaryPort, replSe
     IndexBuildTest.waitForIndexBuildToStop(primaryDB);
     replSet.awaitReplication();
     IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "a_1"]);
-    IndexBuildTest.assertIndexes(newSecondary.getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
+    IndexBuildTest.assertIndexes(newSecondary.getDB(dbName).getCollection(collName), 2, [
+        "_id_",
+        "a_1",
+    ]);
 })();
 
 replSet.stopSet();

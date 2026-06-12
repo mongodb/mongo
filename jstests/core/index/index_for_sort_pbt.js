@@ -27,7 +27,9 @@ if (isSlowBuild(db)) {
 const originalKnobValue = assert.commandWorked(
     db.adminCommand({getParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: 1}),
 ).internalQueryPlannerPushdownFilterToIxscanForSort;
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: true}),
+);
 
 const controlColl = db.index_for_sort_pbt_control;
 const experimentColl = db.index_for_sort_pbt;
@@ -60,7 +62,13 @@ const docArb = fc.record({
     s: stringValArb,
 });
 
-const indexModelArb = fc.constantFrom({a: 1, b: 1}, {a: 1, b: -1}, {a: 1, c: 1}, {a: 1, "nested.x": 1}, {a: 1, s: 1});
+const indexModelArb = fc.constantFrom(
+    {a: 1, b: 1},
+    {a: 1, b: -1},
+    {a: 1, c: 1},
+    {a: 1, "nested.x": 1},
+    {a: 1, s: 1},
+);
 
 // ---------------------------
 // Predicate generators
@@ -114,8 +122,12 @@ function stringFieldPredicates(field) {
         // Equality and membership.
         stringValArb.map((v) => ({[field]: v})),
         stringValArb.map((v) => ({[field]: {$eq: v}})),
-        fc.array(stringValArb, {minLength: 1, maxLength: 4}).map((vals) => ({[field]: {$in: vals}})),
-        fc.array(stringValArb, {minLength: 1, maxLength: 4}).map((vals) => ({[field]: {$nin: vals}})),
+        fc
+            .array(stringValArb, {minLength: 1, maxLength: 4})
+            .map((vals) => ({[field]: {$in: vals}})),
+        fc
+            .array(stringValArb, {minLength: 1, maxLength: 4})
+            .map((vals) => ({[field]: {$nin: vals}})),
 
         // $exists.
         fc.boolean().map((b) => ({[field]: {$exists: b}})),
@@ -123,7 +135,9 @@ function stringFieldPredicates(field) {
         // Simple regexes over small alphabet; case-sensitive and case-insensitive.
         fc
             .constantFrom("a", "b", "c", "^a", "a$", "ab?")
-            .chain((pat) => fc.constantFrom({[field]: {$regex: pat}}, {[field]: {$regex: pat, $options: "i"}})),
+            .chain((pat) =>
+                fc.constantFrom({[field]: {$regex: pat}}, {[field]: {$regex: pat, $options: "i"}}),
+            ),
     );
 }
 
@@ -141,7 +155,10 @@ const {filter: filterArb} = fc.letrec((tie) => ({
 
     // A compound filter nests 2–3 sub-filters under $and, $or, or $nor.
     compound: fc
-        .tuple(fc.constantFrom("$and", "$or", "$nor"), fc.array(tie("filter"), {minLength: 2, maxLength: 3}))
+        .tuple(
+            fc.constantFrom("$and", "$or", "$nor"),
+            fc.array(tie("filter"), {minLength: 2, maxLength: 3}),
+        )
         .map(([op, children]) => ({[op]: children})),
 
     // A filter is either a leaf (common) or a compound expression (rarer).
@@ -226,20 +243,29 @@ function correctnessProperty(getQuery, testHelpers, extraParams) {
 
     const {filter, sortSpec, projection, indexKey} = extraParams;
     const baseline = controlColl.find(filter, projection).sort(sortSpec).toArray();
-    const withIndex = experimentColl.find(filter, projection).sort(sortSpec).hint(indexKey).toArray();
+    const withIndex = experimentColl
+        .find(filter, projection)
+        .sort(sortSpec)
+        .hint(indexKey)
+        .toArray();
 
     // Use ordered comparison: the sort order itself is what the index-for-sort optimization affects.
     if (!friendlyEqual(baseline, withIndex)) {
         return {
             passed: false,
-            message: "Find query with index hint returned different results from control collection scan.",
+            message:
+                "Find query with index hint returned different results from control collection scan.",
             baseline,
             withIndex,
             filter,
             sortSpec,
             projection,
             indexKey,
-            explain: experimentColl.find(filter, projection).sort(sortSpec).hint(indexKey).explain(),
+            explain: experimentColl
+                .find(filter, projection)
+                .sort(sortSpec)
+                .hint(indexKey)
+                .explain(),
         };
     }
     return {passed: true};
@@ -249,6 +275,9 @@ try {
     testProperty(correctnessProperty, {controlColl, experimentColl}, workloadModel, numRuns);
 } finally {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlannerPushdownFilterToIxscanForSort: originalKnobValue}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlannerPushdownFilterToIxscanForSort: originalKnobValue,
+        }),
     );
 }

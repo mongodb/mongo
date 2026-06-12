@@ -12,7 +12,10 @@
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {disableReplicaSetWriteBlock, enableReplicaSetWriteBlock} from "jstests/libs/block_replica_set_writes_utils.js";
+import {
+    disableReplicaSetWriteBlock,
+    enableReplicaSetWriteBlock,
+} from "jstests/libs/block_replica_set_writes_utils.js";
 import {afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {isEnterpriseShell, runEncryptedTest} from "jstests/fle2/libs/encrypted_client_util.js";
@@ -33,7 +36,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
 
     afterEach(function () {
         // Disable replica set and global user write block (if not previously enabled the operation is a no-op).
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandWorked(
             this.replicaSetPrimaryAdminDB.runCommand({
                 setUserWriteBlockMode: 1,
@@ -49,7 +55,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
     });
 
     it("Test that concurrent blockReplicaSetWrites commands serialize", function () {
-        const hangFailPoint = configureFailPoint(this.replicaSetPrimary, "hangInBlockReplicaSetWritesCommand");
+        const hangFailPoint = configureFailPoint(
+            this.replicaSetPrimary,
+            "hangInBlockReplicaSetWritesCommand",
+        );
 
         jsTest.log.info("Starting parallel shell to run parallel blockReplicaSetWrites command");
         const awaitShell = startParallelShell(() => {
@@ -113,9 +122,14 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             "Expected replicaSetWritesBlockReason to be InsufficientDiskSpace",
         );
 
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
 
-        const docsAfterRelease = this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.find().toArray();
+        const docsAfterRelease = this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section
+            .find()
+            .toArray();
         assert.eq(
             0,
             docsAfterRelease.length,
@@ -135,14 +149,23 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             "InsufficientDiskSpace" /* reason */,
         );
 
-        assert.commandFailedWithCode(testColl.insert({_id: 2, x: 2}), ErrorCodes.ReplicaSetWritesBlocked);
-        assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 100}}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(
+            testColl.insert({_id: 2, x: 2}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+        assert.commandFailedWithCode(
+            testColl.update({_id: 1}, {$set: {x: 100}}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
         assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
 
         assert.eq(1, testColl.find({_id: 1, x: 1}).itcount());
 
         // Test CUD operations are allowed after disabling replica set write block
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
 
         assert.commandWorked(testColl.insert({_id: 2, x: 2}));
         assert.commandWorked(testColl.update({_id: 1}, {$set: {x: 100}}));
@@ -158,17 +181,25 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             "InsufficientDiskSpace" /* reason */,
         );
         assert.commandWorked(
-            this.replicaSetPrimaryAdminDB.getCollection(this.adminTestCollName).insert({_id: 1, x: 1}),
+            this.replicaSetPrimaryAdminDB
+                .getCollection(this.adminTestCollName)
+                .insert({_id: 1, x: 1}),
         );
         assert.commandWorked(
-            this.replicaSetPrimaryAdminDB.getCollection(this.adminTestCollName).update({_id: 1}, {$set: {x: 100}}),
+            this.replicaSetPrimaryAdminDB
+                .getCollection(this.adminTestCollName)
+                .update({_id: 1}, {$set: {x: 100}}),
         );
 
         assert.commandWorked(
-            this.replicaSetPrimaryConfigDB.getCollection(this.configTestCollName).insert({_id: 1, x: 1}),
+            this.replicaSetPrimaryConfigDB
+                .getCollection(this.configTestCollName)
+                .insert({_id: 1, x: 1}),
         );
         assert.commandWorked(
-            this.replicaSetPrimaryConfigDB.getCollection(this.configTestCollName).update({_id: 1}, {$set: {x: 100}}),
+            this.replicaSetPrimaryConfigDB
+                .getCollection(this.configTestCollName)
+                .update({_id: 1}, {$set: {x: 100}}),
         );
 
         // We do not test operations to local database because the test would fail in
@@ -187,15 +218,26 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         try {
             enableProfileRes = testDB.runCommand({profile: 2});
         } catch (e) {
-            jsTest.log.info("Skipping system.profile testing since profiling is not supported", {e});
+            jsTest.log.info("Skipping system.profile testing since profiling is not supported", {
+                e,
+            });
             return;
         }
         if (!enableProfileRes.ok) {
-            const knownUnsupportedCodes = [ErrorCodes.CommandNotSupported, ErrorCodes.InvalidOptions];
-            assert(knownUnsupportedCodes.includes(enableProfileRes.code), "Unexpected error enabling profiling", {
+            const knownUnsupportedCodes = [
+                ErrorCodes.CommandNotSupported,
+                ErrorCodes.InvalidOptions,
+            ];
+            assert(
+                knownUnsupportedCodes.includes(enableProfileRes.code),
+                "Unexpected error enabling profiling",
+                {
+                    enableProfileRes,
+                },
+            );
+            jsTest.log.info("Skipping system.profile testing since profiling is not supported", {
                 enableProfileRes,
             });
-            jsTest.log.info("Skipping system.profile testing since profiling is not supported", {enableProfileRes});
             return;
         }
 
@@ -232,18 +274,28 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.eq(2, testColl.count(), "Both documents should remain while deletions are blocked");
 
         // Disable write block and and re-enable with allowDeletions: true to check that user deletes are allowed.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
         );
         assert.commandWorked(testColl.remove({_id: 1}));
-        assert.eq(1, testColl.count(), "Document should have been deleted when allowDeletions is true");
+        assert.eq(
+            1,
+            testColl.count(),
+            "Document should have been deleted when allowDeletions is true",
+        );
 
         // Inserts and updates should still be blocked when allowDeletions is true.
         assert.commandFailedWithCode(testColl.insert({_id: 3}), ErrorCodes.ReplicaSetWritesBlocked);
-        assert.commandFailedWithCode(testColl.update({_id: 2}, {$set: {x: 1}}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(
+            testColl.update({_id: 2}, {$set: {x: 1}}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
     });
 
     it("Test TTL deletions are blocked when allowDeletions is false and allowed when allowDeletions is true", function () {
@@ -279,17 +331,28 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             "InsufficientDiskSpace" /* reason */,
         );
         runTTLMonitor();
-        assert.eq(1, testColl.count(), "TTL should not have reaped the document while deletions are blocked");
+        assert.eq(
+            1,
+            testColl.count(),
+            "TTL should not have reaped the document while deletions are blocked",
+        );
 
         // Disable write block and re-enable with allowDeletions: true — TTL should now reap the document.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
         );
         runTTLMonitor();
-        assert.eq(0, testColl.count(), "TTL should have reaped the document when allowDeletions is true");
+        assert.eq(
+            0,
+            testColl.count(),
+            "TTL should have reaped the document when allowDeletions is true",
+        );
 
         pauseTtl.off();
     });
@@ -331,7 +394,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
 
         // With both blocks active, writes must fail with the global error code (UserWritesBlocked),
         // not ReplicaSetWritesBlocked.
-        const insertRes = assert.commandFailedWithCode(testColl.insert({_id: 2}), ErrorCodes.UserWritesBlocked);
+        const insertRes = assert.commandFailedWithCode(
+            testColl.insert({_id: 2}),
+            ErrorCodes.UserWritesBlocked,
+        );
         assert(
             insertRes.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
             "Expected reason DiskUseThresholdExceeded in error message",
@@ -346,7 +412,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             "Expected reason DiskUseThresholdExceeded in error message",
             {updateRes},
         );
-        const deleteRes = assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.UserWritesBlocked);
+        const deleteRes = assert.commandFailedWithCode(
+            testColl.remove({_id: 1}),
+            ErrorCodes.UserWritesBlocked,
+        );
         assert(
             deleteRes.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
             "Expected reason DiskUseThresholdExceeded in error message",
@@ -373,14 +442,20 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // CUD should be blocked and return DiskUseThresholdExceeded reason.
-        const res = assert.commandFailedWithCode(testColl0.insert({_id: 1}), ErrorCodes.UserWritesBlocked);
+        const res = assert.commandFailedWithCode(
+            testColl0.insert({_id: 1}),
+            ErrorCodes.UserWritesBlocked,
+        );
         assert(
             res.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
             "Expected reason DiskUseThresholdExceeded in error message",
         );
 
         // DDL should now also be blocked (global blocks DDL).
-        assert.commandFailedWithCode(testDB.createCollection("testColl1"), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(
+            testDB.createCollection("testColl1"),
+            ErrorCodes.UserWritesBlocked,
+        );
 
         // Disable global write blocking and check that DDLs are allowed again. After the previous blocked
         // createCollection operation, setUserWriteBlockMode command can throw WriteConflict, so we need to
@@ -437,7 +512,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // Disable write block.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
 
         // Check that with allowDeletions:true, compact is permitted.
         enableReplicaSetWriteBlock(
@@ -448,7 +526,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandWorked(testDB.runCommand({compact: "testColl", force: true}));
 
         // Disable write block entirely and verify compact still succeeds.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandWorked(testDB.runCommand({compact: "testColl", force: true}));
     });
 
@@ -482,7 +563,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandWorked(this.replicaSetPrimaryAdminDB.runCommand({autoCompact: false}));
 
         // Disable write block.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
 
         // Check that with allowDeletions:true, auto-compact is permitted.
         enableReplicaSetWriteBlock(
@@ -526,7 +610,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
 
         // CUD should be blocked. UserWriteBlockModeOpObserver fires before
         // ReplicaSetWriteBlockOpObserver, so the global reason surfaces regardless of enable order.
-        const res = assert.commandFailedWithCode(testColl0.insert({_id: 1}), ErrorCodes.UserWritesBlocked);
+        const res = assert.commandFailedWithCode(
+            testColl0.insert({_id: 1}),
+            ErrorCodes.UserWritesBlocked,
+        );
         assert(
             res.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
             "Expected reason DiskUseThresholdExceeded in error message",
@@ -534,12 +621,21 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // DDL should also be blocked (global blocks DDL).
-        assert.commandFailedWithCode(testDB.createCollection("testColl1"), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(
+            testDB.createCollection("testColl1"),
+            ErrorCodes.UserWritesBlocked,
+        );
 
         // Disable replica set write block. Global block remains, so CUD and DDL stay blocked.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandFailedWithCode(testColl0.insert({_id: 2}), ErrorCodes.UserWritesBlocked);
-        assert.commandFailedWithCode(testDB.createCollection("testColl1"), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(
+            testDB.createCollection("testColl1"),
+            ErrorCodes.UserWritesBlocked,
+        );
 
         // Disable global write block. Both CUD and DDL should now be allowed.
         assert.soon(() => {
@@ -572,7 +668,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // Index build on a non-empty collection should still be blocked.
-        assert.commandFailedWithCode(nonEmptyColl.createIndex({b: 1}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(
+            nonEmptyColl.createIndex({b: 1}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
     });
 
     it("Test that new index builds on user collections are blocked when blockReplicaSetWrites is enabled", function () {
@@ -583,7 +682,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         enableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, false, "InsufficientDiskSpace");
 
         // A new index build on a non-empty user collection should be rejected with ReplicaSetWritesBlocked.
-        assert.commandFailedWithCode(testColl.createIndex({a: 1}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(
+            testColl.createIndex({a: 1}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
         assert.eq(
             null,
             testColl.getIndexes().find((idx) => idx.name === "a_1"),
@@ -621,7 +723,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // Disable write block and check that cloneCollectionAsCapped succeeds.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandWorked(
             testDB.runCommand({
                 cloneCollectionAsCapped: "srcColl",
@@ -646,11 +751,20 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             false /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
         );
-        assert.commandFailedWithCode(testDB.runCommand(compactCmd), ErrorCodes.ReplicaSetWritesBlocked);
-        assert.commandFailedWithCode(testDB.runCommand(cleanupCmd), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(
+            testDB.runCommand(compactCmd),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+        assert.commandFailedWithCode(
+            testDB.runCommand(cleanupCmd),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
 
         // Disable replica set write block and check that new QE compact and cleanup are not blocked anymore.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandFailedWithCode(testDB.runCommand(compactCmd), ErrorCodes.NamespaceNotFound);
         assert.commandFailedWithCode(testDB.runCommand(cleanupCmd), ErrorCodes.NamespaceNotFound);
     });
@@ -663,7 +777,13 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         const fleDbName = "block_replica_set_writes_fle";
         const fleCollName = "encrypted";
         const encryptedFields = {
-            fields: [{path: "first", bsonType: "string", queries: {queryType: "equality", contention: 0}}],
+            fields: [
+                {
+                    path: "first",
+                    bsonType: "string",
+                    queries: {queryType: "equality", contention: 0},
+                },
+            ],
         };
         runEncryptedTest(db, fleDbName, fleCollName, encryptedFields, (edb, client) => {
             const coll = edb[fleCollName];
@@ -700,11 +820,20 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             testDB.runCommand({convertToCapped: "testColl", size: 100000}),
             ErrorCodes.ReplicaSetWritesBlocked,
         );
-        assert(!testColl.stats().capped, "Collection should not have been converted while writes are blocked");
+        assert(
+            !testColl.stats().capped,
+            "Collection should not have been converted while writes are blocked",
+        );
 
         // Disable write block and check that convertToCapped succeeds.
-        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandWorked(testDB.runCommand({convertToCapped: "testColl", size: 100000}));
-        assert(testColl.stats().capped, "Collection should be capped after convertToCapped succeeds");
+        assert(
+            testColl.stats().capped,
+            "Collection should be capped after convertToCapped succeeds",
+        );
     });
 });

@@ -12,7 +12,11 @@ rst.initiate();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const testDB = rst.getPrimary().getDB("test");
@@ -51,7 +55,12 @@ try {
 
         // Test the same thing but using the shell helpers.
         let error = assert.throws(() =>
-            source.aggregate([stageSpec], {cursor: {batchSize: 0}, writeConcern: {w: 2, wtimeout: 100}}).itcount(),
+            source
+                .aggregate([stageSpec], {
+                    cursor: {batchSize: 0},
+                    writeConcern: {w: 2, wtimeout: 100},
+                })
+                .itcount(),
         );
         // Unfortunately this is the best way we have to check that the cause of the failure was due
         // to write concern. The aggregate shell helper will assert the command worked. When this
@@ -61,7 +70,9 @@ try {
         assert(error.writeConcernError, tojson(error));
 
         // Now test without batchSize just to be sure.
-        error = assert.throws(() => source.aggregate([stageSpec], {writeConcern: {w: 2, wtimeout: 100}}));
+        error = assert.throws(() =>
+            source.aggregate([stageSpec], {writeConcern: {w: 2, wtimeout: 100}}),
+        );
         assert(error instanceof Error);
         assert(error.writeConcernError, tojson(error));
 

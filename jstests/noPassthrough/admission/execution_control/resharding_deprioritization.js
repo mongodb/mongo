@@ -52,14 +52,24 @@ function sumDonorsTotalDeprioritizationCount() {
 }
 
 for (const node of donorNodes) {
-    assert.commandWorked(node.adminCommand({setParameter: 1, executionControlDeprioritizationGate: true}));
+    assert.commandWorked(
+        node.adminCommand({setParameter: 1, executionControlDeprioritizationGate: true}),
+    );
 }
 for (const node of recipientNodes) {
-    assert.commandWorked(node.adminCommand({setParameter: 1, executionControlDeprioritizationGate: true}));
+    assert.commandWorked(
+        node.adminCommand({setParameter: 1, executionControlDeprioritizationGate: true}),
+    );
 }
 
-const pauseBeforeCloning = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeCloning");
-const pauseBeforeApplying = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeApplying");
+const pauseBeforeCloning = configureFailPoint(
+    configPrimary,
+    "reshardingPauseCoordinatorBeforeCloning",
+);
+const pauseBeforeApplying = configureFailPoint(
+    configPrimary,
+    "reshardingPauseCoordinatorBeforeApplying",
+);
 
 let nonDeprioritizableDonorCountBeforeCatchup;
 let nonDeprioritizableRecipientCountBeforeCatchup;
@@ -72,12 +82,14 @@ reshardingTest.withReshardingInBackground(
     () => {
         pauseBeforeCloning.wait();
         const deprioritizationDonorCountBeforeCloning = sumDonorsTotalDeprioritizationCount();
-        const deprioritizationRecipientCountBeforeCloning = getTotalDeprioritizationCount(recipientPrimary);
+        const deprioritizationRecipientCountBeforeCloning =
+            getTotalDeprioritizationCount(recipientPrimary);
         pauseBeforeCloning.off();
 
         pauseBeforeApplying.wait();
         const deprioritizationDonorCountAfterCloning = sumDonorsTotalDeprioritizationCount();
-        const deprioritizationRecipientCountAfterCloning = getTotalDeprioritizationCount(recipientPrimary);
+        const deprioritizationRecipientCountAfterCloning =
+            getTotalDeprioritizationCount(recipientPrimary);
 
         assert.gt(
             deprioritizationDonorCountAfterCloning,
@@ -90,8 +102,10 @@ reshardingTest.withReshardingInBackground(
             "Recipient deprioritizable counter should increase during the cloning phase",
         );
 
-        nonDeprioritizableDonorCountBeforeCatchup = getTotalMarkedNonDeprioritizableCount(donorPrimary);
-        nonDeprioritizableRecipientCountBeforeCatchup = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
+        nonDeprioritizableDonorCountBeforeCatchup =
+            getTotalMarkedNonDeprioritizableCount(donorPrimary);
+        nonDeprioritizableRecipientCountBeforeCatchup =
+            getTotalMarkedNonDeprioritizableCount(recipientPrimary);
         jsTestLog(
             `Counters before applying - donor: ${nonDeprioritizableDonorCountBeforeCatchup}, ` +
                 `recipient: ${nonDeprioritizableRecipientCountBeforeCatchup}`,
@@ -108,7 +122,8 @@ reshardingTest.withReshardingInBackground(
     },
     {
         postCheckConsistencyFn: () => {
-            const nonDeprioritizableDonorCountAfterCatchup = getTotalMarkedNonDeprioritizableCount(donorPrimary);
+            const nonDeprioritizableDonorCountAfterCatchup =
+                getTotalMarkedNonDeprioritizableCount(donorPrimary);
             const nonDeprioritizableRecipientCountAfterCatchup =
                 getTotalMarkedNonDeprioritizableCount(recipientPrimary);
             jsTestLog(

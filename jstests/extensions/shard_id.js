@@ -26,7 +26,8 @@ const shardNames = isMongos
           .toArray()
           .map((s) => s._id)
     : [];
-const isShardedColl = isMongos && db.getSiblingDB("config").collections.countDocuments({_id: coll.getFullName()}) > 0;
+const isShardedColl =
+    isMongos && db.getSiblingDB("config").collections.countDocuments({_id: coll.getFullName()}) > 0;
 
 function assertShardIdEmpty(results, context) {
     for (const doc of results) {
@@ -38,7 +39,11 @@ function assertShardIdEmpty(results, context) {
 function assertShardIdPopulated(results) {
     for (const doc of results) {
         assert(doc.hasOwnProperty("shardId"), "Document should have shardId field: " + tojson(doc));
-        assert.contains(doc.shardId, shardNames, "shardId should match a known shard, got: " + doc.shardId);
+        assert.contains(
+            doc.shardId,
+            shardNames,
+            "shardId should match a known shard, got: " + doc.shardId,
+        );
     }
 }
 

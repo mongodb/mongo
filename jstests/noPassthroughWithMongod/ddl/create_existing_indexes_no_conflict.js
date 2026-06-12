@@ -24,7 +24,10 @@ let sleepFunction = function (myDbName, myCollName) {
     );
 };
 
-let sleepCommand = startParallelShell(funWithArgs(sleepFunction, dbName, collName), testDB.getMongo().port);
+let sleepCommand = startParallelShell(
+    funWithArgs(sleepFunction, dbName, collName),
+    testDB.getMongo().port,
+);
 
 const sleepID = waitForCommand(
     "sleepCmd",
@@ -33,7 +36,10 @@ const sleepID = waitForCommand(
 );
 
 assert.commandWorked(testColl.createIndex({a: 1}));
-assert.commandFailedWithCode(testColl.createIndex({a: -1}, {name: "a_1"}), ErrorCodes.IndexKeySpecsConflict);
+assert.commandFailedWithCode(
+    testColl.createIndex({a: -1}, {name: "a_1"}),
+    ErrorCodes.IndexKeySpecsConflict,
+);
 
 // Interrupt the sleep command.
 assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));

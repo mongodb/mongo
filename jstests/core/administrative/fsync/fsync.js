@@ -114,7 +114,9 @@ let currentOp = db.getSiblingDB("admin").runCommand({currentOp: 1});
 assert.commandWorked(currentOp);
 assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked server");
 
-let shellHandle1 = startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+let shellHandle1 = startParallelShell(
+    "db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});",
+);
 
 fsyncLockRes = db.fsyncLock();
 assert.commandWorked(fsyncLockRes);
@@ -123,7 +125,9 @@ currentOp = db.getSiblingDB("admin").runCommand({currentOp: 1});
 assert.commandWorked(currentOp);
 assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked server");
 
-let shellHandle2 = startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+let shellHandle2 = startParallelShell(
+    "db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});",
+);
 waitUntilOpCountIs({op: "insert", ns: "fsyncLockTestDB.multipleLock", waitingForLock: true}, 2);
 
 assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());

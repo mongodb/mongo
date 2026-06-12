@@ -19,7 +19,11 @@ assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles:
 admin.auth("admin", "admin");
 
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: "majority"},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 function resetClusterIpSourceAllowlist(host) {
@@ -47,7 +51,9 @@ conf.version++;
 // Following function will succeed after resetClusterIpSourceAllowlist()
 // successfully resets IP for connection
 jsTest.log("ReplSet started, will block __system connections and expect error");
-assert.commandWorked(primary.adminCommand({setParameter: 1, "clusterIpSourceAllowlist": ["192.0.2.1"]}));
+assert.commandWorked(
+    primary.adminCommand({setParameter: 1, "clusterIpSourceAllowlist": ["192.0.2.1"]}),
+);
 assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 thread.join();
 

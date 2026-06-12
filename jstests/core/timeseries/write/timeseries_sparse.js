@@ -36,14 +36,19 @@ TimeseriesTest.run((insert) => {
                 tojson(docsUpdate),
         );
 
-        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+        );
         TimeseriesTest.createTimeFieldIndexToAllowBucketsReopening(coll);
 
         assert.commandWorked(
             insert(coll, docsInsert),
             "failed to create bucket with initial docs: " + tojson(docsInsert),
         );
-        assert.commandWorked(insert(coll, docsUpdate), "failed to append docs to bucket : " + tojson(docsUpdate));
+        assert.commandWorked(
+            insert(coll, docsUpdate),
+            "failed to append docs to bucket : " + tojson(docsUpdate),
+        );
 
         // Check measurements.
         let docs = docsInsert.concat(docsUpdate);
@@ -54,7 +59,11 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check buckets.
-        const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
+            .find()
+            .rawData()
+            .sort({"control.min._id": 1})
+            .toArray();
         assert.eq(1, bucketDocs.length, bucketDocs);
         TimeseriesTest.decompressBucket(bucketDocs[0]);
 

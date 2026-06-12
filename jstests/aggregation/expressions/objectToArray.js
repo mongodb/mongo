@@ -64,7 +64,9 @@ assert.eq(result, [
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({_id: 5, "date": ISODate("2017-01-24T00:00:00")}));
-result = coll.aggregate([{$project: {document: {$objectToArray: {dayOfWeek: {$dayOfWeek: "$date"}}}}}]).toArray();
+result = coll
+    .aggregate([{$project: {document: {$objectToArray: {dayOfWeek: {$dayOfWeek: "$date"}}}}}])
+    .toArray();
 assert.eq(result, [{_id: 5, document: [{"k": "dayOfWeek", "v": 3}]}]);
 
 // $objectToArray errors on non-document types.

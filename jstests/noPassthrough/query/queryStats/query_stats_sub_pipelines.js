@@ -20,7 +20,9 @@ coll.drop();
 assert.commandWorked(coll.insert({x: 10, y: 20}));
 
 const viewName = "projection_view";
-assert.commandWorked(db.runCommand({create: viewName, viewOn: collName, pipeline: [{$project: {_id: 1, x: 1}}]}));
+assert.commandWorked(
+    db.runCommand({create: viewName, viewOn: collName, pipeline: [{$project: {_id: 1, x: 1}}]}),
+);
 const view = db[viewName];
 
 // Tests a basic query on a view as a sanity check.
@@ -37,7 +39,9 @@ const view = db[viewName];
 
 // Tests a query where a view reference is in a $lookup pipeline.
 (function testViewInLookupPipeline() {
-    coll.aggregate([{$lookup: {from: viewName, pipeline: [{$match: {x: 10}}], as: "lookup"}}]).toArray();
+    coll.aggregate([
+        {$lookup: {from: viewName, pipeline: [{$match: {x: 10}}], as: "lookup"}},
+    ]).toArray();
 
     const stats = getLatestQueryStatsEntry(db);
     const key = stats.key;
@@ -137,7 +141,15 @@ const view = db[viewName];
 // Tests a query where a view reference is in a $graphLookup pipeline.
 (function testViewInGraphLookupPipeline() {
     coll.aggregate([
-        {$graphLookup: {from: viewName, startWith: "$x", connectFromField: "x", connectToField: "x", as: "lookup"}},
+        {
+            $graphLookup: {
+                from: viewName,
+                startWith: "$x",
+                connectFromField: "x",
+                connectToField: "x",
+                as: "lookup",
+            },
+        },
     ]).toArray();
 
     const stats = getLatestQueryStatsEntry(db);
@@ -183,7 +195,11 @@ const view = db[viewName];
 
     // The view should not be resolved in the key.
     assert.eq({"db": `${dbName}`, "coll": `${collName}`}, key.queryShape.cmdNs, tojson(key));
-    assert.eq([{$unionWith: {coll: viewName, pipeline: [{$sort: {x: 1}}]}}], key.queryShape.pipeline, tojson(key));
+    assert.eq(
+        [{$unionWith: {coll: viewName, pipeline: [{$sort: {x: 1}}]}}],
+        key.queryShape.pipeline,
+        tojson(key),
+    );
 })();
 
 MongoRunner.stopMongod(conn);

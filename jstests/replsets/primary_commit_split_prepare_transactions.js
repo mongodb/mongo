@@ -60,7 +60,9 @@ let testColl = testDB.getCollection(collName);
 // Also checks the config.transactions entry.
 const checkTransaction = function (sessionDB, lsid, txnNumber, expectedState) {
     const expectedError =
-        expectedState == "prepared" ? ErrorCodes.PreparedTransactionInProgress : ErrorCodes.TransactionCommitted;
+        expectedState == "prepared"
+            ? ErrorCodes.PreparedTransactionInProgress
+            : ErrorCodes.TransactionCommitted;
     assert.commandFailedWithCode(
         sessionDB.runCommand({
             insert: collName,
@@ -118,12 +120,12 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Wait until lastStableRecoveryTimestamp >= prepareTimestamp on all nodes.
 assert.soon(() => {
-    const primaryLastStableRecoveryTimestamp = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))[
-        "lastStableRecoveryTimestamp"
-    ];
-    const secondaryLastStableRecoveryTimestamp = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))[
-        "lastStableRecoveryTimestamp"
-    ];
+    const primaryLastStableRecoveryTimestamp = assert.commandWorked(
+        primary.adminCommand({replSetGetStatus: 1}),
+    )["lastStableRecoveryTimestamp"];
+    const secondaryLastStableRecoveryTimestamp = assert.commandWorked(
+        secondary.adminCommand({replSetGetStatus: 1}),
+    )["lastStableRecoveryTimestamp"];
     jsTestLog(
         "Awaiting last stable recovery timestamp " +
             `(primary last stable recovery: ${tojson(primaryLastStableRecoveryTimestamp)}, ` +
@@ -221,7 +223,10 @@ jsTestLog("Transaction is blocked on failpoint in the middle of a split transact
     assert.commandWorked(read({level: "majority"}, longTimeout));
 
     jsTestLog("Test read with read concern 'linearizable' blocks on prepared conflicts.");
-    assert.commandFailedWithCode(read({level: "linearizable"}, shortTimeout), ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(
+        read({level: "linearizable"}, shortTimeout),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     jsTestLog("Test afterClusterTime read after prepareTimestamp blocks on prepare conflicts.");
     assert.commandFailedWithCode(
@@ -239,7 +244,10 @@ jsTestLog("Transaction is blocked on failpoint in the middle of a split transact
 // 5) Restart the new primary node and wait for it to be a primary again.
 jsTestLog("Restarting the primary node");
 // Restart newPrimary.
-replTest.stop(newPrimary, 9 /* signal */, {forRestart: true, allowedExitCode: MongoRunner.EXIT_SIGKILL});
+replTest.stop(newPrimary, 9 /* signal */, {
+    forRestart: true,
+    allowedExitCode: MongoRunner.EXIT_SIGKILL,
+});
 replTest.start(newPrimary, {waitForConnect: true}, true /* waitForHealth */);
 jsTestLog("Restarted the primary node");
 

@@ -118,7 +118,10 @@ describe("conflicting create with mismatched fixedBucketing", function () {
     for (const {existing, retry} of mismatchedPairs) {
         it(`fails when existing=${existing} and retry=${retry}`, function () {
             assert.commandWorked(createWithFixedBucketing(existing));
-            assert.commandFailedWithCode(createWithFixedBucketing(retry), ErrorCodes.NamespaceExists);
+            assert.commandFailedWithCode(
+                createWithFixedBucketing(retry),
+                ErrorCodes.NamespaceExists,
+            );
         });
     }
 });
@@ -130,17 +133,46 @@ describe("collMod fixedBucketing handling for bucketing changes", function () {
 
     const cases = [
         {initial: true, newSpan: 200, expected: false, desc: "true → false on bucketing change"},
-        {initial: false, newSpan: 200, expected: false, desc: "false stays false on bucketing change"},
-        {initial: undefined, newSpan: 200, expected: undefined, desc: "unset stays unset on bucketing change"},
-        {initial: true, newSpan: 100, expected: true, desc: "true stays true when bucketing unchanged"},
-        {initial: false, newSpan: 100, expected: false, desc: "false stays false when bucketing unchanged"},
-        {initial: undefined, newSpan: 100, expected: undefined, desc: "unset stays unset when bucketing unchanged"},
+        {
+            initial: false,
+            newSpan: 200,
+            expected: false,
+            desc: "false stays false on bucketing change",
+        },
+        {
+            initial: undefined,
+            newSpan: 200,
+            expected: undefined,
+            desc: "unset stays unset on bucketing change",
+        },
+        {
+            initial: true,
+            newSpan: 100,
+            expected: true,
+            desc: "true stays true when bucketing unchanged",
+        },
+        {
+            initial: false,
+            newSpan: 100,
+            expected: false,
+            desc: "false stays false when bucketing unchanged",
+        },
+        {
+            initial: undefined,
+            newSpan: 100,
+            expected: undefined,
+            desc: "unset stays unset when bucketing unchanged",
+        },
     ];
 
     for (const {initial, newSpan, expected, desc} of cases) {
         it(desc, function () {
-            assert.commandWorked(createWithFixedBucketing(initial, {maxSpanSeconds: 100, roundingSeconds: 100}));
-            assert.commandWorked(collModBucketing({maxSpanSeconds: newSpan, roundingSeconds: newSpan}));
+            assert.commandWorked(
+                createWithFixedBucketing(initial, {maxSpanSeconds: 100, roundingSeconds: 100}),
+            );
+            assert.commandWorked(
+                collModBucketing({maxSpanSeconds: newSpan, roundingSeconds: newSpan}),
+            );
             assert.eq(getStoredFixedBucketing(), expected);
         });
     }
@@ -150,7 +182,9 @@ describe("collMod fixedBucketing handling for bucketing changes", function () {
     // unchanged) are already covered by the parameterized loop above.
     it("true → false on granularity change", function () {
         assert.commandWorked(createWithFixedBucketing(true));
-        assert.commandWorked(testDB.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}));
+        assert.commandWorked(
+            testDB.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}),
+        );
         assert.eq(getStoredFixedBucketing(), false);
     });
 });

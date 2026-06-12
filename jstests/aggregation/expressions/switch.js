@@ -107,7 +107,9 @@ assert.eq(res[0], {"output": null});
 pipeline = {
     "$project": {
         "_id": 0,
-        "output": {"$switch": {"branches": [{"case": true, "then": "$missingField"}], "default": false}},
+        "output": {
+            "$switch": {"branches": [{"case": true, "then": "$missingField"}], "default": false},
+        },
     },
 };
 res = coll.aggregate(pipeline).toArray();
@@ -129,7 +131,9 @@ assert.eq(res[0], {"output": null});
 pipeline = {
     "$project": {
         "_id": 0,
-        "output": {"$switch": {"branches": [{"case": null, "then": false}], "default": "$missingField"}},
+        "output": {
+            "$switch": {"branches": [{"case": null, "then": false}], "default": "$missingField"},
+        },
     },
 };
 res = coll.aggregate(pipeline).toArray();

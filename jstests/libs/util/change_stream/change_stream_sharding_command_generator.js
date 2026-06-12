@@ -55,7 +55,10 @@ class ShardingCommandGenerator {
     };
 
     constructor(seed) {
-        assert(seed !== null && seed !== undefined, "Seed must be explicitly provided to ShardingCommandGenerator");
+        assert(
+            seed !== null && seed !== undefined,
+            "Seed must be explicitly provided to ShardingCommandGenerator",
+        );
         this.seed = seed;
     }
 
@@ -120,16 +123,28 @@ class ShardingCommandGenerator {
         // Step 4: While there are unvisited actions.
         while (unvisitedActions.size > 0) {
             // 4a: For each unvisited self-loop action (state → state), visit and mark as visited.
-            let selfLoopAction = this._getRandomUnvisitedSelfLoop(testModel, currentState, unvisitedActions);
+            let selfLoopAction = this._getRandomUnvisitedSelfLoop(
+                testModel,
+                currentState,
+                unvisitedActions,
+            );
             while (selfLoopAction !== null) {
                 this._appendAction(commands, selfLoopAction, params, collectionCtx);
                 this._updateCollectionCtxForAction(selfLoopAction, collectionCtx);
                 this._markActionAsVisited(unvisitedActions, currentState, selfLoopAction);
-                selfLoopAction = this._getRandomUnvisitedSelfLoop(testModel, currentState, unvisitedActions);
+                selfLoopAction = this._getRandomUnvisitedSelfLoop(
+                    testModel,
+                    currentState,
+                    unvisitedActions,
+                );
             }
 
             // 4b: If exists unvisited non-self-loop action, visit it and move to target state.
-            const action = this._getRandomUnvisitedNonSelfLoop(testModel, currentState, unvisitedActions);
+            const action = this._getRandomUnvisitedNonSelfLoop(
+                testModel,
+                currentState,
+                unvisitedActions,
+            );
             if (action !== null) {
                 this._appendAction(commands, action.action, params, collectionCtx);
                 this._updateCollectionCtxForAction(action.action, collectionCtx);
@@ -143,7 +158,10 @@ class ShardingCommandGenerator {
                     shortestPaths,
                 );
 
-                assert(targetState !== null, "State machine has unreachable states with unvisited actions");
+                assert(
+                    targetState !== null,
+                    "State machine has unreachable states with unvisited actions",
+                );
 
                 const path = shortestPaths.get(currentState).get(targetState).path;
                 for (const step of path) {
@@ -458,7 +476,8 @@ class ShardingCommandGenerator {
             // RESHARD_COLLECTION_* requires an existing sharded collection (enforced by state machine).
             // We return early because ShardCollectionCommand handles everything (create + index + shard).
             assert(
-                action === Action.SHARD_COLLECTION_RANGE || action === Action.SHARD_COLLECTION_HASHED,
+                action === Action.SHARD_COLLECTION_RANGE ||
+                    action === Action.SHARD_COLLECTION_HASHED,
                 `Unexpected action ${action} on non-existent collection - only SHARD_COLLECTION_* allowed`,
             );
 
@@ -521,7 +540,8 @@ class ShardingCommandGenerator {
             // For reshard: only drop old index if it's different from the new one.
             // For unshard: always drop the old shard key index (targetShardKey is null).
             const shouldDropIndex =
-                action === Action.UNSHARD_COLLECTION || bsonWoCompare(oldShardKey, targetShardKey) !== 0;
+                action === Action.UNSHARD_COLLECTION ||
+                bsonWoCompare(oldShardKey, targetShardKey) !== 0;
             if (shouldDropIndex && oldShardKey) {
                 commands.push(
                     new DropIndexCommand({

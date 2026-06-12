@@ -23,7 +23,10 @@ function testPreserveNullAndEmptyArraysParam(inputDoc, unwindPath, outputDoc) {
     assert.eq(
         preservedResults[0],
         outputDoc,
-        "Unexpected result for an $unwind with preserveNullAndEmptyArrays " + "(input was " + tojson(inputDoc) + ")",
+        "Unexpected result for an $unwind with preserveNullAndEmptyArrays " +
+            "(input was " +
+            tojson(inputDoc) +
+            ")",
     );
 
     // If not, we should get no outputs.

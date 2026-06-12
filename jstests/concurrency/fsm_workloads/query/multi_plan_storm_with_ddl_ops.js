@@ -40,8 +40,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         },
         recreateIndex: function recreateIndex(db, collName) {
             // Both commands may fail due to a concurrent dropIndex.
-            assert.commandWorkedOrFailedWithCode(db[collName].dropIndex({a: 1}), [ErrorCodes.IndexNotFound]);
-            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({a: 1}), [ErrorCodes.IndexBuildAborted]);
+            assert.commandWorkedOrFailedWithCode(db[collName].dropIndex({a: 1}), [
+                ErrorCodes.IndexNotFound,
+            ]);
+            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({a: 1}), [
+                ErrorCodes.IndexBuildAborted,
+            ]);
         },
         collMod: function collMod(db, collName) {
             // Change the validation level.

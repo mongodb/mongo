@@ -122,7 +122,10 @@ function runNoSuchTransactionTests(cmd, cmdName) {
 
 runNoSuchTransactionTests({commitTransaction: 1}, "commitTransaction");
 
-runNoSuchTransactionTests({coordinateCommitTransaction: 1, participants: []}, "coordinateCommitTransaction");
+runNoSuchTransactionTests(
+    {coordinateCommitTransaction: 1, participants: []},
+    "coordinateCommitTransaction",
+);
 
 session.endSession();
 

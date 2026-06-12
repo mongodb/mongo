@@ -40,7 +40,9 @@ assert.commandWorked(
     }),
 );
 
-assert.commandWorked(testDB.runCommand({find: coll.getName(), filter: {$where: "isTeenager(this.age)"}}));
+assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$where: "isTeenager(this.age)"}}),
+);
 
 assert(systemJs.drop());
 

@@ -17,7 +17,9 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
     let replTest = new ReplSetTest({name: testName, nodes: 3});
     let nodes = replTest.nodeList();
 
-    let conns = replTest.startSet({setParameter: {createRollbackDataFiles: shouldCreateRollbackFiles}});
+    let conns = replTest.startSet({
+        setParameter: {createRollbackDataFiles: shouldCreateRollbackFiles},
+    });
     let r = replTest.initiate(
         {
             "_id": testName,

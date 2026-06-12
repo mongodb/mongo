@@ -46,8 +46,15 @@ assert.commandWorked(coll.createIndex({a: -1, b: 1, c: 1, d: 1}));
 // A helper function to look up a cache entry in the plan cache based on the given filter
 // and sort specs.
 function getPlanForCacheEntry(query, sortSpec) {
-    const keyHash = getPlanCacheKeyFromShape({query: query, sort: sortSpec, collection: coll, db: db});
-    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const keyHash = getPlanCacheKeyFromShape({
+        query: query,
+        sort: sortSpec,
+        collection: coll,
+        db: db,
+    });
+    const res = coll
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}])
+        .toArray();
     assert.eq(
         1,
         res.length,
@@ -62,7 +69,9 @@ function getPlanForCacheEntry(query, sortSpec) {
 // and sort specs.
 function getPlanForCacheEntryAgg(pipeline) {
     const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll);
-    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const res = coll
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}])
+        .toArray();
     assert.eq(
         1,
         res.length,
@@ -87,7 +96,12 @@ function assertIsNotExplodeForSort(query, sortSpec) {
     assert.eq(sortMerges.length, 0, explain);
 }
 
-function assertActiveAndSameCacheEntry(expectedActive, isCacheEntrySame, [lhs, lhsTag], [rhs, rhsTag]) {
+function assertActiveAndSameCacheEntry(
+    expectedActive,
+    isCacheEntrySame,
+    [lhs, lhsTag],
+    [rhs, rhsTag],
+) {
     assert.eq(lhs.isActive, expectedActive, lhs);
     if (isCacheEntrySame) {
         assert.eq(
@@ -95,14 +109,22 @@ function assertActiveAndSameCacheEntry(expectedActive, isCacheEntrySame, [lhs, l
             getPlanCacheShapeHashFromObject(rhs),
             `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`,
         );
-        assert.eq(lhs.planCacheKey, rhs.planCacheKey, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.eq(
+            lhs.planCacheKey,
+            rhs.planCacheKey,
+            `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`,
+        );
     } else {
         assert.neq(
             getPlanCacheShapeHashFromObject(lhs),
             getPlanCacheShapeHashFromObject(rhs),
             `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`,
         );
-        assert.neq(lhs.planCacheKey, rhs.planCacheKey, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.neq(
+            lhs.planCacheKey,
+            rhs.planCacheKey,
+            `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`,
+        );
     }
 }
 
@@ -301,9 +323,9 @@ assertQueryParameterizedCorrectly({
     reuseEntry: false,
 });
 
-const maxScansToExplode = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryMaxScansToExplode: 1}))[
-    "internalQueryMaxScansToExplode"
-];
+const maxScansToExplode = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryMaxScansToExplode: 1}),
+)["internalQueryMaxScansToExplode"];
 
 const maxExplodeIn = [];
 for (let i = 0; i < maxScansToExplode; ++i) {

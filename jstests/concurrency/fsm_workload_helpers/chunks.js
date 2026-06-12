@@ -8,7 +8,11 @@
  * Intended for use by workloads testing sharding (i.e., workloads starting with 'sharded_').
  */
 
-import {isMongod, isMongodConfigsvr, isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {
+    isMongod,
+    isMongodConfigsvr,
+    isMongos,
+} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export var ChunkHelper = (function () {
@@ -56,7 +60,9 @@ export var ChunkHelper = (function () {
         return runCommandWithRetries(
             db,
             cmd,
-            (res) => res.code === ErrorCodes.LockBusy || res.code === ErrorCodes.ConflictingOperationInProgress,
+            (res) =>
+                res.code === ErrorCodes.LockBusy ||
+                res.code === ErrorCodes.ConflictingOperationInProgress,
         );
     }
 
@@ -71,7 +77,9 @@ export var ChunkHelper = (function () {
         return runCommandWithRetries(
             db,
             cmd,
-            (res) => res.code === ErrorCodes.LockBusy || res.code === ErrorCodes.ConflictingOperationInProgress,
+            (res) =>
+                res.code === ErrorCodes.LockBusy ||
+                res.code === ErrorCodes.ConflictingOperationInProgress,
         );
     }
 
@@ -93,7 +101,8 @@ export var ChunkHelper = (function () {
             cmd.writeConcern = {w: "majority"}; // _secondaryThrottle requires a write concern.
         }
 
-        const runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+        const runningWithStepdowns =
+            TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
         const isSlowBuild = () => {
             // Consider this a slow build on TSAN or if we're fuzzing mongod configs, which
             // can intentionally slow the server.
@@ -141,7 +150,9 @@ export var ChunkHelper = (function () {
         return runCommandWithRetries(
             db,
             cmd,
-            (res) => res.code === ErrorCodes.LockBusy || res.code === ErrorCodes.ConflictingOperationInProgress,
+            (res) =>
+                res.code === ErrorCodes.LockBusy ||
+                res.code === ErrorCodes.ConflictingOperationInProgress,
         );
     }
 
@@ -201,7 +212,11 @@ export var ChunkHelper = (function () {
         }
         let res = conn.getCollection(collName).find(query).explain();
         assert.commandWorked(res);
-        assert.gt(res.queryPlanner.winningPlan.shards.length, 0, "Explain did not have shards key.");
+        assert.gt(
+            res.queryPlanner.winningPlan.shards.length,
+            0,
+            "Explain did not have shards key.",
+        );
 
         let shards = res.queryPlanner.winningPlan.shards.map((shard) => shard.shardName);
         return {shards: shards, explain: res, query: query, shardVersion: shardVersion};
@@ -238,7 +253,10 @@ export var ChunkHelper = (function () {
             ns + " is not a valid namespace",
         );
         return findChunksUtil
-            .findChunksByNs(conn.getDB("config"), ns, {"min._id": {$gte: lower}, "max._id": {$lte: upper}})
+            .findChunksByNs(conn.getDB("config"), ns, {
+                "min._id": {$gte: lower},
+                "max._id": {$lte: upper},
+            })
             .itcount();
     }
 
@@ -255,7 +273,10 @@ export var ChunkHelper = (function () {
             ns + " is not a valid namespace",
         );
         return findChunksUtil
-            .findChunksByNs(conn.getDB("config"), ns, {"min._id": {$gte: lower}, "max._id": {$lte: upper}})
+            .findChunksByNs(conn.getDB("config"), ns, {
+                "min._id": {$gte: lower},
+                "max._id": {$lte: upper},
+            })
             .sort({"min._id": 1})
             .toArray();
     }

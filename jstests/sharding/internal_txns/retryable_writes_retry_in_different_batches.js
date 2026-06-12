@@ -46,7 +46,9 @@ function runCommandsWithSessionOpts(db, cmdObjs, sessionOpts) {
         cmdResponses.push(assert.commandWorked(db.runCommand(cmdObjWithTxnFields)));
     });
     if (sessionOpts.isTransaction) {
-        assert.commandWorked(db.adminCommand(makeCommitTransactionCmdObj(sessionOpts.lsid, sessionOpts.txnNumber)));
+        assert.commandWorked(
+            db.adminCommand(makeCommitTransactionCmdObj(sessionOpts.lsid, sessionOpts.txnNumber)),
+        );
     }
 
     return cmdResponses;

@@ -27,7 +27,12 @@ assert.soon(() => {
 }, "Timed out waiting for primary to take its first stable checkpoint");
 
 // Retrieve the initiating set entry's timestamp from the head of the oplog.
-const initiatingSetTs = primary.getDB("local").oplog.rs.find().sort({$natural: 1}).limit(1).next().ts;
+const initiatingSetTs = primary
+    .getDB("local")
+    .oplog.rs.find()
+    .sort({$natural: 1})
+    .limit(1)
+    .next().ts;
 jsTestLog("Initiating set oplog entry timestamp: " + tojson(initiatingSetTs));
 
 // Hold the primary's stable recovery timestamp at the initiating set entry's timestamp.
@@ -45,7 +50,12 @@ assert.commandWorked(testDb.coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 
 // Capture the primary's last oplog entry timestamp. Without the initiating-set reset logic,
 // this is what beginApplyingTimestamp would be set to on the secondary.
-const normalBeginApplyingTs = primary.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next().ts;
+const normalBeginApplyingTs = primary
+    .getDB("local")
+    .oplog.rs.find()
+    .sort({$natural: -1})
+    .limit(1)
+    .next().ts;
 assert(
     bsonWoCompare(normalBeginApplyingTs, initiatingSetTs) > 0,
     "Primary's last oplog entry should be newer than the initiating set entry. normalBeginApplyingTs=" +
@@ -79,7 +89,10 @@ pauseBeforeCloningFp.wait();
 // Validate that beginApplyingTimestamp was reset to the initiating set entry's timestamp
 // rather than remaining at the normal value (normalBeginApplyingTs).
 const syncStatus = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(syncStatus.initialSyncStatus, "Expected initialSyncStatus in replSetGetStatus during initial sync");
+assert(
+    syncStatus.initialSyncStatus,
+    "Expected initialSyncStatus in replSetGetStatus during initial sync",
+);
 assert.eq(
     syncStatus.initialSyncStatus.initialSyncOplogStart,
     initiatingSetTs,

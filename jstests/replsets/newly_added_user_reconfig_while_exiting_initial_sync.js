@@ -76,7 +76,9 @@ const userReconfigFn = function () {
 };
 const waitForUserReconfig = startParallelShell(userReconfigFn, primary.port);
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 waitForUserReconfig();
 
 jsTestLog("Waiting for 'newlyAdded' field to be removed");
@@ -93,7 +95,10 @@ assertVoteCount(primary, {
 jsTestLog("Making sure we can see the results of the user reconfig");
 const modifiedConfig = rst.getReplSetConfigFromNode();
 assert.eq(3, modifiedConfig.members.length, () => [tojson(baseConfig), tojson(modifiedConfig)]);
-assert.eq("abcde:12345", modifiedConfig.members[2].host, () => [tojson(baseConfig), tojson(modifiedConfig)]);
+assert.eq("abcde:12345", modifiedConfig.members[2].host, () => [
+    tojson(baseConfig),
+    tojson(modifiedConfig),
+]);
 
 jsTestLog("Making sure set can accept w:2 writes");
 assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 2}}));

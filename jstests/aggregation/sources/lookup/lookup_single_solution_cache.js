@@ -39,7 +39,15 @@ const expectedResults = [
     // Sort by "a" so we know the cached plan will hold b=1 (the second run will be cached).
     const pipeline = [
         {$sort: {a: 1}},
-        {$lookup: {from: "inner", localField: "a", foreignField: "b", as: "docs", pipeline: [{$project: {_id: 0}}]}},
+        {
+            $lookup: {
+                from: "inner",
+                localField: "a",
+                foreignField: "b",
+                as: "docs",
+                pipeline: [{$project: {_id: 0}}],
+            },
+        },
         {$project: {_id: 0}},
     ];
 

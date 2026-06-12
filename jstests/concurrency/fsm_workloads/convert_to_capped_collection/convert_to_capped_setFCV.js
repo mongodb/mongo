@@ -35,16 +35,19 @@ export const $config = (function () {
         },
 
         convertToCapped: function (db, collName) {
-            assert.commandWorkedOrFailedWithCode(db.runCommand({convertToCapped: collName, size: 1024}), [
-                ErrorCodes.NamespaceNotFound,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.runCommand({convertToCapped: collName, size: 1024}),
+                [ErrorCodes.NamespaceNotFound],
+            );
         },
 
         setFCV: function (db, collName) {
             const fcvValues = [lastLTSFCV, latestFCV];
             const targetFCV = fcvValues[Random.randInt(2)];
             try {
-                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+                assert.commandWorked(
+                    db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+                );
             } catch (e) {
                 if (handleRandomSetFCVErrors(e, targetFCV)) {
                     return;
@@ -58,9 +61,10 @@ export const $config = (function () {
             try {
                 // Fetch the FCV document and the catalog at a consistent point in time.
                 const fcvRes = assert.commandWorked(
-                    db
-                        .getSiblingDB("admin")
-                        .runCommand({find: "system.version", filter: {_id: "featureCompatibilityVersion"}}),
+                    db.getSiblingDB("admin").runCommand({
+                        find: "system.version",
+                        filter: {_id: "featureCompatibilityVersion"},
+                    }),
                 );
                 const fcvDoc = fcvRes.cursor.firstBatch[0];
                 print("Got FCV document: " + tojsononeline(fcvRes));
@@ -72,7 +76,9 @@ export const $config = (function () {
                 // If the FCV is fully downgraded, recordIdsReplicated field should not be present.
                 const atClusterTime = fcvRes.operationTime;
                 const catalog = db[collName]
-                    .aggregate([{$listCatalog: {}}], {readConcern: {level: "snapshot", atClusterTime}})
+                    .aggregate([{$listCatalog: {}}], {
+                        readConcern: {level: "snapshot", atClusterTime},
+                    })
                     .toArray();
                 for (const catalogEntry of catalog) {
                     assert(
@@ -91,7 +97,9 @@ export const $config = (function () {
     };
 
     const teardown = function (db, collName, cluster) {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
 
     return {

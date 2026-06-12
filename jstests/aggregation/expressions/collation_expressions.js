@@ -52,7 +52,12 @@ testExpressionWithCollation(coll, {$gte: ["b", "B"]}, true, caseInsensitive);
 testExpressionWithCollation(coll, {$in: ["A", [1, 2, "a", 3, 4]]}, true, caseInsensitive);
 
 // Test that $indexOfArray respects the collation.
-testExpressionWithCollation(coll, {$indexOfArray: [[1, 2, "a", "b", "c", "B"], "B"]}, 3, caseInsensitive);
+testExpressionWithCollation(
+    coll,
+    {$indexOfArray: [[1, 2, "a", "b", "c", "B"], "B"]},
+    3,
+    caseInsensitive,
+);
 
 // Test that $indexOfBytes doesn't respect the collation.
 testExpressionWithCollation(coll, {$indexOfBytes: ["12abcB", "B"]}, 5, caseInsensitive);
@@ -164,7 +169,9 @@ testExpressionWithCollation(coll, {$split: ["abc", "B"]}, ["abc"], caseInsensiti
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "A"}));
 results = coll
-    .aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["b", "B"]}]}}}], {collation: caseInsensitive})
+    .aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["b", "B"]}]}}}], {
+        collation: caseInsensitive,
+    })
     .toArray();
 assert.eq(1, results.length);
 assert.eq(true, results[0].out);
@@ -173,7 +180,9 @@ assert.eq(true, results[0].out);
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "A", str2: "B"}));
 results = coll
-    .aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["$str2", "b"]}]}}}], {collation: caseInsensitive})
+    .aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["$str2", "b"]}]}}}], {
+        collation: caseInsensitive,
+    })
     .toArray();
 assert.eq(1, results.length);
 assert.eq(true, results[0].out);
@@ -182,7 +191,9 @@ assert.eq(true, results[0].out);
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "A"}));
 results = coll
-    .aggregate([{$project: {out: {$or: [{$eq: ["$str", "a"]}, {$eq: ["b", "c"]}]}}}], {collation: caseInsensitive})
+    .aggregate([{$project: {out: {$or: [{$eq: ["$str", "a"]}, {$eq: ["b", "c"]}]}}}], {
+        collation: caseInsensitive,
+    })
     .toArray();
 assert.eq(1, results.length);
 assert.eq(true, results[0].out);
@@ -191,7 +202,9 @@ assert.eq(true, results[0].out);
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "A", str2: "B"}));
 results = coll
-    .aggregate([{$project: {out: {$or: [{$eq: ["$str", "c"]}, {$eq: ["$str2", "b"]}]}}}], {collation: caseInsensitive})
+    .aggregate([{$project: {out: {$or: [{$eq: ["$str", "c"]}, {$eq: ["$str2", "b"]}]}}}], {
+        collation: caseInsensitive,
+    })
     .toArray();
 assert.eq(1, results.length);
 assert.eq(true, results[0].out);
@@ -247,7 +260,9 @@ testExpressionWithCollation(
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 results = coll
-    .aggregate([{$group: {_id: {a: {$eq: ["a", "A"]}, b: {$eq: ["b", "B"]}}}}], {collation: caseInsensitive})
+    .aggregate([{$group: {_id: {a: {$eq: ["a", "A"]}, b: {$eq: ["b", "B"]}}}}], {
+        collation: caseInsensitive,
+    })
     .toArray();
 assert.eq(1, results.length);
 assert.eq(true, results[0]._id.a);

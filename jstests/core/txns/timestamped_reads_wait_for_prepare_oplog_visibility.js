@@ -62,7 +62,9 @@ const readThreadFunc = async function (readFunc, _collName, hangTimesEntered, lo
     readFuncObj.oplogVisibility();
 
     // Let the transaction finish preparing.
-    assert.commandWorked(db.adminCommand({configureFailPoint: "hangAfterReservingPrepareTimestamp", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "hangAfterReservingPrepareTimestamp", mode: "off"}),
+    );
 
     // Wait for 'prepareTransaction' to complete and be logged.
     assert.commandWorked(
@@ -83,7 +85,11 @@ function runTest(prefix, readFunc) {
     try {
         // The default WC is majority and this test can't satisfy majority writes.
         assert.commandWorked(
-            db.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+            db.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"},
+            }),
         );
 
         jsTestLog("Testing oplog visibility for " + prefix);
@@ -105,7 +111,9 @@ function runTest(prefix, readFunc) {
         const session = db.getMongo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase(TestData.dbName);
         session.startTransaction({readConcern: {level: "snapshot"}});
-        const updateResult = assert.commandWorked(sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}));
+        const updateResult = assert.commandWorked(
+            sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}),
+        );
         // Make sure that txnDoc is part of both the snapshot and transaction as an update can still
         // succeed if it doesn't find any matching documents to modify.
         assert.eq(updateResult["nModified"], 1);
@@ -154,7 +162,11 @@ const snapshotRead = function (_collName) {
         jsTestLog("Snapshot reads should not block on oplog visibility.");
         session.startTransaction({readConcern: {level: "snapshot"}});
         let cursor = assert.commandWorked(
-            sessionDB.runCommand({find: _collName, filter: TestData.txnDocFilter, maxTimeMS: TestData.successTimeout}),
+            sessionDB.runCommand({
+                find: _collName,
+                filter: TestData.txnDocFilter,
+                maxTimeMS: TestData.successTimeout,
+            }),
         );
         assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
         assert.commandWorked(session.abortTransaction_forTesting());
@@ -172,7 +184,9 @@ const snapshotRead = function (_collName) {
     };
 
     const prepareConflict = function () {
-        jsTestLog("Snapshot reads should block on prepared transactions for " + "conflicting documents.");
+        jsTestLog(
+            "Snapshot reads should block on prepared transactions for " + "conflicting documents.",
+        );
         session.startTransaction({readConcern: {level: "snapshot"}});
         let cursor = assert.commandFailedWithCode(
             sessionDB.runCommand({
@@ -182,9 +196,15 @@ const snapshotRead = function (_collName) {
             }),
             ErrorCodes.MaxTimeMSExpired,
         );
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
 
-        jsTestLog("Snapshot reads should succeed on non-conflicting documents while a " + "transaction is in prepare.");
+        jsTestLog(
+            "Snapshot reads should succeed on non-conflicting documents while a " +
+                "transaction is in prepare.",
+        );
         session.startTransaction({readConcern: {level: "snapshot"}});
         cursor = assert.commandWorked(
             sessionDB.runCommand({
@@ -204,7 +224,9 @@ const afterClusterTime = function (_collName) {
     const _db = db.getSiblingDB(TestData.dbName);
 
     // Advance the cluster time with an arbitrary other insert.
-    let res = assert.commandWorked(_db.runCommand({insert: _collName, documents: [{advanceClusterTime: 1}]}));
+    let res = assert.commandWorked(
+        _db.runCommand({insert: _collName, documents: [{advanceClusterTime: 1}]}),
+    );
     assert(res.hasOwnProperty("$clusterTime"), tojson(res));
     assert(res.$clusterTime.hasOwnProperty("clusterTime"), tojson(res));
     const clusterTime = res.$clusterTime.clusterTime;
@@ -233,7 +255,10 @@ const afterClusterTime = function (_collName) {
     };
 
     const prepareConflict = function () {
-        jsTestLog("afterClusterTime reads should block on prepared transactions for " + "conflicting documents.");
+        jsTestLog(
+            "afterClusterTime reads should block on prepared transactions for " +
+                "conflicting documents.",
+        );
         assert.commandFailedWithCode(
             _db.runCommand({
                 find: _collName,
@@ -245,7 +270,8 @@ const afterClusterTime = function (_collName) {
         );
 
         jsTestLog(
-            "afterClusterTime reads should succeed on non-conflicting documents " + "while transaction is in prepare.",
+            "afterClusterTime reads should succeed on non-conflicting documents " +
+                "while transaction is in prepare.",
         );
         let cursor = assert.commandWorked(
             _db.runCommand({
@@ -267,7 +293,11 @@ const normalRead = function (_collName) {
     const oplogVisibility = function () {
         jsTestLog("Ordinary reads should not block on oplog visibility.");
         let cursor = assert.commandWorked(
-            _db.runCommand({find: _collName, filter: TestData.txnDocFilter, maxTimeMS: TestData.successTimeout}),
+            _db.runCommand({
+                find: _collName,
+                filter: TestData.txnDocFilter,
+                maxTimeMS: TestData.successTimeout,
+            }),
         );
         assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
         cursor = assert.commandWorked(
@@ -283,7 +313,11 @@ const normalRead = function (_collName) {
     const prepareConflict = function () {
         jsTestLog("Ordinary reads should not block on prepared transactions.");
         let cursor = assert.commandWorked(
-            _db.runCommand({find: _collName, filter: TestData.txnDocFilter, maxTimeMS: TestData.successTimeout}),
+            _db.runCommand({
+                find: _collName,
+                filter: TestData.txnDocFilter,
+                maxTimeMS: TestData.successTimeout,
+            }),
         );
         assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
         cursor = assert.commandWorked(

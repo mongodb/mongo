@@ -48,7 +48,9 @@ assert.eq(found, {_id: 3, x: 3});
 // Tests for explain using findAndModify with an _id equality query.
 //
 {
-    let explain = coll.explain("queryPlanner").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
+    let explain = coll
+        .explain("queryPlanner")
+        .findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
     // post 8.0, EXPRESS will handle update-by-id
     if (!planHasStage(db, explain.queryPlanner.winningPlan, "EXPRESS_UPDATE")) {
         assert(planHasStage(db, explain.queryPlanner.winningPlan, "IDHACK"));
@@ -56,7 +58,9 @@ assert.eq(found, {_id: 3, x: 3});
     }
 
     // Run explain with execution-level verbosity.
-    explain = coll.explain("executionStats").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
+    explain = coll
+        .explain("executionStats")
+        .findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
     assert.eq(explain.executionStats.nReturned, 1);
     // UPDATE stage would modify one document.
     let updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
@@ -75,12 +79,16 @@ if (!FixtureHelpers.isMongos(db)) {
     //
     // Tests for explain with a query that requires a COLLSCAN.
     //
-    let explain = coll.explain("queryPlanner").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
+    let explain = coll
+        .explain("queryPlanner")
+        .findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
 
     // Run explain with execution-level verbosity.
-    explain = coll.explain("executionStats").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
+    explain = coll
+        .explain("executionStats")
+        .findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
     assert.eq(explain.executionStats.nReturned, 1);
     // UPDATE stage would modify one document.
     const updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");

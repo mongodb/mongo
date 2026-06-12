@@ -10,9 +10,14 @@ import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 function testTieBreaking(breakTies, expectedPlanCount, checkAgainstOriginal) {
     const expectedDocsExamined = 1;
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlanTieBreakingWithIndexHeuristics: breakTies}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlanTieBreakingWithIndexHeuristics: breakTies,
+        }),
     );
-    const stats = assert.commandWorked(coll.find({a: "mouse", b: /not rat/, c: /capybara/, d: /degu/}).explain(true));
+    const stats = assert.commandWorked(
+        coll.find({a: "mouse", b: /not rat/, c: /capybara/, d: /degu/}).explain(true),
+    );
 
     // Check we're generating the expected number of plans.
     assert.eq(stats.executionStats.allPlansExecution.length, expectedPlanCount);

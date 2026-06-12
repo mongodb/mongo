@@ -109,7 +109,10 @@ export function withExtensions(
     const extensionsToLoad = [];
 
     for (const [extLib, extensionOptions] of Object.entries(extToOptionsMap)) {
-        const cfgStr = typeof extensionOptions === "string" ? extensionOptions : JSON.stringify(extensionOptions);
+        const cfgStr =
+            typeof extensionOptions === "string"
+                ? extensionOptions
+                : JSON.stringify(extensionOptions);
         const extensionName = generateExtensionConfigWithOptions(extLib, cfgStr);
         extensionsToLoad.push(extensionName);
     }
@@ -211,7 +214,13 @@ export function withExtensionsAndMongot(
     });
 
     try {
-        withExtensions(extToOptionsMap, wrappedTestFn, topologiesToTest, shardingOptions, additionalOptions);
+        withExtensions(
+            extToOptionsMap,
+            wrappedTestFn,
+            topologiesToTest,
+            shardingOptions,
+            additionalOptions,
+        );
     } finally {
         if (mongotmock) {
             mongotmock.stop();
@@ -247,7 +256,9 @@ export function checkExtensionFailsToLoad({options, st, validateExitCode = true}
     }, mongodExpectedExitCode);
     // mongos returns badOptions on extension load failure.
     tryStartup(() => {
-        const conn = MongoRunner.runMongos(Object.assign({configdb: st.configRS.getURL()}, options));
+        const conn = MongoRunner.runMongos(
+            Object.assign({configdb: st.configRS.getURL()}, options),
+        );
         MongoRunner.stopMongos(conn);
     }, MongoRunner.EXIT_BADOPTIONS);
 }

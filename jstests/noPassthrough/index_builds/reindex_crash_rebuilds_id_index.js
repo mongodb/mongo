@@ -33,7 +33,9 @@ assert.eq("_id_", spec.name, tojson(spec));
 
 // Enable a failpoint that causes reIndex to crash after dropping the indexes but before
 // rebuilding them.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "reIndexCrashAfterDrop", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "reIndexCrashAfterDrop", mode: "alwaysOn"}),
+);
 assert.throws(() => testColl.runCommand({reIndex: collName}));
 
 // The server should have crashed from the failpoint.

@@ -9,12 +9,18 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Set the secondaries to priority 0 to prevent the primaries from stepping down.
 let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};
-let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}, causallyConsistent: true});
+let st = new ShardingTest({
+    mongos: 2,
+    shards: {rs0: rsOpts, rs1: rsOpts},
+    causallyConsistent: true,
+});
 let dbName = "test",
     collName = "foo",
     ns = "test.foo";
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
@@ -52,7 +58,10 @@ assert.commandFailedWithCode(
         count: collName,
         query: {x: 1},
         $readPreference: {mode: "secondary"},
-        readConcern: {"afterClusterTime": staleMongosDB.getSession().getOperationTime(), "level": "available"},
+        readConcern: {
+            "afterClusterTime": staleMongosDB.getSession().getOperationTime(),
+            "level": "available",
+        },
     }),
     ErrorCodes.InvalidOptions,
 );

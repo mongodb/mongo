@@ -28,7 +28,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     let doHello = (admin, {lbConnection, lbHello}) => {
         if (lbConnection)
             assert.commandWorked(
-                admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}),
+                admin.adminCommand({
+                    configureFailPoint: "clientIsConnectedToLoadBalancerPort",
+                    mode: "alwaysOn",
+                }),
             );
         try {
             let helloDoc = {};
@@ -36,14 +39,20 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             return admin.runCommand("hello", helloDoc);
         } finally {
             assert.commandWorked(
-                admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}),
+                admin.adminCommand({
+                    configureFailPoint: "clientIsConnectedToLoadBalancerPort",
+                    mode: "off",
+                }),
             );
         }
     };
 
     let assertServiceId = (res) => {
         assert.commandWorked(res);
-        assert(res.hasOwnProperty("serviceId"), "serviceId missing from hello response:" + tojson(res));
+        assert(
+            res.hasOwnProperty("serviceId"),
+            "serviceId missing from hello response:" + tojson(res),
+        );
         assert(res.serviceId.isObjectId, "res.serviceId = " + tojson(res.serviceId));
     };
 

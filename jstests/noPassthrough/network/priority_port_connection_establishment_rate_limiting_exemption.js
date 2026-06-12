@@ -42,9 +42,10 @@ describe("Tests for priority port exemption from connection (session) establishm
         // incrementing the establishmentRateLimit counter. As a result, the rejected counter would
         // already be non-zero at this point, invalidating our test assumptions.
         assert.commandWorked(
-            exemptConn
-                .getDB("admin")
-                .adminCommand({setParameter: 1, ingressConnectionEstablishmentRateLimiterEnabled: true}),
+            exemptConn.getDB("admin").adminCommand({
+                setParameter: 1,
+                ingressConnectionEstablishmentRateLimiterEnabled: true,
+            }),
         );
         jsTest.log.info("Enabled connection (session) establishment rate limiter");
 
@@ -92,9 +93,10 @@ describe("Tests for priority port exemption from connection (session) establishm
 
         // Disable connection (session) establishment request rate limiter
         assert.commandWorked(
-            exemptConn
-                .getDB("admin")
-                .adminCommand({setParameter: 1, ingressConnectionEstablishmentRateLimiterEnabled: false}),
+            exemptConn.getDB("admin").adminCommand({
+                setParameter: 1,
+                ingressConnectionEstablishmentRateLimiterEnabled: false,
+            }),
         );
         jsTest.log.info("Disabled connection (session) establishment rate limiter");
     };

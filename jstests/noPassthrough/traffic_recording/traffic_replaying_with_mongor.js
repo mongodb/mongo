@@ -26,7 +26,11 @@ function opsToRecord(dbContext) {
  */
 function runTrafficRecording(baseDir, customSubDir) {
     const {recordingDirGlobal, recordingDir} = createDirectories(baseDir, customSubDir);
-    const {mongodInstance, coll, recordingFilePath} = recordOperations(recordingDirGlobal, customSubDir, opsToRecord);
+    const {mongodInstance, coll, recordingFilePath} = recordOperations(
+        recordingDirGlobal,
+        customSubDir,
+        opsToRecord,
+    );
 
     const docs = coll.find({}).toArray();
 
@@ -35,7 +39,10 @@ function runTrafficRecording(baseDir, customSubDir) {
     return {recordingFilePath, docs, recordingDirGlobal};
 }
 
-const {recordingFilePath, docs, recordingDirGlobal} = runTrafficRecording("traffic_recording", "recordings");
+const {recordingFilePath, docs, recordingDirGlobal} = runTrafficRecording(
+    "traffic_recording",
+    "recordings",
+);
 jsTest.log("Documents on the original instance: ");
 printjson(docs);
 

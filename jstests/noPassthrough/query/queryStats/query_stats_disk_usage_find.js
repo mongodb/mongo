@@ -47,7 +47,11 @@ function runUnindexedFindTest(conn, coll) {
     const expectedDocs = 4;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}, sort: {v: 1}};
 
-    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -83,7 +87,11 @@ function runIndexedFindTest(conn, coll) {
     const expectedDocs = 4;
     const shape = {filter: {y: {$gt: "?number"}}, sort: {v: 1}};
 
-    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     // Results should be the same independent of batch size. We need to reach a batch size of
     // docsReturned + 1 for the initial find command to return an exhausted cursor.
@@ -91,7 +99,12 @@ function runIndexedFindTest(conn, coll) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
 
         // In the sharded case, this will target only one shard.
-        const cmd = {find: coll.getName(), filter: {y: {$gt: 0}}, sort: {v: 1}, batchSize: batchSize};
+        const cmd = {
+            find: coll.getName(),
+            filter: {y: {$gt: 0}},
+            sort: {v: 1},
+            batchSize: batchSize,
+        };
         const queryStats = exhaustCursorAndGetQueryStats({
             conn: conn,
             cmd: cmd,
@@ -121,7 +134,11 @@ function runFindAgainstViewTest(conn, coll) {
     const expectedDocs = 3;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}, sort: {v: 1}};
 
-    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({
+        conn: conn,
+        collName: view.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);

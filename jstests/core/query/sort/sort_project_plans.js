@@ -20,25 +20,41 @@
 
     // Inclusion projection preserving relevant fields after sort.
     {
-        let pipe = [{$sort: {b: 1}}, {$project: {a: 1, foo: 1}}, {$group: {_id: "$a", maxFoo: {$max: "$foo"}}}];
+        let pipe = [
+            {$sort: {b: 1}},
+            {$project: {a: 1, foo: 1}},
+            {$group: {_id: "$a", maxFoo: {$max: "$foo"}}},
+        ];
         runOneDocTest(pipe, {_id: 1, maxFoo: 1002});
     }
 
     // Inclusion projection removing a relevant field after sort.
     {
-        let pipe = [{$sort: {b: 1}}, {$project: {a: 1}}, {$group: {_id: "$a", maxFoo: {$max: "$foo"}}}];
+        let pipe = [
+            {$sort: {b: 1}},
+            {$project: {a: 1}},
+            {$group: {_id: "$a", maxFoo: {$max: "$foo"}}},
+        ];
         runOneDocTest(pipe, {_id: 1, maxFoo: null});
     }
 
     // Exclusion projection removing irrelevant field after sort.
     {
-        let pipe = [{$sort: {b: 1}}, {$project: {z: 0}}, {$group: {_id: "$a", maxFoo: {$max: "$foo"}}}];
+        let pipe = [
+            {$sort: {b: 1}},
+            {$project: {z: 0}},
+            {$group: {_id: "$a", maxFoo: {$max: "$foo"}}},
+        ];
         runOneDocTest(pipe, {_id: 1, maxFoo: 1002});
     }
 
     // Exclusion projection removing a subsequently referenced field after sort.
     {
-        let pipe = [{$sort: {b: 1}}, {$project: {foo: 0}}, {$group: {_id: "$a", maxFoo: {$max: "$foo"}}}];
+        let pipe = [
+            {$sort: {b: 1}},
+            {$project: {foo: 0}},
+            {$group: {_id: "$a", maxFoo: {$max: "$foo"}}},
+        ];
         runOneDocTest(pipe, {_id: 1, maxFoo: null});
     }
 })();

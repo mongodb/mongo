@@ -32,8 +32,16 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         let lastDistanceSeen = 0;
         while (cursor.hasNext()) {
             const doc = cursor.next();
-            assert.lte(doc.dist, maxDistance, `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`);
-            assert.lte(lastDistanceSeen, doc.dist, `dist in ${tojson(doc)} is not less than the previous distance`);
+            assert.lte(
+                doc.dist,
+                maxDistance,
+                `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`,
+            );
+            assert.lte(
+                lastDistanceSeen,
+                doc.dist,
+                `dist in ${tojson(doc)} is not less than the previous distance`,
+            );
             lastDistanceSeen = doc.dist;
         }
     };

@@ -89,7 +89,11 @@ function createViewChain(viewSpecs) {
     const chain = createViewChain([
         {suffix: "level1", sourceColl: collName, pipeline: [{$testBar: {noop: true}}]},
         {suffix: "level2", sourceColl: null, pipeline: [{$addFields: {level2: true}}]},
-        {suffix: "level3", sourceColl: null, pipeline: [{$testBar: {noop: true}}, {$addFields: {level3: true}}]},
+        {
+            suffix: "level3",
+            sourceColl: null,
+            pipeline: [{$testBar: {noop: true}}, {$addFields: {level3: true}}],
+        },
         {suffix: "level4", sourceColl: null, pipeline: [{$addFields: {level4: true}}]},
     ]);
 
@@ -111,7 +115,10 @@ function createViewChain(viewSpecs) {
 {
     const viewName = makeViewName("double_unionwith_target");
     assert.commandWorked(
-        testDb.createView(viewName, foreignCollName, [{$testBar: {noop: true}}, {$match: {type: "X"}}]),
+        testDb.createView(viewName, foreignCollName, [
+            {$testBar: {noop: true}},
+            {$match: {type: "X"}},
+        ]),
     );
 
     const pipeline = [
@@ -138,7 +145,11 @@ function createViewChain(viewSpecs) {
 {
     // Tests: transform extension at base, desugaring extension in middle, non-desugaring at top
     const chain = createViewChain([
-        {suffix: "mixed_level1_transform", sourceColl: collName, pipeline: [{$sort: {_id: 1}}, {$extensionLimit: 4}]},
+        {
+            suffix: "mixed_level1_transform",
+            sourceColl: collName,
+            pipeline: [{$sort: {_id: 1}}, {$extensionLimit: 4}],
+        },
         {
             suffix: "mixed_level2_desugar",
             sourceColl: null,
@@ -236,12 +247,19 @@ function createViewChain(viewSpecs) {
 {
     // View A: non-desugaring extension.
     const viewAName = makeViewName("view_A");
-    assert.commandWorked(testDb.createView(viewAName, collName, [{$testBar: {noop: true}}, {$match: {category: "A"}}]));
+    assert.commandWorked(
+        testDb.createView(viewAName, collName, [
+            {$testBar: {noop: true}},
+            {$match: {category: "A"}},
+        ]),
+    );
 
     // View B: desugaring extension.
     const viewBName = makeViewName("view_B");
     assert.commandWorked(
-        testDb.createView(viewBName, foreignCollName, [{$matchTopN: {filter: {}, sort: {_id: 1}, limit: 2}}]),
+        testDb.createView(viewBName, foreignCollName, [
+            {$matchTopN: {filter: {}, sort: {_id: 1}, limit: 2}},
+        ]),
     );
 
     // View C: transform extension that unions with View B.
@@ -256,7 +274,11 @@ function createViewChain(viewSpecs) {
     );
 
     // Query View A and union with View C.
-    const pipeline = [{$addFields: {source: "A"}}, {$unionWith: viewCName}, {$sort: {_id: 1, source: 1}}];
+    const pipeline = [
+        {$addFields: {source: "A"}},
+        {$unionWith: viewCName},
+        {$sort: {_id: 1, source: 1}},
+    ];
 
     const results = testDb[viewAName].aggregate(pipeline).toArray();
 
@@ -285,7 +307,11 @@ function createViewChain(viewSpecs) {
     jsTest.log.info("Testing $graphLookup from nested view chain with extensions");
 
     const chain = createViewChain([
-        {suffix: "graphchain_base", sourceColl: graphCollName, pipeline: [{$testBar: {noop: true}}]},
+        {
+            suffix: "graphchain_base",
+            sourceColl: graphCollName,
+            pipeline: [{$testBar: {noop: true}}],
+        },
         {suffix: "graphchain_mid", sourceColl: null, pipeline: [{$addFields: {midLevel: true}}]},
         {
             suffix: "graphchain_top",
@@ -327,12 +353,17 @@ function createViewChain(viewSpecs) {
 // $unionWith with $graphLookup in subpipeline, both targeting views with extensions
 // =============================================================================
 {
-    jsTest.log.info("Testing $unionWith with $graphLookup in subpipeline targeting extension views");
+    jsTest.log.info(
+        "Testing $unionWith with $graphLookup in subpipeline targeting extension views",
+    );
 
     // View for the $graphLookup.
     const graphViewName = makeViewName("union_graph_combo");
     assert.commandWorked(
-        testDb.createView(graphViewName, graphCollName, [{$testBar: {noop: true}}, {$addFields: {isGraph: true}}]),
+        testDb.createView(graphViewName, graphCollName, [
+            {$testBar: {noop: true}},
+            {$addFields: {isGraph: true}},
+        ]),
     );
 
     const pipeline = [
@@ -380,7 +411,11 @@ function createViewChain(viewSpecs) {
     // View with non-desugaring extension.
     const viewAName = makeViewName("seq_union_A");
     assert.commandWorked(
-        testDb.createView(viewAName, collName, [{$testBar: {noop: true}}, {$match: {x: 1}}, {$addFields: {from: "A"}}]),
+        testDb.createView(viewAName, collName, [
+            {$testBar: {noop: true}},
+            {$match: {x: 1}},
+            {$addFields: {from: "A"}},
+        ]),
     );
 
     // View with desugaring extension.

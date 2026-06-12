@@ -37,7 +37,11 @@ assert.eq(nodes[0], primary);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 
@@ -52,9 +56,14 @@ assert.commandWorked(
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
 // Stop the primary from calling into awaitReplication().
-const hangBeforeWaitingForWriteConcern = configureFailPoint(nodes[0], "hangBeforeWaitingForWriteConcern");
+const hangBeforeWaitingForWriteConcern = configureFailPoint(
+    nodes[0],
+    "hangBeforeWaitingForWriteConcern",
+);
 // Stop the primary from being able to complete stepping down.
-assert.commandWorked(nodes[0].adminCommand({configureFailPoint: "blockHeartbeatStepdown", mode: "alwaysOn"}));
+assert.commandWorked(
+    nodes[0].adminCommand({configureFailPoint: "blockHeartbeatStepdown", mode: "alwaysOn"}),
+);
 
 jsTestLog("Do w:majority write that will block waiting for replication.");
 let doMajorityWrite = function () {
@@ -71,7 +80,10 @@ let doMajorityWrite = function () {
         },
     );
     jsTestLog(`w:majority write replied: ${tojson(res)}`);
-    assert.writeErrorWithCode(res, [ErrorCodes.PrimarySteppedDown, ErrorCodes.InterruptedDueToReplStateChange]);
+    assert.writeErrorWithCode(res, [
+        ErrorCodes.PrimarySteppedDown,
+        ErrorCodes.InterruptedDueToReplStateChange,
+    ]);
 };
 
 let joinMajorityWriter = startParallelShell(doMajorityWrite, nodes[0].port);
@@ -108,7 +120,9 @@ nodes[1].acceptConnectionsFrom(nodes[0]);
 nodes[2].acceptConnectionsFrom(nodes[0]);
 
 // Allow the old primary to finish stepping down so that shutdown can finish.
-assert.commandWorked(nodes[0].adminCommand({configureFailPoint: "blockHeartbeatStepdown", mode: "off"}));
+assert.commandWorked(
+    nodes[0].adminCommand({configureFailPoint: "blockHeartbeatStepdown", mode: "off"}),
+);
 
 jsTestLog(
     "Unblock the thread waiting for replication of the now rolled-back write, ensure " +

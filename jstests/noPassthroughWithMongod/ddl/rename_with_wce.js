@@ -44,9 +44,14 @@ assert.commandFailed(admin.runCommand({renameCollection: "db_a.rename7", to: "db
 // Ensure that a WCE during renaming doesn't cause a failure.
 assert.commandWorked(db_a.setProfilingLevel(2)); // So we can check WCE happens.
 assert.commandWorked(
-    db_a.adminCommand({"configureFailPoint": "writeConflictInRenameCollCopyToTmp", "mode": {times: 1}}),
+    db_a.adminCommand({
+        "configureFailPoint": "writeConflictInRenameCollCopyToTmp",
+        "mode": {times: 1},
+    }),
 );
-assert.commandWorked(admin.runCommand({renameCollection: "db_a.rename7", to: "db_b.rename7", dropTarget: true}));
+assert.commandWorked(
+    admin.runCommand({renameCollection: "db_a.rename7", to: "db_b.rename7", dropTarget: true}),
+);
 assert.gte(db_a.system.profile.findOne().writeConflicts, 1); // Make sure that our WCE happened
 assert.commandWorked(db_a.setProfilingLevel(0));
 a.drop();

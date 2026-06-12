@@ -44,7 +44,13 @@ checkChangeStreamMetrics(db, 3, 1);
 coll.explain().aggregate([{$changeStream: {showExpandedEvents: true}}]);
 checkChangeStreamMetrics(db, 4, 2);
 
-function checkOplogMetrics(db, changeStream, previousMetrics, expectedDocsReturned, expectedDocsScanned) {
+function checkOplogMetrics(
+    db,
+    changeStream,
+    previousMetrics,
+    expectedDocsReturned,
+    expectedDocsScanned,
+) {
     assert.soon(() => changeStream.hasNext());
     // Consume the events.
     while (changeStream.hasNext()) {
@@ -52,11 +58,16 @@ function checkOplogMetrics(db, changeStream, previousMetrics, expectedDocsReturn
     }
 
     const newMetrics = db.serverStatus().metrics;
-    const oplogDocsReturned = newMetrics.oplogStats.document.returned - previousMetrics.oplogStats.document.returned;
+    const oplogDocsReturned =
+        newMetrics.oplogStats.document.returned - previousMetrics.oplogStats.document.returned;
     const oplogDocsScanned =
-        newMetrics.oplogStats.queryExecutor.scannedObjects - previousMetrics.oplogStats.queryExecutor.scannedObjects;
+        newMetrics.oplogStats.queryExecutor.scannedObjects -
+        previousMetrics.oplogStats.queryExecutor.scannedObjects;
     assert.gte(newMetrics.document.returned, newMetrics.oplogStats.document.returned);
-    assert.gte(newMetrics.queryExecutor.scannedObjects, newMetrics.oplogStats.queryExecutor.scannedObjects);
+    assert.gte(
+        newMetrics.queryExecutor.scannedObjects,
+        newMetrics.oplogStats.queryExecutor.scannedObjects,
+    );
     assert.eq(expectedDocsReturned, oplogDocsReturned);
     // Since the oplog can be written to in the background (for example, for internal replicated
     // collections), we can only guarantee that there are *at least* the expected number of

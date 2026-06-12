@@ -8,7 +8,11 @@
  * ]
  */
 
-import {getUriForColl, getUriForIndex, runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
+import {
+    getUriForColl,
+    getUriForIndex,
+    runWiredTigerTool,
+} from "jstests/disk/libs/wt_file_helper.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 

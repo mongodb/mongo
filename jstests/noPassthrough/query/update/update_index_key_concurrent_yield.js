@@ -19,7 +19,9 @@ for (let i = 0; i < N; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-const join = startParallelShell("while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.createIndex( { x : 1 } );");
+const join = startParallelShell(
+    "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.createIndex( { x : 1 } );",
+);
 
 assert.commandWorked(
     t.update(

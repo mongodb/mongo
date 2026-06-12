@@ -6,7 +6,10 @@
  * ]
  */
 
-import {assertPlanUsesDistinctScan, assertPlanUsesIndexScan} from "jstests/libs/query/group_to_distinct_scan_utils.js";
+import {
+    assertPlanUsesDistinctScan,
+    assertPlanUsesIndexScan,
+} from "jstests/libs/query/group_to_distinct_scan_utils.js";
 
 const docs = [
     {
@@ -75,14 +78,24 @@ const distinctScanTestCases = [
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$top: {output: "$year", sortBy: {season: 1, year: 1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$top: {output: "$year", sortBy: {season: 1, year: 1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
@@ -171,14 +184,24 @@ const distinctScanTestCases = [
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$bottomN: {n: 1, output: "$year", sortBy: {year: 1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$bottomN: {n: 1, output: "$year", sortBy: {year: 1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$bottomN: {n: 1, output: "$year", sortBy: {year: -1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$bottomN: {n: 1, output: "$year", sortBy: {year: -1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
@@ -199,14 +222,24 @@ const distinctScanTestCases = [
     {
         pipeline: [
             {$sort: {kind: 1, season: 1, year: 1}},
-            {$group: {_id: "$kind", year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}}}},
+            {
+                $group: {
+                    _id: "$kind",
+                    year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}},
+                },
+            },
         ],
         index: {kind: 1, season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {kind: 1, season: 1, year: 1}},
-            {$group: {_id: "$kind", year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$kind",
+                    year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}},
+                },
+            },
         ],
         index: {kind: 1, season: 1, year: 1},
     },
@@ -220,21 +253,36 @@ const distinctScanTestCases = [
     {
         pipeline: [
             {$sort: {kind: 1, season: 1, year: 1}},
-            {$group: {_id: "$kind", year: {$top: {output: "$year", sortBy: {season: -1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$kind",
+                    year: {$top: {output: "$year", sortBy: {season: -1, year: -1}}},
+                },
+            },
         ],
         index: {kind: 1, season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {kind: -1, season: -1, year: -1}},
-            {$group: {_id: "$kind", year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}}}},
+            {
+                $group: {
+                    _id: "$kind",
+                    year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}},
+                },
+            },
         ],
         index: {kind: 1, season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {kind: -1, season: -1, year: -1}},
-            {$group: {_id: "$kind", year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$kind",
+                    year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}},
+                },
+            },
         ],
         index: {kind: 1, season: 1, year: 1},
     },
@@ -248,7 +296,12 @@ const distinctScanTestCases = [
     {
         pipeline: [
             {$sort: {kind: -1, season: -1, year: -1}},
-            {$group: {_id: "$kind", year: {$top: {output: "$year", sortBy: {season: -1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$kind",
+                    year: {$top: {output: "$year", sortBy: {season: -1, year: -1}}},
+                },
+            },
         ],
         index: {kind: 1, season: 1, year: 1},
     },
@@ -258,28 +311,48 @@ const indexScanTestCases = [
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {season: -1, year: -1}},
-            {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: 1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$bottom: {output: "$year", sortBy: {season: 1, year: -1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
-            {$group: {_id: "$season", year: {$top: {output: "$year", sortBy: {season: 1, year: -1}}}}},
+            {
+                $group: {
+                    _id: "$season",
+                    year: {$top: {output: "$year", sortBy: {season: 1, year: -1}}},
+                },
+            },
         ],
         index: {season: 1, year: 1},
     },

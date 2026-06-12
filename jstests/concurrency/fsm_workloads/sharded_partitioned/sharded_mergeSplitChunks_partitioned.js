@@ -30,7 +30,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         $super.setup.apply(this, arguments);
     };
 
-    $config.data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {
+    $config.data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(
+        db,
+        collName,
+        partition,
+    ) {
         let innerChunkSize = Math.floor(this.partitionSize / this.iterations);
         jsTestLog("innerChunkSize: " + innerChunkSize);
         for (let i = 0; i < this.iterations; ++i) {
@@ -89,7 +93,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // verify that the shard the original chunk was on returns all data for the chunk.
         let shardInfo = ShardingTopologyHelpers.getShardInfo(db, this.tid);
         let shardPrimary = ChunkHelper.getPrimary(shardInfo.shards[chunk.shard]);
-        let shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk.min._id, chunk.max._id);
+        let shardNumDocsAfter = ChunkHelper.getNumDocs(
+            shardPrimary,
+            ns,
+            chunk.min._id,
+            chunk.max._id,
+        );
         let msg = "Shard does not have same number of documents after splitChunk.\n" + msgBase;
         assert.eq(shardNumDocsAfter, numDocsBefore, msg);
 
@@ -103,7 +112,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 // two chunks between the old chunk's lower and upper bounds.
                 // If the operation failed, verify that there is still only one chunk
                 // between the old chunk's lower and upper bounds.
-                let numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(conn, ns, chunk.min._id, chunk.max._id);
+                let numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(
+                    conn,
+                    ns,
+                    chunk.min._id,
+                    chunk.max._id,
+                );
                 if (splitChunkRes.ok) {
                     msg =
                         "splitChunk succeeded but the config does not see exactly 2 chunks " +
@@ -157,7 +171,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // Regardless of if the splitChunk operation succeeded or failed,
             // verify that each mongos sees all data in the original chunk's
             // range only on the shard the original chunk was on.
-            let shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
+            let shardsForChunk = ChunkHelper.getShardsForRange(
+                mongos,
+                ns,
+                chunk.min._id,
+                chunk.max._id,
+            );
             msg =
                 "Mongos does not see exactly 1 shard for chunk after splitChunk.\n" +
                 msgBase +
@@ -177,7 +196,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // If the splitChunk operation succeeded, verify that the mongos sees two chunks between
             // the old chunk's lower and upper bounds. If the operation failed, verify that the
             // mongos still only sees one chunk between the old chunk's lower and upper bounds.
-            let numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(mongos, ns, chunk.min._id, chunk.max._id);
+            let numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(
+                mongos,
+                ns,
+                chunk.min._id,
+                chunk.max._id,
+            );
             if (splitChunkRes.ok) {
                 msg =
                     "splitChunk succeeded but the mongos does not see exactly 2 chunks " +

@@ -34,7 +34,8 @@ const tsOptions2 = {
 const kColl = "coll";
 const kBucket = "system.buckets.coll";
 const isMultiversionSuite =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 function createWorked(collName, tsOptions = {}) {
     if (Object.keys(tsOptions).length === 0) {
@@ -65,7 +66,10 @@ function createWorkedOrFailedWithCode(collName, tsOptions, errorCode) {
 
 function runTest(testCase, minRequiredVersion = null) {
     if (minRequiredVersion != null) {
-        const res = db.getSiblingDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
+        const res = db
+            .getSiblingDB("admin")
+            .system.version.find({_id: "featureCompatibilityVersion"})
+            .toArray();
         if (res.length == 0) {
             // For specific suites like multitenancy we don't have the privileges to access to
             // specific databases. If we cannot establish the version, let's skip the test case.
@@ -136,7 +140,9 @@ db.dropDatabase();
         // Creation of bucket namespace is not idempotent before 8.0 (SERVER-89827)
         "8.0", // minRequiredVersion
     );
-    jsTest.log("Case collection: timeseries / collection: bucket timeseries with different options.");
+    jsTest.log(
+        "Case collection: timeseries / collection: bucket timeseries with different options.",
+    );
     runTest(() => {
         createWorked(kColl, tsOptions);
         createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
@@ -165,13 +171,17 @@ db.dropDatabase();
         "8.0", // minRequiredVersion
     );
 
-    jsTest.log("Case collection: bucket timeseries / collection: timeseries with different options.");
+    jsTest.log(
+        "Case collection: bucket timeseries / collection: timeseries with different options.",
+    );
     runTest(() => {
         createWorked(kBucket, tsOptions);
         createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
     });
 
-    jsTest.log("Case collection: bucket timeseries / collection: bucket timeseries with different options.");
+    jsTest.log(
+        "Case collection: bucket timeseries / collection: bucket timeseries with different options.",
+    );
     runTest(() => {
         createWorked(kBucket, tsOptions);
         createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
@@ -205,7 +215,9 @@ db.dropDatabase();
 }
 
 {
-    jsTest.log("Creation of unsharded bucket collections without timeseries options is not permitted.");
+    jsTest.log(
+        "Creation of unsharded bucket collections without timeseries options is not permitted.",
+    );
     runTest(() => {
         createFailed(kBucket, {}, ErrorCodes.IllegalOperation);
     });

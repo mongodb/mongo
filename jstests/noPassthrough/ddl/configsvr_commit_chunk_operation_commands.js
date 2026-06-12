@@ -36,7 +36,8 @@ function runUntilNonRetryable(st, cmd) {
         if (
             RetryableWritesUtil.isRetryableCode(res.code) ||
             RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-            (res.writeConcernError && RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
+            (res.writeConcernError &&
+                RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
         ) {
             return false;
         }
@@ -86,7 +87,15 @@ describe("_configsvrCommitChunkSplit retryability", function () {
         assert.eq(countChunks(this.st, this.collUuid), 1, "expected single initial chunk", {ns});
 
         assert.commandWorked(
-            run(this.st, ns, this.collEpoch, this.collTimestamp, this.shardName, this.lsid, NumberLong(1)),
+            run(
+                this.st,
+                ns,
+                this.collEpoch,
+                this.collTimestamp,
+                this.shardName,
+                this.lsid,
+                NumberLong(1),
+            ),
         );
 
         assert.eq(countChunks(this.st, this.collUuid), 2, "expected two chunks after split");
@@ -98,7 +107,15 @@ describe("_configsvrCommitChunkSplit retryability", function () {
 
     it("rejects an older txnNumber on the same lsid with TransactionTooOld", function () {
         assert.commandFailedWithCode(
-            run(this.st, ns, this.collEpoch, this.collTimestamp, this.shardName, this.lsid, NumberLong(0)),
+            run(
+                this.st,
+                ns,
+                this.collEpoch,
+                this.collTimestamp,
+                this.shardName,
+                this.lsid,
+                NumberLong(0),
+            ),
             ErrorCodes.TransactionTooOld,
         );
     });
@@ -108,16 +125,29 @@ describe("_configsvrCommitChunkSplit retryability", function () {
         const dummyBefore = getDummyDoc(this.st, dummyDocId);
 
         assert.commandWorked(
-            run(this.st, ns, this.collEpoch, this.collTimestamp, this.shardName, this.lsid, NumberLong(1)),
+            run(
+                this.st,
+                ns,
+                this.collEpoch,
+                this.collTimestamp,
+                this.shardName,
+                this.lsid,
+                NumberLong(1),
+            ),
         );
 
         const chunkCountAfter = countChunks(this.st, this.collUuid);
         const dummyAfter = getDummyDoc(this.st, dummyDocId);
 
-        assert.eq(chunkCountBefore, chunkCountAfter, "split must not be re-applied for the same txnNumber", {
+        assert.eq(
             chunkCountBefore,
             chunkCountAfter,
-        });
+            "split must not be re-applied for the same txnNumber",
+            {
+                chunkCountBefore,
+                chunkCountAfter,
+            },
+        );
         assert.eq(
             dummyBefore.count,
             dummyAfter.count,
@@ -230,10 +260,15 @@ describe("_configsvrCommitChunksMerge retryability", function () {
         const chunkCountAfter = countChunks(this.st, this.collUuid);
         const dummyAfter = getDummyDoc(this.st, dummyDocId);
 
-        assert.eq(chunkCountBefore, chunkCountAfter, "merge must not be re-applied for the same txnNumber", {
+        assert.eq(
             chunkCountBefore,
             chunkCountAfter,
-        });
+            "merge must not be re-applied for the same txnNumber",
+            {
+                chunkCountBefore,
+                chunkCountAfter,
+            },
+        );
         assert.eq(
             dummyBefore.count,
             dummyAfter.count,
@@ -292,10 +327,15 @@ describe("_configsvrCommitMergeAllChunksOnShard retryability", function () {
         // The catalog manager may merge zero or more chunks depending on the snapshot history
         // window; either way the chunk count must not grow.
         const chunkCountAfter = countChunks(this.st, this.collUuid);
-        assert.lte(chunkCountAfter, chunkCountBefore, "chunk count must not grow after mergeAllChunksOnShard", {
-            chunkCountBefore,
+        assert.lte(
             chunkCountAfter,
-        });
+            chunkCountBefore,
+            "chunk count must not grow after mergeAllChunksOnShard",
+            {
+                chunkCountBefore,
+                chunkCountAfter,
+            },
+        );
 
         const dummy = getDummyDoc(this.st, dummyDocId);
         assert(dummy, "expected dummy bookkeeping doc to be present", {dummyDocId});

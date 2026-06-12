@@ -39,13 +39,19 @@ const numQueriesPerRun = 50;
 const controlColl = db.query_knob_correctness_pbt_control;
 const experimentColl = db.query_knob_correctness_pbt_experiment;
 
-const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl, experimentColl);
+const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(
+    controlColl,
+    experimentColl,
+);
 
 // The property only holds when the docs don't contain arrays and pipelines don't generate nested arrays.
 function getWorkloadModelForComplexRenameMatchSwap() {
     // Aggregations are 'renaming' stage followed by a match stage.
     const renamingArb = fc.oneof(computedProjectArb, addFieldsVarArb, groupArb);
-    const aggModel = fc.record({"pipeline": fc.tuple(renamingArb, getMatchArb()), "options": fc.constant({})});
+    const aggModel = fc.record({
+        "pipeline": fc.tuple(renamingArb, getMatchArb()),
+        "options": fc.constant({}),
+    });
 
     // This document model generates very nested objects that do not contain any arrays.
     const docModel = getNestedDocModelNoArray();

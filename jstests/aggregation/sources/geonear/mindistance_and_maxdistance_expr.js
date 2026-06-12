@@ -31,10 +31,14 @@ const far = {
     coll.drop();
 
     // Create the desired index type and populate the collection.
-    assert.commandWorked(coll.createIndex({pt: geoType}, add2dsphereVersionIfNeededForSpec({pt: geoType})));
+    assert.commandWorked(
+        coll.createIndex({pt: geoType}, add2dsphereVersionIfNeededForSpec({pt: geoType})),
+    );
     [origin, near, far].forEach((doc) => {
         doc.distFromOrigin =
-            geoType === "2dsphere" ? Geo.sphereDistance(doc.pt, origin.pt) : Geo.distance(doc.pt, origin.pt);
+            geoType === "2dsphere"
+                ? Geo.sphereDistance(doc.pt, origin.pt)
+                : Geo.distance(doc.pt, origin.pt);
         assert.commandWorked(coll.insert(doc));
     });
 
@@ -52,7 +56,11 @@ const far = {
         };
         const projStage = {$project: {_id: 0, dist: 0}};
         const res = coll.aggregate([geoNearStage, projStage]).toArray();
-        assert.eq(res, expected, () => `Unexpected results from ${tojson(geoNearStage)} using a ${geoType} index`);
+        assert.eq(
+            res,
+            expected,
+            () => `Unexpected results from ${tojson(geoNearStage)} using a ${geoType} index`,
+        );
     }
 
     function compareConstVersusExpression(minOrMax, value) {
@@ -87,8 +95,14 @@ const far = {
     }
 
     // Non-numeric and non-constant expressions for minDistance are illegal.
-    assert.throwsWithCode(() => assertGeoNearResults({minDistance: {$concat: ["3", ".2"]}}), ErrorCodes.TypeMismatch);
-    assert.throwsWithCode(() => assertGeoNearResults({minDistance: {$getField: "distFromOrigin"}}), 7555701);
+    assert.throwsWithCode(
+        () => assertGeoNearResults({minDistance: {$concat: ["3", ".2"]}}),
+        ErrorCodes.TypeMismatch,
+    );
+    assert.throwsWithCode(
+        () => assertGeoNearResults({minDistance: {$getField: "distFromOrigin"}}),
+        7555701,
+    );
     assert.throwsWithCode(() => assertGeoNearResults({minDistance: "$distFromOrigin"}), 7555701);
 
     // Compare results from const and variable minDistance.
@@ -99,8 +113,14 @@ const far = {
     assertGeoNearResults({minDistance: {$add: [near.distFromOrigin / 2, 1.0, -1.0]}}, [near, far]);
 
     // Non-numeric and non-constant expressions for maxDistance are illegal.
-    assert.throwsWithCode(() => assertGeoNearResults({maxDistance: {$concat: ["3", ".2"]}}), ErrorCodes.TypeMismatch);
-    assert.throwsWithCode(() => assertGeoNearResults({maxDistance: {$getField: "distFromOrigin"}}), 7555702);
+    assert.throwsWithCode(
+        () => assertGeoNearResults({maxDistance: {$concat: ["3", ".2"]}}),
+        ErrorCodes.TypeMismatch,
+    );
+    assert.throwsWithCode(
+        () => assertGeoNearResults({maxDistance: {$getField: "distFromOrigin"}}),
+        7555702,
+    );
     assert.throwsWithCode(() => assertGeoNearResults({maxDistance: "$distFromOrigin"}), 7555702);
 
     // Compare results from const and variable maxDistance.
@@ -108,11 +128,10 @@ const far = {
     compareConstVersusExpression("maxDistance", near.distFromOrigin / 2);
 
     // Test minDistance and maxDistance as expressions.
-    assertGeoNearResults({minDistance: {$add: [1.0, -1.0]}, maxDistance: {$multiply: [1.0, kMaxDistance]}}, [
-        origin,
-        near,
-        far,
-    ]);
+    assertGeoNearResults(
+        {minDistance: {$add: [1.0, -1.0]}, maxDistance: {$multiply: [1.0, kMaxDistance]}},
+        [origin, near, far],
+    );
 
     function getLookupRes(minOrMax, lookupCollection) {
         const pipeline = [

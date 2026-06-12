@@ -13,7 +13,10 @@ expectedResult = {
         "replication": {"replSetName": "myconfigname"},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_replsetname.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/set_replsetname.json"},
+    expectedResult,
+);
 
 jsTest.log('Testing override of "replication.replSetName" config file option with "replSet"');
 expectedResult = {

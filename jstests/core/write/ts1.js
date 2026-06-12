@@ -30,7 +30,11 @@ function cmp(a, b) {
 for (let i = 0; i < N - 1; i++) {
     const a = get(i);
     const b = get(i + 1);
-    assert.gt(0, cmp(a, b), `Expected ${tojson(a)} to be smaller than ${tojson(b)} (at iteration ${i})`);
+    assert.gt(
+        0,
+        cmp(a, b),
+        `Expected ${tojson(a)} to be smaller than ${tojson(b)} (at iteration ${i})`,
+    );
 }
 
 assert.eq(N, t.find({x: {$type: 17}}).itcount());

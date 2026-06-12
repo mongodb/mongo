@@ -1,7 +1,9 @@
 // Tests --networkMessageCompressors options.
 
 let runTest = function (optionValue, expected) {
-    jsTest.log('Testing with --networkMessageCompressors="' + optionValue + '" expecting: ' + expected);
+    jsTest.log(
+        'Testing with --networkMessageCompressors="' + optionValue + '" expecting: ' + expected,
+    );
     let mongo = MongoRunner.runMongod({networkMessageCompressors: optionValue});
     assert.commandWorked(mongo.adminCommand({hello: 1}));
     clearRawMongoProgramOutput();

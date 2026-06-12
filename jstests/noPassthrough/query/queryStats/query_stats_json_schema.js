@@ -15,7 +15,14 @@ function verifyConsistentFields(key) {
     assert.eq(kShellApplicationName, key.client.application.name);
 }
 
-function runAndVerifyQueryStatsTokenization(coll, admin, pipeline, expectedResult, statsSize, index) {
+function runAndVerifyQueryStatsTokenization(
+    coll,
+    admin,
+    pipeline,
+    expectedResult,
+    statsSize,
+    index,
+) {
     coll.aggregate(pipeline).toArray();
     const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
@@ -60,7 +67,11 @@ function runTest(conn) {
                                         {
                                             "$nor": [
                                                 {
-                                                    "$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}},
+                                                    "$_internalPath": {
+                                                        [kHashedDollarFieldName]: {
+                                                            "$exists": "?bool",
+                                                        },
+                                                    },
                                                 },
                                             ],
                                         },
@@ -68,7 +79,9 @@ function runTest(conn) {
                                             "$and": [
                                                 {
                                                     "$_internalPath": {
-                                                        [kHashedDollarFieldName]: {"$_internalSchemaType": [4]},
+                                                        [kHashedDollarFieldName]: {
+                                                            "$_internalSchemaType": [4],
+                                                        },
                                                     },
                                                 },
                                             ],
@@ -102,7 +115,11 @@ function runTest(conn) {
                                         {
                                             "$nor": [
                                                 {
-                                                    "$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}},
+                                                    "$_internalPath": {
+                                                        [kHashedDollarFieldName]: {
+                                                            "$exists": "?bool",
+                                                        },
+                                                    },
                                                 },
                                             ],
                                         },
@@ -110,7 +127,9 @@ function runTest(conn) {
                                             "$and": [
                                                 {
                                                     "$_internalPath": {
-                                                        [kHashedDollarFieldName]: {"$_internalSchemaType": ["number"]},
+                                                        [kHashedDollarFieldName]: {
+                                                            "$_internalSchemaType": ["number"],
+                                                        },
                                                     },
                                                 },
                                             ],
@@ -132,7 +151,9 @@ function runTest(conn) {
     // $_internalSchemaMinLength is correctly tokenized. Reproduces BF-32040.
     {
         const kHashedDollarFieldName = "48mlorj6MWkqJLHiyvv/5h1Doa+b8Pi7C3hH8O48Y5A=";
-        const pipeline = [{$match: {$jsonSchema: {properties: {$bitsAnySet: {type: "string", minLength: 6}}}}}];
+        const pipeline = [
+            {$match: {$jsonSchema: {properties: {$bitsAnySet: {type: "string", minLength: 6}}}}},
+        ];
         const expectedResult = [
             {
                 "$match": {
@@ -144,7 +165,11 @@ function runTest(conn) {
                                         {
                                             "$nor": [
                                                 {
-                                                    "$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}},
+                                                    "$_internalPath": {
+                                                        [kHashedDollarFieldName]: {
+                                                            "$exists": "?bool",
+                                                        },
+                                                    },
                                                 },
                                             ],
                                         },
@@ -159,7 +184,9 @@ function runTest(conn) {
                                                 },
                                                 {
                                                     "$_internalPath": {
-                                                        [kHashedDollarFieldName]: {"$_internalSchemaType": [2]},
+                                                        [kHashedDollarFieldName]: {
+                                                            "$_internalSchemaType": [2],
+                                                        },
                                                     },
                                                 },
                                             ],
@@ -194,7 +221,11 @@ function runTest(conn) {
                                         {
                                             "$nor": [
                                                 {
-                                                    "$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}},
+                                                    "$_internalPath": {
+                                                        [kHashedDollarFieldName]: {
+                                                            "$exists": "?bool",
+                                                        },
+                                                    },
                                                 },
                                             ],
                                         },
@@ -235,7 +266,11 @@ function runTest(conn) {
                                         {
                                             "$nor": [
                                                 {
-                                                    "$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}},
+                                                    "$_internalPath": {
+                                                        [kHashedDollarFieldName]: {
+                                                            "$exists": "?bool",
+                                                        },
+                                                    },
                                                 },
                                             ],
                                         },
@@ -243,7 +278,9 @@ function runTest(conn) {
                                             "$and": [
                                                 {
                                                     "$_internalPath": {
-                                                        [kHashedDollarFieldName]: {"$_internalSchemaType": [18]},
+                                                        [kHashedDollarFieldName]: {
+                                                            "$_internalSchemaType": [18],
+                                                        },
                                                     },
                                                 },
                                             ],
@@ -278,7 +315,11 @@ function runTest(conn) {
                     "$and": [
                         {
                             "$and": [
-                                {"$_internalPath": {[kHashedDollarFieldName]: {"$exists": "?bool"}}},
+                                {
+                                    "$_internalPath": {
+                                        [kHashedDollarFieldName]: {"$exists": "?bool"},
+                                    },
+                                },
                                 {[kHashedFieldA]: {"$exists": "?bool"}},
                                 {[kHashedFieldB]: {"$exists": "?bool"}},
                             ],
@@ -318,7 +359,9 @@ function runTest(conn) {
                                     "$and": [
                                         {
                                             "$_internalPath": {
-                                                [kHashedSliceName]: {"$_internalSchemaType": ["number"]},
+                                                [kHashedSliceName]: {
+                                                    "$_internalSchemaType": ["number"],
+                                                },
                                             },
                                         },
                                     ],
@@ -326,7 +369,9 @@ function runTest(conn) {
                                 {
                                     "$and": [
                                         {
-                                            "$_internalPath": {[kHashedOrName]: {"$_internalSchemaType": [2]}},
+                                            "$_internalPath": {
+                                                [kHashedOrName]: {"$_internalSchemaType": [2]},
+                                            },
                                         },
                                     ],
                                 },

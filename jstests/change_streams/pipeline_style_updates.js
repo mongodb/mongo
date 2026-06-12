@@ -22,7 +22,10 @@ assert.commandWorked(
 );
 
 const cst = new ChangeStreamTest(db);
-const changeStreamCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+const changeStreamCursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: db.t1,
+});
 
 function testPipelineStyleUpdate(pipeline, expectedChange, operationType) {
     assert.commandWorked(db.t1.update({_id: 100}, pipeline));
@@ -60,7 +63,9 @@ expected = {
 testPipelineStyleUpdate(updatePipeline, expected, "update");
 
 jsTestLog("Testing pipeline-based update with $replaceRoot.");
-updatePipeline = [{$replaceRoot: {newRoot: {_id: 100, b: 2, "obj": {"a": 2, "b": 2, "str": kLargeStr}}}}];
+updatePipeline = [
+    {$replaceRoot: {newRoot: {_id: 100, b: 2, "obj": {"a": 2, "b": 2, "str": kLargeStr}}}},
+];
 expected = {
     updateDescription: {
         updatedFields: {"obj.a": 2},

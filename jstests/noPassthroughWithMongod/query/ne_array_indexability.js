@@ -1,7 +1,10 @@
 /**
  * Test that $ne: [] queries are cached correctly. See SERVER-39764.
  */
-import {getPlanCacheKeyFromShape, getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanCacheKeyFromShape,
+    getPlanCacheShapeHashFromObject,
+} from "jstests/libs/query/analyze_plan.js";
 import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 const isUsingSbePlanCache = sbePlanCacheEnabled(db);

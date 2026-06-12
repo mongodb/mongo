@@ -17,7 +17,11 @@ function validateDocumentKeyInOplogForRemove(ns, _id, docKey) {
         const elemMatch = docKey
             ? {"ns": ns, "op": "d", "o._id": _id, "o.x": docKey}
             : {"ns": ns, "op": "d", "o._id": _id};
-        const applyOpsEntry = oplog.findOne({ns: "admin.$cmd", op: "c", "o.applyOps": {$elemMatch: elemMatch}});
+        const applyOpsEntry = oplog.findOne({
+            ns: "admin.$cmd",
+            op: "c",
+            "o.applyOps": {$elemMatch: elemMatch},
+        });
         assert.docEq(o, applyOpsEntry.o.applyOps[0].o);
     }
 }

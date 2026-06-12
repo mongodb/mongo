@@ -41,7 +41,10 @@ assert.commandWorked(primaryDB.runCommand({create: collName}));
 
 // Create a unique index on the collection in the foreground.
 assert.commandWorked(
-    primaryDB.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}),
+    primaryDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {x: 1}, name: "x_1", unique: true}],
+    }),
 );
 
 let replSet = secondaryReadsTest.getReplset();
@@ -77,7 +80,9 @@ secondaryReadsTest.startSecondaryReaders(nReaders, readFn);
 
 // Write the initial documents. Ensure they have been replicated.
 for (let i = 0; i < nOps; i++) {
-    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}));
+    assert.commandWorked(
+        primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}),
+    );
 }
 replSet.awaitReplication();
 

@@ -42,9 +42,11 @@ replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.timeoutMS);
 jsTestLog("node 2 is now primary");
 // The default WC is majority and this test can't test catchup properly if it used majority writes.
 assert.commandWorked(
-    replSet
-        .getPrimary()
-        .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    replSet.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 replSet.awaitReplication();

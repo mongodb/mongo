@@ -35,7 +35,9 @@ jsTest.log("Adding a config server replica set without a specified shardName sho
 addShardRes = st.s.adminCommand({addShard: configRS.getURL()});
 assertAddShardFailed(addShardRes);
 
-jsTest.log("Adding a config server replica set with a shardName that matches the set's name should fail.");
+jsTest.log(
+    "Adding a config server replica set with a shardName that matches the set's name should fail.",
+);
 addShardRes = st.s.adminCommand({addShard: configRS.getURL(), name: configRS.name});
 assertAddShardFailed(addShardRes, configRS.name);
 

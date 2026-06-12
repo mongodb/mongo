@@ -21,14 +21,24 @@ assert.commandWorked(sessionDb.runCommand({create: collName}));
 function checkLastCommittedTransaction(operationCount, writeConcern) {
     let res = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     assert(res.hasOwnProperty("transactions"), () => tojson(res));
-    assert(res.transactions.hasOwnProperty("lastCommittedTransaction"), () => tojson(res.transactions));
-    assert.eq(operationCount, res.transactions.lastCommittedTransaction.operationCount, () => tojson(res.transactions));
+    assert(res.transactions.hasOwnProperty("lastCommittedTransaction"), () =>
+        tojson(res.transactions),
+    );
+    assert.eq(operationCount, res.transactions.lastCommittedTransaction.operationCount, () =>
+        tojson(res.transactions),
+    );
     if (operationCount === 0) {
-        assert.eq(0, res.transactions.lastCommittedTransaction.oplogOperationBytes, () => tojson(res.transactions));
+        assert.eq(0, res.transactions.lastCommittedTransaction.oplogOperationBytes, () =>
+            tojson(res.transactions),
+        );
     } else {
-        assert.lt(0, res.transactions.lastCommittedTransaction.oplogOperationBytes, () => tojson(res.transactions));
+        assert.lt(0, res.transactions.lastCommittedTransaction.oplogOperationBytes, () =>
+            tojson(res.transactions),
+        );
     }
-    assert.docEq(writeConcern, res.transactions.lastCommittedTransaction.writeConcern, () => tojson(res.transactions));
+    assert.docEq(writeConcern, res.transactions.lastCommittedTransaction.writeConcern, () =>
+        tojson(res.transactions),
+    );
 }
 
 // Initially the 'lastCommittedTransaction' section is not present.
@@ -58,7 +68,9 @@ checkLastCommittedTransaction(1, newDefaultWC);
 let filteredRes = assert.commandWorked(
     primary.adminCommand({serverStatus: 1, transactions: {includeLastCommitted: false}}),
 );
-assert(!filteredRes.transactions.hasOwnProperty("lastCommittedTransaction"), () => tojson(filteredRes));
+assert(!filteredRes.transactions.hasOwnProperty("lastCommittedTransaction"), () =>
+    tojson(filteredRes),
+);
 
 function runTests(prepare) {
     jsTestLog("Testing server transaction metrics with prepare=" + prepare);
@@ -66,7 +78,9 @@ function runTests(prepare) {
     function commitTransaction() {
         if (prepare) {
             prepareTimestampForCommit = PrepareHelpers.prepareTransaction(session);
-            assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestampForCommit));
+            assert.commandWorked(
+                PrepareHelpers.commitTransaction(session, prepareTimestampForCommit),
+            );
         } else {
             assert.commandWorked(session.commitTransaction_forTesting());
         }

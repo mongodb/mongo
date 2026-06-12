@@ -12,7 +12,10 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {finishAndValidate, reInitiateSetWithSecondary} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
+import {
+    finishAndValidate,
+    reInitiateSetWithSecondary,
+} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -68,7 +71,14 @@ assert.commandWorked(
 
 assert.commandWorked(
     primary.adminCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 4}, o: {$v: 2, diff: {sdoc: {u: {field: 1}}}}}],
+        applyOps: [
+            {
+                op: "u",
+                ns: coll.getFullName(),
+                o2: {_id: 4},
+                o: {$v: 2, diff: {sdoc: {u: {field: 1}}}},
+            },
+        ],
     }),
 );
 
@@ -105,7 +115,9 @@ assert.commandWorked(coll.updateMany({}, {$set: {array: "string", doc: "string"}
 jsTestLog("Allow initial sync to finish");
 
 assert.commandWorked(
-    secondary.getDB("admin").runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondary
+        .getDB("admin")
+        .runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
 );
 
 jsTestLog(`Collection on primary: ${tojson(coll.find().toArray())}`);

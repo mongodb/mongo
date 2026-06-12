@@ -67,8 +67,16 @@ coll = db.getCollection(jsTestName());
     );
 
     // Both buckets should contain 1 measurement.
-    assert.eq(1, bucketDocs[0].control.count, "Expected 1 measurement in first bucket " + tojson(bucketDocs));
-    assert.eq(1, bucketDocs[1].control.count, "Expected 1 measurement in second bucket " + tojson(bucketDocs));
+    assert.eq(
+        1,
+        bucketDocs[0].control.count,
+        "Expected 1 measurement in first bucket " + tojson(bucketDocs),
+    );
+    assert.eq(
+        1,
+        bucketDocs[1].control.count,
+        "Expected 1 measurement in second bucket " + tojson(bucketDocs),
+    );
 
     jsTestLog("Exiting targetNewBucketAndCheckCompressed.");
 })();

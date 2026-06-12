@@ -53,7 +53,9 @@ createCollectionAndCheckConsistency(db, "collection_capped", {
     max: 1024,
 });
 
-createCollectionAndCheckConsistency(db, "collection_images", {changeStreamPreAndPostImages: {enabled: true}});
+createCollectionAndCheckConsistency(db, "collection_images", {
+    changeStreamPreAndPostImages: {enabled: true},
+});
 
 createCollectionAndCheckConsistency(db, "collection_clustered", {
     clusteredIndex: {"key": {_id: 1}, "unique": true, "name": "clustered index"},
@@ -97,13 +99,23 @@ if (isViewlessTimeseriesOnlySuite(db) || isViewfulTimeseriesOnlySuite(db)) {
         storageEngine: {wiredTiger: {configString: "block_compressor=snappy"}},
     });
 
-    assert.commandWorked(db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
+    assert.commandWorked(
+        db.runCommand({
+            collMod: "timeseries_complex",
+            timeseriesBucketsMayHaveMixedSchemaData: true,
+        }),
+    );
     assertCatalogListOperationsConsistencyForCollection(db.timeseries_complex);
 }
 
 if (isViewfulTimeseriesOnlySuite(db)) {
     // TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
-    createViewAndCheckConsistency(db, "timeseries_no_buckets", getTimeseriesBucketsColl("timeseries_no_buckets"), []);
+    createViewAndCheckConsistency(
+        db,
+        "timeseries_no_buckets",
+        getTimeseriesBucketsColl("timeseries_no_buckets"),
+        [],
+    );
     db.timeseries_no_buckets.drop();
 }
 
@@ -115,7 +127,11 @@ createIndexAndCheckConsistency(db.collection_simple, {fCompound1: -1, fCompound2
 createIndexAndCheckConsistency(db.collection_simple, {fUnique: 1}, {unique: true});
 createIndexAndCheckConsistency(db.collection_simple, {fSparse: 1}, {sparse: true});
 createIndexAndCheckConsistency(db.collection_simple, {fSparseNonBool: 1}, {sparse: 123.45});
-createIndexAndCheckConsistency(db.collection_simple, {fSparseNumberLong: 1}, {sparse: NumberLong("1234567891011")});
+createIndexAndCheckConsistency(
+    db.collection_simple,
+    {fSparseNumberLong: 1},
+    {sparse: NumberLong("1234567891011")},
+);
 createIndexAndCheckConsistency(db.collection_simple, {fUnique: 1}, {unique: true});
 createIndexAndCheckConsistency(db.collection_simple, {fTtl: 1}, {expireAfterSeconds: 123});
 createIndexAndCheckConsistency(db.collection_simple, {fTtlNumber: 1}, {expireAfterSeconds: 123.45});
@@ -138,7 +154,9 @@ createIndexAndCheckConsistency(db.collection_simple, {f2dNonIntBits: "2d"}, {bit
 createIndexAndCheckConsistency(db.collection_simple, {f2dSphere: "2dsphere"});
 createIndexAndCheckConsistency(db.timeseries_simple, {"timestamp": 1});
 
-var twoDSphereIndexVersion = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3;
+var twoDSphereIndexVersion = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4")
+    ? 4
+    : 3;
 if (!isStableFCVSuite()) {
     // If we are upgrading/downgrading the FCV, avoid having to drop any v4 indexes by pinning the version to 3
     // TODO SERVER-118561 Remove this when 9.0 is last LTS.
@@ -150,7 +168,9 @@ createIndexAndCheckConsistency(
     {fUnrelatedIndexPluginOptions: 1},
     {
         textIndexVersion: 3,
-        "2dsphereIndexVersion": FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3,
+        "2dsphereIndexVersion": FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4")
+            ? 4
+            : 3,
         bits: 26,
         min: -180,
         max: 180,

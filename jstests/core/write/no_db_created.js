@@ -17,7 +17,11 @@ let noDB = function (db) {
     let dbName = db.getName();
     let dbsRes = assert.commandWorked(adminDB.runCommand("listDatabases"));
     dbsRes.databases.forEach(function (e) {
-        assert.neq(dbName, e.name, "Found db which shouldn't exist:" + dbName + "; " + tojson(dbsRes));
+        assert.neq(
+            dbName,
+            e.name,
+            "Found db which shouldn't exist:" + dbName + "; " + tojson(dbsRes),
+        );
     });
 };
 let mydb = db.getSiblingDB("neverCreated");

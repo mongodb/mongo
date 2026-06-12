@@ -6,7 +6,10 @@
 // Skip db hash check because replication is stopped on secondaries.
 TestData.skipCheckDBHashes = true;
 
-import {stopReplicationOnSecondaries, restartReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    stopReplicationOnSecondaries,
+    restartReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let name = "operation_time_read_and_write_concern";
@@ -17,9 +20,11 @@ replTest.initiate();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    replTest
-        .getPrimary()
-        .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    replTest.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 
@@ -34,13 +39,19 @@ let majorityDoc = {_id: 10, x: 1};
 let localDoc = {_id: 15, x: 2};
 
 res = assert.commandWorked(
-    testDB.runCommand({insert: collectionName, documents: [majorityDoc], writeConcern: {w: "majority"}}),
+    testDB.runCommand({
+        insert: collectionName,
+        documents: [majorityDoc],
+        writeConcern: {w: "majority"},
+    }),
 );
 var majorityWriteOperationTime = res.operationTime;
 
 stopReplicationOnSecondaries(replTest, false /* changeReplicaSetDefaultWCToLocal */);
 
-res = assert.commandWorked(testDB.runCommand({insert: collectionName, documents: [localDoc], writeConcern: {w: 1}}));
+res = assert.commandWorked(
+    testDB.runCommand({insert: collectionName, documents: [localDoc], writeConcern: {w: 1}}),
+);
 let localWriteOperationTime = res.operationTime;
 
 assert.gt(localWriteOperationTime, majorityWriteOperationTime);
@@ -120,7 +131,11 @@ let successfulDoc = {_id: 1000, y: 1};
 let failedDoc = {_id: 1000, y: 2};
 
 res = assert.commandWorked(
-    testDB.runCommand({insert: collectionName, documents: [successfulDoc], writeConcern: {w: "majority"}}),
+    testDB.runCommand({
+        insert: collectionName,
+        documents: [successfulDoc],
+        writeConcern: {w: "majority"},
+    }),
 );
 var majorityWriteOperationTime = res.operationTime;
 

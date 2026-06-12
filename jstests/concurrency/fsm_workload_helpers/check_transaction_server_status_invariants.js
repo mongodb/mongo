@@ -42,14 +42,18 @@ export function allCountsNonNegative(serverStatusTxnStats) {
     let aborted = Number(serverStatusTxnStats["totalAborted"]);
     let open = Number(serverStatusTxnStats["currentOpen"]);
     let started = Number(serverStatusTxnStats["totalStarted"]);
-    return active >= 0 && inactive >= 0 && committed >= 0 && aborted >= 0 && open >= 0 && started >= 0;
+    return (
+        active >= 0 && inactive >= 0 && committed >= 0 && aborted >= 0 && open >= 0 && started >= 0
+    );
 }
 
 /**
  * serverStatus invariant: totalPreparedThenAborted + totalPreparedThenCommitted +
  * currentPrepared = totalPrepared
  */
-export function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared(serverStatusTxnStats) {
+export function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared(
+    serverStatusTxnStats,
+) {
     let preparedAborted = Number(serverStatusTxnStats["totalPreparedThenAborted"]);
     let preparedCommitted = Number(serverStatusTxnStats["totalPreparedThenCommitted"]);
     let currentPrepared = Number(serverStatusTxnStats["currentPrepared"]);
@@ -63,13 +67,21 @@ export function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTot
  * serverStatus invariant: unpreparedAborted + unpreparedCommitted + unpreparedOpen =
  * totalUnprepared
  */
-export function unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared(serverStatusTxnStats) {
+export function unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared(
+    serverStatusTxnStats,
+) {
     let unpreparedAborted =
-        Number(serverStatusTxnStats["totalAborted"]) - Number(serverStatusTxnStats["totalPreparedThenAborted"]);
+        Number(serverStatusTxnStats["totalAborted"]) -
+        Number(serverStatusTxnStats["totalPreparedThenAborted"]);
     let unpreparedCommitted =
-        Number(serverStatusTxnStats["totalCommitted"]) - Number(serverStatusTxnStats["totalPreparedThenCommitted"]);
-    let unpreparedOpen = Number(serverStatusTxnStats["currentOpen"]) - Number(serverStatusTxnStats["currentPrepared"]);
-    let totalUnprepared = Number(serverStatusTxnStats["totalStarted"]) - Number(serverStatusTxnStats["totalPrepared"]);
+        Number(serverStatusTxnStats["totalCommitted"]) -
+        Number(serverStatusTxnStats["totalPreparedThenCommitted"]);
+    let unpreparedOpen =
+        Number(serverStatusTxnStats["currentOpen"]) -
+        Number(serverStatusTxnStats["currentPrepared"]);
+    let totalUnprepared =
+        Number(serverStatusTxnStats["totalStarted"]) -
+        Number(serverStatusTxnStats["totalPrepared"]);
     return unpreparedAborted + unpreparedCommitted + unpreparedOpen === totalUnprepared;
 }
 
@@ -150,7 +162,11 @@ export function checkServerStatusInvariants(db, nSamples, isMongos) {
     checkInvariant(samples, committedPlusAbortedPlusOpenEqualsStarted, maxErrPct);
     if (!isMongos) {
         // Check mongod specific stats.
-        checkInvariant(samples, preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared, maxErrPct);
+        checkInvariant(
+            samples,
+            preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared,
+            maxErrPct,
+        );
         checkInvariant(
             samples,
             unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared,

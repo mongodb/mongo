@@ -58,7 +58,9 @@ hangBeforeVoteCommit.wait();
 
 // Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
 // Simulate a remaining disk space of 450MB on the secondary node.
-const simulateDiskSpaceFp = configureFailPoint(secondaryDB, "simulateAvailableDiskSpace", {bytes: 450 * 1024 * 1024});
+const simulateDiskSpaceFp = configureFailPoint(secondaryDB, "simulateAvailableDiskSpace", {
+    bytes: 450 * 1024 * 1024,
+});
 
 jsTestLog("Waiting for the disk space monitor to take action on secondary");
 assert.soon(() => {

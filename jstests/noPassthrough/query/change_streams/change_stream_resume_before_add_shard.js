@@ -12,7 +12,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const rsNodeOptions = {
     setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
 };
-const st = new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
+const st = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    rs: {nodes: 1},
+    other: {rsOptions: rsNodeOptions},
+});
 
 const mongosDB = st.s.getDB(jsTestName());
 const coll = mongosDB.test;
@@ -89,7 +94,12 @@ assertCanResumeFromEachEvent(changeList);
 // Now shard the collection on _id and move one chunk to the new shard.
 st.shardColl(coll, {_id: 1}, {_id: 3}, false);
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 3}, to: "newShard1", _waitForDelete: true}),
+    st.s.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {_id: 3},
+        to: "newShard1",
+        _waitForDelete: true,
+    }),
 );
 
 // Insert some new documents into the new shard and verify that the original stream sees them.

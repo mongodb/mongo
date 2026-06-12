@@ -27,13 +27,19 @@ function runTest(coll) {
     const docWithDollarY = {_id: 5, x: 1, $set: {$inc: {x: 5}}, $y: 1};
     assert.eq(
         [docWithDollarY],
-        coll.aggregate([{$replaceWith: {$setField: {field: {$literal: "$y"}, input: "$$ROOT", value: 1}}}]).toArray(),
+        coll
+            .aggregate([
+                {$replaceWith: {$setField: {field: {$literal: "$y"}, input: "$$ROOT", value: 1}}},
+            ])
+            .toArray(),
     );
 }
 
 const st = new ShardingTest({shards: 2});
 try {
-    assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}),
+    );
     assert.commandWorked(st.s0.adminCommand({shardCollection: "test.coll", key: {x: "hashed"}}));
 
     runTest(st.getDB("test").coll);

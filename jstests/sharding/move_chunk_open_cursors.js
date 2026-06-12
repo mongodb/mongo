@@ -10,7 +10,9 @@ const testNs = dbName + "." + collName;
 
 const nDocs = 1000 * 10;
 const st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const coll = st.s0.getDB(dbName)[collName];
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
@@ -23,9 +25,13 @@ assert.commandWorked(st.admin.runCommand({shardCollection: testNs, key: {_id: 1}
 
 // Open some cursors before migrating data.
 // Ensure the cursor stage at the front of the pipeline does not buffer any data.
-assert.commandWorked(st.shard0.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
+assert.commandWorked(
+    st.shard0.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}),
+);
 const getMoreBatchSize = 100;
-const aggResponse = assert.commandWorked(coll.runCommand({aggregate: collName, pipeline: [], cursor: {batchSize: 0}}));
+const aggResponse = assert.commandWorked(
+    coll.runCommand({aggregate: collName, pipeline: [], cursor: {batchSize: 0}}),
+);
 const aggCursor = new DBCommandCursor(coll.getDB(), aggResponse, getMoreBatchSize);
 
 assert(st.adminCommand({split: testNs, middle: {_id: nDocs / 2}}));
@@ -38,7 +44,9 @@ assert.eq(
 );
 
 // Test the same behavior with the find command.
-const findResponse = assert.commandWorked(coll.runCommand({find: collName, filter: {}, batchSize: getMoreBatchSize}));
+const findResponse = assert.commandWorked(
+    coll.runCommand({find: collName, filter: {}, batchSize: getMoreBatchSize}),
+);
 const findCursor = new DBCommandCursor(coll.getDB(), findResponse, getMoreBatchSize);
 assert(st.adminCommand({split: testNs, middle: {_id: nDocs / 4}}));
 assert(st.adminCommand({moveChunk: testNs, find: {_id: 0}, to: st.shard1.shardName}));

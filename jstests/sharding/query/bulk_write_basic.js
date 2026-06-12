@@ -98,7 +98,11 @@ function bulkWriteBasicTest(ordered) {
 
     // Now run the bulk write command on s0.
     assert.commandWorked(
-        db_s0.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {a: 3}}], nsInfo: [{ns: orange}]}),
+        db_s0.adminCommand({
+            bulkWrite: 1,
+            ops: [{insert: 0, document: {a: 3}}],
+            nsInfo: [{ns: orange}],
+        }),
     );
     insertedDocs = getCollection(orange).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
@@ -118,8 +122,12 @@ function bulkWriteBasicTest(ordered) {
 
     jsTestLog("Create chunks, then move them.");
     assert.commandWorked(db_s0.adminCommand({split: banana, middle: {a: 2}}));
-    assert.commandWorked(db_s0.adminCommand({moveChunk: banana, find: {a: 0}, to: st.shard0.shardName}));
-    assert.commandWorked(db_s0.adminCommand({moveChunk: banana, find: {a: 3}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db_s0.adminCommand({moveChunk: banana, find: {a: 0}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        db_s0.adminCommand({moveChunk: banana, find: {a: 3}, to: st.shard1.shardName}),
+    );
 
     jsTestLog("Running bulk write command.");
     assert.commandWorked(
@@ -193,7 +201,11 @@ function bulkWriteBasicTest(ordered) {
             checkLog.checkContainsOnce(
                 st.s0,
                 /(8037206|11182203).*Noting cannotImplicitlyCreateCollection response.*strawberry/,
-            ) || checkLog.checkContainsOnce(st.s0, /(7279201|10346900).*Noting stale config response.*strawberry/),
+            ) ||
+                checkLog.checkContainsOnce(
+                    st.s0,
+                    /(7279201|10346900).*Noting stale config response.*strawberry/,
+                ),
         );
 
         assert(checkLog.checkContainsOnce(st.s0, opMayNeedToBeRetriedLog(4, "strawberry")));

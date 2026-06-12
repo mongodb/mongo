@@ -125,7 +125,10 @@ class MultipleChangeStreamMatcher {
      */
     assertDone() {
         this.matchers.forEach((matcher, idx) => {
-            assert(matcher.isDone(), `Stream ${idx} not done. Matched ${matcher.index} of ${matcher.matchers.length}`);
+            assert(
+                matcher.isDone(),
+                `Stream ${idx} not done. Matched ${matcher.index} of ${matcher.matchers.length}`,
+            );
         });
     }
 

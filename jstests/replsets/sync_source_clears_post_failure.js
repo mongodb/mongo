@@ -33,7 +33,10 @@ assertSyncSourceChangesTo(rst, newNode, rst.nodes[0]);
 jsTestLog("Node 1 is syncing from Node 0");
 
 // Simulate a shut down.
-let failfirstOplogEntryFetcherCallback = configureFailPoint(newNode, "failfirstOplogEntryFetcherCallback");
+let failfirstOplogEntryFetcherCallback = configureFailPoint(
+    newNode,
+    "failfirstOplogEntryFetcherCallback",
+);
 
 jsTestLog("Calling replSetSyncFrom while failfirstOplogEntryFetcherCallback is enabled");
 let primaryHost = TestData.usePriorityPorts ? primary.priorityHost : primary.host;

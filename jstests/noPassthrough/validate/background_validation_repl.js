@@ -54,7 +54,10 @@ const doTest = (replSet) => {
     /**
      * Ensure {full:true} and {background:true} cannot be run together.
      */
-    assert.commandFailedWithCode(testColl.validate({background: true, full: true}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        testColl.validate({background: true, full: true}),
+        ErrorCodes.InvalidOptions,
+    );
 
     assert.commandWorked(testDB.adminCommand({fsync: 1}));
 
@@ -79,8 +82,14 @@ const doTest = (replSet) => {
         const asyncTestDB = db.getSiblingDB("db_background_validation_repl");
         const asyncTestColl = asyncTestDB.coll_background_validation_repl;
         const validateRes = asyncTestColl.validate({background: true});
-        assert.commandWorked(validateRes, "asynchronous background validate command failed: " + tojson(validateRes));
-        assert(validateRes.valid, "asynchronous background validate command was not valid: " + tojson(validateRes));
+        assert.commandWorked(
+            validateRes,
+            "asynchronous background validate command failed: " + tojson(validateRes),
+        );
+        assert(
+            validateRes.valid,
+            "asynchronous background validate command was not valid: " + tojson(validateRes),
+        );
     }, replSet.getPrimary().port);
 
     // Wait for background validation command to start.
@@ -92,7 +101,11 @@ const doTest = (replSet) => {
     assert.commandWorked(testColl.insert({a: 1, b: 1, c: 1, d: 100}));
     assert.commandWorked(testColl.update({d: 100}, {"e": "updated"}));
     let docRes = testColl.find({"e": "updated"});
-    assert.eq(1, docRes.toArray().length, "expected to find a single document, found: " + tojson(docRes.toArray()));
+    assert.eq(
+        1,
+        docRes.toArray().length,
+        "expected to find a single document, found: " + tojson(docRes.toArray()),
+    );
 
     // Clear the failpoint and make sure the validate command was successful.
     failPoint.off();
@@ -106,10 +119,26 @@ const doTest = (replSet) => {
     assert(res.valid, "Validate cmd with {background:true} failed: " + tojson(res));
     assert.eq(res.nIndexes, 4, "Expected 4 indexes: " + tojson(res));
     assert.eq(res.nrecords, numDocs, "Expected " + numDocs + " collection records:" + tojson(res));
-    assert.eq(res.keysPerIndex._id_, numDocs, "Expected " + numDocs + " _id index records: " + tojson(res));
-    assert.eq(res.keysPerIndex.a_1, numDocs, "Expected " + numDocs + " a_1 index records: " + tojson(res));
-    assert.eq(res.keysPerIndex.b_1, numDocs, "Expected " + numDocs + " b_1 index records: " + tojson(res));
-    assert.eq(res.keysPerIndex.c_1, numDocs, "Expected " + numDocs + " c_1 index records: " + tojson(res));
+    assert.eq(
+        res.keysPerIndex._id_,
+        numDocs,
+        "Expected " + numDocs + " _id index records: " + tojson(res),
+    );
+    assert.eq(
+        res.keysPerIndex.a_1,
+        numDocs,
+        "Expected " + numDocs + " a_1 index records: " + tojson(res),
+    );
+    assert.eq(
+        res.keysPerIndex.b_1,
+        numDocs,
+        "Expected " + numDocs + " b_1 index records: " + tojson(res),
+    );
+    assert.eq(
+        res.keysPerIndex.c_1,
+        numDocs,
+        "Expected " + numDocs + " c_1 index records: " + tojson(res),
+    );
 };
 
 const replSet = initTest();

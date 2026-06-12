@@ -80,7 +80,10 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
 // the server's oldest supported protocol
 // Run TLS 1.3 scenarios on platforms that either disable TLS1.1 (legacy distros) or on
 // Windows hosts that explicitly support TLS 1.3.
-if (!sslProviderSupportsTLS1_1() || (determineSSLProvider() === "windows" && windowsSupportsTLS13())) {
+if (
+    !sslProviderSupportsTLS1_1() ||
+    (determineSSLProvider() === "windows" && windowsSupportsTLS13())
+) {
     // Server disables TLS 1.2, client disables TLS 1.3
     runTest("TLS1_2", "TLS1_3");
 

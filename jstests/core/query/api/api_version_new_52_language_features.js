@@ -70,22 +70,38 @@ const stablePipelines = [
     ],
     [
         {
-            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$minN: {input: "$a", n: 2}}}},
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$minN: {input: "$a", n: 2}}},
+            },
         },
     ],
     [
         {
-            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$maxN: {input: "$a", n: 2}}}},
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$maxN: {input: "$a", n: 2}}},
+            },
         },
     ],
     [
         {
-            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$firstN: {input: "$a", n: 2}}}},
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$firstN: {input: "$a", n: 2}}},
+            },
         },
     ],
     [
         {
-            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$lastN: {input: "$a", n: 2}}}},
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$lastN: {input: "$a", n: 2}}},
+            },
         },
     ],
     [{$setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$locf: "$a"}}}}],

@@ -55,12 +55,17 @@ const applyOpsCmd = {
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
 // First sets 'prepareUnique' before converting the index to unique.
-assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}),
+);
 const cannotConvertIndexToUniqueError = assert.commandFailedWithCode(
     db.adminCommand(applyOpsCmd),
     ErrorCodes.CannotConvertIndexToUnique,
 );
-jsTestLog("Cannot enable index constraint error from failed conversion: " + tojson(cannotConvertIndexToUniqueError));
+jsTestLog(
+    "Cannot enable index constraint error from failed conversion: " +
+        tojson(cannotConvertIndexToUniqueError),
+);
 assert.eq(1, cannotConvertIndexToUniqueError.applied, tojson(cannotConvertIndexToUniqueError));
 assert.commandWorked(coll.remove({_id: 2}));
 
@@ -70,7 +75,10 @@ assert.commandWorked(coll.remove({_id: 2}));
 const dryRunCmd = Object.extend({}, applyOpsCmd, true /* deep */);
 dryRunCmd.applyOps[0].o.dryRun = true;
 jsTestLog("Running collMod in dry run mode through applyOps: " + tojson(dryRunCmd));
-const dryRunError = assert.commandFailedWithCode(db.adminCommand(dryRunCmd), ErrorCodes.InvalidOptions);
+const dryRunError = assert.commandFailedWithCode(
+    db.adminCommand(dryRunCmd),
+    ErrorCodes.InvalidOptions,
+);
 jsTestLog("Rejected dry run mode result: " + tojson(dryRunError));
 
 // Successfully converts to a unique index.

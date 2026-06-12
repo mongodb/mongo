@@ -18,7 +18,10 @@ const dropDB = rst.getPrimary().getDB("drop");
     const sessionDB = session.getDatabase("drop");
     session.startTransaction();
     assert.commandWorked(sessionDB.bar.insert({_id: 1}));
-    assert.commandFailedWithCode(dropDB.runCommand({dropDatabase: 1, maxTimeMS: 100}), ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(
+        dropDB.runCommand({dropDatabase: 1, maxTimeMS: 100}),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
@@ -27,7 +30,10 @@ const dropDB = rst.getPrimary().getDB("drop");
 (function assertDatabaseDropCanBeInterrupted() {
     assert.commandWorked(dropDB.bar.insert({}));
 
-    const failPoint = configureFailPoint(rst.getPrimary(), "dropDatabaseHangAfterAllCollectionsDrop");
+    const failPoint = configureFailPoint(
+        rst.getPrimary(),
+        "dropDatabaseHangAfterAllCollectionsDrop",
+    );
 
     // This will get blocked by the failpoint when collection drop phase finishes.
     let dropDatabaseShell = startParallelShell(() => {
@@ -42,9 +48,13 @@ const dropDB = rst.getPrimary().getDB("drop");
     let sleepCommand = startParallelShell(() => {
         // Make dropDatabase timeout.
         assert.commandFailedWithCode(
-            db
-                .getSiblingDB("drop")
-                .adminCommand({sleep: 1, secs: 500, lockTarget: "drop", lock: "ir", $comment: "Lock sleep"}),
+            db.getSiblingDB("drop").adminCommand({
+                sleep: 1,
+                secs: 500,
+                lockTarget: "drop",
+                lock: "ir",
+                $comment: "Lock sleep",
+            }),
             ErrorCodes.Interrupted,
         );
     }, rst.getPrimary().port);

@@ -29,8 +29,17 @@ function withJavaScriptProtection() {
 
 function testFunctionUnmarshall(jsProtection, evalFunc) {
     let evalString = "(" + tojson(evalFunc) + ")();";
-    let protectionFlag = jsProtection ? "--enableJavaScriptProtection" : "--disableJavaScriptProtection";
-    let exitCode = runMongoProgram("mongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
+    let protectionFlag = jsProtection
+        ? "--enableJavaScriptProtection"
+        : "--disableJavaScriptProtection";
+    let exitCode = runMongoProgram(
+        "mongo",
+        "--port",
+        testServer.port,
+        protectionFlag,
+        "--eval",
+        evalString,
+    );
     assert.eq(exitCode, 0);
 }
 

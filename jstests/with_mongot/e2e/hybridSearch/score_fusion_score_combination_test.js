@@ -72,7 +72,10 @@ const coll = db[jsTestName()];
     const actualResults = coll
         .aggregate([
             {
-                $scoreFusion: {input: {pipelines, normalization: "none"}, combination: {method: "avg"}},
+                $scoreFusion: {
+                    input: {pipelines, normalization: "none"},
+                    combination: {method: "avg"},
+                },
             },
             projectScore,
         ])
@@ -92,7 +95,12 @@ const coll = db[jsTestName()];
                 },
             },
             {
-                $project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single_score", "$double"]}},
+                $project: {
+                    _id: 1,
+                    single: 1,
+                    double: 1,
+                    score: {$avg: ["$single_score", "$double"]},
+                },
             },
             sortScore,
         ])
@@ -136,7 +144,12 @@ const coll = db[jsTestName()];
                 },
             },
             {
-                $project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single_score", "$double"]}},
+                $project: {
+                    _id: 1,
+                    single: 1,
+                    double: 1,
+                    score: {$avg: ["$single_score", "$double"]},
+                },
             },
             sortScore,
         ])
@@ -161,7 +174,10 @@ const coll = db[jsTestName()];
     const actualResults = coll
         .aggregate([
             {
-                $scoreFusion: {input: {pipelines, normalization: "none"}, combination: {method: "avg"}},
+                $scoreFusion: {
+                    input: {pipelines, normalization: "none"},
+                    combination: {method: "avg"},
+                },
             },
             projectScore,
         ])
@@ -170,7 +186,10 @@ const coll = db[jsTestName()];
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
     const expectedResults = coll
-        .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}}, sortScore])
+        .aggregate([
+            {$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}},
+            sortScore,
+        ])
         .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
@@ -194,7 +213,10 @@ const coll = db[jsTestName()];
     const actualResults = coll
         .aggregate([
             {
-                $scoreFusion: {input: {pipelines, normalization: "none"}, combination: {method: "avg"}},
+                $scoreFusion: {
+                    input: {pipelines, normalization: "none"},
+                    combination: {method: "avg"},
+                },
             },
             projectScore,
         ])
@@ -203,7 +225,10 @@ const coll = db[jsTestName()];
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
     const expectedResults = coll
-        .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}}, sortScore])
+        .aggregate([
+            {$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}},
+            sortScore,
+        ])
         .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
@@ -258,7 +283,10 @@ const coll = db[jsTestName()];
             {
                 $scoreFusion: {
                     input: {pipelines, normalization: "none"},
-                    combination: {method: "expression", expression: {$add: ["$$single", "$$double"]}},
+                    combination: {
+                        method: "expression",
+                        expression: {$add: ["$$single", "$$double"]},
+                    },
                 },
             },
             projectScore,
@@ -269,7 +297,10 @@ const coll = db[jsTestName()];
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
     const expectedResults = coll
-        .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$add: ["$single", "$double"]}}}, sortScore])
+        .aggregate([
+            {$project: {_id: 1, single: 1, double: 1, score: {$add: ["$single", "$double"]}}},
+            sortScore,
+        ])
         .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
@@ -295,7 +326,10 @@ const coll = db[jsTestName()];
             {
                 $scoreFusion: {
                     input: {pipelines, normalization: "none"},
-                    combination: {method: "expression", expression: {$avg: ["$$single", "$$double"]}},
+                    combination: {
+                        method: "expression",
+                        expression: {$avg: ["$$single", "$$double"]},
+                    },
                 },
             },
             projectScore,
@@ -305,7 +339,10 @@ const coll = db[jsTestName()];
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
     const expectedResults = coll
-        .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}}, sortScore])
+        .aggregate([
+            {$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}},
+            sortScore,
+        ])
         .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
@@ -388,7 +425,10 @@ const coll = db[jsTestName()];
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
     const expectedResultsForUndefinedDocsField = coll
-        .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}}, sortScore])
+        .aggregate([
+            {$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}},
+            sortScore,
+        ])
         .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
@@ -493,7 +533,10 @@ const coll = db[jsTestName()];
                             {
                                 $divide: [
                                     {
-                                        $avg: [{$add: ["$single", "$double"]}, {$multiply: ["$single", "$double"]}],
+                                        $avg: [
+                                            {$add: ["$single", "$double"]},
+                                            {$multiply: ["$single", "$double"]},
+                                        ],
                                     },
                                     "$single",
                                 ],
@@ -576,7 +619,12 @@ const coll = db[jsTestName()];
     const expectedResults = coll
         .aggregate([
             {
-                $project: {_id: 1, single: 1, double: 1, score: {$add: ["$single", "$double", 5.0]}},
+                $project: {
+                    _id: 1,
+                    single: 1,
+                    double: 1,
+                    score: {$add: ["$single", "$double", 5.0]},
+                },
             },
             sortScore,
         ])
@@ -607,7 +655,10 @@ const coll = db[jsTestName()];
     const combinations = [combinationAvg, combinationExpression];
     function returnAverageWithWeights(weight1, weight2, numSigmoid) {
         if (numSigmoid === 1) {
-            return [{$multiply: [{$sigmoid: "$single"}, weight1]}, {$multiply: [{$sigmoid: "$double"}, weight2]}];
+            return [
+                {$multiply: [{$sigmoid: "$single"}, weight1]},
+                {$multiply: [{$sigmoid: "$double"}, weight2]},
+            ];
         } else {
             return [
                 {$multiply: [{$sigmoid: {$sigmoid: "$single"}}, weight1]},
@@ -631,9 +682,13 @@ const coll = db[jsTestName()];
             .toArray();
         // Pipeline returns an array of documents, each with the calculated expected score that
         // $scoreFusion should have computed.
-        const avgWeight = i === 0 ? returnAverageWithWeights(0.5, 2, 1) : returnAverageWithWeights(1, 1, 1);
+        const avgWeight =
+            i === 0 ? returnAverageWithWeights(0.5, 2, 1) : returnAverageWithWeights(1, 1, 1);
         let expectedResults = coll
-            .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: avgWeight}}}, sortScore])
+            .aggregate([
+                {$project: {_id: 1, single: 1, double: 1, score: {$avg: avgWeight}}},
+                sortScore,
+            ])
             .toArray();
         // Assert that every document returned by $scoreFusion is scored as expected using the
         // "avg" combination.method.
@@ -655,7 +710,10 @@ const coll = db[jsTestName()];
         // Pipeline returns an array of documents, each with the calculated expected score that
         // $scoreFusion should have computed.
         expectedResults = coll
-            .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: avgWeight}}}, sortScore])
+            .aggregate([
+                {$project: {_id: 1, single: 1, double: 1, score: {$avg: avgWeight}}},
+                sortScore,
+            ])
             .toArray();
         // Assert that every document returned by $scoreFusion is scored as expected using the
         // "avg" combination.method.
@@ -677,9 +735,13 @@ const coll = db[jsTestName()];
             .toArray();
         // Pipeline returns an array of documents, each with the calculated expected score that
         // $scoreFusion should have computed.
-        const avgWeightDouble = i === 0 ? returnAverageWithWeights(0.5, 2, 2) : returnAverageWithWeights(1, 1, 2);
+        const avgWeightDouble =
+            i === 0 ? returnAverageWithWeights(0.5, 2, 2) : returnAverageWithWeights(1, 1, 2);
         expectedResults = coll
-            .aggregate([{$project: {_id: 1, single: 1, double: 1, score: {$avg: avgWeightDouble}}}, sortScore])
+            .aggregate([
+                {$project: {_id: 1, single: 1, double: 1, score: {$avg: avgWeightDouble}}},
+                sortScore,
+            ])
             .toArray();
         // Assert that every document returned by $scoreFusion is scored as expected using the
         // "avg" combination.method.
@@ -707,7 +769,10 @@ const coll = db[jsTestName()];
     const combinations = [combinationAvg, combinationExpression];
     function returnAverageWithWeights(weight1, weight2, inludeMultiply = false) {
         if (inludeMultiply) {
-            return [{$multiply: ["$single_score", weight1]}, {$multiply: ["$double_score", weight2]}];
+            return [
+                {$multiply: ["$single_score", weight1]},
+                {$multiply: ["$double_score", weight2]},
+            ];
         } else {
             return [
                 ["$single_score", weight1],
@@ -733,7 +798,8 @@ const coll = db[jsTestName()];
             .toArray();
         // Pipeline returns an array of documents, each with the calculated expected score that
         // $scoreFusion should have computed.
-        const avgWeight = i === 0 ? returnAverageWithWeights(0.5, 2, true) : returnAverageWithWeights(1, 1, true);
+        const avgWeight =
+            i === 0 ? returnAverageWithWeights(0.5, 2, true) : returnAverageWithWeights(1, 1, true);
         let expectedResults = coll
             .aggregate([
                 {
@@ -816,7 +882,8 @@ const coll = db[jsTestName()];
             .toArray();
         // Pipeline returns an array of documents, each with the calculated expected score that
         // $scoreFusion should have computed.
-        const avgWeights = i === 0 ? returnAverageWithWeights(0.5, 2) : returnAverageWithWeights(1, 1);
+        const avgWeights =
+            i === 0 ? returnAverageWithWeights(0.5, 2) : returnAverageWithWeights(1, 1);
         expectedResults = coll
             .aggregate([
                 {

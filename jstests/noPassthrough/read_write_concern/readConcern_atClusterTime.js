@@ -87,13 +87,19 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 // 'atClusterTime' cannot be used with 'afterOpTime'.
 session.startTransaction({
-    readConcern: {level: "snapshot", atClusterTime: clusterTime, afterOpTime: {ts: Timestamp(1, 2), t: 1}},
+    readConcern: {
+        level: "snapshot",
+        atClusterTime: clusterTime,
+        afterOpTime: {ts: Timestamp(1, 2), t: 1},
+    },
 });
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // 'atClusterTime' cannot be used with 'afterClusterTime'.
-session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime}});
+session.startTransaction({
+    readConcern: {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime},
+});
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 session.endSession();
@@ -106,11 +112,15 @@ assert.commandWorked(sessionDb.runCommand({find: collName}));
 assert(
     assert
         .commandFailedWithCode(
-            sessionDb.runCommand({find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTime}}),
+            sessionDb.runCommand({
+                find: collName,
+                readConcern: {level: "snapshot", atClusterTime: clusterTime},
+            }),
             ErrorCodes.InvalidOptions,
         )
         .errmsg.includes(
-            "Specifying a timestamp for readConcern snapshot in a causally " + "consistent session is not allowed",
+            "Specifying a timestamp for readConcern snapshot in a causally " +
+                "consistent session is not allowed",
         ),
 );
 
@@ -122,9 +132,15 @@ rst.stopSet();
     let rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
-    let session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+    let session = rst
+        .getPrimary()
+        .getDB(dbName)
+        .getMongo()
+        .startSession({causalConsistency: false});
     let sessionDb = session.getDatabase(dbName);
-    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
+    session.startTransaction({
+        readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)},
+    });
     assert.commandWorked(sessionDb.runCommand({find: collName}));
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
@@ -136,7 +152,9 @@ rst.stopSet();
     rst.initiate();
     session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
-    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
+    session.startTransaction({
+        readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)},
+    });
     assert.commandWorked(sessionDb.runCommand({find: collName}));
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();

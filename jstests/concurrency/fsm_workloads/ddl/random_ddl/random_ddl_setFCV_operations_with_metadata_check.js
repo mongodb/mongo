@@ -148,11 +148,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             const targetFCV = fcvValues[Random.randInt(3)];
             // Ensure we're in the latest version.
             jsTestLog("STATE:setFCV setting FCV to " + targetFCV);
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
-            db.getSiblingDB($config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName].update(
-                {},
-                {$inc: {count: 1}},
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
             );
+            db.getSiblingDB($config.data.succesfullSetFCVDbName)[
+                $config.data.succesfullSetFCVCollName
+            ].update({}, {$inc: {count: 1}});
         } catch (e) {
             if (!$config.data.kAcceptedSetFCVErrors.includes(e.code)) {
                 throw e;
@@ -203,18 +204,24 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.transitions = uniformDistTransitions($config.states);
 
     $config.setup = function (db, collName, cluster) {
-        db.getSiblingDB($config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName].insert({count: 0});
+        db.getSiblingDB($config.data.succesfullSetFCVDbName)[
+            $config.data.succesfullSetFCVCollName
+        ].insert({count: 0});
     };
 
     $config.teardown = function (db, collName, cluster) {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
 
         const fcvExecutions = db
             .getSiblingDB($config.data.succesfullSetFCVDbName)
             [$config.data.succesfullSetFCVCollName].findOne({}).count;
         assert(
             fcvExecutions >= $config.data.expectedSetFCVExecutions,
-            "Expected setFeatureCompatibility to run at least 2 times, but it ran " + fcvExecutions + " times",
+            "Expected setFeatureCompatibility to run at least 2 times, but it ran " +
+                fcvExecutions +
+                " times",
         );
     };
 

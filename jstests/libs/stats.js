@@ -40,7 +40,11 @@ export function assertHistogramDiffEq(db, coll, lastHistogram, readDiff, writeDi
         // The checkDB command could be run multiple times in a short period of time.
         allowedDiff = 3;
     }
-    assert.lte(Math.abs(diff.commands - commandDiff), allowedDiff, "miscounted histogram commands:\n" + tojson(diff));
+    assert.lte(
+        Math.abs(diff.commands - commandDiff),
+        allowedDiff,
+        "miscounted histogram commands:\n" + tojson(diff),
+    );
     return thisHistogram;
 }
 

@@ -40,8 +40,14 @@ const conn = MongoRunner.runMongod();
 const db = conn.getDB("admin");
 
 // We shouldn't be able to fetch test-only server or cluster parameters.
-assert.commandFailedWithCode(db.runCommand({getParameter: 1, requireApiVersion: 1}), ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({getParameter: 1, requireApiVersion: 1}),
+    ErrorCodes.InvalidOptions,
+);
+assert.commandFailedWithCode(
+    db.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
+    ErrorCodes.BadValue,
+);
 
 MongoRunner.stopMongod(conn);
 MongoRunner._startWithArgs = originalStartWithArgs;

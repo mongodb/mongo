@@ -2,7 +2,10 @@
  * Common properties our property-based tests may use. Intended to be paired with the `testProperty`
  * interface in property_testing_utils.js.
  */
-import {getPlanCache, runDeoptimized} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {
+    getPlanCache,
+    runDeoptimized,
+} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {
     getAllPlans,
     getAllPlanStages,
@@ -43,7 +46,13 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
 export function createCorrectnessProperty(
     controlColl,
     experimentColl,
-    {statsCollectorFn, jsTestLogExplain, modifyExperimentQueryFn, sortArraysComparator, preconditionFn} = {},
+    {
+        statsCollectorFn,
+        jsTestLogExplain,
+        modifyExperimentQueryFn,
+        sortArraysComparator,
+        preconditionFn,
+    } = {},
 ) {
     return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers, extraParams) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
@@ -56,11 +65,15 @@ export function createCorrectnessProperty(
             assert.eq(typeof query, "object");
             const controlResults = resultMap[i];
 
-            const {pipeline, options} = modifyExperimentQueryFn ? modifyExperimentQueryFn(query) : query;
+            const {pipeline, options} = modifyExperimentQueryFn
+                ? modifyExperimentQueryFn(query)
+                : query;
             const experimentResults = experimentColl.aggregate(pipeline, options).toArray();
 
             const needsExplain = preconditionFn || jsTestLogExplain || statsCollectorFn;
-            const explain = needsExplain ? experimentColl.explain().aggregate(pipeline, options) : null;
+            const explain = needsExplain
+                ? experimentColl.explain().aggregate(pipeline, options)
+                : null;
             if (preconditionFn) preconditionFn(explain, extraParams);
             if (jsTestLogExplain) jsTest.log.info(explain);
             if (statsCollectorFn) statsCollectorFn(explain);
@@ -69,7 +82,8 @@ export function createCorrectnessProperty(
             if (!cmpFn(controlResults, experimentResults)) {
                 return {
                     passed: false,
-                    message: "Query results from experiment collection did not match plain collection using collscan.",
+                    message:
+                        "Query results from experiment collection did not match plain collection using collscan.",
                     query: {pipeline, options},
                     explain: explain ?? experimentColl.explain().aggregate(pipeline, options),
                     controlResults,
@@ -115,7 +129,9 @@ export function createCacheCorrectnessProperty(controlColl, experimentColl, stat
         for (let i = 0; i < remainingQueries.length; i++) {
             const query = remainingQueries[i];
             const controlResults = resultMap[i];
-            const experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
+            const experimentResults = experimentColl
+                .aggregate(query.pipeline, query.options)
+                .toArray();
 
             if (statsCollectorFn) {
                 statsCollectorFn(experimentColl.explain().aggregate(query.pipeline, query.options));
@@ -179,12 +195,15 @@ export function createReplanningCacheCorrectnessProperty(controlColl, experiment
             for (let i = 0; i < replanQueries.length; i++) {
                 const query = replanQueries[i];
                 const controlResults = resultMap[i];
-                const experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
+                const experimentResults = experimentColl
+                    .aggregate(query.pipeline, query.options)
+                    .toArray();
 
                 if (!testHelpers.comp(controlResults, experimentResults)) {
                     return {
                         passed: false,
-                        message: "A cached query that was forced to replan returned incorrect results.",
+                        message:
+                            "A cached query that was forced to replan returned incorrect results.",
                         query,
                         explain: experimentColl.explain().aggregate(query.pipeline, query.options),
                         controlResults,
@@ -226,7 +245,10 @@ function assertCeIsDefined(explain) {
 
     for (const plan of plans) {
         for (const stage of getAllPlanStages(plan)) {
-            assert(stage.costEstimate !== undefined && stage.cardinalityEstimate !== undefined, {explain, stage});
+            assert(stage.costEstimate !== undefined && stage.cardinalityEstimate !== undefined, {
+                explain,
+                stage,
+            });
         }
     }
 }
@@ -256,13 +278,17 @@ export function createPlanStabilityProperty(experimentColl, assertCeExists = fal
         for (const query of queries) {
             // Run explain on the query once to get the initial winning plan. Then we run explain
             // ten more times to assert that the winning plan is the same each time.
-            const initialExplain = experimentColl.explain().aggregate(query.pipeline, query.options);
+            const initialExplain = experimentColl
+                .explain()
+                .aggregate(query.pipeline, query.options);
             if (assertCeExists) {
                 assertCeIsDefined(initialExplain);
             }
 
             for (let i = 0; i < 10; i++) {
-                const newExplain = experimentColl.explain().aggregate(query.pipeline, query.options);
+                const newExplain = experimentColl
+                    .explain()
+                    .aggregate(query.pipeline, query.options);
                 if (!sameWinningAndRejectedPlans(initialExplain, newExplain)) {
                     return {
                         passed: false,
@@ -327,7 +353,9 @@ function runWithKnobs(db, fn, knobToVal = {}, failPointToMode = {}) {
     const priorFailPointModes = {};
     for (const fpName of failPointNames) {
         const paramName = `failpoint.${fpName}`;
-        const getParamResult = assert.commandWorked(adminDb.adminCommand({getParameter: 1, [paramName]: 1}));
+        const getParamResult = assert.commandWorked(
+            adminDb.adminCommand({getParameter: 1, [paramName]: 1}),
+        );
         // Mode is a 1 or 0 for on or off failpoint status.
         const priorModeStr = getParamResult[paramName].mode ? "alwaysOn" : "off";
         priorFailPointModes[fpName] = priorModeStr;
@@ -350,8 +378,15 @@ function runWithKnobs(db, fn, knobToVal = {}, failPointToMode = {}) {
     }
 }
 
-export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl, experimentColl) {
-    return function queriesWithKnobsSetAreSameAsControlCollScan(getQuery, testHelpers, {knobToVal}) {
+export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(
+    controlColl,
+    experimentColl,
+) {
+    return function queriesWithKnobsSetAreSameAsControlCollScan(
+        getQuery,
+        testHelpers,
+        {knobToVal},
+    ) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
         // Compute the control results all at once.
@@ -361,7 +396,9 @@ export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(contro
             for (let i = 0; i < queries.length; i++) {
                 const query = queries[i];
                 const controlResults = resultMap[i];
-                const experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
+                const experimentResults = experimentColl
+                    .aggregate(query.pipeline, query.options)
+                    .toArray();
                 // Use the normalizing comparator. A knob-controlled rewrite may legitimately affect
                 // result order, and the default `comp` is not robust to numerics that compare equal
                 // but have different binary representations (e.g. +0 and -0) in different orders.

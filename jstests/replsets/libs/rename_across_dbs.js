@@ -107,8 +107,9 @@ export var RenameAcrossDatabasesTest = function (options) {
         const primary = replTest.getPrimary();
         _testLog(
             "Feature compatibility version: " +
-                assert.commandWorked(primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-                    .featureCompatibilityVersion,
+                assert.commandWorked(
+                    primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+                ).featureCompatibilityVersion,
         );
 
         // Rename a collection across databases that also drops the existing target collection.

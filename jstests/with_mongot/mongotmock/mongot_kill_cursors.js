@@ -54,7 +54,11 @@ function runTest(pipeline, expectedCommand, shouldPrefetchGetMore) {
         cursorHistory.push({
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
             response: {
-                cursor: {id: cursorId, ns: coll.getFullName(), nextBatch: [{_id: 14, ...someScore}]},
+                cursor: {
+                    id: cursorId,
+                    ns: coll.getFullName(),
+                    nextBatch: [{_id: 14, ...someScore}],
+                },
                 ok: 1,
             },
         });
@@ -70,7 +74,9 @@ function runTest(pipeline, expectedCommand, shouldPrefetchGetMore) {
         },
     });
 
-    assert.commandWorked(mongotTestDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
+    assert.commandWorked(
+        mongotTestDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}),
+    );
 
     // Perform a query that creates a cursor on mongot.
     // Note that the 'batchSize' provided here only applies to the cursor between the driver and
@@ -107,7 +113,12 @@ const searchQuery = {
 };
 runTest(
     [{$search: searchQuery}],
-    mongotCommandForQuery({query: searchQuery, collName: collName, db: dbName, collectionUUID: collectionUUID}),
+    mongotCommandForQuery({
+        query: searchQuery,
+        collName: collName,
+        db: dbName,
+        collectionUUID: collectionUUID,
+    }),
     /*shouldPrefetchGetMore*/ false,
 );
 

@@ -31,7 +31,9 @@ assert.throwsWithCode(() => {
 
 // No external file metadata
 assert.throwsWithCode(() => {
-    db.coll.aggregate([{$match: {a: 1}}], {$_externalDataSources: [{collName: "coll", dataSources: []}]});
+    db.coll.aggregate([{$match: {a: 1}}], {
+        $_externalDataSources: [{collName: "coll", dataSources: []}],
+    });
 }, 7039001);
 
 // No file type
@@ -97,7 +99,9 @@ assert.throwsWithCode(() => {
 // No url
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{collName: "coll", dataSources: [{storageType: "pipe", fileType: "bson"}]}],
+        $_externalDataSources: [
+            {collName: "coll", dataSources: [{storageType: "pipe", fileType: "bson"}]},
+        ],
     });
 }, ErrorCodes.IDLFailedToParse);
 
@@ -119,7 +123,9 @@ assert.throwsWithCode(() => {
         $_externalDataSources: [
             {
                 collName: "coll",
-                dataSources: [{url: kUrlProtocolFile + "../name1", storageType: "pipe", fileType: "bson"}],
+                dataSources: [
+                    {url: kUrlProtocolFile + "../name1", storageType: "pipe", fileType: "bson"},
+                ],
             },
         ],
     });
@@ -131,7 +137,13 @@ assert.throwsWithCode(() => {
         $_externalDataSources: [
             {
                 collName: "coll",
-                dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}],
+                dataSources: [
+                    {
+                        url: kUrlProtocolFile + getRandomPipeName(),
+                        storageType: "pipe",
+                        fileType: "bson",
+                    },
+                ],
             },
         ],
     });
@@ -142,7 +154,13 @@ assert.throwsWithCode(() => {
         $_externalDataSources: [
             {
                 collName: "coll",
-                dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}],
+                dataSources: [
+                    {
+                        url: kUrlProtocolFile + getRandomPipeName(),
+                        storageType: "pipe",
+                        fileType: "bson",
+                    },
+                ],
             },
         ],
     });
@@ -366,14 +384,20 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: "coll",
-                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
             ],
         });
         const resArr = cursor.toArray();
         assert.eq(resArr.length, expectedRes.length);
         for (let i = 0; i < expectedRes.length; ++i) {
-            assert.eq(resArr[i], expectedRes[i], `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
+            assert.eq(
+                resArr[i],
+                expectedRes[i],
+                `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`,
+            );
         }
     })();
 
@@ -407,7 +431,9 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: "coll",
-                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
             ],
         });
@@ -430,18 +456,26 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: collName1,
-                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
                 {
                     collName: collName2,
-                    dataSources: [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
             ],
         });
         const resArr = cursor.toArray();
         assert.eq(resArr.length, expectedRes.length);
         for (let i = 0; i < expectedRes.length; ++i) {
-            assert.eq(resArr[i], expectedRes[i], `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
+            assert.eq(
+                resArr[i],
+                expectedRes[i],
+                `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`,
+            );
         }
     })();
 
@@ -470,7 +504,9 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: "coll",
-                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
             ],
         });
@@ -486,7 +522,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         assert.commandWorked(
             db.adminCommand({
                 setParameter: 1,
-                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: oldSbeGroupMaxMemory,
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
+                    oldSbeGroupMaxMemory,
             }),
         );
     })();
@@ -522,11 +559,15 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: collName1,
-                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
                 {
                     collName: collName2,
-                    dataSources: [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}],
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"},
+                    ],
                 },
             ],
         });
@@ -557,7 +598,9 @@ if (hostInfo.os.type != "Windows") {
         assert(mkdir(pipeDir).created, `Failed to create ${pipeDir}`);
 
         jsTestLog(`Testing named pipe test cases with externalPipeDir=${pipeDir}`);
-        conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true, externalPipeDir: pipeDir}});
+        conn = MongoRunner.runMongod({
+            setParameter: {enableComputeMode: true, externalPipeDir: pipeDir},
+        });
         db = conn.getDB(jsTestName());
 
         testSimpleAggregationsOverExternalDataSource(pipeDir);

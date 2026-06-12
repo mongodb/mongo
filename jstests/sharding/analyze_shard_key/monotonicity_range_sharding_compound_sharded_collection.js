@@ -17,6 +17,11 @@ import {
 
 const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, oplogSize: 500}});
 
-testAnalyzeShardKeysShardedCollection(st, rangeShardingCompoundTestCases, testProbability, numDocsRange);
+testAnalyzeShardKeysShardedCollection(
+    st,
+    rangeShardingCompoundTestCases,
+    testProbability,
+    numDocsRange,
+);
 
 st.stop();

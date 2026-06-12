@@ -32,8 +32,16 @@ function createShardToUse() {
     shardToUse.initiate();
     assert.commandWorked(st.s.adminCommand({addShard: shardToUse.getURL()}));
     shardIdentifierForms = [
-        {shardId: "shardToUse", shardURL: shardToUse.getURL(), hostAndPort: shardToUse.getPrimary().host},
-        {shardId: st.shard0.shardName, shardURL: st.shard0.host, hostAndPort: st.rs0.getPrimary().host},
+        {
+            shardId: "shardToUse",
+            shardURL: shardToUse.getURL(),
+            hostAndPort: shardToUse.getPrimary().host,
+        },
+        {
+            shardId: st.shard0.shardName,
+            shardURL: st.shard0.host,
+            hostAndPort: st.rs0.getPrimary().host,
+        },
     ];
 }
 
@@ -42,7 +50,9 @@ const testCommands = {
         commandToRun: (identifier) => ({addShardToZone: identifier, zone: zoneName}),
         runPreconditions: () => {},
         runPostconditions: (conn, sameShardId, otherShardId) => {
-            assert.commandWorked(conn.runCommand({removeShardFromZone: sameShardId, zone: zoneName}));
+            assert.commandWorked(
+                conn.runCommand({removeShardFromZone: sameShardId, zone: zoneName}),
+            );
         },
         expectedOutcomes: {
             shardId: true,
@@ -87,7 +97,9 @@ const testCommands = {
             to: identifier,
         }),
         runPreconditions: (conn, sameShardId, otherShardId) => {
-            assert.commandWorked(conn.runCommand({moveRange: shardedNs, min: {_id: MinKey}, toShard: otherShardId}));
+            assert.commandWorked(
+                conn.runCommand({moveRange: shardedNs, min: {_id: MinKey}, toShard: otherShardId}),
+            );
         },
         runPostconditions: () => {},
         expectedOutcomes: {
@@ -104,7 +116,9 @@ const testCommands = {
             toShard: identifier,
         }),
         runPreconditions: (conn, sameShardId, otherShardId) => {
-            assert.commandWorked(conn.runCommand({moveRange: shardedNs, min: {_id: MinKey}, toShard: otherShardId}));
+            assert.commandWorked(
+                conn.runCommand({moveRange: shardedNs, min: {_id: MinKey}, toShard: otherShardId}),
+            );
         },
         runPostconditions: () => {},
         expectedOutcomes: {
@@ -157,7 +171,10 @@ const testCommands = {
         runPreconditions: (conn, sameShardId, otherShardId) => {
             assert.commandWorked(conn.runCommand({startShardDraining: sameShardId}));
             assert.commandWorked(conn.runCommand({balancerStart: 1}));
-            let dbDocs = conn.getSiblingDB("config").databases.find({primary: sameShardId}).toArray();
+            let dbDocs = conn
+                .getSiblingDB("config")
+                .databases.find({primary: sameShardId})
+                .toArray();
             for (const dbDoc of dbDocs) {
                 assert.commandWorked(conn.runCommand({movePrimary: dbDoc._id, to: otherShardId}));
             }
@@ -182,10 +199,14 @@ const testCommands = {
     unshardCollection: {
         commandToRun: (identifier) => ({unshardCollection: unshardedCollNs, toShard: identifier}),
         runPreconditions: (conn) => {
-            assert.commandWorked(conn.runCommand({shardCollection: unshardedCollNs, key: {_id: 1}}));
+            assert.commandWorked(
+                conn.runCommand({shardCollection: unshardedCollNs, key: {_id: 1}}),
+            );
         },
         runPostconditions: (conn, sameShardId, otherShardId) => {
-            assert.commandWorked(conn.runCommand({unshardCollection: unshardedCollNs, toShard: sameShardId}));
+            assert.commandWorked(
+                conn.runCommand({unshardCollection: unshardedCollNs, toShard: sameShardId}),
+            );
         },
         expectedOutcomes: {
             shardId: true,
@@ -197,7 +218,9 @@ const testCommands = {
     moveCollection: {
         commandToRun: (identifier) => ({moveCollection: unshardedCollNs, toShard: identifier}),
         runPreconditions: (conn, sameShardId, otherShardId) => {
-            assert.commandWorked(conn.runCommand({moveCollection: unshardedCollNs, toShard: otherShardId}));
+            assert.commandWorked(
+                conn.runCommand({moveCollection: unshardedCollNs, toShard: otherShardId}),
+            );
         },
         runPostconditions: () => {},
         expectedOutcomes: {
@@ -307,7 +330,9 @@ createShardToUse();
 const adminDB = st.s.getDB("admin");
 const mongosDB = st.s.getDB(dbName);
 
-assert.commandWorked(adminDB.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    adminDB.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(adminDB.runCommand({shardCollection: shardedNs, key: {_id: 1}}));
 assert.commandWorked(adminDB.runCommand({shardCollection: reshardCollNs, key: {_id: 1}}));
 assert.commandWorked(mongosDB[shardedCollName].insert({_id: 0}));
@@ -316,13 +341,20 @@ assert.commandWorked(mongosDB.createCollection(unshardedCollName));
 
 for (const command of Object.keys(testCommands)) {
     for (const identifierType of identifierTypes) {
-        jsTest.log.info("Testing command: " + command + " with shard identifier form: " + tojson(identifierType));
+        jsTest.log.info(
+            "Testing command: " +
+                command +
+                " with shard identifier form: " +
+                tojson(identifierType),
+        );
         testCommands[command].runPreconditions(
             adminDB,
             shardIdentifierForms[0].shardId,
             shardIdentifierForms[1].shardId,
         );
-        let res = adminDB.runCommand(testCommands[command].commandToRun(shardIdentifierForms[0][identifierType]));
+        let res = adminDB.runCommand(
+            testCommands[command].commandToRun(shardIdentifierForms[0][identifierType]),
+        );
         if (testCommands[command].expectedOutcomes[identifierType] === true) {
             assert.commandWorked(res);
         } else {

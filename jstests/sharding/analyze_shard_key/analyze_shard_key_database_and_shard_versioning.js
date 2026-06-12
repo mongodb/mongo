@@ -29,7 +29,9 @@ function runTest(readPreference, writeConcern) {
     jsTest.log(`Testing analyzeShardKey with ${tojson({dbName, collName, readPreference})}`);
 
     // Make shard0 the primary shard.
-    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+    );
 
     const mongos0Coll = st.s0.getCollection(ns);
     assert.commandWorked(mongos0Coll.createIndex({x: 1}));
@@ -80,7 +82,12 @@ function runTest(readPreference, writeConcern) {
     assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
     assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
     assert.commandWorked(
-        st.s0.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard0.shardName, _waitForDelete: true}),
+        st.s0.adminCommand({
+            moveChunk: ns,
+            find: {x: 1},
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     // Rerun the analyzeShardKey command against mongos1. Since it does not know that a migration

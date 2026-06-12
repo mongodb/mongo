@@ -28,16 +28,26 @@ const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the test collection on _id.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
 
 // Move the [0, MaxKey] chunk to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 1},
+        to: st.rs1.getURL(),
+    }),
+);
 
 // Save current config time. We use this for opening the change streams in this test,
 // because we want to avoid v2 change stream readers running into "future cluster time"
@@ -85,7 +95,9 @@ function assertAllGetMoresHaveTimeout(profileDB, nss, comment, timeout) {
 // change stream cursor (thus avoiding issues such as SERVER-35084).
 function reopenChangeStream(existingCursorId) {
     if (existingCursorId) {
-        assert.commandWorked(mongosDB.runCommand({killCursors: mongosColl.getName(), cursors: [existingCursorId]}));
+        assert.commandWorked(
+            mongosDB.runCommand({killCursors: mongosColl.getName(), cursors: [existingCursorId]}),
+        );
     }
 
     const csCmdRes = assert.commandWorked(
@@ -122,14 +134,27 @@ for (let shardDB of [shard0DB, shard1DB]) {
     // shards have already been profiled. We use an assert.soon() here to wait for the maxTimeMS
     // on the shards to expire, at which point the getMores will appear in the profile
     // collection.
-    assert.soon(() => profilerHasAtLeastOneMatchingGetMore(shardDB, mongosColl.getFullName(), testComment, oneSec));
+    assert.soon(() =>
+        profilerHasAtLeastOneMatchingGetMore(
+            shardDB,
+            mongosColl.getFullName(),
+            testComment,
+            oneSec,
+        ),
+    );
 }
 
 // Verify that with no activity on the shards, a $changeStream with maxTimeMS waits for the full
 // duration on mongoS. Allow some leniency since the server-side wait may wake spuriously.
 csCursorId = reopenChangeStream(csCursorId);
 let startTime = new Date().getTime();
-assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: mongosColl.getName(), maxTimeMS: fiveSecs}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        getMore: csCursorId,
+        collection: mongosColl.getName(),
+        maxTimeMS: fiveSecs,
+    }),
+);
 assert.gte(new Date().getTime() - startTime, fiveSecs - halfSec);
 
 // Confirm that each getMore dispatched to the shards during this period had a maxTimeMS of 1s.
@@ -139,7 +164,13 @@ for (let shardDB of [shard0DB, shard1DB]) {
 
 // Issue a getMore with a sub-second maxTimeMS. This should propagate to the shards as-is.
 csCursorId = reopenChangeStream(csCursorId);
-assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: mongosColl.getName(), maxTimeMS: halfSec}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        getMore: csCursorId,
+        collection: mongosColl.getName(),
+        maxTimeMS: halfSec,
+    }),
+);
 
 for (let shardDB of [shard0DB, shard1DB]) {
     // The mongos is guaranteed to have already delivered getMores to each of the shards.
@@ -148,7 +179,14 @@ for (let shardDB of [shard0DB, shard1DB]) {
     // shards have already been profiled. We use an assert.soon() here to wait for the maxTimeMS
     // on the shards to expire, at which point the getMores will appear in the profile
     // collection.
-    assert.soon(() => profilerHasAtLeastOneMatchingGetMore(shardDB, mongosColl.getFullName(), testComment, halfSec));
+    assert.soon(() =>
+        profilerHasAtLeastOneMatchingGetMore(
+            shardDB,
+            mongosColl.getFullName(),
+            testComment,
+            halfSec,
+        ),
+    );
 }
 
 // Write a document to shard0, and confirm that - despite the fact that shard1 is still idle - a
@@ -157,7 +195,11 @@ csCursorId = reopenChangeStream(csCursorId);
 assert.commandWorked(mongosColl.insert({_id: -1}));
 startTime = new Date().getTime();
 const csResult = assert.commandWorked(
-    mongosDB.runCommand({getMore: csCursorId, collection: mongosColl.getName(), maxTimeMS: thirtyMins}),
+    mongosDB.runCommand({
+        getMore: csCursorId,
+        collection: mongosColl.getName(),
+        maxTimeMS: thirtyMins,
+    }),
 );
 assert.lte(new Date().getTime() - startTime, fiveMins);
 assert.docEq({_id: -1}, csResult.cursor.nextBatch[0].fullDocument);
@@ -170,12 +212,21 @@ assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: mongo
 assert.soon(function () {
     // Run a getMore with a 250ms maxTimeMS against mongos.
     assert.commandWorked(
-        mongosDB.runCommand({getMore: csCursorId, collection: mongosColl.getName(), maxTimeMS: quarterSec}),
+        mongosDB.runCommand({
+            getMore: csCursorId,
+            collection: mongosColl.getName(),
+            maxTimeMS: quarterSec,
+        }),
     );
     // Check whether all shards now have a getMore with 250ms maxTimeMS recorded in their
     // profile collections.
     return [shard0DB, shard1DB].every(function (shardDB) {
-        return profilerHasAtLeastOneMatchingGetMore(shardDB, mongosColl.getFullName(), testComment, quarterSec);
+        return profilerHasAtLeastOneMatchingGetMore(
+            shardDB,
+            mongosColl.getFullName(),
+            testComment,
+            quarterSec,
+        );
     });
 });
 

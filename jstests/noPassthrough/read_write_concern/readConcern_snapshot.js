@@ -24,7 +24,10 @@ let sessionDb = session.getDatabase(dbName);
 if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     // Transactions with readConcern snapshot fail.
     session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        sessionDb.runCommand({find: collName}),
+        ErrorCodes.IllegalOperation,
+    );
     assert.commandFailedWithCode(session.abortTransaction_forTesting(), [
         ErrorCodes.NoSuchTransaction,
         ErrorCodes.IllegalOperation,
@@ -32,7 +35,10 @@ if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern) {
 
     // Transactions without readConcern snapshot fail.
     session.startTransaction();
-    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        sessionDb.runCommand({find: collName}),
+        ErrorCodes.IllegalOperation,
+    );
     assert.commandFailedWithCode(session.abortTransaction_forTesting(), [
         ErrorCodes.NoSuchTransaction,
         ErrorCodes.IllegalOperation,
@@ -86,7 +92,9 @@ assert.commandWorked(
 assert.commandWorked(session.commitTransaction_forTesting());
 
 // readConcern 'snapshot' is not allowed with 'afterOpTime'.
-session.startTransaction({readConcern: {level: "snapshot", afterOpTime: {ts: Timestamp(1, 2), t: 1}}});
+session.startTransaction({
+    readConcern: {level: "snapshot", afterOpTime: {ts: Timestamp(1, 2), t: 1}},
+});
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 session.endSession();
@@ -95,7 +103,9 @@ pingRes = assert.commandWorked(rst.getSecondary().adminCommand({ping: 1}));
 assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
 assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
 
-session.startTransaction({readConcern: {level: "snapshot", afterClusterTime: pingRes.$clusterTime.clusterTime}});
+session.startTransaction({
+    readConcern: {level: "snapshot", afterClusterTime: pingRes.$clusterTime.clusterTime},
+});
 assert.commandWorked(sessionDb.runCommand({find: collName}));
 assert.commandWorked(session.commitTransaction_forTesting());
 
@@ -146,7 +156,9 @@ const snapshotReadConcern = {
     level: "snapshot",
 };
 // readConcern 'snapshot' is supported by find outside of transactions.
-res = assert.commandWorked(testDB.runCommand({find: collName, batchSize: 0, readConcern: snapshotReadConcern}));
+res = assert.commandWorked(
+    testDB.runCommand({find: collName, batchSize: 0, readConcern: snapshotReadConcern}),
+);
 assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by getMore outside of a transaction.
@@ -155,12 +167,19 @@ assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by aggregate outside of transactions.
 res = assert.commandWorked(
-    testDB.runCommand({aggregate: collName, pipeline: [], cursor: {}, readConcern: snapshotReadConcern}),
+    testDB.runCommand({
+        aggregate: collName,
+        pipeline: [],
+        cursor: {},
+        readConcern: snapshotReadConcern,
+    }),
 );
 assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by distinct outside of transactions.
-res = assert.commandWorked(testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
+res = assert.commandWorked(
+    testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}),
+);
 assert(res.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is not supported by count.

@@ -80,7 +80,11 @@ function makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, 
 // 'getMoreErrCodes' are the error codes with which we expect the getMore to fail (e.g. a
 // killCursors command should cause getMore to fail with "CursorKilled", but killOp should cause
 // a getMore to fail with "Interrupted").
-function testShardedKillPinned({killFunc: killFunc, getMoreErrCodes: getMoreErrCodes, useSession: useSession}) {
+function testShardedKillPinned({
+    killFunc: killFunc,
+    getMoreErrCodes: getMoreErrCodes,
+    useSession: useSession,
+}) {
     let getMoreJoiner = null;
     let cursorId;
     let sessionId;
@@ -90,10 +94,18 @@ function testShardedKillPinned({killFunc: killFunc, getMoreErrCodes: getMoreErrC
         // mongods. Setting the failpoint on the mongos will only cause it to spin, and not
         // actually send any requests out.
         assert.commandWorked(
-            shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}),
+            shard0DB.adminCommand({
+                configureFailPoint: kFailPointName,
+                mode: "alwaysOn",
+                data: kFailpointOptions,
+            }),
         );
         assert.commandWorked(
-            shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}),
+            shard1DB.adminCommand({
+                configureFailPoint: kFailPointName,
+                mode: "alwaysOn",
+                data: kFailpointOptions,
+            }),
         );
 
         // Run a find against mongos. This should open cursors on both of the shards.
@@ -110,7 +122,12 @@ function testShardedKillPinned({killFunc: killFunc, getMoreErrCodes: getMoreErrC
         cursorId = cmdRes.cursor.id;
         assert.neq(cursorId, NumberLong(0));
 
-        const parallelShellFn = makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, sessionId);
+        const parallelShellFn = makeParallelShellFunctionString(
+            cursorId,
+            getMoreErrCodes,
+            useSession,
+            sessionId,
+        );
         getMoreJoiner = startParallelShell(parallelShellFn, st.s.port);
 
         // Wait until we know the mongod cursors are pinned.
@@ -164,8 +181,12 @@ function testShardedKillPinned({killFunc: killFunc, getMoreErrCodes: getMoreErrC
             logActiveOpsAndIdleCursors(shard1DB),
         );
     } finally {
-        assert.commandWorked(shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
-        assert.commandWorked(shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
+        assert.commandWorked(
+            shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}),
+        );
+        assert.commandWorked(
+            shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}),
+        );
         if (getMoreJoiner) {
             getMoreJoiner();
         }
@@ -179,7 +200,10 @@ for (let useSession of [true, false]) {
         killFunc: function (mongosCursorId) {
             // Run killCursors against the mongos cursor. Verify that the cursor is reported as
             // killed successfully, and does not hang or return a "CursorInUse" error.
-            let cmdRes = mongosDB.runCommand({killCursors: coll.getName(), cursors: [mongosCursorId]});
+            let cmdRes = mongosDB.runCommand({
+                killCursors: coll.getName(),
+                cursors: [mongosCursorId],
+            });
             assert.commandWorked(cmdRes);
             assert.eq(cmdRes.cursorsKilled, [mongosCursorId]);
             assert.eq(cmdRes.cursorsAlive, []);
@@ -238,7 +262,10 @@ for (let useSession of [true, false]) {
             assert.eq(1, currentGetMoresArray.length, currentGetMoresArray);
             let currentGetMore = currentGetMoresArray[0];
             let shardCursorId = currentGetMore.command.getMore;
-            let cmdRes = shard0DB.runCommand({killCursors: coll.getName(), cursors: [shardCursorId]});
+            let cmdRes = shard0DB.runCommand({
+                killCursors: coll.getName(),
+                cursors: [shardCursorId],
+            });
             assert.commandWorked(cmdRes);
             assert.eq(cmdRes.cursorsKilled, [shardCursorId]);
             assert.eq(cmdRes.cursorsAlive, []);

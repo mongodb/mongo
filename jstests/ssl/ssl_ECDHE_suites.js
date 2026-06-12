@@ -52,7 +52,9 @@ assert.gte(res.indexOf(resIndicator), 0, "Expected enumeration results in output
 let cipherDict = JSON.parse(res.substring(res.indexOf(resIndicator) + resIndicator.length));
 
 // Checking that SSLv2, SSLv3 and TLS 1.0 are not accepted
-suites.slice(0, suites.indexOf("tls1")).forEach((tlsVersion) => assert(cipherDict[tlsVersion].length === 0));
+suites
+    .slice(0, suites.indexOf("tls1"))
+    .forEach((tlsVersion) => assert(cipherDict[tlsVersion].length === 0));
 
 let hasECDHE = false;
 let hasDHE = false;

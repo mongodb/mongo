@@ -34,7 +34,10 @@ function bumpClusterTime() {
                 "hello": 1,
                 "$clusterTime": {
                     "clusterTime": higherClusterTime,
-                    "signature": {"hash": BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), "keyId": NumberLong(0)},
+                    "signature": {
+                        "hash": BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+                        "keyId": NumberLong(0),
+                    },
                 },
             }),
         );
@@ -53,7 +56,11 @@ assert.soon(() => syncColl.find().itcount() === 2);
 
 function doMajorityRead(coll, expectedCount) {
     const res = assert.commandWorked(
-        coll.runCommand("find", {"filter": {x: 7}, "readConcern": {"level": "majority"}, "maxTimeMS": rst.timeoutMS}),
+        coll.runCommand("find", {
+            "filter": {x: 7},
+            "readConcern": {"level": "majority"},
+            "maxTimeMS": rst.timeoutMS,
+        }),
     );
     // Exhaust the cursor to avoid leaking cursors on the server.
     assert.eq(expectedCount, new DBCommandCursor(coll.getDB(), res).itcount());
@@ -64,9 +71,10 @@ const collName = "foo";
 
 try {
     assert.commandWorked(
-        primary
-            .getDB(dbName)
-            .adminCommand({"configureFailPoint": "hangBeforeMajorityReadTransactionStarted", "mode": "alwaysOn"}),
+        primary.getDB(dbName).adminCommand({
+            "configureFailPoint": "hangBeforeMajorityReadTransactionStarted",
+            "mode": "alwaysOn",
+        }),
     );
 
     for (let i = 0; i < 10; i++) {
@@ -79,7 +87,9 @@ try {
         doMajorityRead(coll, 0);
 
         assert.commandWorked(coll.insert({x: 7, y: 1}));
-        assert.commandWorked(coll.createIndex({x: 1}, {"name": "x_1", "expireAfterSeconds": 60 * 60 * 23}));
+        assert.commandWorked(
+            coll.createIndex({x: 1}, {"name": "x_1", "expireAfterSeconds": 60 * 60 * 23}),
+        );
 
         // Majority read should eventually see new documents because it will not block on the index
         // build.
@@ -90,7 +100,9 @@ try {
 
         assert.commandWorked(coll.insert({x: 7, y: 2}));
         assert.commandWorked(
-            coll.runCommand("collMod", {"index": {"keyPattern": {x: 1}, "expireAfterSeconds": 60 * 60 * 24}}),
+            coll.runCommand("collMod", {
+                "index": {"keyPattern": {x: 1}, "expireAfterSeconds": 60 * 60 * 24},
+            }),
         );
         // Majority read should eventually see new documents because it will not block on the index
         // build.
@@ -122,9 +134,10 @@ try {
     clusterTimeBumper();
 } finally {
     assert.commandWorked(
-        primary
-            .getDB(dbName)
-            .adminCommand({"configureFailPoint": "hangBeforeMajorityReadTransactionStarted", "mode": "off"}),
+        primary.getDB(dbName).adminCommand({
+            "configureFailPoint": "hangBeforeMajorityReadTransactionStarted",
+            "mode": "off",
+        }),
     );
 }
 

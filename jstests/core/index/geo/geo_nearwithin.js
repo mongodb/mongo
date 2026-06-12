@@ -18,7 +18,8 @@ for (let x = -points; x < points; x += 1) {
 }
 assert.commandWorked(t.insert(docs));
 
-const runQuery = (center) => t.find({$and: [{geo: {$near: [0, 0]}}, {geo: {$within: {$center: center}}}]}).toArray();
+const runQuery = (center) =>
+    t.find({$and: [{geo: {$near: [0, 0]}}, {geo: {$within: {$center: center}}}]}).toArray();
 
 let resNear = runQuery([[0, 0], 1]);
 assert.eq(resNear.length, 5, tojson(resNear));

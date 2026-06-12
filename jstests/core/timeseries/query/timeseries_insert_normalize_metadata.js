@@ -17,7 +17,9 @@ TimeseriesTest.run((insert) => {
     function runTest(measurementsToInsert, queryFilter, expectedUnsuccessfulQueryFilter) {
         coll.drop();
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         for (let i = 0; i < measurementsToInsert.length; i++) {

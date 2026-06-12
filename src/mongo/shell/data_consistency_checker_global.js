@@ -10,4 +10,5 @@ import {
 globalThis.CollInfos = CollInfos;
 globalThis.DataConsistencyChecker = DataConsistencyChecker;
 globalThis.filterGetAllCollectionsExcludingViews = filterGetAllCollectionsExcludingViews;
-globalThis.filterGetAllCollectionsExcludingViewsAndTimeseries = filterGetAllCollectionsExcludingViewsAndTimeseries;
+globalThis.filterGetAllCollectionsExcludingViewsAndTimeseries =
+    filterGetAllCollectionsExcludingViewsAndTimeseries;

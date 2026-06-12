@@ -87,7 +87,12 @@ function testReadCmd(rst, cmdOpts, testCase) {
     }
 
     if (testCase.expectSampling) {
-        QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+        QuerySamplingUtil.assertSoonSampledQueryDocuments(
+            primary,
+            ns,
+            collectionUuid,
+            expectedSampledQueryDocs,
+        );
     } else {
         // To verify that no writes occurred, wait for one interval before asserting.
         sleep(queryAnalysisWriterIntervalSecs * 1000);

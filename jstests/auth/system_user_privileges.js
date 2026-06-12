@@ -18,7 +18,11 @@ function runCountCommand(conn, dbName, collectionName) {
 
 // Asserts that on the given "conn", "dbName"."collectionName".count() fails as unauthorized.
 function assertCountUnauthorized(conn, dbName, collectionName) {
-    assert.eq(runCountCommand(conn, dbName, collectionName).code, 13, "On " + dbName + "." + collectionName);
+    assert.eq(
+        runCountCommand(conn, dbName, collectionName).code,
+        13,
+        "On " + dbName + "." + collectionName,
+    );
 }
 
 let conn = MongoRunner.runMongod({auth: ""});

@@ -38,7 +38,10 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
 // ------------------------------------------------------------
 {
     const result = localColl
-        .aggregate([{$unionWith: {db: foreignDB.getName(), coll: foreignColl.getName()}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$unionWith: {db: foreignDB.getName(), coll: foreignColl.getName()}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     assert.eq(result, localDocs.concat(foreignDocs));
 }
@@ -118,7 +121,10 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
 // ------------------------------------------------------------
 {
     const result = localColl
-        .aggregate([{$unionWith: {db: foreignDB.getName(), coll: "nonexistent_collection"}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$unionWith: {db: foreignDB.getName(), coll: "nonexistent_collection"}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     assert.eq(result, localDocs);
 }
@@ -133,7 +139,10 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
     assert.commandWorked(localDB.createCollection(emptyColl.getName()));
 
     const result = emptyColl
-        .aggregate([{$unionWith: {db: foreignDB.getName(), coll: foreignColl.getName()}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$unionWith: {db: foreignDB.getName(), coll: foreignColl.getName()}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     assert.eq(result, foreignDocs);
 }
@@ -149,7 +158,9 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
     assert.commandWorked(localDB.createCollection(emptyColl.getName()));
     const nonExistentDB = "unionWith_cross_db_nonexistent_db2_" + ObjectId().str;
 
-    const result = emptyColl.aggregate([{$unionWith: {db: nonExistentDB, coll: "any_collection"}}]).toArray();
+    const result = emptyColl
+        .aggregate([{$unionWith: {db: nonExistentDB, coll: "any_collection"}}])
+        .toArray();
     assert.eq(result, []);
 }
 
@@ -158,11 +169,16 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
 // ------------------------------------------------------------
 {
     assert.commandWorked(
-        foreignDB.createView("foreign_view", foreignColl.getName(), [{$match: {x: {$in: ["d", "f"]}}}]),
+        foreignDB.createView("foreign_view", foreignColl.getName(), [
+            {$match: {x: {$in: ["d", "f"]}}},
+        ]),
     );
 
     const result = localColl
-        .aggregate([{$unionWith: {db: foreignDB.getName(), coll: "foreign_view"}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$unionWith: {db: foreignDB.getName(), coll: "foreign_view"}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     const expected = localDocs.concat([
         {_id: 4, x: "d"},
@@ -203,7 +219,10 @@ assert.commandWorked(foreignColl.insert(foreignDocs));
     assert.commandWorked(sameDBColl.insert(sameDBDocs));
 
     const result = localColl
-        .aggregate([{$unionWith: {db: localDB.getName(), coll: sameDBColl.getName()}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$unionWith: {db: localDB.getName(), coll: sameDBColl.getName()}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     assert.eq(result, localDocs.concat(sameDBDocs));
 }

@@ -26,9 +26,11 @@ replSet.initiate({
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    replSet
-        .getPrimary()
-        .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    replSet.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replSet.awaitReplication();
 
@@ -44,10 +46,15 @@ jsTestLog("Initiating stepdown");
 assert.commandWorked(
     primary
         .getDB(name)
-        .foo.insert({myDoc: true, x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+        .foo.insert(
+            {myDoc: true, x: 1},
+            {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+        ),
 );
 let stepDownCmd = function () {
-    let res = db.getSiblingDB("admin").runCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});
+    let res = db
+        .getSiblingDB("admin")
+        .runCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});
     assert.commandFailedWithCode(res, 11601 /*interrupted*/);
 };
 let stepDowner = startParallelShell(stepDownCmd, primary.port);
@@ -69,12 +76,16 @@ assert.soon(function () {
 
 jsTestLog("Ensure that writes start failing with NotWritablePrimary errors");
 assert.soonNoExcept(function () {
-    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotWritablePrimary);
+    assert.commandFailedWithCode(
+        primary.getDB(name).foo.insert({x: 2}),
+        ErrorCodes.NotWritablePrimary,
+    );
     return true;
 });
 
 jsTestLog(
-    "Ensure that even though writes are failing with NotWritablePrimary, we still report " + "ourselves as PRIMARY",
+    "Ensure that even though writes are failing with NotWritablePrimary, we still report " +
+        "ourselves as PRIMARY",
 );
 assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand("replSetGetStatus").myState);
 

@@ -30,7 +30,9 @@ const mongosDB = st.s0.getDB(dbName);
 const tsColl = mongosDB.getCollection(jsTestName());
 assertDropCollection(mongosDB, tsColl.getName());
 assert.commandWorked(
-    mongosDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    mongosDB.createCollection(tsColl.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 const documents = [
     {_id: 0, [timeFieldName]: new Date("2021-09-30T07:46:38.746Z"), [metaFieldName]: 2, a: 5},
@@ -62,7 +64,10 @@ function testLimits(testDB, isMongos = true) {
         assert.sameMembers(results, documents);
     }
 
-    const stages = [{$addFields: {c: 5}}, {$project: {a: 1, [timeFieldName]: 1, [metaFieldName]: 1}}];
+    const stages = [
+        {$addFields: {c: 5}},
+        {$project: {a: 1, [timeFieldName]: 1, [metaFieldName]: 1}},
+    ];
     let pipeline = [];
 
     // Validate a pipeline of length 'pipelineLengthLimit - 1' succeeds. The pipeline will be at the
@@ -70,7 +75,9 @@ function testLimits(testDB, isMongos = true) {
     for (let i = 0; i < pipelineLengthLimit - 1; i++) {
         pipeline.push(stages[i % stages.length]);
     }
-    assert.commandWorked(testDB.runCommand({aggregate: tsColl.getName(), pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(
+        testDB.runCommand({aggregate: tsColl.getName(), pipeline: pipeline, cursor: {}}),
+    );
 
     // Add a $limit stage to the front of the pipeline. The pipeline should fail, since the pipeline
     // exceeds the length limit with the '$_internalUnpackBucket' stage.

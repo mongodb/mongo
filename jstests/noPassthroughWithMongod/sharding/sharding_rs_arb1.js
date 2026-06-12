@@ -27,7 +27,11 @@ let admin = st.getDB("admin");
 
 // Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 let res = admin.runCommand({addshard: replTest.getURL()});
 printjson(res);

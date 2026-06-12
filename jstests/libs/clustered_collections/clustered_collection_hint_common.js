@@ -12,9 +12,9 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
         // Create clustered collection.
         assertDropCollection(coll.getDB(), coll.getName());
         assert.commandWorked(
-            coll
-                .getDB()
-                .createCollection(coll.getName(), {clusteredIndex: {key: {[clusterKeyFieldName]: 1}, unique: true}}),
+            coll.getDB().createCollection(coll.getName(), {
+                clusteredIndex: {key: {[clusterKeyFieldName]: 1}, unique: true},
+            }),
         );
 
         // Create an index that the query planner would consider preferable to using the cluster key
@@ -315,7 +315,12 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 update: collName,
                 updates: [{q: {[clusterKeyFieldName]: 3}, u: {$inc: {a: -2}}, hint: clusterKey}],
             },
-            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 3, maxRecord: 3},
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "forward",
+                minRecord: 3,
+                maxRecord: 3,
+            },
         });
 
         // Update with reverse $natural hint.
@@ -323,9 +328,16 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedNReturned: 0,
             cmd: {
                 update: collName,
-                updates: [{q: {[clusterKeyFieldName]: 80}, u: {$inc: {a: 80}}, hint: {$natural: -1}}],
+                updates: [
+                    {q: {[clusterKeyFieldName]: 80}, u: {$inc: {a: 80}}, hint: {$natural: -1}},
+                ],
             },
-            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "backward", minRecord: 80, maxRecord: 80},
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "backward",
+                minRecord: 80,
+                maxRecord: 80,
+            },
         });
 
         // Update with hint on secondary index.
@@ -345,7 +357,12 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 delete: collName,
                 deletes: [{q: {[clusterKeyFieldName]: 2}, limit: 0, hint: clusterKey}],
             },
-            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 2, maxRecord: 2},
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "forward",
+                minRecord: 2,
+                maxRecord: 2,
+            },
         });
 
         // Delete reverse $natural hint.
@@ -355,7 +372,12 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 delete: collName,
                 deletes: [{q: {[clusterKeyFieldName]: 30}, limit: 0, hint: {$natural: -1}}],
             },
-            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "backward", minRecord: 30, maxRecord: 30},
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "backward",
+                minRecord: 30,
+                maxRecord: 30,
+            },
         });
 
         // Delete with hint on standard index.
@@ -397,7 +419,10 @@ export function validateClusteredCollectionHint(
     }
 
     for (const expectedWinningPlanStageStats of expectedWinningPlanStats) {
-        const stageOfInterest = getPlanStage(actualWinningPlan, expectedWinningPlanStageStats.stage);
+        const stageOfInterest = getPlanStage(
+            actualWinningPlan,
+            expectedWinningPlanStageStats.stage,
+        );
         assert.neq(null, stageOfInterest);
 
         for (const [key, value] of Object.entries(expectedWinningPlanStageStats)) {

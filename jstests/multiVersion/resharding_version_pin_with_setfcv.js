@@ -34,16 +34,22 @@ function testReshardingWithFCV(st, sourceNs, startingFCVStr, targetFCVStr, resha
 
     const mongos = st.s;
 
-    assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: startingFCVStr, confirm: true}));
+    assert.commandWorked(
+        mongos.adminCommand({setFeatureCompatibilityVersion: startingFCVStr, confirm: true}),
+    );
 
     const donorShardNames = [st.shard0.shardName, st.shard1.shardName];
     const recipientShardNames = donorShardNames;
 
     const [dbName, collName] = sourceNs.split(".");
-    assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: donorShardNames[0]}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: dbName, primaryShard: donorShardNames[0]}),
+    );
     assert.commandWorked(mongos.adminCommand({shardCollection: sourceNs, key: {x: 1}}));
     assert.commandWorked(mongos.adminCommand({split: sourceNs, middle: {x: 0}}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: sourceNs, find: {x: 0}, to: donorShardNames[1]}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: sourceNs, find: {x: 0}, to: donorShardNames[1]}),
+    );
     const sourceCollection = mongos.getDB(dbName).getCollection(collName);
     assert.commandWorked(
         sourceCollection.insertMany([
@@ -93,7 +99,9 @@ function testReshardingWithFCV(st, sourceNs, startingFCVStr, targetFCVStr, resha
 
     const awaitSetFCV = startParallelShell(
         funWithArgs(function (version) {
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}),
+            );
         }, targetFCVStr),
         mongos.port,
     );
@@ -107,7 +115,8 @@ function testReshardingWithFCV(st, sourceNs, startingFCVStr, targetFCVStr, resha
     fcvHangFp.wait();
 
     jsTest.log(
-        "Finished waiting for FCV failpoint to get hit, " + "now unblocking it to allow FCV to abort resharding",
+        "Finished waiting for FCV failpoint to get hit, " +
+            "now unblocking it to allow FCV to abort resharding",
     );
 
     fcvHangFp.off();
@@ -152,7 +161,10 @@ describe("resharding is pinned to version while FCV is in transitional state", f
         st.stop();
     });
 
-    let reshardingFpNamesToTest = [...mustTestReshardingPauseFPNames, ...selectRandom(otherReshardingPauseFPNames, 1)];
+    let reshardingFpNamesToTest = [
+        ...mustTestReshardingPauseFPNames,
+        ...selectRandom(otherReshardingPauseFPNames, 1),
+    ];
 
     reshardingFpNamesToTest.forEach((fpName) => {
         it(`completes resharding while FCV is downgrading, ${fpName}`, function () {

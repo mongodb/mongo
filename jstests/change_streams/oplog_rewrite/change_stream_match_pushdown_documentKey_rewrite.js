@@ -82,7 +82,9 @@ assert(coll.drop());
 // Enable a failpoint that will prevent $expr match expressions from generating $_internalExprEq
 // or similar expressions. This ensures that the following test-cases only exercise the $expr
 // rewrites.
-assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}),
+);
 FixtureHelpers.runCommandOnEachPrimary({
     db: db.getSiblingDB("admin"),
     cmdObj: {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"},
@@ -168,7 +170,9 @@ for (const op of ["insert", "update", "replace", "delete"]) {
     // Test out an $expr predicate on the full 'documentKey' field.
     verifyOnWholeCluster(
         {
-            $match: {$and: [{operationType: op}, {$expr: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}]},
+            $match: {
+                $and: [{operationType: op}, {$expr: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}],
+            },
         },
         {[collName]: {[op]: [2]}},
         [1, 0] /* expectedOplogRetDocsForEachShard */,
@@ -179,7 +183,10 @@ for (const op of ["insert", "update", "replace", "delete"]) {
     verifyOnWholeCluster(
         {
             $match: {
-                $and: [{operationType: op}, {$expr: {$not: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}}],
+                $and: [
+                    {operationType: op},
+                    {$expr: {$not: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}},
+                ],
             },
         },
         {[collName]: {[op]: [3, 2, 3]}},

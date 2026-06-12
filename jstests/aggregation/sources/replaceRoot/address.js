@@ -71,7 +71,10 @@ let correctAddresses = coll.aggregate(addressPipe).toArray();
 
 // Then compute the same results using $replaceRoot.
 let replaceWithResult = coll
-    .aggregate([{$replaceRoot: {newRoot: "$address"}}, {$sort: {city: 1, zip: 1, street: 1, number: 1}}])
+    .aggregate([
+        {$replaceRoot: {newRoot: "$address"}},
+        {$sort: {city: 1, zip: 1, street: 1, number: 1}},
+    ])
     .toArray();
 
 // Then assert they are the same.

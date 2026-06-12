@@ -10,7 +10,11 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -64,18 +68,25 @@ function assertWildcardDistinctScan({
         // Run the distinct and confirm that it produces the expected results.
         assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
 
-        const expectedKeyPattern = indexSpec.wildcardProjection ? {$_path: 1, other: 1} : {$_path: 1};
+        const expectedKeyPattern = indexSpec.wildcardProjection
+            ? {$_path: 1, other: 1}
+            : {$_path: 1};
         if (expectedPath) {
             expectedKeyPattern[expectedPath] = 1;
         }
 
-        const wildcardProjection = Object.assign(indexSpec.wildcardProjection || {}, pathProjection || {});
+        const wildcardProjection = Object.assign(
+            indexSpec.wildcardProjection || {},
+            pathProjection || {},
+        );
 
         // Build a wildcard index on the collection and re-run the test.
         assert.commandWorked(
             coll.createIndex(
                 indexSpec.keyPattern,
-                Object.keys(wildcardProjection).length === 0 ? {} : {wildcardProjection: wildcardProjection},
+                Object.keys(wildcardProjection).length === 0
+                    ? {}
+                    : {wildcardProjection: wildcardProjection},
             ),
         );
 
@@ -105,7 +116,10 @@ function assertWildcardDistinctScan({
             assert.eq(planHasStage(coll.getDB(), winningPlan, "FETCH"), fetchIsExpected);
         }
         assert(planHasStage(coll.getDB(), winningPlan, expectedScanType));
-        assert.docEq(expectedKeyPattern, getPlanStages(winningPlan, expectedScanType).shift().keyPattern);
+        assert.docEq(
+            expectedKeyPattern,
+            getPlanStages(winningPlan, expectedScanType).shift().keyPattern,
+        );
     }
 }
 

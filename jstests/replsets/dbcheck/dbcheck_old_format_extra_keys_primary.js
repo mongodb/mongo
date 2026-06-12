@@ -7,7 +7,10 @@
  * ]
  */
 
-import {DbCheckOldFormatKeysTest, defaultNumDocs} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
+import {
+    DbCheckOldFormatKeysTest,
+    defaultNumDocs,
+} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
 import {
     assertCompleteCoverage,
     checkHealthLog,
@@ -70,9 +73,17 @@ assertCompleteCoverage(
 forEachNonArbiterSecondary(rst, function (node) {
     // The first batch should return IndexKeyOrderViolation error because the keys in this unique
     // index are the same (set to {a: null}).
-    checkHealthLog(node.getDB("local").system.healthlog, logQueries.inconsistentBatchQuery, numBatches - 1);
+    checkHealthLog(
+        node.getDB("local").system.healthlog,
+        logQueries.inconsistentBatchQuery,
+        numBatches - 1,
+    );
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.indexKeyOrderViolationQuery, 1);
-    checkHealthLog(node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, numBatches);
+    checkHealthLog(
+        node.getDB("local").system.healthlog,
+        logQueries.allErrorsOrWarningsQuery,
+        numBatches,
+    );
 
     assertCompleteCoverage(
         node.getDB("local").system.healthlog,

@@ -70,7 +70,10 @@ function runConnectionsTest(mongod, metricsDir, metricsFileName) {
         () => {
             // This may be greater than the expected total because of the initial connection we
             // made and background processes that may be creating connections.
-            return getConnectionsMetricValue(metricsDir, metricsFileName, testCaseStartDate) >= expectedTotal;
+            return (
+                getConnectionsMetricValue(metricsDir, metricsFileName, testCaseStartDate) >=
+                expectedTotal
+            );
         },
         `mongod serverStatus.network.numRequests counter should have recorded at least ` +
             `${newConnections} new requests (initial: ${initialValue}, expected total: ${expectedTotal})`,
@@ -120,7 +123,11 @@ describe("OTel Prometheus file export using openTelemetryPrometheusMetricsDirect
     });
 
     it("should correctly track new connections to mongod", function () {
-        runConnectionsTest(this.mongod, this.metricsDir, /*metricsFileName=*/ "mongodb-prometheus-metrics.txt");
+        runConnectionsTest(
+            this.mongod,
+            this.metricsDir,
+            /*metricsFileName=*/ "mongodb-prometheus-metrics.txt",
+        );
     });
 });
 

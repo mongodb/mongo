@@ -13,12 +13,20 @@ assert.commandWorked(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
 assert.commandWorked(coll.createIndex({text: "text"}));
 
 assert.throwsWithCode(
-    () => coll.aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: {$meta: "searchScore"}}}]),
+    () =>
+        coll.aggregate([
+            {$match: {$text: {$search: "apple banana"}}},
+            {$sort: {textScore: {$meta: "searchScore"}}},
+        ]),
     kUnavailableMetadataErrCode,
 );
 
 assert.throwsWithCode(
-    () => coll.aggregate([{$match: {$text: {$search: "apple banana"}}}, {$set: {textScore: {$meta: "searchScore"}}}]),
+    () =>
+        coll.aggregate([
+            {$match: {$text: {$search: "apple banana"}}},
+            {$set: {textScore: {$meta: "searchScore"}}},
+        ]),
     kUnavailableMetadataErrCode,
 );
 
@@ -50,7 +58,10 @@ assert.throwsWithCode(
 );
 
 assert.throws(() =>
-    coll.aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: {$meta: "unknown"}}}]),
+    coll.aggregate([
+        {$match: {$text: {$search: "apple banana"}}},
+        {$sort: {textScore: {$meta: "unknown"}}},
+    ]),
 );
 
 const results = [
@@ -62,11 +73,19 @@ const results = [
 assert.eq(
     results,
     coll
-        .aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: {$meta: "textScore"}}}])
+        .aggregate([
+            {$match: {$text: {$search: "apple banana"}}},
+            {$sort: {textScore: {$meta: "textScore"}}},
+        ])
         .toArray(),
 );
 
 assert.sameMembers(
     results,
-    coll.aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: {$meta: "randVal"}}}]).toArray(),
+    coll
+        .aggregate([
+            {$match: {$text: {$search: "apple banana"}}},
+            {$sort: {textScore: {$meta: "randVal"}}},
+        ])
+        .toArray(),
 );

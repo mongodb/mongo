@@ -64,7 +64,13 @@ for (var i = 0; i < goodValues.length; i++) {
     try {
         NumberLong(goodValues[i]);
     } catch (e) {
-        doassert("Error: NumberLong(" + goodValues[i] + ") should have worked, but got '" + e.message + "'.");
+        doassert(
+            "Error: NumberLong(" +
+                goodValues[i] +
+                ") should have worked, but got '" +
+                e.message +
+                "'.",
+        );
     }
 }
 for (var i = 0; i < badValues.length; i++) {

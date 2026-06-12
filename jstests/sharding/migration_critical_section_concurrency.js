@@ -13,7 +13,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({mongos: 1, shards: 2});
-assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}),
+);
 
 let testDB = st.s0.getDB("TestDB");
 
@@ -33,12 +35,21 @@ assert.commandWorked(coll1.insert({Key: 1, Value: "1"}));
 
 // Ensure that coll0 has chunks on both shards so we can test queries against both donor and
 // recipient for Coll1's migration below
-assert.commandWorked(st.s0.adminCommand({moveChunk: "TestDB.Coll0", find: {Key: 1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: "TestDB.Coll0", find: {Key: 1}, to: st.shard1.shardName}),
+);
 
 // Pause the move chunk operation just before it leaves the critical section
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
-let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {Key: 1}, null, "TestDB.Coll1", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s0.host,
+    {Key: 1},
+    null,
+    "TestDB.Coll1",
+    st.shard1.shardName,
+);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 

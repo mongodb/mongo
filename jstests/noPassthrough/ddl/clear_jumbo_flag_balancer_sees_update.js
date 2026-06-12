@@ -39,24 +39,35 @@ const csrsPrimary = st.configRS.getPrimary();
 // zone violation.
 // --------------------------------------------------------------------------
 
-assert.commandWorked(adminDB.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    adminDB.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(adminDB.runCommand({addShardToZone: st.shard1.shardName, zone: "Z"}));
 assert.commandWorked(adminDB.runCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(adminDB.runCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(adminDB.runCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: MaxKey}, zone: "Z"}));
+assert.commandWorked(
+    adminDB.runCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: MaxKey}, zone: "Z"}),
+);
 
 // Move [0, MaxKey) to shard0 if it was placed elsewhere during sharding.
 const chunkBeforeSetup = findChunksUtil.findOneChunkByNs(configDB, ns, {min: {x: 0}});
 assert(chunkBeforeSetup, "expected chunk with min {x:0}");
 if (chunkBeforeSetup.shard !== st.shard0.shardName) {
     assert.commandWorked(
-        adminDB.runCommand({moveRange: ns, min: {x: 0}, max: {x: MaxKey}, toShard: st.shard0.shardName}),
+        adminDB.runCommand({
+            moveRange: ns,
+            min: {x: 0},
+            max: {x: MaxKey},
+            toShard: st.shard0.shardName,
+        }),
     );
 }
 
 // Stamp the chunk as jumbo directly on config.chunks — the balancer will see it as unmovable
 // until clearJumboFlag clears it.
-assert.commandWorked(configDB.chunks.updateOne({uuid: chunkBeforeSetup.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
+assert.commandWorked(
+    configDB.chunks.updateOne({uuid: chunkBeforeSetup.uuid, min: {x: 0}}, {$set: {jumbo: true}}),
+);
 const jumboChunkBefore = findChunksUtil.findOneChunkByNs(configDB, ns, {min: {x: 0}});
 assert(jumboChunkBefore.jumbo, "jumbo flag not set on config.chunks");
 
@@ -73,7 +84,11 @@ st.startBalancer();
 st.awaitBalancerRound();
 
 const chunkAfterRound1 = findChunksUtil.findOneChunkByNs(configDB, ns, {min: {x: 0}});
-assert.eq(st.shard0.shardName, chunkAfterRound1.shard, "jumbo chunk should not have moved during round 1");
+assert.eq(
+    st.shard0.shardName,
+    chunkAfterRound1.shard,
+    "jumbo chunk should not have moved during round 1",
+);
 
 // Confirm the balancer logged the jumbo-skip warning.
 checkLog.containsJson(csrsPrimary, 21891, {namespace: ns});
@@ -108,6 +123,8 @@ assert.soon(() => {
 }, "balancer did not migrate the chunk to shard1 after clearJumboFlag; " + "the in-memory routing-cache update may not be working");
 st.stopBalancer();
 
-jsTestLog("Round 2 complete: balancer migrated the chunk to shard1 immediately after clearJumboFlag.");
+jsTestLog(
+    "Round 2 complete: balancer migrated the chunk to shard1 immediately after clearJumboFlag.",
+);
 
 st.stop();

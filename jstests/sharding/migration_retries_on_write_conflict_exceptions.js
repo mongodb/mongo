@@ -13,7 +13,9 @@ const ns = dbName + "." + collName;
 let st = new ShardingTest({shards: 2});
 
 // Create a sharded collection with two chunks: [-inf, 50), [50, inf)
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 
@@ -30,7 +32,12 @@ const awaitResult = startParallelShell(
     funWithArgs(
         function (ns, toShardName) {
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 50}, to: toShardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 50},
+                    to: toShardName,
+                    _waitForDelete: true,
+                }),
             );
         },
         ns,
@@ -58,7 +65,10 @@ for (let i = 75; i < 100; ++i) {
 
 // Trigger WriteConflictExceptions during writes.
 assert.commandWorked(
-    st.shard1.adminCommand({configureFailPoint: "WTWriteConflictException", mode: {activationProbability: 0.1}}),
+    st.shard1.adminCommand({
+        configureFailPoint: "WTWriteConflictException",
+        mode: {activationProbability: 0.1},
+    }),
 );
 preTransferModsFailpoint.off();
 

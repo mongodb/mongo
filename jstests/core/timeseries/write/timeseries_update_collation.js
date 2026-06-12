@@ -56,7 +56,13 @@ const docs = [
 /**
  * Confirms that updates return the expected set of documents and run the correct bucket query.
  */
-function runTest({updateFilter, queryCollation, collectionCollation, nModified, expectedBucketQuery}) {
+function runTest({
+    updateFilter,
+    queryCollation,
+    collectionCollation,
+    nModified,
+    expectedBucketQuery,
+}) {
     jsTestLog(
         `Running ${tojson(updateFilter)} with queryCollation: ${tojson(
             queryCollation,

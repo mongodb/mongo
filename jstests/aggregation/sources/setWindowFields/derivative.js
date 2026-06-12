@@ -33,7 +33,11 @@ let result = coll.runCommand({
         ],
     },
 });
-assert.commandFailedWithCode(result, ErrorCodes.FailedToParse, "$derivative requires explicit window bounds");
+assert.commandFailedWithCode(
+    result,
+    ErrorCodes.FailedToParse,
+    "$derivative requires explicit window bounds",
+);
 
 // $derivative never compares values from separate partitions.
 coll.drop();
@@ -204,7 +208,9 @@ function derivativeStage(unit) {
     return stage;
 }
 function explainUnit(unit) {
-    return coll.runCommand({explain: {aggregate: coll.getName(), cursor: {}, pipeline: [derivativeStage(unit)]}});
+    return coll.runCommand({
+        explain: {aggregate: coll.getName(), cursor: {}, pipeline: [derivativeStage(unit)]},
+    });
 }
 assert.commandFailedWithCode(explainUnit("year"), 5490710);
 assert.commandFailedWithCode(explainUnit("quarter"), 5490710);

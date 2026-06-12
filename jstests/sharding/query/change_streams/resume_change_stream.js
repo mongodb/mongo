@@ -4,7 +4,10 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-import {ChangeStreamTest, validateChangeStreamHistoryLostException} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    validateChangeStreamHistoryLostException,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
@@ -25,7 +28,8 @@ const mongosColl = mongosDB[jsTestName()];
 // Workaround required to make the test work in multiversion setup.
 const changeStreamHistoryLostExceptionMessageValidatorFactory = () => {
     const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
     const is90OrHigher = MongoRunner.compareBinVersions(lastLTSFCV, "9.0") >= 0;
     if (!isMultiversion || is90OrHigher) {
         // If all servers are guaranteed to run 9.0 or higher, use the actual exception message
@@ -45,17 +49,27 @@ function testResume(mongosColl, collToWatch) {
     mongosColl.drop();
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+    assert.commandWorked(
+        mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+    );
 
     // Shard the test collection on _id.
-    assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+    );
 
     // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
-    assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
+    assert.commandWorked(
+        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}),
+    );
 
     // Move the [0, MaxKey] chunk to st.shard1.shardName.
     assert.commandWorked(
-        mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}),
+        mongosDB.adminCommand({
+            moveChunk: mongosColl.getFullName(),
+            find: {_id: 1},
+            to: st.rs1.getURL(),
+        }),
     );
 
     // Write a document to each chunk.
@@ -125,7 +139,9 @@ function testResume(mongosColl, collToWatch) {
 
     while (!oplogIsRolledOver()) {
         let idVal = 100 + i++;
-        assert.commandWorked(mongosColl.insert({_id: idVal, long_str: largeStr}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            mongosColl.insert({_id: idVal, long_str: largeStr}, {writeConcern: {w: "majority"}}),
+        );
         sleep(100);
     }
 
@@ -166,14 +182,22 @@ function testResume(mongosColl, collToWatch) {
     assert(mongosColl.drop());
 
     // Shard the test collection on shardKey.
-    assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+    assert.commandWorked(
+        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}),
+    );
 
     // Split the collection into 2 chunks: [MinKey, 50), [50, MaxKey].
-    assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 50}}));
+    assert.commandWorked(
+        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 50}}),
+    );
 
     // Move the [50, MaxKey] chunk to st.shard1.shardName.
     assert.commandWorked(
-        mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {shardKey: 51}, to: st.rs1.getURL()}),
+        mongosDB.adminCommand({
+            moveChunk: mongosColl.getFullName(),
+            find: {shardKey: 51},
+            to: st.rs1.getURL(),
+        }),
     );
 
     const numberOfDocs = 100;
@@ -181,19 +205,34 @@ function testResume(mongosColl, collToWatch) {
     // Insert test documents.
     for (let counter = 0; counter < numberOfDocs / 5; ++counter) {
         assert.commandWorked(
-            mongosColl.insert({_id: "abcd" + counter, shardKey: counter * 5 + 0}, {writeConcern: {w: "majority"}}),
+            mongosColl.insert(
+                {_id: "abcd" + counter, shardKey: counter * 5 + 0},
+                {writeConcern: {w: "majority"}},
+            ),
         );
         assert.commandWorked(
-            mongosColl.insert({_id: "Abcd" + counter, shardKey: counter * 5 + 1}, {writeConcern: {w: "majority"}}),
+            mongosColl.insert(
+                {_id: "Abcd" + counter, shardKey: counter * 5 + 1},
+                {writeConcern: {w: "majority"}},
+            ),
         );
         assert.commandWorked(
-            mongosColl.insert({_id: "aBcd" + counter, shardKey: counter * 5 + 2}, {writeConcern: {w: "majority"}}),
+            mongosColl.insert(
+                {_id: "aBcd" + counter, shardKey: counter * 5 + 2},
+                {writeConcern: {w: "majority"}},
+            ),
         );
         assert.commandWorked(
-            mongosColl.insert({_id: "abCd" + counter, shardKey: counter * 5 + 3}, {writeConcern: {w: "majority"}}),
+            mongosColl.insert(
+                {_id: "abCd" + counter, shardKey: counter * 5 + 3},
+                {writeConcern: {w: "majority"}},
+            ),
         );
         assert.commandWorked(
-            mongosColl.insert({_id: "abcD" + counter, shardKey: counter * 5 + 4}, {writeConcern: {w: "majority"}}),
+            mongosColl.insert(
+                {_id: "abcD" + counter, shardKey: counter * 5 + 4},
+                {writeConcern: {w: "majority"}},
+            ),
         );
     }
 

@@ -20,7 +20,9 @@ const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 
 // Disable maxTime enforcement on mongos so we can verify it's happening on mongod.
-assert.commandWorked(mongosDB.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
+assert.commandWorked(
+    mongosDB.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
+);
 
 jsTestLog("Creating collection with insert.");
 assert.commandWorked(sessionColl.insert({_id: 0}));

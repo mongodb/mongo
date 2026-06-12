@@ -13,7 +13,9 @@
  */
 
 const timeseriesCollName = jsTestName() + "_timeseries";
-assert.commandWorked(db.createCollection(timeseriesCollName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(timeseriesCollName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 const timeseriesColl = db[timeseriesCollName];
 assert.commandWorked(timeseriesColl.insert({t: new Date(), m: 1, a: 42, b: 17}));
 
@@ -25,7 +27,9 @@ assert.commandWorked(nonTimeseriesColl.insert({a: 50, b: 20}));
 let rankFusionPipeline = [{$rankFusion: {input: {pipelines: {sortPipeline: [{$sort: {a: 1}}]}}}}];
 let scoreFusionPipeline = [
     {
-        $scoreFusion: {input: {pipelines: {scorePipeline: [{$score: {score: "$a"}}]}, normalization: "none"}},
+        $scoreFusion: {
+            input: {pipelines: {scorePipeline: [{$score: {score: "$a"}}]}, normalization: "none"},
+        },
     },
 ];
 
@@ -53,7 +57,10 @@ function runPipeline(pipeline, collName) {
             $_internalIsHybridSearch: true,
         },
     };
-    assert.commandFailedWithCode(runPipeline([badUnionWithStageWithIsHybridSearchTrue], timeseriesCollName), 5491300);
+    assert.commandFailedWithCode(
+        runPipeline([badUnionWithStageWithIsHybridSearchTrue], timeseriesCollName),
+        5491300,
+    );
 
     let badUnionWithStageWithIsHybridSearchFalse = {
         $unionWith: {
@@ -63,7 +70,10 @@ function runPipeline(pipeline, collName) {
             $_internalIsHybridSearch: false,
         },
     };
-    assert.commandFailedWithCode(runPipeline([badUnionWithStageWithIsHybridSearchFalse], timeseriesCollName), 5491300);
+    assert.commandFailedWithCode(
+        runPipeline([badUnionWithStageWithIsHybridSearchFalse], timeseriesCollName),
+        5491300,
+    );
 });
 
 // TODO SERVER-108117 Enable these tests.
@@ -76,7 +86,10 @@ function runPipeline(pipeline, collName) {
         },
     };
 
-    assert.commandFailedWithCode(runPipeline([badLookupStageWithIsHybridSearchTrue], timeseriesCollName), 5491300);
+    assert.commandFailedWithCode(
+        runPipeline([badLookupStageWithIsHybridSearchTrue], timeseriesCollName),
+        5491300,
+    );
 
     let badLookupStageWithIsHybridSearchFalse = {
         $lookup: {
@@ -86,7 +99,10 @@ function runPipeline(pipeline, collName) {
             $_internalIsHybridSearch: false,
         },
     };
-    assert.commandFailedWithCode(runPipeline([badLookupStageWithIsHybridSearchFalse], timeseriesCollName), 5491300);
+    assert.commandFailedWithCode(
+        runPipeline([badLookupStageWithIsHybridSearchFalse], timeseriesCollName),
+        5491300,
+    );
 });
 
 // Note that hybrid search cannot run against a collectionless $unionWith because a collectionless
@@ -97,12 +113,18 @@ function runPipeline(pipeline, collName) {
     let rankFusionUnionWithStage = {
         $unionWith: {coll: timeseriesCollName, pipeline: rankFusionPipeline},
     };
-    assert.commandFailedWithCode(runPipeline([rankFusionUnionWithStage], timeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([rankFusionUnionWithStage], timeseriesCollName),
+        [10787900, 10787901],
+    );
 
     let scoreFusionUnionWithStage = {
         $unionWith: {coll: timeseriesCollName, pipeline: scoreFusionPipeline},
     };
-    assert.commandFailedWithCode(runPipeline([scoreFusionUnionWithStage], timeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([scoreFusionUnionWithStage], timeseriesCollName),
+        [10787900, 10787901],
+    );
 })();
 
 (function testHybridSearchOnUnionWithOnNonTimeseriesCollectionInsideTimeseriesQuery() {
@@ -125,12 +147,18 @@ function runPipeline(pipeline, collName) {
     let rankFusionUnionWithStage = {
         $unionWith: {coll: timeseriesCollName, pipeline: rankFusionPipeline},
     };
-    assert.commandFailedWithCode(runPipeline([rankFusionUnionWithStage], nonTimeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([rankFusionUnionWithStage], nonTimeseriesCollName),
+        [10787900, 10787901],
+    );
 
     let scoreFusionUnionWithStage = {
         $unionWith: {coll: timeseriesCollName, pipeline: scoreFusionPipeline},
     };
-    assert.commandFailedWithCode(runPipeline([scoreFusionUnionWithStage], nonTimeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([scoreFusionUnionWithStage], nonTimeseriesCollName),
+        [10787900, 10787901],
+    );
 })();
 
 (function testHybridSearchOnUnionWithOnTimeseriesCollectionInsideNonTimeseriesQueryNested() {
@@ -161,12 +189,18 @@ function runPipeline(pipeline, collName) {
     let rankFusionLookupStage = {
         $lookup: {from: timeseriesCollName, pipeline: rankFusionPipeline, as: "out"},
     };
-    assert.commandFailedWithCode(runPipeline([rankFusionLookupStage], timeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([rankFusionLookupStage], timeseriesCollName),
+        [10787900, 10787901],
+    );
 
     let scoreFusionLookupStage = {
         $lookup: {from: timeseriesCollName, pipeline: scoreFusionPipeline, as: "out"},
     };
-    assert.commandFailedWithCode(runPipeline([scoreFusionLookupStage], timeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([scoreFusionLookupStage], timeseriesCollName),
+        [10787900, 10787901],
+    );
 })();
 
 (function testHybridSearchOnLookupOnNonTimeseriesCollectionInsideTimeseriesQuery() {
@@ -187,12 +221,18 @@ function runPipeline(pipeline, collName) {
     let rankFusionLookupStage = {
         $lookup: {from: timeseriesCollName, pipeline: rankFusionPipeline, as: "out"},
     };
-    assert.commandFailedWithCode(runPipeline([rankFusionLookupStage], nonTimeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([rankFusionLookupStage], nonTimeseriesCollName),
+        [10787900, 10787901],
+    );
 
     let scoreFusionLookupStage = {
         $lookup: {from: timeseriesCollName, pipeline: scoreFusionPipeline, as: "out"},
     };
-    assert.commandFailedWithCode(runPipeline([scoreFusionLookupStage], nonTimeseriesCollName), [10787900, 10787901]);
+    assert.commandFailedWithCode(
+        runPipeline([scoreFusionLookupStage], nonTimeseriesCollName),
+        [10787900, 10787901],
+    );
 })();
 
 (function testHybridSearchOnLookupOnTimeseriesCollectionInsideNonTimeseriesQueryNested() {

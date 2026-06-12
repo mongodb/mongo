@@ -26,7 +26,11 @@ replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 let primary = replSet.getPrimary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let secondary = replSet.getSecondary();
@@ -45,7 +49,10 @@ let stepDowner = startParallelShell(stepDownCmd, primary.port);
 assert.soon(function () {
     let res = primary.getDB("admin").currentOp(true);
     for (let entry in res.inprog) {
-        if (res.inprog[entry]["command"] && res.inprog[entry]["command"]["replSetStepDown"] === 60) {
+        if (
+            res.inprog[entry]["command"] &&
+            res.inprog[entry]["command"]["replSetStepDown"] === 60
+        ) {
             return true;
         }
     }
@@ -55,12 +62,16 @@ assert.soon(function () {
 
 jsTestLog("Ensure that writes start failing with NotWritablePrimary errors");
 assert.soonNoExcept(function () {
-    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotWritablePrimary);
+    assert.commandFailedWithCode(
+        primary.getDB(name).foo.insert({x: 2}),
+        ErrorCodes.NotWritablePrimary,
+    );
     return true;
 });
 
 jsTestLog(
-    "Ensure that even though writes are failing with NotWritablePrimary, we still report " + "ourselves as PRIMARY",
+    "Ensure that even though writes are failing with NotWritablePrimary, we still report " +
+        "ourselves as PRIMARY",
 );
 assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand("replSetGetStatus").myState);
 

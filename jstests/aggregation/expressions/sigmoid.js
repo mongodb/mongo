@@ -12,8 +12,16 @@ testExpression(coll, {$sigmoid: 0}, 0.5);
 testExpression(coll, {$sigmoid: 5}, 0.9933071490757153);
 testExpression(coll, {$sigmoid: 10.11}, 0.999959330847226);
 testExpression(coll, {$sigmoid: -24}, 3.7751345441365816e-11);
-testExpression(coll, {$sigmoid: NumberDecimal("-3.14")}, NumberDecimal("0.04148711930169585060767831941324486"));
-testExpression(coll, {$sigmoid: NumberDecimal("3.14")}, NumberDecimal("0.9585128806983041493923216805867550"));
+testExpression(
+    coll,
+    {$sigmoid: NumberDecimal("-3.14")},
+    NumberDecimal("0.04148711930169585060767831941324486"),
+);
+testExpression(
+    coll,
+    {$sigmoid: NumberDecimal("3.14")},
+    NumberDecimal("0.9585128806983041493923216805867550"),
+);
 testExpression(coll, {$sigmoid: 100}, 1);
 testExpression(coll, {$sigmoid: NumberInt("-2147483648")}, 0);
 testExpression(coll, {$sigmoid: NumberInt("2147483647")}, 1);
@@ -58,7 +66,9 @@ const expectedNumericFieldPathResults = [
 ];
 
 coll.insertMany(testNumericFieldPathDocs);
-const numericFieldPathResults = coll.aggregate([{$project: {computed: {$sigmoid: "$foo"}}}]).toArray();
+const numericFieldPathResults = coll
+    .aggregate([{$project: {computed: {$sigmoid: "$foo"}}}])
+    .toArray();
 assert(anyEq(numericFieldPathResults, expectedNumericFieldPathResults));
 coll.drop();
 
@@ -113,4 +123,8 @@ assertErrorCode(
     {$project: {computed: {$sigmoid: {$concat: ["claudia", "will", "reilly", "ted"]}}}},
     ErrorCodes.TypeMismatch,
 );
-assertErrorCode(coll, {$project: {computed: {$sigmoid: {$toUpper: "taqi"}}}}, ErrorCodes.TypeMismatch);
+assertErrorCode(
+    coll,
+    {$project: {computed: {$sigmoid: {$toUpper: "taqi"}}}},
+    ErrorCodes.TypeMismatch,
+);

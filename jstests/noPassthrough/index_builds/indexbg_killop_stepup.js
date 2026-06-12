@@ -31,7 +31,10 @@ assert.commandWorked(coll.insert({a: 1}));
 
 let secondary = rst.getSecondary();
 IndexBuildTest.pauseIndexBuilds(secondary);
-let waitForCommitReadinessFP = configureFailPoint(primary, "hangIndexBuildAfterSignalPrimaryForCommitReadiness");
+let waitForCommitReadinessFP = configureFailPoint(
+    primary,
+    "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+);
 
 const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {}, [
     ErrorCodes.InterruptedDueToReplStateChange,
@@ -51,7 +54,9 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
 });
 
 // Step up the secondary and hang the process.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangIndexBuildOnStepUp", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "hangIndexBuildOnStepUp", mode: "alwaysOn"}),
+);
 // Wait for the index build to write the oplog entry indicating the primary is ready to commit.
 waitForCommitReadinessFP.wait();
 waitForCommitReadinessFP.off();
@@ -75,7 +80,9 @@ assert.commandWorked(
 assert.commandWorked(secondaryDB.killOp(opId));
 
 // Finish the step up.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangIndexBuildOnStepUp", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "hangIndexBuildOnStepUp", mode: "off"}),
+);
 rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
 awaitStepUp();
 

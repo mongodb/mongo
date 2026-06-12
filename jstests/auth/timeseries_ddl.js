@@ -37,7 +37,9 @@ st.admin.logout();
 function createCollectionsAsRegularUser() {
     assert(db.auth("rw", pass));
     assert.commandWorked(db.createCollection(normalCollName));
-    assert.commandWorked(db.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}));
+    assert.commandWorked(
+        db.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}),
+    );
     assert.commandFailedWithCode(db.createCollection(bucketCollName), ErrorCodes.Unauthorized);
     db.logout();
 }

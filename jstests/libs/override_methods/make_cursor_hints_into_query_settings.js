@@ -84,7 +84,8 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
             explainCmd,
         )} while transforming cursor hints into query settings`,
     );
-    const isIdHackQuery = explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+    const isIdHackQuery =
+        explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {
         // Query settings cannot be set over IDHACK or express queries.
         return originalResponse;
@@ -92,7 +93,9 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
 
     // If the collection used is a view, determine the underlying collection.
     const resolvedCollName = getCollectionName(db, innerCmd);
-    const collectionName = isSystemBucketColl ? resolvedCollName.substring(sysCollNamePrefix.length) : resolvedCollName;
+    const collectionName = isSystemBucketColl
+        ? resolvedCollName.substring(sysCollNamePrefix.length)
+        : resolvedCollName;
     if (!collectionName) {
         return originalResponse;
     }
@@ -117,7 +120,9 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     }
 
     const representativeQuery = qsutils.makeQueryInstance(
-        isSystemBucketColl ? {...innerCmdCopy, [getCommandName(innerCmdCopy)]: collectionName} : innerCmdCopy,
+        isSystemBucketColl
+            ? {...innerCmdCopy, [getCommandName(innerCmdCopy)]: collectionName}
+            : innerCmdCopy,
     );
     return qsutils.withQuerySettings(representativeQuery, settings, () =>
         clientFunction.apply(conn, makeFuncArgs(cmdObj)),

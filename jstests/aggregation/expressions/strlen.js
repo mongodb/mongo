@@ -22,7 +22,12 @@ assert.commandWorked(
 );
 
 // $strLenCP
-assertErrorCode(coll, [{$project: {strLen: {$strLenCP: 1}}}], 5155900, "$strLenCP requires a string argument.");
+assertErrorCode(
+    coll,
+    [{$project: {strLen: {$strLenCP: 1}}}],
+    5155900,
+    "$strLenCP requires a string argument.",
+);
 
 assertErrorCode(
     coll,
@@ -38,9 +43,16 @@ assertErrorCode(
     "$strLenCP requires a string argument.",
 );
 
-assertErrorCode(coll, [{$project: {strLen: {$strLenCP: "$b"}}}], 5155900, "$strLenCP requires a string argument.");
+assertErrorCode(
+    coll,
+    [{$project: {strLen: {$strLenCP: "$b"}}}],
+    5155900,
+    "$strLenCP requires a string argument.",
+);
 
-assert.commandFailed(coll.runCommand("aggregate", {pipeline: [{$project: {a: {$strLenCP: null}}}]}));
+assert.commandFailed(
+    coll.runCommand("aggregate", {pipeline: [{$project: {a: {$strLenCP: null}}}]}),
+);
 
 assertErrorCode(
     coll,
@@ -63,9 +75,16 @@ assertErrorCode(
     "$strLenBytes requires a string argument",
 );
 
-assertErrorCode(coll, [{$project: {strLen: {$strLenBytes: "$b"}}}], 5155800, "$strLenBytes requires a string argument");
+assertErrorCode(
+    coll,
+    [{$project: {strLen: {$strLenBytes: "$b"}}}],
+    5155800,
+    "$strLenBytes requires a string argument",
+);
 
-assert.commandFailed(coll.runCommand("aggregate", {pipeline: [{$project: {a: {$strLenBytes: null}}}]}));
+assert.commandFailed(
+    coll.runCommand("aggregate", {pipeline: [{$project: {a: {$strLenBytes: null}}}]}),
+);
 
 assertErrorCode(
     coll,

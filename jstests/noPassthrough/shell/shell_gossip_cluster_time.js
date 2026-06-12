@@ -42,12 +42,18 @@ function testCommandGossipedWithClusterTime(func, expectedClusterTime) {
     if (expectedClusterTime === undefined) {
         assert(
             !cmdObjSeen.hasOwnProperty("$clusterTime"),
-            "Expected operation " + tojson(cmdObjSeen) + " to not have a $clusterTime object: " + func.toString(),
+            "Expected operation " +
+                tojson(cmdObjSeen) +
+                " to not have a $clusterTime object: " +
+                func.toString(),
         );
     } else {
         assert(
             cmdObjSeen.hasOwnProperty("$clusterTime"),
-            "Expected operation " + tojson(cmdObjSeen) + " to have a $clusterTime object: " + func.toString(),
+            "Expected operation " +
+                tojson(cmdObjSeen) +
+                " to have a $clusterTime object: " +
+                func.toString(),
         );
 
         assert(bsonBinaryEqual(expectedClusterTime, cmdObjSeen.$clusterTime));
@@ -99,7 +105,8 @@ assert(
 primary.resetClusterTime_forTesting();
 assert(
     primary.getClusterTime() === undefined,
-    "client's cluster time should have been reset, but has clusterTime: " + tojson(primary.getClusterTime()),
+    "client's cluster time should have been reset, but has clusterTime: " +
+        tojson(primary.getClusterTime()),
 );
 
 // Performing an operation with session2 should use the highest clusterTime seen by session2
@@ -115,7 +122,8 @@ assert.eq(session2.getClusterTime(), primary.getClusterTime());
 primary.resetClusterTime_forTesting();
 assert(
     primary.getClusterTime() === undefined,
-    "client's cluster time should have been reset, but has clusterTime: " + tojson(primary.getClusterTime()),
+    "client's cluster time should have been reset, but has clusterTime: " +
+        tojson(primary.getClusterTime()),
 );
 
 // Performing an operation with session2 should use the highest clusterTime seen by session2

@@ -31,8 +31,14 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
 function assertClassicMultiPlannerMetrics(multiPlannerMetrics, expectedCount) {
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros), expectedCount);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans), expectedCount);
+    assert.eq(
+        sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros),
+        expectedCount,
+    );
+    assert.eq(
+        sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans),
+        expectedCount,
+    );
     assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), expectedCount);
     assert.eq(multiPlannerMetrics.classicCount, expectedCount);
     assert.eq(multiPlannerMetrics.choseWinningPlan, expectedCount);
@@ -56,7 +62,9 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 // Run with classic engine and verify metrics.
 {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+    );
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
@@ -65,7 +73,9 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 // Run with SBE and verify metrics.
 {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+    );
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
@@ -75,8 +85,8 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 assert.soon(
     () => {
         // Verify FTDC includes aggregate metrics.
-        const multiPlannerMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query
-            .multiPlanner;
+        const multiPlannerMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus
+            .metrics.query.multiPlanner;
 
         const expectedClassicCount = 2;
         if (multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
@@ -94,7 +104,9 @@ assert.soon(
     },
     () =>
         "FTDC output should eventually reflect observed serverStatus metrics. Current FTDC: " +
-        tojson(verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.multiPlanner),
+        tojson(
+            verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.multiPlanner,
+        ),
 );
 
 // Test 'stoppingConditions.hitWorksLimit'.
@@ -102,7 +114,9 @@ assert.soon(
     // Run the query with a low works limit.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 1}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10000}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10000}),
+    );
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
     assert.docEq(multiPlannerMetrics.stoppingCondition, {
@@ -120,9 +134,13 @@ assert.soon(
     assert.commandWorked(coll.insert({_id: 7, a: 1, b: 1, c: 1}));
 
     // Run the query with a low results limit.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 1}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 1}),
+    );
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 101}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 101}),
+    );
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
     assert.docEq(multiPlannerMetrics.stoppingCondition, {
@@ -137,7 +155,9 @@ assert.soon(
 // AND_SORTED intersection wrapped in a SORT) exceeds the memory limit during execution and a
 // non-blocking backup plan is available.
 {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+    );
 
     const backupColl = db.getCollection("backup_plan_test");
     backupColl.drop();
@@ -157,8 +177,12 @@ assert.soon(
 
     // Force index intersection so the AND_SORTED plan (which includes a blocking sort) wins
     // multi-planning. A non-blocking single-index plan becomes the backup.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}),
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}),
+    );
 
     // The sort memory limit must be large enough for the trial period to succeed (so the
     // blocking plan wins and a backup is set), but small enough that full execution OOMs.
@@ -167,7 +191,9 @@ assert.soon(
         db.adminCommand({getParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1}),
     ).internalQueryMaxBlockingSortMemoryUsageBytes;
     const sortLimit = (numDocs * docSize) / 2;
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: sortLimit}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: sortLimit}),
+    );
 
     backupColl.getPlanCache().clear();
 
@@ -189,15 +215,25 @@ assert.soon(
     assert.gt(
         metricsAfter,
         metricsBefore,
-        "Expected switchedToBackupPlan to increment; before=" + metricsBefore + " after=" + metricsAfter,
+        "Expected switchedToBackupPlan to increment; before=" +
+            metricsBefore +
+            " after=" +
+            metricsAfter,
     );
 
     // Restore parameters.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: origSortBytes}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxBlockingSortMemoryUsageBytes: origSortBytes,
+        }),
     );
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}),
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}),
+    );
 }
 
 MongoRunner.stopMongod(conn);

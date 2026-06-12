@@ -35,7 +35,10 @@ const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 // Skip the test if running in 'trySbeRestricted' mode with 'SearchInSbe' enabled. In this mode,
 // $search will be pushed down to SBE, but $limit will not.
-if (checkSbeRestricted(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")) {
+if (
+    checkSbeRestricted(testDB) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")
+) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     stWithMock.stop();
     quit();
@@ -50,7 +53,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchBatchSizeTunin
 const testColl = testDB.getCollection(collName);
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 
 assert.commandWorked(testColl.insert({_id: 1, x: "ow"}));
@@ -129,7 +134,13 @@ function mockShards(mongotQuery, shard0Docs, shard1Docs) {
 (function testBasicCase() {
     const mongotQuery = {query: "lorem"};
     const pipeline = [{$search: mongotQuery}, {$limit: 2}];
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
     mockShards(
         mongotQuery,
         [
@@ -153,7 +164,13 @@ function mockShards(mongotQuery, shard0Docs, shard1Docs) {
 (function testLimitStoredSource() {
     const mongotQuery = {query: "lorem", returnStoredSource: true};
     const pipeline = [{$search: mongotQuery}, {$limit: 2}];
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
     mockShards(
         mongotQuery,
         [

@@ -55,8 +55,12 @@ const moviesViewPipeline = [
     {
         $addFields: {
             display_title: {$concat: ["$title", " (", {$toString: "$year"}, ")"]},
-            decade: {$concat: [{$toString: {$subtract: [{$trunc: {$divide: ["$year", 10]}}, 0]}}, "0s"]},
-            runtime_minutes: {$cond: {if: {$eq: ["$title", "The Godfather"]}, then: 175, else: 142}},
+            decade: {
+                $concat: [{$toString: {$subtract: [{$trunc: {$divide: ["$year", 10]}}, 0]}}, "0s"],
+            },
+            runtime_minutes: {
+                $cond: {if: {$eq: ["$title", "The Godfather"]}, then: 175, else: 142},
+            },
         },
     },
 ];

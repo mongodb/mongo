@@ -1,7 +1,11 @@
 // Test query works with IXSCAN in descending scanning direction. These tests ensure shard ids can
 // be obtained correctly with descending intervals.
 
-import {getPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const shardingTest = new ShardingTest({shards: 1});
@@ -30,7 +34,11 @@ assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: 
     assert.eq(ixscans.length, 1);
     const ixscan = ixscans[0];
     assert.eq(ixscan.direction, "backward");
-    assert.eq(ixscan.indexBounds, {"a": ["[2.0, 1.0]"], "b": ["[20.0, 10.0]"], "c": ["[200.0, 100.0]"]});
+    assert.eq(ixscan.indexBounds, {
+        "a": ["[2.0, 1.0]"],
+        "b": ["[20.0, 10.0]"],
+        "c": ["[200.0, 100.0]"],
+    });
 
     // Asserts that the command should succeed.
     assert.doesNotThrow(() => coll.find(query).sort(sortSpec).toArray());

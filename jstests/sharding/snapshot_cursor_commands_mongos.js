@@ -86,13 +86,34 @@ let shardingScenarios = {
             assert.commandWorked(st.splitAt(ns, {_id: 4}));
             assert.commandWorked(st.splitAt(ns, {_id: 7}));
 
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}),
+            );
 
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard0.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard1.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard2.shardName,
+                }),
+            );
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -119,12 +140,31 @@ let shardingScenarios = {
             const ns = dbName + "." + shardedCollName;
 
             assert.commandWorked(st.splitAt(ns, {_id: 5}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}),
+            );
 
-            assert.eq(0, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
-            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
+            assert.eq(
+                0,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard0.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard1.shardName,
+                }),
+            );
+            assert.eq(
+                1,
+                findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {
+                    shard: st.shard2.shardName,
+                }),
+            );
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -136,7 +176,10 @@ let shardingScenarios = {
         setUp: function (st, collName) {
             assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
             assert.commandWorked(
-                st.s.adminCommand({shardCollection: st.s.getDB(dbName)[shardedCollName] + "", key: {_id: 1}}),
+                st.s.adminCommand({
+                    shardCollection: st.s.getDB(dbName)[shardedCollName] + "",
+                    key: {_id: 1},
+                }),
             );
 
             const mainDb = st.s.getDB(dbName);
@@ -260,4 +303,7 @@ runScenario(shardingScenarios.singleShard, {useCausalConsistency: false});
 
 runScenario(shardingScenarios.multiShardAllShardReads, {useCausalConsistency: false});
 
-runScenario(shardingScenarios.multiShardSomeShardReads, {useCausalConsistency: false, collName: shardedCollName});
+runScenario(shardingScenarios.multiShardSomeShardReads, {
+    useCausalConsistency: false,
+    collName: shardedCollName,
+});

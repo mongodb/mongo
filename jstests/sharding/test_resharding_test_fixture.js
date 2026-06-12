@@ -56,14 +56,22 @@ assert.commandWorked(sourceCollection.update({_id: 0}, {$inc: {extra: 1}}, {mult
 // The reshardCollection command should still be actively running on mongos.
 const ops = mongos
     .getDB("admin")
-    .aggregate([{$currentOp: {allUsers: true, localOps: true}}, {$match: {"command.reshardCollection": ns}}])
+    .aggregate([
+        {$currentOp: {allUsers: true, localOps: true}},
+        {$match: {"command.reshardCollection": ns}},
+    ])
     .toArray();
 assert.eq(1, ops.length, "failed to find reshardCollection in $currentOp output");
 
 // Test options parsing
-const collectionInfos = sourceCollection.getDB().getCollectionInfos({name: sourceCollection.getName()});
+const collectionInfos = sourceCollection
+    .getDB()
+    .getCollectionInfos({name: sourceCollection.getName()});
 const collInfo = collectionInfos[0];
 
-assert(collInfo.options.clusteredIndex, "collection should have a clustered index: " + tojson(collInfo));
+assert(
+    collInfo.options.clusteredIndex,
+    "collection should have a clustered index: " + tojson(collInfo),
+);
 
 reshardingTest.teardown();

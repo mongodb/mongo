@@ -96,7 +96,8 @@ try {
     }
 
     const primary = topology.primary;
-    const secondaries = primary === undefined ? topology.nodes : topology.nodes.filter((node) => node !== primary);
+    const secondaries =
+        primary === undefined ? topology.nodes : topology.nodes.filter((node) => node !== primary);
     const randomSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
     const randomSecondaryConn = newMongoWithRetry(randomSecondary);
     res = lagLastApplied(randomSecondaryConn);

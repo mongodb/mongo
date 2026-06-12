@@ -18,8 +18,9 @@ replSet.startSet();
 replSet.initiate();
 let primaryAdmin = replSet.getPrimary().getDB("admin");
 assert.eq(
-    assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-        .minSnapshotHistoryWindowInSeconds,
+    assert.commandWorked(
+        primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}),
+    ).minSnapshotHistoryWindowInSeconds,
     600,
 );
 const primaryDB = replSet.getPrimary().getDB("test");

@@ -91,7 +91,9 @@ jsTestLog(
 {
     createSourceCollection(reshardingTest);
 
-    const donorPrimary = reshardingTest.getReplSetForShard(reshardingTest.donorShardNames[0]).getPrimary();
+    const donorPrimary = reshardingTest
+        .getReplSetForShard(reshardingTest.donorShardNames[0])
+        .getPrimary();
     const failpoint = configureFailPoint(donorPrimary, kCsmStallFailpoint);
 
     // Give verification only 1% of the critical-section budget so the deadline trips quickly.
@@ -110,7 +112,9 @@ jsTestLog(
 {
     createSourceCollection(reshardingTest);
 
-    const recipientPrimary = reshardingTest.getReplSetForShard(reshardingTest.recipientShardNames[0]).getPrimary();
+    const recipientPrimary = reshardingTest
+        .getReplSetForShard(reshardingTest.recipientShardNames[0])
+        .getPrimary();
     const failpoint = configureFailPoint(recipientPrimary, kCsmStallFailpoint);
 
     setVerificationTimeoutPercent(reshardingTest, 1);
@@ -129,7 +133,9 @@ jsTestLog(
 {
     createSourceCollection(reshardingTest);
 
-    const donorPrimary = reshardingTest.getReplSetForShard(reshardingTest.donorShardNames[0]).getPrimary();
+    const donorPrimary = reshardingTest
+        .getReplSetForShard(reshardingTest.donorShardNames[0])
+        .getPrimary();
     const failpoint = configureFailPoint(donorPrimary, "failCommand", {
         failCommands: ["_shardsvrReshardingDonorFetchFinalCollectionStats"],
         blockConnection: true,
@@ -153,7 +159,9 @@ jsTestLog(
 {
     createSourceCollection(reshardingTest);
 
-    const recipientPrimary = reshardingTest.getReplSetForShard(reshardingTest.recipientShardNames[0]).getPrimary();
+    const recipientPrimary = reshardingTest
+        .getReplSetForShard(reshardingTest.recipientShardNames[0])
+        .getPrimary();
     const failpoint = configureFailPoint(recipientPrimary, "failCommand", {
         failCommands: ["_shardsvrReshardingRecipientFetchFinalCollectionStats"],
         blockConnection: true,
@@ -178,7 +186,9 @@ jsTestLog(
 {
     createSourceCollection(reshardingTest);
 
-    const donorPrimary = reshardingTest.getReplSetForShard(reshardingTest.donorShardNames[0]).getPrimary();
+    const donorPrimary = reshardingTest
+        .getReplSetForShard(reshardingTest.donorShardNames[0])
+        .getPrimary();
     const failpoint = configureFailPoint(donorPrimary, kCsmStallFailpoint);
 
     setVerificationTimeoutPercent(reshardingTest, 0);
@@ -196,7 +206,9 @@ jsTestLog(
 {
     createSourceCollection(reshardingTest);
 
-    const donorPrimary = reshardingTest.getReplSetForShard(reshardingTest.donorShardNames[0]).getPrimary();
+    const donorPrimary = reshardingTest
+        .getReplSetForShard(reshardingTest.donorShardNames[0])
+        .getPrimary();
     const failpoint = configureFailPoint(donorPrimary, "failCommand", {
         failCommands: ["_shardsvrReshardingDonorFetchFinalCollectionStats"],
         errorCode: ErrorCodes.OperationFailed,

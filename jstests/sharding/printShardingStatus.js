@@ -31,14 +31,22 @@ function grabStatusOutput(configdb, verbose) {
 function assertPresentInOutput(output, content, what) {
     assert(
         output.includes(content),
-        what + ' "' + content + '" NOT present in output of ' + "printShardingStatus() (but it should be)",
+        what +
+            ' "' +
+            content +
+            '" NOT present in output of ' +
+            "printShardingStatus() (but it should be)",
     );
 }
 
 function assertNotPresentInOutput(output, content, what) {
     assert(
         !output.includes(content),
-        what + ' "' + content + '" IS present in output of ' + "printShardingStatus() (but it should not be)",
+        what +
+            ' "' +
+            content +
+            '" IS present in output of ' +
+            "printShardingStatus() (but it should not be)",
     );
 }
 
@@ -178,7 +186,11 @@ output = grabStatusOutput(configCopy, false);
 assertPresentInOutput(output, "most recently active mongoses:\n        none", "no mongoses");
 
 output = grabStatusOutput(configCopy, true);
-assertPresentInOutput(output, "most recently active mongoses:\n        none", "no mongoses (verbose)");
+assertPresentInOutput(
+    output,
+    "most recently active mongoses:\n        none",
+    "no mongoses (verbose)",
+);
 
 assert(mongos.getDB(dbName).dropDatabase());
 
@@ -205,15 +217,23 @@ function testCollDetails(args) {
 
     let originalValues = {};
     if (args.hasOwnProperty("unique")) {
-        originalValues["unique"] = mongos.getDB("config").collections.findOne({_id: collName}).unique;
+        originalValues["unique"] = mongos
+            .getDB("config")
+            .collections.findOne({_id: collName}).unique;
         assert.commandWorked(
-            mongos.getDB("config").collections.update({_id: collName}, {$set: {"unique": args.unique}}),
+            mongos
+                .getDB("config")
+                .collections.update({_id: collName}, {$set: {"unique": args.unique}}),
         );
     }
     if (args.hasOwnProperty("noBalance")) {
-        originalValues["noBalance"] = mongos.getDB("config").collections.findOne({_id: collName}).noBalance;
+        originalValues["noBalance"] = mongos
+            .getDB("config")
+            .collections.findOne({_id: collName}).noBalance;
         assert.commandWorked(
-            mongos.getDB("config").collections.update({_id: collName}, {$set: {"noBalance": args.noBalance}}),
+            mongos
+                .getDB("config")
+                .collections.update({_id: collName}, {$set: {"noBalance": args.noBalance}}),
         );
     }
 
@@ -237,18 +257,29 @@ function testCollDetails(args) {
 
         // Restore original value.
         assert.commandWorked(
-            mongos.getDB("config").collections.update({_id: collName}, {$set: {"unique": originalValues.unique}}),
+            mongos
+                .getDB("config")
+                .collections.update({_id: collName}, {$set: {"unique": originalValues.unique}}),
         );
     }
 
-    assertPresentInOutput(output, "balancing: " + !args.noBalance, "balancing indicator (inverse of noBalance)");
+    assertPresentInOutput(
+        output,
+        "balancing: " + !args.noBalance,
+        "balancing indicator (inverse of noBalance)",
+    );
     if (args.hasOwnProperty("noBalance") && typeof args.noBalance != "boolean") {
         // non-bool: actual value must be shown
         assertPresentInOutput(output, tojson(args.noBalance), "noBalance indicator (non bool)");
 
         // Restore original value.
         assert.commandWorked(
-            mongos.getDB("config").collections.update({_id: collName}, {$set: {"noBalance": originalValues.noBalance}}),
+            mongos
+                .getDB("config")
+                .collections.update(
+                    {_id: collName},
+                    {$set: {"noBalance": originalValues.noBalance}},
+                ),
         );
     }
 

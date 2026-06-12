@@ -114,7 +114,11 @@ tests.push(function assertLogsAreFilteredBySeverity() {
                     }),
                 )
                 .filter((log) => log);
-            assert.eq(logLevel, printedLogs.length, "printed a different number of logs: " + logLevel);
+            assert.eq(
+                logLevel,
+                printedLogs.length,
+                "printed a different number of logs: " + logLevel,
+            );
         });
     });
 });

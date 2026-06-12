@@ -51,7 +51,13 @@ function assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, cmdFun
 
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, stepName);
-    let moveChunkThread = new Thread(runMoveChunk, st.s.host, ns, fromShard.shardName, toShard.shardName);
+    let moveChunkThread = new Thread(
+        runMoveChunk,
+        st.s.host,
+        ns,
+        fromShard.shardName,
+        toShard.shardName,
+    );
     moveChunkThread.start();
     waitForMoveChunkStep(fromShard, stepName);
 
@@ -75,15 +81,22 @@ const index = {
 // The steps after cloning starts and before the donor enters the critical section.
 const stepNames = [moveChunkStepNames.startedMoveChunk, moveChunkStepNames.reachedSteadyState];
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // The dropIndexes test cases need to be skipped when dropIndexes run in a sharding ddl coordinator.
 // This is because the ddl coordinator will wait for the migration to terminate instead of just
 // throwing a fire and forget abort migration signal, which is the old dropIndexes behavior.
-const skipDropIndexesTests = FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator");
+const skipDropIndexesTests = FeatureFlagUtil.isEnabled(
+    testDB,
+    "featureFlagDropIndexesDDLCoordinator",
+);
 
 stepNames.forEach((stepName) => {
-    jsTest.log(`Testing that createIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`);
+    jsTest.log(
+        `Testing that createIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`,
+    );
     const collName = "testCreateIndexesMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
 
@@ -144,11 +157,15 @@ stepNames.forEach((stepName) => {
 
 stepNames.forEach((stepName) => {
     if (skipDropIndexesTests) {
-        jsTest.log("Skipping dropIndexes tests because the dropIndexes operation runs on a sharding DDL coordinator.");
+        jsTest.log(
+            "Skipping dropIndexes tests because the dropIndexes operation runs on a sharding DDL coordinator.",
+        );
         return;
     }
 
-    jsTest.log(`Testing that dropIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`);
+    jsTest.log(
+        `Testing that dropIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`,
+    );
     const collName = "testDropIndexesMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
 
@@ -175,7 +192,9 @@ stepNames.forEach((stepName) => {
 
 stepNames.forEach((stepName) => {
     if (skipDropIndexesTests) {
-        jsTest.log("Skippine dropIndexes tests because the dropIndexes operation runs on a sharding DDL coordinator.");
+        jsTest.log(
+            "Skippine dropIndexes tests because the dropIndexes operation runs on a sharding DDL coordinator.",
+        );
         return;
     }
 

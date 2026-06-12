@@ -37,7 +37,9 @@ function validateTargetDocsPerBatch() {
             ),
         );
 
-        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}),
+        );
 
         // batchedDeletesTargetBatchDocs := 0 means no limit.
         const expectedBatches = docsPerBatch ? Math.ceil(collCount / docsPerBatch) : 1;
@@ -76,7 +78,9 @@ function validateTargetBatchTimeMS() {
             ),
         );
 
-        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: targetBatchTimeMS}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: targetBatchTimeMS}),
+        );
 
         // batchedDeletesTargetBatchTimeMS := 0 means no limit.
         const expectedBatches = targetBatchTimeMS ? collCount : 1;
@@ -123,7 +127,9 @@ function validateTargetStagedDocsBytes() {
     for (let stagedDocsBytes of [0, 1024 * 1024, 5 * 1024 * 1024]) {
         jsTestLog("Validating stagedDocsBytes=" + stagedDocsBytes);
 
-        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: stagedDocsBytes}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: stagedDocsBytes}),
+        );
 
         coll.drop();
         assert.commandWorked(
@@ -134,7 +140,9 @@ function validateTargetStagedDocsBytes() {
         );
 
         // batchedDeletesTargetStagedDocsBytes := 0 means no limit.
-        const expectedBatches = stagedDocsBytes ? Math.ceil(cumulativePaddingBytes / stagedDocsBytes) : 1;
+        const expectedBatches = stagedDocsBytes
+            ? Math.ceil(cumulativePaddingBytes / stagedDocsBytes)
+            : 1;
         const serverStatusBatchesBefore = db.serverStatus()["batchedDeletes"]["batches"];
         const serverStatusDocsBefore = db.serverStatus()["batchedDeletes"]["docs"];
 

@@ -44,7 +44,9 @@ assert.commandWorked(coll.insert(badDoc));
 // collection scan. This is important for this test because we are mutating the collection state
 // before the index builder is able to observe the invalid geo document. By comparison,
 // IndexBuildTest.pauseIndexBuilds() stalls the index build in the middle of the collection scan.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}),
+);
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1, b: 1});
 
 // Wait for the index build to start on the secondary.
@@ -52,7 +54,9 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {
+    includeBuildUUIDs: true,
+});
 
 // Resolve the key generation error so that the index build succeeds on the primary before it scans
 // the invalid document.
@@ -61,9 +65,14 @@ assert.commandWorked(coll.update({_id: 0}, {a: 1, b: 1}));
 // Unblock the index build on the old primary during the collection scanning phase, and block after
 // the collection scan phase.
 assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildDumpsInsertsFromBulk", mode: "alwaysOn"}),
+    testDB.adminCommand({
+        configureFailPoint: "hangAfterIndexBuildDumpsInsertsFromBulk",
+        mode: "alwaysOn",
+    }),
 );
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"}),
+);
 
 // Step down the primary.
 const stepDown = startParallelShell(() => {
@@ -78,7 +87,12 @@ checkLog.containsJson(primary, 20444);
 
 // Unblock the index build on the old primary during the collection scanning phase, this lets
 // stepdown complete.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildDumpsInsertsFromBulk", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "hangAfterIndexBuildDumpsInsertsFromBulk",
+        mode: "off",
+    }),
+);
 
 // Wait for stepdown to complete.
 stepDown();

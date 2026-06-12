@@ -16,16 +16,19 @@ let coll = db[collName];
 let collRenamed = db[collNameRenamed];
 
 // Detect if collections are implicitly sharded
-const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+const isImplicitlyShardedCollection =
+    typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
 function dropCollectionWithoutImplicitRecreate(coll) {
     if (isImplicitlyShardedCollection) {
-        const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+        const originalImplicitlyShardOnCreateCollectionOnly =
+            TestData.implicitlyShardOnCreateCollectionOnly;
         try {
             TestData.implicitlyShardOnCreateCollectionOnly = true;
             assert(coll.drop());
         } finally {
-            TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+            TestData.implicitlyShardOnCreateCollectionOnly =
+                originalImplicitlyShardOnCreateCollectionOnly;
         }
     } else {
         assert(coll.drop());

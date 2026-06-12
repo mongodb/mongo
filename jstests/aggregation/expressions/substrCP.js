@@ -11,15 +11,26 @@ coll.drop();
 assert.commandWorked(coll.insertOne({"a": "abc"}));
 
 function assertArgsException(errorCode, args) {
-    assertErrorCode(coll, [{$project: {a: {$substrCP: args}}}], errorCode, "error thrown, check parameters");
+    assertErrorCode(
+        coll,
+        [{$project: {a: {$substrCP: args}}}],
+        errorCode,
+        "error thrown, check parameters",
+    );
 }
 
 function assertSubstring(expected, str, offset, len) {
-    assert.eq(expected, coll.aggregate({$project: {a: {$substrCP: [str, offset, len]}}}).toArray()[0].a);
+    assert.eq(
+        expected,
+        coll.aggregate({$project: {a: {$substrCP: [str, offset, len]}}}).toArray()[0].a,
+    );
 }
 
 function assertSubstringBytes(expected, str, offset, len) {
-    assert.eq(expected, coll.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a);
+    assert.eq(
+        expected,
+        coll.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a,
+    );
 }
 
 assertArgsException(34452, ["$a", 0, "a"]);
@@ -86,7 +97,11 @@ assert.eq(
                 a: {
                     $substrCP: [
                         {
-                            $substrCP: [{$substrCP: [{$substrCP: ["abcdefghij", "$b", 6]}, "$c", 5]}, 0, 3],
+                            $substrCP: [
+                                {$substrCP: [{$substrCP: ["abcdefghij", "$b", 6]}, "$c", 5]},
+                                0,
+                                3,
+                            ],
                         },
                         1,
                         1,

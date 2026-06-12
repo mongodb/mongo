@@ -30,11 +30,17 @@ session.startTransaction();
 sessionDb.t.insert({y: 1});
 
 // This only requires database IX lock.
-assert.commandWorked(mydb.adminCommand({renameCollection: dbName + ".a", to: dbName + ".b", dropTarget: true}));
+assert.commandWorked(
+    mydb.adminCommand({renameCollection: dbName + ".a", to: dbName + ".b", dropTarget: true}),
+);
 assert.commandWorked(mydb.adminCommand({renameCollection: dbName + ".b", to: dbName + ".c"}));
 try {
-    assert.commandWorked(mydb.adminCommand({renameCollection: dbName + ".c", to: otherDbName + ".d"}));
-    assert.commandWorked(mydb.adminCommand({renameCollection: otherDbName + ".d", to: dbName + ".e"}));
+    assert.commandWorked(
+        mydb.adminCommand({renameCollection: dbName + ".c", to: otherDbName + ".d"}),
+    );
+    assert.commandWorked(
+        mydb.adminCommand({renameCollection: otherDbName + ".d", to: dbName + ".e"}),
+    );
 } catch (e) {
     if (e.code == ErrorCodes.CommandFailed && FixtureHelpers.isMongos(mydb)) {
         // Rename across databases fails if the source and target DBs have different primary shards.

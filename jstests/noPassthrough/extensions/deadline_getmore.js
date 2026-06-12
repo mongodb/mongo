@@ -8,7 +8,10 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -25,11 +28,17 @@ function setupCollection(conn, db, coll) {
         assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
         assert.commandWorked(coll.createIndex({x: 1}));
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
-        assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {x: Math.floor(NUM_DOCS / 2)}}));
+        assert.commandWorked(
+            db.adminCommand({split: coll.getFullName(), middle: {x: Math.floor(NUM_DOCS / 2)}}),
+        );
 
         assert(shardIds.length > 1);
-        assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 2}, to: shardIds[0]}));
-        assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 7}, to: shardIds[1]}));
+        assert.commandWorked(
+            db.adminCommand({moveChunk: coll.getFullName(), find: {x: 2}, to: shardIds[0]}),
+        );
+        assert.commandWorked(
+            db.adminCommand({moveChunk: coll.getFullName(), find: {x: 7}, to: shardIds[1]}),
+        );
     }
 
     const bulkDocs = [];
@@ -57,7 +66,10 @@ function runDeadlineTests(conn, _shardingTest) {
 
         const result = db.runCommand({
             aggregate: collName,
-            pipeline: [{$sort: {x: 1}}, {$assertDeadlineIncreaseAfterBatch: {batchSize: batchSize}}],
+            pipeline: [
+                {$sort: {x: 1}},
+                {$assertDeadlineIncreaseAfterBatch: {batchSize: batchSize}},
+            ],
             cursor: {batchSize: batchSize},
             maxTimeMS: maxTimeMs,
         });
@@ -90,10 +102,13 @@ function runDeadlineTests(conn, _shardingTest) {
         jsTest.log("Test: deadline propagation via shell cursor helper");
         const batchSize = 3;
 
-        const cursor = coll.aggregate([{$sort: {x: 1}}, {$assertDeadlineIncreaseAfterBatch: {batchSize: batchSize}}], {
-            cursor: {batchSize: batchSize},
-            maxTimeMS: maxTimeMs,
-        });
+        const cursor = coll.aggregate(
+            [{$sort: {x: 1}}, {$assertDeadlineIncreaseAfterBatch: {batchSize: batchSize}}],
+            {
+                cursor: {batchSize: batchSize},
+                maxTimeMS: maxTimeMs,
+            },
+        );
 
         // Exhaust the cursor; if the deadline is not refreshed correctly,
         // the extension stage will trigger a uassert.
@@ -114,7 +129,10 @@ function runDeadlineTests(conn, _shardingTest) {
 
         const result = db.runCommand({
             aggregate: collName,
-            pipeline: [{$sort: {x: 1}}, {$assertDeadlineIncreaseAfterBatch: {batchSize: batchSize}}],
+            pipeline: [
+                {$sort: {x: 1}},
+                {$assertDeadlineIncreaseAfterBatch: {batchSize: batchSize}},
+            ],
             cursor: {batchSize: batchSize},
             maxTimeMS: maxTimeMs,
         });

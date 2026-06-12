@@ -34,7 +34,9 @@ describe("$vectorSearch with $out on unsharded collection", function () {
         assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
 
         // Set primary shard so the unsharded collection lives on a specific shard.
-        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}));
+        assert.commandWorked(
+            testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}),
+        );
 
         testColl.drop();
         foreignColl.drop();
@@ -52,7 +54,14 @@ describe("$vectorSearch with $out on unsharded collection", function () {
             name: vectorSearchIndex,
             type: "vectorSearch",
             definition: {
-                fields: [{type: "vector", path: path, numDimensions: queryVector.length, similarity: "cosine"}],
+                fields: [
+                    {
+                        type: "vector",
+                        path: path,
+                        numDimensions: queryVector.length,
+                        similarity: "cosine",
+                    },
+                ],
             },
         });
     });
@@ -66,7 +75,15 @@ describe("$vectorSearch with $out on unsharded collection", function () {
     it("succeeds with vectorSearchScore and $out stage", function () {
         testColl.aggregate(
             [
-                {$vectorSearch: {queryVector, path, numCandidates, limit, index: vectorSearchIndex}},
+                {
+                    $vectorSearch: {
+                        queryVector,
+                        path,
+                        numCandidates,
+                        limit,
+                        index: vectorSearchIndex,
+                    },
+                },
                 {$project: {_id: 1, x: 1, score: {$meta: "vectorSearchScore"}}},
                 {$out: foreignColl.getName()},
             ],

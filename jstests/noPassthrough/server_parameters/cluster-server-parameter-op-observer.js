@@ -5,7 +5,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(conn) {
     const config = conn.getDB("config");
-    const res = config.clusterParameters.insert({_id: "foo", clusterParameterTime: Date(), value: 123});
+    const res = config.clusterParameters.insert({
+        _id: "foo",
+        clusterParameterTime: Date(),
+        value: 123,
+    });
     assert(res.hasWriteError());
     assert.neq(res.getWriteError().length, 0);
 }

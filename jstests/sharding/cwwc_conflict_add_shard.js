@@ -49,7 +49,9 @@ function convertShardToRS() {
 function convertRSToShard() {
     let start = new Date();
     jsTestLog("Converting replicaSet server to shardServer.");
-    shardServer.nodes.forEach((node) => shardServer.restart(node, {shardsvr: "", skipValidation: true}));
+    shardServer.nodes.forEach((node) =>
+        shardServer.restart(node, {shardsvr: "", skipValidation: true}),
+    );
 
     jsTest.log("Coversion RS -> Shard took: " + (new Date() - start));
 }
@@ -113,7 +115,12 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
     convertShardToRS();
 }
 
-const cwwc = [{w: 1}, {w: "majority"}, {w: "majority", wtimeout: 0, j: false}, {w: "majority", wtimeout: 0, j: true}];
+const cwwc = [
+    {w: 1},
+    {w: "majority"},
+    {w: "majority", wtimeout: 0, j: false},
+    {w: "majority", wtimeout: 0, j: true},
+];
 
 createNewShard();
 // No CWWC set neither on shard nor cluster should succeed.

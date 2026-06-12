@@ -49,7 +49,10 @@ let testCases = [
             update: {$set: {z: 4}},
         },
         expectedMods: [{"z": 4}],
-        expectedResponse: {lastErrorObject: {n: 1, updatedExisting: true}, value: {_id: 0, x: -2, y: 1}},
+        expectedResponse: {
+            lastErrorObject: {n: 1, updatedExisting: true},
+            value: {_id: 0, x: -2, y: 1},
+        },
         dbName: dbName,
         collName: collName,
         opType: WriteWithoutShardKeyTestUtil.OperationType.findAndModifyUpdate,
@@ -64,7 +67,10 @@ let testCases = [
             update: {$set: {z: 4}},
         },
         expectedMods: [{"z": 4}],
-        expectedResponse: {lastErrorObject: {n: 1, updatedExisting: true}, value: {_id: 4, x: 2, y: 1}},
+        expectedResponse: {
+            lastErrorObject: {n: 1, updatedExisting: true},
+            value: {_id: 4, x: 2, y: 1},
+        },
         dbName: dbName,
         collName: collName,
         opType: WriteWithoutShardKeyTestUtil.OperationType.findAndModifyUpdate,

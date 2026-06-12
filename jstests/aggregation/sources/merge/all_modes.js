@@ -29,7 +29,9 @@ const target = db.all_modes_target;
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -85,7 +87,9 @@ const target = db.all_modes_target;
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -153,7 +157,9 @@ const target = db.all_modes_target;
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
     const error = assert.throws(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "fail"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "fail"}},
+        ]),
     );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
@@ -166,7 +172,9 @@ const target = db.all_modes_target;
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
     const error = assert.throws(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "discard"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "discard"}},
+        ]),
     );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
@@ -185,7 +193,9 @@ const target = db.all_modes_target;
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "insert"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "insert"}},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -241,7 +251,9 @@ const target = db.all_modes_target;
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "discard"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "discard"}},
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -261,7 +273,11 @@ const target = db.all_modes_target;
     assert.doesNotThrow(() =>
         source.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "insert"},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: [{$addFields: {x: 2}}],
+                    whenNotMatched: "insert",
+                },
             },
         ]),
     );
@@ -328,7 +344,11 @@ const target = db.all_modes_target;
     assert.doesNotThrow(() =>
         source.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "discard"},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: [{$addFields: {x: 2}}],
+                    whenNotMatched: "discard",
+                },
             },
         ]),
     );
@@ -355,7 +375,15 @@ const target = db.all_modes_target;
         ]),
     );
     assert.doesNotThrow(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "insert"}}]),
+        source.aggregate([
+            {
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "keepExisting",
+                    whenNotMatched: "insert",
+                },
+            },
+        ]),
     );
     assertArrayEq({
         actual: target.find().toArray(),
@@ -374,7 +402,9 @@ const target = db.all_modes_target;
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
     const error = assert.throws(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "fail"}}]),
+        source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "fail"}},
+        ]),
     );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
@@ -387,7 +417,15 @@ const target = db.all_modes_target;
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
     const error = assert.throws(() =>
-        source.aggregate([{$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "discard"}}]),
+        source.aggregate([
+            {
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "keepExisting",
+                    whenNotMatched: "discard",
+                },
+            },
+        ]),
     );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.

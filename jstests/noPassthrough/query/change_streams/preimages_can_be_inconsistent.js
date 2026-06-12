@@ -62,7 +62,10 @@ describe("change streams preimages consistency checks", function () {
         // The test expects a hash mismatch between the primary and the secondary node.
         try {
             replSetTest.stopSet();
-            assert(false, "Expected an inconsistency error when stopping the replica set, but no error was thrown.");
+            assert(
+                false,
+                "Expected an inconsistency error when stopping the replica set, but no error was thrown.",
+            );
         } catch (e) {
             // Verify that the inconsistency is the one we're looking for in preimages.
             assert.eq(e.message.includes("non-matching preimage entries"), true);
@@ -87,7 +90,11 @@ describe("change streams preimages consistency checks", function () {
     });
 
     afterEach(() => {
-        assert.eq(null, replSetTest, "Expected replSetTest to be shut down by sub-afterEach blocks");
+        assert.eq(
+            null,
+            replSetTest,
+            "Expected replSetTest to be shut down by sub-afterEach blocks",
+        );
     });
 
     it("checks that there is no hash mismatch for identical preimages", () => {

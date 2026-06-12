@@ -16,7 +16,11 @@ let primary = replTest.getPrimary();
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const dbName = "test";
@@ -41,7 +45,9 @@ assert.commandWorked(sessionColl2.insert({_id: 2}));
 jsTestLog("Disable snapshotting on all nodes");
 
 // Disable snapshotting so that future operations do not enter the majority snapshot.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 session.startTransaction();
 assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
@@ -89,7 +95,11 @@ assert.eq(testDB[collName].find({_id: 1}).toArray(), [{_id: 1}]);
 // Make sure that another write on the same document from the first transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -137,7 +147,11 @@ assert.eq(testDB[collName].find({_id: 2}).toArray(), [{_id: 2}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 2}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -157,7 +171,11 @@ jsTestLog("Aborting the second transaction");
 
 // Make sure we can successfully abort the second transaction after recovery.
 assert.commandWorked(
-    sessionDB2.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber2), autocommit: false}),
+    sessionDB2.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber2),
+        autocommit: false,
+    }),
 );
 
 jsTestLog("Attempting to run another transaction");

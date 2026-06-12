@@ -22,21 +22,34 @@ const metaField = "meta";
 function createTimeseriesCollectionWithData(testDB, collName) {
     const coll = testDB[collName];
     coll.drop();
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
-    assert.commandWorked(coll.insert({[timeField]: ISODate("2021-05-18T00:00:00.000Z"), v: 1, [metaField]: "a"}));
-    assert.commandWorked(coll.insert({[timeField]: ISODate("2021-05-18T01:00:00.000Z"), v: 2, [metaField]: "a"}));
-    assert.commandWorked(coll.insert({[timeField]: ISODate("2021-05-18T02:00:00.000Z"), v: 3, [metaField]: "b"}));
+    assert.commandWorked(
+        testDB.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
+    );
+    assert.commandWorked(
+        coll.insert({[timeField]: ISODate("2021-05-18T00:00:00.000Z"), v: 1, [metaField]: "a"}),
+    );
+    assert.commandWorked(
+        coll.insert({[timeField]: ISODate("2021-05-18T01:00:00.000Z"), v: 2, [metaField]: "a"}),
+    );
+    assert.commandWorked(
+        coll.insert({[timeField]: ISODate("2021-05-18T02:00:00.000Z"), v: 3, [metaField]: "b"}),
+    );
     return coll;
 }
 
 function testInsertNotRecorded(testDB, coll, collName) {
-    assert.commandWorked(coll.insert({[timeField]: ISODate("2021-05-18T03:00:00.000Z"), v: 4, [metaField]: "c"}));
+    assert.commandWorked(
+        coll.insert({[timeField]: ISODate("2021-05-18T03:00:00.000Z"), v: 4, [metaField]: "c"}),
+    );
 
     const updateStats = getQueryStatsUpdateCmd(testDB, {collName: collName});
     assert.eq(
         0,
         updateStats.length,
-        "Time-series inserts should NOT be recorded as update commands. Found: " + tojson(updateStats),
+        "Time-series inserts should NOT be recorded as update commands. Found: " +
+            tojson(updateStats),
     );
 }
 
@@ -47,11 +60,19 @@ function testBulkInsertNotRecorded(testDB, coll, collName) {
             ops: [
                 {
                     insert: 0,
-                    document: {[timeField]: ISODate("2021-05-18T04:00:00.000Z"), v: 5, [metaField]: "c"},
+                    document: {
+                        [timeField]: ISODate("2021-05-18T04:00:00.000Z"),
+                        v: 5,
+                        [metaField]: "c",
+                    },
                 },
                 {
                     insert: 0,
-                    document: {[timeField]: ISODate("2021-05-18T05:00:00.000Z"), v: 6, [metaField]: "c"},
+                    document: {
+                        [timeField]: ISODate("2021-05-18T05:00:00.000Z"),
+                        v: 6,
+                        [metaField]: "c",
+                    },
                 },
             ],
             nsInfo: [{ns: coll.getFullName()}],
@@ -62,7 +83,8 @@ function testBulkInsertNotRecorded(testDB, coll, collName) {
     assert.eq(
         0,
         updateStats.length,
-        "Time-series bulk inserts should NOT be recorded as update commands. Found: " + tojson(updateStats),
+        "Time-series bulk inserts should NOT be recorded as update commands. Found: " +
+            tojson(updateStats),
     );
 }
 
@@ -71,8 +93,16 @@ function testBulkInsertNotRecorded(testDB, coll, collName) {
 function testMetaFieldUpdateNotRecordedOnMongod(testDB, coll, collName) {
     assert.commandWorked(
         coll.insertMany([
-            {[timeField]: ISODate("2021-05-18T06:00:00.000Z"), v: 7, [metaField]: "updateMetaField"},
-            {[timeField]: ISODate("2021-05-18T07:00:00.000Z"), v: 8, [metaField]: "updateMetaField"},
+            {
+                [timeField]: ISODate("2021-05-18T06:00:00.000Z"),
+                v: 7,
+                [metaField]: "updateMetaField",
+            },
+            {
+                [timeField]: ISODate("2021-05-18T07:00:00.000Z"),
+                v: 8,
+                [metaField]: "updateMetaField",
+            },
         ]),
     );
     const updateResult = testDB.runCommand({
@@ -96,8 +126,16 @@ function testMetaFieldUpdateNotRecordedOnMongod(testDB, coll, collName) {
 function testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName) {
     assert.commandWorked(
         coll.insertMany([
-            {[timeField]: ISODate("2021-05-18T06:00:00.000Z"), v: 7, [metaField]: "updateMetaField"},
-            {[timeField]: ISODate("2021-05-18T07:00:00.000Z"), v: 8, [metaField]: "updateMetaField"},
+            {
+                [timeField]: ISODate("2021-05-18T06:00:00.000Z"),
+                v: 7,
+                [metaField]: "updateMetaField",
+            },
+            {
+                [timeField]: ISODate("2021-05-18T07:00:00.000Z"),
+                v: 8,
+                [metaField]: "updateMetaField",
+            },
         ]),
     );
     const updateResult = testDB.runCommand({
@@ -124,7 +162,15 @@ function testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName) {
         usedDisk: false,
         fromMultiPlanner: false,
         fromPlanCache: false,
-        writes: {nMatched: 2, nUpserted: 0, nModified: 2, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
+        writes: {
+            nMatched: 2,
+            nUpserted: 0,
+            nModified: 2,
+            nDeleted: 0,
+            nInserted: 0,
+            nUpdateOps: 1,
+            nDeleteOps: 0,
+        },
     });
     assertExpectedResults({
         results: entry,
@@ -246,8 +292,16 @@ describe("time-series query stats (sharded)", function () {
             // the meta field changes the document and we don't reset data between tests.
             assert.commandWorked(
                 coll.insertMany([
-                    {[timeField]: ISODate("2021-05-18T00:00:00Z"), v: 1, [metaField]: "retryable_basic"},
-                    {[timeField]: ISODate("2021-05-18T01:00:00Z"), v: 2, [metaField]: "retryable_dedup"},
+                    {
+                        [timeField]: ISODate("2021-05-18T00:00:00Z"),
+                        v: 1,
+                        [metaField]: "retryable_basic",
+                    },
+                    {
+                        [timeField]: ISODate("2021-05-18T01:00:00Z"),
+                        v: 2,
+                        [metaField]: "retryable_dedup",
+                    },
                 ]),
             );
         });

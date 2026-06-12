@@ -54,7 +54,9 @@ assert.eq(
 
 // Enable failpoint to allow bucket collection to be created but fail creation of view definition
 const failpoint = "failTimeseriesViewCreation";
-assert.commandWorked(primaryDb.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: {ns: viewNs}}));
+assert.commandWorked(
+    primaryDb.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: {ns: viewNs}}),
+);
 assert.commandFailed(
     primaryDb.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName},
@@ -122,7 +124,9 @@ assert.eq(
 assert.contains(bucketsCollName, primaryDb.getCollectionNames());
 
 // Omitting expireAfterSeconds should fail
-assert.commandFailed(primaryDb.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandFailed(
+    primaryDb.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+);
 assert.eq(
     primaryDb.getCollectionNames().findIndex((c) => c == viewName),
     -1,

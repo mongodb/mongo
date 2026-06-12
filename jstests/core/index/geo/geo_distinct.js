@@ -108,15 +108,24 @@ assert.eq(res.values.sort(), [3]);
 assert.commandWorked(coll.dropIndexes());
 
 // A. Unindexed key, no geo index on query predicate.
-res = coll.runCommand("distinct", {key: "zone", query: {"loc.coordinates": {$near: [0, 0], $maxDistance: 1}}});
+res = coll.runCommand("distinct", {
+    key: "zone",
+    query: {"loc.coordinates": {$near: [0, 0], $maxDistance: 1}},
+});
 assert.commandFailed(res);
 // B. Unindexed key, with 2d index on query predicate.
 assert.commandWorked(coll.createIndex({"loc.coordinates": "2d"}));
-res = coll.runCommand("distinct", {key: "zone", query: {"loc.coordinates": {$near: [0, 0], $maxDistance: 1}}});
+res = coll.runCommand("distinct", {
+    key: "zone",
+    query: {"loc.coordinates": {$near: [0, 0], $maxDistance: 1}},
+});
 assert.commandWorked(res);
 assert.eq(res.values.sort(), [3]);
 // C. Indexed key, with 2d index on query predicate.
 assert.commandWorked(coll.createIndex({zone: 1}));
-res = coll.runCommand("distinct", {key: "zone", query: {"loc.coordinates": {$near: [0, 0], $maxDistance: 1}}});
+res = coll.runCommand("distinct", {
+    key: "zone",
+    query: {"loc.coordinates": {$near: [0, 0], $maxDistance: 1}},
+});
 assert.commandWorked(res);
 assert.eq(res.values.sort(), [3]);

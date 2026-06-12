@@ -49,7 +49,9 @@ assert.commandWorked(db.t2.insert(documents2));
 
 function testUpdate(expected, coll, filter, oplogUpdate, opts = {}) {
     for (let i = 0; i < 2; ++i) {
-        assert.commandWorked(coll.update(filter, [{$_internalApplyOplogUpdate: {oplogUpdate: oplogUpdate}}], opts));
+        assert.commandWorked(
+            coll.update(filter, [{$_internalApplyOplogUpdate: {oplogUpdate: oplogUpdate}}], opts),
+        );
 
         let actual = coll.find().toArray();
         assert(

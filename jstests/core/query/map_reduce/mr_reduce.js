@@ -45,7 +45,9 @@
     assert.commandWorked(source.insert({_id: 4, a: [4, 5]}));
     // Insert something that should be unaltered by the mapReduce into the output collection.
     assert.commandWorked(out.insert({_id: 10, value: 5}));
-    assert.commandWorked(source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 3}}}));
+    assert.commandWorked(
+        source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 3}}}),
+    );
 
     expected = [
         {_id: 1, value: 1},
@@ -60,7 +62,9 @@
     assert.commandWorked(source.insert({_id: 5, a: [5, 6]}));
     // Insert something that should be unaltered by the mapReduce into the output collection.
     assert.commandWorked(out.insert({_id: 20, value: 10}));
-    assert.commandWorked(source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 4}}}));
+    assert.commandWorked(
+        source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 4}}}),
+    );
 
     expected = [
         {_id: 1, value: 1},
@@ -94,13 +98,17 @@
         return Array.sum(v);
     };
 
-    assert.commandWorked(source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 0}}}));
+    assert.commandWorked(
+        source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 0}}}),
+    );
 
     assert.eq(2, out.findOne({_id: 1}).value);
     assert.eq(1, out.findOne({_id: 2}).value);
 
     assert.commandWorked(source.insert({_id: 4, x: 2}));
-    assert.commandWorked(source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 3}}}));
+    assert.commandWorked(
+        source.mapReduce(map, reduce, {out: {reduce: outName}, query: {_id: {$gt: 3}}}),
+    );
 
     assert.eq(2, out.findOne({_id: 1}).value);
     assert.eq(2, out.findOne({_id: 2}).value);

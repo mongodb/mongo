@@ -27,7 +27,8 @@ let conn = MongoRunner.runMongod({
     // - Turn off archiving and compression for easier debugging if there is a failure.
     // - Make the maximum file size small to encourage lots of file changes.  WT-2706 was
     // related to log file switches.
-    wiredTigerEngineConfigString: "checkpoint=(wait=60,log_size=0),log=(remove=false,compressor=none,file_max=10M)",
+    wiredTigerEngineConfigString:
+        "checkpoint=(wait=60,log_size=0),log=(remove=false,compressor=none,file_max=10M)",
 });
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -66,7 +67,12 @@ let max_per_thread = 1000000;
 let num_threads = 8;
 let threads = [];
 for (var i = 0; i < num_threads; i++) {
-    let t = new Thread(insertWorkload, conn.host, i * max_per_thread, max_per_thread + i * max_per_thread);
+    let t = new Thread(
+        insertWorkload,
+        conn.host,
+        i * max_per_thread,
+        max_per_thread + i * max_per_thread,
+    );
     threads.push(t);
     t.start();
 }
@@ -119,7 +125,12 @@ for (var i = 0; i < retData.length; i++) {
     assert.eq(
         null,
         missing,
-        "Thread " + i + " missing id " + missing + " start and end for all threads: " + tojson(retData),
+        "Thread " +
+            i +
+            " missing id " +
+            missing +
+            " start and end for all threads: " +
+            tojson(retData),
     );
 }
 

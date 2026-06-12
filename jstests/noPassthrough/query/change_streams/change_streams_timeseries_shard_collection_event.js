@@ -5,7 +5,10 @@
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test constants.
@@ -144,7 +147,10 @@ let st = new ShardingTest({
     // 'metaField' mixed range and hash based compound key sharding.
     createAndShardTimeseriesCollectionThenAssertShardCollectionFormat(st, {
         createCollectionCommand: {timeseries: {timeField: timeFieldName, metaField: "metadata"}},
-        shardCollectionCommand: {shardCollection: collNS, key: {"metadata.x": 1, "metadata.y": "hashed"}},
+        shardCollectionCommand: {
+            shardCollection: collNS,
+            key: {"metadata.x": 1, "metadata.y": "hashed"},
+        },
         expectedShardCollectionEventOperationDescription: {
             "shardKey": {"meta.x": 1, "meta.y": "hashed"},
             "unique": false,

@@ -23,7 +23,10 @@
  * ]
  */
 import {getStageFromSplitPipeline} from "jstests/libs/query/analyze_plan.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -84,14 +87,30 @@ function runSourceTests(coll) {
     // Metadata referenced downstream.
     assertDeps(
         coll,
-        [{$project: {token: {$meta: "searchSequenceToken"}, neededMeta: 1, neededVar: 1, neededWholeDoc: 1}}],
+        [
+            {
+                $project: {
+                    token: {$meta: "searchSequenceToken"},
+                    neededMeta: 1,
+                    neededVar: 1,
+                    neededWholeDoc: 1,
+                },
+            },
+        ],
         {expectedMeta: true, expectedVar: false, expectedWholeDoc: false},
     );
     assertDeps(
         coll,
         [
             {$limit: 100},
-            {$project: {token: {$meta: "searchSequenceToken"}, neededMeta: 1, neededVar: 1, neededWholeDoc: 1}},
+            {
+                $project: {
+                    token: {$meta: "searchSequenceToken"},
+                    neededMeta: 1,
+                    neededVar: 1,
+                    neededWholeDoc: 1,
+                },
+            },
         ],
         {expectedMeta: true, expectedVar: false, expectedWholeDoc: false},
     );
@@ -151,7 +170,11 @@ function runSourceTests(coll) {
 function assertNeededFields(coll, downstream, expectedNeededFields) {
     const pipeline = [{$trackDepsSource: {meta: "searchSequenceToken", var: "NOW"}}, ...downstream];
     const results = runPipelineAndCheckShards(coll, pipeline, ["neededFields"]);
-    assert.eq(results[0].neededFields, expectedNeededFields, `neededFields for pipeline: ${tojson(pipeline)}`);
+    assert.eq(
+        results[0].neededFields,
+        expectedNeededFields,
+        `neededFields for pipeline: ${tojson(pipeline)}`,
+    );
 }
 
 function runNeededFieldsTests(coll) {
@@ -162,7 +185,11 @@ function runNeededFieldsTests(coll) {
     assertNeededFields(coll, [{$addFields: {extra: 1}}], null);
 
     // Inclusive projection that includes tracking fields so we can read the result.
-    assertNeededFields(coll, [{$project: {a: 1, b: 1, neededFields: 1, _id: 0}}], ["a", "b", "neededFields"]);
+    assertNeededFields(
+        coll,
+        [{$project: {a: 1, b: 1, neededFields: 1, _id: 0}}],
+        ["a", "b", "neededFields"],
+    );
 
     // Nested field paths.
     assertNeededFields(
@@ -172,7 +199,11 @@ function runNeededFieldsTests(coll) {
     );
 
     // $limit followed by inclusive projection — fields flow through $limit.
-    assertNeededFields(coll, [{$limit: 5}, {$project: {foo: 1, neededFields: 1, _id: 0}}], ["foo", "neededFields"]);
+    assertNeededFields(
+        coll,
+        [{$limit: 5}, {$project: {foo: 1, neededFields: 1, _id: 0}}],
+        ["foo", "neededFields"],
+    );
 
     // Metadata projection with inclusive field projection — fields reported independently.
     assertNeededFields(
@@ -188,7 +219,11 @@ function runNeededFieldsTests(coll) {
 function assertTransformDepsNotCalled(coll, pipeline) {
     const explain = coll.explain().aggregate(pipeline);
     const stageObj = getStageFromSplitPipeline(explain, "$trackDepsTransform");
-    assert.neq(stageObj, null, `$trackDepsTransform not found in explain output: ${tojson(explain)}`);
+    assert.neq(
+        stageObj,
+        null,
+        `$trackDepsTransform not found in explain output: ${tojson(explain)}`,
+    );
     assert.eq(
         stageObj["$trackDepsTransform"].depsCallbackCalled,
         false,
@@ -230,7 +265,11 @@ function runTransformNegativeTests(coll) {
             true,
             `Source stage should detect metadata needed through mixed suffix: ${tojson(results[0])}`,
         );
-        assert.eq(results[0].neededVar, false, `No variable reference in mixed suffix: ${tojson(results[0])}`);
+        assert.eq(
+            results[0].neededVar,
+            false,
+            `No variable reference in mixed suffix: ${tojson(results[0])}`,
+        );
         // $trackDepsTransform is in the suffix and all extension stages unconditionally
         // declare needWholeDocument=true in getDependencies.
         assert.eq(
@@ -251,7 +290,10 @@ function runMixedPipelineTests(coll) {
     // produced and flows through host stages correctly.
     {
         const results = coll
-            .aggregate([{$readNDocuments: {numDocs: 1}}, {$project: {_id: 1, score: {$meta: "score"}}}])
+            .aggregate([
+                {$readNDocuments: {numDocs: 1}},
+                {$project: {_id: 1, score: {$meta: "score"}}},
+            ])
             .toArray();
         assert.eq(results.length, 1, `Expected 1 result, got: ${tojson(results)}`);
         assert.eq(
@@ -264,7 +306,11 @@ function runMixedPipelineTests(coll) {
     // Score metadata flows through $limit.
     {
         const results = coll
-            .aggregate([{$readNDocuments: {numDocs: 1}}, {$limit: 10}, {$addFields: {myScore: {$meta: "score"}}}])
+            .aggregate([
+                {$readNDocuments: {numDocs: 1}},
+                {$limit: 10},
+                {$addFields: {myScore: {$meta: "score"}}},
+            ])
             .toArray();
         assert.eq(results.length, 1, `Expected 1 result, got: ${tojson(results)}`);
         assert.eq(
@@ -276,7 +322,9 @@ function runMixedPipelineTests(coll) {
 
     // When metadata is not referenced, $produceIds should not produce it.
     {
-        const results = coll.aggregate([{$readNDocuments: {numDocs: 1}}, {$project: {_id: 1, val: 1}}]).toArray();
+        const results = coll
+            .aggregate([{$readNDocuments: {numDocs: 1}}, {$project: {_id: 1, val: 1}}])
+            .toArray();
         assert.eq(results.length, 1, `Expected 1 result, got: ${tojson(results)}`);
         assert(
             !results[0].hasOwnProperty("score"),
@@ -287,11 +335,15 @@ function runMixedPipelineTests(coll) {
     // Extension source ($trackDepsSource) with a suffix that includes a desugared extension stage
     // ($addFieldsMatch). The desugared host stages should participate in dep analysis: $addFields
     // implies needsWholeDocument.
-    assertDeps(coll, [{$addFieldsMatch: {field: "extra", value: 1, filter: {$gt: ["$extra", 0]}}}], {
-        expectedMeta: false,
-        expectedVar: false,
-        expectedWholeDoc: true,
-    });
+    assertDeps(
+        coll,
+        [{$addFieldsMatch: {field: "extra", value: 1, filter: {$gt: ["$extra", 0]}}}],
+        {
+            expectedMeta: false,
+            expectedVar: false,
+            expectedWholeDoc: true,
+        },
+    );
 
     // Desugared $addFieldsMatch in suffix followed by an inclusive $project. The $project
     // sets EXHAUSTIVE_FIELDS so the source only needs the projected fields, not the whole doc.
@@ -312,7 +364,14 @@ function runMixedPipelineTests(coll) {
         coll,
         [
             {$addFieldsMatch: {field: "extra", value: 1, filter: {$gt: ["$extra", 0]}}},
-            {$project: {token: {$meta: "searchSequenceToken"}, neededMeta: 1, neededVar: 1, neededWholeDoc: 1}},
+            {
+                $project: {
+                    token: {$meta: "searchSequenceToken"},
+                    neededMeta: 1,
+                    neededVar: 1,
+                    neededWholeDoc: 1,
+                },
+            },
         ],
         {expectedMeta: true, expectedVar: false, expectedWholeDoc: false},
     );
@@ -325,7 +384,14 @@ function runMixedPipelineTests(coll) {
             {$trackDepsSource: {meta: "searchSequenceToken", var: "NOW"}},
             {$trackDepsTransform: {}},
             {$addFieldsMatch: {field: "extra", value: 1, filter: {$gt: ["$extra", 0]}}},
-            {$project: {token: {$meta: "searchSequenceToken"}, neededMeta: 1, neededVar: 1, neededWholeDoc: 1}},
+            {
+                $project: {
+                    token: {$meta: "searchSequenceToken"},
+                    neededMeta: 1,
+                    neededVar: 1,
+                    neededWholeDoc: 1,
+                },
+            },
         ];
         assertTransformDepsNotCalled(coll, pipeline);
 
@@ -348,7 +414,10 @@ function runMixedPipelineTests(coll) {
     // Extension source + extension transform + variable reference through desugared stages.
     assertDeps(
         coll,
-        [{$trackDepsTransform: {}}, {$addFieldsMatch: {field: "ts", value: "$$NOW", filter: {$gt: ["$ts", 0]}}}],
+        [
+            {$trackDepsTransform: {}},
+            {$addFieldsMatch: {field: "ts", value: "$$NOW", filter: {$gt: ["$ts", 0]}}},
+        ],
         {expectedMeta: false, expectedVar: true, expectedWholeDoc: true},
     );
 }
@@ -365,10 +434,15 @@ function runTests(conn, shardingTest) {
     const coll = db[jsTestName()];
 
     // Insert documents so the collection exists and $readNDocuments can find them.
-    assert.commandWorked(coll.insertMany(Array.from({length: 10}, (_, i) => ({_id: i, val: i * 10}))));
+    assert.commandWorked(
+        coll.insertMany(Array.from({length: 10}, (_, i) => ({_id: i, val: i * 10}))),
+    );
 
     // Non-existent metadata type returns an error.
-    assert.throwsWithCode(() => coll.aggregate([{$trackDepsSource: {meta: "UNKNOWN_META"}}]).toArray(), 17308);
+    assert.throwsWithCode(
+        () => coll.aggregate([{$trackDepsSource: {meta: "UNKNOWN_META"}}]).toArray(),
+        17308,
+    );
 
     // Run on unsharded collection. On mongos this exercises the fromRouter path where the full
     // pipeline is forwarded to a single shard without splitting.
@@ -389,7 +463,14 @@ function runTests(conn, shardingTest) {
         {
             const pipeline = [
                 {$trackDepsSource: {meta: "searchSequenceToken", var: "NOW"}},
-                {$project: {token: {$meta: "searchSequenceToken"}, neededMeta: 1, neededVar: 1, neededWholeDoc: 1}},
+                {
+                    $project: {
+                        token: {$meta: "searchSequenceToken"},
+                        neededMeta: 1,
+                        neededVar: 1,
+                        neededWholeDoc: 1,
+                    },
+                },
             ];
             const explain = coll.explain().aggregate(pipeline);
             assert(

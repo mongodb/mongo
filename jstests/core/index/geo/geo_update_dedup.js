@@ -75,7 +75,12 @@ let x = {
 };
 t.save({geo: x});
 
-res = t.update({geo: {$geoNear: {"type": "Point", "coordinates": [50.0, 50.0]}}}, {$inc: {touchCount: 1}}, false, true);
+res = t.update(
+    {geo: {$geoNear: {"type": "Point", "coordinates": [50.0, 50.0]}}},
+    {$inc: {touchCount: 1}},
+    false,
+    true,
+);
 assert.eq(1, res.nMatched);
 assert.eq(1, t.findOne().touchCount);
 

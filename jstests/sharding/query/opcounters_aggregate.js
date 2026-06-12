@@ -30,7 +30,9 @@ const mongosDB = st.s.getDB("test");
 const shard0DB = st.shard0.getDB("test");
 const shard1DB = st.shard1.getDB("test");
 const coll = mongosDB.getCollection(jsTestName());
-assert.commandWorked(st.s.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 coll.drop();
 assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
@@ -61,11 +63,27 @@ coll.aggregate([{$match: {}}]).toArray();
 let routerAfter = getMongosCounters();
 let shardAfter = getShard0Counters();
 
-assert.eq(routerBefore.aggregate + 1, routerAfter.aggregate, "mongos: aggregate counter should increment");
-assert.eq(routerBefore.query, routerAfter.query, "mongos: aggregate should NOT increment queries counter");
+assert.eq(
+    routerBefore.aggregate + 1,
+    routerAfter.aggregate,
+    "mongos: aggregate counter should increment",
+);
+assert.eq(
+    routerBefore.query,
+    routerAfter.query,
+    "mongos: aggregate should NOT increment queries counter",
+);
 
-assert.gte(shardAfter.aggregate, shardBefore.aggregate + 1, "shard: aggregate counter should increment");
-assert.eq(shardBefore.query, shardAfter.query, "shard: aggregate should NOT increment queries counter");
+assert.gte(
+    shardAfter.aggregate,
+    shardBefore.aggregate + 1,
+    "shard: aggregate counter should increment",
+);
+assert.eq(
+    shardBefore.query,
+    shardAfter.query,
+    "shard: aggregate should NOT increment queries counter",
+);
 
 // --- find increments queries but NOT aggregates on both mongos and shard ---
 
@@ -77,8 +95,16 @@ coll.find({}).toArray();
 routerAfter = getMongosCounters();
 shardAfter = getShard0Counters();
 
-assert.eq(routerBefore.query + 1, routerAfter.query, "mongos: find should increment queries counter");
-assert.eq(routerBefore.aggregate, routerAfter.aggregate, "mongos: find should NOT increment aggregate counter");
+assert.eq(
+    routerBefore.query + 1,
+    routerAfter.query,
+    "mongos: find should increment queries counter",
+);
+assert.eq(
+    routerBefore.aggregate,
+    routerAfter.aggregate,
+    "mongos: find should NOT increment aggregate counter",
+);
 
 assert.eq(shardBefore.query + 1, shardAfter.query, "shard: find should increment queries counter");
 // It's too flakey to assert that the find command does NOT modify the shard's aggregate counter,

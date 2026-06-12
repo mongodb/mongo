@@ -31,9 +31,15 @@ const viewDef = {
 
 testDB.system.views.drop();
 assert.commandWorked(testDB.createCollection("system.views"));
-assert.commandWorked(testDB.adminCommand({applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: viewDef}]}));
+assert.commandWorked(
+    testDB.adminCommand({
+        applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: viewDef}],
+    }),
+);
 
 // Don't let the bogus view stick around, or else it will cause an error in validation.
 assert.commandWorked(
-    testDB.adminCommand({applyOps: [{op: "d", ns: testDB.getName() + ".system.views", o: {_id: viewName}}]}),
+    testDB.adminCommand({
+        applyOps: [{op: "d", ns: testDB.getName() + ".system.views", o: {_id: viewName}}],
+    }),
 );

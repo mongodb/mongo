@@ -27,13 +27,19 @@ const shard0Identity = st.rs0.getPrimary().getDB("admin").getCollection("system.
     _id: "shardIdentity",
 });
 
-assert.commandWorked(st.s.adminCommand({shardCollection: kDbName + "." + kShardedCollName, key: {_id: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: kDbName + "." + kShardedCollName, key: {_id: 1}}),
+);
 
 assert.commandWorked(st.s.getDB(kDbName).createCollection(kUnshardedCollName));
 
-const recoveryTimestamp = assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).runCommand({ping: 1})).operationTime;
+const recoveryTimestamp = assert.commandWorked(
+    st.rs0.getPrimary().getDB(kDbName).runCommand({ping: 1}),
+).operationTime;
 
-jsTest.log("Going to hold the stable timestamp of the secondary node at " + tojson(recoveryTimestamp));
+jsTest.log(
+    "Going to hold the stable timestamp of the secondary node at " + tojson(recoveryTimestamp),
+);
 // Hold back the recovery timestamp before doing another write so we have some oplog entries to
 // apply when restart in queryableBackupMode with recoverToOplogTimestamp.
 const secondary = st.rs0.getSecondary();
@@ -66,7 +72,9 @@ applyCRUDOnColl(st.s.getDB(kDbName)[kUnshardedCollName]);
 st.rs0.awaitReplication();
 
 jsTest.log("Going to stop the secondary node of the shard");
-const operationTime = assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).runCommand({ping: 1})).operationTime;
+const operationTime = assert.commandWorked(
+    st.rs0.getPrimary().getDB(kDbName).runCommand({ping: 1}),
+).operationTime;
 const secondaryPort = secondary.port;
 const secondaryDbPath = secondary.dbpath;
 // Remove the secondary from the cluster since we will restart it in queryable backup mode later.
@@ -74,8 +82,11 @@ const secondaryId = st.rs0.getNodeId(secondary);
 st.rs0.remove(secondaryId);
 st.rs0.reInitiate();
 
-jsTest.log("Going to start a mongod process with --shardsvr, --queryableBackupMode and recoverToOplogTimestamp");
-let configFileStr = "sharding:\n _overrideShardIdentity: '" + tojson(shard0Identity).replace(/\s+/g, " ") + "'";
+jsTest.log(
+    "Going to start a mongod process with --shardsvr, --queryableBackupMode and recoverToOplogTimestamp",
+);
+let configFileStr =
+    "sharding:\n _overrideShardIdentity: '" + tojson(shard0Identity).replace(/\s+/g, " ") + "'";
 let delim = _isWindows() ? "\\" : "/";
 let configFilePath = secondaryDbPath + delim + "config-for-read-only-mongod.yml";
 writeFile(configFilePath, configFileStr);

@@ -22,14 +22,20 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {makeUnsignedSecurityToken, runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+import {
+    makeUnsignedSecurityToken,
+    runCommandWithSecurityToken,
+} from "jstests/libs/multitenancy_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export const kNonTestOnlyClusterParameters = {
     changeStreamOptions: {
         default: {preAndPostImages: {expireAfterSeconds: "off"}},
-        testValues: [{preAndPostImages: {expireAfterSeconds: 30}}, {preAndPostImages: {expireAfterSeconds: 20}}],
+        testValues: [
+            {preAndPostImages: {expireAfterSeconds: 30}},
+            {preAndPostImages: {expireAfterSeconds: 20}},
+        ],
         setParameters: {"multitenancySupport": false},
     },
     changeStreams: {
@@ -115,7 +121,11 @@ export const kTestOnlyClusterParameters = {
 
 export const kOmittedInFTDCClusterParameterNames = ["testBoolClusterParameter"];
 
-export const kAllClusterParameters = Object.assign({}, kNonTestOnlyClusterParameters, kTestOnlyClusterParameters);
+export const kAllClusterParameters = Object.assign(
+    {},
+    kNonTestOnlyClusterParameters,
+    kTestOnlyClusterParameters,
+);
 
 export const kAllClusterParameterNames = Object.keys(kAllClusterParameters);
 
@@ -135,8 +145,8 @@ export const kAllClusterParameterValues2 = kAllClusterParameterNames.map((name) 
     Object.assign({_id: name}, kAllClusterParameters[name].testValues[1]),
 );
 
-export const kNonTestOnlyClusterParameterDefaults = Object.keys(kNonTestOnlyClusterParameters).map((name) =>
-    Object.assign({_id: name}, kAllClusterParameters[name].default),
+export const kNonTestOnlyClusterParameterDefaults = Object.keys(kNonTestOnlyClusterParameters).map(
+    (name) => Object.assign({_id: name}, kAllClusterParameters[name].default),
 );
 
 export function considerParameter(paramName, conn) {
@@ -152,7 +162,9 @@ export function considerParameter(paramName, conn) {
     // than or equal to the specified version.
     function validateMinFCV(cp) {
         if (cp.minFCV) {
-            const fcvDoc = conn.getDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
+            const fcvDoc = conn
+                .getDB("admin")
+                .system.version.findOne({_id: "featureCompatibilityVersion"});
             return MongoRunner.compareBinVersions(fcvDoc.version, cp.minFCV) >= 0;
         }
         return true;
@@ -230,9 +242,13 @@ export function runSetClusterParameter(conn, update, tenantId) {
     };
 
     const adminDB = conn.getDB("admin");
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
     assert.commandWorked(
-        runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: setClusterParameterDoc}),
+        runCommandWithSecurityToken(tenantToken, adminDB, {
+            setClusterParameter: setClusterParameterDoc,
+        }),
     );
 }
 
@@ -246,13 +262,20 @@ export function runGetClusterParameterNode(
     omitInFTDC = false,
     omittedInFTDCClusterParameters = [],
 ) {
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
     const adminDB = conn.getDB("admin");
 
     // Filter out parameters that we don't care about.
     if (Array.isArray(getClusterParameterArgs)) {
-        getClusterParameterArgs = getClusterParameterArgs.filter((name) => considerParameter(name, conn));
-    } else if (typeof getClusterParameterArgs === "string" && !considerParameter(getClusterParameterArgs, conn)) {
+        getClusterParameterArgs = getClusterParameterArgs.filter((name) =>
+            considerParameter(name, conn),
+        );
+    } else if (
+        typeof getClusterParameterArgs === "string" &&
+        !considerParameter(getClusterParameterArgs, conn)
+    ) {
         return true;
     }
 
@@ -262,11 +285,13 @@ export function runGetClusterParameterNode(
     let expectedClusterParameters = allExpectedClusterParameters.slice();
     if (omitInFTDC) {
         getClusterParameterCmd["omitInFTDC"] = true;
-        expectedClusterParameters = allExpectedClusterParameters.filter((expectedClusterParameter) => {
-            return !omittedInFTDCClusterParameters.find(
-                (testOnlyParameter) => testOnlyParameter == expectedClusterParameter._id,
-            );
-        });
+        expectedClusterParameters = allExpectedClusterParameters.filter(
+            (expectedClusterParameter) => {
+                return !omittedInFTDCClusterParameters.find(
+                    (testOnlyParameter) => testOnlyParameter == expectedClusterParameter._id,
+                );
+            },
+        );
     }
     const actualClusterParameters = assert.commandWorked(
         runCommandWithSecurityToken(tenantToken, adminDB, getClusterParameterCmd),
@@ -445,39 +470,59 @@ export function testValidClusterParameterCommands(conn) {
 
         // Run getClusterParameter in list format and '*' and ensure it returns all default values
         // on all nodes in the replica set.
-        runGetClusterParameterReplicaSet(conn, kAllClusterParameterNames, kAllClusterParameterDefaults);
+        runGetClusterParameterReplicaSet(
+            conn,
+            kAllClusterParameterNames,
+            kAllClusterParameterDefaults,
+        );
         runGetClusterParameterReplicaSet(conn, "*", kAllClusterParameterDefaults);
 
         // For each parameter, run setClusterParameter and verify that getClusterParameter
         // returns the updated value on all nodes in the replica set.
         for (let i = 0; i < kAllClusterParameterNames.length; i++) {
             runSetClusterParameter(conn.getPrimary(), kAllClusterParameterValues1[i]);
-            runGetClusterParameterReplicaSet(conn, kAllClusterParameterNames[i], [kAllClusterParameterValues1[i]]);
+            runGetClusterParameterReplicaSet(conn, kAllClusterParameterNames[i], [
+                kAllClusterParameterValues1[i],
+            ]);
 
             // Verify that document updates are also handled properly.
             runSetClusterParameter(conn.getPrimary(), kAllClusterParameterValues2[i]);
-            runGetClusterParameterReplicaSet(conn, kAllClusterParameterNames[i], [kAllClusterParameterValues2[i]]);
+            runGetClusterParameterReplicaSet(conn, kAllClusterParameterNames[i], [
+                kAllClusterParameterValues2[i],
+            ]);
         }
 
         // Finally, run getClusterParameter in list format and '*' and ensure that they now all
         // return updated values.
-        runGetClusterParameterReplicaSet(conn, kAllClusterParameterNames, kAllClusterParameterValues2);
+        runGetClusterParameterReplicaSet(
+            conn,
+            kAllClusterParameterNames,
+            kAllClusterParameterValues2,
+        );
         runGetClusterParameterReplicaSet(conn, "*", kAllClusterParameterValues2);
     } else if (conn instanceof ShardingTest) {
         // Run getClusterParameter in list format and '*' and ensure it returns all default values
         // on all nodes in the sharded cluster.
-        runGetClusterParameterSharded(conn, kAllClusterParameterNames, kAllClusterParameterDefaults);
+        runGetClusterParameterSharded(
+            conn,
+            kAllClusterParameterNames,
+            kAllClusterParameterDefaults,
+        );
         runGetClusterParameterSharded(conn, "*", kAllClusterParameterDefaults);
 
         // For each parameter, simulate setClusterParameter and verify that getClusterParameter
         // returns the updated value on all nodes in the sharded cluster.
         for (let i = 0; i < kAllClusterParameterNames.length; i++) {
             runSetClusterParameter(conn.s0, kAllClusterParameterValues1[i]);
-            runGetClusterParameterSharded(conn, kAllClusterParameterNames[i], [kAllClusterParameterValues1[i]]);
+            runGetClusterParameterSharded(conn, kAllClusterParameterNames[i], [
+                kAllClusterParameterValues1[i],
+            ]);
 
             // Verify that document updates are also handled properly.
             runSetClusterParameter(conn.s0, kAllClusterParameterValues2[i]);
-            runGetClusterParameterSharded(conn, kAllClusterParameterNames[i], [kAllClusterParameterValues2[i]]);
+            runGetClusterParameterSharded(conn, kAllClusterParameterNames[i], [
+                kAllClusterParameterValues2[i],
+            ]);
         }
 
         // Finally, run getClusterParameter in list format and '*' and ensure that they now all
@@ -487,23 +532,43 @@ export function testValidClusterParameterCommands(conn) {
     } else {
         // Standalone
         // Run getClusterParameter in list format and '*' and ensure it returns all default values.
-        assert(runGetClusterParameterNode(conn, kAllClusterParameterNames, kAllClusterParameterDefaults));
+        assert(
+            runGetClusterParameterNode(
+                conn,
+                kAllClusterParameterNames,
+                kAllClusterParameterDefaults,
+            ),
+        );
         assert(runGetClusterParameterNode(conn, "*", kAllClusterParameterDefaults));
 
         // For each parameter, run setClusterParameter and verify that getClusterParameter
         // returns the updated value.
         for (let i = 0; i < kAllClusterParameterNames.length; i++) {
             runSetClusterParameter(conn, kAllClusterParameterValues1[i]);
-            assert(runGetClusterParameterNode(conn, kAllClusterParameterNames[i], [kAllClusterParameterValues1[i]]));
+            assert(
+                runGetClusterParameterNode(conn, kAllClusterParameterNames[i], [
+                    kAllClusterParameterValues1[i],
+                ]),
+            );
 
             // Verify that document updates are also handled properly.
             runSetClusterParameter(conn, kAllClusterParameterValues2[i]);
-            assert(runGetClusterParameterNode(conn, kAllClusterParameterNames[i], [kAllClusterParameterValues2[i]]));
+            assert(
+                runGetClusterParameterNode(conn, kAllClusterParameterNames[i], [
+                    kAllClusterParameterValues2[i],
+                ]),
+            );
         }
 
         // Finally, run getClusterParameter in list format and '*' and ensure that they now return
         // updated values.
-        assert(runGetClusterParameterNode(conn, kAllClusterParameterNames, kAllClusterParameterValues2));
+        assert(
+            runGetClusterParameterNode(
+                conn,
+                kAllClusterParameterNames,
+                kAllClusterParameterValues2,
+            ),
+        );
         assert(runGetClusterParameterNode(conn, "*", kAllClusterParameterValues2));
     }
 }
@@ -513,10 +578,14 @@ export const tenantId2 = ObjectId();
 
 // Assert that explicitly getting a disabled cluster server parameter fails on a node.
 export function testExplicitDisabledGetClusterParameter(conn, tenantId) {
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
     const adminDB = conn.getDB("admin");
     assert.commandFailedWithCode(
-        runCommandWithSecurityToken(tenantToken, adminDB, {getClusterParameter: "testIntClusterParameter"}),
+        runCommandWithSecurityToken(tenantToken, adminDB, {
+            getClusterParameter: "testIntClusterParameter",
+        }),
         ErrorCodes.BadValue,
     );
     assert.commandFailedWithCode(
@@ -530,7 +599,9 @@ export function testExplicitDisabledGetClusterParameter(conn, tenantId) {
 // Tests that disabled cluster server parameters return errors or are filtered out as appropriate
 // by get/setClusterParameter.
 export function testDisabledClusterParameters(conn, tenantId) {
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
     if (conn instanceof ReplSetTest) {
         // Assert that explicitly setting a disabled cluster server parameter fails.
         const adminDB = conn.getPrimary().getDB("admin");
@@ -600,21 +671,29 @@ export function testDisabledClusterParameters(conn, tenantId) {
 
         // Assert that getClusterParameter: '*' succeeds but only returns enabled cluster
         // parameters.
-        assert(runGetClusterParameterNode(conn, "*", kNonTestOnlyClusterParameterDefaults, tenantId));
+        assert(
+            runGetClusterParameterNode(conn, "*", kNonTestOnlyClusterParameterDefaults, tenantId),
+        );
     }
 }
 
 // Tests that invalid uses of getClusterParameter fails on a given node.
 export function testInvalidGetClusterParameter(conn, tenantId) {
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
     const adminDB = conn.getDB("admin");
     // Assert that specifying a nonexistent parameter returns an error.
     assert.commandFailedWithCode(
-        runCommandWithSecurityToken(tenantToken, adminDB, {getClusterParameter: "nonexistentParam"}),
+        runCommandWithSecurityToken(tenantToken, adminDB, {
+            getClusterParameter: "nonexistentParam",
+        }),
         ErrorCodes.NoSuchKey,
     );
     assert.commandFailedWithCode(
-        runCommandWithSecurityToken(tenantToken, adminDB, {getClusterParameter: ["nonexistentParam"]}),
+        runCommandWithSecurityToken(tenantToken, adminDB, {
+            getClusterParameter: ["nonexistentParam"],
+        }),
         ErrorCodes.NoSuchKey,
     );
     assert.commandFailedWithCode(
@@ -631,7 +710,9 @@ export function testInvalidGetClusterParameter(conn, tenantId) {
 
 // Tests that invalid uses of set/getClusterParameter fail with the appropriate errors.
 export function testInvalidClusterParameterCommands(conn, tenantId) {
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
     if (conn instanceof ReplSetTest) {
         const adminDB = conn.getPrimary().getDB("admin");
 
@@ -640,12 +721,16 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
 
         // Assert that setting a nonexistent parameter on the primary returns an error.
         assert.commandFailed(
-            runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: {nonexistentParam: {intData: 5}}}),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {nonexistentParam: {intData: 5}},
+            }),
         );
 
         // Assert that running setClusterParameter with a scalar value fails.
         assert.commandFailed(
-            runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: {testIntClusterParameter: 5}}),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {testIntClusterParameter: 5},
+            }),
         );
 
         conn.getSecondaries().forEach(function (secondary) {
@@ -680,12 +765,16 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
 
         // Assert that setting a nonexistent parameter on the mongos returns an error.
         assert.commandFailed(
-            runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: {nonexistentParam: {intData: 5}}}),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {nonexistentParam: {intData: 5}},
+            }),
         );
 
         // Assert that running setClusterParameter with a scalar value fails.
         assert.commandFailed(
-            runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: {testIntClusterParameter: 5}}),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {testIntClusterParameter: 5},
+            }),
         );
 
         const shards = [conn.rs0, conn.rs1, conn.rs2];
@@ -769,12 +858,16 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
 
         // Assert that setting a nonexistent parameter returns an error.
         assert.commandFailed(
-            runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: {nonexistentParam: {intData: 5}}}),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {nonexistentParam: {intData: 5}},
+            }),
         );
 
         // Assert that running setClusterParameter with a scalar value fails.
         assert.commandFailed(
-            runCommandWithSecurityToken(tenantToken, adminDB, {setClusterParameter: {testIntClusterParameter: 5}}),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {testIntClusterParameter: 5},
+            }),
         );
 
         // Assert that invalid direct writes to <tenantId>_config.clusterParameters fail.
@@ -827,7 +920,9 @@ export function testGetClusterParameterStar(conn, tenantId) {
         adminDB = conn.getDB("admin");
     }
 
-    const tenantToken = tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    const tenantToken = tenantId
+        ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false})
+        : undefined;
 
     const allParameters = assert.commandWorked(
         runCommandWithSecurityToken(tenantToken, adminDB, {getClusterParameter: "*"}),

@@ -1,7 +1,11 @@
 // Tests new mongo using TLS options as parameters
 import {CA_CERT, CLIENT_CERT, SERVER_CERT, TRUSTED_CA_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
-const mongod = MongoRunner.runMongod({tlsMode: "requireTLS", tlsCertificateKeyFile: SERVER_CERT, tlsCAFile: CA_CERT});
+const mongod = MongoRunner.runMongod({
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT,
+});
 
 assert.commandWorked(mongod.adminCommand({connectionStatus: 1}));
 

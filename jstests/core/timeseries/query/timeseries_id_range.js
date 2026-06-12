@@ -17,9 +17,16 @@
  *   requires_fcv_80,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getAggPlanStage, getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getPlanStage,
+    getSingleNodeExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     // These dates will all be inserted into individual buckets.
@@ -44,7 +51,9 @@ TimeseriesTest.run((insert) => {
     function init() {
         coll.drop();
 
-        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+        );
 
         TimeseriesTest.createTimeFieldIndexToAllowBucketsReopening(coll);
     }

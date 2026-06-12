@@ -65,7 +65,10 @@ const twoJoinPipeline = [
 ];
 
 const enumerators = [
-    {name: "bottomUp (CHEAPEST)", params: {internalJoinReorderMode: "bottomUp", internalJoinPlanTreeShape: "leftDeep"}},
+    {
+        name: "bottomUp (CHEAPEST)",
+        params: {internalJoinReorderMode: "bottomUp", internalJoinPlanTreeShape: "leftDeep"},
+    },
     {
         name: "bottomUp (ALL)",
         params: {
@@ -84,7 +87,9 @@ const enumerators = [
 function runForcedJoinMethodTest(pipeline, forcedMethod) {
     for (const {name, params} of enumerators) {
         jsTest.log.info(`Force ${forcedMethod} with ${name} enumerator`);
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinMethod: forcedMethod, ...params}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalJoinMethod: forcedMethod, ...params}),
+        );
 
         const explain = coll.explain().aggregate(pipeline);
         assertAllJoinsUseMethod(explain, forcedMethod);
@@ -97,9 +102,14 @@ function runForcedJoinMethodTest(pipeline, forcedMethod) {
 function assertForcedMethodFails(pipeline, forcedMethod) {
     for (const {name, params} of enumerators) {
         jsTest.log.info(`Force ${forcedMethod} with ${name} enumerator (expect failure)`);
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinMethod: forcedMethod, ...params}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalJoinMethod: forcedMethod, ...params}),
+        );
 
-        assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.QueryRejectedBySettings);
+        assert.throwsWithCode(
+            () => coll.aggregate(pipeline).toArray(),
+            ErrorCodes.QueryRejectedBySettings,
+        );
     }
 }
 

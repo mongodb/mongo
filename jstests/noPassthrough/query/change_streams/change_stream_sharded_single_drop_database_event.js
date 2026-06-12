@@ -35,9 +35,15 @@ const kNsName = jsTestName() + "." + collName;
 assert.commandWorked(st.s0.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: kNsName, middle: {_id: 10}}));
 assert.commandWorked(st.s0.adminCommand({split: kNsName, middle: {_id: 20}}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {_id: 5}, to: st["shard0"].shardName}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {_id: 15}, to: st["shard1"].shardName}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {_id: 25}, to: st["shard2"].shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: kNsName, find: {_id: 5}, to: st["shard0"].shardName}),
+);
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: kNsName, find: {_id: 15}, to: st["shard1"].shardName}),
+);
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: kNsName, find: {_id: 25}, to: st["shard2"].shardName}),
+);
 
 for (let i = 0; i <= 30; i += 5) {
     assert.commandWorked(db[collName].insert({_id: i}));

@@ -88,29 +88,56 @@ assert.commandWorked(coll.insert({loc: lineEquator, a: -1, x: 2}));
 assert.commandWorked(coll.insert({loc: lineEquator, a: 2, x: 2}));
 
 assert.commandWorked(
-    coll.createIndex({a: 1}, {partialFilterExpression: {loc: {$geoWithin: {$geometry: bigPoly20Comp}}}}),
+    coll.createIndex(
+        {a: 1},
+        {partialFilterExpression: {loc: {$geoWithin: {$geometry: bigPoly20Comp}}}},
+    ),
 );
 
-var explainResults = coll.find({a: 2, loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).explain("queryPlanner");
+var explainResults = coll
+    .find({a: 2, loc: {$geoWithin: {$geometry: bigPoly20Comp}}})
+    .explain("queryPlanner");
 var winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
 coll.drop();
 
-assert.commandWorked(coll.insert({a: 1, name: "Dallas", loc: {type: "Point", coordinates: [-96.808891, 32.779]}}));
 assert.commandWorked(
-    coll.insert({a: 1, name: "Paris TX", loc: {type: "Point", coordinates: [-95.555513, 33.6609389]}}),
+    coll.insert({a: 1, name: "Dallas", loc: {type: "Point", coordinates: [-96.808891, 32.779]}}),
 );
 assert.commandWorked(
-    coll.insert({a: 2, name: "Houston", loc: {type: "Point", coordinates: [-95.3632715, 29.7632836]}}),
+    coll.insert({
+        a: 1,
+        name: "Paris TX",
+        loc: {type: "Point", coordinates: [-95.555513, 33.6609389]},
+    }),
 );
 assert.commandWorked(
-    coll.insert({a: 1, name: "San Antonio", loc: {type: "Point", coordinates: [-98.4936282, 29.4241219]}}),
+    coll.insert({
+        a: 2,
+        name: "Houston",
+        loc: {type: "Point", coordinates: [-95.3632715, 29.7632836]},
+    }),
 );
-assert.commandWorked(coll.insert({a: 3, name: "LA", loc: {type: "Point", coordinates: [-118.2436849, 34.0522342]}}));
 assert.commandWorked(
-    coll.insert({a: 3, name: "Berkeley", loc: {type: "Point", coordinates: [-122.272747, 37.8715926]}}),
+    coll.insert({
+        a: 1,
+        name: "San Antonio",
+        loc: {type: "Point", coordinates: [-98.4936282, 29.4241219]},
+    }),
 );
-assert.commandWorked(coll.insert({a: 1, name: "NYC", loc: {type: "Point", coordinates: [-74.0059729, 40.7142691]}}));
+assert.commandWorked(
+    coll.insert({a: 3, name: "LA", loc: {type: "Point", coordinates: [-118.2436849, 34.0522342]}}),
+);
+assert.commandWorked(
+    coll.insert({
+        a: 3,
+        name: "Berkeley",
+        loc: {type: "Point", coordinates: [-122.272747, 37.8715926]},
+    }),
+);
+assert.commandWorked(
+    coll.insert({a: 1, name: "NYC", loc: {type: "Point", coordinates: [-74.0059729, 40.7142691]}}),
+);
 
 let texasPolygon = {
     type: "Polygon",
@@ -150,7 +177,9 @@ let southWestUSPolygon = {
 assert.commandWorked(
     coll.createIndex(
         {loc: "2dsphere"},
-        add2dsphereVersionIfNeeded({partialFilterExpression: {loc: {$geoWithin: {$geometry: southWestUSPolygon}}}}),
+        add2dsphereVersionIfNeeded({
+            partialFilterExpression: {loc: {$geoWithin: {$geometry: southWestUSPolygon}}},
+        }),
     ),
 );
 
@@ -190,7 +219,9 @@ coll.drop();
 coll.createIndex(
     {loc: "2dsphere"},
     add2dsphereVersionIfNeeded({
-        partialFilterExpression: {loc: {$geoWithin: {$centerSphere: [[-74.0064, 40.7142], 10 / 3963.2]}}},
+        partialFilterExpression: {
+            loc: {$geoWithin: {$centerSphere: [[-74.0064, 40.7142], 10 / 3963.2]}},
+        },
     }),
 );
 // Point corresponding to UWS of Manhattan.

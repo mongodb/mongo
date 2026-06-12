@@ -18,7 +18,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.create = function create(db, collName) {
         this.counter++;
         let pipeline = [{$match: {_id: this.counter}}];
-        assert.commandWorkedOrFailedWithCode(db.createCollection("system.views"), ErrorCodes.NamespaceExists);
+        assert.commandWorkedOrFailedWithCode(
+            db.createCollection("system.views"),
+            ErrorCodes.NamespaceExists,
+        );
         assert.commandWorked(
             db.adminCommand({
                 applyOps: [

@@ -50,14 +50,22 @@ const baselineMetrics = waitForIndexStatusMetrics(
 jsTest.log("Starting an index build on each collection and freezing them.");
 IndexBuildTest.pauseIndexBuilds(testDB.getMongo());
 
-const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), firstColl.getFullName(), {b: 1}, {}, [
-    ErrorCodes.IndexBuildAborted,
-]);
+const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(
+    testDB.getMongo(),
+    firstColl.getFullName(),
+    {b: 1},
+    {},
+    [ErrorCodes.IndexBuildAborted],
+);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, firstCollName, "b_1");
 
-const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), secondColl.getFullName(), {b: 1}, {}, [
-    ErrorCodes.IndexBuildAborted,
-]);
+const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
+    testDB.getMongo(),
+    secondColl.getFullName(),
+    {b: 1},
+    {},
+    [ErrorCodes.IndexBuildAborted],
+);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, secondCollName, "b_1");
 
 jsTest.log("Dropping database " + dbName + " with in-progress index builds on its collections.");

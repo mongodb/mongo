@@ -39,7 +39,9 @@ const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 const testColl = st.s.getDB(dbName)[collName];
 assert.commandWorked(testColl.insert({x: 1}));
@@ -82,15 +84,20 @@ stopServerReplication(st.rs1.getSecondaries());
 
 sleep(remainingReshardingOperationTimeThresholdMillis + 1);
 assert.commandWorked(
-    st.rs0.getPrimary().adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 1}}),
+    st.rs0
+        .getPrimary()
+        .adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 1}}),
 );
 assert.commandWorked(
-    st.rs1.getPrimary().adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}),
+    st.rs1
+        .getPrimary()
+        .adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}),
 );
 fp.off();
 
 jsTest.log(
-    "Verify that the critical section cannot be started due to the replication lag on the " + "donor and recipient",
+    "Verify that the critical section cannot be started due to the replication lag on the " +
+        "donor and recipient",
 );
 sleep(reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis);
 assertReshardingInApplyingState(st.s, ns);
@@ -103,7 +110,10 @@ restartServerReplication(st.rs0.getSecondaries()[0]);
 sleep(reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis);
 assertReshardingInApplyingState(st.s, ns);
 
-jsTest.log("Re-enable majority replication on the donor and verify that the critical section " + "can now be started");
+jsTest.log(
+    "Re-enable majority replication on the donor and verify that the critical section " +
+        "can now be started",
+);
 restartServerReplication(st.rs1.getSecondaries()[0]);
 moveCollThread.join();
 

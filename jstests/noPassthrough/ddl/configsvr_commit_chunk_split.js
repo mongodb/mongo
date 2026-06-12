@@ -35,7 +35,18 @@ describe("_configsvrCommitChunkSplit retryability", function () {
         this.st.stop();
     });
 
-    function runConfigsvrCommitChunkSplit(st, ns, min, max, splitPoints, shardName, epoch, timestamp, lsid, txnNumber) {
+    function runConfigsvrCommitChunkSplit(
+        st,
+        ns,
+        min,
+        max,
+        splitPoints,
+        shardName,
+        epoch,
+        timestamp,
+        lsid,
+        txnNumber,
+    ) {
         let res;
         assert.soon(() => {
             res = st.configRS.getPrimary().adminCommand({
@@ -54,7 +65,8 @@ describe("_configsvrCommitChunkSplit retryability", function () {
             if (
                 RetryableWritesUtil.isRetryableCode(res.code) ||
                 RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-                (res.writeConcernError && RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
+                (res.writeConcernError &&
+                    RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
             ) {
                 return false;
             }
@@ -136,10 +148,15 @@ describe("_configsvrCommitChunkSplit retryability", function () {
         const chunkCountAfter = countChunks(this.st, this.collUuid);
         const dummyAfter = getDummyDoc(this.st, dummyDocId);
 
-        assert.eq(chunkCountBefore, chunkCountAfter, "split must not be re-applied for the same txnNumber", {
+        assert.eq(
             chunkCountBefore,
             chunkCountAfter,
-        });
+            "split must not be re-applied for the same txnNumber",
+            {
+                chunkCountBefore,
+                chunkCountAfter,
+            },
+        );
         assert.eq(
             dummyBefore.count,
             dummyAfter.count,

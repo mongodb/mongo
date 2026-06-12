@@ -66,7 +66,10 @@ function buildQueryWithWeights(weights, stageName) {
         // Must be $scoreFusion.
         query = [
             {
-                $scoreFusion: {input: {pipelines: pipelines, normalization: "none"}, combination: {weights}},
+                $scoreFusion: {
+                    input: {pipelines: pipelines, normalization: "none"},
+                    combination: {weights},
+                },
             },
             {$limit: limit},
         ];
@@ -78,10 +81,16 @@ function buildQueryWithWeights(weights, stageName) {
 function runTest(weights, expectedResultIds) {
     let rankFusionQuery = buildQueryWithWeights(weights, "$rankFusion");
     let rankFusionResults = coll.aggregate(rankFusionQuery).toArray();
-    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), rankFusionResults);
+    assertDocArrExpectedFuzzy(
+        buildExpectedResults(expectedResultIds, datasets.MOVIES),
+        rankFusionResults,
+    );
     let scoreFusionQuery = buildQueryWithWeights(weights, "$scoreFusion");
     let scoreFusionResults = coll.aggregate(scoreFusionQuery).toArray();
-    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), scoreFusionResults);
+    assertDocArrExpectedFuzzy(
+        buildExpectedResults(expectedResultIds, datasets.MOVIES),
+        scoreFusionResults,
+    );
 }
 
 // Asserts the $rankFusion/$scoreFusion query fails with the expected error code, given a bad

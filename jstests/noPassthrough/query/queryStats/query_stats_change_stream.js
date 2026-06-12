@@ -21,7 +21,9 @@ function testCollectionChangeStream(conn) {
     assertDropAndRecreateCollection(db, "coll");
 
     // Check change stream explain is recorded.
-    assert.commandWorked(db.coll.explain({"verbosity": "queryPlanner"}).aggregate([{"$changeStream": {}}]));
+    assert.commandWorked(
+        db.coll.explain({"verbosity": "queryPlanner"}).aggregate([{"$changeStream": {}}]),
+    );
     let queryStatsEntry = getLatestQueryStatsEntry(db);
     checkChangeStreamEntry({
         queryStatsEntry: queryStatsEntry,

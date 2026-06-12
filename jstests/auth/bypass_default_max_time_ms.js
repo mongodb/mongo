@@ -20,7 +20,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMS(db, newValue) {
-    assert.commandWorked(db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(
+        db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}),
+    );
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -152,7 +154,9 @@ const keyFile = "jstests/libs/key1";
         shards: {nodes: 1},
         config: {nodes: 1},
         keyFile: keyFile,
-        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+        mongosOptions: {
+            setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        },
     });
 
     const conn = st.s;
@@ -203,7 +207,10 @@ const keyFile = "jstests/libs/key1";
         }
 
         const newConn = new Mongo(conn.host);
-        const securityToken = _createSecurityToken({user: user, db: "admin", tenant: tenantId1}, vtsKey);
+        const securityToken = _createSecurityToken(
+            {user: user, db: "admin", tenant: tenantId1},
+            vtsKey,
+        );
         newConn._setSecurityToken(securityToken);
         return newConn.getDB(dbName);
     };

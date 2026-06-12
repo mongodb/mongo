@@ -19,12 +19,16 @@ let coll = null;
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
 
-jsTestLog("Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.");
+jsTestLog(
+    "Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.",
+);
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(
-    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+    db.createCollection(collName, {
+        timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+    }),
 );
 coll = db.getCollection(collName);
 
@@ -45,13 +49,17 @@ assert.eq(res.warnings.length, 0);
 // Inserts documents into another bucket but manually changes the min timestamp. Expects
 // warnings from validation.
 // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
-assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+assert.commandWorked(
+    conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+);
 
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(
-    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+    db.createCollection(collName, {
+        timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+    }),
 );
 coll = db.getCollection(collName);
 coll.insertMany(

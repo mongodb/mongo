@@ -25,7 +25,8 @@ function getReplannedMetric() {
 
 function getReplannedPlanIsCachedPlanMetric() {
     const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
-    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType].replanned_plan_is_cached_plan;
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType]
+        .replanned_plan_is_cached_plan;
 }
 
 // Carefully construct a collection so that some queries will have fewer works with an {a: 1} index
@@ -59,7 +60,10 @@ assert.eq(1, coll.find(cheapQuery).itcount());
 // should produce plans that can be associated with expensiveQuery as well.
 let entry = getCachedPlanForQuery(db, coll, expensiveQuery);
 let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
-assert.eq(getPlanCacheShapeHashFromObject(getCachedPlanForQuery(db, coll, cheapQuery)), planCacheShapeHash);
+assert.eq(
+    getPlanCacheShapeHashFromObject(getCachedPlanForQuery(db, coll, cheapQuery)),
+    planCacheShapeHash,
+);
 
 let entryWorks = entry.works;
 assert.eq(entry.isActive, false);

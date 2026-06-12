@@ -140,7 +140,9 @@ function makeExpectedBounds(op, path) {
     // operation, then we add bounds that include all subpaths as well, i.e.
     // ["path.to.field.", "path.to.field/")
     const pointPathBound = `["${path}", "${path}"]`;
-    const pathBounds = op.subpathBounds ? [pointPathBound, `["${path}.", "${path}/")`] : [pointPathBound];
+    const pathBounds = op.subpathBounds
+        ? [pointPathBound, `["${path}.", "${path}/")`]
+        : [pointPathBound];
 
     // {$_path: pathBounds, path.to.field: [[computed bounds]]}
     let expectedBounds = {$_path: pathBounds};
@@ -181,7 +183,9 @@ function fixupOldVersionBounds(bounds) {
 // with one predicate on each expected path, and a rooted $and over all predicates and paths.
 function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
     assert.commandWorked(coll.dropIndexes());
-    assert.commandWorked(coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
+    assert.commandWorked(
+        coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}),
+    );
 
     // The 'expectedPaths' argument is the set of paths which we expect to be indexed, based on
     // the keyPattern and projection. Make sure that the caller has provided this argument.
@@ -198,7 +202,10 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
             const query = {[path]: op.expression};
 
             // Explain the query, and determine whether an indexed solution is available.
-            const ixScans = getPlanStages(getWinningPlanFromExplain(coll.find(query).explain()), "IXSCAN");
+            const ixScans = getPlanStages(
+                getWinningPlanFromExplain(coll.find(query).explain()),
+                "IXSCAN",
+            );
 
             // If we expect the current path to have been excluded based on the $** keyPattern
             // and projection, or if the current operation is not supported by $** indexes,
@@ -254,7 +261,11 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         for (let offset = 0; offset < ixScanBounds.length; offset += orQueryBounds.length) {
             const ixBounds = ixScanBounds.slice(offset, offset + orQueryBounds.length);
             orQueryBounds.forEach((exBound) =>
-                assert(ixBounds.some((ixBound) => !bsonWoCompare(fixupOldVersionBounds(ixBound), exBound))),
+                assert(
+                    ixBounds.some(
+                        (ixBound) => !bsonWoCompare(fixupOldVersionBounds(ixBound), exBound),
+                    ),
+                ),
             );
         }
 
@@ -309,7 +320,9 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 // Given a compound wildcard key pattern, runs tests similar to 'runWildcardIndexTest()'.
 function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
     assert.commandWorked(coll.dropIndexes());
-    assert.commandWorked(coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
+    assert.commandWorked(
+        coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}),
+    );
 
     // Verify the expected behaviour for every combination of path and operator.
     for (let op of operationListCompound) {

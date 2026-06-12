@@ -17,7 +17,12 @@ const rsNodeOptions = {
     // Use a higher frequency for periodic noops to speed up the test.
     setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
 };
-const st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    rs: {nodes: 1},
+    other: {rsOptions: rsNodeOptions},
+});
 
 const mongos = st.s;
 const mongosColl = mongos.getCollection("test.foo");
@@ -25,7 +30,9 @@ const mongosDB = mongos.getDB("test");
 
 // Enable sharding to inform mongos of the database, allowing us to open a cursor.
 // Make sure all chunks start on shard 0.
-assert.commandWorked(mongos.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Open a change stream cursor before the collection is sharded.
 const changeStream = mongosColl.aggregate([{$changeStream: {}}]);
@@ -33,7 +40,9 @@ assert(!changeStream.hasNext(), "Do not expect any results yet");
 
 jsTestLog("Sharding collection");
 // Once we have a cursor, actually shard the collection.
-assert.commandWorked(mongos.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongos.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // Insert two documents.
 assert.commandWorked(mongosColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
@@ -145,7 +154,12 @@ assert.commandWorked(mongosColl.insert({_id: 16}, {writeConcern: {w: "majority"}
 // from both before and after the migration.
 jsTestLog("Migrating [10, MaxKey] chunk to new shard.");
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 20}, to: "newShard", _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 20},
+        to: "newShard",
+        _waitForDelete: true,
+    }),
 );
 assert.commandWorked(mongosColl.insert({_id: -6}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(mongosColl.insert({_id: 6}, {writeConcern: {w: "majority"}}));

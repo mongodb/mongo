@@ -34,7 +34,9 @@ const getPreImagesForAllNodes = (nodes) => {
 const setExpireAfterSeconds = (node, expireAfterSeconds) => {
     assert.commandWorked(
         node.getDB("admin").runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: expireAfterSeconds}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: expireAfterSeconds}},
+            },
         }),
     );
 };
@@ -58,9 +60,13 @@ const CommonOps = (node, commonCollName, collWithoutCommonPreImagesName, expireA
 
     // Create 'collWithoutCommonPreImages' but don't generate pre-images for it until node histories
     // diverge.
-    const collWithoutCommonPreImages = assertDropAndRecreateCollection(testDB, collWithoutCommonPreImagesName, {
-        changeStreamPreAndPostImages: {enabled: true},
-    });
+    const collWithoutCommonPreImages = assertDropAndRecreateCollection(
+        testDB,
+        collWithoutCommonPreImagesName,
+        {
+            changeStreamPreAndPostImages: {enabled: true},
+        },
+    );
 
     setExpireAfterSeconds(node, expireAfterSeconds);
 };
@@ -93,12 +99,18 @@ const SyncSourceOps = (node, commonCollName, collWithoutCommonPreImagesName) => 
     const collWithoutCommonPreImages = testDB[collWithoutCommonPreImagesName];
     assert.commandWorked(collWithoutCommonPreImages.insert(baseDocs));
     assert.commandWorked(
-        collWithoutCommonPreImages.update({}, {$set: {collName: collWithoutCommonPreImagesName}}, {multi: true}),
+        collWithoutCommonPreImages.update(
+            {},
+            {$set: {collName: collWithoutCommonPreImagesName}},
+            {multi: true},
+        ),
     );
 };
 
 const runTestCase = (expireAfterSeconds) => {
-    jsTest.log(`Running rollback test case with 'expireAfterSeconds' ${tojson(expireAfterSeconds)}`);
+    jsTest.log(
+        `Running rollback test case with 'expireAfterSeconds' ${tojson(expireAfterSeconds)}`,
+    );
 
     const rollbackTest = new RollbackTest(jsTestName(), undefined, nodeOptions);
     let primary = rollbackTest.getPrimary();

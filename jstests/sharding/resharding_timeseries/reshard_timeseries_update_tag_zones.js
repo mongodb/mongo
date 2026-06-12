@@ -24,7 +24,9 @@ const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Create a timeseries collection with a non-"meta" metaField name to exercise the shard key
 // translation path (user-facing field -> internal bucket field).
@@ -37,7 +39,9 @@ assert.commandWorked(
 );
 
 const existingZoneName = "x1";
-assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
+assert.commandWorked(
+    st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}),
+);
 
 // Set up an initial zone range on the existing shard key. updateZoneKeyRange requires the
 // internal field name ("meta.x") since config.collections stores the translated shard key.

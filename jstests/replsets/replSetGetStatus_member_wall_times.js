@@ -12,7 +12,10 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 // We use GTE to account for the possibility of other writes in the system (e.g. HMAC).
 // Comparison is GTE by default, GT if 'strict' is specified.
 function checkWallTimes(primary, greaterMemberIndex, lesserMemberIndex, strict = false) {
-    const ReduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(primary, "ReduceMajorityWriteLatency");
+    const ReduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(
+        primary,
+        "ReduceMajorityWriteLatency",
+    );
     assert.soonNoExcept(function () {
         let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
         assert(res.members, () => tojson(res));
@@ -86,7 +89,9 @@ stopServerReplication(laggedSecondary);
 
 jsTestLog("Adding more documents to collection");
 assert.commandWorked(primaryColl.insert({"two": 2}, {writeConcern: {w: 1}}));
-rst.awaitReplication(undefined /* timeout */, undefined /* secondaryOpTimeType */, [caughtUpSecondary]);
+rst.awaitReplication(undefined /* timeout */, undefined /* secondaryOpTimeType */, [
+    caughtUpSecondary,
+]);
 
 // Wall times of the lagged secondary should be strictly lesser.
 checkWallTimes(primary, 0 /* greater */, 2 /* lesser */, true /* strict */);

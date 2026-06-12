@@ -63,7 +63,11 @@ function runTest(st, createFn) {
 
     // Make sure system.session exists as sharded
     let result = st.config.collections.find({_id: kNs}).toArray();
-    assert.eq(1, result.length, "config.system.collection must exists as sharded, but found " + tojson(result));
+    assert.eq(
+        1,
+        result.length,
+        "config.system.collection must exists as sharded, but found " + tojson(result),
+    );
     assert.eq(
         kExpectedShardKey,
         result[0].key,

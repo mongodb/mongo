@@ -82,7 +82,9 @@ assertVoteCount(primary, {
 
 jsTestLog("Allowing primary to initiate the 'newlyAdded' field removal for the first node");
 let hangDuringAutomaticReconfigFP = configureFailPoint(primaryDb, "hangDuringAutomaticReconfig");
-assert.commandWorked(newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 rst.awaitSecondaryNodes(null, [newNodeOne]);
 
 hangDuringAutomaticReconfigFP.wait();
@@ -124,7 +126,9 @@ assert.eq(2, configOnDisk.members[1]._id, configOnDisk);
 assert(configOnDisk.members[1]["newlyAdded"], configOnDisk);
 
 jsTestLog("Letting the other secondary node finish initial sync");
-assert.commandWorked(newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 rst.awaitSecondaryNodes(null, [newNodeTwo]);
 
 jsTestLog("Waiting for the second 'newlyAdded' field to be removed (_id 2, index 1)");

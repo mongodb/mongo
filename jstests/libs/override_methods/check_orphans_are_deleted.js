@@ -47,7 +47,11 @@ ShardingTest.prototype.checkOrphansAreDeleted = function () {
 
                     if (shardConn != null) {
                         authutil.asCluster(shardConn, keyFile, () => {
-                            CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
+                            CheckOrphansAreDeletedHelpers.runCheck(
+                                mongosConn,
+                                shardConn,
+                                shardDoc._id,
+                            );
                         });
                     }
                 });

@@ -154,12 +154,19 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 0}));
 assert.eq(
     {_id: 0, a: 0, b: 6},
-    coll.findAndModify({query: {_id: 0, $expr: {$eq: ["$a", 0]}}, update: {$set: {b: 6}}, new: true}),
+    coll.findAndModify({
+        query: {_id: 0, $expr: {$eq: ["$a", 0]}},
+        update: {$set: {b: 6}},
+        new: true,
+    }),
 );
 
 // $expr with unbound variable throws.
 assert.throws(function () {
-    coll.findAndModify({query: {_id: 0, $expr: {$eq: ["$a", "$$unbound"]}}, update: {$set: {b: 6}}});
+    coll.findAndModify({
+        query: {_id: 0, $expr: {$eq: ["$a", "$$unbound"]}},
+        update: {$set: {b: 6}},
+    });
 });
 
 // $expr with division by zero throws.
@@ -171,7 +178,11 @@ assert.throws(function () {
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 0}));
 assert.throws(function () {
-    coll.findAndModify({query: {_id: 0, $expr: {$eq: ["$a", 0]}}, update: {$set: {b: 6}}, upsert: true});
+    coll.findAndModify({
+        query: {_id: 0, $expr: {$eq: ["$a", 0]}},
+        update: {$set: {b: 6}},
+        upsert: true,
+    });
 });
 
 // $expr is not allowed in $pull filter.
@@ -331,7 +342,11 @@ assert.writeError(coll.update({_id: 0}, {$pull: {a: {$expr: {$eq: ["$b", 5]}}}})
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
 assert.writeError(
-    coll.update({_id: 0}, {$set: {"a.$[i].b": 6}}, {arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]}),
+    coll.update(
+        {_id: 0},
+        {$set: {"a.$[i].b": 6}},
+        {arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]},
+    ),
 );
 
 // Any writes preceding the write that fails to parse are executed.

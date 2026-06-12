@@ -9,7 +9,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -18,7 +21,9 @@ const metaField = "m";
 const time = new Date("2024-01-01T00:00:00Z");
 
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 
 assert.commandWorked(
     coll.insert([
@@ -43,14 +48,21 @@ const aggCur = getTimeseriesCollForRawOps(coll).aggregate([{$match: {"control.co
 });
 
 let getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: aggCur.getId(), collection: getTimeseriesCollForRawOps(coll).getName(), batchSize: 1}),
+    db.runCommand({
+        getMore: aggCur.getId(),
+        collection: getTimeseriesCollForRawOps(coll).getName(),
+        batchSize: 1,
+    }),
 );
 assert.eq(1, getMoreRes.cursor.nextBatch.length, tojson(getMoreRes));
 assert.eq(expectedDocs[0], getMoreRes.cursor.nextBatch[0]);
 assert.neq(0, getMoreRes.cursor.id, tojson(getMoreRes));
 
 getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: getMoreRes.cursor.id, collection: getTimeseriesCollForRawOps(coll).getName()}),
+    db.runCommand({
+        getMore: getMoreRes.cursor.id,
+        collection: getTimeseriesCollForRawOps(coll).getName(),
+    }),
 );
 assert.eq(2, getMoreRes.cursor.nextBatch.length, tojson(getMoreRes));
 assert.eq(expectedDocs[1], getMoreRes.cursor.nextBatch[0]);

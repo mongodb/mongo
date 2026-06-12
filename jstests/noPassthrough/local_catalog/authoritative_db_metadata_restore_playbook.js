@@ -20,7 +20,10 @@ function getDbMetadataFromGlobalCatalog(db) {
 }
 
 function validateShardCatalog(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard = shard.getDB("config").getCollection("shard.catalog.databases").findOne({_id: dbName});
+    const dbMetadataFromShard = shard
+        .getDB("config")
+        .getCollection("shard.catalog.databases")
+        .findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
@@ -28,7 +31,11 @@ function overwriteGlobalCatalogConfigDbEntry(db, dbName, newValue) {
     assert.commandWorked(
         db
             .getSiblingDB("config")
-            .databases.update({_id: dbName}, {$set: newValue}, {upsert: true, writeConcern: {w: "majority"}}),
+            .databases.update(
+                {_id: dbName},
+                {$set: newValue},
+                {upsert: true, writeConcern: {w: "majority"}},
+            ),
     );
 }
 
@@ -181,7 +188,9 @@ for (const fn of [
     const dbName = "test";
     let db = st.s.getDB(dbName);
 
-    assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     // Create a collection and have data present on it to check later.
     const testDoc = {x: 1};
@@ -225,7 +234,9 @@ for (const fn of [
 
     // Verify that we can still read the test document and insert a new one.
     assert.sameMembers(db.testColl.find({}, {_id: 0, x: 1}).toArray(), [testDoc]);
-    assert.sameMembers(db.testColl.find({}, {_id: 0, x: 1}).readPref("secondary").toArray(), [testDoc]);
+    assert.sameMembers(db.testColl.find({}, {_id: 0, x: 1}).readPref("secondary").toArray(), [
+        testDoc,
+    ]);
     assert.commandWorked(db.testColl.insertOne(testDoc));
 
     // Drop the database as cleanup for the next operation.

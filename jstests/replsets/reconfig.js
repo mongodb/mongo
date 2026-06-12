@@ -58,7 +58,10 @@ assert.commandWorked(admin.runCommand({replSetReconfig: config, force: true}));
 // Wait for the last node to know it is REMOVED before stopping the test.
 jsTestLog("Waiting for the last node to be REMOVED.");
 assert.soonNoExcept(() => {
-    assert.commandFailedWithCode(nodes[4].adminCommand({"replSetGetStatus": 1}), ErrorCodes.InvalidReplicaSetConfig);
+    assert.commandFailedWithCode(
+        nodes[4].adminCommand({"replSetGetStatus": 1}),
+        ErrorCodes.InvalidReplicaSetConfig,
+    );
     return true;
 });
 jsTestLog("Finished waiting for the last node to be REMOVED.");

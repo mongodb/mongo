@@ -17,14 +17,18 @@ const memoryLimitMb = 1;
 const largeStr = "A".repeat(1024 * 1024); // 1MB string
 
 // Create a collection exceeding the memory limit.
-for (let i = 0; i < memoryLimitMb + 1; ++i) assert.commandWorked(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
+for (let i = 0; i < memoryLimitMb + 1; ++i)
+    assert.commandWorked(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
 
 viewsDB.largeView.drop();
 assert.commandWorked(viewsDB.createView("largeView", "largeColl", [{$sort: {x: -1}}]));
 
 function testDiskUse(cmd) {
     assert.commandWorked(viewsDB.adminCommand({setParameter: 1, allowDiskUseByDefault: false}));
-    assert.commandFailedWithCode(viewsDB.runCommand(cmd), ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    assert.commandFailedWithCode(
+        viewsDB.runCommand(cmd),
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+    );
 
     assert.commandWorked(viewsDB.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
     // TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
@@ -40,7 +44,10 @@ function testDiskUse(cmd) {
 // The 'count' command executes the view definition pipeline containing the '$sort' stage. This
 // stage needs to spill to disk if the memory limit is reached.
 assert.commandWorked(
-    viewsDB.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: memoryLimitMb * 1024 * 1024}),
+    viewsDB.adminCommand({
+        setParameter: 1,
+        internalQueryMaxBlockingSortMemoryUsageBytes: memoryLimitMb * 1024 * 1024,
+    }),
 );
 
 // In SBE the $sort will not cause spilling because it's only the integers being sorted on.

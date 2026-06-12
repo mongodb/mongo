@@ -23,7 +23,10 @@ assert.commandWorked(
 let majority_result = t.runCommand({find: "read_concern", readConcern: {level: "majority"}});
 if (isWiredTiger(db) || isEphemeral(db)) {
     // Majority readConcern succeed.
-    assert.commandWorked(majority_result, "expected majority readConcern to succeed on standalone mongod");
+    assert.commandWorked(
+        majority_result,
+        "expected majority readConcern to succeed on standalone mongod",
+    );
 } else {
     // Majority readConcern fail.
     assert.commandFailedWithCode(
@@ -42,7 +45,10 @@ assert.commandFailedWithCode(
 
 // Standalones don't support any operations with clusterTime.
 assert.commandFailedWithCode(
-    t.runCommand({find: "read_concern", readConcern: {level: "local", afterClusterTime: Timestamp(0, 1)}}),
+    t.runCommand({
+        find: "read_concern",
+        readConcern: {level: "local", afterClusterTime: Timestamp(0, 1)},
+    }),
     [ErrorCodes.IllegalOperation, ErrorCodes.NotImplemented],
     "expected afterClusterTime read to fail on standalone mongod",
 );

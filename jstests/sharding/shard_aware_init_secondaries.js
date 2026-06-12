@@ -41,9 +41,10 @@ let shardIdentityUpdate = {
     $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString},
 };
 assert.commandWorked(
-    priConn
-        .getDB("admin")
-        .system.version.update(shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 2}}),
+    priConn.getDB("admin").system.version.update(shardIdentityQuery, shardIdentityUpdate, {
+        upsert: true,
+        writeConcern: {w: 2},
+    }),
 );
 
 let secConn = replTest.getSecondary();
@@ -54,7 +55,11 @@ let res = secConn.getDB("admin").runCommand({shardingState: 1});
 assert(res.enabled, tojson(res));
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
-assert.soon(() => shardIdentityDoc.configsvrConnectionString == secConn.adminCommand({shardingState: 1}).configServer);
+assert.soon(
+    () =>
+        shardIdentityDoc.configsvrConnectionString ==
+        secConn.adminCommand({shardingState: 1}).configServer,
+);
 
 replTest.restart(replTest.getNodeId(secConn));
 replTest.waitForPrimary();
@@ -68,7 +73,11 @@ res = secConn.getDB("admin").runCommand({shardingState: 1});
 assert(res.enabled, tojson(res));
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
-assert.soon(() => shardIdentityDoc.configsvrConnectionString == secConn.adminCommand({shardingState: 1}).configServer);
+assert.soon(
+    () =>
+        shardIdentityDoc.configsvrConnectionString ==
+        secConn.adminCommand({shardingState: 1}).configServer,
+);
 
 replTest.stopSet();
 

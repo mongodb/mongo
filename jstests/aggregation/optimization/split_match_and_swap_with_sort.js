@@ -46,7 +46,10 @@ assert.commandWorked(
 }
 
 {
-    const pipeline = [{$sort: {b: 1}}, {$match: {$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}}];
+    const pipeline = [
+        {$sort: {b: 1}},
+        {$match: {$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}},
+    ];
 
     assert.eq(
         [
@@ -59,14 +62,21 @@ assert.commandWorked(
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getAggPlanStage(pipelineExplained, "COLLSCAN");
     assert.neq(null, collScanStage, pipelineExplained);
-    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]}, collScanStage.filter, collScanStage);
+    assert.eq(
+        {$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]},
+        collScanStage.filter,
+        collScanStage,
+    );
 }
 
 {
     // SERVER-46233: Normally a $or at the root of a $match expression prevents it from getting
     // split. However, When the $or has only one child, the optimizer should be able to eliminate
     // the $or and then recognize that the simplified result _is_ eligible to be split.
-    const pipeline = [{$sort: {b: 1}}, {$match: {$or: [{$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}]}}];
+    const pipeline = [
+        {$sort: {b: 1}},
+        {$match: {$or: [{$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}]}},
+    ];
 
     assert.eq(
         [
@@ -79,5 +89,9 @@ assert.commandWorked(
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getAggPlanStage(pipelineExplained, "COLLSCAN");
     assert.neq(null, collScanStage, pipelineExplained);
-    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]}, collScanStage.filter, collScanStage);
+    assert.eq(
+        {$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]},
+        collScanStage.filter,
+        collScanStage,
+    );
 }

@@ -115,9 +115,21 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn, validateFn 
                     "Expected nUpdateOps in writes metrics: " + tojson(entry),
                 );
                 // Each entry should report that there were 4 update ops in the command.
-                assert.eq(entry.metrics.writes.nUpdateOps.sum, 4, "Expected nUpdateOps.sum to be 4: " + tojson(entry));
-                assert.eq(entry.metrics.writes.nUpdateOps.max, 4, "Expected nUpdateOps.min to be 4: " + tojson(entry));
-                assert.eq(entry.metrics.writes.nUpdateOps.min, 4, "Expected nUpdateOps.max to be 4: " + tojson(entry));
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.sum,
+                    4,
+                    "Expected nUpdateOps.sum to be 4: " + tojson(entry),
+                );
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.max,
+                    4,
+                    "Expected nUpdateOps.min to be 4: " + tojson(entry),
+                );
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.min,
+                    4,
+                    "Expected nUpdateOps.max to be 4: " + tojson(entry),
+                );
             }
         });
 
@@ -153,8 +165,16 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn, validateFn 
                     "Expected nUpdateOps.sum to be 16: " + tojson(entry),
                 );
                 // Each recording should have updated the value by 4.
-                assert.eq(entry.metrics.writes.nUpdateOps.max, 4, "Expected nUpdateOps.min to be 4: " + tojson(entry));
-                assert.eq(entry.metrics.writes.nUpdateOps.min, 4, "Expected nUpdateOps.max to be 4: " + tojson(entry));
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.max,
+                    4,
+                    "Expected nUpdateOps.min to be 4: " + tojson(entry),
+                );
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.min,
+                    4,
+                    "Expected nUpdateOps.max to be 4: " + tojson(entry),
+                );
             }
         });
 
@@ -190,8 +210,16 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn, validateFn 
                     4,
                     "Expected nUpdateOps.sum to be 4 (2 executions * 2 ops): " + tojson(entry),
                 );
-                assert.eq(entry.metrics.writes.nUpdateOps.max, 2, "Expected nUpdateOps.max to be 2: " + tojson(entry));
-                assert.eq(entry.metrics.writes.nUpdateOps.min, 2, "Expected nUpdateOps.min to be 2: " + tojson(entry));
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.max,
+                    2,
+                    "Expected nUpdateOps.max to be 2: " + tojson(entry),
+                );
+                assert.eq(
+                    entry.metrics.writes.nUpdateOps.min,
+                    2,
+                    "Expected nUpdateOps.min to be 2: " + tojson(entry),
+                );
             }
         });
     });
@@ -224,6 +252,8 @@ runUpdateCmdMetricsTests(
     (fixture) => fixture.stop(),
     ({testDB, coll}) => {
         const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
-        assert.gte(Object.keys(stats.shards).length, 2, "Expected data on at least 2 shards", {shards: stats.shards});
+        assert.gte(Object.keys(stats.shards).length, 2, "Expected data on at least 2 shards", {
+            shards: stats.shards,
+        });
     },
 );

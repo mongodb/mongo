@@ -72,7 +72,9 @@ if (systemUsesReplicatedTruncates(primary)) {
     jsTest.log.info("Skipping test because replicated truncates are enabled.");
 } else {
     // Create a collection with change stream pre- and post-images enabled.
-    assert.commandWorked(testDB.createCollection("coll", {changeStreamPreAndPostImages: {enabled: true}}));
+    assert.commandWorked(
+        testDB.createCollection("coll", {changeStreamPreAndPostImages: {enabled: true}}),
+    );
     const coll = testDB.coll;
 
     // Insert documents and perform several rounds of updates to produce a large number of pre-images.
@@ -161,7 +163,10 @@ if (systemUsesReplicatedTruncates(primary)) {
     // cause the startup procedure to request the RSTL in X mode. On a build without a fix this races and
     // deadlocks: the X request queues behind the IX holder, IX priority inversion blocks oplog
     // application that would commit/abort the prepared transaction, and nothing makes progress.
-    jsTestLog("Secondary is in RECOVERING state; allowing preimage remover to race with pending RSTL " + "acquisition");
+    jsTestLog(
+        "Secondary is in RECOVERING state; allowing preimage remover to race with pending RSTL " +
+            "acquisition",
+    );
 
     // Wait for the ChangeStreamExpiredPreImageRemover to reach its "hang" failpoint and then make it
     // enter the collection scan phase.
@@ -174,7 +179,10 @@ if (systemUsesReplicatedTruncates(primary)) {
     );
 
     assert.commandWorked(
-        restartedSecondary.adminCommand({configureFailPoint: "preImagesTruncateHangBeforeExecution", mode: "off"}),
+        restartedSecondary.adminCommand({
+            configureFailPoint: "preImagesTruncateHangBeforeExecution",
+            mode: "off",
+        }),
     );
 
     jsTestLog("Waiting for preimage remover to early bail out");
@@ -194,7 +202,10 @@ if (systemUsesReplicatedTruncates(primary)) {
 
     jsTestLog("Releasing hangBeforeFinishRecovery failpoint");
     assert.commandWorked(
-        restartedSecondary.adminCommand({configureFailPoint: "hangBeforeFinishRecovery", mode: "off"}),
+        restartedSecondary.adminCommand({
+            configureFailPoint: "hangBeforeFinishRecovery",
+            mode: "off",
+        }),
     );
 
     jsTestLog("Waiting for secondary to fully transition to SECONDARY state");

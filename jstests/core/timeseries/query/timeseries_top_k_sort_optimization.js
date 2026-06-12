@@ -42,7 +42,12 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getCallerName} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {getAggPlanStages, getEngine, getPlanStages, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getEngine,
+    getPlanStages,
+    getSingleNodeExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -145,7 +150,9 @@ const doc_t10_sB_x6_y1 = {
 function prepareCollection(collName, docs) {
     testDB[collName].drop();
 
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "s"}}));
+    assert.commandWorked(
+        testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "s"}}),
+    );
     const coll = testDB[collName];
     assert.commandWorked(coll.insert(docs));
 
@@ -170,7 +177,11 @@ function verifyOptimizedForClassic(pipeline, explain) {
 function verifySortNotAbsorbedForClassic(pipeline, explain) {
     const sortStages = getAggPlanStages(explain, "$sort");
     const groupStages = getAggPlanStages(explain, "$group");
-    assert.eq(sortStages.length, 1, `W/o the optimization, $sort should appear in the plan: ${D(pipeline, explain)}`);
+    assert.eq(
+        sortStages.length,
+        1,
+        `W/o the optimization, $sort should appear in the plan: ${D(pipeline, explain)}`,
+    );
     assert.eq(groupStages.length, 1, `Expected a single $group stage: ${D(pipeline, explain)}`);
 }
 
@@ -284,7 +295,10 @@ function runTestCase({
             doc_t9_sC_x6_y1000,
             doc_t10_sB_x6_y1,
         ],
-        pipeline: [{$sort: {t: 1}}, {$group: {_id: "$s", open: {$first: "$x"}, close: {$last: "$x"}}}],
+        pipeline: [
+            {$sort: {t: 1}},
+            {$group: {_id: "$s", open: {$first: "$x"}, close: {$last: "$x"}}},
+        ],
         expected: [
             {_id: "A", open: 10, close: 4},
             {_id: "B", open: 2, close: 6},
@@ -467,7 +481,13 @@ function runTestCase({
 
 (function testNotOptimizedOtherStageBetweenSortAndGroup() {
     runTestCase({
-        docs: [doc_t1_sD_adotb_0_, doc_t2_sA_adotb_1_99_, doc_t3_sB_adotb2, doc_t6_sC_adotb_100_, doc_t7_sC_a_50_51_],
+        docs: [
+            doc_t1_sD_adotb_0_,
+            doc_t2_sA_adotb_1_99_,
+            doc_t3_sB_adotb2,
+            doc_t6_sC_adotb_100_,
+            doc_t7_sC_a_50_51_,
+        ],
         pipeline: [
             {$sort: {"a.b": 1}},
             {$addFields: {arrsum: {$sum: "$a.b"}}},
@@ -521,7 +541,10 @@ function runTestCase({
             doc_t9_sC_x6_y1000,
             doc_t10_sB_x6_y1,
         ],
-        pipeline: [{$sort: {t: 1}}, {$group: {_id: "$s", f1: {$first: "$x"}, f2: {$firstN: {n: 2, input: "$y"}}}}],
+        pipeline: [
+            {$sort: {t: 1}},
+            {$group: {_id: "$s", f1: {$first: "$x"}, f2: {$firstN: {n: 2, input: "$y"}}}},
+        ],
         expected: [
             {_id: "A", f1: 10, f2: [5, 1]},
             {_id: "B", f1: 2, f2: [100, 24]},
@@ -546,7 +569,10 @@ function runTestCase({
             doc_t9_sC_x6_y1000,
             doc_t10_sB_x6_y1,
         ],
-        pipeline: [{$sort: {x: {$meta: "randVal"}}}, {$group: {_id: "$s", open: {$first: "$x"}, close: {$last: "$x"}}}],
+        pipeline: [
+            {$sort: {x: {$meta: "randVal"}}},
+            {$group: {_id: "$s", open: {$first: "$x"}, close: {$last: "$x"}}},
+        ],
         expected: [
             {_id: "A", open: 10, close: 4},
             {_id: "B", open: 2, close: 6},
@@ -555,7 +581,11 @@ function runTestCase({
         ],
         verifyThis: (pipeline, explain) => {
             const sortStages = getAggPlanStages(explain, "$sort");
-            assert.eq(sortStages.length, 1, `W/o the optimization, $sort should appear: ${D(pipeline, explain)}`);
+            assert.eq(
+                sortStages.length,
+                1,
+                `W/o the optimization, $sort should appear: ${D(pipeline, explain)}`,
+            );
         },
     });
 })();

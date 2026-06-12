@@ -21,7 +21,10 @@ assert.commandWorked(testDB.dropDatabase({}));
 function assertPlanIsEOF(result) {
     assert.commandWorked(result);
     assert(isEofPlan(db, result), "Expected an EOF plan, got: " + tojson(result));
-    assert(!db.getMongo().getDBNames().includes(testDB.getName()), "Database should not have been created");
+    assert(
+        !db.getMongo().getDBNames().includes(testDB.getName()),
+        "Database should not have been created",
+    );
 
     // listDatabases filters out empty DBs, so we also directly check the config.databases
     // collection to ensure that the database metadata entry was not created.
@@ -44,7 +47,9 @@ describe("explain on non-existent database should return an EOF plan", function 
     });
 
     it("for aggregate specified with explain command", function () {
-        assertPlanIsEOF(testDB.test.runCommand({explain: {aggregate: "test", pipeline: [], cursor: {}}}));
+        assertPlanIsEOF(
+            testDB.test.runCommand({explain: {aggregate: "test", pipeline: [], cursor: {}}}),
+        );
     });
 
     it("for find", function () {
@@ -62,18 +67,24 @@ describe("explain on non-existent database should return an EOF plan", function 
     // });
 
     it("for delete", function () {
-        assertPlanIsEOF(testDB.runCommand({explain: {delete: "test", deletes: [{q: {a: 1}, limit: 0}]}}));
+        assertPlanIsEOF(
+            testDB.runCommand({explain: {delete: "test", deletes: [{q: {a: 1}, limit: 0}]}}),
+        );
     });
 
     it("for update with upsert:false", function () {
         assertPlanIsEOF(
-            testDB.runCommand({explain: {update: "test", updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]}}),
+            testDB.runCommand({
+                explain: {update: "test", updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]},
+            }),
         );
     });
 
     it("for update with upsert:true", function () {
         assertPlanIsEOF(
-            testDB.runCommand({explain: {update: "test", updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]}}),
+            testDB.runCommand({
+                explain: {update: "test", updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]},
+            }),
         );
     });
 
@@ -100,7 +111,9 @@ describe("explain on non-existent database should return an EOF plan", function 
 
     it("for rawData delete", function () {
         assertPlanIsEOF(
-            testDB.runCommand({explain: {delete: "test", deletes: [{q: {a: 1}, limit: 0}], rawData: true}}),
+            testDB.runCommand({
+                explain: {delete: "test", deletes: [{q: {a: 1}, limit: 0}], rawData: true},
+            }),
         );
     });
 
@@ -110,7 +123,12 @@ describe("explain on non-existent database should return an EOF plan", function 
     it("for findAndModify with upsert:false", function () {
         assert.commandFailedWithCode(
             testDB.runCommand({
-                explain: {findAndModify: "test", query: {a: 1}, update: {$set: {b: 1}}, upsert: false},
+                explain: {
+                    findAndModify: "test",
+                    query: {a: 1},
+                    update: {$set: {b: 1}},
+                    upsert: false,
+                },
             }),
             ErrorCodes.NamespaceNotFound,
         );
@@ -119,7 +137,12 @@ describe("explain on non-existent database should return an EOF plan", function 
     it("for findAndModify with upsert:true", function () {
         assert.commandFailedWithCode(
             testDB.runCommand({
-                explain: {findAndModify: "test", query: {a: 1}, update: {$set: {b: 1}}, upsert: true},
+                explain: {
+                    findAndModify: "test",
+                    query: {a: 1},
+                    update: {$set: {b: 1}},
+                    upsert: true,
+                },
             }),
             ErrorCodes.NamespaceNotFound,
         );

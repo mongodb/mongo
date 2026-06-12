@@ -5,13 +5,17 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
 
 const measurementsPerBucket = 10;
 const nBuckets = 10;
-const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: measurementsPerBucket}});
+const conn = MongoRunner.runMongod({
+    setParameter: {timeseriesBucketMaxCount: measurementsPerBucket},
+});
 
 const testDB = conn.getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 const tsColl = testDB.getCollection("tsColl");
-assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "start", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "start", metaField: "m"}}),
+);
 
 const bulk = tsColl.initializeUnorderedBulkOp();
 const aMinuteInMs = 60 * 1000;
@@ -89,7 +93,12 @@ let assertMeasurementsInBuckets = (lo, hi, measurements) => {
 assertMeasurementsInBuckets(2, 4, filteredMeasurements);
 
 // Delete bucket 2.
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, tsColl).deleteOne({_id: ids[0]}, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, tsColl).deleteOne(
+        {_id: ids[0]},
+        getRawOperationSpec(testDB),
+    ),
+);
 filteredMeasurements = getFilteredMeasurements();
 assertMeasurementsInBuckets(3, 4, filteredMeasurements);
 

@@ -104,7 +104,10 @@ describe("$changeStream", function () {
                     assert.soon(() => csCursor.hasNext());
                     const nextEvent = csCursor.next();
                     for (let fieldName in expectedEvent) {
-                        assert.eq(expectedEvent[fieldName], nextEvent[fieldName], {expectedEvent, nextEvent});
+                        assert.eq(expectedEvent[fieldName], nextEvent[fieldName], {
+                            expectedEvent,
+                            nextEvent,
+                        });
                     }
                 }
             } else {
@@ -242,7 +245,9 @@ describe("$changeStream", function () {
     describe("Throws an exception when handling shard insertion document coming from the shard in invalid format", function () {
         function assertChangeStreamShouldThrowForV1(projection, expectedErrorCode) {
             const isMultiversion =
-                TestData.useRandomBinVersionsWithinReplicaSet || TestData.mixedBinVersions || TestData.mongosBinVersion;
+                TestData.useRandomBinVersionsWithinReplicaSet ||
+                TestData.mixedBinVersions ||
+                TestData.mongosBinVersion;
             if (isMultiversion) {
                 return;
             }
@@ -262,7 +267,9 @@ describe("$changeStream", function () {
                 let res = csCursor;
                 assert.soon(() => {
                     const cursorId = res._cursorid ?? res.cursor.id;
-                    res = assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "test"}));
+                    res = assert.commandWorked(
+                        testDB.runCommand({getMore: cursorId, collection: "test"}),
+                    );
                 });
             }, [expectedErrorCode, undefined]);
         }

@@ -26,7 +26,10 @@ assert(
         coll
             .find(
                 {
-                    $and: [{$or: [{a: {$lt: 2}}, {a: {$gt: 3}}]}, {b: {$elemMatch: {c: {$eq: 1, $exists: true}}}}],
+                    $and: [
+                        {$or: [{a: {$lt: 2}}, {a: {$gt: 3}}]},
+                        {b: {$elemMatch: {c: {$eq: 1, $exists: true}}}},
+                    ],
                 },
                 {_id: 0},
             )
@@ -43,7 +46,10 @@ assert(
 const results = coll
     .find(
         {
-            $and: [{$or: [{a: {$lt: 2}}, {a: {$gt: 3}}]}, {b: {$elemMatch: {c: {$eq: 1, $mod: [2, 1]}}}}],
+            $and: [
+                {$or: [{a: {$lt: 2}}, {a: {$gt: 3}}]},
+                {b: {$elemMatch: {c: {$eq: 1, $mod: [2, 1]}}}},
+            ],
         },
         {_id: 0},
     )
@@ -72,7 +78,12 @@ assert.commandWorked(coll.createIndex({"b.e": 1, "b.c": 1}));
 // Test OR within elemmatch.
 assert(
     arrayEq(
-        coll.find({$and: [{a: 5}, {b: {$elemMatch: {$and: [{c: 5}, {$or: [{d: 6}, {e: 7}]}]}}}]}, {_id: 0}).toArray(),
+        coll
+            .find(
+                {$and: [{a: 5}, {b: {$elemMatch: {$and: [{c: 5}, {$or: [{d: 6}, {e: 7}]}]}}}]},
+                {_id: 0},
+            )
+            .toArray(),
         [
             {a: 5, b: [{c: 5, d: 6, e: 7}]},
             {a: 5, b: [{c: 5, d: 6, e: 8}]},

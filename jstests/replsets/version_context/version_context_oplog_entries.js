@@ -21,8 +21,9 @@ rst.initiate();
 const conn = rst.getPrimary();
 const db = conn.getDB("test");
 
-const currentFCV = assert.commandWorked(db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-    .featureCompatibilityVersion.version;
+const currentFCV = assert.commandWorked(
+    db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+).featureCompatibilityVersion.version;
 
 // Force operations to use an Operation FCV, so they emit the `versionContext` field in their oplog
 // entries. This is required since not all operations use an OFCV yet.
@@ -47,7 +48,10 @@ function verifyStandaloneOplogEntry(oplogEntry) {
     );
 
     if (oplogEntry.op === "n") {
-        assert(!oplogEntry.versionContext, "Unexpected versionContext in no-op entry: " + tojson(oplogEntry));
+        assert(
+            !oplogEntry.versionContext,
+            "Unexpected versionContext in no-op entry: " + tojson(oplogEntry),
+        );
     } else {
         assert.eq({OFCV: currentFCV}, oplogEntry.versionContext, tojson(oplogEntry));
     }
@@ -56,7 +60,9 @@ function verifyStandaloneOplogEntry(oplogEntry) {
 (function testStandaloneOperations() {
     const coll = db.no_txn;
 
-    const insertResult = assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{x: 1}]}));
+    const insertResult = assert.commandWorked(
+        db.runCommand({insert: coll.getName(), documents: [{x: 1}]}),
+    );
     verifyStandaloneOplogEntry(findOneInOplog({ts: insertResult.operationTime}));
 
     const updateResult = assert.commandWorked(
@@ -94,7 +100,9 @@ function verifyBatchedWritesEntry(oplogEntry) {
 (function testBatchedWrites() {
     const coll = db.getCollection("batched_writes");
 
-    const insertResult = assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{x: 1}, {x: 2}]}));
+    const insertResult = assert.commandWorked(
+        db.runCommand({insert: coll.getName(), documents: [{x: 1}, {x: 2}]}),
+    );
     verifyBatchedWritesEntry(findOneInOplog({ts: insertResult.operationTime}));
 
     const deleteResult = assert.commandWorked(
@@ -146,7 +154,9 @@ function verifyTransactionOplogEntry(oplogEntry) {
     assert.commandWorked(coll.insertOne({x: 1}));
     assert.commandWorked(coll.updateOne({x: 1}, {$set: {x: 2}}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    const commitResult = assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+    const commitResult = assert.commandWorked(
+        PrepareHelpers.commitTransaction(session, prepareTimestamp),
+    );
 
     verifyTransactionOplogEntry(findOneInOplog({ts: prepareTimestamp}));
     verifyStandaloneOplogEntry(findOneInOplog({ts: commitResult.operationTime}));

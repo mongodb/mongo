@@ -95,7 +95,11 @@ const newShardKey = {
 main();
 
 function main() {
-    const testCases = [TestMode.kSuccess, TestMode.kFailInCloning, TestMode.kFailInAwaitingFetchTimestamp];
+    const testCases = [
+        TestMode.kSuccess,
+        TestMode.kFailInCloning,
+        TestMode.kFailInAwaitingFetchTimestamp,
+    ];
 
     for (const mode of testCases) {
         const isSuccess = mode === TestMode.kSuccess;
@@ -132,7 +136,11 @@ function initializeCollection(collName) {
 
 function runResharding(collName, uuid) {
     jsTest.log.info(`Running resharding with user supplied UUID: ${tojson(uuid)}`);
-    return db.adminCommand({reshardCollection: `${dbName}.${collName}`, key: newShardKey, reshardingUUID: uuid});
+    return db.adminCommand({
+        reshardCollection: `${dbName}.${collName}`,
+        key: newShardKey,
+        reshardingUUID: uuid,
+    });
 }
 
 function getAllReplicaSets() {
@@ -201,7 +209,11 @@ function getCompletionLogs(uuid) {
 function verifyCompletionLogs(collName, logs, mode) {
     // There could be multiple completion logs if deleting the coordinator state document is rolled
     // back.
-    assert.gt(logs.length, 0, "No log lines with id 7763800 emitted on config server following resharding.");
+    assert.gt(
+        logs.length,
+        0,
+        "No log lines with id 7763800 emitted on config server following resharding.",
+    );
     const completionLog = JSON.parse(logs.pop());
     jsTest.log.info(`Completion log found: ${tojson(completionLog)}`);
     const info = completionLog.attr.info;
@@ -233,10 +245,17 @@ function verifyDonorMetrics(stats, mode) {
         assert.gt(donor.bytesToClone, 0, "bytesToClone");
         assert.gt(donor.documentsToClone, 0, "documentsToClone");
         assert.gt(donor.indexCount, 0, "donor indexCount");
-        assert(donor.hasOwnProperty("writesDuringCriticalSection"), "Missing writesDuringCriticalSection");
+        assert(
+            donor.hasOwnProperty("writesDuringCriticalSection"),
+            "Missing writesDuringCriticalSection",
+        );
         if (isSuccess) {
             assert(donor.hasOwnProperty("phaseDurations"), "Missing donor phaseDurations");
-            assert.gte(donor.phaseDurations.criticalSectionDurationMs, 0, "criticalSectionDurationMs");
+            assert.gte(
+                donor.phaseDurations.criticalSectionDurationMs,
+                0,
+                "criticalSectionDurationMs",
+            );
             assert(donor.hasOwnProperty("criticalSectionInterval"));
             const interval = donor.criticalSectionInterval;
             assert(interval.hasOwnProperty("start"), "Missing criticalSectionInterval start");
@@ -266,7 +285,11 @@ function verifyRecipientMetrics(stats, mode) {
             assert.gt(duration, 0, `Phase ${phaseName} had no duration`);
         }
         if (isSuccess) {
-            for (const expected of ["copyDurationMs", "applyDurationMs", "buildingIndexDurationMs"]) {
+            for (const expected of [
+                "copyDurationMs",
+                "applyDurationMs",
+                "buildingIndexDurationMs",
+            ]) {
                 assert(
                     recipient.phaseDurations.hasOwnProperty(expected),
                     `Successful operation did not report ${expected}`,
@@ -300,12 +323,20 @@ function verifyTotals(stats, mode) {
 
     assert.gt(totals.maxDonorIndexes, 0, "maxDonorIndexes");
     assertMetricGtZero("maxRecipientIndexes", totals, mode);
-    assertMetricEq("numberOfIndexesDelta", totals, totals.maxRecipientIndexes - totals.maxDonorIndexes, mode);
+    assertMetricEq(
+        "numberOfIndexesDelta",
+        totals,
+        totals.maxRecipientIndexes - totals.maxDonorIndexes,
+        mode,
+    );
 }
 
 function verifyCriticalSection(stats, mode) {
     const isSuccess = mode === TestMode.kSuccess;
-    assert(stats.hasOwnProperty("criticalSection") === isSuccess, "Incorrect critical section presence");
+    assert(
+        stats.hasOwnProperty("criticalSection") === isSuccess,
+        "Incorrect critical section presence",
+    );
     if (!isSuccess) {
         return;
     }

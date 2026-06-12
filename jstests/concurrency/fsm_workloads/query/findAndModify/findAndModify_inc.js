@@ -27,7 +27,11 @@ export const $config = (function () {
         update: function update(db, collName) {
             let updateDoc = this.getUpdateArgument(this.fieldName);
 
-            let res = db.runCommand({findAndModify: collName, query: {_id: "findAndModify_inc"}, update: updateDoc});
+            let res = db.runCommand({
+                findAndModify: collName,
+                query: {_id: "findAndModify_inc"},
+                update: updateDoc,
+            });
             assert.commandWorked(res);
 
             // If the document was invalidated during a yield, then we wouldn't have modified it.
@@ -38,7 +42,10 @@ export const $config = (function () {
                 // is retried internally. We never expect to see a null value returned by the
                 // "findAndModify" command when it is known that a matching document exists in the
                 // collection.
-                assert(res.value !== null, "query spec should have matched a document, returned " + tojson(res));
+                assert(
+                    res.value !== null,
+                    "query spec should have matched a document, returned " + tojson(res),
+                );
             }
 
             if (res.value !== null) {

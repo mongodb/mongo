@@ -35,7 +35,9 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
     assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
     assert(admin.auth("admin", "pwd"));
     // Make a less-privileged base user.
-    assert.commandWorked(admin.runCommand({createUser: "baseuser", pwd: "pwd", roles: ["readWriteAnyDatabase"]}));
+    assert.commandWorked(
+        admin.runCommand({createUser: "baseuser", pwd: "pwd", roles: ["readWriteAnyDatabase"]}),
+    );
 
     const baseConn = new Mongo(conn.host);
     const baseAdmin = baseConn.getDB("admin");
@@ -49,12 +51,18 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
 
         // Confirm the user exists on the tenant authz collection only, and not the global
         // collection.
-        assert.eq(admin.system.users.count({user: "user1"}), 0, "user1 should not exist on global users collection");
+        assert.eq(
+            admin.system.users.count({user: "user1"}),
+            0,
+            "user1 should not exist on global users collection",
+        );
 
         const countUserCmd = {count: "system.users", query: {user: "user1"}};
 
         // Count again using unsigned tenant token.
-        const usersCountToken = assert.commandWorked(runCommandWithSecurityToken(unsignedToken, admin, countUserCmd));
+        const usersCountToken = assert.commandWorked(
+            runCommandWithSecurityToken(unsignedToken, admin, countUserCmd),
+        );
         assert.eq(usersCountToken.n, 1, "user1 should exist on tenant users collection");
 
         // Users without `useTenant` should not be able to use unsigned tenant tokens.
@@ -71,7 +79,8 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
     }
 
     // Dial up the logging to watch for tenant ID being processed.
-    const originalLogLevel = assert.commandWorked(admin.setLogLevel(kLogLevelForToken)).was.verbosity;
+    const originalLogLevel = assert.commandWorked(admin.setLogLevel(kLogLevelForToken)).was
+        .verbosity;
 
     const tokenConn = new Mongo(conn.host);
     const tokenDB = tokenConn.getDB("admin");
@@ -109,7 +118,13 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
         assert.eq(authInfo.authenticatedUsers.length, 1);
         assert(0 === bsonWoCompare(authInfo.authenticatedUsers[0], {user: "user1", db: "admin"}));
         assert.eq(authInfo.authenticatedUserRoles.length, 1);
-        assert(0 === bsonWoCompare(authInfo.authenticatedUserRoles[0], {role: "readWriteAnyDatabase", db: "admin"}));
+        assert(
+            0 ===
+                bsonWoCompare(authInfo.authenticatedUserRoles[0], {
+                    role: "readWriteAnyDatabase",
+                    db: "admin",
+                }),
+        );
 
         // Look for "Accepted Security Token" message with explicit tenant logging.
         const expect = {token: token};
@@ -127,13 +142,23 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
         // The failed command did not dispatch because they are forbidden in multitenancy.
         // We should see three post-operation logout events.
         const logoutMessages = log.filter((l) => l.id === kLogoutMessageID);
-        assert.eq(logoutMessages.length, 3, "Unexpected number of logout messages: " + tojson(logoutMessages));
+        assert.eq(
+            logoutMessages.length,
+            3,
+            "Unexpected number of logout messages: " + tojson(logoutMessages),
+        );
 
         // None of those authorization sessions should remain active into their next requests.
         const staleMessages = log.filter((l) => l.id === kStaleAuthenticationMessageID);
-        assert.eq(staleMessages.length, 0, "Unexpected stale authentications: " + tojson(staleMessages));
+        assert.eq(
+            staleMessages.length,
+            0,
+            "Unexpected stale authentications: " + tojson(staleMessages),
+        );
     } else {
-        assert.commandWorked(admin.runCommand({createUser: "user1", pwd: "pwd", roles: ["readWriteAnyDatabase"]}));
+        assert.commandWorked(
+            admin.runCommand({createUser: "user1", pwd: "pwd", roles: ["readWriteAnyDatabase"]}),
+        );
         // Attempting to pass a valid looking security token will fail if not enabled.
         assert.commandFailed(tokenDB.runCommand({features: 1}));
     }

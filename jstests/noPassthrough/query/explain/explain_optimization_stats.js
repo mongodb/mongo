@@ -42,15 +42,28 @@ function runTest(db, microAndNanosExpected) {
         runWithFailpoint(db, testCase.failpointName, testCase.failpointOpts, () => {
             const explain = assert.commandWorked(db.runCommand(testCase.command));
             // Assert the optimizationTimeMillis field is reported in explain as expected.
-            const optimizationTimeMillis = collectOptimizationTimes(explain, "optimizationTimeMillis");
+            const optimizationTimeMillis = collectOptimizationTimes(
+                explain,
+                "optimizationTimeMillis",
+            );
             optimizationTimeMillis.forEach((time) => assert.gte(time, waitTimeMillis, explain));
             assert.gt(optimizationTimeMillis.length, 0, explain);
 
-            const optimizationTimeMicros = collectOptimizationTimes(explain, "optimizationTimeMicros");
-            const optimizationTimeNanos = collectOptimizationTimes(explain, "optimizationTimeNanos");
+            const optimizationTimeMicros = collectOptimizationTimes(
+                explain,
+                "optimizationTimeMicros",
+            );
+            const optimizationTimeNanos = collectOptimizationTimes(
+                explain,
+                "optimizationTimeNanos",
+            );
             if (microAndNanosExpected) {
-                optimizationTimeMicros.forEach((time) => assert.gte(time, waitTimeMillis * 1000, explain));
-                optimizationTimeNanos.forEach((time) => assert.gte(time, waitTimeMillis * 1000 * 1000, explain));
+                optimizationTimeMicros.forEach((time) =>
+                    assert.gte(time, waitTimeMillis * 1000, explain),
+                );
+                optimizationTimeNanos.forEach((time) =>
+                    assert.gte(time, waitTimeMillis * 1000 * 1000, explain),
+                );
             }
         });
     }
@@ -69,7 +82,9 @@ jsTest.log.info("Testing standalone with default timing precision");
 
 jsTest.log.info("Testing standalone with nanosecond timing precision");
 (function testStandaloneNanosecondTimingPrecision() {
-    const conn = MongoRunner.runMongod({setParameter: {internalMeasureQueryExecutionTimeInNanoseconds: true}});
+    const conn = MongoRunner.runMongod({
+        setParameter: {internalMeasureQueryExecutionTimeInNanoseconds: true},
+    });
     const db = conn.getDB(jsTestName());
     try {
         runTest(db, true);

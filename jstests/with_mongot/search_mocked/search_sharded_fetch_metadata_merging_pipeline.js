@@ -32,7 +32,9 @@ const mongotConn = stWithMock.getMockConnectedToHost(conn);
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
-assert.commandWorked(conn.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    conn.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const collName = "meta";
 const coll = testDB.getCollection(collName);
@@ -269,7 +271,10 @@ function setQueryMockResponses(removeGetMore, hasSearchStage = false) {
 // returned by mongot(mock).
 function testSearchQuery() {
     setQueryMockResponses(false);
-    let queryResult = coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}]);
+    let queryResult = coll.aggregate([
+        {$search: searchQuery},
+        {$project: {"var": "$$SEARCH_META"}},
+    ]);
     assert.eq([{_id: 1, var: {_id: {}, value: 56}}], queryResult.toArray());
 }
 

@@ -93,7 +93,9 @@ for (let i = 0; i < densifyUnits.length; i++) {
 // Test that full range does not fail if there's only one document in the collection.
 coll.drop();
 coll.insert({_id: 1, val: 1, orig: true});
-let result = coll.aggregate([{"$densify": {"field": "val", "range": {"step": 2, "bounds": "full"}}}]);
+let result = coll.aggregate([
+    {"$densify": {"field": "val", "range": {"step": 2, "bounds": "full"}}},
+]);
 const expected = [{_id: 1, val: 1, orig: true}];
 const resultArray = result.toArray();
 assert.sameMembers(resultArray, expected);

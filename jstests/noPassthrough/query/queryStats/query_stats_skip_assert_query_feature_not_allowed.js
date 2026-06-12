@@ -43,13 +43,20 @@ coll.drop();
 // Run a simple query that does not need a particular FCV to run,
 // so that there is at least one query shape stored in the query stats store.
 assert.commandWorked(
-    conn.adminCommand({aggregate: coll.getName(), pipeline: [{$project: {_id: 1, x: "x"}}], cursor: {}}),
+    conn.adminCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$project: {_id: 1, x: "x"}}],
+        cursor: {},
+    }),
 );
 
 // Now enable the fail point that simulates that the query feature is not allowed for
 // the query shape saved in the query stats store.
 assert.commandWorked(
-    testDB.adminCommand({"configureFailPoint": "queryStatsGenerateQueryFeatureNotAllowedError", "mode": "alwaysOn"}),
+    testDB.adminCommand({
+        "configureFailPoint": "queryStatsGenerateQueryFeatureNotAllowedError",
+        "mode": "alwaysOn",
+    }),
 );
 
 // Now when requesting the $queryStats, we should receive a QueryFeatureNotEnabled error,
@@ -70,10 +77,16 @@ assert.eq(results.length, 0);
 // but not the one that should be skipped over, so we can ensure that $queryStats
 // still fails when we expect it to.
 assert.commandWorked(
-    testDB.adminCommand({"configureFailPoint": "queryStatsGenerateQueryFeatureNotAllowedError", "mode": "off"}),
+    testDB.adminCommand({
+        "configureFailPoint": "queryStatsGenerateQueryFeatureNotAllowedError",
+        "mode": "off",
+    }),
 );
 assert.commandWorked(
-    testDB.adminCommand({"configureFailPoint": "queryStatsFailToReparseQueryShape", "mode": "alwaysOn"}),
+    testDB.adminCommand({
+        "configureFailPoint": "queryStatsFailToReparseQueryShape",
+        "mode": "alwaysOn",
+    }),
 );
 assert.commandFailedWithCode(
     conn.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),

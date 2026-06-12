@@ -85,7 +85,11 @@ if (FixtureHelpers.isMongos(db)) {
     });
 
     it("connection with 2+ mongos must be a MultiRouterMongo", function () {
-        assert.eq(conn.isMultiRouter, true, "Connection with " + numMongos + " mongos MUST be a MultiRouterMongo");
+        assert.eq(
+            conn.isMultiRouter,
+            true,
+            "Connection with " + numMongos + " mongos MUST be a MultiRouterMongo",
+        );
         assert.eq(conn._mongoConnections.length, numMongos);
     });
 
@@ -100,40 +104,55 @@ if (FixtureHelpers.isMongos(db)) {
             tracker.restore();
         });
 
-        (implicitTxns ? it.skip : it)("each operation calls _getNextMongo exactly once", function () {
-            insertTestData();
-            runFinds();
+        (implicitTxns ? it.skip : it)(
+            "each operation calls _getNextMongo exactly once",
+            function () {
+                insertTestData();
+                runFinds();
 
-            const kMinOps = kNumFinds + 1; // +1 insert
-            // Assert _getNextMongo is called at least once per transaction.
-            assert.gte(
-                tracker.getTotalOps(),
-                kMinOps,
-                "Expected at least " + kMinOps + " operations but tracked " + tracker.getTotalOps(),
-            );
-            // Assert _getNextMongo has distributed the calls
-            assert.gte(
-                tracker.getUsedRouters(),
-                2,
-                "At least 2 mongos should be used: " + tojson(tracker.getMongosUsageCount()),
-            );
-            chatty("Mongos usage distribution: " + tojson(tracker.getMongosUsageCount()));
-        });
+                const kMinOps = kNumFinds + 1; // +1 insert
+                // Assert _getNextMongo is called at least once per transaction.
+                assert.gte(
+                    tracker.getTotalOps(),
+                    kMinOps,
+                    "Expected at least " +
+                        kMinOps +
+                        " operations but tracked " +
+                        tracker.getTotalOps(),
+                );
+                // Assert _getNextMongo has distributed the calls
+                assert.gte(
+                    tracker.getUsedRouters(),
+                    2,
+                    "At least 2 mongos should be used: " + tojson(tracker.getMongosUsageCount()),
+                );
+                chatty("Mongos usage distribution: " + tojson(tracker.getMongosUsageCount()));
+            },
+        );
 
-        (implicitTxns ? it : it.skip)("implicit transactions are pinned but still distributed", function () {
-            insertTestData();
-            runFinds();
+        (implicitTxns ? it : it.skip)(
+            "implicit transactions are pinned but still distributed",
+            function () {
+                insertTestData();
+                runFinds();
 
-            // In transaction passthroughs, _getNextMongo is called once per
-            // transaction (not per operation) due to session pinning.
-            // Assert _getNextMongo is called at least once per transaction.
-            const kMinOps = 5;
-            assert.gte(
-                tracker.getTotalOps(),
-                kMinOps,
-                "Expected at least " + kMinOps + " transactions but tracked " + tracker.getTotalOps(),
-            );
-            chatty("Mongos usage distribution (implicit txns): " + tojson(tracker.getMongosUsageCount()));
-        });
+                // In transaction passthroughs, _getNextMongo is called once per
+                // transaction (not per operation) due to session pinning.
+                // Assert _getNextMongo is called at least once per transaction.
+                const kMinOps = 5;
+                assert.gte(
+                    tracker.getTotalOps(),
+                    kMinOps,
+                    "Expected at least " +
+                        kMinOps +
+                        " transactions but tracked " +
+                        tracker.getTotalOps(),
+                );
+                chatty(
+                    "Mongos usage distribution (implicit txns): " +
+                        tojson(tracker.getMongosUsageCount()),
+                );
+            },
+        );
     });
 });

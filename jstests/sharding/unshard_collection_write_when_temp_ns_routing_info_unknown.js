@@ -18,7 +18,9 @@ reshardingTest.setup();
 
 const testCases = [
     {
-        desc: "Test ordinary insert when donor does not have temporary resharding collection " + "routing info cached",
+        desc:
+            "Test ordinary insert when donor does not have temporary resharding collection " +
+            "routing info cached",
         ns: "unshardDb.coll_no_txn",
         opFn: (sourceCollection) => {
             const docToInsert = {_id: 0, oldKey: 5};
@@ -57,7 +59,9 @@ const testCases = [
                 .getDatabase(sourceCollection.getDB().getName())
                 .getCollection(sourceCollection.getName());
 
-            const sessionCollectionB = session.getDatabase(sourceCollection.getDB().getName()).getCollection("foo");
+            const sessionCollectionB = session
+                .getDatabase(sourceCollection.getDB().getName())
+                .getCollection("foo");
             assert.commandWorked(sessionCollectionB.insert({a: 1}));
 
             const docToInsert = {_id: 0, oldKey: 5};
@@ -85,22 +89,25 @@ for (const {desc, ns, opFn} of testCases) {
     const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
 
     const recipientShardNames = reshardingTest.recipientShardNames;
-    reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0]}, (tempNs) => {
-        // Wait for the recipients to have finished cloning so the temporary resharding
-        // collection is known to exist.
-        assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: sourceCollection.getFullName(),
+    reshardingTest.withUnshardCollectionInBackground(
+        {toShard: recipientShardNames[0]},
+        (tempNs) => {
+            // Wait for the recipients to have finished cloning so the temporary resharding
+            // collection is known to exist.
+            assert.soon(() => {
+                const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
+                    ns: sourceCollection.getFullName(),
+                });
+
+                return coordinatorDoc !== null && coordinatorDoc.state === "applying";
             });
 
-            return coordinatorDoc !== null && coordinatorDoc.state === "applying";
-        });
+            // Make the routing info for the temporary sharding collection unknown
+            donor0.adminCommand({flushRouterConfig: tempNs});
 
-        // Make the routing info for the temporary sharding collection unknown
-        donor0.adminCommand({flushRouterConfig: tempNs});
-
-        opFn(sourceCollection);
-    });
+            opFn(sourceCollection);
+        },
+    );
 }
 
 reshardingTest.teardown();

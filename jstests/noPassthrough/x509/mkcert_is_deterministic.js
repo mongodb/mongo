@@ -29,7 +29,14 @@ mkdir(genpath);
 // Run mkcert, and ensure it succeeds and that expected results are generated successfully.
 jsTest.log.info("Running mkcert");
 clearRawMongoProgramOutput();
-let res = runNonMongoProgram(getPython3Binary(), "x509/mkcert.py", main_cert_json_file, "--mkcrl", "-o", genpath);
+let res = runNonMongoProgram(
+    getPython3Binary(),
+    "x509/mkcert.py",
+    main_cert_json_file,
+    "--mkcrl",
+    "-o",
+    genpath,
+);
 jsTest.log.info(rawMongoProgramOutput(".*"));
 assert.eq(res, 0);
 assert(fileExists(genpath + "ca.pem"));
@@ -39,7 +46,14 @@ assert(fileExists(genpath + "crl.pem"));
 const genpath2 = basedir + "generated2/";
 mkdir(genpath2);
 jsTest.log.info("Running mkcert again");
-res = runNonMongoProgram(getPython3Binary(), "x509/mkcert.py", main_cert_json_file, "--mkcrl", "-o", genpath2);
+res = runNonMongoProgram(
+    getPython3Binary(),
+    "x509/mkcert.py",
+    main_cert_json_file,
+    "--mkcrl",
+    "-o",
+    genpath2,
+);
 assert.eq(res, 0);
 
 // Diff the two generation paths to make sure the contents of the paths are identical.

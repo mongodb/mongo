@@ -93,7 +93,9 @@ export class WorkloadBucketManyOutputs extends PipelineWorkload {
         for (let i = 0; i < this.scale(); i++) {
             outputs[`f${i}`] = {$min: `$f${i}`};
         }
-        return [{$bucket: {groupBy: "$f0", boundaries: [0, 1], default: "default", output: outputs}}];
+        return [
+            {$bucket: {groupBy: "$f0", boundaries: [0, 1], default: "default", output: outputs}},
+        ];
     }
 
     result() {
@@ -109,7 +111,9 @@ export class WorkloadBucketManyOutputs extends PipelineWorkload {
 export class WorkloadBucketAutoManyBuckets extends PipelineWorkload {
     /** Many buckets in a single $bucketAuto stage */
     pipeline() {
-        return [{$bucketAuto: {groupBy: "$f0", buckets: this.scale(), output: {"count": {$sum: 1}}}}];
+        return [
+            {$bucketAuto: {groupBy: "$f0", buckets: this.scale(), output: {"count": {$sum: 1}}}},
+        ];
     }
 
     result() {
@@ -181,7 +185,10 @@ export class WorkloadSetWindowFieldsManySortBy extends PipelineWorkload {
             sortByFields[`f${i}`] = 1;
         }
 
-        return [{$setWindowFields: {sortBy: sortByFields, output: {"f0": {$max: "$f0"}}}}, {$unset: "_id"}];
+        return [
+            {$setWindowFields: {sortBy: sortByFields, output: {"f0": {$max: "$f0"}}}},
+            {$unset: "_id"},
+        ];
     }
 
     result(dataset) {
@@ -249,7 +256,10 @@ export class WorkloadFillManyPartitionFields extends PipelineWorkload {
         for (let i = 0; i < this.scale(); i++) {
             partitionByFields.push(`f${i}`);
         }
-        return [{$fill: {partitionByFields: partitionByFields, output: {f0: {"value": 1}}}}, {$unset: "_id"}];
+        return [
+            {$fill: {partitionByFields: partitionByFields, output: {f0: {"value": 1}}}},
+            {$unset: "_id"},
+        ];
     }
 
     result() {

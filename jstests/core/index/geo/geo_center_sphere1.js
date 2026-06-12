@@ -38,7 +38,8 @@ function test(index) {
             let o = {_id: num++, loc: [x, y]};
             bulk.insert(o);
             for (let i = 0; i < searches.length; i++) {
-                if (Geo.sphereDistance([x, y], searches[i][0]) <= searches[i][1]) correct[i].push(o);
+                if (Geo.sphereDistance([x, y], searches[i][0]) <= searches[i][1])
+                    correct[i].push(o);
             }
         }
         gc(); // needed with low skip values
@@ -99,7 +100,11 @@ function test(index) {
             print("explain for " + tojson(q, "", true) + " = " + tojson(explain));
             // The index should be at least minimally effective in preventing the full collection
             // scan.
-            assert.gt(t.find().count(), explain.executionStats.totalKeysExamined, "nscanned : " + tojson(searches[i]));
+            assert.gt(
+                t.find().count(),
+                explain.executionStats.totalKeysExamined,
+                "nscanned : " + tojson(searches[i]),
+            );
         }
     }
 }

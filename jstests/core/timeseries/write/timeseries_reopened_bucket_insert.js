@@ -14,7 +14,10 @@
  *   requires_collstats,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -28,30 +31,53 @@ const metaTimeIndexName = [[metaField], "1", [timeField], "1"].join("_");
 const resetCollection = function () {
     coll.drop();
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
 };
 
-const checkIfBucketReopened = function (measurement, willCreateBucket = false, willReopenBucket = false) {
+const checkIfBucketReopened = function (
+    measurement,
+    willCreateBucket = false,
+    willReopenBucket = false,
+) {
     let stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
     const prevBucketCount = getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec);
-    const prevExpectedReopenedBuckets = TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened");
+    const prevExpectedReopenedBuckets = TimeseriesTest.getStat(
+        stats.timeseries,
+        "numBucketsReopened",
+    );
 
-    const expectedReopenedBuckets = willReopenBucket ? prevExpectedReopenedBuckets + 1 : prevExpectedReopenedBuckets;
+    const expectedReopenedBuckets = willReopenBucket
+        ? prevExpectedReopenedBuckets + 1
+        : prevExpectedReopenedBuckets;
     const expectedBucketCount = willCreateBucket ? prevBucketCount + 1 : prevBucketCount;
     assert.commandWorked(coll.insert(measurement));
 
     stats = assert.commandWorked(coll.stats());
     assert.hasFields(stats, ["timeseries"]);
     if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
-        assert.gte(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), expectedBucketCount);
+        assert.gte(
+            getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
+            expectedBucketCount,
+        );
         // The bucket re-opened more than expected due to retries
         // TODO(SERVER-123053): Assert `>= expectedReopenedBuckets` once we don't fail to find re-opening candidates due to viewless timeseries downgrade.
-        assert.gte(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), prevExpectedReopenedBuckets);
+        assert.gte(
+            TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"),
+            prevExpectedReopenedBuckets,
+        );
     } else {
-        assert.eq(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), expectedBucketCount);
-        assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
+        assert.eq(
+            getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
+            expectedBucketCount,
+        );
+        assert.eq(
+            TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"),
+            expectedReopenedBuckets,
+        );
     }
 };
 
@@ -137,7 +163,9 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     checkIfBucketReopened(measurement2, /* willCreateBucket */ false, /* willReopenBucket */ false);
 
     // Insert closed bucket into the collection using raw ops.
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(missingClosedFlagBucketDoc, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(missingClosedFlagBucketDoc, kRawOperationSpec),
+    );
     // We expect to reopen buckets with missing 'closed' flags (this means the buckets are open for
     // inserts).
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
@@ -233,7 +261,11 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     };
 
     for (let i = 0; i < initialMeasurements.length; ++i) {
-        checkIfBucketReopened(initialMeasurements[i], /* willCreateBucket= */ i == 0, /* willReopenBucket= */ false);
+        checkIfBucketReopened(
+            initialMeasurements[i],
+            /* willCreateBucket= */ i == 0,
+            /* willReopenBucket= */ false,
+        );
     }
     // Time forwards will open a new bucket, and close and compress the old one.
     checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
@@ -323,16 +355,22 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
         "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc, kRawOperationSpec),
+    );
     // If an otherwise suitable bucket has the closed flag set, we expect to open a new bucket.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(year2000BucketDoc, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(year2000BucketDoc, kRawOperationSpec),
+    );
     // If an otherwise suitable bucket has an incompatible time range with the measurement, we
     // expect to open a new bucket.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(metaMismatchFieldBucketDoc, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(metaMismatchFieldBucketDoc, kRawOperationSpec),
+    );
     // If an otherwise suitable bucket has a mismatching meta field, we expect to open a new bucket.
     checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
@@ -416,7 +454,9 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     });
     assert(metaTimeIndex.length == 1);
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec),
+    );
     // We expect to reopen the suitable bucket when inserting the first measurement.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
@@ -427,15 +467,21 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     });
     assert(metaTimeIndex.length == 0);
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec),
+    );
     // We have a suitable bucket for the second measurement but it is only visible via query-based
     // reopening which is not supported without the meta and time index.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     // Create a meta and time index for query-based reopening.
-    assert.commandWorked(coll.createIndex({[metaField]: 1, [timeField]: 1}, {name: "generic_meta_time_index_name"}));
+    assert.commandWorked(
+        coll.createIndex({[metaField]: 1, [timeField]: 1}, {name: "generic_meta_time_index_name"}),
+    );
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec),
+    );
     // Creating an index on meta and time will re-enable us to perform query-based reopening to
     // insert measurement 3 into a suitable bucket.
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
@@ -552,7 +598,9 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
         ),
     );
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec),
+    );
     // We expect no buckets to be reopened because a partial index on meta and time cannot be used
     // for query based reopening.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
@@ -560,23 +608,33 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     // Create an index on an arbitrary field.
     assert.commandWorked(coll.createIndex({"a": 1}, {name: "arbitraryIndex"}));
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec),
+    );
     // We expect no buckets to be reopened because the index created cannot be used for query-based
     // reopening.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     // Create an index on an arbitrary field in addition to the meta and time fields.
-    assert.commandWorked(coll.createIndex({"a": 1, [metaField]: 1, [timeField]: 1}, {name: "nonSuitableIndex"}));
+    assert.commandWorked(
+        coll.createIndex({"a": 1, [metaField]: 1, [timeField]: 1}, {name: "nonSuitableIndex"}),
+    );
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec),
+    );
     // We expect no buckets to be reopened because the index created cannot be used for
     // query-based reopening.
     checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     // Create a meta and time index with an additional key on another arbitrary, data field.
-    assert.commandWorked(coll.createIndex({[metaField]: 1, [timeField]: 1, "a": 1}, {name: metaTimeIndexName}));
+    assert.commandWorked(
+        coll.createIndex({[metaField]: 1, [timeField]: 1, "a": 1}, {name: metaTimeIndexName}),
+    );
 
-    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc4, kRawOperationSpec));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc4, kRawOperationSpec),
+    );
     // We expect to be able to reopen the suitable bucket when inserting the measurement because as
     // long as an index covers the meta and time field, it can have additional keys.
     checkIfBucketReopened(measurement4, /* willCreateBucket */ false, /* willReopenBucket */ true);
@@ -587,7 +645,9 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
 (function reopenBucketsWhenSuitableIndexExistsNoMeta() {
     jsTestLog("Entering reopenBucketsWhenSuitableIndexExistsNoMeta...");
     coll.drop();
-    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}),
+    );
 
     const measurement1 = {[timeField]: ISODate("2024-11-04T10:14:00Z")};
     const measurement2 = {[timeField]: ISODate("2024-10-04T10:14:00Z")};
@@ -658,30 +718,51 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     if (!isShardedTimeseries(coll) && !TestData.runningWithBalancer) {
         // Create a partial index on time.
         assert.commandWorked(
-            coll.createIndex({[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}),
+            coll.createIndex(
+                {[timeField]: 1},
+                {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}},
+            ),
         );
 
-        assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec),
+        );
         // We expect no buckets to be reopened because a partial index on time cannot be used  for
         // query based reopening.
-        checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+        checkIfBucketReopened(
+            measurement1,
+            /* willCreateBucket */ true,
+            /* willReopenBucket */ false,
+        );
 
         // Create an index on an arbitrary field.
         assert.commandWorked(coll.createIndex({"a": 1, [timeField]: 1}, {name: "arbitraryIndex"}));
 
-        assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec),
+        );
         // We expect no buckets to be reopened because the index created cannot be used for
         // query-based reopening.
-        checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+        checkIfBucketReopened(
+            measurement2,
+            /* willCreateBucket */ true,
+            /* willReopenBucket */ false,
+        );
 
         // Create an index on time.
         assert.commandWorked(coll.createIndex({[timeField]: 1}, {name: "timeIndex"}));
 
-        assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec),
+        );
         // We expect to be able to reopen the suitable bucket when inserting the measurement because
         // as long as an index covers time field (when the collection has no metaField), it can have
         // additional keys.
-        checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+        checkIfBucketReopened(
+            measurement3,
+            /* willCreateBucket */ false,
+            /* willReopenBucket */ true,
+        );
     }
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExistsNoMeta.");

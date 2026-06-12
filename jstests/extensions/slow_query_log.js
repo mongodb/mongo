@@ -20,15 +20,27 @@ const coll = db.getCollection(collName);
 function getSlowQueryLogsByComment(db, comment) {
     const slowQueryLogId = 51803; // ID for 'Slow query' log messages.
 
-    let logs = checkLog.getFilteredLogMessages(db, slowQueryLogId, {command: {comment: comment}}, null, true) || [];
+    let logs =
+        checkLog.getFilteredLogMessages(
+            db,
+            slowQueryLogId,
+            {command: {comment: comment}},
+            null,
+            true,
+        ) || [];
     // For sharded clusters, also check logs on all shards.
     if (FixtureHelpers.isMongos(db)) {
         const shardLogsArrays = FixtureHelpers.mapOnEachShardNode({
             db,
             primaryNodeOnly: true,
             func: (shardDb) =>
-                checkLog.getFilteredLogMessages(shardDb, slowQueryLogId, {command: {comment: comment}}, null, true) ||
-                [],
+                checkLog.getFilteredLogMessages(
+                    shardDb,
+                    slowQueryLogId,
+                    {command: {comment: comment}},
+                    null,
+                    true,
+                ) || [],
         });
         logs = logs.concat(...shardLogsArrays);
     }
@@ -102,7 +114,10 @@ describe("$modifyForLog toBsonForLog()", function () {
         const logEntry = logs[0];
         assert(logEntry.attr !== undefined, "Log entry should have 'attr' field");
         assert(logEntry.attr.command !== undefined, "Log entry should have 'attr.command' field");
-        assert(logEntry.attr.command.pipeline !== undefined, "Log entry should have 'attr.command.pipeline' field");
+        assert(
+            logEntry.attr.command.pipeline !== undefined,
+            "Log entry should have 'attr.command.pipeline' field",
+        );
 
         const modifyStage = logEntry.attr.command.pipeline[0].$modifyForLog;
         assert(modifyStage !== undefined, "$modifyForLog stage should be in logged pipeline");
@@ -115,7 +130,11 @@ describe("$modifyForLog toBsonForLog()", function () {
         );
 
         assert(modifyStage.spec.largeArray !== undefined, "largeArray should exist in logged spec");
-        assert.lte(modifyStage.spec.largeArray.length, 5, "Large array should be truncated to <= 5 elements");
+        assert.lte(
+            modifyStage.spec.largeArray.length,
+            5,
+            "Large array should be truncated to <= 5 elements",
+        );
 
         assert.eq(modifyStage.spec.smallArray.length, 3, "Small array should not be truncated");
 
@@ -148,18 +167,28 @@ describe("$modifyForLog toBsonForLog()", function () {
         const logEntry = logs[0];
         assert(logEntry.attr !== undefined, "Log entry should have 'attr' field");
         assert(logEntry.attr.command !== undefined, "Log entry should have 'attr.command' field");
-        assert(logEntry.attr.command.pipeline !== undefined, "Log entry should have 'attr.command.pipeline' field");
+        assert(
+            logEntry.attr.command.pipeline !== undefined,
+            "Log entry should have 'attr.command.pipeline' field",
+        );
 
         const modifyStage = logEntry.attr.command.pipeline[0].$modifyForLog;
         assert(modifyStage !== undefined, "$modifyForLog stage should be in logged pipeline");
 
-        assert(modifyStage.spec.largeNestedObject.summary !== undefined, "Large nested object should be summarized");
+        assert(
+            modifyStage.spec.largeNestedObject.summary !== undefined,
+            "Large nested object should be summarized",
+        );
         assert(
             modifyStage.spec.largeNestedObject.summary.includes("20 fields"),
             "Summary should mention the number of fields",
         );
 
-        assert.eq(modifyStage.spec.smallNestedObject.a, 1, "Small nested object should not be summarized");
+        assert.eq(
+            modifyStage.spec.smallNestedObject.a,
+            1,
+            "Small nested object should not be summarized",
+        );
     });
 
     it("should log explain with wrapper and modified pipeline in slow query logs", function () {

@@ -60,7 +60,9 @@ const pipeline = [
         $setWindowFields: {
             partitionBy: "$category",
             sortBy: {date: 1},
-            output: {runningTotal: {$sum: "$amount", window: {documents: ["unbounded", "current"]}}},
+            output: {
+                runningTotal: {$sum: "$amount", window: {documents: ["unbounded", "current"]}},
+            },
         },
     },
 ];

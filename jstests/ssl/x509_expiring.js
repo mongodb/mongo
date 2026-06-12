@@ -24,15 +24,23 @@ function test(expiration, expect) {
         ],
     });
 
-    assert(external.auth({user: CLIENT_USER, mechanism: "MONGODB-X509"}), "authentication with valid user failed");
+    assert(
+        external.auth({user: CLIENT_USER, mechanism: "MONGODB-X509"}),
+        "authentication with valid user failed",
+    );
 
     // Check that there's a "Successfully authenticated" message that includes the client IP
-    const log = assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
+    const log = assert.commandWorked(
+        external.getSiblingDB("admin").runCommand({getLog: "global"}),
+    ).log;
 
     function checkPeerCertificateExpires(element /*, index, array*/) {
         const logJson = JSON.parse(element);
 
-        return (logJson.id === 23221 || logJson.id === 23222) && logJson.attr.peerSubjectName === CLIENT_USER;
+        return (
+            (logJson.id === 23221 || logJson.id === 23222) &&
+            logJson.attr.peerSubjectName === CLIENT_USER
+        );
     }
     assert.eq(log.some(checkPeerCertificateExpires), expect);
 

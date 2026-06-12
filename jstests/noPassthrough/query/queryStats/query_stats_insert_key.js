@@ -104,7 +104,11 @@ function runInsertKeyTests(topologyName, setupFn, teardownFn, validateFn = null)
             );
 
             const entries = getQueryStatsInsertCmd(testDB.getMongo(), {collName: coll.getName()});
-            assert.eq(entries.length, 1, "Both inserts should share the same query shape: " + tojson(entries));
+            assert.eq(
+                entries.length,
+                1,
+                "Both inserts should share the same query shape: " + tojson(entries),
+            );
             assert.eq(entries[0].key.queryShape.documents, "?array<?object>");
         });
 
@@ -123,7 +127,9 @@ function runInsertKeyTests(topologyName, setupFn, teardownFn, validateFn = null)
             );
 
             const plain = getQueryStatsInsertCmd(testDB.getMongo(), {collName: coll.getName()});
-            const tokenized = getQueryStatsInsertCmd(testDB.getMongo(), {transformIdentifiers: true});
+            const tokenized = getQueryStatsInsertCmd(testDB.getMongo(), {
+                transformIdentifiers: true,
+            });
 
             assert.eq(plain.length, 1);
             assert.eq(tokenized.length, 1);
@@ -163,6 +169,8 @@ runInsertKeyTests(
     (st) => st.stop(),
     ({testDB, coll}) => {
         const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
-        assert.gte(Object.keys(stats.shards).length, 2, "Expected chunks on at least 2 shards", {shards: stats.shards});
+        assert.gte(Object.keys(stats.shards).length, 2, "Expected chunks on at least 2 shards", {
+            shards: stats.shards,
+        });
     },
 );

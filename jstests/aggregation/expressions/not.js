@@ -98,31 +98,41 @@ assert.eq(results, [
     {_id: 1, x: false},
 ]);
 
-results = coll.aggregate([{$project: {x: {$not: {$not: {$not: "$x"}}}}}, {$sort: {_id: 1}}]).toArray();
+results = coll
+    .aggregate([{$project: {x: {$not: {$not: {$not: "$x"}}}}}, {$sort: {_id: 1}}])
+    .toArray();
 assert.eq(results, [
     {_id: 0, x: false},
     {_id: 1, x: true},
 ]);
 
-results = coll.aggregate([{$project: {x: {$not: {$and: ["$x", "$y"]}}}}, {$sort: {_id: 1}}]).toArray();
+results = coll
+    .aggregate([{$project: {x: {$not: {$and: ["$x", "$y"]}}}}, {$sort: {_id: 1}}])
+    .toArray();
 assert.eq(results, [
     {_id: 0, x: true},
     {_id: 1, x: true},
 ]);
 
-results = coll.aggregate([{$project: {x: {$not: {$or: ["$x", "$y"]}}}}, {$sort: {_id: 1}}]).toArray();
+results = coll
+    .aggregate([{$project: {x: {$not: {$or: ["$x", "$y"]}}}}, {$sort: {_id: 1}}])
+    .toArray();
 assert.eq(results, [
     {_id: 0, x: false},
     {_id: 1, x: false},
 ]);
 
-results = coll.aggregate([{$project: {x: {$and: [{$not: "$x"}, "$y"]}}}, {$sort: {_id: 1}}]).toArray();
+results = coll
+    .aggregate([{$project: {x: {$and: [{$not: "$x"}, "$y"]}}}, {$sort: {_id: 1}}])
+    .toArray();
 assert.eq(results, [
     {_id: 0, x: false},
     {_id: 1, x: true},
 ]);
 
-results = coll.aggregate([{$project: {x: {$or: [{$not: "$x"}, "$y"]}}}, {$sort: {_id: 1}}]).toArray();
+results = coll
+    .aggregate([{$project: {x: {$or: [{$not: "$x"}, "$y"]}}}, {$sort: {_id: 1}}])
+    .toArray();
 assert.eq(results, [
     {_id: 0, x: false},
     {_id: 1, x: true},

@@ -12,7 +12,10 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 function runCommandsWithDifferentIds(primary, secondary, cmds) {
     // Disable oplog application to ensure the oplog entries come in the same batch.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
-    checkLog.contains(secondary, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+    checkLog.contains(
+        secondary,
+        "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled",
+    );
 
     let responseTimestamps = [];
     cmds.forEach(function (cmd) {
@@ -27,7 +30,12 @@ function runCommandsWithDifferentIds(primary, secondary, cmds) {
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
     replTest.awaitReplication();
     cmds.forEach(function (cmd, i) {
-        RetryableWritesUtil.checkTransactionTable(secondary, cmd.lsid, cmd.txnNumber, responseTimestamps[i]);
+        RetryableWritesUtil.checkTransactionTable(
+            secondary,
+            cmd.lsid,
+            cmd.txnNumber,
+            responseTimestamps[i],
+        );
     });
 
     // Both nodes should have the same transaction collection record for each sessionId.
@@ -44,7 +52,10 @@ function runCommandsWithDifferentIds(primary, secondary, cmds) {
 function runCommandsWithSameId(primary, secondary, cmds) {
     // Disable oplog application to ensure the oplog entries come in the same batch.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
-    checkLog.contains(secondary, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+    checkLog.contains(
+        secondary,
+        "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled",
+    );
 
     let latestOpTimeTs = Timestamp();
     let highestTxnNumber = NumberLong(-1);
@@ -61,7 +72,12 @@ function runCommandsWithSameId(primary, secondary, cmds) {
     // highest transaction number and the latest write optime.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
     replTest.awaitReplication();
-    RetryableWritesUtil.checkTransactionTable(secondary, cmds[0].lsid, highestTxnNumber, latestOpTimeTs);
+    RetryableWritesUtil.checkTransactionTable(
+        secondary,
+        cmds[0].lsid,
+        highestTxnNumber,
+        latestOpTimeTs,
+    );
 
     // Both nodes should have the same transaction collection record for the sessionId.
     RetryableWritesUtil.assertSameRecordOnBothConnections(primary, secondary, cmds[0].lsid);
@@ -77,7 +93,11 @@ let secondary = replTest.getSecondary();
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 ////////////////////////////////////////////////////////////////////////
 // Test insert command

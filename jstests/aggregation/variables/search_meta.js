@@ -26,7 +26,16 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$lookup: {from: coll.getName(), let: {SEARCH_META: "$title"}, as: "joined", pipeline: []}}],
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll.getName(),
+                    let: {SEARCH_META: "$title"},
+                    as: "joined",
+                    pipeline: [],
+                },
+            },
+        ],
         cursor: {},
     }),
     ErrorCodes.FailedToParse,
@@ -38,7 +47,10 @@ const response = db.runCommand({
     cursor: {},
 });
 if (!response.ok) {
-    assert.commandFailedWithCode(response, [ErrorCodes.SearchNotEnabled, 6047401] /* mongos or community */);
+    assert.commandFailedWithCode(
+        response,
+        [ErrorCodes.SearchNotEnabled, 6047401] /* mongos or community */,
+    );
 } else {
     assert.eq(response.cursor.firstBatch, []);
 }

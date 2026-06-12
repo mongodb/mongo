@@ -2,14 +2,24 @@
  * Tests that a $not-$in-$regex query, which cannot be supported by an index, cannot incorrectly
  * hijack the cached plan for an earlier $not-$in query.
  */
-import {getPlanCacheKeyFromShape, getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanCacheKeyFromShape,
+    getWinningPlanFromExplain,
+    isCollscan,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.plan_cache_not_in_regex;
 coll.drop();
 
 // Helper function which obtains the cached plan, if any, for a given query shape.
 function getPlanForCacheEntry(query, proj, sort) {
-    const keyHash = getPlanCacheKeyFromShape({query: query, projection: proj, sort: sort, collection: coll, db: db});
+    const keyHash = getPlanCacheKeyFromShape({
+        query: query,
+        projection: proj,
+        sort: sort,
+        collection: coll,
+        db: db,
+    });
 
     const cursor = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]);
     const entryStats = cursor.toArray();
@@ -46,7 +56,9 @@ for (let [proj, sort] of [
 
     // Now perform a $not-$in-$regex query, confirm that it obtains the correct results, and
     // that it used a COLLSCAN rather than planning from the cache.
-    const explainOutput = assert.commandWorked(coll.find({a: {$not: {$in: [34, /bar/]}}}).explain("executionStats"));
+    const explainOutput = assert.commandWorked(
+        coll.find({a: {$not: {$in: [34, /bar/]}}}).explain("executionStats"),
+    );
     assert(isCollscan(coll.getDB(), getWinningPlanFromExplain(explainOutput)));
     assert.eq(1, explainOutput.executionStats.nReturned);
 

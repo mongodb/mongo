@@ -15,7 +15,9 @@ try {
     const coll = db.plan_selection_no_results;
     coll.drop();
     // Enable sort-based intersection, which is disabled by default.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}),
+    );
 
     assert.commandWorked(coll.createIndex({x: 1}));
     assert.commandWorked(coll.createIndex({y: 1}));
@@ -60,6 +62,9 @@ try {
     }
 } finally {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: origKnobValue}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlannerEnableSortIndexIntersection: origKnobValue,
+        }),
     );
 }

@@ -25,7 +25,9 @@ function runTest(isOrderedWrite) {
     // Setup
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
 
     const largeMeta = "a".repeat(16 * 1024 * 1024 + 1);
@@ -46,7 +48,10 @@ function runTest(isOrderedWrite) {
 
     // Insert Measurement
 
-    assert.commandFailedWithCode(coll.insert(measurement1, {ordered: isOrderedWrite}), ErrorCodes.BSONObjectTooLarge);
+    assert.commandFailedWithCode(
+        coll.insert(measurement1, {ordered: isOrderedWrite}),
+        ErrorCodes.BSONObjectTooLarge,
+    );
 
     let stats = coll.stats().timeseries;
     assert.eq(0, stats.numBucketInserts, tojson(stats));
@@ -58,7 +63,10 @@ function runTest(isOrderedWrite) {
     assert.eq(isOrderedWrite ? 2 : 1, stats.numBucketDocumentsTooLargeInsert, tojson(stats));
     assert.eq(0, stats.numBucketDocumentsTooLargeUpdate, tojson(stats));
 
-    assert.commandFailedWithCode(coll.insert(measurement2, {ordered: isOrderedWrite}), ErrorCodes.BSONObjectTooLarge);
+    assert.commandFailedWithCode(
+        coll.insert(measurement2, {ordered: isOrderedWrite}),
+        ErrorCodes.BSONObjectTooLarge,
+    );
 
     stats = coll.stats().timeseries;
     assert.eq(0, stats.numBucketInserts, tojson(stats));

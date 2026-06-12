@@ -18,7 +18,10 @@
 // ]
 
 import {kGenericArgFieldNames} from "jstests/libs/cmd_object_utils.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
@@ -40,7 +43,10 @@ class QuerySettingsBackfillMetricsTests {
 
     verify(...fns) {
         const currentMetrics = this.getBackfillMetrics();
-        fns.forEach((fn) => assert.doesNotThrow(() => fn(currentMetrics)), "Backfill metrics validation failed");
+        fns.forEach(
+            (fn) => assert.doesNotThrow(() => fn(currentMetrics)),
+            "Backfill metrics validation failed",
+        );
     }
 
     captureCurrentMetrics() {
@@ -82,7 +88,11 @@ class QuerySettingsBackfillMetricsTests {
 
     memoryUsedBytesIncreased() {
         return ({memoryUsedBytes}) =>
-            assert.gt(memoryUsedBytes, this.capturedMetrics.memoryUsedBytes, "Expected memory used to increase");
+            assert.gt(
+                memoryUsedBytes,
+                this.capturedMetrics.memoryUsedBytes,
+                "Expected memory used to increase",
+            );
     }
 
     memoryUsedBytesDidNotIncrease() {
@@ -163,19 +173,27 @@ describe("QuerySettingsBackfill", function () {
                 // increase.
                 metrics.captureCurrentMetrics();
                 assert.commandWorked(db.runCommand(cmdObj));
-                metrics.verify(metrics.bufferedRepresentativeQueriesIs(1), metrics.memoryUsedBytesIncreased());
+                metrics.verify(
+                    metrics.bufferedRepresentativeQueriesIs(1),
+                    metrics.memoryUsedBytesIncreased(),
+                );
 
                 // Execute the same query again and ensure that it isn't buffered again and no
                 // additional memory is used.
                 metrics.captureCurrentMetrics();
                 assert.commandWorked(db.runCommand(cmdObj));
-                metrics.verify(metrics.bufferedRepresentativeQueriesIs(1), metrics.memoryUsedBytesDidNotIncrease());
+                metrics.verify(
+                    metrics.bufferedRepresentativeQueriesIs(1),
+                    metrics.memoryUsedBytesDidNotIncrease(),
+                );
 
                 // Unblock the execution of the task.
                 fp.off();
 
                 // Assert that the representative query will soon be present in $querySettings.
-                const expectedConfiguration = [qsutils.makeQueryShapeConfiguration(settings, query)];
+                const expectedConfiguration = [
+                    qsutils.makeQueryShapeConfiguration(settings, query),
+                ];
                 qsutils.assertQueryShapeConfiguration(
                     expectedConfiguration,
                     /* shouldRunExplain */ true,

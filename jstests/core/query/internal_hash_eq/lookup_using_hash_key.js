@@ -39,7 +39,9 @@ let results = coll
                     from: coll.getName(),
                     let: {correlated_hash: "$hashVal"},
                     as: "relookup",
-                    pipeline: [{$match: {$expr: {$eq: [{$toHashedIndexKey: "$a"}, "$$correlated_hash"]}}}],
+                    pipeline: [
+                        {$match: {$expr: {$eq: [{$toHashedIndexKey: "$a"}, "$$correlated_hash"]}}},
+                    ],
                 },
             },
             {$unset: "hashVal"},

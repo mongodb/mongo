@@ -6,7 +6,11 @@
  * ]
  */
 
-import {getUriForColl, insertInvalidUTF8, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
+import {
+    getUriForColl,
+    insertInvalidUTF8,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {clearHealthLog, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 

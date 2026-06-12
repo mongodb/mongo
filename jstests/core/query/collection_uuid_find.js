@@ -15,7 +15,8 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB["coll"];
 assert.commandWorked(coll.insert({_id: 0}));
 
-const uuid = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch[0].info.uuid;
+const uuid = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch[0].info
+    .uuid;
 
 // The command succeeds when the correct UUID is provided.
 assert.commandWorked(testDB.runCommand({find: coll.getName(), collectionUUID: uuid}));
@@ -59,7 +60,10 @@ assert.eq(res.actualCollection, null);
 
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace does not exist.
-assert.commandWorkedOrFailedWithCode(testDB.runCommand({drop: coll2.getName()}), ErrorCodes.NamespaceNotFound);
+assert.commandWorkedOrFailedWithCode(
+    testDB.runCommand({drop: coll2.getName()}),
+    ErrorCodes.NamespaceNotFound,
+);
 res = assert.commandFailedWithCode(
     testDB.runCommand({find: coll2.getName(), collectionUUID: uuid}),
     ErrorCodes.CollectionUUIDMismatch,

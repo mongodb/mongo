@@ -22,7 +22,9 @@ const fooViewName = "foo_view_on_" + jsTestName();
 const regularViewName = "regular_view_on_" + jsTestName();
 
 // $testFoo in a view definition.
-assert.commandWorked(db.createView(fooViewName, jsTestName(), [{$testFoo: {}}, ...baseViewPipeline]));
+assert.commandWorked(
+    db.createView(fooViewName, jsTestName(), [{$testFoo: {}}, ...baseViewPipeline]),
+);
 let res = db[fooViewName].aggregate(baseUserPipeline).toArray();
 assertArrayEq({actual: res, expected: expectedResults});
 

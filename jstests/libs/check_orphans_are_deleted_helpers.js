@@ -8,7 +8,10 @@ export var CheckOrphansAreDeletedHelpers = (function () {
         // guarantee either of these happens so we force a refresh on these collections to ensure
         // recovery happens.
         const ensureMigrationsRecovered = (shardConn, configDB) => {
-            let pendingMigrations = configDB.getCollection("migrationCoordinators").find().toArray();
+            let pendingMigrations = configDB
+                .getCollection("migrationCoordinators")
+                .find()
+                .toArray();
             pendingMigrations.forEach((migrationRecoveryDoc) => {
                 let nss = migrationRecoveryDoc["nss"];
                 assert.commandWorked(shardConn.adminCommand({_flushRoutingTableCacheUpdates: nss}));
@@ -65,7 +68,10 @@ export var CheckOrphansAreDeletedHelpers = (function () {
                 const collName = tempNsArray.join(".");
 
                 jsTest.log.info(
-                    "Checking that orphan documents on shard " + shardId + " have been deleted from namespace " + ns,
+                    "Checking that orphan documents on shard " +
+                        shardId +
+                        " have been deleted from namespace " +
+                        ns,
                 );
 
                 let rangeDeletions = [];
@@ -85,7 +91,9 @@ export var CheckOrphansAreDeletedHelpers = (function () {
                                 .toArray();
                             jsTest.log.info("Idle cursors on shard " + shardId, {idleCursors});
                         } catch (e) {
-                            jsTest.log.info("Failed to get idle cursors on shard " + shardId, {error: e});
+                            jsTest.log.info("Failed to get idle cursors on shard " + shardId, {
+                                error: e,
+                            });
                         }
 
                         return (
@@ -191,26 +199,37 @@ export var CheckOrphansAreDeletedHelpers = (function () {
                                                                 as: "chunkDoc",
                                                                 in: {
                                                                     $and: [
-                                                                        {$gte: ["$$sk", "$$chunkDoc.min"]},
+                                                                        {
+                                                                            $gte: [
+                                                                                "$$sk",
+                                                                                "$$chunkDoc.min",
+                                                                            ],
+                                                                        },
                                                                         {
                                                                             $or: [
-                                                                                {$lt: ["$$sk", "$$chunkDoc.max"]},
                                                                                 {
-                                                                                    $allElementsTrue: [
-                                                                                        {
-                                                                                            $map: {
-                                                                                                input: "$$chunkDoc.max",
-                                                                                                in: {
-                                                                                                    $eq: [
-                                                                                                        {
-                                                                                                            $type: "$$this",
-                                                                                                        },
-                                                                                                        "maxKey",
-                                                                                                    ],
+                                                                                    $lt: [
+                                                                                        "$$sk",
+                                                                                        "$$chunkDoc.max",
+                                                                                    ],
+                                                                                },
+                                                                                {
+                                                                                    $allElementsTrue:
+                                                                                        [
+                                                                                            {
+                                                                                                $map: {
+                                                                                                    input: "$$chunkDoc.max",
+                                                                                                    in: {
+                                                                                                        $eq: [
+                                                                                                            {
+                                                                                                                $type: "$$this",
+                                                                                                            },
+                                                                                                            "maxKey",
+                                                                                                        ],
+                                                                                                    },
                                                                                                 },
                                                                                             },
-                                                                                        },
-                                                                                    ],
+                                                                                        ],
                                                                                 },
                                                                             ],
                                                                         },
@@ -231,7 +250,12 @@ export var CheckOrphansAreDeletedHelpers = (function () {
                     assert.eq(
                         0,
                         orphans.length,
-                        "found orphans @ " + shardId + ", orphans: " + tojson(orphans) + " for collection " + ns,
+                        "found orphans @ " +
+                            shardId +
+                            ", orphans: " +
+                            tojson(orphans) +
+                            " for collection " +
+                            ns,
                     );
                 }
             });

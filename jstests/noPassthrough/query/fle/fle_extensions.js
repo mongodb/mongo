@@ -4,7 +4,10 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 if (!isEnterpriseShell()) {
     jsTestLog("Skipping test as it requires the enterprise module");

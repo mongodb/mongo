@@ -47,8 +47,14 @@ describe("lazy profiling with differently-cased database", function () {
     it("should enable profiling on secondary without creating the database", function () {
         assert.commandWorked(secondary.getDB(lowerName).runCommand({profile: 2}));
         assert.commandWorked(secondary.getDB(upperName).runCommand({profile: 2}));
-        assert(!secondary.getDBNames().includes(lowerName), lowerName + " should not be created by setProfilingLevel");
-        assert(!secondary.getDBNames().includes(upperName), upperName + " should not be created by setProfilingLevel");
+        assert(
+            !secondary.getDBNames().includes(lowerName),
+            lowerName + " should not be created by setProfilingLevel",
+        );
+        assert(
+            !secondary.getDBNames().includes(upperName),
+            upperName + " should not be created by setProfilingLevel",
+        );
     });
 
     it("should not profile find commands with profiling set until the db has been created", function () {
@@ -62,7 +68,10 @@ describe("lazy profiling with differently-cased database", function () {
         assert.commandWorked(primary.getDB(upperName).coll.insert({x: 1}));
         rst.awaitReplication();
 
-        assert(secondary.getDBNames().includes(upperName), upperName + " should exist on secondary after replication");
+        assert(
+            secondary.getDBNames().includes(upperName),
+            upperName + " should exist on secondary after replication",
+        );
         assert(
             !secondary.getDBNames().includes(lowerName),
             lowerName + " should not exist on secondary before the read",
@@ -73,7 +82,10 @@ describe("lazy profiling with differently-cased database", function () {
         const result = secondary.getDB(lowerName).coll.find({}).toArray();
         assert.eq(result.length, 0, "find on non-existent collection should return empty");
 
-        assert(secondary.getDBNames().includes(upperName), upperName + " should still exist on secondary");
+        assert(
+            secondary.getDBNames().includes(upperName),
+            upperName + " should still exist on secondary",
+        );
         assert(
             !secondary.getDBNames().includes(lowerName),
             lowerName + " must not be created by the profiler's lazy initialization",

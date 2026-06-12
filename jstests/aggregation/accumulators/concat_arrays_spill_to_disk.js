@@ -22,8 +22,14 @@ assert.gt(dataSize, memoryLimitMB * 1024 * 1024);
 
 // Test accumulating all values into one array. On debug builds we will spill to disk for $group and
 // so may hit the group error code before we hit ExceededMemoryLimit.
-const pipeline = [{$sort: {sortKey: 1}}, {$group: {_id: null, bigArray: {$concatArrays: "$bigArr"}}}];
-const expectedCodes = [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit];
+const pipeline = [
+    {$sort: {sortKey: 1}},
+    {$group: {_id: null, bigArray: {$concatArrays: "$bigArr"}}},
+];
+const expectedCodes = [
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+    ErrorCodes.ExceededMemoryLimit,
+];
 
 // Test that 'allowDiskUse: false' does indeed prevent spilling to disk.
 assert.commandFailedWithCode(

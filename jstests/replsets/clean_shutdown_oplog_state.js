@@ -30,7 +30,11 @@ let primary = rst.getPrimary(); // Waits for PRIMARY state.
 let secondary = rst.nodes[1];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Stop replication on the secondary.
@@ -42,7 +46,9 @@ primary.getCollection("test.coll").insert({_id: -1});
 // Start a w:2 write that will block until replication is resumed.
 let waitForReplStart = startParallelShell(function () {
     printjson(
-        assert.commandWorked(db.getCollection("side").insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})),
+        assert.commandWorked(
+            db.getCollection("side").insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}}),
+        ),
     );
 }, primary.host.split(":")[1]);
 
@@ -89,8 +95,15 @@ const filter = {
 };
 let oplogDoc = conn.getCollection("local.oplog.rs").find(filter).sort({$natural: -1}).limit(1)[0];
 let collDoc = conn.getCollection("test.coll").find().sort({_id: -1}).limit(1)[0];
-let minValidDoc = conn.getCollection("local.replset.minvalid").find().sort({$natural: -1}).limit(1)[0];
-let oplogTruncateAfterPointDoc = conn.getCollection("local.replset.oplogTruncateAfterPoint").find().limit(1)[0];
+let minValidDoc = conn
+    .getCollection("local.replset.minvalid")
+    .find()
+    .sort({$natural: -1})
+    .limit(1)[0];
+let oplogTruncateAfterPointDoc = conn
+    .getCollection("local.replset.oplogTruncateAfterPoint")
+    .find()
+    .limit(1)[0];
 printjson({
     oplogDoc: oplogDoc,
     collDoc: collDoc,

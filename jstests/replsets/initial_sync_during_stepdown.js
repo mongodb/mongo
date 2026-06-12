@@ -29,7 +29,11 @@ let collNss = primaryColl.getFullName();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 function setupTest({
@@ -69,7 +73,11 @@ function setupTest({
     rst.waitForState(secondary, ReplSetTest.State.STARTUP_2);
 }
 
-function finishTest({failPoint, nss: nss = "", DocsCopiedByOplogFetcher: DocsCopiedByOplogFetcher = 0}) {
+function finishTest({
+    failPoint,
+    nss: nss = "",
+    DocsCopiedByOplogFetcher: DocsCopiedByOplogFetcher = 0,
+}) {
     jsTestLog("Waiting for primary to reach failPoint '" + failPoint + "'.");
     waitForCurOpByFailPointNoNS(primaryAdmin, failPoint);
 
@@ -115,7 +123,11 @@ jsTestLog("Testing stepdown while 'databases' cloner lists databases.");
 runStepDownTest({failPoint: "hangBeforeListDatabases"});
 
 jsTestLog("Testing stepdown while 'database' cloner lists collections.");
-runStepDownTest({failPoint: "hangBeforeListCollections", nss: dbNss, nssSuffix: ".$cmd.listCollections"});
+runStepDownTest({
+    failPoint: "hangBeforeListCollections",
+    nss: dbNss,
+    nssSuffix: ".$cmd.listCollections",
+});
 
 jsTestLog("Testing stepdown while 'collection' cloner performs collection count.");
 runStepDownTest({failPoint: "hangBeforeCollectionCount", nss: collNss});
@@ -166,14 +178,19 @@ assert.commandWorked(primaryColl.insert([{_id: 3}, {_id: 4}]));
 
 // Insert is successful. So, enable fail point "waitWithPinnedCursorDuringGetMoreBatch"
 // such that it doesn't drop locks when getmore cmd waits inside the fail point block.
-configureFailPoint(primary, "waitWithPinnedCursorDuringGetMoreBatch", {nss: oplogNss, shouldCheckForInterrupt: true});
+configureFailPoint(primary, "waitWithPinnedCursorDuringGetMoreBatch", {
+    nss: oplogNss,
+    shouldCheckForInterrupt: true,
+});
 
 // Now, disable fail point "waitAfterPinningCursorBeforeGetMoreBatch" to allow getmore to
 // continue and hang on "waitWithPinnedCursorDuringGetMoreBatch" fail point.
 configureFailPoint(primary, "waitAfterPinningCursorBeforeGetMoreBatch", {}, "off");
 
 // Disable fail point on secondary to allow initial sync to continue.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 
 finishTest({
     failPoint: "waitWithPinnedCursorDuringGetMoreBatch",

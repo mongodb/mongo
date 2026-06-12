@@ -69,7 +69,9 @@ function runTests(dataShard) {
         const kColl = getNewCollName();
         const kNss = kDbName + "." + kColl;
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: 1}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: 1}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {_id: 1}, 1);
         checkCRUDWorks(kColl, {_id: 1});
@@ -86,7 +88,9 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
@@ -94,7 +98,9 @@ function runTests(dataShard) {
         checkCRUDWorks(kColl, {_id: 1});
         checkIndexes(kColl, 1);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: 1}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: 1}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {_id: 1}, 1);
         checkChunkLocation(kColl, dataShard);
@@ -108,7 +114,9 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
@@ -116,7 +124,9 @@ function runTests(dataShard) {
         checkCRUDWorks(kColl, {_id: 1});
         checkIndexes(kColl, 1);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: 1}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: 1}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {x: 1}, 1);
         checkChunkLocation(kColl, dataShard);
@@ -130,7 +140,9 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
@@ -147,7 +159,9 @@ function runTests(dataShard) {
 
         assert.commandWorked(st.s.getDB(kDbName).getCollection(kColl).createIndex({x: 1}));
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: 1}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: 1}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {x: 1}, 1);
         checkChunkLocation(kColl, dataShard);
@@ -161,7 +175,9 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
@@ -204,7 +220,9 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
@@ -212,7 +230,9 @@ function runTests(dataShard) {
         checkCRUDWorks(kColl, {_id: 1});
         checkIndexes(kColl, 1);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: 1}, unique: true}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: 1}, unique: true}),
+        );
 
         checkCollAndChunks(kColl, false, false, {x: 1}, 1);
         checkChunkLocation(kColl, dataShard);
@@ -228,14 +248,18 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
         checkCRUDWorks(kColl, {_id: 1});
         checkIndexes(kColl, 1);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: "hashed"}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: "hashed"}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {_id: "hashed"}, expectedNumChunks);
         checkCRUDWorks(kColl, {_id: 1});
@@ -248,14 +272,18 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
         checkCRUDWorks(kColl, {_id: 1});
         checkIndexes(kColl, 1);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: "hashed"}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: "hashed"}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {x: "hashed"}, expectedNumChunks);
         checkCRUDWorks(kColl, {x: 1});
@@ -268,7 +296,9 @@ function runTests(dataShard) {
         const kNss = kDbName + "." + kColl;
 
         assert.commandWorked(
-            st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
+            st.s
+                .getDB(kDbName)
+                .runCommand({createUnsplittableCollection: kColl, dataShard: dataShard}),
         );
 
         checkCollAndChunks(kColl, false, true, {_id: 1}, 1);
@@ -286,7 +316,9 @@ function runTests(dataShard) {
         checkCRUDWorks(kColl, {_id: 1});
         checkIndexes(kColl, 3);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: "hashed"}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: "hashed"}}),
+        );
 
         checkCollAndChunks(kColl, false, false, {x: "hashed"}, expectedNumChunks);
         checkCRUDWorks(kColl, {x: 1});
@@ -310,7 +342,9 @@ function runTests(dataShard) {
         checkCRUDWorks(kColl, {time: ISODate("2021-05-18T08:00:00.000Z")});
         checkIndexes(kColl, 0);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {time: 1}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {time: 1}}),
+        );
 
         checkCollAndChunks(kColl, true, false, {"control.min.time": 1}, 1);
         checkCRUDWorks(kColl, {time: ISODate("2021-05-18T08:00:00.000Z")});
@@ -334,7 +368,9 @@ function runTests(dataShard) {
         checkCRUDWorks(kColl, {time: ISODate("2021-05-18T08:00:00.000Z")});
         checkIndexes(kColl, 1);
 
-        assert.commandWorked(st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {"tag.subField": 1}}));
+        assert.commandWorked(
+            st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {"tag.subField": 1}}),
+        );
 
         checkCollAndChunks(kColl, true, false, {"meta.subField": 1}, 1);
         checkCRUDWorks(kColl, {time: ISODate("2021-05-18T08:00:00.000Z")});

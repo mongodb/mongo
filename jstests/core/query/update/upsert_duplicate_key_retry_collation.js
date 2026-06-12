@@ -37,7 +37,9 @@ const testColl = db[jsTestName()];
 {
     // Test index with collation, query without collation
     assert(testColl.drop());
-    assert.commandWorked(testColl.createIndex({x: 1}, {unique: true, collation: {locale: "en", strength: 2}}));
+    assert.commandWorked(
+        testColl.createIndex({x: 1}, {unique: true, collation: {locale: "en", strength: 2}}),
+    );
     assert.commandWorked(testColl.insertMany([{_id: 0, x: "UNIQUE"}]));
 
     assert.throwsWithCode(
@@ -49,7 +51,9 @@ const testColl = db[jsTestName()];
 {
     // Test index and query with different collation strength
     assert(testColl.drop());
-    assert.commandWorked(testColl.createIndex({x: 1}, {unique: true, collation: {locale: "en", strength: 3}}));
+    assert.commandWorked(
+        testColl.createIndex({x: 1}, {unique: true, collation: {locale: "en", strength: 3}}),
+    );
     assert.commandWorked(
         testColl.insertMany([
             {_id: 0, x: "UNIQUË"},

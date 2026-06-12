@@ -6,7 +6,11 @@
 
 import "jstests/multiVersion/libs/verify_versions.js";
 
-import {getUriForColl, getUriForIndex, runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
+import {
+    getUriForColl,
+    getUriForIndex,
+    runWiredTigerTool,
+} from "jstests/disk/libs/wt_file_helper.js";
 import {allSupportedVersions} from "jstests/multiVersion/libs/supported_versions.js";
 
 // Setup the dbpath for this test.
@@ -19,7 +23,9 @@ function setupCommon(db) {
 }
 
 function checkCommon(validateLogs, shouldCorrupt) {
-    let results = validateLogs.filter((json) => json.id === 9437301 && json.attr.results.ns == "test.collect");
+    let results = validateLogs.filter(
+        (json) => json.id === 9437301 && json.attr.results.ns == "test.collect",
+    );
 
     assert.eq(1, results.length);
     let result = results[0].attr.results;
@@ -43,9 +49,15 @@ function checkCommon(validateLogs, shouldCorrupt) {
 function setup4(db) {
     // Removed in 5.0 as per https://www.mongodb.com/docs/v6.2/core/geohaystack/
     assert.commandWorked(db.createCollection("geohaystack"));
-    assert.commandWorked(db["geohaystack"].insert({_id: 100, pos: {lng: 126.9, lat: 35.2}, type: "restaurant"}));
-    assert.commandWorked(db["geohaystack"].insert({_id: 200, pos: {lng: 127.5, lat: 36.1}, type: "restaurant"}));
-    assert.commandWorked(db["geohaystack"].createIndex({pos: "geoHaystack", type: 1}, {bucketSize: 1}));
+    assert.commandWorked(
+        db["geohaystack"].insert({_id: 100, pos: {lng: 126.9, lat: 35.2}, type: "restaurant"}),
+    );
+    assert.commandWorked(
+        db["geohaystack"].insert({_id: 200, pos: {lng: 127.5, lat: 36.1}, type: "restaurant"}),
+    );
+    assert.commandWorked(
+        db["geohaystack"].createIndex({pos: "geoHaystack", type: 1}, {bucketSize: 1}),
+    );
 }
 
 function corrupt4(conn) {
@@ -54,7 +66,9 @@ function corrupt4(conn) {
 }
 
 function check4(validateLogs, shouldCorrupt) {
-    let results = validateLogs.filter((json) => json.id === 9437301 && json.attr.results.ns == "test.geohaystack");
+    let results = validateLogs.filter(
+        (json) => json.id === 9437301 && json.attr.results.ns == "test.geohaystack",
+    );
     assert.eq(1, results.length);
     let result = results[0].attr.results;
     assert(result, "Couldn't find validation result for test.geohaystack");
@@ -134,7 +148,9 @@ function check5(validateLogs, shouldCorrupt) {
         assert.eq(3, weatherResult.nrecords);
     }
 
-    let uniqResults = validateLogs.filter((json) => json.id === 9437301 && json.attr.results.ns == "test.uniqueColl");
+    let uniqResults = validateLogs.filter(
+        (json) => json.id === 9437301 && json.attr.results.ns == "test.uniqueColl",
+    );
     assert.eq(1, uniqResults.length);
     let uniqResult = uniqResults[0].attr.results;
     assert(uniqResult, "Couldn't find validation result for test.uniqueColl");
@@ -213,9 +229,17 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
 }
 
 for (let i = 0; i < allSupportedVersions.length; i++) {
-    testVersion(allSupportedVersions[i].binVersion, allSupportedVersions[i].featureCompatibilityVersion, false);
+    testVersion(
+        allSupportedVersions[i].binVersion,
+        allSupportedVersions[i].featureCompatibilityVersion,
+        false,
+    );
 }
 
 for (let i = 0; i < allSupportedVersions.length; i++) {
-    testVersion(allSupportedVersions[i].binVersion, allSupportedVersions[i].featureCompatibilityVersion, true);
+    testVersion(
+        allSupportedVersions[i].binVersion,
+        allSupportedVersions[i].featureCompatibilityVersion,
+        true,
+    );
 }

@@ -83,25 +83,33 @@ function runUpdateTwice(cmdObj, coll, shard0, shard1, firstExp, secondExp) {
     assert.eq(firstRes.n, firstExp);
     assert.eq(firstRes.nModified, firstExp);
 
-    assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard1}),
+    );
 
     const secondRes = assert.commandWorked(coll.runCommand("update", cmdObj));
     assert.eq(secondRes.n, secondExp);
     assert.eq(secondRes.nModified, secondExp);
 
-    assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard0}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard0}),
+    );
 }
 
 function runDeleteTwice(cmdObj, coll, shard0, shard1, firstExp, secondExp) {
     const firstRes = assert.commandWorked(coll.runCommand("delete", cmdObj));
     assert.eq(firstRes.n, firstExp);
 
-    assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard1}),
+    );
 
     const secondRes = assert.commandWorked(coll.runCommand("delete", cmdObj));
     assert.eq(secondRes.n, secondExp);
 
-    assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard0}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: 5}, to: shard0}),
+    );
 }
 
 const shardName0 = st.shard0.shardName;

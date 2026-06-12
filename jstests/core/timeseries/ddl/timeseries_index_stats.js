@@ -35,7 +35,9 @@ TimeseriesTest.run((insert) => {
     coll.drop();
 
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     assert.commandWorked(insert(coll, doc), "failed to insert doc: " + tojson(doc));
@@ -83,7 +85,10 @@ TimeseriesTest.run((insert) => {
         assert.docEq(
             stat.key,
             indexKeys[stat.name],
-            "$indexStats returned unexpected top-level key for index: " + stat.name + ": " + tojson(indexStatsDocs),
+            "$indexStats returned unexpected top-level key for index: " +
+                stat.name +
+                ": " +
+                tojson(indexStatsDocs),
         );
         assert.docEq(
             stat.spec.key,
@@ -100,7 +105,11 @@ TimeseriesTest.run((insert) => {
     const bucketIndexStatsDocs = getTimeseriesCollForRawOps(coll)
         .aggregate([{$indexStats: {}}], kRawOperationSpec)
         .toArray();
-    assert.eq(Object.keys(indexKeys).length + 1, bucketIndexStatsDocs.length, tojson(bucketIndexStatsDocs));
+    assert.eq(
+        Object.keys(indexKeys).length + 1,
+        bucketIndexStatsDocs.length,
+        tojson(bucketIndexStatsDocs),
+    );
 
     // Check that $indexStats is not limited to being the only stage in an aggregation pipeline on a
     // time-series collection.
@@ -108,5 +117,9 @@ TimeseriesTest.run((insert) => {
         .aggregate([{$indexStats: {}}, {$group: {_id: 0, index_names: {$addToSet: "$name"}}}])
         .toArray();
     assert.eq(1, multiStageDocs.length, tojson(multiStageDocs));
-    assert.sameMembers(Object.keys(indexKeys), multiStageDocs[0].index_names, tojson(multiStageDocs));
+    assert.sameMembers(
+        Object.keys(indexKeys),
+        multiStageDocs[0].index_names,
+        tojson(multiStageDocs),
+    );
 });

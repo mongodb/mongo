@@ -36,7 +36,10 @@ const prepareTimestamp1 = PrepareHelpers.prepareTransaction(priSession);
 
 jsTestLog("Error committing the transaction");
 // This will error in the "commit unprepared transaction" code path.
-assert.commandFailedWithCode(priSessionDB.adminCommand({commitTransaction: 1}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    priSessionDB.adminCommand({commitTransaction: 1}),
+    ErrorCodes.InvalidOptions,
+);
 
 // This will error in the "commit prepared transaction" code path.
 const tooEarlyTS1 = Timestamp(prepareTimestamp1.getTime() - 1, 1);
@@ -74,7 +77,10 @@ assert.commandWorked(secSessionColl.insert({_id: 2}));
 const prepareTimestamp2 = PrepareHelpers.prepareTransaction(secSession);
 
 jsTestLog("Error committing the transaction");
-assert.commandFailedWithCode(secSessionDB.adminCommand({commitTransaction: 1}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    secSessionDB.adminCommand({commitTransaction: 1}),
+    ErrorCodes.InvalidOptions,
+);
 const tooEarlyTS2 = Timestamp(prepareTimestamp2.getTime() - 1, 1);
 assert.commandFailedWithCode(
     secSessionDB.adminCommand({commitTransaction: 1, commitTimestamp: tooEarlyTS2}),

@@ -3,7 +3,11 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-let rst = new ReplSetTest({name: "configRS", nodes: 3, nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
+let rst = new ReplSetTest({
+    name: "configRS",
+    nodes: 3,
+    nodeOptions: {configsvr: "", storageEngine: "wiredTiger"},
+});
 rst.startSet();
 let conf = rst.getReplSetConfig();
 conf.members[1].priority = 0;

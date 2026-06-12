@@ -56,7 +56,11 @@ function runTestFastScan() {
 
 const prevCBRConfig = getCBRConfig(db);
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"}),
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "automaticCE",
+    }),
 );
 
 try {
@@ -64,7 +68,9 @@ try {
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running with:", {cbrFallbackStrategy});
-        assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}),
+        );
         runTestIxscan();
         runTestFastScan();
     }

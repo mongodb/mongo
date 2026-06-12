@@ -60,14 +60,28 @@ function testLimits(testDB, lengthLimit) {
         testDB.runCommand({
             aggregate: "test",
             cursor: {},
-            pipeline: [{$unionWith: {coll: "test", pipeline: new Array(maxLength).fill({$project: {_id: 1}})}}],
+            pipeline: [
+                {
+                    $unionWith: {
+                        coll: "test",
+                        pipeline: new Array(maxLength).fill({$project: {_id: 1}}),
+                    },
+                },
+            ],
         }),
     );
     assert.commandFailedWithCode(
         testDB.runCommand({
             aggregate: "test",
             cursor: {},
-            pipeline: [{$unionWith: {coll: "test", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})}}],
+            pipeline: [
+                {
+                    $unionWith: {
+                        coll: "test",
+                        pipeline: new Array(tooLarge).fill({$project: {_id: 1}}),
+                    },
+                },
+            ],
         }),
         kPreParseErrCode,
     );
@@ -89,7 +103,10 @@ function testLimits(testDB, lengthLimit) {
     );
 
     assert.commandWorked(
-        testDB.runCommand({update: "test", updates: [{q: {}, u: new Array(maxLength).fill({$project: {_id: 1}})}]}),
+        testDB.runCommand({
+            update: "test",
+            updates: [{q: {}, u: new Array(maxLength).fill({$project: {_id: 1}})}],
+        }),
     );
     assert.commandFailedWithCode(
         testDB.runCommand({
@@ -105,15 +122,22 @@ function testLimits(testDB, lengthLimit) {
         // Long pipelines with many unions.
         new Array(maxLength).fill({$unionWith: collname}),
         // maxLength * 2 total unions.
-        new Array(maxLength).fill({$unionWith: {coll: collname, pipeline: [{$unionWith: collname}]}}),
+        new Array(maxLength).fill({
+            $unionWith: {coll: collname, pipeline: [{$unionWith: collname}]},
+        }),
         // maxLength in subPipeline.
         [
             {
-                $unionWith: {coll: collname, pipeline: new Array(maxLength).fill({$unionWith: collname})},
+                $unionWith: {
+                    coll: collname,
+                    pipeline: new Array(maxLength).fill({$unionWith: collname}),
+                },
             },
         ],
         // maxLength * 50 total unions, should be within max doc size.
-        new Array(maxLength).fill({$unionWith: {coll: collname, pipeline: new Array(50).fill({$unionWith: collname})}}),
+        new Array(maxLength).fill({
+            $unionWith: {coll: collname, pipeline: new Array(50).fill({$unionWith: collname})},
+        }),
     ].forEach((pipeline) => {
         assert.commandWorked(
             testDB.runCommand({
@@ -159,15 +183,17 @@ function testLimits(testDB, lengthLimit) {
     });
 
     // Same test, but these to stages get replaced by 2 stages under the hood.
-    [{$bucket: {groupBy: "$nonExistentField", boundaries: [0, 1], default: 2}}, {$sortByCount: "$_id"}].forEach(
-        (stage) =>
-            assert.commandWorked(
-                testDB.runCommand({
-                    aggregate: collname,
-                    cursor: {},
-                    pipeline: new Array(parseInt(maxLength / 2)).fill(stage),
-                }),
-            ),
+    [
+        {$bucket: {groupBy: "$nonExistentField", boundaries: [0, 1], default: 2}},
+        {$sortByCount: "$_id"},
+    ].forEach((stage) =>
+        assert.commandWorked(
+            testDB.runCommand({
+                aggregate: collname,
+                cursor: {},
+                pipeline: new Array(parseInt(maxLength / 2)).fill(stage),
+            }),
+        ),
     );
 }
 
@@ -190,7 +216,11 @@ function testLimitsWithLookupCache(testDB, lengthLimit) {
             cursor: {},
             pipeline: [
                 {
-                    $lookup: {from: "test", as: "as", pipeline: new Array(maxLength).fill({$project: {_id: 1}})},
+                    $lookup: {
+                        from: "test",
+                        as: "as",
+                        pipeline: new Array(maxLength).fill({$project: {_id: 1}}),
+                    },
                 },
             ],
             comment: "lookup maxLength",
@@ -202,7 +232,11 @@ function testLimitsWithLookupCache(testDB, lengthLimit) {
             cursor: {},
             pipeline: [
                 {
-                    $lookup: {from: "test", as: "as", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})},
+                    $lookup: {
+                        from: "test",
+                        as: "as",
+                        pipeline: new Array(tooLarge).fill({$project: {_id: 1}}),
+                    },
                 },
             ],
             comment: "lookup tooLarge",
@@ -257,8 +291,12 @@ function runTestWithLookupCache(lengthLimit, mongosConfig = {}, mongodConfig = {
     // Explicitly move chunks to ensure predictable shard distribution:
     // - Shard0 gets documents with _id: 1 (chunk [MinKey, 2))
     // - Shard1 gets documents with _id: 2, 3, 4 (chunk [2, MaxKey))
-    assert.commandWorked(st.s0.adminCommand({moveChunk: "test.test", find: {_id: 0}, to: st.rs0.getURL()}));
-    assert.commandWorked(st.s0.adminCommand({moveChunk: "test.test", find: {_id: 2}, to: st.rs1.getURL()}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: "test.test", find: {_id: 0}, to: st.rs0.getURL()}),
+    );
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: "test.test", find: {_id: 2}, to: st.rs1.getURL()}),
+    );
 
     jsTest.log.info("Running test against mongos");
     testLimitsWithLookupCache(mongosDB, lengthLimit);
@@ -272,16 +310,27 @@ function runTestWithLookupCache(lengthLimit, mongosConfig = {}, mongodConfig = {
 // This is a sanity check to make sure that the default value is correct. If the limit is changed,
 // it will break for users and this check catches that.
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
-let pipelineLimit = assert.commandWorked(st.s0.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}));
-assert.eq(getExpectedPipelineLimit(st.s0.getDB("test")), pipelineLimit["internalPipelineLengthLimit"]);
+let pipelineLimit = assert.commandWorked(
+    st.s0.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}),
+);
+assert.eq(
+    getExpectedPipelineLimit(st.s0.getDB("test")),
+    pipelineLimit["internalPipelineLengthLimit"],
+);
 
 const shardPrimary = st.rs0.getPrimary().getDB("test");
-pipelineLimit = assert.commandWorked(shardPrimary.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}));
+pipelineLimit = assert.commandWorked(
+    shardPrimary.adminCommand({"getParameter": 1, "internalPipelineLengthLimit": 1}),
+);
 assert.eq(getExpectedPipelineLimit(shardPrimary), pipelineLimit["internalPipelineLengthLimit"]);
 st.stop();
 
 // Test with modified pipeline length limit.
-runTest(50, {setParameter: {internalPipelineLengthLimit: 50}}, {setParameter: {internalPipelineLengthLimit: 50}});
+runTest(
+    50,
+    {setParameter: {internalPipelineLengthLimit: 50}},
+    {setParameter: {internalPipelineLengthLimit: 50}},
+);
 runTestWithLookupCache(
     50,
     {setParameter: {internalPipelineLengthLimit: 50}},

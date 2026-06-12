@@ -11,14 +11,18 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const kSmallMemoryLimit = 1024;
-const conn = MongoRunner.runMongod({setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: kSmallMemoryLimit}});
+const conn = MongoRunner.runMongod({
+    setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: kSmallMemoryLimit},
+});
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 
 const coll = testDB.timeseries_internal_bounded_sort;
 coll.drop();
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 
 // Insert some data.
 {
@@ -111,7 +115,9 @@ aggOptions.allowDiskUse = true;
 
     // Let's make sure the execution stats make sense.
     const stats = getAggPlanStage(
-        getTimeseriesCollForRawOps(testDB, coll).explain("executionStats").aggregate(pipeline, aggOptions),
+        getTimeseriesCollForRawOps(testDB, coll)
+            .explain("executionStats")
+            .aggregate(pipeline, aggOptions),
         "$_internalBoundedSort",
     );
     assert.eq(stats.usedDisk, true);
@@ -125,21 +131,26 @@ aggOptions.allowDiskUse = true;
     // limit, so let's ensure that the total spills are at least what we'd expect if none of the
     // buckets overlap.
     const docsPerBucket = Math.floor(
-        stats.nReturned / getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
+        stats.nReturned /
+            getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
     );
     const spillsPerBucket = Math.floor(docsPerBucket / docsToTriggerSpill);
     assert.gt(spillsPerBucket, 0);
     assert.gt(stats.spilledDataStorageSize, 0);
     assert.gte(
         stats.spills,
-        getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)) * spillsPerBucket,
+        getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)) *
+            spillsPerBucket,
     );
 }
 
 // Test $sort + $limit.
 {
     const naive = getTimeseriesCollForRawOps(testDB, coll)
-        .aggregate([unpackStage, {$_internalInhibitOptimization: {}}, {$sort: {t: 1}}, {$limit: 100}], aggOptions)
+        .aggregate(
+            [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: {t: 1}}, {$limit: 100}],
+            aggOptions,
+        )
         .toArray();
     assertSorted(naive);
     assert.eq(100, naive.length);

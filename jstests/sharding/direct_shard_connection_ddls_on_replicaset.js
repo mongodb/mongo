@@ -34,21 +34,36 @@ describe("Check direct DDLs against replica set with different startup option ar
     it("Node started with no options", () => {
         this.rs.startSet();
         this.rs.initiate();
-        const testDBDirectConnection = this.createNewUserForDBAndGetDirectConn("user", "x", ["readWrite"], "testDB");
+        const testDBDirectConnection = this.createNewUserForDBAndGetDirectConn(
+            "user",
+            "x",
+            ["readWrite"],
+            "testDB",
+        );
         assert.commandWorked(testDBDirectConnection.createCollection("testColl0"));
     });
 
     it("Node started with --shardsvr", () => {
         this.rs.startSet({shardsvr: ""});
         this.rs.initiate();
-        const testDBDirectConnection = this.createNewUserForDBAndGetDirectConn("user", "x", ["readWrite"], "testDB");
+        const testDBDirectConnection = this.createNewUserForDBAndGetDirectConn(
+            "user",
+            "x",
+            ["readWrite"],
+            "testDB",
+        );
         assert.commandWorked(testDBDirectConnection.createCollection("testColl1"));
     });
 
     it("Node started with --configsvr and --replicaSetConfigShardMaintenanceMode", () => {
         this.rs.startSet({configsvr: "", replicaSetConfigShardMaintenanceMode: ""});
         this.rs.initiate();
-        const testDBDirectConnection = this.createNewUserForDBAndGetDirectConn("user", "x", ["readWrite"], "testDB");
+        const testDBDirectConnection = this.createNewUserForDBAndGetDirectConn(
+            "user",
+            "x",
+            ["readWrite"],
+            "testDB",
+        );
         assert.commandWorked(testDBDirectConnection.createCollection("testColl2"));
     });
 });

@@ -15,7 +15,9 @@ const timeFieldName = "time";
 const metaFieldName = "m";
 
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 const expectedMetrics = {
@@ -42,7 +44,8 @@ const checkNoServerStatus = function () {
     const serverStatus = assert.commandWorked(testDB.serverStatus());
     assert(
         !serverStatus.hasOwnProperty("bucketCatalog"),
-        "Found unexpected bucketCatalog section in serverStatus: " + tojson(serverStatus.bucketCatalog),
+        "Found unexpected bucketCatalog section in serverStatus: " +
+            tojson(serverStatus.bucketCatalog),
     );
 };
 

@@ -39,7 +39,9 @@ assert.throwsWithCode(function () {
     coll.aggregate(pipeline);
 }, ErrorCodes.NoQueryExecutionPlans);
 
-assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}),
+);
 
 assert.throwsWithCode(function () {
     coll.aggregate(pipeline);

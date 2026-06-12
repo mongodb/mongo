@@ -35,14 +35,22 @@ function runTest(conn) {
             roles: [],
         }),
     );
-    assert.commandWorked(viewsDB.runCommand({createUser: "viewUser", pwd: "pwd", roles: ["readWriteView"]}));
+    assert.commandWorked(
+        viewsDB.runCommand({createUser: "viewUser", pwd: "pwd", roles: ["readWriteView"]}),
+    );
 
     adminDB.logout();
     assert(viewsDB.auth("viewUser", "pwd"));
 
     const lookupStage = {$lookup: {from: "forbidden", localField: "x", foreignField: "x", as: "y"}};
     const graphLookupStage = {
-        $graphLookup: {from: "forbidden", startWith: [], connectFromField: "x", connectToField: "x", as: "y"},
+        $graphLookup: {
+            from: "forbidden",
+            startWith: [],
+            connectFromField: "x",
+            connectToField: "x",
+            as: "y",
+        },
     };
 
     // You cannot create a view if you have both the 'createCollection' and 'find' actions on
@@ -93,12 +101,20 @@ function runTest(conn) {
         "modified a view to read an unreadable collection via $graphLookup",
     );
     assert.commandFailedWithCode(
-        viewsDB.runCommand({collMod: "view", viewOn: "permitted", pipeline: [{$facet: {a: [lookupStage]}}]}),
+        viewsDB.runCommand({
+            collMod: "view",
+            viewOn: "permitted",
+            pipeline: [{$facet: {a: [lookupStage]}}],
+        }),
         ErrorCodes.Unauthorized,
         "modified a view to read an unreadable collection via $lookup in a $facet",
     );
     assert.commandFailedWithCode(
-        viewsDB.runCommand({collMod: "view", viewOn: "permitted", pipeline: [{$facet: {b: [graphLookupStage]}}]}),
+        viewsDB.runCommand({
+            collMod: "view",
+            viewOn: "permitted",
+            pipeline: [{$facet: {b: [graphLookupStage]}}],
+        }),
         ErrorCodes.Unauthorized,
         "modified a view to read an unreadable collection via $graphLookup in a $facet",
     );
@@ -155,6 +171,11 @@ runTest(mongod);
 MongoRunner.stopMongod(mongod);
 
 // Run the test on a sharded cluster.
-const cluster = new ShardingTest({shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {rsOptions: {auth: ""}}});
+const cluster = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    keyFile: "jstests/libs/key1",
+    other: {rsOptions: {auth: ""}},
+});
 runTest(cluster);
 cluster.stop();

@@ -79,7 +79,10 @@ if (result.code === 10742100) {
 } else if (result.code === ErrorCodes.InvalidOptions) {
     // Regular _id index error
     jsTest.log.info("Test 3: Collection is regular - got expected InvalidOptions error");
-    assert(result.errmsg.includes("cannot drop _id index"), "Error message should mention _id index");
+    assert(
+        result.errmsg.includes("cannot drop _id index"),
+        "Error message should mention _id index",
+    );
 }
 
 // Test 4: Dry run trying to drop non-existent index - should succeed
@@ -157,6 +160,10 @@ let nonExistentCmd = {
 };
 
 result = st.shard0.getDB(dbName).runCommand(nonExistentCmd);
-assert.commandFailedWithCode(result, ErrorCodes.NamespaceNotFound, "Should fail for non-existent collection");
+assert.commandFailedWithCode(
+    result,
+    ErrorCodes.NamespaceNotFound,
+    "Should fail for non-existent collection",
+);
 
 st.stop();

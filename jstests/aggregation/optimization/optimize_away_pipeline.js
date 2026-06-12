@@ -27,7 +27,10 @@ import {
     isQueryPlan,
     planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeFullyEnabled,
+    checkSbeRestrictedOrFullyEnabled,
+} from "jstests/libs/query/sbe_util.js";
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
@@ -116,7 +119,10 @@ function assertPipelineDoesNotUseAggregation({
     assert(isQueryPlan(explainOutput), explainOutput);
     if (explainOutput.hasOwnProperty("shards")) {
         Object.keys(explainOutput.shards).forEach((shard) =>
-            assert(explainOutput.shards[shard].queryPlanner.optimizedPipeline === true, explainOutput),
+            assert(
+                explainOutput.shards[shard].queryPlanner.optimizedPipeline === true,
+                explainOutput,
+            ),
         );
     } else {
         assert(explainOutput.queryPlanner.optimizedPipeline === true, explainOutput);
@@ -153,7 +159,11 @@ function testGetMore({command = null, expectedResult = null} = {}) {
 // Calls 'assertPushdownEnabled' if sbeFullyEnabled is 'true' or if pipeline has SBE eligible stages
 // ($group, $lookup, $_internalUnpackBucket, and $search) under sbeRestricted. Otherwise, it calls
 // 'assertPushdownDisabled'.
-function assertPipelineIfSbeEnabled(assertPushdownEnabled, assertPushdownDisabled, hasEligibleRestrictedStage = false) {
+function assertPipelineIfSbeEnabled(
+    assertPushdownEnabled,
+    assertPushdownDisabled,
+    hasEligibleRestrictedStage = false,
+) {
     return sbeFullyEnabled || (sbeRestricted && hasEligibleRestrictedStage)
         ? assertPushdownEnabled()
         : assertPushdownDisabled();
@@ -322,10 +332,17 @@ assertPipelineIfSbeEnabled(
 
 // Test that we can optimize away a pipeline with a $text search predicate.
 assert.commandWorked(coll.createIndex({y: "text"}));
-assertPipelineDoesNotUseAggregation({pipeline: [{$match: {$text: {$search: "abc"}}}], expectedStages: ["IXSCAN"]});
+assertPipelineDoesNotUseAggregation({
+    pipeline: [{$match: {$text: {$search: "abc"}}}],
+    expectedStages: ["IXSCAN"],
+});
 // Test that $match, $sort, and $project all get answered by the PlanStage layer for a $text query.
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {$text: {$search: "abc"}}}, {$sort: {sortField: 1}}, {$project: {a: 1, b: 1}}],
+    pipeline: [
+        {$match: {$text: {$search: "abc"}}},
+        {$sort: {sortField: 1}},
+        {$project: {a: 1, b: 1}},
+    ],
     expectedStages: ["TEXT_MATCH", "SORT", "PROJECTION_SIMPLE"],
 });
 assert.commandWorked(coll.dropIndexes());
@@ -391,7 +408,12 @@ assertPipelineDoesNotUseAggregation({
 assertPipelineIfSbeEnabled(
     function () {
         assertPipelineDoesNotUseAggregation({
-            pipeline: [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1}}, {$limit: 1}, {$sort: {x: 1}}],
+            pipeline: [
+                {$match: {x: {$gte: 20}}},
+                {$project: {_id: 0, x: 1}},
+                {$limit: 1},
+                {$sort: {x: 1}},
+            ],
             expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "SORT"],
             expectedResult: [{x: 20}],
         });
@@ -400,7 +422,12 @@ assertPipelineIfSbeEnabled(
         // $match, $project, $limit, $sort cannot be optimized away in Classic, because the $limit
         // comes before the $sort.
         assertPipelineUsesAggregation({
-            pipeline: [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1}}, {$limit: 1}, {$sort: {x: 1}}],
+            pipeline: [
+                {$match: {x: {$gte: 20}}},
+                {$project: {_id: 0, x: 1}},
+                {$limit: 1},
+                {$sort: {x: 1}},
+            ],
             expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
             expectedResult: [{x: 20}],
             optimizedAwayStages: ["$project", "$limit"],
@@ -420,14 +447,24 @@ assertPipelineDoesNotUseAggregation({
 
 // $match, $sort, $limit, $project can be optimized away.
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$sort: {x: -1}}, {$limit: 2}, {$project: {_id: 0, x: 1}}],
+    pipeline: [
+        {$match: {x: {$gte: 20}}},
+        {$sort: {x: -1}},
+        {$limit: 2},
+        {$project: {_id: 0, x: 1}},
+    ],
     expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
     expectedResult: [{x: 30}, {x: 20}],
 });
 
 // $match, $sort, $project, $limit can be optimized away.
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$sort: {x: -1}}, {$project: {_id: 0, x: 1}}, {$limit: 2}],
+    pipeline: [
+        {$match: {x: {$gte: 20}}},
+        {$sort: {x: -1}},
+        {$project: {_id: 0, x: 1}},
+        {$limit: 2},
+    ],
     expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
     expectedResult: [{x: 30}, {x: 20}],
 });
@@ -435,7 +472,13 @@ assertPipelineDoesNotUseAggregation({
 // $match, $sort, $limit, $project can be optimized away, where limits must swap and combine to
 // enable pushdown.
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$sort: {x: -1}}, {$limit: 3}, {$project: {_id: 0, x: 1}}, {$limit: 2}],
+    pipeline: [
+        {$match: {x: {$gte: 20}}},
+        {$sort: {x: -1}},
+        {$limit: 3},
+        {$project: {_id: 0, x: 1}},
+        {$limit: 2},
+    ],
     expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
     expectedResult: [{x: 30}, {x: 20}],
 });
@@ -530,7 +573,14 @@ assert.neq(null, limitStage, explain);
 assert.eq(1, limitStage.limitAmount, explain);
 
 // We can optimize away interleaved $limit and $skip after a project.
-pipeline = [{$match: {x: {$gte: 0}}}, {$project: {_id: 0, x: 1}}, {$skip: 20}, {$limit: 15}, {$skip: 10}, {$limit: 7}];
+pipeline = [
+    {$match: {x: {$gte: 0}}},
+    {$project: {_id: 0, x: 1}},
+    {$skip: 20},
+    {$limit: 15},
+    {$skip: 10},
+    {$limit: 7},
+];
 assertPipelineDoesNotUseAggregation({
     pipeline: pipeline,
     expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "SKIP"],
@@ -567,7 +617,12 @@ assertPipelineDoesNotUseAggregation({
 
 // $match, $sort, $project, $limit can be optimized away.
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$sort: {x: -1}}, {$project: {_id: 0, x: 1}}, {$limit: 2}],
+    pipeline: [
+        {$match: {x: {$gte: 20}}},
+        {$sort: {x: -1}},
+        {$project: {_id: 0, x: 1}},
+        {$limit: 2},
+    ],
     expectedStages: ["COLLSCAN", "SORT", "PROJECTION_SIMPLE"],
     expectedResult: [{x: 30}, {x: 20}],
 });
@@ -576,7 +631,12 @@ assertPipelineDoesNotUseAggregation({
 // still required. In this case, the entire pipeline can be optimized away.
 assert.commandWorked(coll.createIndex({y: 1, x: 1}));
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {y: {$gt: 0}, x: {$gte: 20}}}, {$sort: {x: -1}}, {$project: {_id: 0, y: 1, x: 1}}, {$limit: 2}],
+    pipeline: [
+        {$match: {y: {$gt: 0}, x: {$gte: 20}}},
+        {$sort: {x: -1}},
+        {$project: {_id: 0, y: 1, x: 1}},
+        {$limit: 2},
+    ],
     expectedStages: ["IXSCAN", "SORT", "PROJECTION_COVERED"],
     expectedResult: [],
 });
@@ -715,14 +775,20 @@ function assertProjectionIsNotRemoved(pipeline, projectionType = "PROJECTION_SIM
 }
 
 // Test that an inclusion projection is optimized away if it is redundant/unnecessary.
-assertProjectionCanBeRemovedBeforeGroup([{$project: {a: 1, b: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
+assertProjectionCanBeRemovedBeforeGroup([
+    {$project: {a: 1, b: 1}},
+    {$group: {_id: "$a", s: {$sum: "$b"}}},
+]);
 
 // Test that an inclusion projection is NOT optimized away if it is NOT redundant. This one
 // fails to include a dependency of the $group and so will have an impact on the query results.
 assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
 
 // TODO SERVER-67323 This one could be removed, but is left for future work.
-assertProjectionIsNotRemoved([{$project: {a: 1, b: 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
+assertProjectionIsNotRemoved([
+    {$project: {a: 1, b: 1}},
+    {$group: {_id: "$a.b", s: {$sum: "$b.c"}}},
+]);
 
 // Test that an inclusion projection is NOT optimized away if group depends on the entire document.
 assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$$ROOT"}}]);
@@ -745,10 +811,16 @@ assertProjectionCanBeRemovedBeforeGroup(
 // Test that a computed projection at the front of the pipeline is pushed down, even if there's no
 // finite dependency set.
 pipeline = [{$project: {x: {$add: ["$a", 1]}}}];
-assertPipelineDoesNotUseAggregation({pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]});
+assertPipelineDoesNotUseAggregation({
+    pipeline: pipeline,
+    expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"],
+});
 
 // The projections below are not removed because they fail to include the $group's dependencies.
-assertProjectionIsNotRemoved([{$project: {"a.b": 1}}, {$group: {_id: "$a.b", s: {$sum: "$b"}}}], "PROJECTION_DEFAULT");
+assertProjectionIsNotRemoved(
+    [{$project: {"a.b": 1}}, {$group: {_id: "$a.b", s: {$sum: "$b"}}}],
+    "PROJECTION_DEFAULT",
+);
 assertProjectionIsNotRemoved(
     [{$project: {"a.b": 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}],
     "PROJECTION_DEFAULT",
@@ -827,12 +899,17 @@ assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 // Test that an exclusion projection at the front of the pipeline is pushed down if there is no
 // finite dependency set.
 pipeline = [{$project: {x: 0}}];
-assertPipelineDoesNotUseAggregation({pipeline: pipeline, expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN"]});
+assertPipelineDoesNotUseAggregation({
+    pipeline: pipeline,
+    expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN"],
+});
 
 // Test that $replaceRoot can be pushed down.
 pipeline = [
     {
-        $addFields: {replacementDoc: {double: {$multiply: [2, "$x"]}, square: {$multiply: ["$x", "$x"]}}},
+        $addFields: {
+            replacementDoc: {double: {$multiply: [2, "$x"]}, square: {$multiply: ["$x", "$x"]}},
+        },
     },
     {$replaceRoot: {newRoot: "$replacementDoc"}},
 ];
@@ -864,7 +941,11 @@ testGetMore({
     ],
 });
 testGetMore({
-    command: {aggregate: coll.getName(), pipeline: [{$match: {x: {$gte: 20}}}], cursor: {batchSize: 1}},
+    command: {
+        aggregate: coll.getName(),
+        pipeline: [{$match: {x: {$gte: 20}}}],
+        cursor: {batchSize: 1},
+    },
     expectedResult: [
         {_id: 2, x: 20},
         {_id: 3, x: 30},
@@ -905,7 +986,9 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
     // Don't profile the setFCV command, which could be run during this test in the
     // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
     assert.commandWorked(
-        db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+        db.setProfilingLevel(1, {
+            filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+        }),
     );
     testGetMore({
         command: {
@@ -929,7 +1012,9 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
         // Don't profile the setFCV command, which could be run in the
         // fcv_upgrade_downgrade_replica_sets_jscore_passthrough.
         assert.commandWorked(
-            db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+            db.setProfilingLevel(1, {
+                filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+            }),
         );
         testGetMore({
             command: {

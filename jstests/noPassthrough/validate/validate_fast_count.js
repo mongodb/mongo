@@ -29,11 +29,16 @@ describe("FastCount validation", function () {
             {enforceFastSize: true},
             {enforceFastCount: true, enforceFastSize: true},
         ];
-        const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(this.db, "ReplicatedFastCount");
+        const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            this.db,
+            "ReplicatedFastCount",
+        );
         const expectedFastCountType = featureFlagEnabled ? "both" : "legacySizeStorer";
 
         for (const flag of enforceFlagCombinations) {
-            const result = assert.commandWorked(this.db.runCommand(Object.assign({validate: collName}, flag)));
+            const result = assert.commandWorked(
+                this.db.runCommand(Object.assign({validate: collName}, flag)),
+            );
             assert(result.valid, result);
             assert.eq(result.fastCountType, expectedFastCountType, result);
 
@@ -44,7 +49,8 @@ describe("FastCount validation", function () {
             assert.eq(
                 result.keysPerIndex._id_,
                 1,
-                "Expected _id index to have 1 key traversed, indicating _validateIndexes() ran: " + tojson(result),
+                "Expected _id index to have 1 key traversed, indicating _validateIndexes() ran: " +
+                    tojson(result),
             );
         }
     });

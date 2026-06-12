@@ -80,7 +80,10 @@ configurations.forEach((config) => {
             dbConn = conn.getDatabase(dbName);
         }
 
-        let res = assert.commandFailedWithCode(dbConn.runCommand(testCase.cmdObj), ErrorCodes.IllegalOperation);
+        let res = assert.commandFailedWithCode(
+            dbConn.runCommand(testCase.cmdObj),
+            ErrorCodes.IllegalOperation,
+        );
         let errmsg;
         if (res.writeErrors) {
             errmsg = res.writeErrors[0].errmsg;

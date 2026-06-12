@@ -30,7 +30,9 @@ assert.soon(() => {
     assert(result.valid);
 
     if (result.hasOwnProperty("warnings") && result.warnings.length > 0) {
-        jsTestLog("Validation reported warnings - retrying after fsync: " + tojson(result.warnings));
+        jsTestLog(
+            "Validation reported warnings - retrying after fsync: " + tojson(result.warnings),
+        );
         assert.commandWorked(primary.adminCommand({fsync: 1}));
         return false;
     }

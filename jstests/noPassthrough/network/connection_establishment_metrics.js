@@ -28,7 +28,10 @@ function validateSlowConnectionLogEntry(entry) {
     assert(hasNonNegativeAttr(entry, "totalTimeMillis"));
     assert(hasNonNegativeAttr(entry, "poolConnId"));
 
-    let total = entry.attr.dnsResolutionTimeMillis + entry.attr.tcpConnectionTimeMillis + entry.attr.authTimeMillis;
+    let total =
+        entry.attr.dnsResolutionTimeMillis +
+        entry.attr.tcpConnectionTimeMillis +
+        entry.attr.authTimeMillis;
     if (entry.attr.tlsHandshakeTimeMillis >= 0) {
         total += entry.attr.tlsHandshakeTimeMillis;
     }
@@ -63,7 +66,12 @@ let runTest = (connectionHealthLoggingOn) => {
     let st = new ShardingTest({shards: 1});
 
     if (!connectionHealthLoggingOn) {
-        assert.commandWorked(st.s.adminCommand({setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                setParameter: 1,
+                enableDetailedConnectionHealthMetricLogLines: false,
+            }),
+        );
     }
 
     const initialLogEntryCount = validateLogAndExtractCountAndEntry(st).count;
@@ -71,7 +79,9 @@ let runTest = (connectionHealthLoggingOn) => {
     jsTestLog("Setting up the test collection.");
 
     assert.commandWorked(st.s.adminCommand({enableSharding: kDBName}));
-    assert.commandWorked(st.s.adminCommand({shardcollection: `${kDBName}.${kCollectionName}`, key: {[kKeyName]: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardcollection: `${kDBName}.${kCollectionName}`, key: {[kKeyName]: 1}}),
+    );
 
     let db = st.getDB(kDBName);
     assert.commandWorked(db[kCollectionName].insertOne({primaryOnly: true, [kKeyName]: 42}));
@@ -81,9 +91,14 @@ let runTest = (connectionHealthLoggingOn) => {
         millis: kConnectionEstablishmentDelayMillis,
     });
     assert.commandWorked(
-        st.s.adminCommand({setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}),
+        st.s.adminCommand({
+            setParameter: 1,
+            slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis,
+        }),
     );
-    assert.commandWorked(st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().name]}));
+    assert.commandWorked(
+        st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().name]}),
+    );
 
     jsTestLog("Running the query.");
 

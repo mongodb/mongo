@@ -38,6 +38,10 @@ const tsAggModel = addFieldsFirstStageAggModel({isTS: true, is83orAbove: is83orA
 testProperty(
     correctnessProperty,
     {controlColl, experimentColl},
-    makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel, numQueriesPerRun}),
+    makeWorkloadModel({
+        collModel: getCollectionModel({isTS: true}),
+        aggModel: tsAggModel,
+        numQueriesPerRun,
+    }),
     numRuns,
 );

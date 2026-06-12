@@ -19,7 +19,9 @@ import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 if (typeof db === "undefined") {
-    throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
+    throw new Error(
+        "Expected mongo shell to be connected a server, but global 'db' object isn't defined",
+    );
 }
 
 // We turn off printing the JavaScript stacktrace in doassert() to avoid generating an
@@ -111,7 +113,9 @@ async function checkReplDbhashBackgroundThread(hosts) {
         });
     }
 
-    const multitenancyRes = rst.getPrimary().adminCommand({getParameter: 1, multitenancySupport: 1});
+    const multitenancyRes = rst
+        .getPrimary()
+        .adminCommand({getParameter: 1, multitenancySupport: 1});
     const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
 
     for (let session of sessions) {
@@ -184,7 +188,9 @@ async function checkReplDbhashBackgroundThread(hosts) {
     // on the primary but not yet applied on the secondary.
     const checkCollectionHashesForDB = (dbName, clusterTime) => {
         const result = [];
-        const hashes = rst.getHashesUsingSessions(sessions, dbName, {readAtClusterTime: clusterTime});
+        const hashes = rst.getHashesUsingSessions(sessions, dbName, {
+            readAtClusterTime: clusterTime,
+        });
         const hashesByUUID = hashes.map((response, i) => {
             const info = {};
 
@@ -218,14 +224,16 @@ async function checkReplDbhashBackgroundThread(hosts) {
 
                 if (primaryInfo === undefined) {
                     print(
-                        "Skipping collection because it doesn't exist on the primary: " + tojsononeline(secondaryInfo),
+                        "Skipping collection because it doesn't exist on the primary: " +
+                            tojsononeline(secondaryInfo),
                     );
                     continue;
                 }
 
                 if (secondaryInfo === undefined) {
                     print(
-                        "Skipping collection because it doesn't exist on the secondary: " + tojsononeline(primaryInfo),
+                        "Skipping collection because it doesn't exist on the secondary: " +
+                            tojsononeline(primaryInfo),
                     );
                     continue;
                 }
@@ -432,7 +440,9 @@ async function checkReplDbhashBackgroundThread(hosts) {
         errorBlob += `: ${tojson(mismatchInfo)}`;
 
         if (diff.docsWithDifferentContents.length > 0) {
-            errorBlob += "\nThe following documents have different contents on the primary and" + " secondary:";
+            errorBlob +=
+                "\nThe following documents have different contents on the primary and" +
+                " secondary:";
             for (let {sourceNode, syncingNode} of diff.docsWithDifferentContents) {
                 errorBlob += `\n  primary:   ${tojsononeline(sourceNode)}`;
                 errorBlob += `\n  secondary: ${tojsononeline(syncingNode)}`;
@@ -489,7 +499,10 @@ if (topology.type === Topology.kReplicaSet) {
             threads.push(thread);
             thread.start();
         } else {
-            print("Skipping data consistency checks for 1-node CSRS: " + tojsononeline(topology.configsvr));
+            print(
+                "Skipping data consistency checks for 1-node CSRS: " +
+                    tojsononeline(topology.configsvr),
+            );
         }
 
         for (let shardName of Object.keys(topology.shards)) {
@@ -497,7 +510,10 @@ if (topology.type === Topology.kReplicaSet) {
 
             if (shard.type === Topology.kStandalone) {
                 print(
-                    "Skipping data consistency checks for stand-alone shard " + shardName + ": " + tojsononeline(shard),
+                    "Skipping data consistency checks for stand-alone shard " +
+                        shardName +
+                        ": " +
+                        tojsononeline(shard),
                 );
                 continue;
             }
@@ -512,7 +528,10 @@ if (topology.type === Topology.kReplicaSet) {
                 thread.start();
             } else {
                 print(
-                    "Skipping data consistency checks for stand-alone shard " + shardName + ": " + tojsononeline(shard),
+                    "Skipping data consistency checks for stand-alone shard " +
+                        shardName +
+                        ": " +
+                        tojsononeline(shard),
                 );
             }
         }
@@ -535,7 +554,10 @@ if (topology.type === Topology.kReplicaSet) {
         }
 
         returnData.forEach((res) => {
-            assert.commandWorked(res, () => "data consistency checks (point-in-time) failed: " + tojson(res));
+            assert.commandWorked(
+                res,
+                () => "data consistency checks (point-in-time) failed: " + tojson(res),
+            );
         });
     }
 } else {

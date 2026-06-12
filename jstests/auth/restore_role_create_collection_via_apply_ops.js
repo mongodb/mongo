@@ -34,7 +34,9 @@ function runTest(conn) {
     assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
     assert(admin.auth("admin", "admin"));
 
-    assert.commandWorked(admin.runCommand({createUser: "restore1", pwd: "pwd", roles: ["restore"]}));
+    assert.commandWorked(
+        admin.runCommand({createUser: "restore1", pwd: "pwd", roles: ["restore"]}),
+    );
     admin.logout();
 
     assert(admin.auth("restore1", "pwd"));

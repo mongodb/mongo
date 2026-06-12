@@ -109,7 +109,11 @@ export const $config = (function () {
             let coll = db[collName];
             let res;
             let count = coll.find({tid: this.tid}).itcount();
-            assert.gte(count, this.nDocumentsToRead, "readDocs not enough documents for tid " + this.tid);
+            assert.gte(
+                count,
+                this.nDocumentsToRead,
+                "readDocs not enough documents for tid " + this.tid,
+            );
 
             let highest = this.getHighestX(coll, this.tid);
             for (let i = 0; i < this.nDocumentsToRead; ++i) {
@@ -128,7 +132,11 @@ export const $config = (function () {
                 let coll = db[collName];
                 let res;
                 let count = coll.find({tid: this.tid}).itcount();
-                assert.gte(count, this.nDocumentsToUpdate, "updateDocs not enough documents for tid " + this.tid);
+                assert.gte(
+                    count,
+                    this.nDocumentsToUpdate,
+                    "updateDocs not enough documents for tid " + this.tid,
+                );
 
                 let highest = this.getHighestX(coll, this.tid);
                 for (let i = 0; i < this.nDocumentsToUpdate; ++i) {
@@ -144,7 +152,11 @@ export const $config = (function () {
                     assert.contains(res.nMatched, [0, 1], tojson(res));
                     assert.eq(res.nUpserted, 0, tojson(res));
                 }
-                assert.eq(coll.find({tid: this.tid}).itcount(), count, "updateDocs itcount mismatch");
+                assert.eq(
+                    coll.find({tid: this.tid}).itcount(),
+                    count,
+                    "updateDocs itcount mismatch",
+                );
             }
         }
 
@@ -176,7 +188,11 @@ export const $config = (function () {
                 assert.contains(res.nRemoved, [0, 1], tojson(res));
                 nActualDeletes += res.nRemoved;
             }
-            assert.eq(coll.find({tid: this.tid}).itcount(), count - nActualDeletes, "deleteDocs itcount mismatch");
+            assert.eq(
+                coll.find({tid: this.tid}).itcount(),
+                count - nActualDeletes,
+                "deleteDocs itcount mismatch",
+            );
         }
 
         return {
@@ -236,7 +252,10 @@ export const $config = (function () {
                 }),
             );
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS}),
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS,
+                }),
             );
         });
     }

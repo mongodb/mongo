@@ -18,7 +18,9 @@ const adminLogErr = "Authentication failed should be able to login to adminDB.";
 
 function createSuperUser(conn) {
     const adminDB = conn.getDB("admin");
-    assert.commandWorked(adminDB.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
+    assert.commandWorked(
+        adminDB.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}),
+    );
     assert(adminDB.auth("super", "super"), adminLogErr);
     assert(adminDB.logout());
 }
@@ -95,18 +97,28 @@ function listSearchIndexPrivilegeWorks(conn) {
     };
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
     assert(testDB.auth("user_with_priv", "pwd"));
-    assert.commandWorked(testDB.runCommand({aggregate: collName, pipeline: [{$listSearchIndexes: {}}], cursor: {}}));
+    assert.commandWorked(
+        testDB.runCommand({aggregate: collName, pipeline: [{$listSearchIndexes: {}}], cursor: {}}),
+    );
     assert(testDB.logout());
 
     // Test that $listSearchIndexes succeeds when run with the 'read' built-in role.
     // Set up a user with the 'read' role.
     assert(adminDB.auth("super", "super"), adminLogErr);
-    assert.commandWorked(testDB.runCommand({createUser: "user_read", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
+    assert.commandWorked(
+        testDB.runCommand({
+            createUser: "user_read",
+            pwd: "pwd",
+            roles: [{role: "read", db: dbName}],
+        }),
+    );
     assert(adminDB.logout());
     // Assert the aggregation succeeds.
     assert(testDB.auth("user_read", "pwd"));
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({aggregate: collName, pipeline: [{$listSearchIndexes: {}}], cursor: {}}));
+    assert.commandWorked(
+        testDB.runCommand({aggregate: collName, pipeline: [{$listSearchIndexes: {}}], cursor: {}}),
+    );
     assert(testDB.logout());
 }
 

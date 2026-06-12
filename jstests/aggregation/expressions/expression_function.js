@@ -35,7 +35,13 @@ describe("$function body forms", () => {
             ])
             .toArray();
         assert(
-            resultsEq(results, [{newValue: -1}, {newValue: 0}, {newValue: 1}, {newValue: 2}, {newValue: 3}]),
+            resultsEq(results, [
+                {newValue: -1},
+                {newValue: 0},
+                {newValue: 1},
+                {newValue: 2},
+                {newValue: 3},
+            ]),
             results,
         );
     });
@@ -48,7 +54,11 @@ describe("$function body forms", () => {
                 {
                     $project: {
                         newValue: {
-                            $function: {args: ["$value", -1], body: f_finalize.toString(), lang: "js"},
+                            $function: {
+                                args: ["$value", -1],
+                                body: f_finalize.toString(),
+                                lang: "js",
+                            },
                         },
                         _id: 0,
                     },
@@ -56,7 +66,13 @@ describe("$function body forms", () => {
             ])
             .toArray();
         assert(
-            resultsEq(results, [{newValue: -1}, {newValue: 0}, {newValue: 1}, {newValue: 2}, {newValue: 3}]),
+            resultsEq(results, [
+                {newValue: -1},
+                {newValue: 0},
+                {newValue: 1},
+                {newValue: 2},
+                {newValue: 3},
+            ]),
             results,
         );
     });
@@ -75,7 +91,13 @@ describe("$function body forms", () => {
             ])
             .toArray();
         assert(
-            resultsEq(results, [{newValue: 0}, {newValue: 3}, {newValue: 6}, {newValue: 9}, {newValue: 12}]),
+            resultsEq(results, [
+                {newValue: 0},
+                {newValue: 3},
+                {newValue: 6},
+                {newValue: 9},
+                {newValue: 12},
+            ]),
             results,
         );
     });
@@ -92,7 +114,11 @@ describe("$function invalid arguments", () => {
                     {
                         $project: {
                             newValue: {
-                                $function: {args: "must evaluate to an array", body: f_finalize, lang: "js"},
+                                $function: {
+                                    args: "must evaluate to an array",
+                                    body: f_finalize,
+                                    lang: "js",
+                                },
                             },
                         },
                     },
@@ -113,7 +139,11 @@ describe("$function invalid arguments", () => {
                     {
                         $project: {
                             newValue: {
-                                $function: {args: [1, 3], body: "this is not a valid function!", lang: "js"},
+                                $function: {
+                                    args: [1, 3],
+                                    body: "this is not a valid function!",
+                                    lang: "js",
+                                },
                             },
                         },
                     },
@@ -145,7 +175,11 @@ describe("$function invalid arguments", () => {
                 aggregate: coll.getName(),
                 pipeline: [
                     {
-                        $project: {newValue: {$function: {args: [1, 3], body: f_finalize, lang: "not js!"}}},
+                        $project: {
+                            newValue: {
+                                $function: {args: [1, 3], body: f_finalize, lang: "not js!"},
+                            },
+                        },
                     },
                 ],
                 cursor: {},
@@ -162,7 +196,11 @@ describe("$function invalid arguments", () => {
                 aggregate: coll.getName(),
                 pipeline: [
                     {
-                        $project: {newValue: {$function: {args: "A string!", body: f_finalize, lang: "js"}}},
+                        $project: {
+                            newValue: {
+                                $function: {args: "A string!", body: f_finalize, lang: "js"},
+                            },
+                        },
                     },
                 ],
                 cursor: {},

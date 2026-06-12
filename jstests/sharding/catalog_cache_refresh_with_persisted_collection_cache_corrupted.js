@@ -11,13 +11,16 @@ const st = new ShardingTest({
     other: {configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}},
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {x: 1}}));
 
 assert.commandWorked(
-    st.rs0
-        .getPrimary()
-        .adminCommand({_flushRoutingTableCacheUpdatesWithWriteConcern: "test.foo", writeConcern: {w: 3}}),
+    st.rs0.getPrimary().adminCommand({
+        _flushRoutingTableCacheUpdatesWithWriteConcern: "test.foo",
+        writeConcern: {w: 3},
+    }),
 );
 
 const requiredFieldsNames = ["epoch", "timestamp", "uuid", "key", "unique"];
@@ -51,7 +54,9 @@ requiredFieldsNames.forEach((fieldName) => {
     assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 5, force: true}));
 
     // Ensure the catalog cache refresh works despite config.cache.collections being corrupted.
-    assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: "test.foo"}));
+    assert.commandWorked(
+        st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: "test.foo"}),
+    );
 
     // Assert that after the refresh all entries in config.cache.collections are intact.
     assert.eq(

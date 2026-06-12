@@ -15,7 +15,9 @@ TestData.testingDiagnosticsEnabled = false;
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet({
-    setParameter: {performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency: 100},
+    setParameter: {
+        performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency: 100,
+    },
 });
 rst.initiate();
 
@@ -39,7 +41,9 @@ function arrayIsSubset(smallArray, largeArray) {
 function runIntermediateDataCheckTest(isOrdered) {
     jsTestLog("isOrdered: { " + isOrdered + " }");
     coll.drop();
-    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     assert.commandWorked(
         coll.insertMany([
@@ -61,7 +65,10 @@ function runIntermediateDataCheckTest(isOrdered) {
     // are performing the first of the two updates below and are trying to update measurements from
     // Bucket 1.
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate", mode: {times: 1}}),
+        testDB.adminCommand({
+            configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate",
+            mode: {times: 1},
+        }),
     );
 
     // This command performs two updates. The first changes the metaField for the measurements
@@ -147,7 +154,10 @@ function runIntermediateDataCheckTest(isOrdered) {
         assert.eq(buckets[0].control.count, 6, tojson(buckets));
     }
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate", mode: "off"}),
+        testDB.adminCommand({
+            configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate",
+            mode: "off",
+        }),
     );
 }
 

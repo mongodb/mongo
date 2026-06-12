@@ -27,7 +27,10 @@ assert.commandWorked(bulk.execute());
         .toArray();
 
     const expectedResults = coll
-        .aggregate([{$project: {_id: 1, counter: 1, score: dollar_test_field_name}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$project: {_id: 1, counter: 1, score: dollar_test_field_name}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
 
     assert.eq(actualResults, expectedResults);
@@ -118,7 +121,10 @@ assert.commandWorked(bulk.execute());
         .toArray();
 
     const expectedResults = coll
-        .aggregate([{$project: {_id: 1, counter: 1, score: {$sigmoid: dollar_test_field_name}}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$project: {_id: 1, counter: 1, score: {$sigmoid: dollar_test_field_name}}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
 
     assert.eq(actualResults, expectedResults);
@@ -289,7 +295,11 @@ assert.commandWorked(bulk.execute());
     const actualResults = coll
         .aggregate([
             {
-                $score: {score: dollar_test_field_name, normalization: "minMaxScaler", weight: 0.75},
+                $score: {
+                    score: dollar_test_field_name,
+                    normalization: "minMaxScaler",
+                    weight: 0.75,
+                },
             },
             {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
             {$sort: {_id: 1}},

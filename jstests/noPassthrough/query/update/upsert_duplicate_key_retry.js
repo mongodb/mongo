@@ -68,6 +68,9 @@ assert.commandFailedWithCode(testColl.update({x: 3}, {}, {upsert: true}), ErrorC
 assert.commandWorked(testColl.remove({}));
 assert.commandWorked(testColl.insert({x: 3}));
 assert.commandWorked(testColl.insert({x: 4}));
-assert.commandFailedWithCode(testColl.update({x: 3}, {$inc: {x: 1}}, {upsert: true}), ErrorCodes.DuplicateKey);
+assert.commandFailedWithCode(
+    testColl.update({x: 3}, {$inc: {x: 1}}, {upsert: true}),
+    ErrorCodes.DuplicateKey,
+);
 
 rst.stopSet();

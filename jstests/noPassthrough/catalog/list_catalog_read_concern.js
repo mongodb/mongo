@@ -8,7 +8,10 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({
     nodes: 2,
@@ -29,12 +32,21 @@ const coll1 = db.coll_1;
 const coll2 = db.coll_2;
 const view = db.view;
 
-assert.commandWorked(db.runCommand({createIndexes: coll1.getName(), indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(
+    db.runCommand({createIndexes: coll1.getName(), indexes: [{key: {a: 1}, name: "a_1"}]}),
+);
 const viewTS = assert.commandWorked(
     db.runCommand({create: view.getName(), viewOn: coll1.getName(), pipeline: []}),
 ).operationTime;
 
-jsTestLog(view.getFullName() + " view on " + coll1.getFullName() + " created at: " + tojson(viewTS) + " (viewTS)");
+jsTestLog(
+    view.getFullName() +
+        " view on " +
+        coll1.getFullName() +
+        " created at: " +
+        tojson(viewTS) +
+        " (viewTS)",
+);
 
 stopReplicationOnSecondaries(rst);
 
@@ -48,7 +60,9 @@ assert.commandWorked(
 );
 
 assert.commandWorked(db.runCommand({create: coll2.getName(), writeConcern: {w: 1}}));
-const collModTS = assert.commandWorked(db.runCommand({collMod: view.getName(), viewOn: coll2.getName()})).operationTime;
+const collModTS = assert.commandWorked(
+    db.runCommand({collMod: view.getName(), viewOn: coll2.getName()}),
+).operationTime;
 
 jsTestLog(
     view.getFullName() +
@@ -83,7 +97,9 @@ assert.eq(entries.length, 4);
 assert.eq(entries.find((entry) => entry.name === view.getName()).viewOn, coll2.getName());
 
 entries = adminDB
-    .aggregate([{$listCatalog: {}}, {$match: {db: db.getName()}}], {readConcern: {level: "majority"}})
+    .aggregate([{$listCatalog: {}}, {$match: {db: db.getName()}}], {
+        readConcern: {level: "majority"},
+    })
     .toArray();
 jsTestLog("Collectionless majority $listCatalog: " + tojson(entries));
 assert.eq(entries.length, 3);
@@ -100,9 +116,15 @@ rst.awaitReplication();
 
 // At 'collModTS' cluster time, {b: 1} has been created, hence the additional index returned in
 // 'md.indexes'.
-entries = coll1.aggregate([{$listCatalog: {}}], {readConcern: {level: "snapshot", atClusterTime: collModTS}}).toArray();
+entries = coll1
+    .aggregate([{$listCatalog: {}}], {readConcern: {level: "snapshot", atClusterTime: collModTS}})
+    .toArray();
 jsTestLog(
-    coll1.getFullName() + " snapshot $listCatalog (at collModTS: " + tojson(collModTS) + "):  " + tojson(entries),
+    coll1.getFullName() +
+        " snapshot $listCatalog (at collModTS: " +
+        tojson(collModTS) +
+        "):  " +
+        tojson(entries),
 );
 assert.eq(entries.length, 1);
 assert.eq(entries[0].ns, coll1.getFullName());
@@ -110,8 +132,16 @@ assert.eq(entries[0].md.indexes.length, 3);
 
 // At 'viewTS' cluster time, we have not created the {b: 1} index on 'coll1', so the only
 // indexes returned by $listCatalog will be {_id: 1} and {a: 1}.
-entries = coll1.aggregate([{$listCatalog: {}}], {readConcern: {level: "snapshot", atClusterTime: viewTS}}).toArray();
-jsTestLog(coll1.getFullName() + " snapshot $listCatalog (at viewTS: " + tojson(viewTS) + "): " + tojson(entries));
+entries = coll1
+    .aggregate([{$listCatalog: {}}], {readConcern: {level: "snapshot", atClusterTime: viewTS}})
+    .toArray();
+jsTestLog(
+    coll1.getFullName() +
+        " snapshot $listCatalog (at viewTS: " +
+        tojson(viewTS) +
+        "): " +
+        tojson(entries),
+);
 assert.eq(entries.length, 1);
 assert.eq(entries[0].ns, coll1.getFullName());
 assert.eq(entries[0].md.indexes.length, 2);
@@ -122,7 +152,12 @@ entries = adminDB
         readConcern: {level: "snapshot", atClusterTime: collModTS},
     })
     .toArray();
-jsTestLog("Collectionless snapshot $listCatalog (at collModTS: " + tojson(collModTS) + "): " + tojson(entries));
+jsTestLog(
+    "Collectionless snapshot $listCatalog (at collModTS: " +
+        tojson(collModTS) +
+        "): " +
+        tojson(entries),
+);
 assert.eq(entries.length, 4);
 assert.eq(entries.find((entry) => entry.name === view.getName()).viewOn, coll2.getName());
 
@@ -133,7 +168,9 @@ entries = adminDB
         readConcern: {level: "snapshot", atClusterTime: viewTS},
     })
     .toArray();
-jsTestLog("Collectionless snapshot $listCatalog (at viewTS: " + tojson(viewTS) + "): " + tojson(entries));
+jsTestLog(
+    "Collectionless snapshot $listCatalog (at viewTS: " + tojson(viewTS) + "): " + tojson(entries),
+);
 assert.eq(entries.length, 3);
 assert.eq(entries.find((entry) => entry.name === view.getName()).viewOn, coll1.getName());
 

@@ -49,7 +49,13 @@ MongoRunner.stopMongod(dbms);
 // In --auth mode, read-only user should not be able to write to existing or temporary collection,
 // thus only can execute inline mode
 
-dbms = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: dbms.dbpath, auth: "", bind_ip: "127.0.0.1"});
+dbms = MongoRunner.runMongod({
+    restart: true,
+    cleanData: false,
+    dbpath: dbms.dbpath,
+    auth: "",
+    bind_ip: "127.0.0.1",
+});
 d = dbms.getDB(dbName);
 t = d[baseName];
 

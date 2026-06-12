@@ -4,7 +4,10 @@
  * @tags: [
  * ]
  */
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {
     assertChangeStreamEventEq,
     canonicalizeEventForTesting,
@@ -33,7 +36,9 @@ function runViewEventAndResumeTest(showSystemEvents) {
     assert.commandWorked(testDB.createCollection("base"));
     assert.commandWorked(testDB["base"].insert({_id: 1}));
 
-    let cursor = testDB.aggregate([{$changeStream: {showExpandedEvents: true, showSystemEvents: showSystemEvents}}]);
+    let cursor = testDB.aggregate([
+        {$changeStream: {showExpandedEvents: true, showSystemEvents: showSystemEvents}},
+    ]);
 
     assert.commandWorked(testDB.createView("view", "base", viewPipeline));
     assert.soon(() => cursor.hasNext());
@@ -67,7 +72,11 @@ function runViewEventAndResumeTest(showSystemEvents) {
     // event.
     cursor = testDB.aggregate([
         {
-            $changeStream: {resumeAfter: event._id, showExpandedEvents: true, showSystemEvents: showSystemEvents},
+            $changeStream: {
+                resumeAfter: event._id,
+                showExpandedEvents: true,
+                showSystemEvents: showSystemEvents,
+            },
         },
     ]);
     assert.commandWorked(testDB.createView("viewOnView", "view", viewPipeline));
@@ -86,7 +95,9 @@ function runViewEventAndResumeTest(showSystemEvents) {
 
     // Test 'collMod' command on views.
     const updatedViewPipeline = [{$match: {a: 1}}, {$project: {a: 1}}];
-    assert.commandWorked(testDB.runCommand({collMod: "viewOnView", viewOn: "view", pipeline: updatedViewPipeline}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: "viewOnView", viewOn: "view", pipeline: updatedViewPipeline}),
+    );
     assert.soon(() => cursor.hasNext());
     const modifyEvent = cursor.next();
     events.push(modifyEvent);
@@ -110,7 +121,10 @@ function runViewEventAndResumeTest(showSystemEvents) {
     const dropEventView = cursor.next();
     events.push(dropEventView);
 
-    assertChangeStreamEventEq(dropEventView, {operationType: "drop", ns: {db: dbName, coll: "viewOnView"}});
+    assertChangeStreamEventEq(dropEventView, {
+        operationType: "drop",
+        ns: {db: dbName, coll: "viewOnView"},
+    });
 
     // Generate a dummy event so that we can test all events for resumability.
     assert.commandWorked(testDB.createView("dummyView", "view", viewPipeline));
@@ -142,10 +156,14 @@ function runViewEventAndResumeTest(showSystemEvents) {
 
 function runViewEventForTsCollectionTest(showSystemEvents) {
     const events = [];
-    let cursor = testDB.aggregate([{$changeStream: {showExpandedEvents: true, showSystemEvents: showSystemEvents}}]);
+    let cursor = testDB.aggregate([
+        {$changeStream: {showExpandedEvents: true, showSystemEvents: showSystemEvents}},
+    ]);
 
     // Test view change stream events on a timeseries collection.
-    assert.commandWorked(testDB.createCollection("timeseries_coll", {timeseries: {timeField: "time"}}));
+    assert.commandWorked(
+        testDB.createCollection("timeseries_coll", {timeseries: {timeField: "time"}}),
+    );
 
     if (showSystemEvents) {
         // Also expect the creation of the buckets collection.
@@ -173,7 +191,9 @@ function runViewEventForTsCollectionTest(showSystemEvents) {
         nsType: "timeseries",
     });
 
-    assert.commandWorked(testDB.runCommand({collMod: "timeseries_coll", timeseries: {granularity: "minutes"}}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: "timeseries_coll", timeseries: {granularity: "minutes"}}),
+    );
     assert.soon(() => cursor.hasNext());
     let modifyTimeseriesEvent = cursor.next();
     events.push(modifyTimeseriesEvent);

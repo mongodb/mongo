@@ -31,5 +31,8 @@ export function assertUnpackOptimizedAway(coll, pipeline) {
             : getPlanStage(explain, "UNPACK_TS_BUCKET");
     // The rewrite should remove the unpack stage and replace it with a $group over the buckets
     // collection.
-    assert(!unpack, `Expected to find no unpack stage for pipeline ${tojson(pipeline)} but got ${tojson(explain)}`);
+    assert(
+        !unpack,
+        `Expected to find no unpack stage for pipeline ${tojson(pipeline)} but got ${tojson(explain)}`,
+    );
 }

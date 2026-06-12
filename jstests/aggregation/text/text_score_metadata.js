@@ -69,7 +69,9 @@ function runProjectionTest({forceProjectionOnMerger}) {
         assert.eq(
             result[kTextScoreMetadataArg],
             result[kScoreMetadataArg],
-            "the legacy metadata value '" + kTextScoreMetadataArg + "' is not equal to the 'score' metadata value",
+            "the legacy metadata value '" +
+                kTextScoreMetadataArg +
+                "' is not equal to the 'score' metadata value",
         );
     }
 

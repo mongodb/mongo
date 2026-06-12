@@ -28,7 +28,9 @@ function getDottedField(doc, fieldName) {
 }
 
 function getCollectionUuid(db, collName) {
-    const listCollectionRes = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+    const listCollectionRes = assert.commandWorked(
+        db.runCommand({listCollections: 1, filter: {name: collName}}),
+    );
     return listCollectionRes.cursor.firstBatch[0].info.uuid;
 }
 
@@ -50,7 +52,14 @@ function checkCollectionOptionsAndIndexes(conn, ns, expectedOptions, expectedInd
     });
 }
 
-function checkMoveCollectionCloningMetrics(st, ns, numDocs, numBytes, primaryShardName, toShardName) {
+function checkMoveCollectionCloningMetrics(
+    st,
+    ns,
+    numDocs,
+    numBytes,
+    primaryShardName,
+    toShardName,
+) {
     assert.neq(primaryShardName, toShardName);
     let currentOps;
     assert.soon(
@@ -107,7 +116,8 @@ function checkCollectionExistence(conn, ns, exists) {
 function checkOplogBufferAndConflictStashCollections(conn, collUuid, donorShardName, exists) {
     const oplogBufferNs = "config.localReshardingOplogBuffer." + collUuid + "." + donorShardName;
     checkCollectionExistence(conn, oplogBufferNs, exists);
-    const conflictStashNs = "config.localReshardingConflictStash." + collUuid + "." + donorShardName;
+    const conflictStashNs =
+        "config.localReshardingConflictStash." + collUuid + "." + donorShardName;
     checkCollectionExistence(conn, conflictStashNs, exists);
 }
 
@@ -136,7 +146,9 @@ function runTest(testOptions) {
     const coll = db.getCollection(collName);
     const options = {validator: {x: {$gte: 0}}};
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(
         db.runCommand(
             Object.assign(
@@ -190,7 +202,10 @@ function runTest(testOptions) {
             assert.soonRetryOnAcceptableErrors(() => {
                 assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard}));
                 return true;
-            }, [ErrorCodes.FailedToSatisfyReadPreference, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
+            }, [
+                ErrorCodes.FailedToSatisfyReadPreference,
+                ErrorCodes.NetworkInterfaceExceededTimeLimit,
+            ]);
         },
         st.s.host,
         ns,
@@ -208,12 +223,16 @@ function runTest(testOptions) {
     );
 
     // Trigger a failover on shard0.
-    assert.commandWorked(oldShard0Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        oldShard0Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     assert.commandWorked(oldShard0Primary.adminCommand({replSetFreeze: 0}));
     const newShard0Primary = st.rs0.waitForPrimary();
 
     // Trigger a failover on shard1.
-    assert.commandWorked(oldShard1Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        oldShard1Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     assert.commandWorked(oldShard1Primary.adminCommand({replSetFreeze: 0}));
     const newShard1Primary = st.rs1.waitForPrimary();
 
@@ -242,7 +261,12 @@ function runTest(testOptions) {
         st.shard0.shardName,
         testOptions.shouldBufferCollectionExistsInNoChunkRecipient,
     );
-    checkOplogBufferAndConflictStashCollections(newShard1Primary, collUuid, st.shard0.shardName, true /* exists */);
+    checkOplogBufferAndConflictStashCollections(
+        newShard1Primary,
+        collUuid,
+        st.shard0.shardName,
+        true /* exists */,
+    );
 
     beforePersistingDecisionFps.forEach((fp) => fp.off());
     thread.join();

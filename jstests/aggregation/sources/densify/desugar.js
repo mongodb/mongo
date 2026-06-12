@@ -14,22 +14,39 @@ const coll = db[jsTestName()];
 coll.insert({});
 
 // Implicit partition fields and sort are generated.
-assert.eq(desugarSingleStageAggregation(db, coll, {$densify: {field: "a", range: {step: 1.0, bounds: "full"}}}), [
-    {$sort: {sortKey: {a: 1}}},
-    {
-        $_internalDensify: {field: "a", partitionByFields: [], range: {step: 1.0, bounds: "full"}},
-    },
-]);
+assert.eq(
+    desugarSingleStageAggregation(db, coll, {
+        $densify: {field: "a", range: {step: 1.0, bounds: "full"}},
+    }),
+    [
+        {$sort: {sortKey: {a: 1}}},
+        {
+            $_internalDensify: {
+                field: "a",
+                partitionByFields: [],
+                range: {step: 1.0, bounds: "full"},
+            },
+        },
+    ],
+);
 
 // PartitionByFields are prepended to the sortKey if "partition" is specified.
 assert.eq(
     desugarSingleStageAggregation(db, coll, {
-        $densify: {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "partition"}},
+        $densify: {
+            field: "a",
+            partitionByFields: ["b", "c"],
+            range: {step: 1.0, bounds: "partition"},
+        },
     }),
     [
         {$sort: {sortKey: {b: 1, c: 1, a: 1}}},
         {
-            $_internalDensify: {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "partition"}},
+            $_internalDensify: {
+                field: "a",
+                partitionByFields: ["b", "c"],
+                range: {step: 1.0, bounds: "partition"},
+            },
         },
     ],
 );
@@ -42,7 +59,11 @@ assert.eq(
     [
         {$sort: {sortKey: {a: 1}}},
         {
-            $_internalDensify: {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "full"}},
+            $_internalDensify: {
+                field: "a",
+                partitionByFields: ["b", "c"],
+                range: {step: 1.0, bounds: "full"},
+            },
         },
     ],
 );
@@ -55,7 +76,11 @@ assert.eq(
     [
         {$sort: {sortKey: {b: 1, c: 1, a: 1}}},
         {
-            $_internalDensify: {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: [-10, 0]}},
+            $_internalDensify: {
+                field: "a",
+                partitionByFields: ["b", "c"],
+                range: {step: 1.0, bounds: [-10, 0]},
+            },
         },
     ],
 );

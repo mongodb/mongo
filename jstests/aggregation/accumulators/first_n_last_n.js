@@ -67,7 +67,10 @@ assert.commandWorked(coll.insert(docs));
 
 function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
     const actualFirstNResults = coll
-        .aggregate([{$sort: {_id: 1}}, {$group: {_id: "$state", sales: {$firstN: {input: "$sales", n: n}}}}])
+        .aggregate([
+            {$sort: {_id: 1}},
+            {$group: {_id: "$state", sales: {$firstN: {input: "$sales", n: n}}}},
+        ])
         .toArray();
 
     // As these are unordered operators, we need to ensure we can deterministically test the values
@@ -75,7 +78,8 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
     // instead.
     assert(
         arrayEq(expectedFirstNResults, actualFirstNResults),
-        () => "expected " + tojson(expectedFirstNResults) + " actual " + tojson(actualFirstNResults),
+        () =>
+            "expected " + tojson(expectedFirstNResults) + " actual " + tojson(actualFirstNResults),
     );
 
     const firstNResultsWithInitExpr = coll
@@ -96,7 +100,9 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
         .toArray();
 
     let expectedResult = [];
-    expectedFirstNWithInitExpr.forEach((i) => expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}));
+    expectedFirstNWithInitExpr.forEach((i) =>
+        expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}),
+    );
     assert(
         arrayEq(expectedResult, firstNResultsWithInitExpr),
         () => "expected " + tojson(expectedResult) + " actual " + tojson(firstNResultsWithInitExpr),
@@ -120,14 +126,23 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
         .toArray();
 
     expectedResult = [];
-    expectedFirstNWithInitExpr.forEach((i) => expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}));
+    expectedFirstNWithInitExpr.forEach((i) =>
+        expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}),
+    );
     assert(
         arrayEq(expectedResult, firstNResultsWithInitExprAndVariableGroupId),
-        () => "expected " + tojson(expectedResult) + " actual " + tojson(firstNResultsWithInitExprAndVariableGroupId),
+        () =>
+            "expected " +
+            tojson(expectedResult) +
+            " actual " +
+            tojson(firstNResultsWithInitExprAndVariableGroupId),
     );
 
     const actualLastNResults = coll
-        .aggregate([{$sort: {_id: 1}}, {$group: {_id: "$state", sales: {$lastN: {input: "$sales", n: n}}}}])
+        .aggregate([
+            {$sort: {_id: 1}},
+            {$group: {_id: "$state", sales: {$lastN: {input: "$sales", n: n}}}},
+        ])
         .toArray();
     assert(
         arrayEq(expectedLastNResults, actualLastNResults),
@@ -152,7 +167,9 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
         .toArray();
 
     expectedResult = [];
-    expectedLastNWithInitExpr.forEach((i) => expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}));
+    expectedLastNWithInitExpr.forEach((i) =>
+        expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}),
+    );
     assert(
         arrayEq(expectedResult, lastNResultsWithInitExpr),
         () => "expected " + tojson(expectedResult) + " actual " + tojson(lastNResultsWithInitExpr),
@@ -176,10 +193,16 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
         .toArray();
 
     expectedResult = [];
-    expectedLastNWithInitExpr.forEach((i) => expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}));
+    expectedLastNWithInitExpr.forEach((i) =>
+        expectedResult.push({"_id": {"st": i["_id"]}, sales: i["sales"]}),
+    );
     assert(
         arrayEq(expectedResult, lastNResultsWithInitExprAndVariableGroupId),
-        () => "expected " + tojson(expectedResult) + " actual " + tojson(lastNResultsWithInitExprAndVariableGroupId),
+        () =>
+            "expected " +
+            tojson(expectedResult) +
+            " actual " +
+            tojson(lastNResultsWithInitExprAndVariableGroupId),
     );
 
     function reorderBucketResults(bucketResults) {
@@ -214,7 +237,11 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
     reorderBucketResults(actualFirstNBucketAutoResults);
     assert(
         arrayEq(expectedFirstNResults, actualFirstNBucketAutoResults),
-        () => "expected " + tojson(expectedFirstNResults) + " actual " + tojson(actualFirstNBucketAutoResults),
+        () =>
+            "expected " +
+            tojson(expectedFirstNResults) +
+            " actual " +
+            tojson(actualFirstNBucketAutoResults),
     );
 
     let actualLastNBucketAutoResults = coll
@@ -233,7 +260,11 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
     reorderBucketResults(actualLastNBucketAutoResults);
     assert(
         arrayEq(expectedLastNResults, actualLastNBucketAutoResults),
-        () => "expected " + tojson(expectedLastNResults) + " actual " + tojson(actualLastNBucketAutoResults),
+        () =>
+            "expected " +
+            tojson(expectedLastNResults) +
+            " actual " +
+            tojson(actualLastNBucketAutoResults),
     );
 
     // Verify that an index on {_id: 1, sales: -1} will produce the expected results.
@@ -254,7 +285,11 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
 
     const indexedLastNResults = coll
         .aggregate(
-            [{$sort: {_id: 1}}, {$group: {_id: "$state", sales: {$lastN: {input: "$sales", n: n}}}}, {$sort: {_id: 1}}],
+            [
+                {$sort: {_id: 1}},
+                {$group: {_id: "$state", sales: {$lastN: {input: "$sales", n: n}}}},
+                {$sort: {_id: 1}},
+            ],
             {hint: idxSpec},
         )
         .toArray();
@@ -269,7 +304,9 @@ runFirstLastN(largestInt, expectedAllResults, expectedAllResults);
 // Reject non-integral values of n.
 assert.commandFailedWithCode(
     coll.runCommand("aggregate", {
-        pipeline: [{$group: {_id: {"st": "$state"}, sales: {$firstN: {input: "$sales", n: "string"}}}}],
+        pipeline: [
+            {$group: {_id: {"st": "$state"}, sales: {$firstN: {input: "$sales", n: "string"}}}},
+        ],
         cursor: {},
     }),
     5787902,
@@ -294,7 +331,14 @@ assert.commandFailedWithCode(
 // Verify that 'n' cannot be greater than the largest signed 64 bit int.
 assert.commandFailedWithCode(
     coll.runCommand("aggregate", {
-        pipeline: [{$group: {_id: {"st": "$state"}, sales: {$firstN: {input: "$sales", n: largestIntPlus1}}}}],
+        pipeline: [
+            {
+                $group: {
+                    _id: {"st": "$state"},
+                    sales: {$firstN: {input: "$sales", n: largestIntPlus1}},
+                },
+            },
+        ],
         cursor: {},
     }),
     5787903,
@@ -328,6 +372,9 @@ assert.commandFailedWithCode(
 );
 
 assert.commandFailedWithCode(
-    coll.runCommand("aggregate", {pipeline: [{$group: {_id: {"st": "$state"}, sales: {$firstN: {n: 2}}}}], cursor: {}}),
+    coll.runCommand("aggregate", {
+        pipeline: [{$group: {_id: {"st": "$state"}, sales: {$firstN: {n: 2}}}}],
+        cursor: {},
+    }),
     5787907,
 );

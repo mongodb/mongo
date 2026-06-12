@@ -137,7 +137,12 @@ assert.commandWorked(session.commitTransaction_forTesting());
 jsTest.log("Do a matching find-and-modify with upsert, requesting the new doc.");
 session.startTransaction({writeConcern: {w: "majority"}});
 
-res = sessionColl.findAndModify({query: {_id: 2}, update: {$inc: {a: 100}}, upsert: true, new: true});
+res = sessionColl.findAndModify({
+    query: {_id: 2},
+    update: {$inc: {a: 100}},
+    upsert: true,
+    new: true,
+});
 assert.eq({_id: 2, a: 202}, res);
 docs = sessionColl.find({}).toArray();
 assert.sameMembers(docs, [

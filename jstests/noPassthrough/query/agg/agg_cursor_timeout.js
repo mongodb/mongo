@@ -79,9 +79,13 @@ function assertCursorTimesOut(collName, pipeline) {
     // Confirm that cursor timeout occurs within sessions when the
     // `enableTimeoutOfInactiveSessionCursors` parameter is set to true. If false, we rely on
     // session expiration to cleanup outstanding cursors.
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}),
+    );
     assertCursorTimesOutImpl(collName, pipeline);
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}),
+    );
 }
 
 assert.commandWorked(testDB.source.insert({local: 1}));

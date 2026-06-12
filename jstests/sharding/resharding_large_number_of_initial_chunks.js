@@ -48,7 +48,13 @@ for (let i = 0; i < nChunks; i++) {
 newChunks.push({min: {newKey: nChunks}, max: {newKey: MaxKey}, recipientShardId: shard1});
 
 jsTestLog("Resharding Collection");
-assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, _presetReshardedChunks: newChunks}));
+assert.commandWorked(
+    mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        _presetReshardedChunks: newChunks,
+    }),
+);
 
 // Assert that the correct number of chunks documents exist after resharding 'db.foo'.
 // There should be two more chunks docs to cover the ranges

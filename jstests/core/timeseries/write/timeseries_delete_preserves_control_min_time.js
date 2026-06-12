@@ -55,7 +55,11 @@ describe("Deleting the earliest measurement preserves control.min.time", () => {
         assert.eq(1, coll.deleteOne({_id: 0}).deletedCount);
 
         const bucketsAfter = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-        assert.eq(1, bucketsAfter.length, "expected one bucket after delete: " + tojson(bucketsAfter));
+        assert.eq(
+            1,
+            bucketsAfter.length,
+            "expected one bucket after delete: " + tojson(bucketsAfter),
+        );
 
         assert.eq(
             minTimeBefore,

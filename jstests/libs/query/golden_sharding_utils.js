@@ -12,7 +12,9 @@ export function setupShardedCollectionWithOrphans() {
     // Enable sharding.
     const primaryShard = shardingTest.shard0.shardName;
     const otherShard = shardingTest.shard1.shardName;
-    assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(), primaryShard}));
+    assert.commandWorked(
+        shardingTest.s0.adminCommand({enableSharding: db.getName(), primaryShard}),
+    );
 
     const shard0Chunks = ["chunk1_s0", "chunk2_s0", "chunk3_s0"];
     const shard1Chunks = ["chunk1_s1", "chunk2_s1", "chunk3_s1"];
@@ -36,17 +38,25 @@ export function setupShardedCollectionWithOrphans() {
     }
     coll.insertMany(docs);
 
-    assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
+    assert.commandWorked(
+        shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}),
+    );
 
     // Split chunks up.
     for (const chunk of allChunks) {
-        assert.commandWorked(shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: chunk}}));
+        assert.commandWorked(
+            shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: chunk}}),
+        );
     }
 
     // Move "shard 1" chunks off of primary.
     for (const shardKey of shard1Chunks) {
         assert.commandWorked(
-            shardingTest.s.adminCommand({moveChunk: coll.getFullName(), find: {shardKey}, to: otherShard}),
+            shardingTest.s.adminCommand({
+                moveChunk: coll.getFullName(),
+                find: {shardKey},
+                to: otherShard,
+            }),
         );
     }
 

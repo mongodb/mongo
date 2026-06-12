@@ -70,7 +70,10 @@ const vectorSearchCmd = mongotCommandForVectorSearchQuery({
 }
 
 let cursor = testColl.aggregate(
-    [{$vectorSearch: vectorSearchQuery}, {$project: {_id: 1, x: 1, score: {$meta: "vectorSearchScore"}}}],
+    [
+        {$vectorSearch: vectorSearchQuery},
+        {$project: {_id: 1, x: 1, score: {$meta: "vectorSearchScore"}}},
+    ],
     {cursor: {}},
 );
 

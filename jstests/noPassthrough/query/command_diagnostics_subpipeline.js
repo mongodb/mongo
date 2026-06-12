@@ -30,19 +30,30 @@ const db = st.s.getDB(dbName);
 const localColl = db[localCollName];
 localColl.insert({a: 1});
 assert.commandWorked(localColl.createIndex(localShardKey));
-assert.commandWorked(st.s.adminCommand({shardCollection: localColl.getFullName(), key: localShardKey}));
-assert.commandWorked(db.adminCommand({moveChunk: localColl.getFullName(), find: {a: 1}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: localColl.getFullName(), key: localShardKey}),
+);
+assert.commandWorked(
+    db.adminCommand({moveChunk: localColl.getFullName(), find: {a: 1}, to: st.shard0.shardName}),
+);
 
 // Shard1 has the foreign collection with one doc.
 const shardedForeignColl = db[shardedForeignCollName];
 shardedForeignColl.insert({b: 1});
 assert.commandWorked(shardedForeignColl.createIndex(foreignShardKey));
-assert.commandWorked(st.s.adminCommand({shardCollection: shardedForeignColl.getFullName(), key: foreignShardKey}));
 assert.commandWorked(
-    db.adminCommand({moveChunk: shardedForeignColl.getFullName(), find: {b: 1}, to: st.shard1.shardName}),
+    st.s.adminCommand({shardCollection: shardedForeignColl.getFullName(), key: foreignShardKey}),
+);
+assert.commandWorked(
+    db.adminCommand({
+        moveChunk: shardedForeignColl.getFullName(),
+        find: {b: 1},
+        to: st.shard1.shardName,
+    }),
 );
 
-const {failpointName, failpointOpts, errorCode} = getQueryPlannerAlwaysFailsWithNamespace(foreignNs);
+const {failpointName, failpointOpts, errorCode} =
+    getQueryPlannerAlwaysFailsWithNamespace(foreignNs);
 
 const command = {
     aggregate: localCollName,

@@ -48,18 +48,25 @@ function runTest(
     }
 
     assert.soon(function () {
-        return expectServerInfo === checkLog.checkContainsOnceJson(mongo, 4913010, serverInfoToExpect);
+        return (
+            expectServerInfo === checkLog.checkContainsOnceJson(mongo, 4913010, serverInfoToExpect)
+        );
     });
 
     if (!(determineSSLProvider() === "windows" && !expectClusterInfo)) {
         assert.soon(function () {
-            return expectClusterInfo === checkLog.checkContainsOnceJson(mongo, 4913011, clusterInfoToExpect);
+            return (
+                expectClusterInfo ===
+                checkLog.checkContainsOnceJson(mongo, 4913011, clusterInfoToExpect)
+            );
         });
     }
 
     if (!(determineSSLProvider() === "apple")) {
         assert.soon(function () {
-            return expectCRLInfo === checkLog.checkContainsOnceJson(mongo, 4913012, CRLInfotoExpect);
+            return (
+                expectCRLInfo === checkLog.checkContainsOnceJson(mongo, 4913012, CRLInfotoExpect)
+            );
         });
     }
 

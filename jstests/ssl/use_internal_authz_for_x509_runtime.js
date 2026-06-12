@@ -35,7 +35,10 @@ function setupUsers(conn) {
     const adminDB = conn.getDB("admin");
     adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     assert(adminDB.auth("admin", "admin"));
-    conn.getDB("$external").createUser({user: CLIENT_USER, roles: [{role: "readWriteAnyDatabase", db: "admin"}]});
+    conn.getDB("$external").createUser({
+        user: CLIENT_USER,
+        roles: [{role: "readWriteAnyDatabase", db: "admin"}],
+    });
     adminDB.logout();
     return adminDB;
 }
@@ -64,26 +67,38 @@ function runRuntimeParameterChecks(conn, label) {
     const adminDB = setupUsers(conn);
 
     withAdmin(adminDB, (db) => {
-        const defaultResult = assert.commandWorked(db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}));
+        const defaultResult = assert.commandWorked(
+            db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}),
+        );
         assert.eq(false, defaultResult.useInternalAuthzForX509, "default should be false");
 
-        jsTest.log.info("Testing X.509 auth with useInternalAuthzForX509=false (default) on " + label);
+        jsTest.log.info(
+            "Testing X.509 auth with useInternalAuthzForX509=false (default) on " + label,
+        );
         assertX509AuthSucceeds(conn.host);
 
         assert.commandWorked(db.runCommand({setParameter: 1, useInternalAuthzForX509: true}));
 
-        const trueResult = assert.commandWorked(db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}));
+        const trueResult = assert.commandWorked(
+            db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}),
+        );
         assert.eq(true, trueResult.useInternalAuthzForX509, "should be true after setParameter");
 
-        jsTest.log.info("Testing X.509 auth with useInternalAuthzForX509=true (runtime change) on " + label);
+        jsTest.log.info(
+            "Testing X.509 auth with useInternalAuthzForX509=true (runtime change) on " + label,
+        );
         assertX509AuthSucceeds(conn.host);
 
         assert.commandWorked(db.runCommand({setParameter: 1, useInternalAuthzForX509: false}));
 
-        const restoredResult = assert.commandWorked(db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}));
+        const restoredResult = assert.commandWorked(
+            db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}),
+        );
         assert.eq(false, restoredResult.useInternalAuthzForX509, "should be false after restoring");
 
-        jsTest.log.info("Testing X.509 auth after restoring useInternalAuthzForX509=false on " + label);
+        jsTest.log.info(
+            "Testing X.509 auth after restoring useInternalAuthzForX509=false on " + label,
+        );
         assertX509AuthSucceeds(conn.host);
     });
 }
@@ -92,10 +107,18 @@ function runStartupParameterChecks(conn, label) {
     const adminDB = setupUsers(conn);
 
     withAdmin(adminDB, (db) => {
-        const startupResult = assert.commandWorked(db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}));
-        assert.eq(true, startupResult.useInternalAuthzForX509, "should be true when set at startup");
+        const startupResult = assert.commandWorked(
+            db.runCommand({getParameter: 1, useInternalAuthzForX509: 1}),
+        );
+        assert.eq(
+            true,
+            startupResult.useInternalAuthzForX509,
+            "should be true when set at startup",
+        );
 
-        jsTest.log.info("Testing X.509 auth with useInternalAuthzForX509=true (set at startup) on " + label);
+        jsTest.log.info(
+            "Testing X.509 auth with useInternalAuthzForX509=true (set at startup) on " + label,
+        );
         assertX509AuthSucceeds(conn.host);
     });
 }

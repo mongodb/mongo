@@ -35,7 +35,11 @@ function insertData(coll, padding = "") {
     for (let word1 of words1) {
         for (let word2 of words2) {
             for (let word3 of words3) {
-                docs.push({desc: word1 + " " + word2 + " " + word3, price: price, padding: padding});
+                docs.push({
+                    desc: word1 + " " + word2 + " " + word3,
+                    price: price,
+                    padding: padding,
+                });
                 price = (price + 2) % 7;
             }
         }
@@ -73,7 +77,11 @@ const predicate = {
 }
 
 {
-    const pipelineWithLimit = [{$match: predicate}, {$project: {score: {$meta: "textScore"}}}, {$limit: 2}];
+    const pipelineWithLimit = [
+        {$match: predicate},
+        {$project: {score: {$meta: "textScore"}}},
+        {$limit: 2},
+    ];
     jsTest.log.info("Running pipeline " + tojson(pipelineWithLimit));
 
     runMemoryStatsTest({
@@ -98,7 +106,9 @@ const predicate = {
     jsTest.log.info("Running pipeline where we spill: " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: 100}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: 100}),
+    );
 
     runMemoryStatsTest({
         db: db,

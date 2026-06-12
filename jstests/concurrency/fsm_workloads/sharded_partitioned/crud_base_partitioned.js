@@ -47,12 +47,15 @@ export const $config = (function () {
         if (this.threadCount > 1) {
             assert(
                 !(partition.isLowChunk && partition.isHighChunk),
-                "should not be both the high and low chunk when there is more than 1 " + "thread:\n" + tojson(this),
+                "should not be both the high and low chunk when there is more than 1 " +
+                    "thread:\n" +
+                    tojson(this),
             );
         } else {
             assert(
                 partition.isLowChunk && partition.isHighChunk,
-                "should be both the high and low chunk when there is only 1 thread:\n" + tojson(this),
+                "should be both the high and low chunk when there is only 1 thread:\n" +
+                    tojson(this),
             );
         }
 

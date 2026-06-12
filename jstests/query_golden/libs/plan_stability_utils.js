@@ -91,7 +91,8 @@ function sumCounters(tree, counter) {
  *
  */
 function getNReturned(explain) {
-    const lastStage = explain.stages !== undefined ? explain.stages[explain.stages.length - 1] : explain;
+    const lastStage =
+        explain.stages !== undefined ? explain.stages[explain.stages.length - 1] : explain;
     let nReturned;
 
     if (lastStage.executionStats !== undefined) {
@@ -284,8 +285,14 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
                     Object.fromEntries([
                         ["setParameter", 1],
                         ...Object.entries(paramsToRestore)
-                            .filter(([k, _]) => k !== "ok" && k !== "operationTime" && k !== "$clusterTime")
-                            .map(([param, value]) => [param, typeof value === "string" ? value : value["value"]]),
+                            .filter(
+                                ([k, _]) =>
+                                    k !== "ok" && k !== "operationTime" && k !== "$clusterTime",
+                            )
+                            .map(([param, value]) => [
+                                param,
+                                typeof value === "string" ? value : value["value"],
+                            ]),
                     ]),
                 ),
             );
@@ -377,9 +384,12 @@ export function runPlanStabilityCommands(
 
         // Fish for the query plan that we want to dump
         const queryPlanner =
-            explain.queryPlanner !== undefined ? explain.queryPlanner : explain.stages[0]["$cursor"].queryPlanner;
+            explain.queryPlanner !== undefined
+                ? explain.queryPlanner
+                : explain.stages[0]["$cursor"].queryPlanner;
         const winningPlan = queryPlanner.winningPlan;
-        const queryPlan = winningPlan.queryPlan !== undefined ? [winningPlan.queryPlan] : [winningPlan];
+        const queryPlan =
+            winningPlan.queryPlan !== undefined ? [winningPlan.queryPlan] : [winningPlan];
 
         if (explain.stages !== undefined && explain.stages.length > 1) {
             // If there are any classic stages after the SBE stage,
@@ -402,7 +412,9 @@ export function runPlanStabilityCommands(
         if (showRows) {
             // JSON does not allow trailing commas, so we need to check if there are more fields after the "rows" field
             const hasMoreAfterRows = showFull || showChecksum;
-            print(`    "rows" : ${padNumber(nReturned, 9)}${hasMoreAfterRows ? "," : `}${separator}`}`);
+            print(
+                `    "rows" : ${padNumber(nReturned, 9)}${hasMoreAfterRows ? "," : `}${separator}`}`,
+            );
         }
 
         if (showFull) {

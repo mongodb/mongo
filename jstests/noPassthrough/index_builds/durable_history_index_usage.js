@@ -41,7 +41,11 @@ const coll = function () {
 const insert = function (document) {
     // The write concern guarantees the stable and oldest timestamp are bumped.
     return assert.commandWorked(
-        testDB().runCommand({insert: coll().getName(), documents: [document], writeConcern: {w: "majority"}}),
+        testDB().runCommand({
+            insert: coll().getName(),
+            documents: [document],
+            writeConcern: {w: "majority"},
+        }),
     ).operationTime;
 };
 

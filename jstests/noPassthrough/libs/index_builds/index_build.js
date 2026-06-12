@@ -126,12 +126,21 @@ export var IndexBuildTest = class {
      */
     static waitForIndexBuildToStart(database, collectionName, indexName, filter) {
         if (collectionName) {
-            collectionName = getTargetCollForIndexBuilds(database.getCollection(collectionName)).getName();
+            collectionName = getTargetCollForIndexBuilds(
+                database.getCollection(collectionName),
+            ).getName();
         }
 
         let opId;
         assert.soon(function () {
-            return (opId = IndexBuildTest.getIndexBuildOpId(database, collectionName, indexName, filter)) !== -1;
+            return (
+                (opId = IndexBuildTest.getIndexBuildOpId(
+                    database,
+                    collectionName,
+                    indexName,
+                    filter,
+                )) !== -1
+            );
         }, "Index build operation not found after starting via parallelShell");
         return opId;
     }
@@ -178,7 +187,10 @@ export var IndexBuildTest = class {
         assert.eq(
             1,
             inprog.length,
-            "unable to find opid " + opId + " in currentOp() result: " + tojson(database.currentOp()),
+            "unable to find opid " +
+                opId +
+                " in currentOp() result: " +
+                tojson(database.currentOp()),
         );
         const op = inprog[0];
         assert.eq(opId, op.opid, "db.currentOp() returned wrong index build info: " + tojson(op));
@@ -214,7 +226,13 @@ export var IndexBuildTest = class {
             readyIndexes.concat("_id_");
         }
 
-        return IndexBuildTest.assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options);
+        return IndexBuildTest.assertIndexes(
+            coll,
+            numIndexes,
+            readyIndexes,
+            notReadyIndexes,
+            options,
+        );
     }
 
     /**
@@ -284,10 +302,19 @@ export var IndexBuildTest = class {
 
             const spec = indexMap[name];
             if (options.includeBuildUUIDs) {
-                assert(spec.hasOwnProperty("spec"), "expected spec field in " + name + ": " + tojson(spec));
-                assert(spec.hasOwnProperty("buildUUID"), "expected buildUUID field in " + name + ": " + tojson(spec));
+                assert(
+                    spec.hasOwnProperty("spec"),
+                    "expected spec field in " + name + ": " + tojson(spec),
+                );
+                assert(
+                    spec.hasOwnProperty("buildUUID"),
+                    "expected buildUUID field in " + name + ": " + tojson(spec),
+                );
             } else if (options.includeIndexBuildInfo) {
-                assert(spec.hasOwnProperty("spec"), "expected spec field in " + name + ": " + tojson(spec));
+                assert(
+                    spec.hasOwnProperty("spec"),
+                    "expected spec field in " + name + ": " + tojson(spec),
+                );
                 assert(
                     spec.hasOwnProperty("indexBuildInfo"),
                     "expected indexBuildInfo field in " + name + ": " + tojson(spec),
@@ -323,7 +350,13 @@ export var IndexBuildTest = class {
     static assertIndexesSoon(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
         let indexMap;
         assert.soonNoExcept(function () {
-            indexMap = IndexBuildTest.assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options);
+            indexMap = IndexBuildTest.assertIndexes(
+                coll,
+                numIndexes,
+                readyIndexes,
+                notReadyIndexes,
+                options,
+            );
             return true;
         });
         return indexMap;
@@ -358,7 +391,10 @@ export var IndexBuildTest = class {
                 .sort({$natural: -1})
                 .limit(1)
                 .toArray();
-            assert(res && Array.isArray(res) && res.length == 1 && res[0].hasOwnProperty("ts"), msg);
+            assert(
+                res && Array.isArray(res) && res.length == 1 && res[0].hasOwnProperty("ts"),
+                msg,
+            );
             return res[0].ts;
         };
 
@@ -374,7 +410,10 @@ export var IndexBuildTest = class {
         const timestamps = [];
         for (let indexName of indexes) {
             const nameQuery = {...baseQuery, "o.indexes": {$elemMatch: {name: indexName}}};
-            const ts = assertOplogTimestamp(nameQuery, `${oplogEntryType} for index "${indexName}" not found`);
+            const ts = assertOplogTimestamp(
+                nameQuery,
+                `${oplogEntryType} for index "${indexName}" not found`,
+            );
             timestamps.push(ts);
         }
         for (let buildUUID of buildUUIDs) {
@@ -407,7 +446,13 @@ export var IndexBuildTest = class {
      * @returns {Timestamp} timestamp of the most recent oplog entry
      */
     static assertIndexesStarted(coll, indexes, queryOptions) {
-        return IndexBuildTest.assertIndexOplogEntry("startIndexBuild", coll, indexes, [], queryOptions);
+        return IndexBuildTest.assertIndexOplogEntry(
+            "startIndexBuild",
+            coll,
+            indexes,
+            [],
+            queryOptions,
+        );
     }
 
     /**
@@ -441,7 +486,9 @@ export var IndexBuildTest = class {
     static assertIndexesStartedDurable(coll, indexes, queryOptions) {
         const conn = coll.getMongo();
         const mostRecentTs = IndexBuildTest.assertIndexesStarted(coll, indexes, queryOptions);
-        const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+        const stableTs = assert.commandWorked(
+            conn.adminCommand({replSetGetStatus: 1}),
+        ).lastStableRecoveryTimestamp;
         assert.gte(
             timestampCmp(stableTs, mostRecentTs),
             0,
@@ -464,7 +511,9 @@ export var IndexBuildTest = class {
         assert.soonNoExcept(() => {
             const conn = coll.getMongo();
             mostRecentTs = IndexBuildTest.assertIndexesStarted(coll, indexes, queryOptions);
-            const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+            const stableTs = assert.commandWorked(
+                conn.adminCommand({replSetGetStatus: 1}),
+            ).lastStableRecoveryTimestamp;
             return timestampCmp(stableTs, mostRecentTs) >= 0;
         }, "lastStableRecoveryTimestamp not caught up with latest oplog entry timestamp");
         return mostRecentTs;
@@ -487,7 +536,13 @@ export var IndexBuildTest = class {
      * @returns {Timestamp} timestamp of the most recent oplog entry
      */
     static assertIndexesCommitted(coll, indexes, buildUUIDs, queryOptions) {
-        return IndexBuildTest.assertIndexOplogEntry("commitIndexBuild", coll, indexes, buildUUIDs, queryOptions);
+        return IndexBuildTest.assertIndexOplogEntry(
+            "commitIndexBuild",
+            coll,
+            indexes,
+            buildUUIDs,
+            queryOptions,
+        );
     }
 
     /**
@@ -503,7 +558,12 @@ export var IndexBuildTest = class {
     static assertIndexesCommittedSoon(coll, indexes, buildUUIDs, queryOptions) {
         let greatestIndexCommitDurable;
         assert.soonNoExcept(() => {
-            greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(coll, indexes, buildUUIDs, queryOptions);
+            greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(
+                coll,
+                indexes,
+                buildUUIDs,
+                queryOptions,
+            );
             return true;
         });
         return greatestIndexCommitDurable;
@@ -529,7 +589,9 @@ export var IndexBuildTest = class {
             buildUUIDs,
             queryOptions,
         );
-        const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+        const stableTs = assert.commandWorked(
+            conn.adminCommand({replSetGetStatus: 1}),
+        ).lastStableRecoveryTimestamp;
         assert.gte(
             timestampCmp(stableTs, greatestIndexCommitDurable),
             0,
@@ -554,8 +616,15 @@ export var IndexBuildTest = class {
         let greatestIndexCommitDurable;
         assert.soonNoExcept(() => {
             const conn = coll.getMongo();
-            greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(coll, indexes, buildUUIDs, queryOptions);
-            const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+            greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(
+                coll,
+                indexes,
+                buildUUIDs,
+                queryOptions,
+            );
+            const stableTs = assert.commandWorked(
+                conn.adminCommand({replSetGetStatus: 1}),
+            ).lastStableRecoveryTimestamp;
             return timestampCmp(stableTs, greatestIndexCommitDurable) >= 0;
         }, "lastStableRecoveryTimestamp not caught up with latest commitIndexBuild timestamp");
         return greatestIndexCommitDurable;
@@ -566,7 +635,12 @@ export var IndexBuildTest = class {
      * @param {Mongo} conn
      */
     static pauseIndexBuilds(conn) {
-        assert.commandWorked(conn.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "hangAfterStartingIndexBuild",
+                mode: "alwaysOn",
+            }),
+        );
     }
 
     /**
@@ -574,7 +648,9 @@ export var IndexBuildTest = class {
      * @param {Mongo} conn
      */
     static resumeIndexBuilds(conn) {
-        assert.commandWorked(conn.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+        assert.commandWorked(
+            conn.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}),
+        );
     }
 
     /**
@@ -623,7 +699,13 @@ export var IndexBuildTest = class {
      * @param {string[]} [indexesToCheck=notReadyIndexes]
      * @returns {Object} indexMap
      */
-    static checkLogByBuildUUIDForIndexes(coll, logID, readyIndexes, notReadyIndexes, indexesToCheck) {
+    static checkLogByBuildUUIDForIndexes(
+        coll,
+        logID,
+        readyIndexes,
+        notReadyIndexes,
+        indexesToCheck,
+    ) {
         indexesToCheck ??= notReadyIndexes;
 
         const indexMap = IndexBuildTest.assertIndexesIdHelper(
@@ -686,9 +768,15 @@ export const ResumableIndexBuildTest = class {
         for (let i = 0; i < indexNames.length; i++) {
             indexNamesFlatSinglePerBuild[i] = indexNames[i][0];
             buildUUIDs[i] = extractUUIDFromObject(
-                IndexBuildTest.assertIndexesIdHelper(coll, indexNamesFlat.length, [], indexNamesFlat, {
-                    includeBuildUUIDs: true,
-                })[indexNames[i][0]].buildUUID,
+                IndexBuildTest.assertIndexesIdHelper(
+                    coll,
+                    indexNamesFlat.length,
+                    [],
+                    indexNamesFlat,
+                    {
+                        includeBuildUUIDs: true,
+                    },
+                )[indexNames[i][0]].buildUUID,
             );
         }
 
@@ -697,12 +785,17 @@ export const ResumableIndexBuildTest = class {
         for (let i = 0; i < failPoints.length; i++) {
             const data = {
                 buildUUIDs: failPoints.length === 1 ? buildUUIDs : [buildUUIDs[i]],
-                indexNames: failPoints.length === 1 ? indexNamesFlatSinglePerBuild : [indexNames[i][0]],
+                indexNames:
+                    failPoints.length === 1 ? indexNamesFlatSinglePerBuild : [indexNames[i][0]],
                 iteration: failPointsIteration,
             };
             if (failPoints[i].data) {
-                failPoints[i].data.buildUUIDs = failPoints[i].data.buildUUIDs.concat(data.buildUUIDs);
-                failPoints[i].data.indexNames = failPoints[i].data.indexNames.concat(data.indexNames);
+                failPoints[i].data.buildUUIDs = failPoints[i].data.buildUUIDs.concat(
+                    data.buildUUIDs,
+                );
+                failPoints[i].data.indexNames = failPoints[i].data.indexNames.concat(
+                    data.indexNames,
+                );
             } else {
                 failPoints[i].data = data;
             }
@@ -813,9 +906,15 @@ export const ResumableIndexBuildTest = class {
         const indexNamesFlat = ResumableIndexBuildTest.flatten(indexNames);
         let indexes;
         assert.soonNoExcept(function () {
-            indexes = IndexBuildTest.assertIndexesIdHelper(coll, indexNamesFlat.length, [], indexNamesFlat, {
-                includeBuildUUIDs: true,
-            });
+            indexes = IndexBuildTest.assertIndexesIdHelper(
+                coll,
+                indexNamesFlat.length,
+                [],
+                indexNamesFlat,
+                {
+                    includeBuildUUIDs: true,
+                },
+            );
 
             return true;
         });
@@ -824,7 +923,11 @@ export const ResumableIndexBuildTest = class {
         for (const indexName of indexNamesFlat) {
             checkLog.containsJson(primary, [4940900, 10978300], {
                 buildUUID: function (uuid) {
-                    return uuid && uuid["uuid"]["$uuid"] === extractUUIDFromObject(indexes[indexName].buildUUID);
+                    return (
+                        uuid &&
+                        uuid["uuid"]["$uuid"] ===
+                            extractUUIDFromObject(indexes[indexName].buildUUID)
+                    );
                 },
             });
         }
@@ -957,7 +1060,9 @@ export const ResumableIndexBuildTest = class {
                     // context to be killed. This will cause the failpoint specified by failPointName
                     // to be interrupted and allow the index builds to be interrupted for shutdown at
                     // their current locations.
-                    assert.commandWorked(db.adminCommand({configureFailPoint: "hangBeforeShutdown", mode: "off"}));
+                    assert.commandWorked(
+                        db.adminCommand({configureFailPoint: "hangBeforeShutdown", mode: "off"}),
+                    );
                 },
                 failPoints,
                 shutdownFpTimesEntered,
@@ -1056,14 +1161,28 @@ export const ResumableIndexBuildTest = class {
             );
         }
 
-        ResumableIndexBuildTest.checkIndexes(test, dbName, collName, indexNames, postIndexBuildWrites, skipDropping);
+        ResumableIndexBuildTest.checkIndexes(
+            test,
+            dbName,
+            collName,
+            indexNames,
+            postIndexBuildWrites,
+            skipDropping,
+        );
     }
 
     /**
      * Makes sure that inserting into a collection outside of an index build works properly,
      * validates indexes on all nodes in the replica set, and drops the index at the end.
      */
-    static checkIndexes(test, dbName, collName, indexNames, postIndexBuildWrites, skipDropping = false) {
+    static checkIndexes(
+        test,
+        dbName,
+        collName,
+        indexNames,
+        postIndexBuildWrites,
+        skipDropping = false,
+    ) {
         const primary = test.getPrimary();
         const coll = primary.getDB(dbName).getCollection(collName);
 
@@ -1095,7 +1214,10 @@ export const ResumableIndexBuildTest = class {
                     return uuid && uuid["uuid"]["$uuid"] === buildUUIDs[i];
                 },
                 details: function (details) {
-                    return details.phase === expectedResumePhases[expectedResumePhases.length === 1 ? 0 : i];
+                    return (
+                        details.phase ===
+                        expectedResumePhases[expectedResumePhases.length === 1 ? 0 : i]
+                    );
                 },
             });
 
@@ -1219,9 +1341,20 @@ export const ResumableIndexBuildTest = class {
             awaitCreateIndex();
         }
 
-        ResumableIndexBuildTest.checkResume(primary, buildUUIDs, expectedResumePhases, resumeChecks);
+        ResumableIndexBuildTest.checkResume(
+            primary,
+            buildUUIDs,
+            expectedResumePhases,
+            resumeChecks,
+        );
 
-        ResumableIndexBuildTest.checkIndexes(rst, dbName, collName, indexNames, postIndexBuildInserts);
+        ResumableIndexBuildTest.checkIndexes(
+            rst,
+            dbName,
+            collName,
+            indexNames,
+            postIndexBuildInserts,
+        );
     }
 
     /**
@@ -1301,8 +1434,9 @@ export const ResumableIndexBuildTest = class {
         resumeNodeFp.wait();
 
         const buildUUID = extractUUIDFromObject(
-            IndexBuildTest.assertIndexesIdHelper(coll, 1, [], [indexName], {includeBuildUUIDs: true})[indexName]
-                .buildUUID,
+            IndexBuildTest.assertIndexesIdHelper(coll, 1, [], [indexName], {
+                includeBuildUUIDs: true,
+            })[indexName].buildUUID,
         );
 
         clearRawMongoProgramOutput();
@@ -1319,7 +1453,13 @@ export const ResumableIndexBuildTest = class {
 
         awaitCreateIndex();
 
-        ResumableIndexBuildTest.checkIndexes(rst, dbName, collName, [indexName], postIndexBuildInserts);
+        ResumableIndexBuildTest.checkIndexes(
+            rst,
+            dbName,
+            collName,
+            [indexName],
+            postIndexBuildInserts,
+        );
     }
 
     /**
@@ -1358,7 +1498,9 @@ export const ResumableIndexBuildTest = class {
         const hostType = nodeToCrash.host == primary.host ? "primary" : "secondary";
 
         const crashNodeFp = configureFailPoint(nodeToCrash, failpointToHang);
-        jsTest.log.info(`configured failpoint ${failpointToHang} on node ${hostType} (${nodeToCrash.host})`);
+        jsTest.log.info(
+            `configured failpoint ${failpointToHang} on node ${hostType} (${nodeToCrash.host})`,
+        );
 
         jsTest.log.info("kicking off index build and side writes");
         const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
@@ -1381,22 +1523,30 @@ export const ResumableIndexBuildTest = class {
         crashNodeFp.wait();
 
         // Ensure that all nodes are ready to vote except the one designated to crash and hanging at the given failpoint.
-        const buildUUID = IndexBuildTest.assertIndexesIdHelper(coll, 1, [], [indexName], {includeBuildUUIDs: true})[
-            indexName
-        ].buildUUID;
+        const buildUUID = IndexBuildTest.assertIndexesIdHelper(coll, 1, [], [indexName], {
+            includeBuildUUIDs: true,
+        })[indexName].buildUUID;
         const buildUUIDStr = extractUUIDFromObject(buildUUID);
         assert.soon(() => {
-            const buildInfo = primary.getCollection("config.system.indexBuilds").findOne({_id: buildUUID});
+            const buildInfo = primary
+                .getCollection("config.system.indexBuilds")
+                .findOne({_id: buildUUID});
             if (!buildInfo || !buildInfo.commitReadyMembers) {
                 return false;
             }
 
             for (const node of rst.nodes ? rst.nodes : rst.getTestFixture().nodes) {
-                if (node.host != nodeToCrash.host && !buildInfo.commitReadyMembers.includes(node.host)) {
+                if (
+                    node.host != nodeToCrash.host &&
+                    !buildInfo.commitReadyMembers.includes(node.host)
+                ) {
                     return false;
                 }
 
-                if (node.host == nodeToCrash.host && buildInfo.commitReadyMembers.includes(node.host)) {
+                if (
+                    node.host == nodeToCrash.host &&
+                    buildInfo.commitReadyMembers.includes(node.host)
+                ) {
                     return false;
                 }
             }
@@ -1408,11 +1558,18 @@ export const ResumableIndexBuildTest = class {
             `index build ${buildUUIDStr} ready to commit on all nodes except for ${hostType} (${nodeToCrash.host})`,
         );
 
-        jsTest.log.info(`forcing checkpoint with fsync command on ${hostType} (${nodeToCrash.host})`);
+        jsTest.log.info(
+            `forcing checkpoint with fsync command on ${hostType} (${nodeToCrash.host})`,
+        );
         nodeToCrash.adminCommand({fsync: 1});
 
         jsTest.log.info(`crashing ${hostType} (${nodeToCrash.host})`);
-        rst.stop(nodeToCrash, /*signal*/ 9, /*opts*/ {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+        rst.stop(
+            nodeToCrash,
+            /*signal*/ 9,
+            /*opts*/ {allowedExitCode: MongoRunner.EXIT_SIGKILL},
+            {forRestart: true},
+        );
 
         jsTest.log.info(`restarting ${hostType} (${nodeToCrash.host})`);
         rst.start(nodeToCrash, {noCleanData: true}, /*restart*/ true);
@@ -1421,7 +1578,12 @@ export const ResumableIndexBuildTest = class {
         // Ensure that we resume or restart the index build as expected after node crash/restart.
         const restartingLog = {type: "restart", logID: 20660};
         const resumingLog = {type: "resume", logID: 4841700};
-        const checkLogAfterRestart = (tgtNode, monitoringFor, buildUUIDStr, expectedResumePhase) => {
+        const checkLogAfterRestart = (
+            tgtNode,
+            monitoringFor,
+            buildUUIDStr,
+            expectedResumePhase,
+        ) => {
             jsTest.log.info(
                 `monitoring logs for ${monitoringFor.type} (${monitoringFor.logID}) of ${buildUUIDStr} in phase "${expectedResumePhase}"`,
             );
@@ -1436,7 +1598,12 @@ export const ResumableIndexBuildTest = class {
                     return details.phase === expectedResumePhase;
                 };
             }
-            checkLog.containsJson(tgtNode, monitoringFor.logID, attrsDict, /*timeoutMillis*/ 30 * 1000);
+            checkLog.containsJson(
+                tgtNode,
+                monitoringFor.logID,
+                attrsDict,
+                /*timeoutMillis*/ 30 * 1000,
+            );
         };
         let monitoredLog = expectResume ? resumingLog : restartingLog;
         checkLogAfterRestart(nodeToCrash, monitoredLog, buildUUIDStr, expectedResumePhase);
@@ -1519,11 +1686,22 @@ export const ResumableIndexBuildTest = class {
             primaryFp.off();
 
             // Ensure that the index build was completed after unpausing the primary.
-            ResumableIndexBuildTest.assertCompleted(resumeNode, resumeNodeColl, [buildUUID], [indexName]);
+            ResumableIndexBuildTest.assertCompleted(
+                resumeNode,
+                resumeNodeColl,
+                [buildUUID],
+                [indexName],
+            );
         }
 
         awaitCreateIndex();
-        ResumableIndexBuildTest.checkIndexes(rst, dbName, collName, [indexName], postIndexBuildInserts);
+        ResumableIndexBuildTest.checkIndexes(
+            rst,
+            dbName,
+            collName,
+            [indexName],
+            postIndexBuildInserts,
+        );
     }
 
     /**
@@ -1610,7 +1788,13 @@ export const ResumableIndexBuildTest = class {
         // Ensure that the index build was completed after it was restarted.
         ResumableIndexBuildTest.assertCompleted(primary, coll, [buildUUID], [indexName]);
 
-        ResumableIndexBuildTest.checkIndexes(rst, dbName, collName, [indexName], postIndexBuildInserts);
+        ResumableIndexBuildTest.checkIndexes(
+            rst,
+            dbName,
+            collName,
+            [indexName],
+            postIndexBuildInserts,
+        );
 
         const checkLogIdAfterRestart = function (primary, id) {
             rst.stop(primary);
@@ -1722,7 +1906,13 @@ export const ResumableIndexBuildTest = class {
         // Ensure that the index build was completed after it was restarted.
         ResumableIndexBuildTest.assertCompleted(primary, coll, [buildUUID], [indexName]);
 
-        ResumableIndexBuildTest.checkIndexes(rst, dbName, collName, [indexName], postIndexBuildInserts);
+        ResumableIndexBuildTest.checkIndexes(
+            rst,
+            dbName,
+            collName,
+            [indexName],
+            postIndexBuildInserts,
+        );
     }
 };
 

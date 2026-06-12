@@ -7,7 +7,9 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
  */
 export var QuerySamplingUtil = (function () {
     function getCollectionUuid(db, collName) {
-        const listCollectionRes = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+        const listCollectionRes = assert.commandWorked(
+            db.runCommand({listCollections: 1, filter: {name: collName}}),
+        );
         return listCollectionRes.cursor.firstBatch[0].info.uuid;
     }
 
@@ -52,7 +54,9 @@ export var QuerySamplingUtil = (function () {
             assert.eq(docs.length, 0, docs);
 
             if (numTries % 100 == 0) {
-                jsTest.log("Still waiting for active sampling " + tojson({node, ns, collUuid, docs}));
+                jsTest.log(
+                    "Still waiting for active sampling " + tojson({node, ns, collUuid, docs}),
+                );
             }
             return false;
         });
@@ -76,7 +80,9 @@ export var QuerySamplingUtil = (function () {
             assert.eq(docs.length, 1, docs);
 
             if (numTries % 100 == 0) {
-                jsTest.log("Still waiting for inactive sampling " + tojson({node, ns, collUuid, docs}));
+                jsTest.log(
+                    "Still waiting for inactive sampling " + tojson({node, ns, collUuid, docs}),
+                );
             }
             return false;
         });
@@ -191,10 +197,18 @@ export var QuerySamplingUtil = (function () {
         for (let key in subsetObj) {
             const value = subsetObj[key];
             if (typeof value === "object") {
-                assert(supersetObj.hasOwnProperty(key), {key, actual: supersetObj, expected: subsetObj});
+                assert(supersetObj.hasOwnProperty(key), {
+                    key,
+                    actual: supersetObj,
+                    expected: subsetObj,
+                });
                 assertSubObject(supersetObj[key], subsetObj[key]);
             } else {
-                assert.eq(supersetObj[key], subsetObj[key], {key, actual: supersetObj, expected: subsetObj});
+                assert.eq(supersetObj[key], subsetObj[key], {
+                    key,
+                    actual: supersetObj,
+                    expected: subsetObj,
+                });
             }
         }
     }
@@ -255,7 +269,13 @@ export var QuerySamplingUtil = (function () {
      * - The document has the expected fields. If 'diff' is not null, the query has a corresponding
      *   config.sampledQueriesDiff document with the expected diff on that same shard.
      */
-    function assertSoonSampledQueryDocumentsAcrossShards(st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs) {
+    function assertSoonSampledQueryDocumentsAcrossShards(
+        st,
+        ns,
+        collectionUuid,
+        cmdNames,
+        expectedSampledQueryDocs,
+    ) {
         let actualSampledQueryDocs, actualCount;
         let tries = 0;
         assert.soon(
@@ -284,7 +304,10 @@ export var QuerySamplingUtil = (function () {
             },
             "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs),
         );
-        assert.eq(actualCount, expectedSampledQueryDocs.length, {actualSampledQueryDocs, expectedSampledQueryDocs});
+        assert.eq(actualCount, expectedSampledQueryDocs.length, {
+            actualSampledQueryDocs,
+            expectedSampledQueryDocs,
+        });
 
         for (let {filter, shardNames, cmdName, cmdObj, diff} of expectedSampledQueryDocs) {
             if (!filter) {
@@ -321,7 +344,13 @@ export var QuerySamplingUtil = (function () {
                     assertSubObject(queryDoc.cmd, cmdObj);
 
                     if (diff) {
-                        assertSoonSingleSampledDiffDocument(primary, queryDoc._id, ns, collectionUuid, [diff]);
+                        assertSoonSingleSampledDiffDocument(
+                            primary,
+                            queryDoc._id,
+                            ns,
+                            collectionUuid,
+                            [diff],
+                        );
                     }
                 }
             }
@@ -351,7 +380,13 @@ export var QuerySamplingUtil = (function () {
      * 'sampleId' for the collection 'ns', and then asserts that the diff in that document matches
      * one of the diffs in 'expectedSampledDiffs'.
      */
-    function assertSoonSingleSampledDiffDocument(conn, sampleId, ns, collectionUuid, expectedSampledDiffs) {
+    function assertSoonSingleSampledDiffDocument(
+        conn,
+        sampleId,
+        ns,
+        collectionUuid,
+        expectedSampledDiffs,
+    ) {
         const coll = conn.getCollection(kSampledQueriesDiffNs);
 
         assert.soon(() => {

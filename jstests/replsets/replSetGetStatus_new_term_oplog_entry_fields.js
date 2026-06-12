@@ -15,7 +15,11 @@ rst.awaitReplication();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 stopServerReplication(rst.nodes);
@@ -38,7 +42,10 @@ assert.eq(rst.getPrimary(), newPrimary);
 // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has the
 // 'newTermStartDate' field once the transition to primary is complete.
 let res = assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
-assert(res.electionCandidateMetrics, () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+assert(
+    res.electionCandidateMetrics,
+    () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res),
+);
 assert(
     res.electionCandidateMetrics.newTermStartDate,
     () =>
@@ -62,7 +69,10 @@ rst.awaitLastOpCommitted();
 // 'wMajorityWriteAvailabilityDate' field once the new term oplog entry is in the committed
 // snapshot.
 res = assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
-assert(res.electionCandidateMetrics, () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+assert(
+    res.electionCandidateMetrics,
+    () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res),
+);
 assert(
     res.electionCandidateMetrics.wMajorityWriteAvailabilityDate,
     () =>

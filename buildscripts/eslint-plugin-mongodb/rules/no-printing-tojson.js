@@ -49,7 +49,10 @@ export default {
                             node.callee.name
                         }(). Consider using toJsonForLog() instead or disable this rule by adding '// eslint-disable-next-line mongodb/no-printing-tojson'`,
                         fix(fixer) {
-                            return fixer.replaceTextRange([arg.callee.start, arg.callee.end], "toJsonForLog");
+                            return fixer.replaceTextRange(
+                                [arg.callee.start, arg.callee.end],
+                                "toJsonForLog",
+                            );
                         },
                     });
                 });

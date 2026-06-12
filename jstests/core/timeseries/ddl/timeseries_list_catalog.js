@@ -29,7 +29,9 @@ const timeFieldName = "timestamp";
 const metaFieldName = "metadata";
 
 function validateCollectionMetadata(coll, metadata, onAdminDB) {
-    jsTest.log(`Context | nss: ${coll.getFullName()}, tracked: ${isTrackedTimeseries(coll)}, onAdminDB: ${onAdminDB}`);
+    jsTest.log(
+        `Context | nss: ${coll.getFullName()}, tracked: ${isTrackedTimeseries(coll)}, onAdminDB: ${onAdminDB}`,
+    );
     jsTest.log(`Collection metadata: ${tojson(metadata)}`);
     if (metadata.name != getTimeseriesBucketsColl(coll).getName()) {
         assert.eq("timeseries", metadata.type);
@@ -65,7 +67,9 @@ function validateListCatalog(coll, listCatalogRes, onAdminDB, collExists) {
         );
         validateCollectionMetadata(coll, listCatalogRes[0], onAdminDB);
     } else {
-        listCatalogRes.forEach((listCatalogEntry) => validateCollectionMetadata(coll, listCatalogEntry, onAdminDB));
+        listCatalogRes.forEach((listCatalogEntry) =>
+            validateCollectionMetadata(coll, listCatalogEntry, onAdminDB),
+        );
     }
 }
 function testListCatalog(coll, collExists) {
@@ -113,7 +117,11 @@ function testListCatalog(coll, collExists) {
 const coll = db[collName];
 testListCatalog(coll, false /* collExists */);
 
-assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    db.createCollection(collName, {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
+);
 testListCatalog(coll, true /* collExists */);
 
 TimeseriesTest.insertManyDocs(coll);

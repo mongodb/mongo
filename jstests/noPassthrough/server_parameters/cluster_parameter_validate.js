@@ -16,7 +16,9 @@ function runTest(conn) {
     );
 
     assert.commandWorked(
-        db.adminCommand({setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1)}}}),
+        db.adminCommand({
+            setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1)}},
+        }),
     );
 
     assert.commandFailedWithCode(

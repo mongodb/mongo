@@ -20,7 +20,11 @@ const lsid = UUID();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    priConn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    priConn.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Insert something into the user collection.

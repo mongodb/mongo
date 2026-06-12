@@ -37,7 +37,9 @@ function coordinateMultiUpdateShell() {
     return startParallelShell(
         funWithArgs(
             function (dbName, collName) {
-                const databaseVersion = assert.commandWorked(db.adminCommand({getDatabaseVersion: dbName})).dbVersion;
+                const databaseVersion = assert.commandWorked(
+                    db.adminCommand({getDatabaseVersion: dbName}),
+                ).dbVersion;
                 assert.commandWorked(
                     db.adminCommand({
                         _shardsvrCoordinateMultiUpdate: `${dbName}.${collName}`,
@@ -45,7 +47,9 @@ function coordinateMultiUpdateShell() {
                         databaseVersion,
                         command: {
                             update: collName,
-                            updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}],
+                            updates: [
+                                {q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true},
+                            ],
                         },
                     }),
                 );
@@ -57,7 +61,10 @@ function coordinateMultiUpdateShell() {
     );
 }
 
-const coordinatorCleaningUpFailpoint = configureFailPoint(shard0Primary, "hangBeforeRemovingCoordinatorDocument");
+const coordinatorCleaningUpFailpoint = configureFailPoint(
+    shard0Primary,
+    "hangBeforeRemovingCoordinatorDocument",
+);
 
 const awaitMultiUpdate = coordinateMultiUpdateShell();
 coordinatorCleaningUpFailpoint.wait();

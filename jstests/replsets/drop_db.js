@@ -55,7 +55,11 @@ checkWriteConcern(
 
 primaryDB.createCollection(collName);
 checkWriteConcern(
-    () => assert.commandFailedWithCode(primaryDB.dropDatabase({w: 45}), ErrorCodes.UnsatisfiableWriteConcern),
+    () =>
+        assert.commandFailedWithCode(
+            primaryDB.dropDatabase({w: 45}),
+            ErrorCodes.UnsatisfiableWriteConcern,
+        ),
     (cmdObj) => {
         assert.eq(cmdObj.writeConcern, {w: 45});
     },

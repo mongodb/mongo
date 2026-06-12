@@ -99,11 +99,19 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const id = this.getIdForThread(collName);
 
         const doMultiDelete = () => {
-            const result = db.runCommand({delete: collName, deletes: [{q: {x: id}, limit: 0 /* multi:true */}]});
+            const result = db.runCommand({
+                delete: collName,
+                deletes: [{q: {x: id}, limit: 0 /* multi:true */}],
+            });
             assert.commandWorked(result);
 
             jsTest.log(
-                "tid:" + this.tid + " multiDelete _id: " + id + " at operationTime: " + tojson(result.operationTime),
+                "tid:" +
+                    this.tid +
+                    " multiDelete _id: " +
+                    id +
+                    " at operationTime: " +
+                    tojson(result.operationTime),
             );
         };
 
@@ -178,7 +186,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             }
 
             jsTest.log(
-                "changeStream event: operationType: " + event.operationType + "; _id: " + tojson(event.documentKey),
+                "changeStream event: operationType: " +
+                    event.operationType +
+                    "; _id: " +
+                    tojson(event.documentKey),
             );
 
             if (TestData.runInsideTransaction) {
@@ -189,7 +200,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                     const nextOperationForTid = operationsByTid[tid][0];
                     if (
                         nextOperationForTid &&
-                        nextOperationForTid.operationDetails.operationType === event.operationType &&
+                        nextOperationForTid.operationDetails.operationType ===
+                            event.operationType &&
                         nextOperationForTid.operationDetails.documentId === event.documentKey._id
                     ) {
                         found = true;
@@ -216,7 +228,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 if (event.operationType === "delete") {
                     assert(
                         !seenDeletes.includes(event.documentKey._id),
-                        "Found duplicate change stream event for delete on _id: " + event.documentKey._id,
+                        "Found duplicate change stream event for delete on _id: " +
+                            event.documentKey._id,
                     );
                     seenDeletes.push(event.documentKey._id);
                 } else if (event.operationType === "update") {
@@ -301,18 +314,27 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             previousWritePeriodicNoopsOnConfigServer = res.was;
         });
 
-        let startAtOperationTime = Timestamp(this.startAtOperationTime.t, this.startAtOperationTime.i);
+        let startAtOperationTime = Timestamp(
+            this.startAtOperationTime.t,
+            this.startAtOperationTime.i,
+        );
         checkChangeStream(db, collName, startAtOperationTime);
 
         // Restore the original configuration.
         cluster.executeOnMongodNodes((db) => {
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnShards}),
+                db.adminCommand({
+                    setParameter: 1,
+                    writePeriodicNoops: previousWritePeriodicNoopsOnShards,
+                }),
             );
         });
         cluster.executeOnConfigNodes((db) => {
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnConfigServer}),
+                db.adminCommand({
+                    setParameter: 1,
+                    writePeriodicNoops: previousWritePeriodicNoopsOnConfigServer,
+                }),
             );
         });
 

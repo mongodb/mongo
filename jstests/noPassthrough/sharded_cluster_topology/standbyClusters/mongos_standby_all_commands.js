@@ -162,7 +162,11 @@ const allCommands = {
     findAndModify: {
         command: {findAndModify: collName, query: {x: 1}, update: {$set: {x: 99}}},
     },
-    flushRouterConfig: {command: {flushRouterConfig: 1}, isAdminCommand: true, standbyAllowed: true},
+    flushRouterConfig: {
+        command: {flushRouterConfig: 1},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     fsync: {command: {fsync: 1}, isAdminCommand: true},
     fsyncUnlock: {command: {fsyncUnlock: 1}, isAdminCommand: true},
     getAuditConfig: {command: {getAuditConfig: 1}, isAdminCommand: true},
@@ -173,14 +177,26 @@ const allCommands = {
     getCmdLineOpts: {command: {getCmdLineOpts: 1}, isAdminCommand: true, standbyAllowed: true},
     getDatabaseVersion: {command: {getDatabaseVersion: dbName}, isAdminCommand: true},
     getDefaultRWConcern: {command: {getDefaultRWConcern: 1}, isAdminCommand: true},
-    getDiagnosticData: {command: {getDiagnosticData: 1}, isAdminCommand: true, standbyAllowed: true},
+    getDiagnosticData: {
+        command: {getDiagnosticData: 1},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     getLog: {command: {getLog: "global"}, isAdminCommand: true, standbyAllowed: true},
     getMore: {skip: requiresCursor},
-    getParameter: {command: {getParameter: 1, logLevel: 1}, isAdminCommand: true, standbyAllowed: true},
+    getParameter: {
+        command: {getParameter: 1, logLevel: 1},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
     getShardMap: {command: {getShardMap: 1}, isAdminCommand: true, standbyAllowed: true},
     getShardVersion: {command: {getShardVersion: fullNs}, isAdminCommand: true},
-    getTrafficRecordingStatus: {command: {getTrafficRecordingStatus: 1}, isAdminCommand: true, standbyAllowed: true},
+    getTrafficRecordingStatus: {
+        command: {getTrafficRecordingStatus: 1},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     getTransitionToDedicatedConfigServerStatus: {
         command: {getTransitionToDedicatedConfigServerStatus: 1},
         isAdminCommand: true,
@@ -191,7 +207,11 @@ const allCommands = {
     hello: {command: {hello: 1}, isAdminCommand: true, standbyAllowed: true},
     hostInfo: {command: {hostInfo: 1}, isAdminCommand: true, standbyAllowed: true},
     insert: {command: {insert: collName, documents: [{_id: ObjectId()}]}},
-    invalidateUserCache: {command: {invalidateUserCache: 1}, isAdminCommand: true, standbyAllowed: true},
+    invalidateUserCache: {
+        command: {invalidateUserCache: 1},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     isdbgrid: {command: {isdbgrid: 1}, isAdminCommand: true, standbyAllowed: true},
     isMaster: {command: {isMaster: 1}, isAdminCommand: true, standbyAllowed: true},
     killAllSessions: {command: {killAllSessions: []}, isAdminCommand: true},
@@ -201,7 +221,11 @@ const allCommands = {
     killSessions: {skip: requiresParallelShell},
     listCollections: {command: {listCollections: 1}},
     listCommands: {command: {listCommands: 1}, isAdminCommand: true, standbyAllowed: true},
-    listDatabases: {command: {listDatabases: 1, nameOnly: true}, isAdminCommand: true, standbyAllowed: true},
+    listDatabases: {
+        command: {listDatabases: 1, nameOnly: true},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     listIndexes: {command: {listIndexes: collName}},
     listSearchIndexes: {skip: "requires mongot mock setup"},
     listShards: {command: {listShards: 1}, isAdminCommand: true},
@@ -324,7 +348,11 @@ const allCommands = {
         isAdminCommand: true,
     },
     setProfilingFilterGlobally: {skip: "requires special startup parameter"},
-    setParameter: {command: {setParameter: 1, quiet: 1}, isAdminCommand: true, standbyAllowed: true},
+    setParameter: {
+        command: {setParameter: 1, quiet: 1},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     setClusterParameter: {skip: "requires specific cluster parameter setup"},
     setQuerySettings: {skip: "requires specific query settings setup"},
     setUserWriteBlockMode: {
@@ -436,7 +464,9 @@ function runStandbyAllCommandsTest({configShard}) {
     assert.commandWorked(fixture.st.s.adminCommand({shardCollection: fullNs, key: {x: 1}}));
 
     // Create a second database.
-    assert.commandWorked(fixture.st.s.getDB("otherDb").getCollection("otherColl").insertOne({y: 1}));
+    assert.commandWorked(
+        fixture.st.s.getDB("otherDb").getCollection("otherColl").insertOne({y: 1}),
+    );
 
     jsTest.log.info("Transitioning to standby");
     fixture.transitionToStandby();
@@ -465,7 +495,10 @@ function runStandbyAllCommandsTest({configShard}) {
         }
 
         if (test.skip !== undefined) {
-            assert(!test.standbyAllowed, `'${cmdName}' has both skip and standbyAllowed set; pick one`);
+            assert(
+                !test.standbyAllowed,
+                `'${cmdName}' has both skip and standbyAllowed set; pick one`,
+            );
             continue;
         }
 

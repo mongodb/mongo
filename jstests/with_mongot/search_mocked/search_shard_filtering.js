@@ -51,7 +51,14 @@ assert.commandWorked(testColl.insert({_id: 14, shardKey: 100, x: "cow", y: "lore
 assert.commandWorked(testColl.createIndex({shardKey: 1}));
 
 // 'waitForDelete' is set to 'true' so that range deletion completes before we insert our orphan.
-st.shardColl(testColl, {shardKey: 1}, {shardKey: 10}, {shardKey: 10 + 1}, dbName, true /* waitForDelete */);
+st.shardColl(
+    testColl,
+    {shardKey: 1},
+    {shardKey: 10},
+    {shardKey: 10 + 1},
+    dbName,
+    true /* waitForDelete */,
+);
 
 const shard0Conn = st.rs0.getPrimary();
 const shard1Conn = st.rs1.getPrimary();
@@ -61,7 +68,11 @@ assert.eq(shard0Conn.getDB(dbName)[collName].find().itcount(), 4);
 assert.eq(testColl.find().itcount(), 8);
 
 // Insert a document into shard 0 which is not owned by that shard.
-assert.commandWorked(shard0Conn.getDB(dbName)[collName].insert({_id: 15, shardKey: 100, x: "_should be filtered out"}));
+assert.commandWorked(
+    shard0Conn
+        .getDB(dbName)
+        [collName].insert({_id: 15, shardKey: 100, x: "_should be filtered out"}),
+);
 
 // Verify that the orphaned document exists on shard0, but that it gets filtered out when
 // querying 'testColl'.
@@ -165,7 +176,10 @@ cursorId++;
 s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
 cursorId++;
 mockPlanShardedSearchResponse(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
-assert.eq(testColl.aggregate([{$search: mongotQuery}], {cursor: {batchSize: 1}}).toArray(), expectedDocs);
+assert.eq(
+    testColl.aggregate([{$search: mongotQuery}], {cursor: {batchSize: 1}}).toArray(),
+    expectedDocs,
+);
 
 // Test $lookup and $unionWith with $search to ensure shard filtering works in a sub-pipeline.
 // Set up base coll to test shard filtering works within subpipelines.
@@ -193,12 +207,32 @@ s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
 cursorId++;
 s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
 cursorId++;
-mockPlanShardedSearchResponseOnConn(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock, shard0Conn);
-mockPlanShardedSearchResponseOnConn(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock, shard1Conn);
+mockPlanShardedSearchResponseOnConn(
+    collName,
+    mongotQuery,
+    dbName,
+    undefined /*sortSpec*/,
+    stWithMock,
+    shard0Conn,
+);
+mockPlanShardedSearchResponseOnConn(
+    collName,
+    mongotQuery,
+    dbName,
+    undefined /*sortSpec*/,
+    stWithMock,
+    shard1Conn,
+);
 
 const lookupResult = baseColl
     .aggregate([
-        {$lookup: {from: collName, pipeline: [{$search: mongotQuery}, {$sort: {_id: 1}}], as: "searchResults"}},
+        {
+            $lookup: {
+                from: collName,
+                pipeline: [{$search: mongotQuery}, {$sort: {_id: 1}}],
+                as: "searchResults",
+            },
+        },
         {$sort: {_id: 1}},
     ])
     .toArray();
@@ -249,7 +283,10 @@ mockPlanShardedSearchResponseOnConn(
 );
 
 const unionWithResult = baseColl
-    .aggregate([{$unionWith: {coll: collName, pipeline: [{$search: mongotQuery}]}}, {$sort: {_id: 1}}])
+    .aggregate([
+        {$unionWith: {coll: collName, pipeline: [{$search: mongotQuery}]}},
+        {$sort: {_id: 1}},
+    ])
     .toArray();
 
 // Expected result: base collection documents + search results (with orphan filtered out).

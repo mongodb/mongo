@@ -64,10 +64,15 @@ hangDuringSetParameterUpdate.off();
 awaitSetParameter();
 
 // Verify that setParameter took effect.
-const mirrorReadsParam = secondary.getDB("admin").runCommand({getParameter: 1, mirrorReads: 1}).mirrorReads;
+const mirrorReadsParam = secondary
+    .getDB("admin")
+    .runCommand({getParameter: 1, mirrorReads: 1}).mirrorReads;
 assert.eq(mirrorReadsParam.targetedMirroring.tag, {Foo: "Baz"});
 
-assert(checkProgram(secondary.pid).alive, "Expected secondary to remain alive after stale-config race window");
+assert(
+    checkProgram(secondary.pid).alive,
+    "Expected secondary to remain alive after stale-config race window",
+);
 
 rst.awaitSecondaryNodes();
 rst.stopSet();

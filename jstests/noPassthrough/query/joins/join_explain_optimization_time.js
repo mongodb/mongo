@@ -22,7 +22,9 @@ describe("optimizationTimeMillis with join optimization", function () {
     assert.neq(conn, null, "mongod failed to start up");
 
     // Enable join optimization.
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+    );
 
     const db = conn.getDB(jsTestName());
     const coll = db[jsTestName()];
@@ -93,14 +95,22 @@ describe("optimizationTimeMillis with join optimization", function () {
             "optimizationTimeMillis missing from queryPlanner",
             {queryPlanner},
         );
-        assert.gte(queryPlanner.optimizationTimeMillis, 0, "optimizationTimeMillis must be non-negative", {
-            queryPlanner,
-        });
+        assert.gte(
+            queryPlanner.optimizationTimeMillis,
+            0,
+            "optimizationTimeMillis must be non-negative",
+            {
+                queryPlanner,
+            },
+        );
     });
 
     it("reports optimizationTimeMicros and optimizationTimeNanos >= injected delay when nanos knob is enabled", function () {
         assert.commandWorked(
-            conn.adminCommand({setParameter: 1, internalMeasureQueryExecutionTimeInNanoseconds: true}),
+            conn.adminCommand({
+                setParameter: 1,
+                internalMeasureQueryExecutionTimeInNanoseconds: true,
+            }),
         );
         const fp = configureFailPoint(conn, "sleepWhileJoinOptimizing", {ms: kSleepMs});
         try {
@@ -131,7 +141,10 @@ describe("optimizationTimeMillis with join optimization", function () {
         } finally {
             fp.off();
             assert.commandWorked(
-                conn.adminCommand({setParameter: 1, internalMeasureQueryExecutionTimeInNanoseconds: false}),
+                conn.adminCommand({
+                    setParameter: 1,
+                    internalMeasureQueryExecutionTimeInNanoseconds: false,
+                }),
             );
         }
     });

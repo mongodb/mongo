@@ -11,7 +11,9 @@ const st = new ShardingTest({name: "union_with_read_pref", mongos: 1, shards: 2,
 const dbName = jsTestName() + "_db";
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
-assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 
 const mongosColl = mongosDB[jsTestName()];
 const unionedColl = mongosDB.union_target;
@@ -27,9 +29,13 @@ for (let rs of [st.rs0, st.rs1]) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(
+        primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}),
+    );
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}),
+    );
 }
 
 // Write a document to each chunk.
@@ -56,7 +62,9 @@ assert.commandWorked(
 let unionWithComment = "union against primary";
 assert.eq(
     mongosColl
-        .aggregate([{$unionWith: unionedColl.getName()}, {$sort: {docNum: 1}}], {comment: unionWithComment})
+        .aggregate([{$unionWith: unionedColl.getName()}, {$sort: {docNum: 1}}], {
+            comment: unionWithComment,
+        })
         .toArray(),
     [
         {_id: -1, docNum: 0},

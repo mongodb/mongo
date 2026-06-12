@@ -22,19 +22,27 @@ const metaField = "mt";
 const controlTimeField = `control.min.${timeField}`;
 
 const getConfigGranularity = function (db) {
-    return db.getSiblingDB("config").collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+    return db
+        .getSiblingDB("config")
+        .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
         .timeseriesFields.granularity;
 };
 const getConfigMaxSpanSeconds = function (db) {
-    return db.getSiblingDB("config").collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+    return db
+        .getSiblingDB("config")
+        .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
         .timeseriesFields.bucketMaxSpanSeconds;
 };
 const getConfigRoundingSeconds = function (db) {
-    return db.getSiblingDB("config").collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+    return db
+        .getSiblingDB("config")
+        .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
         .timeseriesFields.bucketRoundingSeconds;
 };
 const getHasMixedSchemaData = function (db) {
-    return db.getSiblingDB("config").collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+    return db
+        .getSiblingDB("config")
+        .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
         .timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData;
 };
 
@@ -46,7 +54,9 @@ const checkConfigParametersAfterCollMod = function () {
     const db = mongos.getDB(dbName);
 
     // Create and shard the time-series collection.
-    assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
     assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
     assert.commandWorked(
         mongos.adminCommand({
@@ -68,7 +78,10 @@ const checkConfigParametersAfterCollMod = function () {
     assert.commandWorked(
         db.runCommand({
             collMod: collName,
-            timeseries: {bucketMaxSpanSeconds: currentMaxSpan, bucketRoundingSeconds: currentMaxSpan},
+            timeseries: {
+                bucketMaxSpanSeconds: currentMaxSpan,
+                bucketRoundingSeconds: currentMaxSpan,
+            },
         }),
     );
     assert.isnull(getConfigGranularity(db));
@@ -91,7 +104,10 @@ const checkConfigParametersAfterCollMod = function () {
     assert.commandWorked(
         db.runCommand({
             collMod: collName,
-            timeseries: {bucketMaxSpanSeconds: currentMaxSpan, bucketRoundingSeconds: currentMaxSpan},
+            timeseries: {
+                bucketMaxSpanSeconds: currentMaxSpan,
+                bucketRoundingSeconds: currentMaxSpan,
+            },
         }),
     );
     assert.isnull(getConfigGranularity(db));
@@ -117,7 +133,10 @@ const checkConfigParametersAfterCollMod = function () {
     assert.commandFailedWithCode(
         db.runCommand({
             collMod: collName,
-            timeseries: {bucketMaxSpanSeconds: currentMaxSpan - 1, bucketRoundingSeconds: currentMaxSpan - 1},
+            timeseries: {
+                bucketMaxSpanSeconds: currentMaxSpan - 1,
+                bucketRoundingSeconds: currentMaxSpan - 1,
+            },
         }),
         ErrorCodes.InvalidOptions,
     );
@@ -131,7 +150,10 @@ const checkConfigParametersAfterCollMod = function () {
     assert.commandWorked(
         db.runCommand({
             collMod: collName,
-            timeseries: {bucketMaxSpanSeconds: currentMaxSpan, bucketRoundingSeconds: currentMaxSpan},
+            timeseries: {
+                bucketMaxSpanSeconds: currentMaxSpan,
+                bucketRoundingSeconds: currentMaxSpan,
+            },
         }),
     );
     assert.isnull(getConfigGranularity(db));
@@ -141,7 +163,9 @@ const checkConfigParametersAfterCollMod = function () {
     if (FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
         // 7. Set timeseriesBucketsMayHaveMixedSchemaData flag
         assert(!getHasMixedSchemaData(db));
-        assert.commandWorked(db.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+        assert.commandWorked(
+            db.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}),
+        );
         assert(getHasMixedSchemaData(db));
     }
 
@@ -159,7 +183,9 @@ const checkShardRoutingAfterCollMod = function () {
     const shard1 = st.shard1;
     const db = mongos0.getDB(dbName);
 
-    assert.commandWorked(mongos0.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
+    assert.commandWorked(
+        mongos0.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}),
+    );
     // Create and shard a time-series collection using custom bucketing parameters.
     assert.commandWorked(
         db.createCollection(collName, {
@@ -182,7 +208,10 @@ const checkShardRoutingAfterCollMod = function () {
     //       shard0                  shard1
     const splitChunk = {[controlTimeField]: ISODate("2022-01-01 09:00:00")};
     assert.commandWorked(
-        mongos0.adminCommand({split: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`, middle: splitChunk}),
+        mongos0.adminCommand({
+            split: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`,
+            middle: splitChunk,
+        }),
     );
     assert.commandWorked(
         mongos0.adminCommand({
@@ -199,7 +228,10 @@ const checkShardRoutingAfterCollMod = function () {
 
     function assertDocumentOnShard(shard, _id) {
         const shardDb = shard.getDB(dbName);
-        const buckets = getTimeseriesCollForRawOps(shardDb, shardDb.getCollection(collName)).find().rawData().toArray();
+        const buckets = getTimeseriesCollForRawOps(shardDb, shardDb.getCollection(collName))
+            .find()
+            .rawData()
+            .toArray();
 
         // If we are writing to time-series collections using the compressed format, the data fields
         // will be compressed. We need to decompress the buckets on the shard in order to inspect
@@ -249,7 +281,9 @@ const checkShardRoutingAfterCollMod = function () {
     // While the collMod command on the config server is still being processed, inserts on the
     // collection should be blocked.
     assert.commandFailedWithCode(
-        mongos0.getDB(dbName).runCommand({insert: collName, documents: [{[timeField]: ISODate()}], maxTimeMS: 2000}),
+        mongos0
+            .getDB(dbName)
+            .runCommand({insert: collName, documents: [{[timeField]: ISODate()}], maxTimeMS: 2000}),
         ErrorCodes.MaxTimeMSExpired,
     );
     assert.commandFailedWithCode(

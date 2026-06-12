@@ -24,14 +24,18 @@ export var testDDLOps = function (st) {
     let shard0NumChunks = configDB.chunks.find({shard: shard0Name}).toArray().length;
     let shard1NumChunks = configDB.chunks.find({shard: shard1Name}).toArray().length;
 
-    assert.commandWorked(st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: shard0Name}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: shard0Name}),
+    );
 
     let newShard0NumChunks = configDB.chunks.find({shard: shard0Name}).toArray().length;
     let newShard1NumChunks = configDB.chunks.find({shard: shard1Name}).toArray().length;
     assert.eq(newShard0NumChunks, shard0NumChunks + 1);
     assert.eq(newShard1NumChunks, shard1NumChunks - 1);
 
-    assert.commandWorked(st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: shard1Name}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: shard1Name}),
+    );
 
     // shardCollection
     assert.eq(null, configDB.collections.findOne({_id: "sharded.apple"}));
@@ -39,7 +43,13 @@ export var testDDLOps = function (st) {
     assert.eq(1, configDB.collections.find({_id: "sharded.apple"}).toArray().length);
 
     // renameCollection
-    assert.commandWorked(st.s.adminCommand({renameCollection: "sharded.apple", to: "sharded.pear", dropTarget: true}));
+    assert.commandWorked(
+        st.s.adminCommand({
+            renameCollection: "sharded.apple",
+            to: "sharded.pear",
+            dropTarget: true,
+        }),
+    );
     assert.eq(null, configDB.collections.findOne({_id: "sharded.apple"}));
     assert.eq(1, configDB.collections.find({_id: "sharded.pear"}).toArray().length);
 

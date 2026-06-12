@@ -13,7 +13,9 @@ const collName = jsTestName();
 const bucketsCollName = "system.buckets." + collName;
 
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time", granularity: "seconds"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "time", granularity: "seconds"}}),
+);
 
 // drop on system.buckets.* is rejected.
 assert.commandFailedWithCode(

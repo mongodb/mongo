@@ -3,7 +3,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const sharded = new ShardingTest({mongos: 1, shards: 2});
 
-assert.commandWorked(sharded.s.adminCommand({enableSharding: "test", primaryShard: sharded.shard0.shardName}));
+assert.commandWorked(
+    sharded.s.adminCommand({enableSharding: "test", primaryShard: sharded.shard0.shardName}),
+);
 
 const coll = sharded.s.getDB("test").mainColl;
 const foreignColl = sharded.s.getDB("test").foreignColl;
@@ -15,8 +17,12 @@ const nDocsForeignColl = 2 * nDocsMainColl;
 for (let i = 0; i < nDocsMainColl; i++) {
     assert.commandWorked(coll.insert({_id: i, collName: "mainColl", foreignId: i}));
 
-    assert.commandWorked(foreignColl.insert({_id: 2 * i, key: i, collName: "foreignColl", data: "hello-0"}));
-    assert.commandWorked(foreignColl.insert({_id: 2 * i + 1, key: i, collName: "foreignColl", data: "hello-1"}));
+    assert.commandWorked(
+        foreignColl.insert({_id: 2 * i, key: i, collName: "foreignColl", data: "hello-0"}),
+    );
+    assert.commandWorked(
+        foreignColl.insert({_id: 2 * i + 1, key: i, collName: "foreignColl", data: "hello-1"}),
+    );
 }
 assert.commandWorked(smallColl.insert({_id: 0, collName: "smallColl"}));
 

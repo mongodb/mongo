@@ -45,7 +45,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 },
             },
             {
-                $merge: {into: this.collWithMigrations, whenMatched: "fail", whenNotMatched: "insert"},
+                $merge: {
+                    into: this.collWithMigrations,
+                    whenMatched: "fail",
+                    whenNotMatched: "insert",
+                },
             },
         ]);
 
@@ -93,9 +97,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                             defaultValue +
                             ".",
                     );
-                    initialMaxCatchUpPercentageBeforeBlockingWrites = param.maxCatchUpPercentageBeforeBlockingWrites;
+                    initialMaxCatchUpPercentageBeforeBlockingWrites =
+                        param.maxCatchUpPercentageBeforeBlockingWrites;
                     assert.commandWorked(
-                        db.adminCommand({setParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: defaultValue}),
+                        db.adminCommand({
+                            setParameter: 1,
+                            maxCatchUpPercentageBeforeBlockingWrites: defaultValue,
+                        }),
                     );
                 }
             }
@@ -112,7 +120,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 assert.commandWorked(
                     db.adminCommand({
                         setParameter: 1,
-                        maxCatchUpPercentageBeforeBlockingWrites: initialMaxCatchUpPercentageBeforeBlockingWrites,
+                        maxCatchUpPercentageBeforeBlockingWrites:
+                            initialMaxCatchUpPercentageBeforeBlockingWrites,
                     }),
                 );
             });

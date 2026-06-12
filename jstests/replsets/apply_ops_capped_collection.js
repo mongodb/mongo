@@ -35,7 +35,9 @@ assert.commandWorked(db.runCommand({applyOps: ops}));
 
 // Test that capped deletes via applyOps are permitted.
 assert.commandWorked(
-    db.runCommand({applyOps: [{op: "d", ns: nss(dbName, collName), ts: Timestamp(20, 0), o: {_id: 19}}]}),
+    db.runCommand({
+        applyOps: [{op: "d", ns: nss(dbName, collName), ts: Timestamp(20, 0), o: {_id: 19}}],
+    }),
 );
 
 rst.stopSet();

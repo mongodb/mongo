@@ -79,14 +79,22 @@ function _runCommandWithRetry(conn, commandName, commandObj, func, makeFuncArgs)
 }
 
 // TODO SERVER-117477: remove special handling of TimeseriesInterruptedDueToTimeseriesUpgradeDowngrade once 9.0 becomes last LTS
-function _runCommandWithTimeseriesErrorInterception(conn, commandName, commandObj, func, makeFuncArgs) {
+function _runCommandWithTimeseriesErrorInterception(
+    conn,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     let cmdResponse = func.apply(conn, makeFuncArgs(commandObj));
 
     if (
         (cmdResponse.hasOwnProperty("code") &&
             cmdResponse.code === ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade) ||
         (cmdResponse.hasOwnProperty("writeErrors") &&
-            cmdResponse.writeErrors.some((werr) => werr.code === ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade))
+            cmdResponse.writeErrors.some(
+                (werr) => werr.code === ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade,
+            ))
     ) {
         jsTest.log.info(
             `Intercepted InterruptedDueToTimeseriesUpgradeDowngrade on command` +
@@ -114,9 +122,10 @@ function isRetryableWritesSuiteCached(conn) {
 let _runningWithViewlessTimeseriesUpgradeDowngradeCached = null;
 function runningWithViewlessTimeseriesUpgradeDowngradeCached(conn) {
     if (_runningWithViewlessTimeseriesUpgradeDowngradeCached === null) {
-        _runningWithViewlessTimeseriesUpgradeDowngradeCached = OverrideHelpers.withPreOverrideRunCommand(() =>
-            runningWithViewlessTimeseriesUpgradeDowngrade(conn.getDB("admin")),
-        );
+        _runningWithViewlessTimeseriesUpgradeDowngradeCached =
+            OverrideHelpers.withPreOverrideRunCommand(() =>
+                runningWithViewlessTimeseriesUpgradeDowngrade(conn.getDB("admin")),
+            );
     }
     return _runningWithViewlessTimeseriesUpgradeDowngradeCached;
 }
@@ -131,8 +140,17 @@ function runCommandWithRetry(conn, dbName, commandName, commandObj, func, makeFu
     }
 
     // TODO SERVER-117477: remove special handling of TimeseriesInterruptedDueToTimeseriesUpgradeDowngrade once 9.0 becomes last LTS
-    if (!isRetryableWritesSuiteCached(conn) && runningWithViewlessTimeseriesUpgradeDowngradeCached(conn)) {
-        return _runCommandWithTimeseriesErrorInterception(conn, commandName, commandObj, func, makeFuncArgs);
+    if (
+        !isRetryableWritesSuiteCached(conn) &&
+        runningWithViewlessTimeseriesUpgradeDowngradeCached(conn)
+    ) {
+        return _runCommandWithTimeseriesErrorInterception(
+            conn,
+            commandName,
+            commandObj,
+            func,
+            makeFuncArgs,
+        );
     }
 
     return func.apply(conn, makeFuncArgs(commandObj));

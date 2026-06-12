@@ -158,7 +158,11 @@ function testCommandIsNonDeprioritizable(shardConn, testCase) {
     // Check that the counter increased
     const afterCount = getTotalMarkedNonDeprioritizableCount(shardPrimary);
     jsTest.log.info(`  NonDeprioritizable count after: ${afterCount}`);
-    assert.gt(afterCount, beforeCount, `Command '${testCase.name}' should increment NonDeprioritizable counter`);
+    assert.gt(
+        afterCount,
+        beforeCount,
+        `Command '${testCase.name}' should increment NonDeprioritizable counter`,
+    );
 
     jsTest.log.info(`  PASSED: ${testCase.name}`);
 }
@@ -184,7 +188,9 @@ function runShardLocalTests() {
     /// TODO (SERVER-116499): Remove the following timeseries collections once 9.0 becomes last LTS.
     // Create both untracked and tracked timeseries collections to be used in the timeseries upgrade/downgrade commit test cases.
     const testDB = st.s.getDB("testDB");
-    assert.commandWorked(testDB.createCollection(kUntrackedTimeseriesColl, {timeseries: {timeField: "t"}}));
+    assert.commandWorked(
+        testDB.createCollection(kUntrackedTimeseriesColl, {timeseries: {timeField: "t"}}),
+    );
     assert.commandWorked(
         testDB.runCommand({
             createUnsplittableCollection: kTrackedTimeseriesColl,
@@ -218,8 +224,13 @@ function runShardLocalTests() {
             }
             // _flushDatabaseCacheUpdates is deprecated and rejected when AuthoritativeShardsCRUD
             // is enabled, because shards no longer rely on config.cache.databases in that mode.
-            if (authoritativeShardsCRUDEnabled && testCase.name === "SSCCL database cache refresh") {
-                jsTest.log.info("Skipping 'SSCCL database cache refresh' because AuthoritativeShardsCRUD is enabled");
+            if (
+                authoritativeShardsCRUDEnabled &&
+                testCase.name === "SSCCL database cache refresh"
+            ) {
+                jsTest.log.info(
+                    "Skipping 'SSCCL database cache refresh' because AuthoritativeShardsCRUD is enabled",
+                );
                 continue;
             }
 

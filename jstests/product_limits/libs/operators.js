@@ -32,7 +32,10 @@ export class WorkloadSwitch extends PipelineWorkload {
             branches.push({case: {$ne: [`$f${i}`, i]}, then: i});
         }
 
-        return [{$project: {"result": {$switch: {branches: branches, default: "no match"}}}}, {$unset: "_id"}];
+        return [
+            {$project: {"result": {$switch: {branches: branches, default: "no match"}}}},
+            {$unset: "_id"},
+        ];
     }
 
     result() {

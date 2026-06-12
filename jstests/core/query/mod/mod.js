@@ -145,16 +145,28 @@ assert.eq(0, coll.find({s: {$mod: [10, 1]}}).itcount());
 assert.eq(0, coll.find({noField: {$mod: [10, 1]}}).itcount());
 
 // Check divide by zero.
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [0, 1]}}}), ErrorCodes.BadValue);
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [0, 0]}}}), ErrorCodes.BadValue);
-
-// Check failures with different data types.
 assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), filter: {a: {$mod: [NumberDecimal(0.001), NumberDecimal(1.001)]}}}),
+    db.runCommand({find: coll.getName(), filter: {a: {$mod: [0, 1]}}}),
     ErrorCodes.BadValue,
 );
 assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), filter: {a: {$mod: [NumberInt(1), NumberInt(0), NumberInt(0)]}}}),
+    db.runCommand({find: coll.getName(), filter: {a: {$mod: [0, 0]}}}),
+    ErrorCodes.BadValue,
+);
+
+// Check failures with different data types.
+assert.commandFailedWithCode(
+    db.runCommand({
+        find: coll.getName(),
+        filter: {a: {$mod: [NumberDecimal(0.001), NumberDecimal(1.001)]}},
+    }),
+    ErrorCodes.BadValue,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        find: coll.getName(),
+        filter: {a: {$mod: [NumberInt(1), NumberInt(0), NumberInt(0)]}},
+    }),
     ErrorCodes.BadValue,
 );
 assert.commandFailedWithCode(
@@ -162,7 +174,10 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue,
 );
 assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), filter: {a: {$mod: [NumberDecimal(0), NumberDecimal(0)]}}}),
+    db.runCommand({
+        find: coll.getName(),
+        filter: {a: {$mod: [NumberDecimal(0), NumberDecimal(0)]}},
+    }),
     ErrorCodes.BadValue,
 );
 
@@ -171,10 +186,16 @@ assert.commandFailedWithCode(
     db.runCommand({find: coll.getName(), filter: {a: {$mod: [10, 1, 1]}}}),
     ErrorCodes.BadValue,
 );
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [10]}}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({find: coll.getName(), filter: {a: {$mod: [10]}}}),
+    ErrorCodes.BadValue,
+);
 
 // Check remainder, divisor not a number.
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: ["a", 0]}}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({find: coll.getName(), filter: {a: {$mod: ["a", 0]}}}),
+    ErrorCodes.BadValue,
+);
 assert.commandFailedWithCode(
     db.runCommand({find: coll.getName(), filter: {a: {$mod: ["a", "b"]}}}),
     ErrorCodes.BadValue,

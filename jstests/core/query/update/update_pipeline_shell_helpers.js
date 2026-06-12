@@ -80,16 +80,22 @@ assert(arrayEq(observedResults, expectedResults));
 
 // Test that findAndModify and associated helpers correctly handle pipeline syntax.
 const expectedFindAndModifyPostImage = Object.merge(expectedResults[0], {findAndModify: true});
-const expectedFindOneAndUpdatePostImage = Object.merge(expectedFindAndModifyPostImage, {findOneAndUpdate: true});
+const expectedFindOneAndUpdatePostImage = Object.merge(expectedFindAndModifyPostImage, {
+    findOneAndUpdate: true,
+});
 const findAndModifyPostImage = testColl.findAndModify({
     query: {_id: 1},
     update: [{$set: {findAndModify: true}}],
     new: true,
 });
 assert.docEq(expectedFindAndModifyPostImage, findAndModifyPostImage);
-const findOneAndUpdatePostImage = testColl.findOneAndUpdate({_id: 1}, [{$set: {findOneAndUpdate: true}}], {
-    returnNewDocument: true,
-});
+const findOneAndUpdatePostImage = testColl.findOneAndUpdate(
+    {_id: 1},
+    [{$set: {findOneAndUpdate: true}}],
+    {
+        returnNewDocument: true,
+    },
+);
 assert.docEq(expectedFindOneAndUpdatePostImage, findOneAndUpdatePostImage);
 
 //
@@ -141,4 +147,6 @@ if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
 // Shell helpers for replacement updates should reject pipeline-style updates.
 assert.throws(() => testColl.replaceOne({_id: 1}, [{$replaceWith: {}}]));
 assert.throws(() => testColl.findOneAndReplace({_id: 1}, [{$replaceWith: {}}]));
-assert.throws(() => testColl.bulkWrite([{replaceOne: {filter: {_id: 1}, replacement: [{$replaceWith: {}}]}}]));
+assert.throws(() =>
+    testColl.bulkWrite([{replaceOne: {filter: {_id: 1}, replacement: [{$replaceWith: {}}]}}]),
+);

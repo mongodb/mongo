@@ -20,7 +20,9 @@ let count = 0;
 const runTest = function (write, numExpectedDocs) {
     const coll = db["coll_" + count++];
 
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     const uncompressedBucket = {
         _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -54,7 +56,9 @@ const runTest = function (write, numExpectedDocs) {
         },
     };
 
-    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket, getRawOperationSpec(db)));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket, getRawOperationSpec(db)),
+    );
     assert.eq(coll.find().itcount(), 2);
     assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
     assert.eq(
@@ -65,7 +69,11 @@ const runTest = function (write, numExpectedDocs) {
     assert.commandWorked(write(coll));
     assert.eq(coll.find().itcount(), numExpectedDocs);
     assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
-    assert(TimeseriesTest.isBucketCompressed(getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version));
+    assert(
+        TimeseriesTest.isBucketCompressed(
+            getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version,
+        ),
+    );
 };
 
 runTest((coll) => coll.insert({t: time, m: 0, a: 2}, {ordered: false}), 3);

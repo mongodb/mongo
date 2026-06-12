@@ -25,7 +25,10 @@ import {findMatchingLogLine} from "jstests/libs/log.js";
     function checkLogForNReturned(pipeline, pipelineComment, expectedNReturned) {
         db.coll.aggregate(pipeline, {comment: pipelineComment});
         const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-        const line = findMatchingLogLine(globalLog.log, {msg: "Slow query", comment: pipelineComment});
+        const line = findMatchingLogLine(globalLog.log, {
+            msg: "Slow query",
+            comment: pipelineComment,
+        });
         assert(line, "Failed to find a log line matching the comment " + pipelineComment);
         const nReturned = getNReturned(line);
         assert.eq(nReturned, expectedNReturned, pipelineComment + " with slow query: " + line);

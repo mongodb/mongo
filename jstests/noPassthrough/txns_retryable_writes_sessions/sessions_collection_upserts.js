@@ -91,7 +91,9 @@ let sessionIDs = [];
     assert.eq(1, ops.length);
     assert.eq(
         ops[0].o2._id,
-        implicitInsertOp.o2 && implicitInsertOp.o2._id ? implicitInsertOp.o2._id : implicitInsertOp.o._id,
+        implicitInsertOp.o2 && implicitInsertOp.o2._id
+            ? implicitInsertOp.o2._id
+            : implicitInsertOp.o._id,
     );
     assert.neq(ops[0].o.diff.u.lastUse, implicitSessionLastUse);
 })();

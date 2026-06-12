@@ -60,7 +60,9 @@ assert.commandWorked(result);
         getSingleNodeExplain(coll.explain().aggregate([{$match: {}}])),
     ];
     assert(
-        unshardedPlans.every((plan) => plan.stages.map((x) => Object.keys(x)[0]).includes("$_internalUnpackBucket")),
+        unshardedPlans.every((plan) =>
+            plan.stages.map((x) => Object.keys(x)[0]).includes("$_internalUnpackBucket"),
+        ),
     );
 
     // Shard the time-series collection.

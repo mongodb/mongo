@@ -19,7 +19,9 @@ const st = new ShardingTest({
 const dbName = "test";
 const collName = "foo";
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 let cmd = {
     bulkWrite: 1,
@@ -40,6 +42,14 @@ let checkDocuments = function (coll) {
     assert.eq(1, coll.findOne({x: 100})._id);
 };
 
-testMoveChunkWithSession(st, collName, cmd, function (coll) {}, checkRetryResult, checkDocuments, true);
+testMoveChunkWithSession(
+    st,
+    collName,
+    cmd,
+    function (coll) {},
+    checkRetryResult,
+    checkDocuments,
+    true,
+);
 
 st.stop();

@@ -8,7 +8,10 @@
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -69,7 +72,12 @@ function runTest(startChangeStream) {
         operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
         nsType: "collection",
     });
-    assertNextChangeEvent(cursor, {operationType: "insert", fullDocument: {_id: 0}, ns: ns, documentKey: {_id: 0}});
+    assertNextChangeEvent(cursor, {
+        operationType: "insert",
+        fullDocument: {_id: 0},
+        ns: ns,
+        documentKey: {_id: 0},
+    });
     assertDropCollection(testDB, collName);
     // If this test is running with secondary read preference, it's necessary for the drop to
     // propagate to all secondary nodes and be available for majority reads.
@@ -200,7 +208,9 @@ function runTest(startChangeStream) {
         cursor = startChangeStream();
 
         assert.commandWorked(testDB.adminCommand({enableSharding: ns.db}));
-        assert.commandWorked(testDB.adminCommand({shardCollection: ns.db + "." + collName, key: {a: 1}}));
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: ns.db + "." + collName, key: {a: 1}}),
+        );
 
         assertNextChangeEvent(cursor, {
             operationType: "create",

@@ -27,14 +27,18 @@ export var testMoveChunkWithSession = function (
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
     setupFunc(coll);
-    let result = assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj));
+    let result = assert.commandWorked(
+        useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj),
+    );
 
     jsTestLog("MOVECHUNK");
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
 
     checkRetryResultFunc(
         result,
-        assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj)),
+        assert.commandWorked(
+            useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj),
+        ),
     );
     checkDocumentsFunc(coll);
 
@@ -48,17 +52,25 @@ export var testMoveChunkWithSession = function (
 
     checkRetryResultFunc(
         result,
-        assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj)),
+        assert.commandWorked(
+            useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj),
+        ),
     );
     checkDocumentsFunc(coll);
 
     // Make sure that the other shard knows about the latest primary.
-    awaitRSClientHosts(st.rs0.getPrimary(), {host: st.rs1.getPrimary().host}, {ok: true, ismaster: true});
+    awaitRSClientHosts(
+        st.rs0.getPrimary(),
+        {host: st.rs1.getPrimary().host},
+        {ok: true, ismaster: true},
+    );
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard0.shardName}));
 
     checkRetryResultFunc(
         result,
-        assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj)),
+        assert.commandWorked(
+            useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj),
+        ),
     );
     checkDocumentsFunc(coll);
 };

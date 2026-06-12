@@ -41,8 +41,11 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
         errorCode,
     );
 
-    const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-    assert.isnull(collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName()));
+    const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor
+        .firstBatch;
+    assert.isnull(
+        collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName()),
+    );
     assert.isnull(collections.find((entry) => entry.name === coll.getName()));
 };
 
@@ -61,13 +64,22 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
         }),
     );
 
-    let collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
+    let collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor
+        .firstBatch;
 
-    let collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+    let collectionEntry = collections.find(
+        (entry) => entry.name === getTimeseriesBucketsColl(coll).getName(),
+    );
     assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
     if (collectionEntry) {
-        assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketRoundingSecondsTime);
-        assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsTime);
+        assert.eq(
+            collectionEntry.options.timeseries.bucketRoundingSeconds,
+            bucketRoundingSecondsTime,
+        );
+        assert.eq(
+            collectionEntry.options.timeseries.bucketMaxSpanSeconds,
+            bucketMaxSpanSecondsTime,
+        );
     }
 
     collectionEntry = collections.find((entry) => entry.name === coll.getName());
@@ -84,13 +96,17 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
                 timeseries: {
                     timeField: timeFieldName,
                     granularity: granularityTime,
-                    bucketMaxSpanSeconds: TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime),
+                    bucketMaxSpanSeconds:
+                        TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime),
                 },
             }),
         );
-        collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
+        collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor
+            .firstBatch;
 
-        collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+        collectionEntry = collections.find(
+            (entry) => entry.name === getTimeseriesBucketsColl(coll).getName(),
+        );
         assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
         if (collectionEntry) {
             assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
@@ -121,9 +137,12 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
                 },
             }),
         );
-        collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
+        collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor
+            .firstBatch;
 
-        collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+        collectionEntry = collections.find(
+            (entry) => entry.name === getTimeseriesBucketsColl(coll).getName(),
+        );
         assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
         if (collectionEntry) {
             assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
@@ -155,7 +174,9 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
     );
     collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-    collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+    collectionEntry = collections.find(
+        (entry) => entry.name === getTimeseriesBucketsColl(coll).getName(),
+    );
     assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
     if (collectionEntry) {
         assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
@@ -179,11 +200,17 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
 
     // Verify the create command fails when the 'bucketRoundingSeconds' option is set but not the
     // 'bucketMaxSpanSeconds' option.
-    verifyCreateCommandFails({bucketRoundingSeconds: bucketRoundingSecondsTime}, bucketInvalidOptionsError);
+    verifyCreateCommandFails(
+        {bucketRoundingSeconds: bucketRoundingSecondsTime},
+        bucketInvalidOptionsError,
+    );
 
     // Verify the create command fails when the 'bucketMaxSpanSeconds' option is set but not the
     // 'bucketRoundingSeconds' option.
-    verifyCreateCommandFails({bucketMaxSpanSeconds: bucketMaxSpanSecondsTime}, bucketInvalidOptionsError);
+    verifyCreateCommandFails(
+        {bucketMaxSpanSeconds: bucketMaxSpanSecondsTime},
+        bucketInvalidOptionsError,
+    );
 
     // Verify the create command fails when the 'bucketMaxSpanSeconds' option is set but not the
     // 'bucketRoundingSeconds' option (even if set to granularity default seconds value).
@@ -191,7 +218,10 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
 
     // Verify the create command fails when bucketRoundingSeconds is different than
     // bucketMaxSpanSeconds.
-    verifyCreateCommandFails({bucketRoundingSeconds: 100, bucketMaxSpanSeconds: 50}, bucketInvalidOptionsError);
+    verifyCreateCommandFails(
+        {bucketRoundingSeconds: 100, bucketMaxSpanSeconds: 50},
+        bucketInvalidOptionsError,
+    );
 
     // Verify the create command fails when granularity is set as minutes alongside
     // bucketRoundingSeconds and bucketMaxSpanSeconds and they are not the default granularity

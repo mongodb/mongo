@@ -26,4 +26,7 @@ assert.throws(function () {
 });
 
 // count must return error if collection name is absent
-assert.commandFailedWithCode(db.runCommand("count"), [ErrorCodes.InvalidNamespace, ErrorCodes.TypeMismatch]);
+assert.commandFailedWithCode(db.runCommand("count"), [
+    ErrorCodes.InvalidNamespace,
+    ErrorCodes.TypeMismatch,
+]);

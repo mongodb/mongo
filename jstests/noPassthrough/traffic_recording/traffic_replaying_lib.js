@@ -5,7 +5,9 @@
 export function createDirectories(baseDir, customSubDir) {
     const pathSep = _isWindows() ? "\\" : "/";
     const recordingDirGlobal = MongoRunner.toRealDir("$dataDir" + pathSep + baseDir);
-    const recordingDir = MongoRunner.toRealDir(recordingDirGlobal + pathSep + customSubDir + pathSep);
+    const recordingDir = MongoRunner.toRealDir(
+        recordingDirGlobal + pathSep + customSubDir + pathSep,
+    );
     jsTest.log("Creating a new directory: " + recordingDirGlobal);
     jsTest.log("Creating a new directory: " + recordingDir);
     assert(mkdir(recordingDirGlobal));
@@ -27,7 +29,10 @@ export function cleanUpDirectory(directoryPath) {
 export function recordOperations(recordingDirGlobal, customRecordingDir, opsToRecord) {
     const opts = {
         auth: "",
-        setParameter: {trafficRecordingDirectory: recordingDirGlobal, preAuthMaximumMessageSizeBytes: 16777216},
+        setParameter: {
+            trafficRecordingDirectory: recordingDirGlobal,
+            preAuthMaximumMessageSizeBytes: 16777216,
+        },
     };
     const mongodInstance = MongoRunner.runMongod(opts);
 
@@ -38,7 +43,9 @@ export function recordOperations(recordingDirGlobal, customRecordingDir, opsToRe
     adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
     adminDB.auth("admin", "pass");
 
-    assert.commandWorked(adminDB.runCommand({startTrafficRecording: 1, destination: customRecordingDir}));
+    assert.commandWorked(
+        adminDB.runCommand({startTrafficRecording: 1, destination: customRecordingDir}),
+    );
 
     const serverURI = `mongodb://admin:pass@${mongodInstance.host}/admin`;
 

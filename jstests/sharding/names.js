@@ -28,15 +28,25 @@ assert.eq(rsB.getURL(), config.shards.findOne({_id: rsA.name})["host"], "Wrong h
 assert.eq(rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong host for shard rsB");
 
 // Remove shard
-assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}), "failed to start draining shard");
-let res = assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}), "failed to remove shard");
+assert.commandWorked(
+    mongos.adminCommand({removeshard: rsA.name}),
+    "failed to start draining shard",
+);
+let res = assert.commandWorked(
+    mongos.adminCommand({removeshard: rsA.name}),
+    "failed to remove shard",
+);
 
 assert.eq(
     TestData.configShard ? 2 : 1,
     config.shards.count(),
     "Shard was not removed: " + res + "; Shards: " + tojson(config.shards.find().toArray()),
 );
-assert.eq(rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong host for shard rsB 2");
+assert.eq(
+    rsA.getURL(),
+    config.shards.findOne({_id: rsB.name})["host"],
+    "Wrong host for shard rsB 2",
+);
 
 rsA.stopSet();
 rsB.stopSet();

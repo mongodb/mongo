@@ -44,7 +44,10 @@ function readAcks(file) {
     }
 }
 
-async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution: executionOptions = {}} = {}) {
+async function runWorkloads(
+    workloads,
+    {cluster: clusterOptions = {}, execution: executionOptions = {}} = {},
+) {
     assert.gt(workloads.length, 0, "need at least one workload to run");
 
     const executionMode = {serial: true};
@@ -126,7 +129,10 @@ async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution:
         // initial clusterTime and initial operationTime for the sessions they'll create so that
         // they are guaranteed to observe the effects of the workload's $config.setup() function
         // being called.
-        if (typeof executionOptions.sessionOptions === "object" && executionOptions.sessionOptions !== null) {
+        if (
+            typeof executionOptions.sessionOptions === "object" &&
+            executionOptions.sessionOptions !== null
+        ) {
             // We only start a session for the worker threads and never start one for the main
             // thread. We can therefore get the clusterTime and operationTime tracked by the
             // underlying DummyDriverSession through any DB instance (i.e. the "test" database
@@ -139,7 +145,9 @@ async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution:
             // the JavaScript object through the Thread constructor and use eval() to
             // rehydrate it.
             executionOptions.sessionOptions.initialClusterTime = tojson(session.getClusterTime());
-            executionOptions.sessionOptions.initialOperationTime = tojson(session.getOperationTime());
+            executionOptions.sessionOptions.initialOperationTime = tojson(
+                session.getOperationTime(),
+            );
         }
 
         try {
@@ -155,7 +163,15 @@ async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution:
                 errors.push(
                     ...threadMgr
                         .joinAll()
-                        .map((e) => new WorkloadFailure(e.err, e.stack, e.tid, "Foreground " + e.workloads.join(" "))),
+                        .map(
+                            (e) =>
+                                new WorkloadFailure(
+                                    e.err,
+                                    e.stack,
+                                    e.tid,
+                                    "Foreground " + e.workloads.join(" "),
+                                ),
+                        ),
                 );
             }
         } finally {
@@ -212,7 +228,9 @@ async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution:
 }
 
 if (typeof db === "undefined") {
-    throw new Error("resmoke_runner.js must be run with the mongo shell already connected to the database");
+    throw new Error(
+        "resmoke_runner.js must be run with the mongo shell already connected to the database",
+    );
 }
 
 const clusterOptions = {
@@ -237,8 +255,10 @@ if (TestData.discoverTopology !== false) {
         clusterOptions.sharded.numMongos = topology.mongos.nodes.length;
         clusterOptions.sharded.numShards = Object.keys(topology.shards).length;
         clusterOptions.sharded.stepdownOptions = {};
-        clusterOptions.sharded.stepdownOptions.configStepdown = TestData.runningWithConfigStepdowns || false;
-        clusterOptions.sharded.stepdownOptions.shardStepdown = TestData.runningWithShardStepdowns || false;
+        clusterOptions.sharded.stepdownOptions.configStepdown =
+            TestData.runningWithConfigStepdowns || false;
+        clusterOptions.sharded.stepdownOptions.shardStepdown =
+            TestData.runningWithShardStepdowns || false;
     } else if (topology.type !== Topology.kStandalone) {
         throw new Error("Unrecognized topology format: " + tojson(topology));
     }

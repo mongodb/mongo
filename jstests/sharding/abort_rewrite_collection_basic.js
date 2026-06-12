@@ -35,7 +35,10 @@ let failpoint = configureFailPoint(st.rs1.getPrimary(), "reshardingPauseRecipien
 
 const awaitResult = startParallelShell(
     funWithArgs(function (ns) {
-        assert.commandFailedWithCode(db.adminCommand({rewriteCollection: ns}), ErrorCodes.ReshardCollectionAborted);
+        assert.commandFailedWithCode(
+            db.adminCommand({rewriteCollection: ns}),
+            ErrorCodes.ReshardCollectionAborted,
+        );
     }, ns),
     st.s.port,
 );

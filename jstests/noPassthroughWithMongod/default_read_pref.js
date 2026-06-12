@@ -41,7 +41,11 @@ try {
     db.runReadCommand({ping: 1});
     assert.eq(commandsRan.length, 1);
     assert.docEq({ping: 1}, commandsRan[0].cmd, "The command should not have been wrapped.");
-    assert.eq(commandsRan[0].opts & DBQuery.Option.slaveOk, 0, "The slaveOk bit should not be set.");
+    assert.eq(
+        commandsRan[0].opts & DBQuery.Option.slaveOk,
+        0,
+        "The slaveOk bit should not be set.",
+    );
 } finally {
     db._mongo = mongo;
     db._session = new _DummyDriverSession(mongo);

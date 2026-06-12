@@ -42,6 +42,8 @@ assert.commandFailedWithCode(
 );
 assert.commandWorked(
     viewsDB.adminCommand({
-        applyOps: [{op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}}],
+        applyOps: [
+            {op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}},
+        ],
     }),
 );

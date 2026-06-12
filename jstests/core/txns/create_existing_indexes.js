@@ -27,7 +27,9 @@ assert.commandWorked(
 jsTest.log("Testing createIndexes on an existing index in a transaction");
 session.startTransaction({writeConcern: {w: "majority"}});
 
-assert.commandWorked(sessionColl.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(
+    sessionColl.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
+);
 
 session.commitTransaction();
 

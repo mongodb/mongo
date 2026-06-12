@@ -54,7 +54,11 @@ function assertIndexBoundsAndResult(params) {
     // is important when 'internalQueryFindCommandBatchSize' is less than the result size and the
     // cursor.firstBatch returned from db.runCommand() doesn't contain all the results.
     const results = coll.find(query, projection).sort(sort).toArray();
-    assert.eq(results, params.results, "Regex query " + tojson(query) + " returned incorrect results");
+    assert.eq(
+        results,
+        params.results,
+        "Regex query " + tojson(query) + " returned incorrect results",
+    );
 
     // Check that the query regex will exactly match identical regular expression objects.
     const collRegexValue = db.getCollection(collName + params.regex);
@@ -73,8 +77,16 @@ function assertIndexBoundsAndResult(params) {
 }
 
 // An anchored regex that uses no special operators can use tight index bounds.
-assertIndexBoundsAndResult({regex: /^a/, bounds: ['["a", "b")', "[/^a/, /^a/]"], results: [{_id: "a"}, {_id: "a|b"}]});
-assertIndexBoundsAndResult({regex: /^\\/, bounds: ['["\\", "]")', "[/^\\\\/, /^\\\\/]"], results: [{_id: "\\|"}]});
+assertIndexBoundsAndResult({
+    regex: /^a/,
+    bounds: ['["a", "b")', "[/^a/, /^a/]"],
+    results: [{_id: "a"}, {_id: "a|b"}],
+});
+assertIndexBoundsAndResult({
+    regex: /^\\/,
+    bounds: ['["\\", "]")', "[/^\\\\/, /^\\\\/]"],
+    results: [{_id: "\\|"}],
+});
 
 // An anchored regex using the alternation operator cannot use tight index bounds.
 assertIndexBoundsAndResult({
@@ -84,8 +96,16 @@ assertIndexBoundsAndResult({
 });
 
 // An anchored regex that uses an escaped pipe character can use tight index bounds.
-assertIndexBoundsAndResult({regex: /^a\|/, bounds: ['["a|", "a}")', "[/^a\\|/, /^a\\|/]"], results: [{_id: "a|b"}]});
-assertIndexBoundsAndResult({regex: /^\|/, bounds: ['["|", "}")', "[/^\\|/, /^\\|/]"], results: [{_id: "|"}]});
+assertIndexBoundsAndResult({
+    regex: /^a\|/,
+    bounds: ['["a|", "a}")', "[/^a\\|/, /^a\\|/]"],
+    results: [{_id: "a|b"}],
+});
+assertIndexBoundsAndResult({
+    regex: /^\|/,
+    bounds: ['["|", "}")', "[/^\\|/, /^\\|/]"],
+    results: [{_id: "|"}],
+});
 
 // A pipe character that is preceded by an escaped backslash is correctly interpreted as the
 // alternation operator and cannot use tight index bounds.
@@ -101,10 +121,18 @@ assertIndexBoundsAndResult({
 });
 
 // An escaped backslash immediately followed by an escaped pipe does not use tight index bounds.
-assertIndexBoundsAndResult({regex: /^\\\|/, bounds: ['["", {})', "[/^\\\\\\|/, /^\\\\\\|/]"], results: [{_id: "\\|"}]});
+assertIndexBoundsAndResult({
+    regex: /^\\\|/,
+    bounds: ['["", {})', "[/^\\\\\\|/, /^\\\\\\|/]"],
+    results: [{_id: "\\|"}],
+});
 
 // A pipe escaped with the \Q...\E escape sequence does not use tight index bounds.
-assertIndexBoundsAndResult({regex: /^\Q|\E/, bounds: ['["", {})', "[/^\\Q|\\E/, /^\\Q|\\E/]"], results: [{_id: "|"}]});
+assertIndexBoundsAndResult({
+    regex: /^\Q|\E/,
+    bounds: ['["", {})', "[/^\\Q|\\E/, /^\\Q|\\E/]"],
+    results: [{_id: "|"}],
+});
 
 // An escaped pipe within \Q...\E can use tight index bounds.
 assertIndexBoundsAndResult({

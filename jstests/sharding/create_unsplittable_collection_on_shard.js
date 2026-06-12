@@ -25,9 +25,15 @@ jsTest.log(
     const kDataColl = "unsplittable_collection_on_different_shard";
     const kDataCollNss = kDbName + "." + kDataColl;
 
-    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: shard1}));
+    assert.commandWorked(
+        st.s
+            .getDB(kDbName)
+            .runCommand({createUnsplittableCollection: kDataColl, dataShard: shard1}),
+    );
 
-    let res = assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).runCommand({listIndexes: kDataColl}));
+    let res = assert.commandWorked(
+        st.rs1.getPrimary().getDB(kDbName).runCommand({listIndexes: kDataColl}),
+    );
     let indexes = res.cursor.firstBatch;
     assert(indexes.length === 1);
 
@@ -40,14 +46,22 @@ jsTest.log(
     assert.eq(chunk.shard, shard1);
 }
 
-jsTest.log("Testing that creating a collection on a different data shard when it exists already fails");
+jsTest.log(
+    "Testing that creating a collection on a different data shard when it exists already fails",
+);
 {
     const kDataColl = "unsplittable_collection_on_different_shard_2";
 
-    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: shard1}));
+    assert.commandWorked(
+        st.s
+            .getDB(kDbName)
+            .runCommand({createUnsplittableCollection: kDataColl, dataShard: shard1}),
+    );
 
     assert.commandFailedWithCode(
-        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: shard0}),
+        st.s
+            .getDB(kDbName)
+            .runCommand({createUnsplittableCollection: kDataColl, dataShard: shard0}),
         ErrorCodes.AlreadyInitialized,
     );
 }
@@ -57,7 +71,10 @@ jsTest.log("Testing that creating an unsplittable collection on a non-existing s
     const kDataColl = "unsplittable_collection_on_config_shard";
 
     assert.commandFailedWithCode(
-        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: "non-existing-shard-name"}),
+        st.s.getDB(kDbName).runCommand({
+            createUnsplittableCollection: kDataColl,
+            dataShard: "non-existing-shard-name",
+        }),
         ErrorCodes.ShardNotFound,
     );
 }

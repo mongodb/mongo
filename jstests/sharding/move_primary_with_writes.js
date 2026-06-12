@@ -23,7 +23,12 @@ function verifyDocuments(mongos, dbName, fromShard, toShard, numDocsOnDataShard)
         assert.eq(
             numDocs,
             shard.getDB(dbName).getCollection(collName).count(),
-            "Collection " + collName + " is expected to have " + numDocs + " docs on shard " + shard.shardName,
+            "Collection " +
+                collName +
+                " is expected to have " +
+                numDocs +
+                " docs on shard " +
+                shard.shardName,
         );
     }
 
@@ -104,16 +109,25 @@ function createCollections() {
         assert.commandWorked(db.shardedColl.insert({_id: i, a: i, b: i, c: i}));
     }
 
-    assert.commandWorked(db.runCommand({createIndexes: "unshardedColl", indexes: unshardedFooIndexes}));
-    assert.commandWorked(db.runCommand({createIndexes: "unshardedTrackedColl", indexes: unshardedFooIndexes}));
+    assert.commandWorked(
+        db.runCommand({createIndexes: "unshardedColl", indexes: unshardedFooIndexes}),
+    );
+    assert.commandWorked(
+        db.runCommand({createIndexes: "unshardedTrackedColl", indexes: unshardedFooIndexes}),
+    );
     assert.commandWorked(db.runCommand({createIndexes: "shardedColl", indexes: shardedBarIndexes}));
 
     assert.commandWorked(
-        db.adminCommand({moveCollection: dbName + ".unshardedTrackedColl", toShard: st.shard1.shardName}),
+        db.adminCommand({
+            moveCollection: dbName + ".unshardedTrackedColl",
+            toShard: st.shard1.shardName,
+        }),
     );
 
     assert.commandWorked(db.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(db.adminCommand({shardCollection: dbName + ".shardedColl", key: {_id: 1}}));
+    assert.commandWorked(
+        db.adminCommand({shardCollection: dbName + ".shardedColl", key: {_id: 1}}),
+    );
 
     assert.commandWorked(db.createView("unshardedFooView", "unshardedColl", [{$match: {}}]));
     assert.commandWorked(db.createView("shardedBarView", "shardedColl", [{$match: {}}]));
@@ -187,7 +201,11 @@ function buildCommands(collName, isCollTracked) {
             isAdminCommand: false,
         },
         {
-            command: {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
+            command: {
+                aggregate: collName,
+                cursor: {},
+                pipeline: [{$match: {}}, {$out: "testOutColl"}],
+            },
             shouldFail: true,
             isAdminCommand: false,
             errorCodes: [ErrorCodes.LockBusy],
@@ -279,7 +297,11 @@ function testMovePrimary(failpoint, fromShard, toShard, mongoS, dbName) {
     let db = mongoS.getDB(dbName);
 
     let codeToRunInParallelShell =
-        '{ db.getSiblingDB("admin").runCommand({movePrimary: "' + dbName + '", to: "' + toShard.name + '"}); }';
+        '{ db.getSiblingDB("admin").runCommand({movePrimary: "' +
+        dbName +
+        '", to: "' +
+        toShard.name +
+        '"}); }';
 
     let fp = configureFailPoint(fromShard, failpoint);
 
@@ -292,7 +314,9 @@ function testMovePrimary(failpoint, fromShard, toShard, mongoS, dbName) {
     assert.eq(3, collections.length);
     collections.forEach((coll) => {
         const collName = coll.collName;
-        const isCollTracked = FixtureHelpers.isTracked(mongoS.getDB(dbName).getCollection(collName));
+        const isCollTracked = FixtureHelpers.isTracked(
+            mongoS.getDB(dbName).getCollection(collName),
+        );
 
         jsTestLog(
             "Testing move primary with FP: " +
@@ -304,7 +328,12 @@ function testMovePrimary(failpoint, fromShard, toShard, mongoS, dbName) {
         );
 
         buildCommands(collName, isCollTracked).forEach((commandObj) => {
-            jsTestLog("Running command: " + tojson(commandObj.command) + ", shoudFail: " + commandObj.shouldFail);
+            jsTestLog(
+                "Running command: " +
+                    tojson(commandObj.command) +
+                    ", shoudFail: " +
+                    commandObj.shouldFail,
+            );
 
             let dbTarget = db;
             if (commandObj.isAdminCommand) {
@@ -313,7 +342,10 @@ function testMovePrimary(failpoint, fromShard, toShard, mongoS, dbName) {
 
             if (commandObj.shouldFail) {
                 if (commandObj.hasOwnProperty("errorCodes")) {
-                    assert.commandFailedWithCode(dbTarget.runCommand(commandObj.command), commandObj.errorCodes);
+                    assert.commandFailedWithCode(
+                        dbTarget.runCommand(commandObj.command),
+                        commandObj.errorCodes,
+                    );
                 } else {
                     assert.commandFailedWithCode(
                         dbTarget.runCommand(commandObj.command),
@@ -335,7 +367,9 @@ function testMovePrimary(failpoint, fromShard, toShard, mongoS, dbName) {
 let overrideDDLLockTimeoutFPs = [];
 st.forEachConnection((shard) => {
     try {
-        overrideDDLLockTimeoutFPs.push(configureFailPoint(shard, "overrideDDLLockTimeout", {"timeoutMillisecs": 500}));
+        overrideDDLLockTimeoutFPs.push(
+            configureFailPoint(shard, "overrideDDLLockTimeout", {"timeoutMillisecs": 500}),
+        );
     } catch (e) {
         // The failpoint has been added in 5.3 so multiversion suite will fail to set this failpoint
         jsTestLog("Failed to override DDL lock timeout: " + e);

@@ -15,16 +15,26 @@ export const createCollAndCRUDInTxn = function (sessionDB, collName, command, ex
         assert.commandWorked(sessionColl.update({_id: 1}, {$inc: {a: 1}}, {upsert: true}));
     } else if (command === "findAndModify") {
         assert.commandWorked(
-            sessionDB.runCommand({findAndModify: collName, query: {_id: 1}, update: {$inc: {a: 1}}, upsert: true}),
+            sessionDB.runCommand({
+                findAndModify: collName,
+                query: {_id: 1},
+                update: {$inc: {a: 1}},
+                upsert: true,
+            }),
         );
     } else {
         doassert(
-            "createCollAndCRUDInTxn called with invalid command. " + "Must be 'insert', 'update', or 'findAndModify'.",
+            "createCollAndCRUDInTxn called with invalid command. " +
+                "Must be 'insert', 'update', or 'findAndModify'.",
         );
     }
     assert.eq(sessionColl.find({a: 1}).itcount(), 1);
     assert.commandWorked(sessionColl.insert({_id: 2}));
-    let res = sessionDB.runCommand({findAndModify: collName, query: {_id: 2}, update: {$inc: {a: 1}}});
+    let res = sessionDB.runCommand({
+        findAndModify: collName,
+        query: {_id: 2},
+        update: {$inc: {a: 1}},
+    });
     assert.commandWorked(res);
     assert.eq(res.value._id, 2);
     assert.commandWorked(sessionColl.update({_id: 2}, {$inc: {a: 1}}));
@@ -32,7 +42,13 @@ export const createCollAndCRUDInTxn = function (sessionDB, collName, command, ex
     assert.eq(sessionColl.find({}).itcount(), 1);
 };
 
-export const assertCollCreateFailedWithCode = function (sessionDB, collName, command, explicitCreate, code) {
+export const assertCollCreateFailedWithCode = function (
+    sessionDB,
+    collName,
+    command,
+    explicitCreate,
+    code,
+) {
     if (undefined === explicitCreate) {
         doassert("assertWriteConflictForCollCreate called with undefined explicitCreate");
     }
@@ -45,10 +61,18 @@ export const assertCollCreateFailedWithCode = function (sessionDB, collName, com
     } else if (command === "insert") {
         assert.commandFailedWithCode(sessionColl.insert({a: 1}), code);
     } else if (command === "update") {
-        assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {a: 1}}, {upsert: true}), code);
+        assert.commandFailedWithCode(
+            sessionColl.update({_id: 1}, {$inc: {a: 1}}, {upsert: true}),
+            code,
+        );
     } else if (command === "findAndModify") {
         assert.commandFailedWithCode(
-            sessionDB.runCommand({findAndModify: collName, query: {_id: 1}, update: {$inc: {a: 1}}, upsert: true}),
+            sessionDB.runCommand({
+                findAndModify: collName,
+                query: {_id: 1},
+                update: {$inc: {a: 1}},
+                upsert: true,
+            }),
             code,
         );
     } else {

@@ -11,7 +11,10 @@ import {
     checkPlatformCompatibleWithExtensions,
     withExtensionsAndMongot,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
-import {mongotCommandForQuery, mongotResponseForBatch} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mongotCommandForQuery,
+    mongotResponseForBatch,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -27,7 +30,10 @@ withExtensionsAndMongot(
         const dbName = "test";
         const db = conn.getDB(dbName);
 
-        if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
+        if (
+            checkSbeRestrictedOrFullyEnabled(db) &&
+            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")
+        ) {
             jsTest.log.info("Skipping: $search in SBE uses a different cursor-establishment path.");
             return;
         }
@@ -35,7 +41,9 @@ withExtensionsAndMongot(
         // Pin oversubscriptionFactor to 1.0 so the expected batchSize is deterministic and directly
         // reflects the bounds we compute.
         assert.commandWorked(
-            db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 1}}}),
+            db.adminCommand({
+                setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 1}},
+            }),
         );
 
         const coll = db[jsTestName()];
@@ -118,7 +126,12 @@ withExtensionsAndMongot(
             assert.commandWorked(
                 db.runCommand({
                     aggregate: coll.getName(),
-                    pipeline: [{$search: searchQuery}, {$skip: 10}, {$extensionLimit: 25}, {$limit: 50}],
+                    pipeline: [
+                        {$search: searchQuery},
+                        {$skip: 10},
+                        {$extensionLimit: 25},
+                        {$limit: 50},
+                    ],
                     cursor: {},
                 }),
             );

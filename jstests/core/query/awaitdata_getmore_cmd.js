@@ -37,7 +37,9 @@ let cmdRes = db.runCommand({find: collName, tailable: true});
 assert.commandFailed(cmdRes);
 
 // Should also fail in the non-capped case if both the tailable and awaitData flags are set.
-jsTestLog("Should also fail in the non-capped case if both the tailable and awaitData flags are set.");
+jsTestLog(
+    "Should also fail in the non-capped case if both the tailable and awaitData flags are set.",
+);
 cmdRes = db.runCommand({find: collName, tailable: true, awaitData: true});
 assert.commandFailed(cmdRes);
 
@@ -73,7 +75,13 @@ assert.eq(cmdRes.cursor.ns, coll.getFullName());
 // Should also succeed if maxTimeMS is supplied on the original find.
 jsTestLog("Should also succeed if maxTimeMS is supplied on the original find.");
 const sixtyMinutes = 60 * 60 * 1000;
-cmdRes = db.runCommand({find: collName, batchSize: 2, awaitData: true, tailable: true, maxTimeMS: sixtyMinutes});
+cmdRes = db.runCommand({
+    find: collName,
+    batchSize: 2,
+    awaitData: true,
+    tailable: true,
+    maxTimeMS: sixtyMinutes,
+});
 assert.commandWorked(cmdRes);
 assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
@@ -135,7 +143,9 @@ assert.gte(new Date() - now, 2000);
 
 // Repeat the test, this time tailing the oplog rather than a user-created capped collection.
 // The oplog tailing in not possible on mongos.
-jsTestLog("Repeat the test, this time tailing the oplog rather than a user-created capped collection.");
+jsTestLog(
+    "Repeat the test, this time tailing the oplog rather than a user-created capped collection.",
+);
 if (FixtureHelpers.isReplSet(db)) {
     // Create a collection, and add some documents. These operations should be reflected on the
     // oplog. The find command we issue to the oplog will filter on this ns. This avoids getMore
@@ -169,15 +179,26 @@ if (FixtureHelpers.isReplSet(db)) {
         assert.eq(cmdRes.cursor.firstBatch.length, 2);
 
         jsTestLog("Issue getMore on the oplog until we get an empty batch of results.");
-        cmdRes = localDB.runCommand({getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 1000});
+        cmdRes = localDB.runCommand({
+            getMore: cmdRes.cursor.id,
+            collection: oplogColl.getName(),
+            maxTimeMS: 1000,
+        });
         assert.commandWorked(cmdRes);
         assert.gt(cmdRes.cursor.id, NumberLong(0));
         assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
 
-        jsTestLog("Keep issuing getMore on the oplog until we get an empty batch after the " + "timeout expires.");
+        jsTestLog(
+            "Keep issuing getMore on the oplog until we get an empty batch after the " +
+                "timeout expires.",
+        );
         assert.soon(() => {
             now = new Date();
-            cmdRes = localDB.runCommand({getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 4000});
+            cmdRes = localDB.runCommand({
+                getMore: cmdRes.cursor.id,
+                collection: oplogColl.getName(),
+                maxTimeMS: 4000,
+            });
             assert.commandWorked(cmdRes);
             jsTestLog("oplog tailing cursor getMore: " + now + ": " + tojson(cmdRes));
             assert.gt(cmdRes.cursor.id, NumberLong(0));
@@ -188,7 +209,8 @@ if (FixtureHelpers.isReplSet(db)) {
     }
 }
 
-const originalCmdLogLevel = assert.commandWorked(db.setLogLevel(5, "command")).was.command.verbosity;
+const originalCmdLogLevel = assert.commandWorked(db.setLogLevel(5, "command")).was.command
+    .verbosity;
 const originalQueryLogLevel = assert.commandWorked(db.setLogLevel(5, "query")).was.query.verbosity;
 
 jsTestLog("Test filtered inserts while writing to a capped collection.");
@@ -220,7 +242,9 @@ try {
     // concern majority.
     const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
     if (topology.type !== Topology.kStandalone) {
-        const readConcern = assert.commandWorked(db.adminCommand({getDefaultRWConcern: 1})).defaultReadConcern;
+        const readConcern = assert.commandWorked(
+            db.adminCommand({getDefaultRWConcern: 1}),
+        ).defaultReadConcern;
         if (readConcern.level == "majority" || TestData.defaultReadConcernLevel === "majority") {
             quit();
         }
@@ -285,7 +309,11 @@ try {
     jsTestLog("Insertion shell terminated.");
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
-    assert.eq(cmdRes.cursor.nextBatch.length, 1, "Collection documents: " + tojson(db.await_data.find({}).toArray()));
+    assert.eq(
+        cmdRes.cursor.nextBatch.length,
+        1,
+        "Collection documents: " + tojson(db.await_data.find({}).toArray()),
+    );
     assert.docEq({_id: "match", x: 1}, cmdRes.cursor.nextBatch[0]);
 } finally {
     db.setLogLevel(originalCmdLogLevel, "command");
@@ -294,7 +322,13 @@ try {
 
 jsTestLog("Testing tailable cursors with trivially false conditions...");
 cmdRes = assert.commandWorked(
-    db.runCommand({find: collName, batchSize: 2, filter: {$alwaysFalse: 1}, awaitData: true, tailable: true}),
+    db.runCommand({
+        find: collName,
+        batchSize: 2,
+        filter: {$alwaysFalse: 1},
+        awaitData: true,
+        tailable: true,
+    }),
 );
 assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
@@ -302,7 +336,9 @@ assert.eq(cmdRes.cursor.firstBatch.length, 0);
 
 assert.commandWorked(coll.insert({_id: "new insertion", x: 123}));
 
-cmdRes = assert.commandWorked(db.runCommand({getMore: cmdRes.cursor.id, collection: collName, batchSize: 1}));
+cmdRes = assert.commandWorked(
+    db.runCommand({getMore: cmdRes.cursor.id, collection: collName, batchSize: 1}),
+);
 assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 assert.eq(cmdRes.cursor.nextBatch.length, 0);

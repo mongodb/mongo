@@ -60,8 +60,9 @@ function runCursorTests(conn) {
     }
 
     // Verify that we can see our own cursor with {allUsers: false}.
-    const cursorId = assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2})).cursor
-        .id;
+    const cursorId = assert.commandWorked(
+        db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}),
+    ).cursor.id;
 
     let result = adminDB
         .aggregate([
@@ -106,8 +107,9 @@ function runCursorTests(conn) {
     }
 
     // Create a cursor with the second (non-root) user and confirm that we can see it.
-    const secondCursorId = assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}))
-        .cursor.id;
+    const secondCursorId = assert.commandWorked(
+        db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}),
+    ).cursor.id;
 
     result = adminDB
         .aggregate([
@@ -150,7 +152,9 @@ function runCursorTests(conn) {
     }
 
     // Clean up the cursors so that they don't affect subsequent tests.
-    assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId, secondCursorId]}));
+    assert.commandWorked(
+        db.runCommand({killCursors: coll.getName(), cursors: [cursorId, secondCursorId]}),
+    );
 
     // Make sure to logout to allow __system user to use the implicit session.
     assert.commandWorked(adminDB.logout());

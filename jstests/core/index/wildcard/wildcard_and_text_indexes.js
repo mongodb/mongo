@@ -92,7 +92,13 @@ for (let textIndex of [{"$**": "text"}, {a: 1, "$**": "text"}]) {
     // when the query filter contains a compound field in the $text index.
     const textQuery = Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: "banana"}});
     let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), getWinningPlanFromExplain(explainOut.queryPlanner), "TEXT_MATCH"));
+    assert(
+        planHasStage(
+            coll.getDB(),
+            getWinningPlanFromExplain(explainOut.queryPlanner),
+            "TEXT_MATCH",
+        ),
+    );
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -101,15 +107,26 @@ for (let textIndex of [{"$**": "text"}, {a: 1, "$**": "text"}]) {
     explainOut = assert.commandWorked(
         coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery)).explain("executionStats"),
     );
-    assert(planHasStage(coll.getDB(), getWinningPlanFromExplain(explainOut.queryPlanner), "TEXT_MATCH"));
+    assert(
+        planHasStage(
+            coll.getDB(),
+            getWinningPlanFromExplain(explainOut.queryPlanner),
+            "TEXT_MATCH",
+        ),
+    );
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
     // Confirm that the $** index can be used alongside a $text predicate in an $or.
-    explainOut = assert.commandWorked(coll.find({$or: [{_fts: 3}, textQuery]}).explain("executionStats"));
+    explainOut = assert.commandWorked(
+        coll.find({$or: [{_fts: 3}, textQuery]}).explain("executionStats"),
+    );
     assert.eq(explainOut.executionStats.nReturned, 3);
 
-    const textOrWildcard = getPlanStages(getWinningPlanFromExplain(explainOut.queryPlanner), "OR").shift();
+    const textOrWildcard = getPlanStages(
+        getWinningPlanFromExplain(explainOut.queryPlanner),
+        "OR",
+    ).shift();
     assert.eq(textOrWildcard.inputStages.length, 2);
     const textBranch = textOrWildcard.inputStages[0].stage === "TEXT_MATCH" ? 0 : 1;
     const wildcardBranch = (textBranch + 1) % 2;

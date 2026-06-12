@@ -6,7 +6,10 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    generateExtensionConfigs,
+    deleteExtensionConfigs,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 const fooStageUnrecognizedErrCode = 40324;
 const fooParseErrorCodes = [11165101];
@@ -103,7 +106,10 @@ function assertFooStageAccepted(primaryConn) {
 function assertFooViewCreationRejected(primaryConn) {
     const db = getDB(primaryConn);
     db[viewName].drop();
-    assert.commandFailedWithCode(db.createView(viewName, collName, [{$testFoo: {}}]), fooStageUnrecognizedErrCode);
+    assert.commandFailedWithCode(
+        db.createView(viewName, collName, [{$testFoo: {}}]),
+        fooStageUnrecognizedErrCode,
+    );
 }
 
 function assertFooViewCreationAllowed(primaryConn, queryable = true) {
@@ -126,7 +132,9 @@ function assertFooViewCreationAllowed(primaryConn, queryable = true) {
  * extension or legacy vector search is being used.
  */
 const vectorSearchPipeline = [{$vectorSearch: {}}];
-const vectorSearchInUnionWithPipeline = [{$unionWith: {coll: collName, pipeline: [{$vectorSearch: {}}]}}];
+const vectorSearchInUnionWithPipeline = [
+    {$unionWith: {coll: collName, pipeline: [{$vectorSearch: {}}]}},
+];
 
 export function assertLegacyVectorSearchUsed(primaryConn) {
     const db = getDB(primaryConn);
@@ -143,7 +151,10 @@ export function assertExtensionVectorSearchUsed(primaryConn) {
 export function assertLegacyVectorSearchInUnionWithUsed(primaryConn) {
     const db = getDB(primaryConn);
     const coll = db[collName];
-    assert.throwsWithCode(() => coll.aggregate(vectorSearchInUnionWithPipeline), ErrorCodes.SearchNotEnabled);
+    assert.throwsWithCode(
+        () => coll.aggregate(vectorSearchInUnionWithPipeline),
+        ErrorCodes.SearchNotEnabled,
+    );
 }
 
 export function assertExtensionVectorSearchInUnionWithUsed(primaryConn) {
@@ -152,7 +163,10 @@ export function assertExtensionVectorSearchInUnionWithUsed(primaryConn) {
     // $unionWith returns docs from both the main collection and the unionWith subpipeline.
     // Since both are the same collection and $vectorSearch acts as a no-op, we get all docs twice.
     const expectedDocs = [...docs, ...docs];
-    assertArrayEq({actual: coll.aggregate(vectorSearchInUnionWithPipeline).toArray(), expected: expectedDocs});
+    assertArrayEq({
+        actual: coll.aggregate(vectorSearchInUnionWithPipeline).toArray(),
+        expected: expectedDocs,
+    });
 }
 
 export function assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn) {
@@ -241,7 +255,11 @@ export function assertFooStageAcceptedV1AndV2(primaryConn) {
     assertArrayEq({actual: result.cursor.firstBatch, expected: docs});
 
     // $testFoo V2 now accepts a non-empty stage definition.
-    result = db.runCommand({aggregate: collName, pipeline: [{$testFoo: {nonEmpty: true}}], cursor: {}});
+    result = db.runCommand({
+        aggregate: collName,
+        pipeline: [{$testFoo: {nonEmpty: true}}],
+        cursor: {},
+    });
     assert.commandWorked(result);
     assertArrayEq({actual: result.cursor.firstBatch, expected: docs});
 
@@ -256,7 +274,9 @@ export function assertFooStageAcceptedV1AndV2(primaryConn) {
 
     // $testFoo with a non-empty stage definition is now accepted in a view pipeline.
     assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {nonEmpty: true}}]));
-    viewResult = assert.commandWorked(db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
+    viewResult = assert.commandWorked(
+        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}),
+    );
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [docs[0]]});
 }
 

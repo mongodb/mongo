@@ -445,7 +445,9 @@ let scenarios = {
 
         // Ensure the latest version changes have been persisted and propagate to the secondary
         // before we target it with versioned commands.
-        assert.commandWorked(st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}));
+        assert.commandWorked(
+            st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}),
+        );
         st.rs0.awaitReplication();
 
         let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(
@@ -458,7 +460,10 @@ let scenarios = {
         test.checkResults(res);
 
         if (test.behavior === "unshardedOnly") {
-            profilerHasZeroMatchingEntriesOrThrow({profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
+            profilerHasZeroMatchingEntriesOrThrow({
+                profileDB: primaryShardSecondary.getDB(db),
+                filter: commandProfile,
+            });
         } else if (test.behavior == "versioned") {
             // Check that the primary shard secondary returned stale shardVersion.
             profilerHasSingleMatchingEntryOrThrow({
@@ -505,7 +510,9 @@ let scenarios = {
 
         // Ensure the latest version changes have been persisted and propagate to the secondary
         // before we target it with versioned commands.
-        assert.commandWorked(st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}));
+        assert.commandWorked(
+            st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}),
+        );
         st.rs0.awaitReplication();
 
         let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(
@@ -518,7 +525,10 @@ let scenarios = {
         test.checkResults(res);
 
         if (test.behavior === "unshardedOnly") {
-            profilerHasZeroMatchingEntriesOrThrow({profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
+            profilerHasZeroMatchingEntriesOrThrow({
+                profileDB: primaryShardSecondary.getDB(db),
+                filter: commandProfile,
+            });
         } else if (test.behavior == "versioned") {
             // Check that the primary shard secondary returned stale shardVersion.
             profilerHasSingleMatchingEntryOrThrow({
@@ -555,7 +565,12 @@ let scenarios = {
         // shard without calling movePrimary, and it is known that a stale mongos will not
         // refresh its notion of the primary shard after it loads it once.
     },
-    dropRecreateAsShardedOnDifferentShard: function (staleMongos, freshMongos, test, commandProfile) {
+    dropRecreateAsShardedOnDifferentShard: function (
+        staleMongos,
+        freshMongos,
+        test,
+        commandProfile,
+    ) {
         let donorShardSecondary = st.rs0.getSecondary();
         let recipientShardSecondary = st.rs1.getSecondary();
 
@@ -591,7 +606,10 @@ let scenarios = {
         test.checkResults(res);
 
         if (test.behavior === "unshardedOnly") {
-            profilerHasZeroMatchingEntriesOrThrow({profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
+            profilerHasZeroMatchingEntriesOrThrow({
+                profileDB: donorShardSecondary.getDB(db),
+                filter: commandProfile,
+            });
             profilerHasZeroMatchingEntriesOrThrow({
                 profileDB: recipientShardSecondary.getDB(db),
                 filter: commandProfile,
@@ -640,13 +658,20 @@ let res = st.s.adminCommand({listCommands: 1});
 assert.commandWorked(res);
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    staleMongos.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    staleMongos.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let commands = Object.keys(res.commands);
 for (let command of commands) {
     let test = testCases[command];
-    assert(test !== undefined, "coverage failure: must define a safe secondary reads test for " + command);
+    assert(
+        test !== undefined,
+        "coverage failure: must define a safe secondary reads test for " + command,
+    );
 
     if (test.skip !== undefined) {
         print("skipping " + command + ": " + test.skip);
@@ -661,7 +686,9 @@ for (let command of commands) {
         jsTest.log("testing command " + tojson(command) + " under scenario " + scenario);
 
         // Each scenario starts with a sharded collection with shard0 as the primary shard.
-        assert.commandWorked(staleMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            staleMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}),
+        );
         assert.commandWorked(staleMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
         // We do this because we expect staleMongos to see that the collection is sharded, which
@@ -683,9 +710,11 @@ for (let command of commands) {
         // which will then be used against the secondary to ensure the secondary is fresh.
         assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
         assert.commandWorked(
-            freshMongos
-                .getDB(db)
-                .runCommand({find: coll, $readPreference: {mode: "secondary"}, readConcern: {"level": "local"}}),
+            freshMongos.getDB(db).runCommand({
+                find: coll,
+                $readPreference: {mode: "secondary"},
+                readConcern: {"level": "local"},
+            }),
         );
         // Wait for drop of previous database to replicate before beginning profiling
         st.rs0.awaitReplication();

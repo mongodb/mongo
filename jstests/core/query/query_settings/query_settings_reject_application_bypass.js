@@ -56,7 +56,8 @@ if (!TestData.fuzzMongodConfigs) {
 }
 
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 // TODO(SERVER-106932): $listExtensions can always be included when feature flag is removed.
 if (FeatureFlagUtil.isPresentAndEnabled(adminDB.getMongo(), "ExtensionsAPI") && !isMultiversion) {
     stages.push(["$listExtensions", adminDB, 1]);
@@ -68,7 +69,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(adminDB.getMongo(), "ExtensionsAPI") && 
 
 // Agg queries containing the above stages.
 const queries = stages.map(([stage, db, collection]) =>
-    new QuerySettingsUtils(db, collection).makeAggregateQueryInstance({pipeline: [{[stage]: {}}], cursor: {}}),
+    new QuerySettingsUtils(db, collection).makeAggregateQueryInstance({
+        pipeline: [{[stage]: {}}],
+        cursor: {},
+    }),
 );
 
 // Reset query settings.
@@ -91,7 +95,9 @@ for (const query of queries) {
     qsutils.withFailpoint("allowAllSetQuerySettings", {}, () => {
         qsutils.withQuerySettings(query, {reject: true}, () => {
             // Verify the query still works, despite reject=true being set.
-            assert.commandWorked(db.getSiblingDB(dbName).runCommand(qsutils.withoutDollarDB(query)));
+            assert.commandWorked(
+                db.getSiblingDB(dbName).runCommand(qsutils.withoutDollarDB(query)),
+            );
         });
     });
 }

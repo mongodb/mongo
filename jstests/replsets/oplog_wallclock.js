@@ -4,7 +4,10 @@ import {getLatestOp} from "jstests/replsets/rslib.js";
 
 let assertLastOplogHasWT = function (primary, msg) {
     const opLogEntry = getLatestOp(primary);
-    assert(opLogEntry.hasOwnProperty("wall"), "oplog entry must contain wt field: " + tojson(opLogEntry));
+    assert(
+        opLogEntry.hasOwnProperty("wall"),
+        "oplog entry must contain wt field: " + tojson(opLogEntry),
+    );
 };
 
 let name = "wt_test_coll";

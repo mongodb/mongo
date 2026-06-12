@@ -29,7 +29,10 @@ function createCollectionAndAssertVersionContext(collName, expectedVersionContex
     }
 }
 
-createCollectionAndAssertVersionContext("coll", shouldSnapshotOFCV ? {OFCV: initialFCV} : undefined);
+createCollectionAndAssertVersionContext(
+    "coll",
+    shouldSnapshotOFCV ? {OFCV: initialFCV} : undefined,
+);
 
 // Verify that the transitional upgrade/downgrade FCVs have corresponding Operation FCV values.
 if (initialFCV == latestFCV) {
@@ -37,7 +40,9 @@ if (initialFCV == latestFCV) {
     // Transitional downgrade FCV
     const hangWhileDowngradingFp = configureFailPoint(st.rs0.getPrimary(), "hangWhileDowngrading");
     const downgradeThread = startParallelShell(function () {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
     }, st.s.port);
     hangWhileDowngradingFp.wait();
     createCollectionAndAssertVersionContext(
@@ -50,7 +55,9 @@ if (initialFCV == latestFCV) {
     // Transitional upgrade FCV
     const hangWhileUpgradingFp = configureFailPoint(st.rs0.getPrimary(), "hangWhileUpgrading");
     const upgradeThread = startParallelShell(function () {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     }, st.s.port);
     hangWhileUpgradingFp.wait();
     createCollectionAndAssertVersionContext(

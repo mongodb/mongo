@@ -155,7 +155,10 @@ import {
             initialDocList: [doc_a_early_time, doc_b_start_time],
             cmd: {filter: query, update: {$set: {[metaFieldName]: 2}}},
             res: {
-                resultDocList: [doc_a_early_time, {[timeFieldName]: times[1], [metaFieldName]: 2, _id: 1, b: 1}],
+                resultDocList: [
+                    doc_a_early_time,
+                    {[timeFieldName]: times[1], [metaFieldName]: 2, _id: 1, b: 1},
+                ],
                 returnDoc: doc_b_start_time,
                 bucketFilter: makeBucketFilter({
                     $and: [
@@ -164,7 +167,9 @@ import {
                         {"control.max.time": {$_internalExprGte: times[1]}},
                         {"control.min.time": {$_internalExprGte: times[1]}},
                         {
-                            "control.max.time": {$_internalExprLt: new Date(times[3].getTime() + offset)},
+                            "control.max.time": {
+                                $_internalExprLt: new Date(times[3].getTime() + offset),
+                            },
                         },
                         {"control.min.time": {$_internalExprLt: times[3]}},
                     ],
@@ -185,15 +190,26 @@ import {
             initialDocList: [doc_a_early_time, doc_a_latest_time],
             cmd: {filter: query, update: {$set: {a: 10}}},
             res: {
-                resultDocList: [doc_a_early_time, {[timeFieldName]: times[3], [metaFieldName]: 1, _id: 1, b: 1, a: 10}],
+                resultDocList: [
+                    doc_a_early_time,
+                    {[timeFieldName]: times[3], [metaFieldName]: 1, _id: 1, b: 1, a: 10},
+                ],
                 returnDoc: doc_a_latest_time,
                 bucketFilter: makeBucketFilter(
                     {meta: {$eq: 1}},
                     {
                         $and: [
                             {_id: {$gte: ObjectId("63e054940000000000000000")}},
-                            {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
-                            {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
+                            {
+                                "control.max.time": {
+                                    $_internalExprGte: ISODate("2023-02-06T01:30:00Z"),
+                                },
+                            },
+                            {
+                                "control.min.time": {
+                                    $_internalExprGte: ISODate("2023-02-06T01:30:00Z"),
+                                },
+                            },
                         ],
                     },
                 ),
@@ -212,7 +228,12 @@ import {
      */
     (function testDeleteOne_MatchMultipleBuckets() {
         testDeleteOne({
-            initialDocList: [doc_a_early_time, doc_b_start_time, doc_a_late_time, doc_a_latest_time],
+            initialDocList: [
+                doc_a_early_time,
+                doc_b_start_time,
+                doc_a_late_time,
+                doc_a_latest_time,
+            ],
             filter: {[timeFieldName]: {$lte: times[3]}},
             // Don't validate exact results as we could delete any doc.
             nDeleted: 1,
@@ -221,7 +242,12 @@ import {
 
     (function testDeleteOne_MatchOneDoc_InBucket() {
         testDeleteOne({
-            initialDocList: [doc_a_early_time, doc_b_start_time, doc_a_late_time, doc_a_latest_time],
+            initialDocList: [
+                doc_a_early_time,
+                doc_b_start_time,
+                doc_a_late_time,
+                doc_a_latest_time,
+            ],
             filter: {[timeFieldName]: {$lte: times[0]}},
             expectedDocList: [doc_b_start_time, doc_a_late_time, doc_a_latest_time],
             nDeleted: 1,
@@ -241,7 +267,9 @@ import {
                     $and: [
                         {_id: {$lt: ObjectId("63e059da0000000000000000")}},
                         {
-                            "control.max.time": {$_internalExprLt: new Date(times[2].getTime() + offset)},
+                            "control.max.time": {
+                                $_internalExprLt: new Date(times[2].getTime() + offset),
+                            },
                         },
                         {"control.min.time": {$_internalExprLt: times[2]}},
                     ],

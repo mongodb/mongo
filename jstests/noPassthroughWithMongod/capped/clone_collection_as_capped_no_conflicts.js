@@ -17,9 +17,13 @@ const sleepFunction = function (sleepDB) {
     // If cloneCollectionAsCapped calls need to wait on this lock, holding this lock for 4 hours
     // will trigger a test timeout.
     assert.commandFailedWithCode(
-        db
-            .getSiblingDB("test")
-            .adminCommand({sleep: 1, secs: 18000, lockTarget: sleepDB, lock: "iw", $comment: "Lock sleep"}),
+        db.getSiblingDB("test").adminCommand({
+            sleep: 1,
+            secs: 18000,
+            lockTarget: sleepDB,
+            lock: "iw",
+            $comment: "Lock sleep",
+        }),
         ErrorCodes.Interrupted,
     );
 };
@@ -33,7 +37,9 @@ const sleepID = waitForCommand(
 
 assert.commandWorked(fromColl.insert({a: 1}));
 assert(!fromColl.isCapped());
-assert.commandWorked(testDB.runCommand({cloneCollectionAsCapped: fromCollName, toCollection: toCollName, size: 100}));
+assert.commandWorked(
+    testDB.runCommand({cloneCollectionAsCapped: fromCollName, toCollection: toCollName, size: 100}),
+);
 assert(toColl.isCapped());
 assert.eq(toColl.count(), 1);
 

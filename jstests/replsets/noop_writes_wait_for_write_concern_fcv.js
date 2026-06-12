@@ -24,7 +24,11 @@ function testFCVNoop(targetVersion) {
     assert.eq(primary, replTest.nodes[0]);
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
-        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        primary.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
 
     // Set the FCV to the given target version, to ensure calling setFCV below is a no-op.

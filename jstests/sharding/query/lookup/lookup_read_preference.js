@@ -16,7 +16,9 @@ const st = new ShardingTest({name: "lookup_read_preference", mongos: 1, shards: 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable
 // causal consistency.
 const dbName = jsTestName() + "_db";
-assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
@@ -35,9 +37,13 @@ for (let rs of [st.rs0, st.rs1]) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(
+        primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}),
+    );
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}),
+    );
 }
 
 // Write a document to each chunk.
@@ -75,11 +81,15 @@ function assertAggRouting(pipeline, expectedResults, comment, readPrefSecondary)
     // getMore. This way, we can ensure sub-operations in a getMore have the right read preference.
     let options = {comment: comment, batchSize: 1};
     if (readPrefSecondary) {
-        Object.assign(options, {$readPreference: {mode: "secondary"}, readConcern: {level: "majority"}});
+        Object.assign(options, {
+            $readPreference: {mode: "secondary"},
+            readConcern: {level: "majority"},
+        });
     }
     assert(arrayEq(expectedResults, local.aggregate(pipeline, options).toArray()));
 
-    const isNestedLookup = pipeline[0].$lookup.pipeline && pipeline[0].$lookup.pipeline[0].hasOwnProperty("$lookup");
+    const isNestedLookup =
+        pipeline[0].$lookup.pipeline && pipeline[0].$lookup.pipeline[0].hasOwnProperty("$lookup");
     const involvedColls = isNestedLookup ? [local, foreign, otherForeign] : [local, foreign];
 
     // For each replica set and for each involved collection, ensure queries are routed to the
@@ -134,7 +144,14 @@ pipeline = [
             localField: "a",
             foreignField: "b",
             pipeline: [
-                {$lookup: {from: otherForeign.getName(), localField: "b", foreignField: "c", as: "cs"}},
+                {
+                    $lookup: {
+                        from: otherForeign.getName(),
+                        localField: "b",
+                        foreignField: "c",
+                        as: "cs",
+                    },
+                },
                 {$unwind: "$cs"},
             ],
         },

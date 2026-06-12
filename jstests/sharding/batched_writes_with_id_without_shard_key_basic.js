@@ -26,7 +26,9 @@ const performOps = function (ordered, numOps) {
     assert.commandWorked(coll.insert({x: -1, _id: -1}));
     assert.commandWorked(coll.insert({x: 1, _id: 1}));
 
-    assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard1.shardName}),
+    );
 
     // Test that retryable writes use broadcast protocol per PM-3190
     let session = st.s.startSession({retryWrites: true});
@@ -63,7 +65,9 @@ const performOps = function (ordered, numOps) {
     );
     assert.eq(ret.n, 2);
 
-    let mongosServerStatus = assert.commandWorked(mongos.getDB(jsTestName()).adminCommand({serverStatus: 1}));
+    let mongosServerStatus = assert.commandWorked(
+        mongos.getDB(jsTestName()).adminCommand({serverStatus: 1}),
+    );
     assert.eq(numOps, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
     assert.eq(numOps, mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdCount);
     session.endSession();

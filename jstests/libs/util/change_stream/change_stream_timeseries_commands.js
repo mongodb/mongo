@@ -42,7 +42,11 @@ export class CreateTimeseriesCollectionCommand extends Command {
             return [createEvent];
         }
 
-        if (watchMode === ChangeStreamWatchMode.kDb && watchedNss && watchedNss.db === this.dbName) {
+        if (
+            watchMode === ChangeStreamWatchMode.kDb &&
+            watchedNss &&
+            watchedNss.db === this.dbName
+        ) {
             return [createEvent];
         }
 
@@ -102,7 +106,8 @@ export class TimeseriesInsertCommand extends Command {
             return [];
         }
 
-        const isSystemBuckets = this.eventNss.coll && this.eventNss.coll.startsWith("system.buckets.");
+        const isSystemBuckets =
+            this.eventNss.coll && this.eventNss.coll.startsWith("system.buckets.");
         if (isSystemBuckets && !showSystemEvents) {
             return [];
         }
@@ -145,7 +150,9 @@ export class FCVUpgradeCommand extends Command {
 
     execute(conn) {
         const adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     }
 
     getChangeEvents(ctx) {
@@ -161,7 +168,11 @@ export class FCVUpgradeCommand extends Command {
 
             if (watchMode === ChangeStreamWatchMode.kCollection) {
                 // Only streams watching the *source* collection (buckets) see rename+invalidate.
-                if (watchedNss && watchedNss.db === bucketsNss.db && watchedNss.coll === bucketsNss.coll) {
+                if (
+                    watchedNss &&
+                    watchedNss.db === bucketsNss.db &&
+                    watchedNss.coll === bucketsNss.coll
+                ) {
                     events.push(renameEvent);
                     events.push({operationType: "invalidate"});
                     break;
@@ -192,7 +203,9 @@ export class FCVDowngradeCommand extends Command {
 
     execute(conn) {
         const adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: this.targetFCV, confirm: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: this.targetFCV, confirm: true}),
+        );
     }
 
     getChangeEvents(ctx) {
@@ -208,7 +221,11 @@ export class FCVDowngradeCommand extends Command {
 
             if (watchMode === ChangeStreamWatchMode.kCollection) {
                 // Only streams watching the *source* collection (regular/viewless) see rename+invalidate.
-                if (watchedNss && watchedNss.db === regularNss.db && watchedNss.coll === regularNss.coll) {
+                if (
+                    watchedNss &&
+                    watchedNss.db === regularNss.db &&
+                    watchedNss.coll === regularNss.coll
+                ) {
                     events.push(renameEvent);
                     events.push({operationType: "invalidate"});
                     break;

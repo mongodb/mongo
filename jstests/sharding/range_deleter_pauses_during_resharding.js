@@ -20,7 +20,10 @@ const reshardingCollNs = `${dbName}.${reshardingCollName}`;
 
 const [reshardingSplitValue, migrationSplitValue, numDocs] = [2, 5, 10];
 assert(0 < reshardingSplitValue, "reshardingSplitValue must be > 0");
-assert(reshardingSplitValue < migrationSplitValue, "reshardingSplitValue must be < migrationSplitValue");
+assert(
+    reshardingSplitValue < migrationSplitValue,
+    "reshardingSplitValue must be < migrationSplitValue",
+);
 assert(migrationSplitValue < numDocs, "migrationSplitValue must be < numDocs");
 
 function seedCollection(coll) {
@@ -61,13 +64,17 @@ function runTest(shouldAbort) {
     const topology = DiscoverTopology.findConnectedNodes(s);
     const donorShard = new Mongo(topology.shards[donorShardName].primary);
     assert.commandWorked(donorShard.adminCommand({setParameter: 1, orphanCleanupDelaySecs: 0}));
-    assert.commandWorked(donorShard.adminCommand({setParameter: 1, disableResumableRangeDeleter: true}));
+    assert.commandWorked(
+        donorShard.adminCommand({setParameter: 1, disableResumableRangeDeleter: true}),
+    );
     // Range Deleter: disabled, Resharding: inactive (unscheduled)
 
     // because of resharding text fixtures post operation consistency checks, if we
     // abort resharding, we can't have any docs on any recipients, but if we succeed,
     // we can't have any docs on any donors
-    const moveChunkRecipientName = shouldAbort ? reshardingTest.donorShardNames[1] : recipientShardName;
+    const moveChunkRecipientName = shouldAbort
+        ? reshardingTest.donorShardNames[1]
+        : recipientShardName;
     const moveChunk = (ns) =>
         assert.commandWorked(
             s.adminCommand({
@@ -124,15 +131,24 @@ function runTest(shouldAbort) {
             newShardKeyPattern: {newKey: 1},
             newChunks: [
                 {min: {newKey: MinKey}, max: {newKey: reshardingSplitValue}, shard: donorShardName},
-                {min: {newKey: reshardingSplitValue}, max: {newKey: MaxKey}, shard: recipientShardName},
+                {
+                    min: {newKey: reshardingSplitValue},
+                    max: {newKey: MaxKey},
+                    shard: recipientShardName,
+                },
             ],
         },
         () => {
             // RangeDeleter: disabled, Resharding: Active
             hangAfterInitializingIndexBuildFailPoint.wait();
-            assert.neq(null, s.getCollection("config.reshardingOperations").findOne({ns: reshardingCollNs}));
+            assert.neq(
+                null,
+                s.getCollection("config.reshardingOperations").findOne({ns: reshardingCollNs}),
+            );
 
-            assert.commandWorked(donorShard.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}));
+            assert.commandWorked(
+                donorShard.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}),
+            );
             // RangeDeleter: Enabled, Resharding: Active (paused)
 
             assertRangeDeletionTaskPresent(controlCollNs, false);

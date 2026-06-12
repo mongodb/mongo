@@ -21,7 +21,9 @@ let dbname = "test";
 let coll = "foo";
 let ns = dbname + "." + coll;
 
-assert.commandWorked(st.s0.adminCommand({enablesharding: dbname, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: dbname, primaryShard: st.shard1.shardName}),
+);
 
 let t = st.s0.getDB(dbname).getCollection(coll);
 
@@ -42,8 +44,15 @@ assert.commandWorked(st.s0.adminCommand({shardcollection: ns, key: {a: 1}}));
 let join = startParallelShell("db." + coll + ".remove({});", st.s0.port);
 
 // migrate while deletions are happening
-const res = st.s0.adminCommand({moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name});
-if (res.code == ErrorCodes.CommandFailed && res.errmsg.includes("timed out waiting for the catch up completion")) {
+const res = st.s0.adminCommand({
+    moveChunk: ns,
+    find: {a: 1},
+    to: st.getOther(st.getPrimaryShard(dbname)).name,
+});
+if (
+    res.code == ErrorCodes.CommandFailed &&
+    res.errmsg.includes("timed out waiting for the catch up completion")
+) {
     jsTest.log(
         "Ignoring the critical section timeout error since this test deletes " +
             numDocs +

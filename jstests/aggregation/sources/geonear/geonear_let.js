@@ -25,7 +25,9 @@ function compareResults(nearArgument) {
     const pipeline = [{$geoNear: {near: "$$pt", distanceField: "distance"}}];
     const res = coll.aggregate(pipeline, {let: {pt: nearArgument}}).toArray();
 
-    const constRes = coll.aggregate([{$geoNear: {near: nearArgument, distanceField: "distance"}}]).toArray();
+    const constRes = coll
+        .aggregate([{$geoNear: {near: nearArgument, distanceField: "distance"}}])
+        .toArray();
 
     assert.eq(res.length, constRes.length);
     for (let i = 0; i < res.length; i++) {
@@ -68,8 +70,12 @@ coll.createIndex({location: "2d"});
 compareResults([10, 22]);
 
 // Error checks.
-let err = assert.throws(() => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let: {pt: 5}}));
+let err = assert.throws(() =>
+    coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let: {pt: 5}}),
+);
 assert.commandFailedWithCode(err, 5860401);
 
-err = assert.throws(() => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let: {pt: "abc"}}));
+err = assert.throws(() =>
+    coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let: {pt: "abc"}}),
+);
 assert.commandFailedWithCode(err, 5860401);

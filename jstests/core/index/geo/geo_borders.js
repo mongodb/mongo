@@ -29,7 +29,10 @@ let overallMin = -1;
 let overallMax = 1;
 
 // Create a point index slightly smaller than the points we have
-let res = t.createIndex({loc: "2d"}, {max: overallMax - epsilon / 2, min: overallMin + epsilon / 2});
+let res = t.createIndex(
+    {loc: "2d"},
+    {max: overallMax - epsilon / 2, min: overallMin + epsilon / 2},
+);
 assert.commandFailed(res);
 
 // Create a point index only slightly bigger than the points we have
@@ -170,7 +173,9 @@ assert.eq(cornerPt.loc.y, overallMax);
 
 // Make sure we get correct corner point when center is on bounds
 // NOTE: Only valid points on MIN bounds
-cornerPt = t.findOne({loc: {$within: {$center: [onBoundsNeg, Math.sqrt(2 * epsilon * epsilon) + step / 2]}}});
+cornerPt = t.findOne({
+    loc: {$within: {$center: [onBoundsNeg, Math.sqrt(2 * epsilon * epsilon) + step / 2]}},
+});
 assert.eq(cornerPt.loc.y, overallMin);
 
 // ***********
@@ -197,10 +202,16 @@ assert.eq(4, t.find({loc: {$near: offCenter, $maxDistance: step * 1.9}}).count()
 // Command Tests
 // **************
 // Make sure we can get all nearby points to point in range
-assert.eq(overallMax, t.aggregate({$geoNear: {near: offCenter, distanceField: "d"}}).toArray()[0].loc.y);
+assert.eq(
+    overallMax,
+    t.aggregate({$geoNear: {near: offCenter, distanceField: "d"}}).toArray()[0].loc.y,
+);
 
 // Make sure we can get all nearby points to point on boundary
-assert.eq(overallMin, t.aggregate({$geoNear: {near: onBoundsNeg, distanceField: "d"}}).toArray()[0].loc.y);
+assert.eq(
+    overallMin,
+    t.aggregate({$geoNear: {near: onBoundsNeg, distanceField: "d"}}).toArray()[0].loc.y,
+);
 
 // Make sure we can't get all nearby points to point over boundary
 assert.commandFailedWithCode(
@@ -215,4 +226,9 @@ assert.eq(numItems, t.aggregate({$geoNear: {near: onBounds, distanceField: "d"}}
 
 // Make sure we can get all nearby points within one step (4 points in top
 // corner)
-assert.eq(4, t.aggregate({$geoNear: {near: offCenter, maxDistance: step * 1.5, distanceField: "d"}}).toArray().length);
+assert.eq(
+    4,
+    t
+        .aggregate({$geoNear: {near: offCenter, maxDistance: step * 1.5, distanceField: "d"}})
+        .toArray().length,
+);

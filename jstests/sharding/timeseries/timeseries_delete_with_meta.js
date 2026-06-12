@@ -159,8 +159,16 @@ const testCases = {
 
     // Shard key on both meta and time field.
     metaTimeShardKey: ["emptyFilter", "metaFilterTwoShards"],
-    metaObjectTimeShardKey: ["emptyFilter", "metaObjectFilterTwoShards", "metaSubFieldFilterTwoShards"],
-    metaSubFieldTimeShardKey: ["emptyFilter", "metaObjectFilterTwoShards", "metaSubFieldFilterTwoShards"],
+    metaObjectTimeShardKey: [
+        "emptyFilter",
+        "metaObjectFilterTwoShards",
+        "metaSubFieldFilterTwoShards",
+    ],
+    metaSubFieldTimeShardKey: [
+        "emptyFilter",
+        "metaObjectFilterTwoShards",
+        "metaSubFieldFilterTwoShards",
+    ],
 };
 
 function runTest(collConfig, reqConfig, insert) {
@@ -240,7 +248,10 @@ function runTest(collConfig, reqConfig, insert) {
         // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series buckets
         // namespace.
         failingDeleteCommand.delete = collName;
-        assert.commandFailedWithCode(st.shard0.getDB(dbName).runCommand(failingDeleteCommand), [5916400, 7934201]);
+        assert.commandFailedWithCode(
+            st.shard0.getDB(dbName).runCommand(failingDeleteCommand),
+            [5916400, 7934201],
+        );
     }
 
     // Reset database profiler.

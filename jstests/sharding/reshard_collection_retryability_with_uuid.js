@@ -74,7 +74,10 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
+const pauseBeforeCloningFP = configureFailPoint(
+    configsvr,
+    "reshardingPauseCoordinatorBeforeCloning",
+);
 
 // Fulfilled once the first reshardCollection command creates the temporary collection.
 let expectedUUIDAfterReshardingCompletes = undefined;
@@ -136,7 +139,10 @@ reshardCollectionThread.join();
 // Confirm the UUID for the namespace that was resharded is the same as the temporary collection's
 // UUID before the second reshardCollection command was issued.
 assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
-let finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+let finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 // A retry after the fact with the same UUID should not reshard the collection again.
@@ -148,7 +154,10 @@ assert.commandWorked(
         reshardingUUID: originalReshardingUUID,
     }),
 );
-finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 // A retry after the fact with the same UUID and forceRedistribution should not reshard the
@@ -162,7 +171,10 @@ assert.commandWorked(
         forceRedistribution: true,
     }),
 );
-finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 // A retry after the fact with no UUID should not reshard the collection again (because the key
@@ -174,7 +186,10 @@ assert.commandWorked(
         _presetReshardedChunks: reshardingTest.presetReshardedChunks,
     }),
 );
-finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 const newReshardingUUID = UUID();
@@ -188,7 +203,10 @@ assert.commandWorked(
         reshardingUUID: newReshardingUUID,
     }),
 );
-finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 // A retry after the fact with a new UUID and forceRedistribution SHOULD reshard the collection
@@ -202,7 +220,10 @@ assert.commandWorked(
         forceRedistribution: true,
     }),
 );
-finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.neq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 // A retry after the fact with no UUID and forceRedistribution SHOULD reshard the collection again.
@@ -215,7 +236,10 @@ assert.commandWorked(
         forceRedistribution: true,
     }),
 );
-finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.neq(newSourceCollectionUUID, finalSourceCollectionUUID);
 
 reshardingTest.teardown();

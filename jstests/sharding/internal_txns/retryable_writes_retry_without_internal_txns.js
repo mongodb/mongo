@@ -46,7 +46,9 @@ function setUpTestMode(mode) {
         });
     } else if (mode == kTestMode.kFailover) {
         const oldPrimary = st.rs0.getPrimary();
-        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
         const newPrimary = st.rs0.getPrimary();
         st.getAllNodes().forEach((conn) => {
@@ -85,7 +87,9 @@ let currentParentTxnNumber = NumberLong(35);
             txnUUID: UUID(),
         };
         const childTxnNumber1 = NumberLong(0);
-        jsTest.log(`Running an update inside a retryable internal transaction with lsid ${tojson(childLsid1)}`);
+        jsTest.log(
+            `Running an update inside a retryable internal transaction with lsid ${tojson(childLsid1)}`,
+        );
         withRetryOnTransientTxnErrorIncrementTxnNum(childTxnNumber1, (txnNum) => {
             assert.commandWorked(
                 testDB.runCommand({
@@ -98,7 +102,9 @@ let currentParentTxnNumber = NumberLong(35);
                     stmtId: stmtId1,
                 }),
             );
-            assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, txnNum)));
+            assert.commandWorked(
+                testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, txnNum)),
+            );
         });
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
 
@@ -108,7 +114,9 @@ let currentParentTxnNumber = NumberLong(35);
             txnUUID: UUID(),
         };
         const childTxnNumber2 = NumberLong(0);
-        jsTest.log(`Running an update inside a retryable internal transaction with lsid ${tojson(childLsid2)}`);
+        jsTest.log(
+            `Running an update inside a retryable internal transaction with lsid ${tojson(childLsid2)}`,
+        );
         withRetryOnTransientTxnErrorIncrementTxnNum(childTxnNumber2, (txnNum) => {
             assert.commandWorked(
                 testDB.runCommand({
@@ -121,7 +129,9 @@ let currentParentTxnNumber = NumberLong(35);
                     stmtId: stmtId2,
                 }),
             );
-            assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, txnNum)));
+            assert.commandWorked(
+                testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, txnNum)),
+            );
         });
         assert.eq(testColl.find({x: 2, y: 1}).itcount(), 1);
 
@@ -184,7 +194,9 @@ let currentParentTxnNumber = NumberLong(35);
             txnUUID: UUID(),
         };
         const childTxnNumber1 = NumberLong(0);
-        jsTest.log(`Running an update in a retryable internal transaction with lsid ${tojson(childLsid1)}`);
+        jsTest.log(
+            `Running an update in a retryable internal transaction with lsid ${tojson(childLsid1)}`,
+        );
         withRetryOnTransientTxnErrorIncrementTxnNum(childTxnNumber1, (txnNum) => {
             assert.commandWorked(
                 testDB.runCommand({
@@ -197,7 +209,9 @@ let currentParentTxnNumber = NumberLong(35);
                     stmtId: stmtId,
                 }),
             );
-            assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, txnNum)));
+            assert.commandWorked(
+                testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, txnNum)),
+            );
         });
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
 
@@ -209,7 +223,9 @@ let currentParentTxnNumber = NumberLong(35);
             txnUUID: UUID(),
         };
         let childTxnNumber2 = NumberLong(0);
-        jsTest.log(`Retrying the update in a retryable internal transaction with lsid ${tojson(childLsid2)}`);
+        jsTest.log(
+            `Retrying the update in a retryable internal transaction with lsid ${tojson(childLsid2)}`,
+        );
 
         // Retry the transaction if the RSM topology is not up to date and we receive a
         // TransientTransactionError. Remove after SERVER-60369 is completed.
@@ -236,7 +252,9 @@ let currentParentTxnNumber = NumberLong(35);
             return false;
         });
 
-        assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, childTxnNumber2)));
+        assert.commandWorked(
+            testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, childTxnNumber2)),
+        );
 
         assert.eq(retryRes.n, 1);
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
@@ -293,7 +311,9 @@ let currentParentTxnNumber = NumberLong(35);
             txnUUID: UUID(),
         };
         let childTxnNumber1 = NumberLong(0);
-        jsTest.log(`Retrying one of the updates in a retryable internal transaction with lsid ${tojson(childLsid1)}`);
+        jsTest.log(
+            `Retrying one of the updates in a retryable internal transaction with lsid ${tojson(childLsid1)}`,
+        );
 
         // Retry the transaction if the RSM topology is not up to date and we receive a
         // TransientTransactionError. Remove after SERVER-60369 is completed.
@@ -320,7 +340,9 @@ let currentParentTxnNumber = NumberLong(35);
             return false;
         });
 
-        assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, childTxnNumber1)));
+        assert.commandWorked(
+            testDB.adminCommand(makeCommitTransactionCmdObj(childLsid1, childTxnNumber1)),
+        );
 
         assert.eq(retryRes1.n, 1);
         assert.eq(testColl.find({x: 1, y: 1}).itcount(), 1);
@@ -332,7 +354,9 @@ let currentParentTxnNumber = NumberLong(35);
         };
         const childTxnNumber2 = NumberLong(0);
         let retryRes2;
-        jsTest.log(`Retrying one of the updates in a retryable internal transaction with lsid ${tojson(childLsid2)}`);
+        jsTest.log(
+            `Retrying one of the updates in a retryable internal transaction with lsid ${tojson(childLsid2)}`,
+        );
         withRetryOnTransientTxnErrorIncrementTxnNum(childTxnNumber2, (txnNum) => {
             retryRes2 = assert.commandWorked(
                 testDB.runCommand({
@@ -345,7 +369,9 @@ let currentParentTxnNumber = NumberLong(35);
                     stmtId: stmtId2,
                 }),
             );
-            assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, txnNum)));
+            assert.commandWorked(
+                testDB.adminCommand(makeCommitTransactionCmdObj(childLsid2, txnNum)),
+            );
         });
 
         assert.eq(retryRes2.n, 1);

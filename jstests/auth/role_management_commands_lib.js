@@ -11,7 +11,10 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
     let userAdminConn = new Mongo(conn.host);
     let testUserAdmin = userAdminConn.getDB("test");
     let adminUserAdmin = userAdminConn.getDB("admin");
-    adminUserAdmin.createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]}, writeConcern);
+    adminUserAdmin.createUser(
+        {user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]},
+        writeConcern,
+    );
     adminUserAdmin.auth("userAdmin", "pwd");
     testUserAdmin.createUser({user: "testUser", pwd: "pwd", roles: []}, writeConcern);
     let db = conn.getDB("test");
@@ -28,7 +31,10 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
     (function testCreateRole() {
         jsTestLog("Testing createRole");
 
-        testUserAdmin.createRole({role: "testRole1", roles: ["read"], privileges: []}, writeConcern);
+        testUserAdmin.createRole(
+            {role: "testRole1", roles: ["read"], privileges: []},
+            writeConcern,
+        );
         testUserAdmin.createRole(
             {
                 role: "testRole2",
@@ -55,7 +61,11 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
             writeConcern,
         );
 
-        testUserAdmin.updateUser("testUser", {roles: [{role: "adminRole", db: "admin"}]}, writeConcern);
+        testUserAdmin.updateUser(
+            "testUser",
+            {roles: [{role: "adminRole", db: "admin"}]},
+            writeConcern,
+        );
         assert.throws(function () {
             db.foo.findOne();
         });
@@ -91,7 +101,11 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.eq(1, db.foo.findOne().a);
         assert.commandFailedWithCode(db.adminCommand("connPoolSync"), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser("testUser", {roles: [{role: "testRole4", db: "test"}]}, writeConcern);
+        testUserAdmin.updateUser(
+            "testUser",
+            {roles: [{role: "testRole4", db: "test"}]},
+            writeConcern,
+        );
         assert.throws(function () {
             db.foo.findOne();
         });
@@ -103,7 +117,11 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
     (function testUpdateRole() {
         jsTestLog("Testing updateRole");
 
-        testUserAdmin.updateRole("testRole4", {roles: [{role: "testRole2", db: "test"}, "testRole2"]}, writeConcern);
+        testUserAdmin.updateRole(
+            "testRole4",
+            {roles: [{role: "testRole2", db: "test"}, "testRole2"]},
+            writeConcern,
+        );
         assert.throws(function () {
             db.foo.findOne();
         });
@@ -137,7 +155,11 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.eq(1, db.foo.findOne().a);
         assert.commandFailedWithCode(db.adminCommand("connPoolSync"), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser("testUser", {roles: [{role: "adminRole", db: "admin"}]}, writeConcern);
+        testUserAdmin.updateUser(
+            "testUser",
+            {roles: [{role: "adminRole", db: "admin"}]},
+            writeConcern,
+        );
         adminUserAdmin.updateRole("adminRole", {roles: [{role: "read", db: "test"}]}, writeConcern);
         assert.doesNotThrow(function () {
             db.foo.findOne();
@@ -255,7 +277,10 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         // At this stage, testUser has testRole2 role. Verify testUser can see testRole2 info, but
         // not others.
         assert.commandWorked(db.runCommand({rolesInfo: "testRole2"}));
-        assert.commandFailedWithCode(db.runCommand({rolesInfo: "testRole1"}), ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(
+            db.runCommand({rolesInfo: "testRole1"}),
+            ErrorCodes.Unauthorized,
+        );
 
         let res = testUserAdmin.runCommand({rolesInfo: "testRole1"});
         assert.eq(1, res.roles.length);
@@ -271,7 +296,9 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.eq(1, res.roles[0].roles.length);
         assert.eq("read", res.roles[0].roles[0].role);
 
-        res = testUserAdmin.runCommand({rolesInfo: ["testRole1", {role: "adminRole", db: "admin"}]});
+        res = testUserAdmin.runCommand({
+            rolesInfo: ["testRole1", {role: "adminRole", db: "admin"}],
+        });
         assert.eq(2, res.roles.length);
         assert.eq("testRole1", res.roles[0].role);
         assert.eq("test", res.roles[0].db);
@@ -296,7 +323,10 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.contains({role: "read", db: "test"}, res.userFragment.inheritedRoles);
         assert.gt(res.userFragment.inheritedPrivileges.length, 0);
 
-        res = testUserAdmin.runCommand({rolesInfo: ["testRole1", "testRole2"], showPrivileges: "asUserFragment"});
+        res = testUserAdmin.runCommand({
+            rolesInfo: ["testRole1", "testRole2"],
+            showPrivileges: "asUserFragment",
+        });
         assert(res.userFragment);
         assert.eq(2, res.userFragment.roles.length);
         assert.contains({role: "testRole1", db: "test"}, res.userFragment.roles);

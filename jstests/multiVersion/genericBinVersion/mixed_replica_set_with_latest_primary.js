@@ -25,7 +25,8 @@ const lastLTSBinVersion = MongoRunner.getBinVersionFor(lastLTSVersion);
 for (let i = 0; i < rst.nodes.length; i++) {
     const admin = rst.nodes[i].getDB("admin");
     const serverStatus = admin.serverStatus();
-    const expectedVersion = nodes[i]["binVersion"] === latestVersion ? latestBinVersion : lastLTSBinVersion;
+    const expectedVersion =
+        nodes[i]["binVersion"] === latestVersion ? latestBinVersion : lastLTSBinVersion;
     const actualVersion = serverStatus["version"];
     assert(MongoRunner.areBinVersionsTheSame(actualVersion, expectedVersion));
 }

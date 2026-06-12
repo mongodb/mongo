@@ -52,16 +52,22 @@ jsTestLog("Waiting for the restarted secondary to select a sync source and run a
 assert.soon(
     () =>
         assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1})).syncSourceId === 0 &&
-        assert.commandWorked(secondary.adminCommand({serverStatus: 1})).metrics.repl.network.getmores.num >= 1,
+        assert.commandWorked(secondary.adminCommand({serverStatus: 1})).metrics.repl.network
+            .getmores.num >= 1,
     "Timed out waiting for restarted secondary to fetch oplog",
 );
 
 jsTestLog("Resume JournalFlusher thread on both nodes");
-assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "off"}));
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "off"}),
+);
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "off"}),
+);
 
 // Record the numEmptyBatches now before the test.
-const numEmptyBatchesBefore = secondary.adminCommand({serverStatus: 1}).metrics.repl.network.getmores.numEmptyBatches;
+const numEmptyBatchesBefore = secondary.adminCommand({serverStatus: 1}).metrics.repl.network
+    .getmores.numEmptyBatches;
 jsTestLog("numEmptyBatches[Before] on secondary is: " + numEmptyBatchesBefore);
 
 // Do some more writes, which will advance the commit point on the primary (sync source) for a
@@ -74,7 +80,8 @@ for (let i = 0; i < 10; i++) {
 }
 
 // Test that numEmptyBatches increases after the test as the commit point advances.
-const numEmptyBatchesAfter = secondary.adminCommand({serverStatus: 1}).metrics.repl.network.getmores.numEmptyBatches;
+const numEmptyBatchesAfter = secondary.adminCommand({serverStatus: 1}).metrics.repl.network.getmores
+    .numEmptyBatches;
 jsTestLog("numEmptyBatches[After] on secondary now is: " + numEmptyBatchesAfter);
 
 assert(

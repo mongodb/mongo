@@ -62,7 +62,9 @@ assert.commandWorked(addShardRes);
 
 // Add some data
 var db = mongos.getDB("foo");
-assert.commandWorked(admin.runCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 let collA = mongos.getCollection("foo.bar");
 assert.commandWorked(admin.runCommand({shardCollection: "" + collA, key: {_id: 1}}));
@@ -76,7 +78,12 @@ for (let i = 0; i < 4; i++) {
 // move a chunk
 // TODO (SERVER-60767): remove _waitForDelete param; removeShard() will sync on range deletion.
 assert.commandWorked(
-    admin.runCommand({moveChunk: "foo.bar", find: {_id: 1}, to: addShardRes.shardAdded, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: "foo.bar",
+        find: {_id: 1},
+        to: addShardRes.shardAdded,
+        _waitForDelete: true,
+    }),
 );
 
 // verify the chunk was moved
@@ -101,7 +108,11 @@ rst.getPrimary().getDB(adminUser.db).auth(adminUser.username, adminUser.password
 // wait until migration coordinator is finished
 assert.soon(
     function () {
-        let migrationCoordinatorDocs = rst.getPrimary().getDB("config").migrationCoordinators.find().toArray();
+        let migrationCoordinatorDocs = rst
+            .getPrimary()
+            .getDB("config")
+            .migrationCoordinators.find()
+            .toArray();
 
         return migrationCoordinatorDocs.length === 0;
     },

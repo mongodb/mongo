@@ -102,7 +102,9 @@ for (let i = 0; i < 5; i++) {
     }
 }
 
-jsTest.log("Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...");
+jsTest.log(
+    "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...",
+);
 rs.awaitReplication();
 // Make sure we wait for secondaries here - otherwise a secondary could come online later and be
 // used for the
@@ -240,9 +242,13 @@ assert.eq(100, ts.find().itcount(), "E5");
 printjson(ts.find().batchSize(5).explain());
 
 // fsyncLock the secondaries and enable command logging on all the mongods.
-assert.commandWorked(rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
+assert.commandWorked(
+    rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}),
+);
 rs.getSecondaries().forEach(function (secondary) {
-    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}),
+    );
     assert.commandWorked(secondary.getDB("test").fsyncLock());
 });
 

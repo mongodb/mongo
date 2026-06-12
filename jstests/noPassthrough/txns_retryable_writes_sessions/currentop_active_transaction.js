@@ -107,7 +107,8 @@ function checkCurrentOpFields(
         "Expected 'timeInactiveMicros' to be at least 0: " + tojson(transactionDocument),
     );
     const actualExpiryTime = ISODate(transactionDocument.expiryTime).getTime();
-    const expectedExpiryTime = ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000;
+    const expectedExpiryTime =
+        ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000;
     assert.eq(
         expectedExpiryTime,
         actualExpiryTime,
@@ -145,14 +146,21 @@ let res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [
 // Set and save the transaction's lifetime. We will use this later to assert that our
 // transaction's expiry time is equal to its start time + lifetime.
 const transactionLifeTime = 10;
-assert.commandWorked(testDB.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+assert.commandWorked(
+    testDB.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}),
+);
 
 // This will make the transaction hang.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingPrepareStartTime", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingPrepareStartTime", mode: "alwaysOn"}),
+);
 
 let timeBeforeTransactionStarts = new ISODate();
 let isPrepared = true;
-const joinPreparedTransaction = startParallelShell(funWithArgs(transactionFn, isPrepared), rst.ports[0]);
+const joinPreparedTransaction = startParallelShell(
+    funWithArgs(transactionFn, isPrepared),
+    rst.ports[0],
+);
 
 const prepareTransactionFilter = {
     active: true,
@@ -164,7 +172,9 @@ const prepareTransactionFilter = {
 
 // Keep running currentOp() until we see the transaction subdocument.
 assert.soon(function () {
-    return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: prepareTransactionFilter}]).itcount();
+    return (
+        1 === adminDB.aggregate([{$currentOp: {}}, {$match: prepareTransactionFilter}]).itcount()
+    );
 });
 
 let timeAfterTransactionStarts = new ISODate();
@@ -184,14 +194,18 @@ checkCurrentOpFields(
 );
 
 // Now the transaction can proceed.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingPrepareStartTime", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingPrepareStartTime", mode: "off"}),
+);
 joinPreparedTransaction();
 
 // Conduct the same test but with a non-prepared transaction.
 res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
 
 // This will make the transaction hang.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}),
+);
 
 timeBeforeTransactionStarts = new ISODate();
 isPrepared = false;
@@ -227,7 +241,9 @@ checkCurrentOpFields(
 );
 
 // Now the transaction can proceed.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}),
+);
 joinTransaction();
 
 rst.stopSet();

@@ -20,7 +20,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.getCollection = function getCollectionName(db, collName) {
-        return $config.data.session.getDatabase(db.getName()).getCollection($config.data.getCollectionName(collName));
+        return $config.data.session
+            .getDatabase(db.getName())
+            .getCollection($config.data.getCollectionName(collName));
     };
 
     $config.states.init = function init(db, collName) {

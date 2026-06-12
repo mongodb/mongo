@@ -21,15 +21,25 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collName);
         coll.drop();
 
-        jsTestLog("Setting up collection: " + coll.getFullName() + " with index: " + tojson(keysForCreate));
+        jsTestLog(
+            "Setting up collection: " +
+                coll.getFullName() +
+                " with index: " +
+                tojson(keysForCreate),
+        );
 
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, doc), "failed to insert doc: " + tojson(doc));
-        assert.commandFailedWithCode(coll.createIndex(keysForCreate), [7246201, ErrorCodes.CannotCreateIndex]);
+        assert.commandFailedWithCode(coll.createIndex(keysForCreate), [
+            7246201,
+            ErrorCodes.CannotCreateIndex,
+        ]);
     };
 
     testIndex({"_id.$**": 1});

@@ -135,7 +135,11 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
             jsTest.log.info(message + " on shards", {shardsWithBackgroundOps});
             return kRetry;
         },
-        () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(res),
+        () =>
+            "Timed out while retrying command '" +
+            tojson(commandObj) +
+            "', response: " +
+            tojson(res),
         kTimeout,
         kInterval,
     );

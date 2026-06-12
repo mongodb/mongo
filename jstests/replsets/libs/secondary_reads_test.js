@@ -42,7 +42,10 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
             const testDb = db.getSiblingDB(TestData.dbName);
             while (true) {
                 readFn();
-                let signalDoc = testDb.getCollection(TestData.signalColl).find({_id: TestData.testDoneId}).itcount();
+                let signalDoc = testDb
+                    .getCollection(TestData.signalColl)
+                    .find({_id: TestData.testDoneId})
+                    .itcount();
                 if (signalDoc != 0) {
                     print("signal doc found. quitting...");
                     quit();
@@ -70,7 +73,9 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
     this.pauseSecondaryBatchApplication = function () {
         clearRawMongoProgramOutput();
 
-        assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+        assert.commandWorked(
+            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}),
+        );
 
         return function () {
             assert.soon(function () {
@@ -80,7 +85,9 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
     };
 
     this.resumeSecondaryBatchApplication = function () {
-        assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "off"}));
+        assert.commandWorked(
+            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "off"}),
+        );
     };
 
     this.getPrimaryDB = function () {

@@ -41,7 +41,9 @@ let runTest = (options) => {
     // 'rawMongoProgramOutput' will only return logs for subprocesses spawned by the shell.
     let runParallelShellSuccess = startParallelShell(
         () => {
-            jsTestLog("Established connection with server to test successful certification verification.");
+            jsTestLog(
+                "Established connection with server to test successful certification verification.",
+            );
         },
         conn.port,
         null /*noConnect */,
@@ -73,7 +75,9 @@ let runTest = (options) => {
         assert.throws(
             startParallelShell(
                 (ocspFaultType) => {
-                    jsTestLog("Something went wrong if we print this! Fault type: " + ocspFaultType);
+                    jsTestLog(
+                        "Something went wrong if we print this! Fault type: " + ocspFaultType,
+                    );
                 },
                 conn.port,
                 null /*noConnect */,

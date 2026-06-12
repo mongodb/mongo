@@ -49,7 +49,11 @@ export const $config = (function () {
             assert.eq(this.numDocs, db[collName].count());
             const numDocs = Random.randInt(this.numDocs);
             const resp = assert.commandWorked(
-                db[collName].updateMany({_id: {$lt: numDocs}}, {$inc: {i: 1}}, {comment: "updateSomething"}),
+                db[collName].updateMany(
+                    {_id: {$lt: numDocs}},
+                    {$inc: {i: 1}},
+                    {comment: "updateSomething"},
+                ),
             );
             assert.eq(numDocs, resp.matchedCount);
             assert.eq(numDocs, resp.modifiedCount);

@@ -48,7 +48,9 @@ const encryptedFields = {
 const client = new EncryptedClient(st.s0, "test");
 const test = client.getDB("test");
 
-assert.commandWorked(client.createEncryptionCollection("encrypted", {encryptedFields: encryptedFields}));
+assert.commandWorked(
+    client.createEncryptionCollection("encrypted", {encryptedFields: encryptedFields}),
+);
 assert.commandWorked(test.createCollection("unencrypted"));
 
 client.runEncryptionOperation(() => {
@@ -84,7 +86,9 @@ if (kHaveAuditing) {
     assert.eq(renameEvents[0].result, ErrorCodes.OK);
     const tempNSS = renameEvents[0].param.new;
 
-    const dropEvents = audit.filter((ev) => ev.atype === "dropCollection" && ev.param.ns === tempNSS);
+    const dropEvents = audit.filter(
+        (ev) => ev.atype === "dropCollection" && ev.param.ns === tempNSS,
+    );
     assert.eq(dropEvents.length, 1, "Invalid number of drop events: " + tojson(dropEvents));
     assert.eq(dropEvents[0].result, ErrorCodes.OK);
 }

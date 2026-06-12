@@ -31,10 +31,17 @@ describe("initial sync waits for sync source stable recovery timestamp to advanc
     // wait-for-stable-timestamp feature. Returns the failpoint handle and the secondary node.
     function prepareInitialSync(extraParams = {}) {
         // Capture the initiating set entry ts (the earliest oplog entry on a fresh primary).
-        const initiatingSetTs = primary.getDB("local").oplog.rs.find().sort({$natural: 1}).limit(1).next().ts;
+        const initiatingSetTs = primary
+            .getDB("local")
+            .oplog.rs.find()
+            .sort({$natural: 1})
+            .limit(1)
+            .next().ts;
 
         // Insert docs to populate the collection before the stable-timestamp pin.
-        assert.commandWorked(primary.getDB(kDbName)[kCollName].insertMany([{_id: 1}, {_id: 2}, {_id: 3}]));
+        assert.commandWorked(
+            primary.getDB(kDbName)[kCollName].insertMany([{_id: 1}, {_id: 2}, {_id: 3}]),
+        );
 
         // Wait for stable ts to checkpoint at a strictly later *second* than initiatingSetTs.
         // _initiatingSetStableTimestampCallback computes diff = stableTs.getSecs() -
@@ -42,7 +49,9 @@ describe("initial sync waits for sync source stable recovery timestamp to advanc
         // so the initiating-set skip (diff <= thresholdSecs) does not fire.
         let pinTs;
         assert.soon(() => {
-            assert.commandWorked(primary.getDB(kDbName)[kCollName].updateOne({_id: 1}, {$inc: {_v: 1}}));
+            assert.commandWorked(
+                primary.getDB(kDbName)[kCollName].updateOne({_id: 1}, {$inc: {_v: 1}}),
+            );
             assert.commandWorked(primary.adminCommand({fsync: 1}));
             const status = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
             const st = status.lastStableRecoveryTimestamp;
@@ -54,10 +63,14 @@ describe("initial sync waits for sync source stable recovery timestamp to advanc
         }, "Timed out waiting for primary stable ts to advance past initiating set entry second");
 
         // Pin stable ts here so beginApplyingTimestamp (set from the next inserts) will be above it.
-        const holdFp = configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: pinTs});
+        const holdFp = configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {
+            timestamp: pinTs,
+        });
 
         // Insert more docs to push optime above pinTs so beginApplyingTimestamp > pinTs.
-        assert.commandWorked(primary.getDB(kDbName)[kCollName].insertMany([{_id: 4}, {_id: 5}, {_id: 6}]));
+        assert.commandWorked(
+            primary.getDB(kDbName)[kCollName].insertMany([{_id: 4}, {_id: 5}, {_id: 6}]),
+        );
 
         const secondary = rst.add({
             rsConfig: {priority: 0, votes: 0},
@@ -104,7 +117,10 @@ describe("initial sync waits for sync source stable recovery timestamp to advanc
             () => {
                 try {
                     const status = secondary.adminCommand({replSetGetStatus: 1});
-                    return status.initialSyncStatus && status.initialSyncStatus.failedInitialSyncAttempts >= 1;
+                    return (
+                        status.initialSyncStatus &&
+                        status.initialSyncStatus.failedInitialSyncAttempts >= 1
+                    );
                 } catch (e) {
                     return false;
                 }

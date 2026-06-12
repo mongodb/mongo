@@ -91,7 +91,10 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 
 // Resume initial sync.
 assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 // Wait for the secondary to complete initial sync.

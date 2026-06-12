@@ -25,7 +25,10 @@ const doc = {
     x: 1,
 };
 
-jsTestLog("Test that if there is no transaction active on the current session, errors with " + "'NoSuchTransaction'.");
+jsTestLog(
+    "Test that if there is no transaction active on the current session, errors with " +
+        "'NoSuchTransaction'.",
+);
 assert.commandFailedWithCode(
     sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(0), autocommit: false}),
     ErrorCodes.NoSuchTransaction,

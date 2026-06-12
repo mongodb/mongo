@@ -9,7 +9,10 @@
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForVectorSearchQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mongotCommandForVectorSearchQuery,
+    MongotMock,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {prepCollection, prepMongotResponse} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Give mongotmock some stuff to return.
@@ -60,14 +63,20 @@ assert.commandFailedWithCode(
 
 // Restart mongod with the option to not authenticate mongod <--> mongot connections.
 MongoRunner.stopMongod(conn);
-conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host, skipAuthenticationToMongot: true}});
+conn = MongoRunner.runMongod({
+    setParameter: {mongotHost: mongotConn.host, skipAuthenticationToMongot: true},
+});
 db = conn.getDB("test");
 coll = db.getCollection(collName);
 
 // Insert some docs.
 prepCollection(conn, "test", collName);
 
-const expected = prepMongotResponse(makeVectorSearchCmd(db, coll, vectorSearchQuery), coll, mongotConn);
+const expected = prepMongotResponse(
+    makeVectorSearchCmd(db, coll, vectorSearchQuery),
+    coll,
+    mongotConn,
+);
 
 // Perform a vector search query. We expect the command to succeed, demonstrating that
 // mongod <--> mongot communication is up.

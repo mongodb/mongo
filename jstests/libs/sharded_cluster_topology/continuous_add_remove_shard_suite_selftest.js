@@ -32,7 +32,9 @@ assert.soon(
     `ContinuousAddRemoveShard hook appears stuck: shard count never changed`,
 );
 
-jsTest.log("ContinuousAddRemoveShard selftest: shard count changed. Waiting for it to return to initial.");
+jsTest.log(
+    "ContinuousAddRemoveShard selftest: shard count changed. Waiting for it to return to initial.",
+);
 
 assert.soon(
     () => shardCount(db) === initialCount,

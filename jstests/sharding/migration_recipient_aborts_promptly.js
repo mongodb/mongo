@@ -29,7 +29,9 @@ const dbName = jsTestName();
 const kAbortExitWindowMs = 3 * 1000;
 
 const st = new ShardingTest({shards: 2, other: {enableBalancer: false}});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 function setupCollection(ns) {
     const [db, coll] = ns.split(".");
@@ -44,7 +46,9 @@ function startMoveChunk(ns, toShardName) {
     return startParallelShell(
         funWithArgs(
             function (ns, toShardName) {
-                const res = db.getSiblingDB("admin").runCommand({moveChunk: ns, find: {_id: 0}, to: toShardName});
+                const res = db
+                    .getSiblingDB("admin")
+                    .runCommand({moveChunk: ns, find: {_id: 0}, to: toShardName});
                 assert.commandFailed(res, () => "moveChunk result: " + tojson(res));
             },
             ns,
@@ -61,7 +65,9 @@ function startMoveChunk(ns, toShardName) {
 
     // Suspend range deletions so the recipient blocks in waitForClean.
     const suspendFp = configureFailPoint(st.shard0, "suspendRangeDeletion");
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     const moveChunkShell = startMoveChunk(ns, st.shard0.shardName);
 
@@ -105,7 +111,10 @@ function startMoveChunk(ns, toShardName) {
     const ns = dbName + ".coll2";
     setupCollection(ns);
 
-    const hangFp = configureFailPoint(st.shard1, "hangMigrationRecipientAfterPersistingRecoveryDoc");
+    const hangFp = configureFailPoint(
+        st.shard1,
+        "hangMigrationRecipientAfterPersistingRecoveryDoc",
+    );
     const moveChunkShell = startMoveChunk(ns, st.shard1.shardName);
 
     hangFp.wait();

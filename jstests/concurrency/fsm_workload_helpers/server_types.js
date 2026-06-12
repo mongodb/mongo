@@ -54,7 +54,11 @@ export function getStorageEngineName(db) {
     assert.commandWorked(status);
 
     assert(isMongod(db), "no storage engine is reported when connected to mongos");
-    assert.neq("undefined", typeof status.storageEngine, "missing storage engine info in server status");
+    assert.neq(
+        "undefined",
+        typeof status.storageEngine,
+        "missing storage engine info in server status",
+    );
 
     return status.storageEngine.name;
 }
@@ -84,7 +88,11 @@ export function supportsCommittedReads(db) {
     assert.commandWorked(status);
 
     assert(isMongod(db), "no storage engine is reported when connected to mongos");
-    assert.neq("undefined", typeof status.storageEngine, "missing storage engine info in server status");
+    assert.neq(
+        "undefined",
+        typeof status.storageEngine,
+        "missing storage engine info in server status",
+    );
 
     return status.storageEngine.supportsCommittedReads;
 }

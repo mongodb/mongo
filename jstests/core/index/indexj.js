@@ -83,7 +83,11 @@ let errMsg = function (explainWithKeysExamined) {
 let keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 
-keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+keysExaminedRet = keysExamined(
+    {a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}},
+    {a: 1, b: 1},
+    {a: -1, b: -1},
+);
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 
 assert.commandWorked(t.insert({a: 1, b: 1}));
@@ -94,7 +98,11 @@ assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 
-keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+keysExaminedRet = keysExamined(
+    {a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}},
+    {a: 1, b: 1},
+    {a: -1, b: -1},
+);
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 
 // We examine one less key in the classic engine because the bounds are slightly tighter.
@@ -105,7 +113,11 @@ if (!isSBEEnabled) {
 keysExaminedRet = keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 
-keysExaminedRet = keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+keysExaminedRet = keysExamined(
+    {a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}},
+    {a: 1, b: 1},
+    {a: -1, b: -1},
+);
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet));
 assert.commandWorked(t.insert({a: 1, b: 1.5}));
 

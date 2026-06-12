@@ -1,6 +1,10 @@
 import "jstests/libs/query/sbe_assert_error_override.js";
 
-import {anyEq, assertErrCodeAndErrMsgContains, assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {
+    anyEq,
+    assertErrCodeAndErrMsgContains,
+    assertErrorCode,
+} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.date_from_string;
 
@@ -55,7 +59,9 @@ let testCases = [
 testCases.forEach(function (testCase) {
     assert.eq(
         [{_id: 0, date: ISODate(testCase.expect)}],
-        coll.aggregate({$project: {date: {$dateFromString: {dateString: testCase.inputString}}}}).toArray(),
+        coll
+            .aggregate({$project: {date: {$dateFromString: {dateString: testCase.inputString}}}})
+            .toArray(),
         tojson(testCase),
     );
     assert.eq(
@@ -64,7 +70,10 @@ testCases.forEach(function (testCase) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: testCase.inputString, format: testCase.format},
+                        $dateFromString: {
+                            dateString: testCase.inputString,
+                            format: testCase.format,
+                        },
                     },
                 },
             })
@@ -108,7 +117,10 @@ testCases.forEach(function (testCase) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: testCase.inputString, timezone: "Europe/London"},
+                        $dateFromString: {
+                            dateString: testCase.inputString,
+                            timezone: "Europe/London",
+                        },
                     },
                 },
             })
@@ -302,7 +314,9 @@ assert.eq(
     coll
         .aggregate([
             {
-                $project: {date: {$dateFromString: {dateString: "$dateString", timezone: "$timezone"}}},
+                $project: {
+                    date: {$dateFromString: {dateString: "$dateString", timezone: "$timezone"}},
+                },
             },
             {$sort: {_id: 1}},
         ])
@@ -341,7 +355,9 @@ assert.eq(
     coll
         .aggregate([
             {
-                $project: {date: {$dateFromString: {dateString: "$dateString", timezone: "Asia/Tokyo"}}},
+                $project: {
+                    date: {$dateFromString: {dateString: "$dateString", timezone: "Asia/Tokyo"}},
+                },
             },
             {$sort: {_id: 1}},
         ])
@@ -371,7 +387,10 @@ assert.eq(
             {
                 $project: {
                     date: {
-                        $dateFromString: {dateString: "2017-07-19T18:52:35.199", timezone: "$timezone"},
+                        $dateFromString: {
+                            dateString: "2017-07-19T18:52:35.199",
+                            timezone: "$timezone",
+                        },
                     },
                 },
             },
@@ -455,7 +474,9 @@ testCases = [
 testCases.forEach(function (testCase) {
     assert.eq(
         [{_id: 0, date: ISODate(testCase.expect)}],
-        coll.aggregate({$project: {date: {$dateFromString: {dateString: testCase.inputString}}}}).toArray(),
+        coll
+            .aggregate({$project: {date: {$dateFromString: {dateString: testCase.inputString}}}})
+            .toArray(),
         tojson(testCase),
     );
     assert.eq(
@@ -464,7 +485,10 @@ testCases.forEach(function (testCase) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: testCase.inputString, format: "%Y-%m-%dT%H:%M:%S.%L%z"},
+                        $dateFromString: {
+                            dateString: testCase.inputString,
+                            format: "%Y-%m-%dT%H:%M:%S.%L%z",
+                        },
                     },
                 },
             })
@@ -577,7 +601,10 @@ testCases.forEach(function (testCase) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: testCase.inputString, format: testCase.format},
+                        $dateFromString: {
+                            dateString: testCase.inputString,
+                            format: testCase.format,
+                        },
                     },
                 },
             })
@@ -604,7 +631,10 @@ testCases.forEach(function (testCase) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: testCase.inputString, format: testCase.format},
+                        $dateFromString: {
+                            dateString: testCase.inputString,
+                            format: testCase.format,
+                        },
                     },
                 },
             })
@@ -627,7 +657,10 @@ testCases.forEach(function (testCase) {
             .aggregate({
                 $project: {
                     date: {
-                        $dateFromString: {dateString: testCase.inputString, format: testCase.format},
+                        $dateFromString: {
+                            dateString: testCase.inputString,
+                            format: testCase.format,
+                        },
                     },
                 },
             })
@@ -670,7 +703,12 @@ pipelines = [
 ];
 
 pipelines.forEach(function (pipeline) {
-    assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Error parsing date string");
+    assertErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.ConversionFailure,
+        "Error parsing date string",
+    );
 });
 
 /* --------------------------------------------------------------------------------------- */
@@ -689,7 +727,9 @@ pipelines = [
     [{$project: {date: {$dateFromString: {dateString: "$tz"}}}}, {$sort: {_id: 1}}],
     [
         {
-            $project: {date: {$dateFromString: {dateString: "2017-07-11T17:05:19Z", timezone: "$tz"}}},
+            $project: {
+                date: {$dateFromString: {dateString: "2017-07-11T17:05:19Z", timezone: "$tz"}},
+            },
         },
         {$sort: {_id: 1}},
     ],
@@ -718,7 +758,11 @@ assert(
         ],
         coll
             .aggregate({
-                $project: {date: {$dateFromString: {dateString: "2017-07-11T17:05:19Z", format: "$format"}}},
+                $project: {
+                    date: {
+                        $dateFromString: {dateString: "2017-07-11T17:05:19Z", format: "$format"},
+                    },
+                },
             })
             .toArray(),
     ),
@@ -728,7 +772,12 @@ assert(
 /* Parse errors. */
 
 let pipeline = [{$project: {date: {$dateFromString: "no-object"}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40540, "$dateFromString only supports an object as an argument");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    40540,
+    "$dateFromString only supports an object as an argument",
+);
 
 pipeline = [{$project: {date: {$dateFromString: {"unknown": "$tz"}}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, 40541, "Unrecognized argument");
@@ -747,7 +796,10 @@ assertErrCodeAndErrMsgContains(
 pipeline = {
     $project: {
         date: {
-            $dateFromString: {dateString: "2017-07-12T22:23:55 GMT+02:00", timezone: "Europe/Amsterdam"},
+            $dateFromString: {
+                dateString: "2017-07-12T22:23:55 GMT+02:00",
+                timezone: "Europe/Amsterdam",
+            },
         },
     },
 };
@@ -763,7 +815,10 @@ assertErrorCode(coll, pipeline, ErrorCodes.ConversionFailure);
 pipeline = {
     $project: {
         date: {
-            $dateFromString: {dateString: "2017-07-12T22:23:55 America/New_York", timezone: "Europe/Amsterdam"},
+            $dateFromString: {
+                dateString: "2017-07-12T22:23:55 America/New_York",
+                timezone: "Europe/Amsterdam",
+            },
         },
     },
 };
@@ -786,7 +841,12 @@ assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Tr
 
 // Test missing specifier prefix '%'.
 pipeline = [{$project: {date: {$dateFromString: {dateString: "1992-26-04", format: "Y-d-m"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Format literal not found");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    ErrorCodes.ConversionFailure,
+    "Format literal not found",
+);
 
 pipeline = [{$project: {date: {$dateFromString: {dateString: "1992", format: "%n"}}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, 18536, "Invalid format character");
@@ -795,7 +855,11 @@ pipeline = [
     {
         $project: {
             date: {
-                $dateFromString: {dateString: "4/26/1992:+0445", format: "%m/%d/%Y:%z", timezone: "+0500"},
+                $dateFromString: {
+                    dateString: "4/26/1992:+0445",
+                    format: "%m/%d/%Y:%z",
+                    timezone: "+0500",
+                },
             },
         },
     },
@@ -808,20 +872,44 @@ assertErrCodeAndErrMsgContains(
 );
 
 pipeline = [{$project: {date: {$dateFromString: {dateString: "4/26/1992", format: 5}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40684, "$dateFromString requires that 'format' be a string");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    40684,
+    "$dateFromString requires that 'format' be a string",
+);
 
 pipeline = [{$project: {date: {$dateFromString: {dateString: "4/26/1992", format: {}}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40684, "$dateFromString requires that 'format' be a string");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    40684,
+    "$dateFromString requires that 'format' be a string",
+);
 
 pipeline = [{$project: {date: {$dateFromString: {dateString: "ISO Day 6", format: "ISO Day %u"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "The parsed date was invalid");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    ErrorCodes.ConversionFailure,
+    "The parsed date was invalid",
+);
 
-pipeline = [{$project: {date: {$dateFromString: {dateString: "ISO Week 52", format: "ISO Week %V"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "The parsed date was invalid");
+pipeline = [
+    {$project: {date: {$dateFromString: {dateString: "ISO Week 52", format: "ISO Week %V"}}}},
+];
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    ErrorCodes.ConversionFailure,
+    "The parsed date was invalid",
+);
 
 pipeline = [
     {
-        $project: {date: {$dateFromString: {dateString: "ISO Week 1, 2018", format: "ISO Week %V, %Y"}}},
+        $project: {
+            date: {$dateFromString: {dateString: "ISO Week 1, 2018", format: "ISO Week %V, %Y"}},
+        },
     },
 ];
 assertErrCodeAndErrMsgContains(
@@ -839,12 +927,23 @@ assertErrCodeAndErrMsgContains(
     "Mixing of ISO dates with natural dates is not allowed",
 );
 
-pipeline = [{$project: {date: {$dateFromString: {dateString: "Dece 31 2018", format: "%b %d %Y"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Error parsing date string");
+pipeline = [
+    {$project: {date: {$dateFromString: {dateString: "Dece 31 2018", format: "%b %d %Y"}}}},
+];
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    ErrorCodes.ConversionFailure,
+    "Error parsing date string",
+);
 
 // Test embedded null bytes in the 'dateString' and 'format' fields.
-pipeline = [{$project: {date: {$dateFromString: {dateString: "12/31\0/2018", format: "%m/%d/%Y"}}}}];
+pipeline = [
+    {$project: {date: {$dateFromString: {dateString: "12/31\0/2018", format: "%m/%d/%Y"}}}},
+];
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Not enough data");
 
-pipeline = [{$project: {date: {$dateFromString: {dateString: "12/31/2018", format: "%m/%d\0/%Y"}}}}];
+pipeline = [
+    {$project: {date: {$dateFromString: {dateString: "12/31/2018", format: "%m/%d\0/%Y"}}}},
+];
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Trailing data");

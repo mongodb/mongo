@@ -54,6 +54,9 @@ for (let i = 0; i < searches.length; i++) {
     assert.gt(
         num,
         explain.executionStats.totalKeysExamined,
-        "nscanned : " + tojson(searches[i] + "; query : " + tojson(q, "", true) + "; explain : " + tojson(explain)),
+        "nscanned : " +
+            tojson(
+                searches[i] + "; query : " + tojson(q, "", true) + "; explain : " + tojson(explain),
+            ),
     );
 }

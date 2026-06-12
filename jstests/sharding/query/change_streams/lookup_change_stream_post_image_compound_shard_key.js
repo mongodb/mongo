@@ -21,17 +21,23 @@ const mongosColl = mongosDB["coll"];
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the test collection with a compound shard key: a, b, c. Then split it into two chunks,
 // and put one chunk on each shard.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1, b: 1, c: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1, b: 1, c: 1}}),
+);
 
 // Split the collection into 2 chunks:
 // [{a: MinKey, b: MinKey, c: MinKey}, {a: 1,      b: MinKey, c: MinKey})
 // and
 // [{a: 1,      b: MinKey, c: MinKey}, {a: MaxKey, b: MaxKey, c: MaxKey}).
-assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {a: 1, b: MinKey, c: MinKey}}));
+assert.commandWorked(
+    mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {a: 1, b: MinKey, c: MinKey}}),
+);
 
 // Move the upper chunk to shard 1.
 assert.commandWorked(
@@ -72,7 +78,10 @@ for (let id = 0; id < nDocs; ++id) {
         next = changeStream.next();
         assert.eq(next.operationType, "update");
         assert.eq(next.documentKey, Object.merge(shardKeyFromId(id), {_id: id}));
-        assert.docEq(Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 1}), next.fullDocument);
+        assert.docEq(
+            Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 1}),
+            next.fullDocument,
+        );
     }
 });
 
@@ -99,7 +108,10 @@ assert.commandWorked(
         let next = changeStream.next();
         assert.eq(next.operationType, "update");
         assert.eq(next.documentKey, Object.merge(shardKeyFromId(id), {_id: id}));
-        assert.docEq(Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 2}), next.fullDocument);
+        assert.docEq(
+            Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 2}),
+            next.fullDocument,
+        );
     }
 });
 

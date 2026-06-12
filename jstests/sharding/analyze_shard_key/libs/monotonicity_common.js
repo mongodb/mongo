@@ -106,7 +106,10 @@ export function appendDuplicatedField(docs, fieldName, getNextValueFunc, maxFreq
     let docIndex = 0;
     while (docIndex < docs.length) {
         const value = getNextValueFunc();
-        const frequency = Math.min(docs.length - docIndex, AnalyzeShardKeyUtil.getRandInteger(1, maxFrequency));
+        const frequency = Math.min(
+            docs.length - docIndex,
+            AnalyzeShardKeyUtil.getRandInteger(1, maxFrequency),
+        );
         for (let i = 0; i < frequency; i++) {
             AnalyzeShardKeyUtil.setDottedField(docs[docIndex], fieldName, value);
             docIndex++;
@@ -228,7 +231,10 @@ export function testMonotonicity(
     const db = conn.getDB(dbName);
 
     const correlationCoefficientThreshold = assert.commandWorked(
-        db.adminCommand({getParameter: 1, analyzeShardKeyMonotonicityCorrelationCoefficientThreshold: 1}),
+        db.adminCommand({
+            getParameter: 1,
+            analyzeShardKeyMonotonicityCorrelationCoefficientThreshold: 1,
+        }),
     ).analyzeShardKeyMonotonicityCorrelationCoefficientThreshold;
 
     testCases.forEach((testCase) => {
@@ -240,7 +246,10 @@ export function testMonotonicity(
             const order = testCase.fieldOpts[i].order;
             if (order == "increasing" || order == "decreasing") {
                 // Make the field have at least 15 unique values in the collection.
-                testCase.fieldOpts[i].maxFrequency = AnalyzeShardKeyUtil.getRandInteger(1, numDocs / 15);
+                testCase.fieldOpts[i].maxFrequency = AnalyzeShardKeyUtil.getRandInteger(
+                    1,
+                    numDocs / 15,
+                );
             }
         }
         const fieldOpts = [...testCase.fieldOpts];
@@ -250,7 +259,9 @@ export function testMonotonicity(
             }
         }
 
-        jsTest.log(`Testing metrics for ${tojson({dbName, collName, currentShardKey, numDocs, testCase})}`);
+        jsTest.log(
+            `Testing metrics for ${tojson({dbName, collName, currentShardKey, numDocs, testCase})}`,
+        );
 
         setupCollection();
 
@@ -323,11 +334,18 @@ export function testMonotonicity(
     });
 }
 
-export function testAnalyzeShardKeysUnshardedCollection(conn, testCases, testProbability, numDocsRange) {
+export function testAnalyzeShardKeysUnshardedCollection(
+    conn,
+    testCases,
+    testProbability,
+    numDocsRange,
+) {
     const dbName = "testDb";
     const collName = "testCollUnsharded";
 
-    jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${tojsononeline({dbName, collName})}`);
+    jsTest.log(
+        `Testing analyzing a shard key for an unsharded collection: ${tojsononeline({dbName, collName})}`,
+    );
 
     let setUpCollection = () => {};
     testMonotonicity(
@@ -342,21 +360,34 @@ export function testAnalyzeShardKeysUnshardedCollection(conn, testCases, testPro
     );
 }
 
-export function testAnalyzeShardKeysShardedCollection(st, testCases, testProbability, numDocsRange) {
+export function testAnalyzeShardKeysShardedCollection(
+    st,
+    testCases,
+    testProbability,
+    numDocsRange,
+) {
     const dbName = "testDb";
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
 
-    jsTest.log(`Testing analyzing a shard key for a sharded collection: ${tojsononeline({dbName, collName})}`);
+    jsTest.log(
+        `Testing analyzing a shard key for a sharded collection: ${tojsononeline({dbName, collName})}`,
+    );
 
     let setUpCollection = () => {
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+        );
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
         assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}),
+            st.s.adminCommand({
+                moveChunk: ns,
+                find: currentShardKeySplitPoint,
+                to: st.shard1.shardName,
+            }),
         );
     };
     testMonotonicity(

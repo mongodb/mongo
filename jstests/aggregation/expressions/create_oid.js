@@ -46,21 +46,29 @@ const failedToParseCode = 9;
 }
 {
     // null
-    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: null}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {_id: {$createObjectId: null}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // array
-    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: ["argument"]}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {_id: {$createObjectId: ["argument"]}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // object id
-    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: ObjectId()}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {_id: {$createObjectId: ObjectId()}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // string
-    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: "argument"}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {_id: {$createObjectId: "argument"}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, failedToParseCode);
 }

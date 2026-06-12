@@ -11,7 +11,9 @@ import {
 } from "src/mongo/shell/data_consistency_checker.js";
 
 if (typeof db === "undefined") {
-    throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
+    throw new Error(
+        "Expected mongo shell to be connected a server, but global 'db' object isn't defined",
+    );
 }
 
 // Disable implicit sessions so FSM workloads that kill random sessions won't interrupt the
@@ -73,19 +75,28 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
     quietly(() => {
         conn = newMongoWithRetry(host);
     });
-    assert.neq(null, conn, "Failed to connect to host '" + host + "' for background collection validation");
+    assert.neq(
+        null,
+        conn,
+        "Failed to connect to host '" + host + "' for background collection validation",
+    );
 
     // Filter out arbiters.
     if (conn.adminCommand({isMaster: 1}).arbiterOnly) {
         print(
-            "Skipping background validation against test node: " + host + " because it is an arbiter and has no data.",
+            "Skipping background validation against test node: " +
+                host +
+                " because it is an arbiter and has no data.",
         );
         return {ok: 1};
     }
 
     // Skip fast count validation on nodes using FCBIS since FCBIS can result in inaccurate fast
     // counts.
-    if (conn.adminCommand({getParameter: 1, initialSyncMethod: 1}).initialSyncMethod === "fileCopyBased") {
+    if (
+        conn.adminCommand({getParameter: 1, initialSyncMethod: 1}).initialSyncMethod ===
+        "fileCopyBased"
+    ) {
         print(
             "Skipping fast count validation against test node: " +
                 host +
@@ -202,7 +213,10 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
 
 if (topology.type === Topology.kStandalone) {
     let res = validateCollectionsBackgroundThread(newMongoWithRetry, topology.mongod);
-    assert.commandWorked(res, () => "background collection validation against the standalone failed: " + tojson(res));
+    assert.commandWorked(
+        res,
+        () => "background collection validation against the standalone failed: " + tojson(res),
+    );
 } else if (topology.type === Topology.kReplicaSet) {
     const threads = [];
     try {

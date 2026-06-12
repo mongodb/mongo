@@ -75,7 +75,9 @@ function setupCollections() {
     // allowDiskUse is false (preventing the HJ fallback).
     foreignDinlj.drop();
     for (let i = 0; i < 5; i++) assert.commandWorked(foreignDinlj.insert({_id: i, b: "hello" + i}));
-    assert.commandWorked(foreignDinlj.createIndex({b: 1}, {collation: {locale: "en", strength: 2}}));
+    assert.commandWorked(
+        foreignDinlj.createIndex({b: 1}, {collation: {locale: "en", strength: 2}}),
+    );
 }
 
 setupCollections();
@@ -113,7 +115,10 @@ function enableAllFlags() {
 
 // Build a $lookup-$unwind pipeline with localField 'a' joining to foreignField 'b'.
 function makeLuPipeline(foreignCollName) {
-    return [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "res"}}, {$unwind: "$res"}];
+    return [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "res"}},
+        {$unwind: "$res"},
+    ];
 }
 
 // Build a $lookup-$unwind pipeline prefixed with a selective $match on the local join field.
@@ -319,9 +324,14 @@ function runAndVerify(flagValues, label) {
         tc.verifyPlan(explain);
         const actual = getEngine(explain);
         const expected = expectedEngine(flagValues, tc);
-        assert.eq(actual, expected, `[${label}] case "${tc.name}": expected ${expected} but got ${actual}`, {
-            flagValues,
-        });
+        assert.eq(
+            actual,
+            expected,
+            `[${label}] case "${tc.name}": expected ${expected} but got ${actual}`,
+            {
+                flagValues,
+            },
+        );
     }
 }
 
@@ -345,9 +355,9 @@ describe("LU IFR flags - each flag disables exactly the expected combinations", 
                 for (const tc of TEST_CASES) {
                     if (getEngine(tc.run()) === "classic") classicCases.push(tc.name);
                 }
-                const expectedCases = TEST_CASES.filter((tc) => tc.strategyFlag === flag || tc.accessFlag === flag).map(
-                    (tc) => tc.name,
-                );
+                const expectedCases = TEST_CASES.filter(
+                    (tc) => tc.strategyFlag === flag || tc.accessFlag === flag,
+                ).map((tc) => tc.name);
                 assert.sameMembers(
                     classicCases,
                     expectedCases,
@@ -379,9 +389,16 @@ describe("LU IFR flags - access-plan flags only gate LU nodes", function () {
             // Plain $lookup (no $unwind absorbed) on COLLSCAN runs in SBE.
             assert.eq(
                 getEngine(
-                    localNoIdx
-                        .explain()
-                        .aggregate([{$lookup: {from: "foreignNoIdx", localField: "a", foreignField: "b", as: "r"}}]),
+                    localNoIdx.explain().aggregate([
+                        {
+                            $lookup: {
+                                from: "foreignNoIdx",
+                                localField: "a",
+                                foreignField: "b",
+                                as: "r",
+                            },
+                        },
+                    ]),
                 ),
                 "sbe",
                 "plain $lookup (no unwind) should use SBE regardless of access-plan flags",
@@ -446,7 +463,14 @@ describe("LU IFR flags - classic plan cache interaction", function () {
         // Predicate answerable by either index on localOrIdx: triggers multi-planning.
         const pipeline = [
             {$match: {a: 0, b: 1}},
-            {$lookup: {from: foreignNoIdx.getName(), localField: "a", foreignField: "b", as: "res"}},
+            {
+                $lookup: {
+                    from: foreignNoIdx.getName(),
+                    localField: "a",
+                    foreignField: "b",
+                    as: "res",
+                },
+            },
             {$unwind: "$res"},
         ];
         localOrIdx.getPlanCache().clear();
@@ -455,7 +479,11 @@ describe("LU IFR flags - classic plan cache interaction", function () {
         assert.eq(localOrIdx.aggregate(pipeline).toArray().length, 1, "warmup: expected 1 result");
         assert.eq(localOrIdx.aggregate(pipeline).toArray().length, 1, "warmup: expected 1 result");
         assert.eq(localOrIdx.aggregate(pipeline).toArray().length, 1, "warmup: expected 1 result");
-        assert.eq(localOrIdx.getPlanCache().list().length, 1, "expected exactly one plan cache entry after warmup");
+        assert.eq(
+            localOrIdx.getPlanCache().list().length,
+            1,
+            "expected exactly one plan cache entry after warmup",
+        );
         // Verify the cache entry is active (not just inactive/pending).
         assert(localOrIdx.getPlanCache().list()[0].isActive, "expected active plan cache entry");
         // With all flags on, the plan runs in SBE (engine selection fires after cache retrieval).
@@ -471,9 +499,13 @@ describe("LU IFR flags - classic plan cache interaction", function () {
                 "expected Classic after ACCESS_IXSCAN disabled, even with a cached plan",
             );
             const classicWinningPlan = getQueryPlanner(classicExplain).winningPlan;
-            assert(classicWinningPlan.isCached, "expected isCached: true confirming classic plan cache was used", {
-                classicWinningPlan,
-            });
+            assert(
+                classicWinningPlan.isCached,
+                "expected isCached: true confirming classic plan cache was used",
+                {
+                    classicWinningPlan,
+                },
+            );
         } finally {
             enableAllFlags();
         }
@@ -486,7 +518,10 @@ describe("LU IFR flags - top-level knobs override our flags", function () {
     it("internalQuerySlotBasedExecutionDisableLookupUnwindPushdown disables LU regardless of IFR flags", function () {
         enableAllFlags();
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableLookupUnwindPushdown: true}),
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionDisableLookupUnwindPushdown: true,
+            }),
         );
         try {
             // All our IFR flags are on, but the top-level knob forces Classic for every LU plan.
@@ -513,14 +548,22 @@ describe("LU IFR flags - top-level knobs override our flags", function () {
         const prevFramework = assert.commandWorked(
             db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
         ).internalQueryFrameworkControl;
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        );
         try {
             for (const tc of TEST_CASES) {
                 const explain = tc.run();
-                assert.eq(getEngine(explain), "classic", `expected classic with forceClassicEngine, case "${tc.name}"`);
+                assert.eq(
+                    getEngine(explain),
+                    "classic",
+                    `expected classic with forceClassicEngine, case "${tc.name}"`,
+                );
             }
         } finally {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevFramework}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevFramework}),
+            );
         }
     });
 });

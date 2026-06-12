@@ -121,7 +121,12 @@ export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline
             function (dbName, cursorId, collName, sessionId) {
                 const testDb = db.getSiblingDB(dbName);
                 assert.commandWorked(
-                    testDb.runCommand({getMore: cursorId, collection: collName, lsid: sessionId, batchSize: 1}),
+                    testDb.runCommand({
+                        getMore: cursorId,
+                        collection: collName,
+                        lsid: sessionId,
+                        batchSize: 1,
+                    }),
                 );
             },
             db.getName(),

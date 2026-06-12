@@ -45,7 +45,9 @@ const awaitResult = startParallelShell(
         function (host, shardName, dbName) {
             const mongos = new Mongo(host);
             assert.commandFailedWithCode(
-                mongos.getDB(dbName).runCommand({createUnsplittableCollection: "test1coll", dataShard: shardName}),
+                mongos
+                    .getDB(dbName)
+                    .runCommand({createUnsplittableCollection: "test1coll", dataShard: shardName}),
                 ErrorCodes.ShardNotFound,
             );
         },
@@ -65,18 +67,25 @@ ShardTransitionUtil.transitionToDedicatedConfigServer(st);
 failpoint.off();
 awaitResult();
 
-jsTest.log("Testing that creating an unsplittable collection on a non-existing shard or the config server fails.");
+jsTest.log(
+    "Testing that creating an unsplittable collection on a non-existing shard or the config server fails.",
+);
 {
     const kDataColl = "unsplittable_collection_on_config_shard";
 
     assert.commandFailedWithCode(
-        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: "config"}),
+        st.s
+            .getDB(kDbName)
+            .runCommand({createUnsplittableCollection: kDataColl, dataShard: "config"}),
         ErrorCodes.ShardNotFound,
         "Collection coordinator should reject any attempt to create a collection on a dedicated config server",
     );
 
     assert.commandFailedWithCode(
-        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: "non-existing-shard-name"}),
+        st.s.getDB(kDbName).runCommand({
+            createUnsplittableCollection: kDataColl,
+            dataShard: "non-existing-shard-name",
+        }),
         ErrorCodes.ShardNotFound,
     );
 }

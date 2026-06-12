@@ -30,7 +30,10 @@ assert.eq(2, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).max({a: 2, b: 2}).
 assert.eq(3, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).toArray().length);
 assert.eq(3, coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).toArray().length);
 assert.eq(3, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).hint({a: 1, b: 1}).toArray().length);
-assert.eq(3, coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length);
+assert.eq(
+    3,
+    coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length,
+);
 
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: -1}));
@@ -39,10 +42,22 @@ assert.eq(4, coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).toArray().length)
 assert.eq(4, coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).toArray().length);
 assert.eq(1, coll.find().hint({a: 1, b: -1}).min({a: 2, b: 1}).toArray().length);
 assert.eq(1, coll.find().hint({a: 1, b: -1}).max({a: 1, b: 1.5}).toArray().length);
-assert.eq(4, coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(4, coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(1, coll.find().hint({a: 1, b: -1}).min({a: 2, b: 1}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(1, coll.find().hint({a: 1, b: -1}).max({a: 1, b: 1.5}).hint({a: 1, b: -1}).toArray().length);
+assert.eq(
+    4,
+    coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).hint({a: 1, b: -1}).toArray().length,
+);
+assert.eq(
+    4,
+    coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).hint({a: 1, b: -1}).toArray().length,
+);
+assert.eq(
+    1,
+    coll.find().hint({a: 1, b: -1}).min({a: 2, b: 1}).hint({a: 1, b: -1}).toArray().length,
+);
+assert.eq(
+    1,
+    coll.find().hint({a: 1, b: -1}).max({a: 1, b: 1.5}).hint({a: 1, b: -1}).toArray().length,
+);
 
 // Check that min/max requires a hint.
 assert.throwsWithCode(

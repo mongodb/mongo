@@ -56,8 +56,19 @@ let primFp = configureFailPoint(primary, "hangAfterInitializingIndexBuild");
 jsTestLog("4. Begin Index Build on all nodes");
 let createIndexFn = function (dbName, collName, indexSpec, indexName) {
     jsTestLog("Resumable replicated index build in parallel shell");
-    jsTestLog("nss: " + dbName + "." + collName + ", indexName: " + indexName + " indexSpec: " + tojson(indexSpec));
-    assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).createIndex(indexSpec, {name: indexName}));
+    jsTestLog(
+        "nss: " +
+            dbName +
+            "." +
+            collName +
+            ", indexName: " +
+            indexName +
+            " indexSpec: " +
+            tojson(indexSpec),
+    );
+    assert.commandWorked(
+        db.getSiblingDB(dbName).getCollection(collName).createIndex(indexSpec, {name: indexName}),
+    );
     jsTestLog("Resumable replicated index build in parallel shell - done");
 };
 
@@ -69,7 +80,9 @@ primFp.wait();
 
 jsTestLog("5. Obtain buildUUID");
 let buildUUID = extractUUIDFromObject(
-    IndexBuildTest.assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName].buildUUID,
+    IndexBuildTest.assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[
+        indexName
+    ].buildUUID,
 );
 
 jsTestLog("6. Finish Index Build on Primary, voted for commit quorum");
@@ -95,7 +108,12 @@ checkLog.containsJson(secondary, 4841700, {
 });
 
 jsTestLog("10. Unclean shutdown of secondary");
-rst.stop(secondary, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, waitpid: true});
+rst.stop(
+    secondary,
+    9,
+    {allowedExitCode: MongoRunner.EXIT_SIGKILL},
+    {forRestart: true, waitpid: true},
+);
 
 jsTestLog("11. Boot secondary");
 rst.start(secondary, undefined, /*restart=*/ true);
@@ -134,7 +152,11 @@ assert.soon(() => {
     return completedBuilds.length >= 1;
 }, "Did not observe build-completion log on the secondary");
 for (const entry of completedBuilds) {
-    assert.gt(entry.attr.numIndexesBefore, 0, "numIndexesBefore should be > 0 after restart rebuild: " + tojson(entry));
+    assert.gt(
+        entry.attr.numIndexesBefore,
+        0,
+        "numIndexesBefore should be > 0 after restart rebuild: " + tojson(entry),
+    );
 }
 
 jsTestLog("16. Join with parallel shell that ran the index build");

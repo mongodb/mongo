@@ -19,7 +19,9 @@ function testHeapProfilerOnStartup(opts) {
     jsTestLog(ss.heapProfile);
 
     assert(ss.heapProfile.stats.bytesAllocated > 0);
-    assert(ss.heapProfile.hasOwnProperty("stacks") && Object.keys(ss.heapProfile.stacks).length > 0);
+    assert(
+        ss.heapProfile.hasOwnProperty("stacks") && Object.keys(ss.heapProfile.stacks).length > 0,
+    );
 
     MongoRunner.stopMongod(db);
 }
@@ -56,7 +58,10 @@ function testHeapProfilerRespectsMemoryLimit() {
     let db;
     try {
         db = MongoRunner.runMongod({
-            setParameter: {heapProfilingSampleIntervalBytes: minProfilingRate, heapProfilingMaxObjects: 2},
+            setParameter: {
+                heapProfilingSampleIntervalBytes: minProfilingRate,
+                heapProfilingMaxObjects: 2,
+            },
         });
     } catch (err) {
         jsTestLog("Heap profiler is not available on this platform.");
@@ -103,7 +108,11 @@ function testHeapProfilingMaxObjectsRuntimeUpdate() {
     // Verify the value was updated
     res = adminDb.runCommand({getParameter: 1, heapProfilingMaxObjects: 1});
     assert.commandWorked(res);
-    assert.eq(res.heapProfilingMaxObjects, newValue, "heapProfilingMaxObjects was not updated to " + newValue);
+    assert.eq(
+        res.heapProfilingMaxObjects,
+        newValue,
+        "heapProfilingMaxObjects was not updated to " + newValue,
+    );
 
     // Set back to 0 (use heuristic)
     assert.commandWorked(adminDb.runCommand({setParameter: 1, heapProfilingMaxObjects: 0}));

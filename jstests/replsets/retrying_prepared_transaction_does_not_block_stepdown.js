@@ -36,6 +36,8 @@ PrepareHelpers.prepareTransaction(session);
 
 // Test that stepDown can proceed.
 jsTestLog("Step down primary");
-assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(
+    primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+);
 
 replTest.stopSet();

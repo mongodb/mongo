@@ -70,10 +70,15 @@ describe("secondary port with INTERNAL split horizon", function () {
     });
 
     it("should have INTERNAL horizon configured on every node", function () {
-        const config = assert.commandWorked(this.primary.adminCommand({replSetGetConfig: 1})).config;
+        const config = assert.commandWorked(
+            this.primary.adminCommand({replSetGetConfig: 1}),
+        ).config;
         for (let i = 0; i < numNodes; i++) {
             const horizons = config.members[i].horizons;
-            assert(horizons.hasOwnProperty("INTERNAL"), `Node ${i} should have an INTERNAL horizon`);
+            assert(
+                horizons.hasOwnProperty("INTERNAL"),
+                `Node ${i} should have an INTERNAL horizon`,
+            );
             assert.eq(
                 horizons.INTERNAL,
                 `${internalHostnames[i]}:${secondaryPorts[i]}`,
@@ -92,7 +97,9 @@ describe("secondary port with INTERNAL split horizon", function () {
     });
 
     it("should return the default horizon via hello on the main port", function () {
-        const config = assert.commandWorked(this.primary.adminCommand({replSetGetConfig: 1})).config;
+        const config = assert.commandWorked(
+            this.primary.adminCommand({replSetGetConfig: 1}),
+        ).config;
         const expectedDefaultHosts = config.members.map((m) => m.host);
         const expectedMe = config.members[this.primaryId].host;
 
@@ -128,12 +135,20 @@ describe("secondary port with INTERNAL split horizon", function () {
         const db = conn.getDB("admin");
 
         const sniResult = assert.commandWorked(db.runCommand({whatsmysni: 1}));
-        assert.eq(sniResult.sni, primaryInternalHostname, "SNI should match the INTERNAL horizon hostname");
+        assert.eq(
+            sniResult.sni,
+            primaryInternalHostname,
+            "SNI should match the INTERNAL horizon hostname",
+        );
 
         const helloResult = assert.commandWorked(db.runCommand({hello: 1}));
 
         const expectedMe = `${primaryInternalHostname}:${primarySecondaryPort}`;
-        assert.eq(helloResult.me, expectedMe, "hello 'me' should match the primary's INTERNAL horizon");
+        assert.eq(
+            helloResult.me,
+            expectedMe,
+            "hello 'me' should match the primary's INTERNAL horizon",
+        );
 
         const expectedHosts = internalHostnames.map((h, i) => `${h}:${secondaryPorts[i]}`);
         assert.sameMembers(
@@ -154,7 +169,9 @@ describe("secondary port with INTERNAL split horizon", function () {
             },
         };
 
-        const secondaryPortHosts = internalHostnames.map((h, i) => `${h}:${secondaryPorts[i]}`).join(",");
+        const secondaryPortHosts = internalHostnames
+            .map((h, i) => `${h}:${secondaryPorts[i]}`)
+            .join(",");
         const rsName = this.rst.name;
         const rsURL = `${rsName}/${secondaryPortHosts}`;
 
@@ -164,7 +181,11 @@ describe("secondary port with INTERNAL split horizon", function () {
         assert.commandWorked(coll.insert({_id: "secondaryPort", src: "secondaryPortConn"}));
 
         const findResult = coll.findOne({_id: "secondaryPort"});
-        assert.neq(findResult, null, "should be able to read the document written via the secondary port");
+        assert.neq(
+            findResult,
+            null,
+            "should be able to read the document written via the secondary port",
+        );
         assert.eq(findResult.src, "secondaryPortConn");
 
         conn.close();
@@ -175,6 +196,9 @@ describe("secondary port with INTERNAL split horizon", function () {
         const connectionAccepted = logs.some((line) => {
             return line.includes('"id":22943');
         });
-        assert(connectionAccepted, "Expected at least one 'Connection accepted' (log 22943) entry in the server log");
+        assert(
+            connectionAccepted,
+            "Expected at least one 'Connection accepted' (log 22943) entry in the server log",
+        );
     });
 });

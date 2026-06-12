@@ -23,7 +23,9 @@ const t = new Date("2002-05-29T00:00:00Z");
 
 const coll = db[jsTestName()];
 
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 assert.commandWorked(
     coll.insertMany([
         {[timeField]: t, [metaField]: "1", v: "replacement"},
@@ -76,12 +78,18 @@ crudTest(() => {
 
 // countDocuments()
 crudTest(() => {
-    assert.eq(getTimeseriesCollForRawOps(coll).countDocuments({"control.count": 2}, kRawOperationSpec), 1);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).countDocuments({"control.count": 2}, kRawOperationSpec),
+        1,
+    );
 });
 
 // distinct()
 crudTest(() => {
-    assert.eq(getTimeseriesCollForRawOps(coll).distinct("control.count", {}, kRawOperationSpec).sort(), [1, 2]);
+    assert.eq(
+        getTimeseriesCollForRawOps(coll).distinct("control.count", {}, kRawOperationSpec).sort(),
+        [1, 2],
+    );
 });
 
 // find()

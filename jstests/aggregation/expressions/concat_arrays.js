@@ -49,7 +49,9 @@ function runAndAssertNull(operands) {
 }
 
 function runAndAssertThrows(operands) {
-    const error = assert.throws(() => coll.aggregate([{$project: {f: {$concatArrays: operands}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {f: {$concatArrays: operands}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, 28664);
 }
 
@@ -103,7 +105,13 @@ runAndAssert(
 runAndAssert(
     [
         "$str_arr",
-        {$filter: {input: "$int_arr", as: "num", cond: {$and: [{$gte: ["$$num", 2]}, {$lte: ["$$num", 3]}]}}},
+        {
+            $filter: {
+                input: "$int_arr",
+                as: "num",
+                cond: {$and: [{$gte: ["$$num", 2]}, {$lte: ["$$num", 3]}]},
+            },
+        },
         "$int_arr",
     ],
     [["a", "b", "c", 2, 3, 1, 2, 3, 4]],
@@ -131,7 +139,11 @@ runAndAssertNull(["$not_a_field"]);
 runAndAssertNull(["$null_val"]);
 runAndAssertNull(["$not_a_field", "$null_val"]);
 runAndAssertNull(["$null_val", "$not_a_field"]);
-runAndAssertNull([{$concatArrays: "$int_arr"}, null, {$concatArrays: {$concatArrays: ["$obj_arr", "$str_arr"]}}]);
+runAndAssertNull([
+    {$concatArrays: "$int_arr"},
+    null,
+    {$concatArrays: {$concatArrays: ["$obj_arr", "$str_arr"]}},
+]);
 
 // Confirm edge case where if null precedes non-array input, null is returned.
 runAndAssertNull(["$int_arr", "$null_val", "$int_val"]);

@@ -412,7 +412,11 @@ function IndexDataGenerator(options) {
             // Find the character (index into keyChars) that we currently have at this position, set
             // this position to the next character in the keyChars sequence
             var keyCharsIndex = keyChars.search(currentKey[currentKeyIndex]);
-            currentKey = setCharAt(currentKey, currentKeyIndex, keyChars[(keyCharsIndex + 1) % keyChars.length]);
+            currentKey = setCharAt(
+                currentKey,
+                currentKeyIndex,
+                keyChars[(keyCharsIndex + 1) % keyChars.length],
+            );
             currentKeyIndex = currentKeyIndex + 1;
 
             // Loop again if we advanced the character past the end of keyChars and wrapped around,
@@ -611,7 +615,9 @@ function CollectionMetadataGenerator(options) {
                 }
                 capped = options["capped"];
             } else {
-                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " + option);
+                throw Error(
+                    "Unsupported key in options passed to CollectionMetadataGenerator: " + option,
+                );
             }
         }
     }

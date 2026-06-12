@@ -81,9 +81,11 @@ replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    replTest
-        .getPrimary()
-        .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    replTest.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 let downstream = nodes[0];
@@ -135,7 +137,9 @@ assertRecordHasTxnNumber(downstream, firstLsid, NumberLong(5));
 assert.eq(upstream.getDB("config").transactions.find().itcount(), 1);
 assertRecordHasTxnNumber(upstream, firstLsid, NumberLong(5));
 
-jsTestLog("Creating a partition between 'the downstream and arbiter node' and 'the upstream node.'");
+jsTestLog(
+    "Creating a partition between 'the downstream and arbiter node' and 'the upstream node.'",
+);
 downstream.disconnect(upstream);
 arbiter.disconnect(upstream);
 
@@ -231,7 +235,10 @@ replTest.awaitSecondaryNodes();
 reconnect(downstream);
 
 jsTestLog("Checking the rollback ID of the downstream node to confirm that a rollback occurred.");
-assert.neq(downstreamRBIDBefore, assert.commandWorked(downstream.adminCommand("replSetGetRBID")).rbid);
+assert.neq(
+    downstreamRBIDBefore,
+    assert.commandWorked(downstream.adminCommand("replSetGetRBID")).rbid,
+);
 
 // Verify the record for the first lsid rolled back to its original value, the record for the
 // second lsid was removed, and the record for the third lsid was created during oplog replay.

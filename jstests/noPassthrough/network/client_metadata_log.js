@@ -9,10 +9,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let checkLogForMetadata = function (mongo, options) {
     const normalizedOptions = JSON.parse(JSON.stringify(options));
-    if (!normalizedOptions.networkMessageCompressors) normalizedOptions.networkMessageCompressors = [];
+    if (!normalizedOptions.networkMessageCompressors)
+        normalizedOptions.networkMessageCompressors = [];
     let argv = ["mongo", "--eval", "tostrictjson(db.hello());", "--port", mongo.port];
     if (normalizedOptions.networkMessageCompressors.length > 0)
-        argv.push(`--networkMessageCompressors=${normalizedOptions.networkMessageCompressors.join(",")}`);
+        argv.push(
+            `--networkMessageCompressors=${normalizedOptions.networkMessageCompressors.join(",")}`,
+        );
     assert.eq(runMongoProgram(...argv), 0);
 
     print(`Checking ${mongo.fullOptions.logFile} for client metadata message`);
@@ -31,7 +34,9 @@ let checkLogForMetadata = function (mongo, options) {
             log +
             "\n************************************************************",
     );
-    const negotiatedCompressorsMatches = matches[matches.length - 1].match(/"negotiatedCompressors":(\[[^\]]*\])/);
+    const negotiatedCompressorsMatches = matches[matches.length - 1].match(
+        /"negotiatedCompressors":(\[[^\]]*\])/,
+    );
     assert(
         negotiatedCompressorsMatches,
         "'client metadata' log line did not include negotiated compressors\n" +
@@ -45,7 +50,8 @@ let checkLogForMetadata = function (mongo, options) {
     negotiatedCompressors.sort();
     normalizedOptions.networkMessageCompressors.sort();
     assert(
-        JSON.stringify(negotiatedCompressors) === JSON.stringify(normalizedOptions.networkMessageCompressors),
+        JSON.stringify(negotiatedCompressors) ===
+            JSON.stringify(normalizedOptions.networkMessageCompressors),
         "'client metadata' log line reports unexpected negotiated compressors:\n" +
             `included [${negotiatedCompressors.join(", ")}]\n` +
             `expected [${normalizedOptions.networkMessageCompressors.join(", ")}]`,
@@ -82,7 +88,10 @@ let testMongoS = function (options) {
 
     let inprogSample = null;
     for (let inprog of curOp.inprog) {
-        if (inprog.hasOwnProperty("clientMetadata") && inprog.clientMetadata.hasOwnProperty("mongos")) {
+        if (
+            inprog.hasOwnProperty("clientMetadata") &&
+            inprog.clientMetadata.hasOwnProperty("mongos")
+        ) {
             inprogSample = inprog;
             break;
         }

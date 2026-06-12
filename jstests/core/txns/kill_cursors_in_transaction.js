@@ -35,7 +35,9 @@ withTxnAndAutoRetryOnMongos(
         let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
         assert(res.hasOwnProperty("cursor"), tojson(res));
         assert(res.cursor.hasOwnProperty("id"), tojson(res));
-        assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+        assert.commandWorked(
+            sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+        );
     },
     /* txnOpts = */ {},
 );
@@ -51,7 +53,10 @@ withRetryOnTransientTxnError(
             sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
             ErrorCodes.OperationNotSupportedInTransaction,
         );
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
     },
     () => {
         session.abortTransaction_forTesting();
@@ -60,9 +65,12 @@ withRetryOnTransientTxnError(
 
 // TODO SERVER-102866 remove when 9.0 becomes last-lts
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 if (!isMultiversion) {
-    jsTest.log("killcursors in session but not transaction can kill cursor in a transaction in another session");
+    jsTest.log(
+        "killcursors in session but not transaction can kill cursor in a transaction in another session",
+    );
     withRetryOnTransientTxnError(
         () => {
             session.startTransaction();
@@ -72,7 +80,9 @@ if (!isMultiversion) {
             assert(res.hasOwnProperty("cursor"), tojson(res));
             assert(res.cursor.hasOwnProperty("id"), tojson(res));
 
-            assert.commandWorked(sessionDb2.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+            assert.commandWorked(
+                sessionDb2.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+            );
         },
         () => {
             session.abortTransaction_forTesting();
@@ -108,7 +118,8 @@ if (!isMultiversion) {
     session.abortTransaction_forTesting();
 
     jsTest.log(
-        "killcursors in transaction should not be able to kill cursor" + "in another transaction in the same session",
+        "killcursors in transaction should not be able to kill cursor" +
+            "in another transaction in the same session",
     );
     withRetryOnTransientTxnError(
         () => {
@@ -182,7 +193,10 @@ assert.soon(
         );
     },
     function () {
-        return "Failed to find drop in currentOp output: " + tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+        return (
+            "Failed to find drop in currentOp output: " +
+            tojson(adminDB.aggregate([{$currentOp: {}}]).toArray())
+        );
     },
 );
 
@@ -202,7 +216,10 @@ if (res.ok) {
     assert(isTransientTxnError, res);
     assert(isLockTimeout, res);
     // The transaction should have implicitly been aborted.
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 }
 
 // Once the transaction has committed, the drop can proceed.

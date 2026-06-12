@@ -15,7 +15,12 @@ const coll = testDB.getCollection("jstests_json_schema_ignore_unsupported");
 
 assertSchemaMatch(coll, {my_keyword: "ignored", minProperties: 2}, {_id: 0}, false);
 assertSchemaMatch(coll, {my_keyword: "ignored", minProperties: 2}, {_id: 0, a: 1}, true);
-assertSchemaMatch(coll, {properties: {a: {my_keyword: "ignored", minProperties: 1}}}, {a: {b: 1}}, true);
+assertSchemaMatch(
+    coll,
+    {properties: {a: {my_keyword: "ignored", minProperties: 1}}},
+    {a: {b: 1}},
+    true,
+);
 
 // Test that the same query knob does not change the behavior for unsupported keywords.
 {

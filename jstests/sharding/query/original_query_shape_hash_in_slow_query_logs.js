@@ -45,7 +45,9 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             {x: 5, y: 2},
             {x: 6, y: 3},
         ]);
-        assert.commandWorked(routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}));
+        assert.commandWorked(
+            routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}),
+        );
 
         // Set up sharded collection on two shards.
         const shardedTwoShardsColl = routerDB[collNames.two_shard];
@@ -58,9 +60,16 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             {x: 7, y: 3},
         ]);
         shardedTwoShardsColl.createIndex({y: 1});
-        assert.commandWorked(routerDB.adminCommand({shardCollection: shardedTwoShardsColl.getFullName(), key: {y: 1}}));
+        assert.commandWorked(
+            routerDB.adminCommand({
+                shardCollection: shardedTwoShardsColl.getFullName(),
+                key: {y: 1},
+            }),
+        );
         // Split and move chunks to ensure data is on both shards.
-        assert.commandWorked(routerDB.adminCommand({split: shardedTwoShardsColl.getFullName(), middle: {y: 2}}));
+        assert.commandWorked(
+            routerDB.adminCommand({split: shardedTwoShardsColl.getFullName(), middle: {y: 2}}),
+        );
         assert.commandWorked(
             routerDB.adminCommand({
                 moveChunk: shardedTwoShardsColl.getFullName(),
@@ -79,7 +88,12 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             {x: 6, y: 3},
         ]);
         shardedOneShardColl.createIndex({y: 1});
-        assert.commandWorked(routerDB.adminCommand({shardCollection: shardedOneShardColl.getFullName(), key: {y: 1}}));
+        assert.commandWorked(
+            routerDB.adminCommand({
+                shardCollection: shardedOneShardColl.getFullName(),
+                key: {y: 1},
+            }),
+        );
 
         // Set slow query threshold to -1 so every query gets logged on the router and shards.
         routerDB.setProfilingLevel(0, -1);
@@ -101,7 +115,10 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                     return false;
                 }
                 if (commandType === "getMore") {
-                    return entry.attr.command.getMore && entry.attr.originatingCommand.comment == queryComment;
+                    return (
+                        entry.attr.command.getMore &&
+                        entry.attr.originatingCommand.comment == queryComment
+                    );
                 }
                 return entry.attr.command.comment == queryComment && !entry.attr.command.getMore;
             });
@@ -184,10 +201,20 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             const commandCursor = new DBCommandCursor(routerDB, result);
             commandCursor.itcount(); // exhaust the cursor
             const getMoreLogs = [
-                ...getSlowQueryLogLines({queryComment: query.comment, testDB: shard0DB, commandType: "getMore"}),
-                ...getSlowQueryLogLines({queryComment: query.comment, testDB: routerDB, commandType: "getMore"}),
+                ...getSlowQueryLogLines({
+                    queryComment: query.comment,
+                    testDB: shard0DB,
+                    commandType: "getMore",
+                }),
+                ...getSlowQueryLogLines({
+                    queryComment: query.comment,
+                    testDB: routerDB,
+                    commandType: "getMore",
+                }),
             ];
-            const logsWithOriginalHash = getMoreLogs.filter((log) => log.attr.command.originalQueryShapeHash);
+            const logsWithOriginalHash = getMoreLogs.filter(
+                (log) => log.attr.command.originalQueryShapeHash,
+            );
             assert.eq(
                 logsWithOriginalHash.length,
                 0,
@@ -221,7 +248,9 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             before(function () {
                 // Create a view on top of this collection for view tests.
                 routerDB[viewName].drop();
-                assert.commandWorked(routerDB.createView(viewName, collName, [{$addFields: {z: 1}}]));
+                assert.commandWorked(
+                    routerDB.createView(viewName, collName, [{$addFields: {z: 1}}]),
+                );
             });
 
             function makeUniqueComment(str) {

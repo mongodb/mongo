@@ -11,7 +11,12 @@
  *     sync across all nodes before this change is applied. All settings will be in sync after
  *     changes are applied.
  */
-export function setParameterOnAllNodes({cluster, paramName, newValue, assertAllSettingsWereIdentical}) {
+export function setParameterOnAllNodes({
+    cluster,
+    paramName,
+    newValue,
+    assertAllSettingsWereIdentical,
+}) {
     let returnValue = null;
     let lastSeenHost = null;
     const setQueryStatsParams = (db) => {

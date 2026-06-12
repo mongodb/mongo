@@ -14,7 +14,11 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("configDebugDump for the authoritative shard catalog", function () {
-    const kShardCatalogCollections = ["shard.catalog.databases", "shard.catalog.collections", "shard.catalog.chunks"];
+    const kShardCatalogCollections = [
+        "shard.catalog.databases",
+        "shard.catalog.collections",
+        "shard.catalog.chunks",
+    ];
     const kCacheCollections = ["cache.collections", "cache.databases"];
 
     // Returns a map from each config-db collection name to its info.configDebugDump value, as
@@ -42,7 +46,10 @@ describe("configDebugDump for the authoritative shard catalog", function () {
         // Creating the database and sharding a collection commits the authoritative shard catalog
         // (config.shard.catalog.{databases,collections,chunks}) on the owning shard.
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.primaryShardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.primaryShardName,
+            }),
         );
         assert.commandWorked(this.st.s.adminCommand({shardCollection: this.ns, key: {x: 1}}));
     });
@@ -55,14 +62,23 @@ describe("configDebugDump for the authoritative shard catalog", function () {
         const byName = getConfigDebugDumpByCollection(this.shardPrimary);
 
         for (const coll of kShardCatalogCollections) {
-            assert(coll in byName, `Expected listCollections on the shard's config db to report ${coll}`, {byName});
+            assert(
+                coll in byName,
+                `Expected listCollections on the shard's config db to report ${coll}`,
+                {byName},
+            );
             assert.eq(
                 "boolean",
                 typeof byName[coll],
                 `Expected info.configDebugDump to be a boolean for config.${coll}`,
                 {byName},
             );
-            assert.eq(true, byName[coll], `Expected config.${coll} to be flagged for the debug dump`, {byName});
+            assert.eq(
+                true,
+                byName[coll],
+                `Expected config.${coll} to be flagged for the debug dump`,
+                {byName},
+            );
         }
     });
 

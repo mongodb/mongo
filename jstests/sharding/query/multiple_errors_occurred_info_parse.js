@@ -49,7 +49,10 @@ assert.eq(res.writeErrors.length, 1, tojson(res));
 const writeError = res.writeErrors[0];
 assert(writeError.code == ErrorCodes.MultipleErrorsOccurred, tojson(res));
 
-assert(!writeError.errmsg.includes("Error parsing extra info for MultipleErrorsOccurred"), tojson(res));
+assert(
+    !writeError.errmsg.includes("Error parsing extra info for MultipleErrorsOccurred"),
+    tojson(res),
+);
 assert(writeError.hasOwnProperty("errInfo"), tojson(res));
 assert(Array.isArray(writeError.errInfo.causedBy), tojson(res));
 assert.eq(writeError.errInfo.causedBy.length, 2, tojson(res));

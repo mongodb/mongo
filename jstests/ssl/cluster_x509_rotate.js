@@ -104,7 +104,9 @@ for (let node of rst.nodeList()) {
                     allowInvalidHostnames: true,
                 },
             });
-            assert.commandWorked(conn.adminCommand({replSetTestEgress: 1, target, timeoutSecs: NumberInt(15)}));
+            assert.commandWorked(
+                conn.adminCommand({replSetTestEgress: 1, target, timeoutSecs: NumberInt(15)}),
+            );
         }
     }
 }

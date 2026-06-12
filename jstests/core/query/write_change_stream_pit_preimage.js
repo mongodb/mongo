@@ -53,7 +53,10 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
 
     // Because the pre-images collection is implicitly replicated, validate that writes do not
     // generate oplog entries, with the exception of deletions.
-    assert.eq(0, localDB.oplog.rs.find({op: {"$ne": "d"}, ns: "config.system.preimages"}).itcount());
+    assert.eq(
+        0,
+        localDB.oplog.rs.find({op: {"$ne": "d"}, ns: "config.system.preimages"}).itcount(),
+    );
 }
 
 // Validates that no pre-image is written while performing ops.
@@ -69,13 +72,19 @@ function testPreImageRecordingInCappedCollection({updateDocFunc, replaceDocFunc}
         size: 1,
         max: 1,
     });
-    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collWithPreImages.getName());
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(
+        testDB,
+        collWithPreImages.getName(),
+    );
     const collWithNoPreImages = assertDropAndRecreateCollection(testDB, "coll_with_no_pre_images", {
         capped: true,
         size: 1,
         max: 1,
     });
-    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collWithNoPreImages.getName());
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(
+        testDB,
+        collWithNoPreImages.getName(),
+    );
 
     // Verify that no pre-image is recorded, when performing writes to the collection, that doesn't
     // have 'changeStreamPreAndPostImages' enabled.
@@ -132,13 +141,23 @@ function testPreImageRecordingInCappedCollection({updateDocFunc, replaceDocFunc}
 }
 
 // Tests the pre-images recording behavior in non-capped collections.
-function testPreImageRecordingInNonCappedCollection({updateDocFunc, replaceDocFunc, removeDocFunc}) {
+function testPreImageRecordingInNonCappedCollection({
+    updateDocFunc,
+    replaceDocFunc,
+    removeDocFunc,
+}) {
     const collWithPreImages = assertDropAndRecreateCollection(testDB, "coll_with_pre_images", {
         changeStreamPreAndPostImages: {enabled: true},
     });
-    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collWithPreImages.getName());
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(
+        testDB,
+        collWithPreImages.getName(),
+    );
     const collWithNoPreImages = assertDropAndRecreateCollection(testDB, "coll_with_no_pre_images");
-    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collWithNoPreImages.getName());
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(
+        testDB,
+        collWithNoPreImages.getName(),
+    );
 
     // Verify that no pre-image is recorded, when performing writes to the collection, that doesn't
     // have 'changeStreamPreAndPostImages' enabled.
@@ -270,7 +289,11 @@ testPreImageRecording({
         ]);
 
         // Check post condition.
-        assert.docEq([updatedDoc], coll.find().toArray(), "$merge stage did not update the document");
+        assert.docEq(
+            [updatedDoc],
+            coll.find().toArray(),
+            "$merge stage did not update the document",
+        );
     },
     replaceDocFunc: function (coll) {
         testDB.aggregate([
@@ -286,7 +309,11 @@ testPreImageRecording({
         ]);
 
         // Check post condition.
-        assert.docEq([replacedDoc], coll.find().toArray(), "$merge stage did not replace the document");
+        assert.docEq(
+            [replacedDoc],
+            coll.find().toArray(),
+            "$merge stage did not replace the document",
+        );
     },
     // Removals cannot be tested in aggregation as aggregation can't remove documents.
     removeDocFunc: null,

@@ -40,7 +40,9 @@ failPoint.wait();
 let ttlPassesBeforeStepdown = getNumTTLPasses();
 
 // Force a stepdown of the primary.
-assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
+assert.commandWorked(
+    primary.getDB("admin").runCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}),
+);
 rst.awaitSecondaryNodes(null, [primary]);
 assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 assert.commandWorked(primary.adminCommand({replSetStepUp: 1}));

@@ -38,7 +38,10 @@ export function runningWithViewlessTimeseriesUpgradeDowngrade(db) {
         return false;
     }
 
-    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db.getMongo(), "CreateViewlessTimeseriesCollections");
+    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(
+        db.getMongo(),
+        "CreateViewlessTimeseriesCollections",
+    );
     if (!flagDoc.value) {
         // The feature flag is disabled (in all FCVs).
         return false;
@@ -58,7 +61,10 @@ export function isViewlessTimeseriesOnlySuite(db) {
     // In FCV upgrade/downgrade suite, the suite is viewless-only if the flag has been enabled since
     // last LTS (example: viewless timeseries released in FCV 9.0, we are in binary 9.1 running a
     // FCV 9.0 - FCV 9.1 upgrade/downgrade suite --> all collections are viewless).
-    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db.getMongo(), "CreateViewlessTimeseriesCollections");
+    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(
+        db.getMongo(),
+        "CreateViewlessTimeseriesCollections",
+    );
     return flagDoc.value && MongoRunner.compareBinVersions(lastLTSFCV, flagDoc.version) >= 0;
 }
 
@@ -69,7 +75,11 @@ export function isViewfulTimeseriesOnlySuite(db) {
     }
 
     // Check if the viewless timeseries feature flag is disabled in the latest FCV.
-    return !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */);
+    return !FeatureFlagUtil.isPresentAndEnabled(
+        db,
+        "CreateViewlessTimeseriesCollections",
+        true /* ignoreFCV */,
+    );
 }
 
 /**
@@ -77,7 +87,10 @@ export function isViewfulTimeseriesOnlySuite(db) {
  * TODO SERVER-101609 remove this function once 9.0 becomes lastLTS.
  */
 export function assertTimeseriesConsistentWithViewlessFlag(db) {
-    const viewlessEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+    const viewlessEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        db,
+        "CreateViewlessTimeseriesCollections",
+    );
     const dbNames = assert
         .commandWorked(db.adminCommand({listDatabases: 1, nameOnly: true}))
         .databases.map((d) => d.name);
@@ -200,12 +213,15 @@ export function runTimeseriesChunkCommand(db, cmdObj) {
             if (
                 lastRes.ok ||
                 (!expectedErrorCodes.includes(lastRes.code) &&
-                    lastRes.code !== ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace)
+                    lastRes.code !==
+                        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace)
             ) {
                 return true;
             }
 
-            jsTest.log.info(`Backing off because timeseries chunk operation ${cmdName} failed on both namespaces`);
+            jsTest.log.info(
+                `Backing off because timeseries chunk operation ${cmdName} failed on both namespaces`,
+            );
             return false;
         },
         () => `Chunk command failed for ${originalNs}: ${tojson(lastRes)}`,
@@ -225,7 +241,14 @@ export function findTimeseriesConfigCollectionsDocument(coll) {
                     .getDB()
                     .getSiblingDB("config")
                     .collections.findOne(
-                        {_id: {$in: [coll.getFullName(), getTimeseriesBucketsColl(coll).getFullName()]}},
+                        {
+                            _id: {
+                                $in: [
+                                    coll.getFullName(),
+                                    getTimeseriesBucketsColl(coll).getFullName(),
+                                ],
+                            },
+                        },
                         {} /* projection */,
                         {} /* options */,
                         "snapshot",
@@ -285,7 +308,9 @@ export function assertExplainTargetsExpectedTimeseriesNamespace(
     if (commandResult.command.findAndModify && !isViewlessTimeseriesOnlySuite(db)) {
         if (
             mayConcurrentlyTrackOrUntrack ||
-            (TestData.runningWithBalancer && isTrackedTimeseries(coll) && !isShardedTimeseries(coll))
+            (TestData.runningWithBalancer &&
+                isTrackedTimeseries(coll) &&
+                !isShardedTimeseries(coll))
         ) {
             // If the collection is tracked or untracked findAndModify explain returns either the buckets or main timeseries namespace
             // In suites with enabled balancer the collection could randomly became tracked.

@@ -17,7 +17,9 @@ export var IndexCatalogHelpers = (function () {
         const found = indexSpecs.filter((spec) => spec.name === indexName);
 
         if (found.length > 1) {
-            throw new Error("Found multiple indexes with name '" + indexName + "': " + tojson(indexSpecs));
+            throw new Error(
+                "Found multiple indexes with name '" + indexName + "': " + tojson(indexSpecs),
+            );
         }
         return found.length === 1 ? found[0] : null;
     }
@@ -71,9 +73,10 @@ export var IndexCatalogHelpers = (function () {
     }
 
     function createSingleIndex(coll, key, parameters) {
-        return coll
-            .getDB()
-            .runCommand({createIndexes: coll.getName(), indexes: [Object.assign({key: key}, parameters)]});
+        return coll.getDB().runCommand({
+            createIndexes: coll.getName(),
+            indexes: [Object.assign({key: key}, parameters)],
+        });
     }
 
     function createIndexAndVerifyWithDrop(coll, key, parameters) {
@@ -117,14 +120,24 @@ export var IndexCatalogHelpers = (function () {
      */
     function listIndexesIncludesSimpleCollation(db) {
         if (isStableFCVSuite()) {
-            return FeatureFlagUtil.isPresentAndEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation");
+            return FeatureFlagUtil.isPresentAndEnabled(
+                db,
+                "ListIndexesAlwaysIncludesSimpleCollation",
+            );
         }
 
         // In FCV upgrade/downgrade suite, the flag is reliably enabled only if it has been enabled since
         // lastLTS (e.g., flag released in FCV 9.0, running binary 9.1 with FCV 9.0 - 9.1
         // upgrade/downgrade suite --> always includes simple collation).
-        const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db.getMongo(), "ListIndexesAlwaysIncludesSimpleCollation");
-        return flagDoc && flagDoc.value && MongoRunner.compareBinVersions(lastLTSFCV, flagDoc.version) >= 0;
+        const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(
+            db.getMongo(),
+            "ListIndexesAlwaysIncludesSimpleCollation",
+        );
+        return (
+            flagDoc &&
+            flagDoc.value &&
+            MongoRunner.compareBinVersions(lastLTSFCV, flagDoc.version) >= 0
+        );
     }
 
     /**
@@ -174,7 +187,8 @@ export var IndexCatalogHelpers = (function () {
         createSingleIndex: createSingleIndex,
         createIndexAndVerifyWithDrop: createIndexAndVerifyWithDrop,
         // TODO (SERVER-119573): Remove this utility once listIndexes output is consistent with storage.
-        convertListIndexesResponseToStorageIndexFormat: convertListIndexesResponseToStorageIndexFormat,
+        convertListIndexesResponseToStorageIndexFormat:
+            convertListIndexesResponseToStorageIndexFormat,
         // TODO (SERVER-122417): Remove these utilities once v9.0 branches out.
         addSimpleCollationToIndexIfMissing: addSimpleCollationToIndexIfMissing,
         addSimpleCollationToIndexesIfMissing: addSimpleCollationToIndexesIfMissing,

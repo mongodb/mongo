@@ -12,9 +12,15 @@ const ns = dbName + "." + collName;
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 // Set up a sharded collection with one chunk on each shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}),
+);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
@@ -39,14 +45,23 @@ assert.commandWorked(
     st.rs1.getPrimary().adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.InternalError, failCommands: ["find"], failInternalCommands: true},
+        data: {
+            errorCode: ErrorCodes.InternalError,
+            failCommands: ["find"],
+            failInternalCommands: true,
+        },
     }),
 );
 
 // Targets Shard1 and encounters a transaction fatal error.
-assert.commandFailedWithCode(sessionDB.runCommand({find: collName, filter: {_id: 1}}), ErrorCodes.InternalError);
+assert.commandFailedWithCode(
+    sessionDB.runCommand({find: collName, filter: {_id: 1}}),
+    ErrorCodes.InternalError,
+);
 
-assert.commandWorked(st.rs1.getPrimary().adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+assert.commandWorked(
+    st.rs1.getPrimary().adminCommand({configureFailPoint: "failCommand", mode: "off"}),
+);
 
 // The transaction should have been aborted on both shards.
 assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());

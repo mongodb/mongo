@@ -27,8 +27,12 @@ assert.commandWorked(admin.runCommand({shardCollection: ns, key: {x: "hashed"}})
 //         -4611686018427387902 -> 0
 // shard1: 0                    -> 4611686018427387902
 //         4611686018427387902  -> MAX
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: NumberLong("-4611686018427387902")}}));
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: NumberLong("4611686018427387902")}}));
+assert.commandWorked(
+    st.s.adminCommand({split: ns, middle: {x: NumberLong("-4611686018427387902")}}),
+);
+assert.commandWorked(
+    st.s.adminCommand({split: ns, middle: {x: NumberLong("4611686018427387902")}}),
+);
 
 assert.commandWorked(
     admin.runCommand({
@@ -64,7 +68,10 @@ assert.commandWorked(
 );
 
 // Get the chunk -4611686018427387902 -> 0 on shard0.
-let chunkToSplit = findChunksUtil.findOneChunkByNs(configDB, ns, {min: {$ne: {x: MinKey}}, shard: st.shard0.shardName});
+let chunkToSplit = findChunksUtil.findOneChunkByNs(configDB, ns, {
+    min: {$ne: {x: MinKey}},
+    shard: st.shard0.shardName,
+});
 
 // Create chunks from that chunk and move some chunks to create holes.
 // shard0: MIN                  -> chunkToSplit.min,
@@ -121,7 +128,9 @@ let shards = [];
 let docChunkBounds = [];
 docs.forEach(function (doc) {
     let hash = convertShardKeyToHashed(doc.x);
-    let {shard, bounds} = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {x: hash});
+    let {shard, bounds} = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {
+        x: hash,
+    });
     shards.push(shard);
     docChunkBounds.push(bounds);
 });
@@ -134,7 +143,12 @@ let staleCollection = staleMongos.getCollection(ns);
 jsTest.log("Trying merges that should fail...");
 
 // Make sure merging non-exact chunks is invalid.
-assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: NumberLong(-5000000000000000000)}]}));
+assert.commandFailed(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: MinKey}, {x: NumberLong(-5000000000000000000)}],
+    }),
+);
 assert.commandFailed(
     admin.runCommand({
         mergeChunks: ns,
@@ -147,19 +161,40 @@ assert.commandFailed(
         bounds: [{x: NumberLong(4500000000000000000)}, {x: NumberLong(5500000000000000000)}],
     }),
 );
-assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(-1500000000000000000)}, {x: MaxKey}]}));
+assert.commandFailed(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: NumberLong(-1500000000000000000)}, {x: MaxKey}],
+    }),
+);
 
 // Make sure merging over holes is invalid.
-assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: NumberLong(-3500000000000000000)}]}));
 assert.commandFailed(
-    admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(-3500000000000000000)}, {x: NumberLong(0)}]}),
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: MinKey}, {x: NumberLong(-3500000000000000000)}],
+    }),
 );
 assert.commandFailed(
-    admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(-3000000000000000000)}, {x: NumberLong(0)}]}),
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: NumberLong(-3500000000000000000)}, {x: NumberLong(0)}],
+    }),
+);
+assert.commandFailed(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: NumberLong(-3000000000000000000)}, {x: NumberLong(0)}],
+    }),
 );
 
 // Make sure merging between shards is invalid.
-assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: NumberLong(-4000000000000000000)}]}));
+assert.commandFailed(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: MinKey}, {x: NumberLong(-4000000000000000000)}],
+    }),
+);
 assert.commandFailed(
     admin.runCommand({
         mergeChunks: ns,
@@ -167,7 +202,10 @@ assert.commandFailed(
     }),
 );
 assert.commandFailed(
-    admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(-2500000000000000000)}, {x: NumberLong(0)}]}),
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: NumberLong(-2500000000000000000)}, {x: NumberLong(0)}],
+    }),
 );
 assert.eq(4, staleCollection.find().itcount());
 
@@ -176,7 +214,9 @@ jsTest.log("Trying merges that should succeed...");
 // Merging single chunks should be treated as a no-op
 // (or fail because 'the range specifies one single chunk' in multiversion test environments)
 try {
-    assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, chunkToSplit.min]}));
+    assert.commandWorked(
+        admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, chunkToSplit.min]}),
+    );
 } catch (e) {
     if (!e.message.match(/could not merge chunks, collection .* already contains chunk for/)) {
         throw e;
@@ -196,7 +236,12 @@ try {
 }
 
 // Make sure merge including the MinKey works.
-assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: NumberLong(-4500000000000000000)}]}));
+assert.commandWorked(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: MinKey}, {x: NumberLong(-4500000000000000000)}],
+    }),
+);
 assert.eq(4, staleCollection.find().itcount());
 // shard0: MIN                  -> -4500000000000000000,
 //         (hole),
@@ -229,7 +274,9 @@ assert.eq(4, staleCollection.find().itcount());
 //         4611686018427387902  -> MAX
 
 // Make sure merge including the MaxKey works.
-assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(0)}, {x: MaxKey}]}));
+assert.commandWorked(
+    admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(0)}, {x: MaxKey}]}),
+);
 assert.eq(4, staleCollection.find().itcount());
 
 // Make sure merging chunks after a chunk has been moved out of a shard succeeds
@@ -258,7 +305,12 @@ assert.eq(4, staleCollection.find().itcount());
 //         0                    -> 4611686018427387902
 //         4611686018427387902  -> MAX
 
-assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{x: NumberLong(-2500000000000000000)}, {x: MaxKey}]}));
+assert.commandWorked(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: NumberLong(-2500000000000000000)}, {x: MaxKey}],
+    }),
+);
 assert.eq(4, staleCollection.find().itcount());
 // shard0: MIN                  -> -4500000000000000000,
 //         -4500000000000000000 -> -4000000000000000000
@@ -266,7 +318,12 @@ assert.eq(4, staleCollection.find().itcount());
 // shard1: -2500000000000000000 -> MAX
 
 // Make sure merge on the other shard after a chunk has been merged succeeds.
-assert.commandWorked(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: NumberLong(-2500000000000000000)}]}));
+assert.commandWorked(
+    admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: MinKey}, {x: NumberLong(-2500000000000000000)}],
+    }),
+);
 // shard0: MIN                  -> -2500000000000000000,
 // shard1: -2500000000000000000 -> MAX
 

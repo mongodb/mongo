@@ -25,7 +25,11 @@ let st = new ShardingTest({
 // This test relies on shard1 having no chunks in config.system.sessions.
 authutil.asCluster(st.s, "jstests/libs/key1", function () {
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: "config.system.sessions", find: {_id: 0}, to: st.shard0.shardName}),
+        st.s.adminCommand({
+            moveChunk: "config.system.sessions",
+            find: {_id: 0},
+            to: st.shard0.shardName,
+        }),
     );
 });
 
@@ -62,12 +66,18 @@ if (!TestData.configShard) {
     st.rs0
         .getPrimary()
         .getDB("admin")
-        .createUser({user: "user", pwd: "password", roles: jsTest.basicUserRoles}, {w: 3, wtimeout: 30000});
+        .createUser(
+            {user: "user", pwd: "password", roles: jsTest.basicUserRoles},
+            {w: 3, wtimeout: 30000},
+        );
 }
 st.rs1
     .getPrimary()
     .getDB("admin")
-    .createUser({user: "user", pwd: "password", roles: jsTest.basicUserRoles}, {w: 3, wtimeout: 30000});
+    .createUser(
+        {user: "user", pwd: "password", roles: jsTest.basicUserRoles},
+        {w: 3, wtimeout: 30000},
+    );
 
 jsTestLog("Creating initial data");
 
@@ -94,7 +104,9 @@ for (let i = 0; i < 100; i++) {
 assert.eq(expectedDocs, testDB.foo.count());
 
 // Wait for the balancer to start back up
-assert.commandWorked(configDB.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));
+assert.commandWorked(
+    configDB.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true),
+);
 st.startBalancer();
 
 // Make sure we've done at least some splitting, so the balancer will work
@@ -139,7 +151,12 @@ let checkReadOps = function (hasReadAuth) {
         checkCommandSucceeded(testDB, {collstats: "foo"});
 
         // inline map-reduce works read-only
-        let res = checkCommandSucceeded(testDB, {mapreduce: "foo", map: map, reduce: reduce, out: {inline: 1}});
+        let res = checkCommandSucceeded(testDB, {
+            mapreduce: "foo",
+            map: map,
+            reduce: reduce,
+            out: {inline: 1},
+        });
         assert.eq(100, res.results.length);
         assert.eq(45, res.results[0].value);
 
@@ -179,7 +196,12 @@ let checkWriteOps = function (hasWriteAuth) {
         assert.eq(1, testDB.foo.findOne({a: 1}).b);
         testDB.foo.remove({a: 1});
         assert.eq(null, testDB.runCommand({getlasterror: 1}).err);
-        checkCommandSucceeded(testDB, {mapreduce: "foo", map: map, reduce: reduce, out: "mrOutput"});
+        checkCommandSucceeded(testDB, {
+            mapreduce: "foo",
+            map: map,
+            reduce: reduce,
+            out: "mrOutput",
+        });
         assert.eq(100, testDB.mrOutput.count());
         assert.eq(45, testDB.mrOutput.findOne().value);
 
@@ -194,7 +216,11 @@ let checkWriteOps = function (hasWriteAuth) {
         print("Checking write operations, should fail");
         testDB.foo.insert({a: 1, i: 1, j: 1});
         assert.eq(0, authenticatedConn.getDB("test").foo.count({a: 1, i: 1, j: 1}));
-        checkCommandFailed(testDB, {findAndModify: "foo", query: {a: 1, i: 1, j: 1}, update: {$set: {b: 1}}});
+        checkCommandFailed(testDB, {
+            findAndModify: "foo",
+            query: {a: 1, i: 1, j: 1},
+            update: {$set: {b: 1}},
+        });
         checkCommandFailed(testDB, {mapreduce: "foo", map: map, reduce: reduce, out: "mrOutput"});
         checkCommandFailed(testDB, {drop: "foo"});
         checkCommandFailed(testDB, {dropDatabase: 1});
@@ -226,8 +252,15 @@ let checkAdminOps = function (hasAuth) {
         checkCommandSucceeded(adminDB, {ismaster: 1});
         checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandSucceeded(adminDB, {split: "test.foo", find: {i: 1, j: 1}});
-        let chunk = findChunksUtil.findOneChunkByNs(configDB, "test.foo", {shard: st.shard0.shardName});
-        checkCommandSucceeded(adminDB, {moveChunk: "test.foo", find: chunk.min, to: st.rs1.name, _waitForDelete: true});
+        let chunk = findChunksUtil.findOneChunkByNs(configDB, "test.foo", {
+            shard: st.shard0.shardName,
+        });
+        checkCommandSucceeded(adminDB, {
+            moveChunk: "test.foo",
+            find: chunk.min,
+            to: st.rs1.name,
+            _waitForDelete: true,
+        });
         if (!isMultiversion) {
             checkCommandSucceeded(adminDB, {lockInfo: 1});
         }
@@ -242,7 +275,12 @@ let checkAdminOps = function (hasAuth) {
         checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandFailed(adminDB, {split: "test.foo", find: {i: 1, j: 1}});
         let chunkKey = {i: {$minKey: 1}, j: {$minKey: 1}};
-        checkCommandFailed(adminDB, {moveChunk: "test.foo", find: chunkKey, to: st.rs1.name, _waitForDelete: true});
+        checkCommandFailed(adminDB, {
+            moveChunk: "test.foo",
+            find: chunkKey,
+            to: st.rs1.name,
+            _waitForDelete: true,
+        });
         if (!isMultiversion) {
             checkCommandFailed(adminDB, {lockInfo: 1});
         }

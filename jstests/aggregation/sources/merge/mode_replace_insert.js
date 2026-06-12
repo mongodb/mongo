@@ -15,14 +15,23 @@ for (let i = 0; i < nDocs; i++) {
 
 // Test that a $merge with whenMatched: "replace" and whenNotMatched: "insert" mode will
 // default the "on" fields to "_id".
-coll.aggregate([{$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
+coll.aggregate([
+    {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+]);
 assert.eq(nDocs, outColl.find().itcount());
 
 // Test that $merge will update existing documents that match the "on" fields.
 const nDocsReplaced = 5;
 coll.aggregate([
     {$project: {_id: {$mod: ["$_id", nDocsReplaced]}}},
-    {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "_id"}},
+    {
+        $merge: {
+            into: outColl.getName(),
+            whenMatched: "replace",
+            whenNotMatched: "insert",
+            on: "_id",
+        },
+    },
 ]);
 assert.eq(nDocsReplaced, outColl.find({a: {$exists: false}}).itcount());
 
@@ -100,7 +109,12 @@ assert.doesNotThrow(() =>
         {$project: {_id: 0}},
         {$addFields: {newField: 1}},
         {
-            $merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "name"},
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+                on: "name",
+            },
         },
     ]),
 );

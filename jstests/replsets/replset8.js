@@ -79,11 +79,17 @@ jsTestLog("update " + (doccount + 1) + "-" + (doccount * 2 - 1) + " result: " + 
 assert.eq(doccount - 1, result.nMatched);
 assert.eq(doccount - 1, result.nModified);
 
-assert.eq(doccount + 1, mdc.find().itcount(), "incorrect collection size on primary (fast count: " + mdc.count() + ")");
+assert.eq(
+    doccount + 1,
+    mdc.find().itcount(),
+    "incorrect collection size on primary (fast count: " + mdc.count() + ")",
+);
 assert.eq(
     doccount + 1,
     secondary.getDB("d")["c"].find().itcount(),
-    "incorrect collection size on secondary  (fast count: " + secondary.getDB("d")["c"].count() + ")",
+    "incorrect collection size on secondary  (fast count: " +
+        secondary.getDB("d")["c"].count() +
+        ")",
 );
 
 jsTestLog("finished");

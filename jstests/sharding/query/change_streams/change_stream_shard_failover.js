@@ -99,7 +99,11 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
 
     // Now resume using the resume token from the first change (which was read before the
     // failover). The mongos should talk to the new primary.
-    const resumeCursor = cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
+    const resumeCursor = cst.getChangeStream({
+        watchMode: watchMode,
+        coll: coll,
+        resumeAfter: firstChange._id,
+    });
 
     // Be sure we can read the remaining changes in the same order as we read them initially.
     cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: docsFoundInOrder.splice(1)});

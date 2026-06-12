@@ -9,7 +9,11 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {getWinningPlanFromExplain, isIndexOnly, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    isIndexOnly,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "covered_index_sort_no_fetch_optimization";
 const coll = db.getCollection(collName);
@@ -42,12 +46,23 @@ function assertExpectedResult(findCmd, expectedResult, isCovered, isBlockingSort
     // Use coll.find() syntax instead of db.runCommand() so we can use the toArray() function. This
     // is important when 'internalQueryFindCommandBatchSize' is less than the result size and the
     // cursor.firstBatch returned from db.runCommand() doesn't contain all the results.
-    const result = coll.find(filter, projection).collation(collation).hint(hint).sort(sort).toArray();
+    const result = coll
+        .find(filter, projection)
+        .collation(collation)
+        .hint(hint)
+        .sort(sort)
+        .toArray();
     assert.eq(result, expectedResult, result);
 
-    const explainResult = assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
+    const explainResult = assert.commandWorked(
+        db.runCommand({explain: findCmd, verbosity: "executionStats"}),
+    );
     assert.eq(isCovered, isIndexOnly(db, getWinningPlanFromExplain(explainResult)), explainResult);
-    assert.eq(isBlockingSort, planHasStage(db, getWinningPlanFromExplain(explainResult), "SORT"), explainResult);
+    assert.eq(
+        isBlockingSort,
+        planHasStage(db, getWinningPlanFromExplain(explainResult), "SORT"),
+        explainResult,
+    );
 }
 
 // Test correctness of basic covered queries. Here, the sort predicate is not the same order
@@ -291,5 +306,11 @@ findCmd = {
     projection: {"b.c": 1, _id: 0},
     sort: {"b.c": 1},
 };
-expected = [{"b": {"c": 1}}, {"b": {"c": 2}}, {"b": {"c": 3}}, {"b": {"c": "A"}}, {"b": {"c": "a"}}];
+expected = [
+    {"b": {"c": 1}},
+    {"b": {"c": 2}},
+    {"b": {"c": 3}},
+    {"b": {"c": "A"}},
+    {"b": {"c": "a"}},
+];
 assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);

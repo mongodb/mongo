@@ -31,28 +31,38 @@ function runBasicTest(adminDB) {
     // "failpoint"
 
     // Test non-existing fail point
-    assert.commandFailed(adminDB.runCommand({configureFailPoint: "fpNotExist", mode: "alwaysOn", data: {x: 1}}));
+    assert.commandFailed(
+        adminDB.runCommand({configureFailPoint: "fpNotExist", mode: "alwaysOn", data: {x: 1}}),
+    );
 
     // Test bad mode string
-    assert.commandFailed(adminDB.runCommand({configureFailPoint: "dummy", mode: "badMode", data: {x: 1}}));
+    assert.commandFailed(
+        adminDB.runCommand({configureFailPoint: "dummy", mode: "badMode", data: {x: 1}}),
+    );
     res = adminDB.runCommand({getParameter: 1, "failpoint.dummy": 1});
     assert.commandWorked(res);
     expectFailPointState(res["failpoint.dummy"], 0, {});
 
     // Test bad mode obj
-    assert.commandFailed(adminDB.runCommand({configureFailPoint: "dummy", mode: {foo: 3}, data: {x: 1}}));
+    assert.commandFailed(
+        adminDB.runCommand({configureFailPoint: "dummy", mode: {foo: 3}, data: {x: 1}}),
+    );
     res = adminDB.runCommand({getParameter: 1, "failpoint.dummy": 1});
     assert.commandWorked(res);
     expectFailPointState(res["failpoint.dummy"], 0, {});
 
     // Test bad mode type
-    assert.commandFailed(adminDB.runCommand({configureFailPoint: "dummy", mode: true, data: {x: 1}}));
+    assert.commandFailed(
+        adminDB.runCommand({configureFailPoint: "dummy", mode: true, data: {x: 1}}),
+    );
     res = adminDB.runCommand({getParameter: 1, "failpoint.dummy": 1});
     assert.commandWorked(res);
     expectFailPointState(res["failpoint.dummy"], 0, {});
 
     // Test bad data type
-    assert.commandFailed(adminDB.runCommand({configureFailPoint: "dummy", mode: "alwaysOn", data: "data"}));
+    assert.commandFailed(
+        adminDB.runCommand({configureFailPoint: "dummy", mode: "alwaysOn", data: "data"}),
+    );
     res = adminDB.runCommand({getParameter: 1, "failpoint.dummy": 1});
     assert.commandWorked(res);
     expectFailPointState(res["failpoint.dummy"], 0, {});
@@ -70,7 +80,9 @@ function runBasicTest(adminDB) {
     expectFailPointState(res["failpoint.dummy"], 4, {});
 
     // Test good command w/ data
-    assert.commandWorked(adminDB.runCommand({configureFailPoint: "dummy", mode: "alwaysOn", data: {x: 1}}));
+    assert.commandWorked(
+        adminDB.runCommand({configureFailPoint: "dummy", mode: "alwaysOn", data: {x: 1}}),
+    );
     res = adminDB.runCommand({getParameter: 1, "failpoint.dummy": 1});
     assert.commandWorked(res);
     expectFailPointState(res["failpoint.dummy"], 1, {x: 1});
@@ -88,10 +100,10 @@ function runBasicTest(adminDB) {
     );
 
     // Test that waitForFailPoint throws an error when maxTimeMS is not provided.
-    assert.commandFailedWithCode(adminDB.adminCommand({waitForFailPoint: "dummy", timesEntered: 1}), [
-        ErrorCodes.FailedToParse,
-        ErrorCodes.IDLFailedToParse,
-    ]);
+    assert.commandFailedWithCode(
+        adminDB.adminCommand({waitForFailPoint: "dummy", timesEntered: 1}),
+        [ErrorCodes.FailedToParse, ErrorCodes.IDLFailedToParse],
+    );
 }
 
 // Test the parameter handling.
@@ -131,7 +143,9 @@ assert.commandWorked(
 );
 
 // Turn off the fail point
-configureFailPointRes = assert.commandWorked(testDB.adminCommand({configureFailPoint: failPointName, mode: "off"}));
+configureFailPointRes = assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: failPointName, mode: "off"}),
+);
 assert.lte(1, configureFailPointRes.count);
 
 joinHungWrite();

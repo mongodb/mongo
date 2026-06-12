@@ -62,7 +62,9 @@ function testAnalyzeShardKeyShardedCollection(st) {
         {currentKey: 10, candidateKey: 100},
     ];
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(coll.createIndex(currentKey));
     assert.commandWorked(coll.createIndex(candidateKey));
     assert.commandWorked(coll.insert(docs, {writeConcern}));
@@ -74,7 +76,12 @@ function testAnalyzeShardKeyShardedCollection(st) {
     // shard1: [0, MaxKey]
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 0}}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: {currentKey: 0},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
     let res = assert.commandWorked(
         st.s.adminCommand({
@@ -109,7 +116,9 @@ function testAnalyzeShardKeyShardedCollection(st) {
     // shard0: [MinKey, -5]
     // shard1: [-5, 0], [0, MaxKey]
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: -5}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {currentKey: -5}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {currentKey: -5}, to: st.shard1.shardName}),
+    );
     res = assert.commandWorked(
         st.s.adminCommand({
             analyzeShardKey: ns,
@@ -139,7 +148,9 @@ function testAnalyzeShardKeyShardedCollection(st) {
     // shard0: [MinKey, -5], [5, MaxKey]
     // shard1: [-5, 0], [0, 5]
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 5}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {currentKey: 5}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {currentKey: 5}, to: st.shard0.shardName}),
+    );
     res = assert.commandWorked(
         st.s.adminCommand({
             analyzeShardKey: ns,
@@ -176,7 +187,10 @@ const setParameterOpts = {
 };
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
+    });
 
     testAnalyzeShardKeyUnshardedCollection(st.s);
     testAnalyzeShardKeyShardedCollection(st);
@@ -186,7 +200,10 @@ const setParameterOpts = {
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Remove block
-    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({
+        nodes: numNodesPerRS,
+        nodeOptions: {setParameter: setParameterOpts},
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

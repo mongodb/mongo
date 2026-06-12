@@ -30,13 +30,17 @@ assert(!FeatureFlagUtil.isEnabled(admin, "Toaster"));
 // Any pre-FCV-upgrade testing should occur here.
 
 // Upgrade FCV and confirm the feature flag is now enabled.
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 assert(FeatureFlagUtil.isPresentAndEnabled(admin, "Toaster"));
 
 // Any post-FCV-upgrade testing should occur here.
 
 // Downgrade FCV and confirm the feature flag is now disabled.
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 assert(!FeatureFlagUtil.isEnabled(admin, "Toaster"));
 
 // Any post-FCV-downgrade testing should occur here.

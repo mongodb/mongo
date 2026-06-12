@@ -48,7 +48,9 @@ function makeView(suffix, source, pipeline) {
 {
     // Test a desugar stage in a view definition.
     {
-        const viewName = makeView("readNDocuments_in_def", coll.getName(), [{$readNDocuments: {numDocs: 3}}]);
+        const viewName = makeView("readNDocuments_in_def", coll.getName(), [
+            {$readNDocuments: {numDocs: 3}},
+        ]);
         const results = testDb[viewName].aggregate([]).toArray();
         assertArrayEq({
             actual: results,
@@ -63,13 +65,20 @@ function makeView(suffix, source, pipeline) {
     // Verify running $readNDocuments on a view fails because the view's pipeline gets prepended,
     // making the desugared source stage no longer first.
     {
-        const viewName = makeView("readNDocuments_on_view_fails", coll.getName(), [{$match: {x: {$gt: 0}}}]);
-        assert.throwsWithCode(() => testDb[viewName].aggregate([{$readNDocuments: {numDocs: 2}}]).toArray(), 40602);
+        const viewName = makeView("readNDocuments_on_view_fails", coll.getName(), [
+            {$match: {x: {$gt: 0}}},
+        ]);
+        assert.throwsWithCode(
+            () => testDb[viewName].aggregate([{$readNDocuments: {numDocs: 2}}]).toArray(),
+            40602,
+        );
     }
 
     // Test a desugar stage in a nested view (view on view).
     {
-        const baseViewName = makeView("readNDocuments_nested_base", coll.getName(), [{$readNDocuments: {numDocs: 4}}]);
+        const baseViewName = makeView("readNDocuments_nested_base", coll.getName(), [
+            {$readNDocuments: {numDocs: 4}},
+        ]);
         const nestedViewName = makeView("readNDocuments_nested_top", baseViewName, [
             {$addFields: {fromView: true}},
             {$match: {x: {$lte: 3}}},
@@ -91,7 +100,9 @@ function makeView(suffix, source, pipeline) {
 {
     // Source stage in a view definition.
     {
-        const viewName = makeView("toast_in_def", coll.getName(), [{$toast: {temp: 350.0, numSlices: 3}}]);
+        const viewName = makeView("toast_in_def", coll.getName(), [
+            {$toast: {temp: 350.0, numSlices: 3}},
+        ]);
         const results = testDb[viewName].aggregate([]).toArray();
         if (!isSharded) {
             assert.docEq(results, [
@@ -115,8 +126,12 @@ function makeView(suffix, source, pipeline) {
 
     // Test a source stage in a nested view.
     {
-        const baseViewName = makeView("toast_nested_base", coll.getName(), [{$toast: {temp: 350.0, numSlices: 4}}]);
-        const nestedViewName = makeView("toast_nested_top", baseViewName, [{$match: {slice: {$lte: 1}}}]);
+        const baseViewName = makeView("toast_nested_base", coll.getName(), [
+            {$toast: {temp: 350.0, numSlices: 4}},
+        ]);
+        const nestedViewName = makeView("toast_nested_top", baseViewName, [
+            {$match: {slice: {$lte: 1}}},
+        ]);
 
         const results = testDb[nestedViewName].aggregate([]).toArray();
         if (!isSharded) {
@@ -138,7 +153,10 @@ function makeView(suffix, source, pipeline) {
 {
     // Transform stage in a view definition.
     {
-        const viewName = makeView("extensionLimit_in_def", coll.getName(), [{$sort: {_id: 1}}, {$extensionLimit: 3}]);
+        const viewName = makeView("extensionLimit_in_def", coll.getName(), [
+            {$sort: {_id: 1}},
+            {$extensionLimit: 3},
+        ]);
         const results = testDb[viewName].aggregate([]).toArray();
         assertArrayEq({
             actual: results,
@@ -165,7 +183,9 @@ function makeView(suffix, source, pipeline) {
 
     // Transform stage in nested view, where the base view uses a desugar stage.
     {
-        const baseViewName = makeView("extensionLimit_nested_base", coll.getName(), [{$readNDocuments: {numDocs: 4}}]);
+        const baseViewName = makeView("extensionLimit_nested_base", coll.getName(), [
+            {$readNDocuments: {numDocs: 4}},
+        ]);
         const nestedViewName = makeView("extensionLimit_nested_top", baseViewName, [
             {$addFields: {nested: true}},
             {$extensionLimit: 2},
@@ -194,9 +214,13 @@ function makeView(suffix, source, pipeline) {
 {
     // View with desugar stage + $unionWith with source stage in subpipeline.
     {
-        const viewName = makeView("combo_desugar_unionWith_source", coll.getName(), [{$readNDocuments: {numDocs: 2}}]);
+        const viewName = makeView("combo_desugar_unionWith_source", coll.getName(), [
+            {$readNDocuments: {numDocs: 2}},
+        ]);
         const pipeline = [{$toast: {temp: 350.0, numSlices: 2}}];
-        const results = testDb[viewName].aggregate([{$unionWith: {coll: coll.getName(), pipeline}}]).toArray();
+        const results = testDb[viewName]
+            .aggregate([{$unionWith: {coll: coll.getName(), pipeline}}])
+            .toArray();
 
         if (!isSharded) {
             assertArrayEq({
@@ -215,9 +239,16 @@ function makeView(suffix, source, pipeline) {
 
     // Nested view with extension stages + $unionWith on a view with extension stage.
     if (!isSharded) {
-        const baseViewName = makeView("combo_nested_base", coll.getName(), [{$sort: {_id: 1}}, {$extensionLimit: 3}]);
-        const nestedViewName = makeView("combo_nested_top", baseViewName, [{$addFields: {source: "nested"}}]);
-        const unionViewName = makeView("combo_union_target", foreignColl.getName(), [{$readNDocuments: {numDocs: 2}}]);
+        const baseViewName = makeView("combo_nested_base", coll.getName(), [
+            {$sort: {_id: 1}},
+            {$extensionLimit: 3},
+        ]);
+        const nestedViewName = makeView("combo_nested_top", baseViewName, [
+            {$addFields: {source: "nested"}},
+        ]);
+        const unionViewName = makeView("combo_union_target", foreignColl.getName(), [
+            {$readNDocuments: {numDocs: 2}},
+        ]);
 
         const results = testDb[nestedViewName].aggregate([{$unionWith: unionViewName}]).toArray();
 
@@ -237,7 +268,12 @@ function makeView(suffix, source, pipeline) {
     {
         const viewPipeline = [
             {$match: {x: {$lte: 2}}},
-            {$unionWith: {coll: foreignColl.getName(), pipeline: [{$sort: {_id: 1}}, {$extensionLimit: 2}]}},
+            {
+                $unionWith: {
+                    coll: foreignColl.getName(),
+                    pipeline: [{$sort: {_id: 1}}, {$extensionLimit: 2}],
+                },
+            },
         ];
         const viewName = makeView("combo_unionWith_in_def", coll.getName(), viewPipeline);
 

@@ -35,9 +35,12 @@ assert.eq(
 );
 
 // Enable debug logs for catalog changes.
-const originalStorageLogLevel = assert.commandWorked(testDB.setLogLevel(1, "storage")).was.storage.verbosity;
+const originalStorageLogLevel = assert.commandWorked(testDB.setLogLevel(1, "storage")).was.storage
+    .verbosity;
 
-let result = assert.commandWorked(testDB.runCommand({collMod: collName, recordIdsReplicated: false}));
+let result = assert.commandWorked(
+    testDB.runCommand({collMod: collName, recordIdsReplicated: false}),
+);
 jsTestLog("Result from successful collMod command: " + tojson(result));
 
 // Check for "Unsetting 'recordIdsReplicated' catalog entry flag" debug log message.

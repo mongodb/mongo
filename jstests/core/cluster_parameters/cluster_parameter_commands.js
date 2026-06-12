@@ -12,7 +12,10 @@
 //    transitioning_replicaset_incompatible,
 //   ]
 
-import {kAllClusterParameters, testInvalidGetClusterParameter} from "jstests/libs/cluster_server_parameter_utils.js";
+import {
+    kAllClusterParameters,
+    testInvalidGetClusterParameter,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // name => name of cluster parameter to get
@@ -20,7 +23,9 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 // _id
 function checkGetClusterParameterMatch(conn, name, expectedValue) {
     const adminDB = conn.getDB("admin");
-    const cps = assert.commandWorked(adminDB.runCommand({getClusterParameter: name})).clusterParameters;
+    const cps = assert.commandWorked(
+        adminDB.runCommand({getClusterParameter: name}),
+    ).clusterParameters;
     // confirm we got the document we were looking for.
     assert.eq(cps.length, 1);
     let actualCp = cps[0];
@@ -107,9 +112,11 @@ for (const [name, data] of Object.entries(kAllClusterParameters)) {
     // ignoring misspelled fields. For more info see SERVER-117009.
     if (typeof data.default === "object") {
         assert.commandFailedWithCode(
-            conn
-                .getDB("admin")
-                .runCommand({setClusterParameter: {[name]: {"unknownField": "unknownValue", ...data.default}}}),
+            conn.getDB("admin").runCommand({
+                setClusterParameter: {
+                    [name]: {"unknownField": "unknownValue", ...data.default},
+                },
+            }),
             [ErrorCodes.IDLUnknownField, ErrorCodes.BadValue],
         );
     }
@@ -133,10 +140,14 @@ testInvalidGetClusterParameter(conn, tenantId);
 
 // Assert that setting a nonexistent parameter returns an error.
 const adminDB = conn.getDB("admin");
-assert.commandFailed(adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId));
+assert.commandFailed(
+    adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId),
+);
 
 // Assert that running setClusterParameter with a scalar value fails.
-assert.commandFailed(adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId));
+assert.commandFailed(
+    adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId),
+);
 
 // Assert that invalid direct writes to config.clusterParameters fail.
 assert.commandFailed(
@@ -151,7 +162,9 @@ assert.commandFailed(
 // consistent with individual gets.
 for (let retry = 0, completed = 0; retry < 2 && completed == 0; retry++) {
     completed = 1;
-    const allParameters = assert.commandWorked(adminDB.runCommand({getClusterParameter: "*"})).clusterParameters;
+    const allParameters = assert.commandWorked(
+        adminDB.runCommand({getClusterParameter: "*"}),
+    ).clusterParameters;
     jsTest.log(allParameters);
     for (const param of allParameters) {
         assert(

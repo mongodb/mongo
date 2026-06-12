@@ -49,12 +49,20 @@ function testErrorOnInvalidNamespace(db) {
 
 function testErrorOnDatabaseDNE(db) {
     jsTestLog("Test moveChunk fails for namespace that does not exist.");
-    assert.commandFailed(db.adminCommand({moveChunk: "nonexistent.namespace", find: {_id: 1}, to: shardNames[1]}));
+    assert.commandFailed(
+        db.adminCommand({moveChunk: "nonexistent.namespace", find: {_id: 1}, to: shardNames[1]}),
+    );
 }
 
 function testErrorOnUnshardedCollection(db) {
     jsTestLog("Test moveChunk fails for an unsharded collection.");
-    assert.commandFailed(db.adminCommand({moveChunk: db.getName() + ".unsharded", find: {_id: 1}, to: shardNames[1]}));
+    assert.commandFailed(
+        db.adminCommand({
+            moveChunk: db.getName() + ".unsharded",
+            find: {_id: 1},
+            to: shardNames[1],
+        }),
+    );
 }
 
 function testHashed(db) {
@@ -63,7 +71,9 @@ function testHashed(db) {
     const ns = db.getName() + "." + collName;
     const coll = db.getCollection(collName);
 
-    assert.commandWorked(db.adminCommand({shardCollection: ns, key: {_id: "hashed"}, numInitialChunks: 1}));
+    assert.commandWorked(
+        db.adminCommand({shardCollection: ns, key: {_id: "hashed"}, numInitialChunks: 1}),
+    );
 
     let aChunk;
     let shard0;
@@ -72,13 +82,21 @@ function testHashed(db) {
     assert(aChunk);
 
     // Error if either of the bounds is not a valid shard key (BSON object - 1 yields a NaN)
-    assert.commandFailed(db.adminCommand({moveChunk: ns, bounds: [MinKey - 1, MaxKey], to: shard1}));
-    assert.commandFailed(db.adminCommand({moveChunk: ns, bounds: [MinKey, MaxKey - 1], to: shard1}));
+    assert.commandFailed(
+        db.adminCommand({moveChunk: ns, bounds: [MinKey - 1, MaxKey], to: shard1}),
+    );
+    assert.commandFailed(
+        db.adminCommand({moveChunk: ns, bounds: [MinKey, MaxKey - 1], to: shard1}),
+    );
 
     // Fail if find and bounds are both set.
-    assert.commandFailed(db.adminCommand({moveChunk: ns, find: {_id: 1}, bounds: [MinKey, MaxKey], to: shard1}));
+    assert.commandFailed(
+        db.adminCommand({moveChunk: ns, find: {_id: 1}, bounds: [MinKey, MaxKey], to: shard1}),
+    );
 
-    assert.commandWorked(db.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}),
+    );
 
     assert.eq(0, configDB.chunks.count({_id: aChunk._id, shard: shard0}));
     assert.eq(1, configDB.chunks.count({_id: aChunk._id, shard: shard1}));
@@ -87,7 +105,11 @@ function testHashed(db) {
 }
 
 function testNotHashed(db, keyDoc) {
-    jsTestLog("Test moveChunk on sharded collection with key " + tojson(keyDoc) + " using find and bounds.");
+    jsTestLog(
+        "Test moveChunk on sharded collection with key " +
+            tojson(keyDoc) +
+            " using find and bounds.",
+    );
     const collName = jsTestName();
     const ns = db.getName() + "." + collName;
     const coll = db.getCollection(collName);

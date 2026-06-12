@@ -22,7 +22,9 @@ function runTest(mongosConn, shardConn) {
     assert.commandWorked(
         clientMongoS.createEncryptionCollection("basic", {
             encryptedFields: {
-                "fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}],
+                "fields": [
+                    {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
+                ],
             },
         }),
     );

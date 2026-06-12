@@ -23,7 +23,8 @@ assert(response1.ok, "Initial heartbeat failed. Heartbeat response: " + response
 // knowledge of a configVersion ahead of the actual config version the
 // server knows about, the server should not crash.
 jsTestLog(
-    "sending heartbeat request with a higher configVersion. Config version sent: " + (response1.config.version + 1),
+    "sending heartbeat request with a higher configVersion. Config version sent: " +
+        (response1.config.version + 1),
 );
 let response2 = primary.getDB("admin").adminCommand({
     replSetHeartbeat: "rshbcrash",
@@ -33,7 +34,10 @@ let response2 = primary.getDB("admin").adminCommand({
     configVersion: response1.config.version + 1,
     from: primary.name,
 });
-assert(response2.ok, "Heartbeat with a higher configVersion failed. Heartbeat response: " + response2);
+assert(
+    response2.ok,
+    "Heartbeat with a higher configVersion failed. Heartbeat response: " + response2,
+);
 // Make sure that the primary exited early due to BadValue.
 checkLog.contains(primary, 10456300);
 

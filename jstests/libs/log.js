@@ -13,11 +13,15 @@
 export function* iterateMatchingLogLines(logLines, fields, ignoreFields) {
     ignoreFields = ignoreFields || [];
     function escapeRegex(input) {
-        return typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, "\\$&") : input;
+        return typeof input === "string"
+            ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, "\\$&")
+            : input;
     }
 
     function lineMatches(line, fields, ignoreFields) {
-        const fieldNames = Object.keys(fields).filter((fieldName) => !ignoreFields.includes(fieldName));
+        const fieldNames = Object.keys(fields).filter(
+            (fieldName) => !ignoreFields.includes(fieldName),
+        );
         return fieldNames.every((fieldName) => {
             const fieldValue = fields[fieldName];
             let regex;

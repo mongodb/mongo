@@ -18,15 +18,28 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2, rs: {nodes: 2}});
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 
 let priConn = st.rs0.getPrimary();
 let serverStatusRes = priConn.adminCommand({serverStatus: 1});
-assert.eq(0, serverStatusRes.shardingStatistics.unfinishedMigrationFromPreviousPrimary, tojson(serverStatusRes));
+assert.eq(
+    0,
+    serverStatusRes.shardingStatistics.unfinishedMigrationFromPreviousPrimary,
+    tojson(serverStatusRes),
+);
 
 pauseMoveChunkAtStep(priConn, moveChunkStepNames.reachedSteadyState);
-let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {x: 0}, null, "test.user", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s0.host,
+    {x: 0},
+    null,
+    "test.user",
+    st.shard1.shardName,
+);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -46,7 +59,11 @@ assert.soon(() => {
 });
 
 serverStatusRes = st.rs0.getPrimary().adminCommand({serverStatus: 1});
-assert.eq(1, serverStatusRes.shardingStatistics.unfinishedMigrationFromPreviousPrimary, tojson(serverStatusRes));
+assert.eq(
+    1,
+    serverStatusRes.shardingStatistics.unfinishedMigrationFromPreviousPrimary,
+    tojson(serverStatusRes),
+);
 
 try {
     joinMoveChunk();

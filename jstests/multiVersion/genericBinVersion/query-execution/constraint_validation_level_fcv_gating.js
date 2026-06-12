@@ -24,9 +24,15 @@ const validator = {a: {$exists: true}};
 
 describe("constraint validationLevel FCV gating", function () {
     before(function () {
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
         assert.commandWorked(
-            testDB.createCollection(collName, {validator, validationLevel: "strict", validationAction: "error"}),
+            adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        assert.commandWorked(
+            testDB.createCollection(collName, {
+                validator,
+                validationLevel: "strict",
+                validationAction: "error",
+            }),
         );
     });
 
@@ -35,7 +41,9 @@ describe("constraint validationLevel FCV gating", function () {
     });
 
     it("rejects constraint at lastLTS FCV", function () {
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         assert.commandFailedWithCode(
             testDB.createCollection("coll_constraint_lts", {
                 validator,
@@ -61,8 +69,12 @@ describe("constraint validationLevel FCV gating", function () {
         if (lastContinuousFCV === lastLTSFCV || lastContinuousFCV === latestFCV) {
             return;
         }
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}),
+        );
         assert.commandFailedWithCode(
             testDB.createCollection("coll_constraint_continuous", {
                 validator,
@@ -82,10 +94,17 @@ describe("constraint validationLevel FCV gating", function () {
     });
 
     it("enables constraint after upgrading to latestFCV", function () {
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-        assert.commandWorked(testDB.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        assert.commandWorked(
+            testDB.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+        );
         assert.commandWorked(testDB.runCommand({collMod: collName, validationLevel: "constraint"}));
-        assert.eq(testDB.getCollectionInfos({name: collName})[0].options.validationLevel, "constraint");
+        assert.eq(
+            testDB.getCollectionInfos({name: collName})[0].options.validationLevel,
+            "constraint",
+        );
         assert.commandWorked(
             testDB.createCollection("coll_direct", {
                 validator,

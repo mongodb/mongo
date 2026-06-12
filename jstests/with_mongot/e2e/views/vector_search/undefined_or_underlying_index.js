@@ -24,7 +24,11 @@ tvShowColl.insertOne({title: "Breaking Bad"});
 const basicQueryResult = (indexName) => {
     return moviesWithEnrichedTitle
         .aggregate(
-            makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: indexName}),
+            makeMovieVectorExactQuery({
+                queryVector: getMoviePlotEmbeddingById(11),
+                limit: 3,
+                indexName: indexName,
+            }),
         )
         .toArray();
 };

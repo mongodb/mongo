@@ -30,7 +30,11 @@ t.insert({x: 1});
 function setPostCommandFailpoint({mode, options}) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: db.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "waitAfterCommandFinishesExecution", data: options, mode: mode},
+        cmdObj: {
+            configureFailPoint: "waitAfterCommandFinishesExecution",
+            data: options,
+            mode: mode,
+        },
     });
 }
 

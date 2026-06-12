@@ -22,7 +22,12 @@ import {
  */
 const createRankFusionPipeline = (inputPipelines, viewPipeline = null) => {
     const rankFusionStage = {$rankFusion: {input: {pipelines: {}}}};
-    return createHybridSearchPipeline(inputPipelines, viewPipeline, rankFusionStage, /**isRankFusion*/ true);
+    return createHybridSearchPipeline(
+        inputPipelines,
+        viewPipeline,
+        rankFusionStage,
+        /**isRankFusion*/ true,
+    );
 };
 
 /**
@@ -46,7 +51,10 @@ const runRankFusionSearchViewsTest = (inputPipelines, checkCorrectness = true) =
  *     needed.
  */
 const runRankFusionWithAllMongotInputPipelinesOnSearchViewsTest = (inputPipelines) => {
-    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines, createRankFusionPipeline);
+    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(
+        inputPipelines,
+        createRankFusionPipeline,
+    );
 };
 
 /* --------------------------------------------------------------------------------------- */

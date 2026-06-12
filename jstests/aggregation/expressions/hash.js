@@ -25,7 +25,10 @@ const successTests = [
         expressionInput: {input: "[1, 2, 3]", algorithm: {$concat: ["xxh", "64"]}},
         expectedHash: BinData(0, "wkwP8yqWE2o="),
     },
-    {expressionInput: {input: "🧐🤓😎", algorithm: "xxh64"}, expectedHash: BinData(0, "tWWU4BmD+Z4=")},
+    {
+        expressionInput: {input: "🧐🤓😎", algorithm: "xxh64"},
+        expectedHash: BinData(0, "tWWU4BmD+Z4="),
+    },
 
     {
         expressionInput: {input: {$concat: ["Hello", " ", "World"]}, algorithm: "sha256"},
@@ -55,7 +58,10 @@ const successTests = [
 
     // Empty
     {expressionInput: {input: "", algorithm: "xxh64"}, expectedHash: BinData(0, "70bbN1HY6Zk=")},
-    {expressionInput: {input: BinData(0, ""), algorithm: "xxh64"}, expectedHash: BinData(0, "70bbN1HY6Zk=")},
+    {
+        expressionInput: {input: BinData(0, ""), algorithm: "xxh64"},
+        expectedHash: BinData(0, "70bbN1HY6Zk="),
+    },
 
     {
         expressionInput: {input: "", algorithm: "sha256"},
@@ -76,8 +82,14 @@ const successTests = [
     },
 
     // Binary input
-    {expressionInput: {input: BinData(0, "aGV5"), algorithm: "xxh64"}, expectedHash: BinData(0, "Wv5M8jFeEv4=")},
-    {expressionInput: {input: BinData(4, "aGV5"), algorithm: "xxh64"}, expectedHash: BinData(0, "Wv5M8jFeEv4=")},
+    {
+        expressionInput: {input: BinData(0, "aGV5"), algorithm: "xxh64"},
+        expectedHash: BinData(0, "Wv5M8jFeEv4="),
+    },
+    {
+        expressionInput: {input: BinData(4, "aGV5"), algorithm: "xxh64"},
+        expectedHash: BinData(0, "Wv5M8jFeEv4="),
+    },
 
     {
         expressionInput: {input: BinData(0, "aGV5"), algorithm: "sha256"},
@@ -123,7 +135,10 @@ const failureTests = [
     {expressionInput: {}, expectedCode: ErrorCodes.FailedToParse},
     {expressionInput: {input: "string"}, expectedCode: ErrorCodes.FailedToParse},
     {expressionInput: {algorithm: "xxh64"}, expectedCode: ErrorCodes.FailedToParse},
-    {expressionInput: {input: "string", algorithm: "xxh64", extra: 1}, expectedCode: ErrorCodes.FailedToParse},
+    {
+        expressionInput: {input: "string", algorithm: "xxh64", extra: 1},
+        expectedCode: ErrorCodes.FailedToParse,
+    },
     {expressionInput: {input: [1, 2, 3], algorithm: "xxh64"}, expectedCode: 10754000},
     {expressionInput: {input: "string", algorithm: [5]}, expectedCode: 10754001},
     {expressionInput: {input: "string", algorithm: null}, expectedCode: 10754001},
@@ -135,8 +150,13 @@ describe("$hash", () => {
     describe("succeeds", () => {
         for (const {expressionInput, expectedHash} of successTests) {
             it(`for ${tojson(expressionInput)}`, () => {
-                const actualHash = coll.aggregate([{$project: {hash: {$hash: expressionInput}}}]).toArray()[0].hash;
-                assert(bsonBinaryEqual(actualHash, expectedHash), `expected=${expectedHash}, actual=${actualHash}`);
+                const actualHash = coll
+                    .aggregate([{$project: {hash: {$hash: expressionInput}}}])
+                    .toArray()[0].hash;
+                assert(
+                    bsonBinaryEqual(actualHash, expectedHash),
+                    `expected=${expectedHash}, actual=${actualHash}`,
+                );
             });
         }
     });
@@ -154,7 +174,9 @@ describe("$hexHash", () => {
     describe("succeeds", () => {
         for (const {expressionInput, expectedHash} of successTests) {
             it(`for ${tojson(expressionInput)}`, () => {
-                const actualHex = coll.aggregate([{$project: {hash: {$hexHash: expressionInput}}}]).toArray()[0].hash;
+                const actualHex = coll
+                    .aggregate([{$project: {hash: {$hexHash: expressionInput}}}])
+                    .toArray()[0].hash;
                 const expectedHex = expectedHash?.hex().toUpperCase() ?? null;
                 assert.eq(actualHex, expectedHex);
             });
@@ -164,7 +186,11 @@ describe("$hexHash", () => {
     describe("fails", () => {
         for (const {expressionInput, expectedCode} of failureTests) {
             it(`for ${tojson(expressionInput)}`, () => {
-                assertErrorCode(coll, [{$project: {hash: {$hexHash: expressionInput}}}], expectedCode);
+                assertErrorCode(
+                    coll,
+                    [{$project: {hash: {$hexHash: expressionInput}}}],
+                    expectedCode,
+                );
             });
         }
     });

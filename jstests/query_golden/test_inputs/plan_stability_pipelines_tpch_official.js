@@ -117,7 +117,10 @@ export const commands = [
                     },
                     "revenue": {
                         "$sum": {
-                            "$multiply": ["$lineitem.l_extendedprice", {"$subtract": [1, "$lineitem.l_discount"]}],
+                            "$multiply": [
+                                "$lineitem.l_extendedprice",
+                                {"$subtract": [1, "$lineitem.l_discount"]},
+                            ],
                         },
                     },
                 },
@@ -220,7 +223,10 @@ export const commands = [
                     "_id": "$nation.n_name",
                     "revenue": {
                         "$sum": {
-                            "$multiply": ["$lineitem.l_extendedprice", {"$subtract": [1, "$lineitem.l_discount"]}],
+                            "$multiply": [
+                                "$lineitem.l_extendedprice",
+                                {"$subtract": [1, "$lineitem.l_discount"]},
+                            ],
                         },
                     },
                 },
@@ -301,10 +307,16 @@ export const commands = [
                                 "$expr": {
                                     "$or": [
                                         {
-                                            "$and": [{"$eq": ["$$n1_name", "FRANCE"]}, {"$eq": ["$n_name", "GERMANY"]}],
+                                            "$and": [
+                                                {"$eq": ["$$n1_name", "FRANCE"]},
+                                                {"$eq": ["$n_name", "GERMANY"]},
+                                            ],
                                         },
                                         {
-                                            "$and": [{"$eq": ["$$n1_name", "GERMANY"]}, {"$eq": ["$n_name", "FRANCE"]}],
+                                            "$and": [
+                                                {"$eq": ["$$n1_name", "GERMANY"]},
+                                                {"$eq": ["$n_name", "FRANCE"]},
+                                            ],
                                         },
                                     ],
                                 },
@@ -320,7 +332,10 @@ export const commands = [
                     "cust_nation": "$n2.n_name",
                     "l_year": {"$year": "$lineitem.l_shipdate"},
                     "volume": {
-                        "$multiply": ["$lineitem.l_extendedprice", {"$subtract": [1, "$lineitem.l_discount"]}],
+                        "$multiply": [
+                            "$lineitem.l_extendedprice",
+                            {"$subtract": [1, "$lineitem.l_discount"]},
+                        ],
                     },
                 },
             },
@@ -381,8 +396,16 @@ export const commands = [
                         {
                             "$match": {
                                 "$and": [
-                                    {"$expr": {"$gte": ["$o_orderdate", new ISODate("1995-01-01")]}},
-                                    {"$expr": {"$lte": ["$o_orderdate", new ISODate("1996-12-31")]}},
+                                    {
+                                        "$expr": {
+                                            "$gte": ["$o_orderdate", new ISODate("1995-01-01")],
+                                        },
+                                    },
+                                    {
+                                        "$expr": {
+                                            "$lte": ["$o_orderdate", new ISODate("1996-12-31")],
+                                        },
+                                    },
                                 ],
                             },
                         },
@@ -525,7 +548,10 @@ export const commands = [
                     "amount": {
                         "$subtract": [
                             {
-                                "$multiply": ["$lineitem.l_extendedprice", {"$subtract": [1, "$lineitem.l_discount"]}],
+                                "$multiply": [
+                                    "$lineitem.l_extendedprice",
+                                    {"$subtract": [1, "$lineitem.l_discount"]},
+                                ],
                             },
                             {
                                 "$multiply": ["$partsupp.ps_supplycost", "$lineitem.l_quantity"],
@@ -627,7 +653,10 @@ export const commands = [
                     },
                     "revenue": {
                         "$sum": {
-                            "$multiply": ["$lineitem.l_extendedprice", {"$subtract": [1, "$lineitem.l_discount"]}],
+                            "$multiply": [
+                                "$lineitem.l_extendedprice",
+                                {"$subtract": [1, "$lineitem.l_discount"]},
+                            ],
                         },
                     },
                 },
@@ -796,7 +825,10 @@ export const commands = [
                                     },
                                 },
                                 "then": {
-                                    "$multiply": ["$l_extendedprice", {"$subtract": [1, "$l_discount"]}],
+                                    "$multiply": [
+                                        "$l_extendedprice",
+                                        {"$subtract": [1, "$l_discount"]},
+                                    ],
                                 },
                                 "else": 0,
                             },

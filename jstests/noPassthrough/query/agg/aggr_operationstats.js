@@ -22,9 +22,15 @@ function runCommonTests(db, expectedNumDocs) {
             ErrorCodes.FailedToParse,
         );
     } else {
-        const aggResult = assert.commandWorked(db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}}));
+        const aggResult = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}}),
+        );
         const res = aggResult.cursor.firstBatch;
-        assert.eq(res.length, expectedNumDocs, "Expected " + expectedNumDocs + " docs, but got " + res.length + ".");
+        assert.eq(
+            res.length,
+            expectedNumDocs,
+            "Expected " + expectedNumDocs + " docs, but got " + res.length + ".",
+        );
     }
 }
 
@@ -47,7 +53,11 @@ runCommonTests(mongos.getDB(dbName), 1);
 for (let i = 0; i < numShards; i++) {
     assert.commandWorked(st.splitAt(namespace, {a: i + 1}));
     assert.commandWorked(
-        admin.runCommand({moveChunk: namespace, find: {a: i + 2}, to: shards[(i + 1) % numShards]._id}),
+        admin.runCommand({
+            moveChunk: namespace,
+            find: {a: i + 2},
+            to: shards[(i + 1) % numShards]._id,
+        }),
     );
 }
 
@@ -66,7 +76,9 @@ runCommonTests(conn.getDB(dbName), 1);
 
 // $collStats with operationStats option should return usage statistic fields.
 if (FeatureFlagUtil.isPresentAndEnabled(standaloneColl, "CursorBasedTop")) {
-    const aggResult = assert.commandWorked(standaloneColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}));
+    const aggResult = assert.commandWorked(
+        standaloneColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
+    );
     const res = aggResult.cursor.firstBatch[0];
     const statFields = [
         "total",

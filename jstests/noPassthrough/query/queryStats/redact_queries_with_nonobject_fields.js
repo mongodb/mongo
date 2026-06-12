@@ -28,7 +28,12 @@ function confirmAggSuccess(collName, pipeline) {
 // Test with non-object fields $limit and $skip.
 confirmAggSuccess(collA.getName(), [{$sort: {bar: -1}}, {$limit: 2}, {$match: {foo: {$lte: 2}}}]);
 confirmAggSuccess(collA.getName(), [{$sort: {bar: -1}}, {$skip: 50}, {$match: {foo: {$lte: 2}}}]);
-confirmAggSuccess(collA.getName(), [{$sort: {bar: -1}}, {$limit: 2}, {$skip: 50}, {$match: {foo: 0}}]);
+confirmAggSuccess(collA.getName(), [
+    {$sort: {bar: -1}},
+    {$limit: 2},
+    {$skip: 50},
+    {$match: {foo: 0}},
+]);
 
 // Test non-object field, $unionWith.
 confirmAggSuccess(collA.getName(), [{$unionWith: collB.getName()}]);

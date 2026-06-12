@@ -33,7 +33,9 @@ let testId = 0;
 {
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-    assert.commandWorked(db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}),
+    );
     assert.commandFailedWithCode(
         db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}),
         ErrorCodes.InvalidOptions,
@@ -44,7 +46,9 @@ let testId = 0;
 {
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-    assert.commandWorked(db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}),
+    );
     assert.commandWorked(coll.dropIndex({a: 1}));
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}));
 }
@@ -55,7 +59,9 @@ let testId = 0;
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk1: 1}}));
     assert.commandWorked(coll.createIndex({sk1: 1, a: 1}, {unique: true}));
-    assert.commandWorked(db.adminCommand({unshardCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(
+        db.adminCommand({unshardCollection: coll.getFullName(), toShard: anotherShard}),
+    );
     assert.commandWorked(coll.dropIndex({sk1: 1, a: 1}));
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk2: 1}}));
 }
@@ -65,7 +71,9 @@ let testId = 0;
 {
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(db.runCommand({create: coll.getName()}));
-    assert.commandWorked(db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}),
+    );
     assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
     assert.commandFailedWithCode(
         db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}),

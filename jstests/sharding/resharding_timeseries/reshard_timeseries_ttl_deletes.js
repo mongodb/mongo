@@ -56,7 +56,10 @@ function assertNumOfDocs(expected) {
         () => {
             const docs = st.s0.getCollection(ns).find({}).toArray();
             if (expected !== docs.length) {
-                jsTestLog("Didn't find expected number of documents, trying again. Found: " + tojson(docs));
+                jsTestLog(
+                    "Didn't find expected number of documents, trying again. Found: " +
+                        tojson(docs),
+                );
             }
             return expected === docs.length;
         },
@@ -136,10 +139,19 @@ assert.eq(1, ttlDeleteEntryRecipient.length, ttlDeleteEntryRecipient);
 if (areViewlessTimeseriesEnabled(db)) {
     assert(ttlDeleteEntryRecipient[0].ns.includes(`${db.getName()}.system.resharding`));
 } else {
-    assert(ttlDeleteEntryRecipient[0].ns.includes(`${db.getName()}.${getTimeseriesBucketsColl("resharding")}`));
+    assert(
+        ttlDeleteEntryRecipient[0].ns.includes(
+            `${db.getName()}.${getTimeseriesBucketsColl("resharding")}`,
+        ),
+    );
 }
 // Ensure TTL deletes works on the resharded collection.
-const pauseTTLMonitor = configureFailPoint(recipient0, "hangTTLMonitorBetweenPasses", {}, "alwaysOn");
+const pauseTTLMonitor = configureFailPoint(
+    recipient0,
+    "hangTTLMonitorBetweenPasses",
+    {},
+    "alwaysOn",
+);
 pauseTTLMonitor.wait();
 insertDocsToBeDeleted();
 assertNumOfDocs(4);

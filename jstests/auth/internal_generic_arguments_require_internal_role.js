@@ -7,9 +7,18 @@ const admin = mongod.getDB("admin");
 admin.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 assert(admin.auth("admin", "pass"));
 
-assert.commandFailedWithCode(db.runCommand({listCollections: 1, mayBypassWriteBlocking: true}), 6317500);
-assert.commandFailedWithCode(db.runCommand({listCollections: 1, versionContext: {OFCV: latestFCV}}), 9955800);
-assert.commandFailedWithCode(db.runCommand({listCollections: 1, mayBypassReplicaSetWriteBlocking: true}), 12097002);
+assert.commandFailedWithCode(
+    db.runCommand({listCollections: 1, mayBypassWriteBlocking: true}),
+    6317500,
+);
+assert.commandFailedWithCode(
+    db.runCommand({listCollections: 1, versionContext: {OFCV: latestFCV}}),
+    9955800,
+);
+assert.commandFailedWithCode(
+    db.runCommand({listCollections: 1, mayBypassReplicaSetWriteBlocking: true}),
+    12097002,
+);
 
 // Verify that the same commands are allowed with the internal __system role
 admin.createUser({user: "system", pwd: "pass", roles: ["root", "__system"]});

@@ -16,7 +16,10 @@
  *  ]
  */
 
-import {getRandomShardName, setupTestDatabase} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
+import {
+    getRandomShardName,
+    setupTestDatabase,
+} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 const fromCollName = "from";
@@ -89,8 +92,12 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
 
     assert.commandWorked(testDB.adminCommand({addShardToZone: primaryShardId, zone: "x"}));
     assert.commandWorked(testDB.adminCommand({addShardToZone: nonPrimaryShardId, zone: "y"}));
-    assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 0}, max: {x: 2}, zone: "x"}));
-    assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 2}, max: {x: 4}, zone: "y"}));
+    assert.commandWorked(
+        testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 0}, max: {x: 2}, zone: "x"}),
+    );
+    assert.commandWorked(
+        testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 2}, max: {x: 4}, zone: "y"}),
+    );
     assert.commandWorked(testDB.adminCommand({shardCollection: fromNs, key: {x: 1}}));
 
     let fromTags = testDB.getSiblingDB("config").tags.find({ns: fromNs}).toArray();
@@ -126,7 +133,9 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     const fromNs = dbName + "." + fromCollName;
     const toNs = dbName + "." + toCollName;
     assert.commandWorked(testDB.adminCommand({addShardToZone: getRandomShardName(db), zone: "x"}));
-    assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: toNs, min: {x: 0}, max: {x: 10}, zone: "x"}));
+    assert.commandWorked(
+        testDB.adminCommand({updateZoneKeyRange: toNs, min: {x: 0}, max: {x: 10}, zone: "x"}),
+    );
 
     assert.commandWorked(testDB.adminCommand({shardCollection: fromNs, key: {x: 1}}));
 
@@ -143,9 +152,23 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     setupShardedCollection(testDB, dbName, fromCollName);
     const longEnoughCollName = "x".repeat(235 - `${dbName}.`.length);
 
-    testRename(testDB, dbName, fromCollName, longEnoughCollName, false /* dropTarget */, false /* mustFail */);
+    testRename(
+        testDB,
+        dbName,
+        fromCollName,
+        longEnoughCollName,
+        false /* dropTarget */,
+        false /* mustFail */,
+    );
 
     const tooLongCollName = longEnoughCollName + "x";
 
-    testRename(testDB, dbName, longEnoughCollName, tooLongCollName, false /* dropTarget */, true /* mustFail */);
+    testRename(
+        testDB,
+        dbName,
+        longEnoughCollName,
+        tooLongCollName,
+        false /* dropTarget */,
+        true /* mustFail */,
+    );
 }

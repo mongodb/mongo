@@ -19,7 +19,9 @@ const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyInd
 const validateCompoundSecondaryIndexes = function (db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}),
+    );
     // Expect it's possible to create a compound secondary index that does not include the cluster
     // key.
     assert.commandWorked(coll.createIndex({secondaryKey0: 1, secondaryKey1: 1}));
@@ -53,13 +55,18 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     if (clusteredIndexSpec.collation) {
         delete clusteredIndexSpec.collation;
     }
-    assert.commandWorked(db[collName].runCommand({createIndexes: collName, indexes: [clusteredIndexSpec]}));
+    assert.commandWorked(
+        db[collName].runCommand({createIndexes: collName, indexes: [clusteredIndexSpec]}),
+    );
 
     // no-op without the 'clustered' option.
     assert.commandWorked(db[collName].createIndex(clusterKey));
 
     // 'clustered' is not a valid option for an index not on the cluster key.
-    assert.commandFailedWithCode(db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6243700);
+    assert.commandFailedWithCode(
+        db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}),
+        6243700,
+    );
 
     assert.commandFailedWithCode(
         db[collName].runCommand({
@@ -88,7 +95,10 @@ const validateClusteredIndexUndroppable = function (db, collName, fullCreateOpti
 
     assert.commandFailedWithCode(db[collName].dropIndex(expectedIndexName), 5979800);
 
-    assert.commandFailedWithCode(db.runCommand({dropIndexes: collName, index: [expectedIndexName]}), 5979800);
+    assert.commandFailedWithCode(
+        db.runCommand({dropIndexes: collName, index: [expectedIndexName]}),
+        5979800,
+    );
 };
 
 const validateCreatedCollection = function (db, collName, createOptions) {
@@ -120,15 +130,25 @@ const validateClusteredCappedCollections = function (db, coll, clusterKey) {
         expireAfterSeconds: 10,
     });
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, size: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            size: 10,
+        }),
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, max: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            max: 10,
+        }),
         6049204,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, size: 10, max: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            size: 10,
+            max: 10,
+        }),
         6049200,
     );
     assert.commandFailedWithCode(
@@ -140,11 +160,19 @@ const validateClusteredCappedCollections = function (db, coll, clusterKey) {
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, capped: true, size: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            capped: true,
+            size: 10,
+        }),
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, capped: true, max: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            capped: true,
+            max: 10,
+        }),
         6049204,
     );
     assert.commandFailedWithCode(
@@ -157,7 +185,10 @@ const validateClusteredCappedCollections = function (db, coll, clusterKey) {
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, capped: true}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            capped: true,
+        }),
         6049201,
     );
 
@@ -180,7 +211,9 @@ const nonReplicatedColl = nonReplicatedDB.coll;
 replicatedColl.drop();
 nonReplicatedColl.drop();
 
-runSuccessfulCreate(nonReplicatedDB, nonReplicatedColl, {clusteredIndex: {key: {ts: 1}, unique: true}});
+runSuccessfulCreate(nonReplicatedDB, nonReplicatedColl, {
+    clusteredIndex: {key: {ts: 1}, unique: true},
+});
 
 runSuccessfulCreate(nonReplicatedDB, nonReplicatedColl, {
     clusteredIndex: {key: {ts: 1}, unique: true},
@@ -213,39 +246,55 @@ assert.commandFailedWithCode(
     ErrorCodes.IDLFailedToParse,
 );
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: 1}, unique: false}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {ts: 1}, unique: false},
+    }),
     5979700,
 );
 
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {randKey: 1}, unique: true}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {randKey: 1}, unique: true},
+    }),
     5979701,
 );
 assert.commandWorked(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {randKey: 1}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {randKey: 1}, unique: true},
+    }),
 );
 nonReplicatedColl.drop();
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {ts: 1}, unique: true}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {ts: 1}, unique: true},
+    }),
     5979701,
 );
 
 // Validate that arbitrary cluster keys must not be compounded, must not have nested fields, and
 // that the key must have a value of 1.
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: 1, a: 1}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {ts: 1, a: 1}, unique: true},
+    }),
     6053700,
 );
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {"ts.a": 1}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {"ts.a": 1}, unique: true},
+    }),
     6053701,
 );
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: -1}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {ts: -1}, unique: true},
+    }),
     6053702,
 );
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: {a: 1}}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {ts: {a: 1}}, unique: true},
+    }),
     6053702,
 );
 

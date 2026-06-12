@@ -75,7 +75,10 @@ jsTestLog("Create a hanging hello via mongos.");
 res = assert.commandWorked(mongos.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 let topologyVersionField = res.topologyVersion;
-let helloFailPoint = configureFailPoint(mongos, oldMongos ? "waitForHelloResponse" : "waitForHelloResponseMongos");
+let helloFailPoint = configureFailPoint(
+    mongos,
+    oldMongos ? "waitForHelloResponse" : "waitForHelloResponseMongos",
+);
 let hello = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), mongos.port);
 helloFailPoint.wait();
 assert.eq(1, mongos.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
@@ -118,19 +121,31 @@ jsTestLog("New writes are allowed.");
 assert.commandWorked(mongosDB.coll.insert({_id: 5}));
 
 jsTestLog("Let shutdown progress to start killing operations.");
-let pauseWhileKillingOperationsFailPoint = configureFailPoint(mongos, "pauseWhileKillingOperationsAtShutdown");
+let pauseWhileKillingOperationsFailPoint = configureFailPoint(
+    mongos,
+    "pauseWhileKillingOperationsAtShutdown",
+);
 
 // Exit quiesce mode so we can hit the pauseWhileKillingOperationsFailPoint failpoint.
 quiesceModeFailPoint.off();
 
 // This throws because the configureFailPoint command is killed by the shutdown.
-if (!pauseWhileKillingOperationsFailPoint.wait({expectedErrorCodes: [ErrorCodes.InterruptedAtShutdown]})) {
-    jsTestLog("Ignoring InterruptedAtShutdown error because `waitForFailPoint` is killed by shutdown");
+if (
+    !pauseWhileKillingOperationsFailPoint.wait({
+        expectedErrorCodes: [ErrorCodes.InterruptedAtShutdown],
+    })
+) {
+    jsTestLog(
+        "Ignoring InterruptedAtShutdown error because `waitForFailPoint` is killed by shutdown",
+    );
 }
 
 jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
 checkTopologyVersion(
-    assert.commandFailedWithCode(mongosDB.runCommand({find: collName}), ErrorCodes.InterruptedAtShutdown),
+    assert.commandFailedWithCode(
+        mongosDB.runCommand({find: collName}),
+        ErrorCodes.InterruptedAtShutdown,
+    ),
     topologyVersionField,
 );
 // Restart mongos.

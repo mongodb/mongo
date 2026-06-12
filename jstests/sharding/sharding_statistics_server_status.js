@@ -51,30 +51,45 @@ function incrementStatsAndCheckServerShardStats(db, donor, recipient, numDocs) {
         assert(statsFromServerStatus[i].totalDonorChunkCloneTimeMillis);
         assert(statsFromServerStatus[i].countDonorMoveChunkLockTimeout);
         assert(statsFromServerStatus[i].countDonorMoveChunkAbortConflictingIndexOperation);
-        assert.eq(stats[i].countDonorMoveChunkStarted, statsFromServerStatus[i].countDonorMoveChunkStarted);
-        assert.eq(stats[i].countDocsClonedOnRecipient, statsFromServerStatus[i].countDocsClonedOnRecipient);
+        assert.eq(
+            stats[i].countDonorMoveChunkStarted,
+            statsFromServerStatus[i].countDonorMoveChunkStarted,
+        );
+        assert.eq(
+            stats[i].countDocsClonedOnRecipient,
+            statsFromServerStatus[i].countDocsClonedOnRecipient,
+        );
         assert.eq(stats[i].countDocsClonedOnDonor, statsFromServerStatus[i].countDocsClonedOnDonor);
         assert.eq(stats[i].countDocsDeletedByRangeDeleter, countDocsDeleted);
         // TODO SERVER-xyz remove FCV check and `db` argument once v8.0 branches out
         const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "7.1") >= 0) {
+        if (
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "7.1") >= 0
+        ) {
             assert.eq(
                 stats[i].countBytesDeletedByRangeDeleter,
                 statsFromServerStatus[i].countBytesDeletedByRangeDeleter,
             );
         }
-        assert.eq(stats[i].countRecipientMoveChunkStarted, statsFromServerStatus[i].countRecipientMoveChunkStarted);
+        assert.eq(
+            stats[i].countRecipientMoveChunkStarted,
+            statsFromServerStatus[i].countRecipientMoveChunkStarted,
+        );
     }
 }
 
 function checkServerStatusMigrationLockTimeoutCount(shardConn, count) {
-    const shardStats = assert.commandWorked(shardConn.adminCommand({serverStatus: 1})).shardingStatistics;
+    const shardStats = assert.commandWorked(
+        shardConn.adminCommand({serverStatus: 1}),
+    ).shardingStatistics;
     assert(shardStats.hasOwnProperty("countDonorMoveChunkLockTimeout"));
     assert.eq(count, shardStats.countDonorMoveChunkLockTimeout);
 }
 
 function checkServerStatusAbortedMigrationCount(shardConn, count) {
-    const shardStats = assert.commandWorked(shardConn.adminCommand({serverStatus: 1})).shardingStatistics;
+    const shardStats = assert.commandWorked(
+        shardConn.adminCommand({serverStatus: 1}),
+    ).shardingStatistics;
     assert(shardStats.hasOwnProperty("countDonorMoveChunkAbortConflictingIndexOperation"));
     assert.eq(count, shardStats.countDonorMoveChunkAbortConflictingIndexOperation);
 }
@@ -94,7 +109,9 @@ function runConcurrentMoveChunk(host, ns, toShard) {
     // occurs.
     function runMoveChunkUntilSuccessOrUnexpectedError() {
         let result = mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: toShard});
-        let shouldRetry = result.hasOwnProperty("code") && result.code == ErrorCodes.ConflictingOperationInProgress;
+        let shouldRetry =
+            result.hasOwnProperty("code") &&
+            result.code == ErrorCodes.ConflictingOperationInProgress;
         if (shouldRetry) {
             jsTestLog("Retrying moveChunk due to ConflictingOperationInProgress");
         } else if (!result.ok) {
@@ -118,7 +135,13 @@ function sleepFunction(host, collectionNs, sleepComment) {
     // Set a MODE_IS collection lock to be held for 1 hours.
     // Holding this lock for 1 hour will trigger a test timeout.
     assert.commandFailedWithCode(
-        mongo.adminCommand({sleep: 1, secs: 3600, lockTarget: collectionNs, lock: "ir", $comment: sleepComment}),
+        mongo.adminCommand({
+            sleep: 1,
+            secs: 3600,
+            lockTarget: collectionNs,
+            lock: "ir",
+            $comment: sleepComment,
+        }),
         ErrorCodes.Interrupted,
     );
 }
@@ -141,14 +164,18 @@ const index2 = {
 };
 let numDocsInserted = 0;
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
 const testDB = st.rs0.getPrimary().getDB(dbName);
 
 // Move chunk from shard0 to shard1 without docs.
-assert.commandWorked(mongos.adminCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName}),
+);
 incrementStatsAndCheckServerShardStats(testDB, stats[0], stats[1], numDocsInserted);
 
 // Insert docs and then move chunk again from shard1 to shard0.
@@ -157,19 +184,34 @@ for (let i = 0; i < numDocsToInsert; ++i) {
     ++numDocsInserted;
 }
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: coll + "",
+        find: {_id: 1},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 incrementStatsAndCheckServerShardStats(testDB, stats[1], stats[0], numDocsInserted);
 
 // Check that numbers are indeed cumulative. Move chunk from shard0 to shard1.
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: coll + "",
+        find: {_id: 1},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 incrementStatsAndCheckServerShardStats(testDB, stats[0], stats[1], numDocsInserted);
 
 // Move chunk from shard1 to shard0.
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: coll + "",
+        find: {_id: 1},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 incrementStatsAndCheckServerShardStats(testDB, stats[1], stats[0], numDocsInserted);
 
@@ -183,14 +225,21 @@ const lockParameterRes = assert.commandWorked(
     donorConn.adminCommand({getParameter: 1, migrationLockAcquisitionMaxWaitMS: 1}),
 );
 const originalMigrationLockTimeout = lockParameterRes.migrationLockAcquisitionMaxWaitMS;
-assert.commandWorked(donorConn.adminCommand({setParameter: 1, migrationLockAcquisitionMaxWaitMS: 2 * 1000}));
+assert.commandWorked(
+    donorConn.adminCommand({setParameter: 1, migrationLockAcquisitionMaxWaitMS: 2 * 1000}),
+);
 
 // Counter starts at 0.
 checkServerStatusMigrationLockTimeoutCount(donorConn, 0);
 
 // Pause a migration before entering the critical section.
 pauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);
-let moveChunkThread = new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+let moveChunkThread = new Thread(
+    runConcurrentMoveChunk,
+    st.s.host,
+    dbName + "." + collName,
+    st.shard1.shardName,
+);
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.reachedSteadyState);
 
@@ -215,14 +264,24 @@ assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}));
 
 // Pause a migration after entering the critical section, but before entering the commit phase.
 pauseMoveChunkAtStep(donorConn, moveChunkStepNames.chunkDataCommitted);
-moveChunkThread = new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+moveChunkThread = new Thread(
+    runConcurrentMoveChunk,
+    st.s.host,
+    dbName + "." + collName,
+    st.shard1.shardName,
+);
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.chunkDataCommitted);
 
 // Use the sleep cmd to acquire the collection MODE_IS lock asynchronously so that the migration
 // cannot commit.
 const sleepComment = "Lock sleep";
-const sleepCommand = new Thread(sleepFunction, st.rs0.getPrimary().host, dbName + "." + collName, sleepComment);
+const sleepCommand = new Thread(
+    sleepFunction,
+    st.rs0.getPrimary().host,
+    dbName + "." + collName,
+    sleepComment,
+);
 sleepCommand.start();
 
 // Wait for the sleep command to start.
@@ -247,7 +306,10 @@ try {
 checkServerStatusMigrationLockTimeoutCount(donorConn, 2);
 
 assert.commandWorked(
-    donorConn.adminCommand({setParameter: 1, migrationLockAcquisitionMaxWaitMS: originalMigrationLockTimeout}),
+    donorConn.adminCommand({
+        setParameter: 1,
+        migrationLockAcquisitionMaxWaitMS: originalMigrationLockTimeout,
+    }),
 );
 
 //
@@ -258,7 +320,12 @@ checkServerStatusAbortedMigrationCount(donorConn, 0);
 
 // Pause a migration after cloning starts.
 pauseMoveChunkAtStep(donorConn, moveChunkStepNames.startedMoveChunk);
-moveChunkThread = new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+moveChunkThread = new Thread(
+    runConcurrentMoveChunk,
+    st.s.host,
+    dbName + "." + collName,
+    st.shard1.shardName,
+);
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.startedMoveChunk);
 
@@ -274,7 +341,12 @@ checkServerStatusAbortedMigrationCount(donorConn, 1);
 
 // Pause a migration before entering the critical section.
 pauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);
-moveChunkThread = new Thread(runConcurrentMoveChunk, st.s.host, dbName + "." + collName, st.shard1.shardName);
+moveChunkThread = new Thread(
+    runConcurrentMoveChunk,
+    st.s.host,
+    dbName + "." + collName,
+    st.shard1.shardName,
+);
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.reachedSteadyState);
 

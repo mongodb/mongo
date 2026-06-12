@@ -9,7 +9,11 @@
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getPlanStages, getWinningPlanFromExplain, isEofPlan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isEofPlan,
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "explain_find_trivially_false_predicates_in_tailables_over_capped_colls";
 
@@ -41,7 +45,12 @@ winningPlan = getWinningPlanFromExplain(explain);
 assert(isEofPlan(db, explain));
 
 // It also uses EOF for queries including projection, sorting, limit and skip arguments.
-explain = coll.find({$alwaysFalse: 1}, {_id: 0, a: 1}).skip(1).limit(2).tailable({awaitData: true}).explain();
+explain = coll
+    .find({$alwaysFalse: 1}, {_id: 0, a: 1})
+    .skip(1)
+    .limit(2)
+    .tailable({awaitData: true})
+    .explain();
 winningPlan = getWinningPlanFromExplain(explain);
 assert(isEofPlan(db, winningPlan));
 eofStages = getPlanStages(winningPlan, "EOF");

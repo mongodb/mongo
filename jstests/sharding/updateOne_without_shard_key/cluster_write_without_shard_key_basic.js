@@ -59,12 +59,18 @@ function runAndVerifyCommand(testCase) {
 
             // Remove document.
             assert.commandWorked(testColl.deleteOne(testCase.cmdObj.targetDocId));
-            assert.eq(null, mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(
+                null,
+                mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId),
+            );
             break;
         case "delete":
             assert.eq(1, res.response.n, res.response);
             assert.eq(res.shardId, testCase.cmdObj.shardId);
-            assert.eq(null, mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(
+                null,
+                mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId),
+            );
             break;
         case "findAndModify":
         case "findandmodify":
@@ -84,7 +90,10 @@ function runAndVerifyCommand(testCase) {
 
             // Remove document.
             assert.commandWorked(testColl.deleteOne(testCase.cmdObj.targetDocId));
-            assert.eq(null, mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(
+                null,
+                mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId),
+            );
             break;
     }
 }
@@ -320,7 +329,10 @@ function runAndVerifyCommand(testCase) {
         expectedModifiedDoc: {_id: 1, x: xFieldValueShard0, a: aFieldValue},
     };
     runAndVerifyCommand(confirmOnlyOneDocUpdatedObj);
-    assert.eq({_id: 0, x: xFieldValueShard0, a: 0}, mongosConn.getCollection(collName).findOne({_id: 0}));
+    assert.eq(
+        {_id: 0, x: xFieldValueShard0, a: 0},
+        mongosConn.getCollection(collName).findOne({_id: 0}),
+    );
 })();
 
 (() => {
@@ -378,7 +390,10 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalQuery: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        shardConn.getCollection(collName).runCommand(cmdObj),
+        ErrorCodes.InvalidOptions,
+    );
 
     // Cannot pass $_originalCollation as an external client in an update command.
     cmdObj = {
@@ -393,7 +408,10 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalCollation: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        shardConn.getCollection(collName).runCommand(cmdObj),
+        ErrorCodes.InvalidOptions,
+    );
 
     // Cannot pass $_originalQuery as an external client in a delete command.
     cmdObj = {
@@ -407,7 +425,10 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalQuery: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        shardConn.getCollection(collName).runCommand(cmdObj),
+        ErrorCodes.InvalidOptions,
+    );
 
     // Cannot pass $_originalCollation as an external client in a delete command.
     cmdObj = {
@@ -422,7 +443,10 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalCollation: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        shardConn.getCollection(collName).runCommand(cmdObj),
+        ErrorCodes.InvalidOptions,
+    );
 
     // Cannot pass $_originalQuery as an external client in a findandmodify command.
     cmdObj = {
@@ -432,7 +456,10 @@ function runAndVerifyCommand(testCase) {
         sampleId: UUID(),
         $_originalQuery: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        shardConn.getCollection(collName).runCommand(cmdObj),
+        ErrorCodes.InvalidOptions,
+    );
 
     // Cannot pass $_originalCollation as an external client in a findandmodify command.
     cmdObj = {
@@ -442,7 +469,10 @@ function runAndVerifyCommand(testCase) {
         sampleId: UUID(),
         $_originalCollation: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        shardConn.getCollection(collName).runCommand(cmdObj),
+        ErrorCodes.InvalidOptions,
+    );
 })();
 
 st.stop();

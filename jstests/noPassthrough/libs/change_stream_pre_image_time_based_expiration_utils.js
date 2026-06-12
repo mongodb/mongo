@@ -26,7 +26,10 @@ export function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo
         assert.eq(
             preImageDocs[idx].preImage._id,
             preImageId,
-            "pre-image in collection: " + tojson(preImageDocs[idx]) + ", expected _id: " + preImageId,
+            "pre-image in collection: " +
+                tojson(preImageDocs[idx]) +
+                ", expected _id: " +
+                preImageId,
         );
     }
 }
@@ -36,7 +39,8 @@ export function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo
 export function getDateToExpireAllPreImages(preImageColl, expireAfterSeconds) {
     const lastPreImageToExpire = preImageColl.find().sort({"_id.ts": -1}).limit(1).toArray();
     assert.eq(lastPreImageToExpire.length, 1, lastPreImageToExpire);
-    const preImageShouldExpireAfter = lastPreImageToExpire[0].operationTime.getTime() + expireAfterSeconds * 1000;
+    const preImageShouldExpireAfter =
+        lastPreImageToExpire[0].operationTime.getTime() + expireAfterSeconds * 1000;
     return new Date(preImageShouldExpireAfter + 1);
 }
 
@@ -68,7 +72,9 @@ export function setupTimeBasedPreImageRetentionPolicyTest(conn, primary, expireA
     // Create several collections with pre- and post-images enabled.
     for (let collIdx = 0; collIdx < collectionCount; collIdx++) {
         const collName = "coll" + collIdx;
-        assert.commandWorked(testDB.createCollection(collName, {changeStreamPreAndPostImages: {enabled: true}}));
+        assert.commandWorked(
+            testDB.createCollection(collName, {changeStreamPreAndPostImages: {enabled: true}}),
+        );
     }
 
     // Get the collections information and sort them by uuid. The pre-image documents are naturally
@@ -84,7 +90,9 @@ export function setupTimeBasedPreImageRetentionPolicyTest(conn, primary, expireA
     // Disable pre-image time-based expiration policy.
     assert.commandWorked(
         conn.getDB("admin").runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}},
+            },
         }),
     );
 
@@ -103,7 +111,9 @@ export function setupTimeBasedPreImageRetentionPolicyTest(conn, primary, expireA
         const docs = docsStatePerCollection[collIdx];
 
         for (let docIdx = 0; docIdx < docs.length; docIdx++) {
-            assert.commandWorked(coll.insert({_id: documentId, collName}, {$set: {documentState: "inserted"}}));
+            assert.commandWorked(
+                coll.insert({_id: documentId, collName}, {$set: {documentState: "inserted"}}),
+            );
 
             const documentState = docs[docIdx];
             allDocs.push([collIdx, documentId]);
@@ -167,14 +177,23 @@ export function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     conn.getDB("admin").setLogLevel(1, "query");
 
     const expireAfterSeconds = 1;
-    const {currentTimeForTimeBasedExpiration, shouldExpireDocs, shouldRetainDocs, allDocs, collectionsInfo} =
-        setupTimeBasedPreImageRetentionPolicyTest(conn, primary, expireAfterSeconds);
+    const {
+        currentTimeForTimeBasedExpiration,
+        shouldExpireDocs,
+        shouldRetainDocs,
+        allDocs,
+        collectionsInfo,
+    } = setupTimeBasedPreImageRetentionPolicyTest(conn, primary, expireAfterSeconds);
 
     // Configure the current time for the pre-image remover job. At this point, the time-based
     // pre-image expiration is still disabled.
-    const currentTimeFailPoint = configureFailPoint(primary, "changeStreamPreImageRemoverCurrentTime", {
-        currentTimeForTimeBasedExpiration,
-    });
+    const currentTimeFailPoint = configureFailPoint(
+        primary,
+        "changeStreamPreImageRemoverCurrentTime",
+        {
+            currentTimeForTimeBasedExpiration,
+        },
+    );
 
     // Wait until at least 1 complete cycle of pre-image removal job is completed.
     currentTimeFailPoint.wait({timesEntered: 2});
@@ -211,14 +230,19 @@ export function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     // Set indefinite expire time for pre-images.
     assert.commandWorked(
         conn.getDB("admin").runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}},
+            },
         }),
     );
 
     // Disable pre-images removal job on the primary, and make sure that the primary has
     // acknowledged the stop. This is a barrier that ensures that the pre-images removal job will
     // not be executing anymore.
-    const disablePreImagesRemoverFailPoint = configureFailPoint(primary, "disableChangeStreamPreImagesRemover");
+    const disablePreImagesRemoverFailPoint = configureFailPoint(
+        primary,
+        "disableChangeStreamPreImagesRemover",
+    );
     disablePreImagesRemoverFailPoint.wait({timesEntered: 1});
 
     // Delete all remaining pre-images on the primary. This is necessary because the pre-images

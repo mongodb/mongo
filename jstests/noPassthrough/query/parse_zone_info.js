@@ -28,9 +28,13 @@ function testWithGoodTimeZoneDir(tz_good_path) {
     const testDB = conn.getDB("test");
     const coll = testDB.parse_zone_info;
     assert.commandWorked(coll.insert({x: new Date()}));
-    assert.doesNotThrow(() => coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "GMT"}}}}]));
     assert.doesNotThrow(() =>
-        coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/Sao_Paulo"}}}}]),
+        coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "GMT"}}}}]),
+    );
+    assert.doesNotThrow(() =>
+        coll.aggregate([
+            {$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/Sao_Paulo"}}}},
+        ]),
     );
 
     // Confirm that attempt to use a non-existent timezone in an expression fails.
@@ -77,7 +81,10 @@ function testWithGoodTimeZoneDir(tz_good_path) {
     }
 
     let res = corner_coll
-        .aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/New_York"}}}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/New_York"}}}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     for (let i = 0; i < test_dates.length; ++i) {
         assert.eq(res[i].x_parts, test_dates[i].test_date_parts);

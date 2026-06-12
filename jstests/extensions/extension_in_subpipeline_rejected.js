@@ -23,7 +23,9 @@ const kNotAllowedInFacetErrorCode = 40600;
 
 // Test that a $lookup pipeline can reject an extension stage.
 {
-    const lookupPipeline = [{$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}}];
+    const lookupPipeline = [
+        {$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}},
+    ];
     assertErrorCode(
         coll,
         lookupPipeline,
@@ -132,7 +134,11 @@ const kNotAllowedInFacetErrorCode = 40600;
             viewOn: coll.getName(),
             pipeline: unionWithPipeline,
         }),
-        [kNotAllowedInUnionWithErrorCode, kNotAllowedInLookupErrorCode, kNotAllowedInFacetErrorCode],
+        [
+            kNotAllowedInUnionWithErrorCode,
+            kNotAllowedInLookupErrorCode,
+            kNotAllowedInFacetErrorCode,
+        ],
     );
     db[jsTestName() + "_view"].drop();
     {
@@ -271,7 +277,10 @@ function testLookupOnViewChainRejected(viewSpecs, description) {
     testLookupOnViewChainRejected(
         [
             {name: "chain_level1_no_ext", pipeline: [{$addFields: {level1: true}}]},
-            {name: "chain_level2_with_ext", pipeline: [{$testBar: {noop: true}}, {$addFields: {level2: true}}]},
+            {
+                name: "chain_level2_with_ext",
+                pipeline: [{$testBar: {noop: true}}, {$addFields: {level2: true}}],
+            },
             {name: "chain_level3_no_ext", pipeline: [{$addFields: {level3: true}}]},
         ],
         "Using $lookup on 3-level view chain where middle view has extension should be rejected",

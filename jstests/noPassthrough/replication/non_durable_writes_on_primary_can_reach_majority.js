@@ -19,11 +19,19 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const checkTimestamps = (cmp, a, b) => {
     if (cmp === "gt") {
-        assert.gt(timestampCmp(a, b), 0, `Expected timestamp to compare greater: ${tojson(a)} <= ${tojson(b)}`);
+        assert.gt(
+            timestampCmp(a, b),
+            0,
+            `Expected timestamp to compare greater: ${tojson(a)} <= ${tojson(b)}`,
+        );
         return;
     }
     assert.eq(cmp, "eq", "Expected 'cmp' to be one of {'eq', 'gt'}");
-    assert.eq(timestampCmp(a, b), 0, `Expected timestamps to be equal: ${tojson(a)} != ${tojson(b)}`);
+    assert.eq(
+        timestampCmp(a, b),
+        0,
+        `Expected timestamps to be equal: ${tojson(a)} != ${tojson(b)}`,
+    );
 };
 
 const rst = new ReplSetTest({name: jsTest.name(), nodes: 3});
@@ -42,13 +50,23 @@ assert.commandWorked(primaryDB.createCollection(collName, {writeConcern: {w: "ma
 
 // Do a write and then fetch and save the durable and majority timestamps on the primary.
 // Use {w: 3, j: true} write concern to make sure the timestamps are stable.
-const res = assert.commandWorked(primaryColl.insert({_id: "writeAllDurable"}, {writeConcern: {w: 3, j: true}}));
+const res = assert.commandWorked(
+    primaryColl.insert({_id: "writeAllDurable"}, {writeConcern: {w: 3, j: true}}),
+);
 const primaryReplSetStatus = assert.commandWorked(primary.adminCommand("replSetGetStatus"));
 const primaryPreFailPointDurableTs = primaryReplSetStatus.optimes.durableOpTime.ts;
 const primaryPreFailPointMajorityTs = primaryReplSetStatus.optimes.readConcernMajorityOpTime.ts;
 jsTestLog("Primary's optimes (initializing): " + tojson(primaryReplSetStatus.optimes));
-assert.neq(primaryPreFailPointDurableTs, null, `Expected ${tojson(primaryPreFailPointDurableTs)} != null`);
-assert.neq(primaryPreFailPointMajorityTs, null, `Expected ${tojson(primaryPreFailPointMajorityTs)} != null`);
+assert.neq(
+    primaryPreFailPointDurableTs,
+    null,
+    `Expected ${tojson(primaryPreFailPointDurableTs)} != null`,
+);
+assert.neq(
+    primaryPreFailPointMajorityTs,
+    null,
+    `Expected ${tojson(primaryPreFailPointMajorityTs)} != null`,
+);
 checkTimestamps("eq", primaryPreFailPointDurableTs, primaryPreFailPointMajorityTs);
 
 // Configure the primary to stop moving the durable timestamp forward. The primary will no longer be
@@ -60,8 +78,12 @@ try {
     // Perform some writes with majority write concern. The primary cannot confirm them, so success
     // means that the secondaries have the writes durably.
     jsTestLog("Writes majority confirmed by secondaries.");
-    assert.commandWorked(primaryColl.insert({_id: "majority1"}, {writeConcern: {w: "majority", j: true}}));
-    assert.commandWorked(primaryColl.insert({_id: "majority2"}, {writeConcern: {w: "majority", j: true}}));
+    assert.commandWorked(
+        primaryColl.insert({_id: "majority1"}, {writeConcern: {w: "majority", j: true}}),
+    );
+    assert.commandWorked(
+        primaryColl.insert({_id: "majority2"}, {writeConcern: {w: "majority", j: true}}),
+    );
 
     // Check that the primary's durable timestamp has not moved forward, but the majority point has.
     const primaryStatus = assert.commandWorked(primary.adminCommand("replSetGetStatus"));
@@ -93,8 +115,12 @@ try {
     // nodes to make sure the durable timestamps move forward if possible -- this will work only on
     // the secondary, the primary's durable timestamp will not move.
     jsTestLog("Writes cannot become majority confirmed.");
-    assert.commandWorked(primaryColl.insert({_id: "noMajority1"}, {writeConcern: {w: 2, j: false}}));
-    assert.commandWorked(primaryColl.insert({_id: "noMajority2"}, {writeConcern: {w: 2, j: false}}));
+    assert.commandWorked(
+        primaryColl.insert({_id: "noMajority1"}, {writeConcern: {w: 2, j: false}}),
+    );
+    assert.commandWorked(
+        primaryColl.insert({_id: "noMajority2"}, {writeConcern: {w: 2, j: false}}),
+    );
 
     jsTest.log("Force checkpoints to move the durable timestamps forward");
     assert.commandWorked(primary.adminCommand({fsync: 1}));
@@ -113,7 +139,9 @@ try {
     // until the secondary's durable timestamp has advanced past the majority timestamp.
     assert.soonNoExcept(
         () => {
-            const secondaryStatus = assert.commandWorked(runningSecondary.adminCommand("replSetGetStatus"));
+            const secondaryStatus = assert.commandWorked(
+                runningSecondary.adminCommand("replSetGetStatus"),
+            );
             const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
             const secondaryMajorityTs = secondaryStatus.optimes.readConcernMajorityOpTime.ts;
             jsTestLog("Secondary's optimes (when 2 nodes): " + tojson(secondaryStatus.optimes));

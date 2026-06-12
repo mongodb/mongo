@@ -77,7 +77,10 @@ function runTest(testCase) {
     const session = st.s.startSession();
     session.startTransaction({readConcern: {level: "snapshot"}});
     session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
-    let hangDonorAtStartOfRangeDel = configureFailPoint(st.rs1.getPrimary(), "suspendRangeDeletion");
+    let hangDonorAtStartOfRangeDel = configureFailPoint(
+        st.rs1.getPrimary(),
+        "suspendRangeDeletion",
+    );
 
     // Move all chunks for testDb.testColl to shard0.
     assert.commandWorked(
@@ -91,7 +94,10 @@ function runTest(testCase) {
 
     // This command MUST fail, the data moved to another shard, we can't try on shard0 nor
     // shard1 with the original clusterTime of the transaction.
-    assert.commandFailedWithCode(getDB(session, testCase).runCommand(testCase.cmdObj), ErrorCodes.MigrationConflict);
+    assert.commandFailedWithCode(
+        getDB(session, testCase).runCommand(testCase.cmdObj),
+        ErrorCodes.MigrationConflict,
+    );
 
     hangDonorAtStartOfRangeDel.off();
 
@@ -110,7 +116,9 @@ let testCases = [
         logMessage: "Running timeseries updateOne test",
         cmdObj: {
             update: collName,
-            updates: [{q: {timestamp: ISODate("2024-01-03T00:00:00.00Z"), y: 2}, u: {$inc: {z: 1}}}],
+            updates: [
+                {q: {timestamp: ISODate("2024-01-03T00:00:00.00Z"), y: 2}, u: {$inc: {z: 1}}},
+            ],
         },
     },
     {

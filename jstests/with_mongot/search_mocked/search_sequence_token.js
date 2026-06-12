@@ -106,7 +106,9 @@ const history = [
     },
 ];
 
-assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+);
 
 // Perform a $search query with pagination turned on.
 let cursor = coll.aggregate([
@@ -126,10 +128,15 @@ const expected = [
 ];
 assert.eq(expected, cursor.toArray());
 
-assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+);
 
 // $addFields is $project sugar.
-cursor = coll.aggregate([{$search: searchQuery}, {$addFields: {"myToken": {$meta: "searchSequenceToken"}}}]);
+cursor = coll.aggregate([
+    {$search: searchQuery},
+    {$addFields: {"myToken": {$meta: "searchSequenceToken"}}},
+]);
 assert.eq(expected, cursor.toArray());
 
 const expected2 = [
@@ -142,7 +149,9 @@ const expected2 = [
         ],
     },
 ];
-assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+);
 
 // Test $search + $facet with searchSequenceToken.
 cursor = coll.aggregate([

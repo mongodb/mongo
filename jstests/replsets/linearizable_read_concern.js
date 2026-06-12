@@ -52,7 +52,11 @@ let secondaries = replTest.getSecondaries();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Without a sync source the heartbeat interval will be half of the election timeout, 30
@@ -63,19 +67,26 @@ replTest.awaitReplication();
 assert.commandWorked(
     primary
         .getDB("test")
-        .foo.insert({"number": 7}, {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}}),
+        .foo.insert(
+            {"number": 7},
+            {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}},
+        ),
 );
 
 jsTestLog("Testing linearizable readConcern parsing");
 // This command is sent to the primary, and the primary is fully connected so it should work.
 let goodRead = assert.commandWorked(
-    primary.getDB("test").runCommand({"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}),
+    primary
+        .getDB("test")
+        .runCommand({"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}),
 );
 assert.eq(goodRead.cursor.firstBatch[0].number, 7);
 
 // This fails because you cannot have a linearizable read command sent to a secondary.
 let badCmd = assert.commandFailed(
-    secondaries[0].getDB("test").runCommand({"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}),
+    secondaries[0]
+        .getDB("test")
+        .runCommand({"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}),
 );
 
 assert.eq(badCmd.errmsg, "cannot satisfy linearizable read concern on non-primary node");
@@ -94,7 +105,10 @@ assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
 
 // A $out aggregation is not allowed with readConcern level "linearizable".
 assert.throwsWithCode(
-    () => primary.getDB("test").foo.aggregate([{$out: "out"}], {readConcern: {level: "linearizable"}}),
+    () =>
+        primary
+            .getDB("test")
+            .foo.aggregate([{$out: "out"}], {readConcern: {level: "linearizable"}}),
     ErrorCodes.InvalidOptions,
 );
 
@@ -103,9 +117,12 @@ assert.throwsWithCode(
     () =>
         primary
             .getDB("test")
-            .foo.aggregate([{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}], {
-                readConcern: {level: "linearizable"},
-            }),
+            .foo.aggregate(
+                [{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}],
+                {
+                    readConcern: {level: "linearizable"},
+                },
+            ),
     ErrorCodes.InvalidOptions,
 );
 
@@ -114,13 +131,19 @@ primary = replTest.getPrimary();
 jsTestLog("Starting linearizablility testing");
 
 const cursorId = assert.commandWorked(
-    primary.getDB("test").runCommand({"find": "foo", readConcern: {level: "linearizable"}, batchSize: 0}),
+    primary
+        .getDB("test")
+        .runCommand({"find": "foo", readConcern: {level: "linearizable"}, batchSize: 0}),
 ).cursor.id;
-jsTestLog("Setting up partitions such that the primary is isolated: [Secondary-Secondary] [Primary]");
+jsTestLog(
+    "Setting up partitions such that the primary is isolated: [Secondary-Secondary] [Primary]",
+);
 secondaries[0].disconnect(primary);
 secondaries[1].disconnect(primary);
 
-jsTestLog("Testing to make sure that linearizable getMores will time out when the primary is isolated.");
+jsTestLog(
+    "Testing to make sure that linearizable getMores will time out when the primary is isolated.",
+);
 assert.commandWorked(primary.getDB("test").foo.insert({_id: 0, x: 0}));
 assert.commandFailedWithCode(
     primary.getDB("test").runCommand({"getMore": cursorId, collection: "foo", batchSize: 1}),
@@ -160,6 +183,8 @@ assert.soon(function () {
 });
 assert.eq(primary, replTest.getPrimary(), "Primary unexpectedly changed mid test.");
 jsTestLog("Making Primary step down");
-assert.commandWorked(primary.adminCommand({"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true}));
+assert.commandWorked(
+    primary.adminCommand({"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true}),
+);
 parallelShell();
 replTest.stopSet();

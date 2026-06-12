@@ -44,12 +44,18 @@ let txnNumber = 0;
         // shard0: [-inf, 0)
         // shard1: [0, 10)
         // shard2: [10, +inf)
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: participant0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: participant0.shardName}),
+        );
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}),
+        );
 
         flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -67,7 +73,10 @@ let txnNumber = 0;
         );
     };
 
-    const testCommitProtocol = function (failpointData, expectError = ErrorCodes.NoSuchTransaction) {
+    const testCommitProtocol = function (
+        failpointData,
+        expectError = ErrorCodes.NoSuchTransaction,
+    ) {
         jsTest.log("Testing commit protocol with failpointData: " + tojson(failpointData));
 
         txnNumber++;
@@ -92,7 +101,9 @@ let txnNumber = 0;
         st.s.getDB(dbName).getCollection(collName).drop();
         clearRawMongoProgramOutput();
 
-        assert.commandWorked(coordPrimary.adminCommand({configureFailPoint: failpointData.failpoint, mode: "off"}));
+        assert.commandWorked(
+            coordPrimary.adminCommand({configureFailPoint: failpointData.failpoint, mode: "off"}),
+        );
     };
 
     //
@@ -102,7 +113,9 @@ let txnNumber = 0;
     // This triggers timeout in the chain registered in TransactionCoordinator constructor, which throws
     // TransactionCoordinatorReachedAbortDecision caught by the onError() in the same chain.
     testCommitProtocol(
-        getCoordinatorFailpoints().find((data) => data.failpoint === "hangBeforeWritingParticipantList"),
+        getCoordinatorFailpoints().find(
+            (data) => data.failpoint === "hangBeforeWritingParticipantList",
+        ),
     );
 
     // This is one of the standard error codes that a transaction shard can generate and is supported by

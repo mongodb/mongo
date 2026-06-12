@@ -53,7 +53,9 @@ assert.commandWorked(bulk.execute());
 const collUuid = QuerySamplingUtil.getCollectionUuid(testDB, collName);
 
 // Enable query sampling
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}),
+);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
 // Find each document

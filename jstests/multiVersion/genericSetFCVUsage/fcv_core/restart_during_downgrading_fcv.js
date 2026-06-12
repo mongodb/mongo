@@ -13,12 +13,18 @@ const dbpath = MongoRunner.dataPath + testName;
 const setup = function (conn, configPrimary) {
     const adminDB = conn.getDB("admin");
     if (configPrimary) {
-        assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+        assert.commandWorked(
+            configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+        );
     } else {
-        assert.commandWorked(conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+        assert.commandWorked(
+            conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+        );
     }
 
-    assert.commandFailed(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandFailed(
+        conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     // Check FCV is in downgrading state.
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV);
 };
@@ -28,7 +34,9 @@ const runTest = function (conn) {
     // Check FCV is still in downgrading state.
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV);
     jsTestLog("Set FCV to upgrade");
-    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     checkFCV(adminDB, latestFCV);
 };
 

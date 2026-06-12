@@ -80,7 +80,12 @@ export class DbCheckOldFormatKeysTest {
      * Inserts data into the replica set across all nodes. To insert old format unique index keys,
      * this function must be called in v4.2 or earlier, prior to upgrading.
      */
-    insertOldFormatKeyStrings(dbName, collName, indexSpecs = [{a: 1}, {b: -1}], data = loadDummyData()) {
+    insertOldFormatKeyStrings(
+        dbName,
+        collName,
+        indexSpecs = [{a: 1}, {b: -1}],
+        data = loadDummyData(),
+    ) {
         this.insertIndexAndData(dbName, collName, indexSpecs, data);
     }
 
@@ -95,9 +100,13 @@ export class DbCheckOldFormatKeysTest {
         for (const node of nodes) {
             // Skip deleting records and the _id index when running a deletion commmand.
             const skipDeleteRecordFp = configureFailPoint(node, "skipDeleteRecord");
-            const skipUnindexingDocWhenDeletedFp = configureFailPoint(node, "skipUnindexingDocumentWhenDeleted", {
-                indexName: "_id_",
-            });
+            const skipUnindexingDocWhenDeletedFp = configureFailPoint(
+                node,
+                "skipUnindexingDocumentWhenDeleted",
+                {
+                    indexName: "_id_",
+                },
+            );
             fps.push(skipDeleteRecordFp);
             fps.push(skipUnindexingDocWhenDeletedFp);
         }
@@ -158,7 +167,13 @@ export class DbCheckOldFormatKeysTest {
     }
 
     createExtraKeysRecordNotFound(nodes, dbName, collName, docFilter = {}) {
-        this.createExtraKeys(nodes, dbName, collName, "skipUnindexingDocumentWhenDeleted", docFilter);
+        this.createExtraKeys(
+            nodes,
+            dbName,
+            collName,
+            "skipUnindexingDocumentWhenDeleted",
+            docFilter,
+        );
     }
 
     createExtraKeysRecordDoesNotMatch(nodes, dbName, collName, docFilter = {}) {

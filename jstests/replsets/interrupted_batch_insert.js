@@ -43,12 +43,18 @@ let primary = replTest.nodes[0];
 let collName = primary.getDB("db")[name].getFullName();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 
 const batchSize = 500;
-const setParameterResult = primary.getDB("admin").runCommand({setParameter: 1, internalInsertMaxBatchSize: batchSize});
+const setParameterResult = primary
+    .getDB("admin")
+    .runCommand({setParameter: 1, internalInsertMaxBatchSize: batchSize});
 assert.commandWorked(setParameterResult);
 
 // Prevent any writes to node 0 (the primary) from replicating to nodes 1 and 2.
@@ -74,7 +80,10 @@ let worker = new Thread(
         });
         let coll = new Mongo(host).getCollection(collName);
         assert.commandFailedWithCode(
-            coll.insert(docsToInsert, {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
+            coll.insert(docsToInsert, {
+                writeConcern: {w: "majority", wtimeout: 5000},
+                ordered: true,
+            }),
             ErrorCodes.InterruptedDueToReplStateChange,
         );
     },
@@ -118,7 +127,9 @@ assert.eq(replTest.nodes[0], replTest.getPrimary());
 failPoint.off();
 
 // Wait until the insert command is done.
-assert.soon(() => primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length === 0);
+assert.soon(
+    () => primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length === 0,
+);
 
 worker.join();
 

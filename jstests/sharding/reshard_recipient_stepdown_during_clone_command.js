@@ -58,7 +58,11 @@ reshardingTest.withReshardingInBackground(
 
         const stepdownThread = new Thread(function (host) {
             try {
-                new Mongo(host).adminCommand({replSetStepDown: 60, force: true, secondaryCatchUpPeriodSecs: 0});
+                new Mongo(host).adminCommand({
+                    replSetStepDown: 60,
+                    force: true,
+                    secondaryCatchUpPeriodSecs: 0,
+                });
             } catch (e) {}
         }, recipientPrimaryHost);
         stepdownThread.start();
@@ -67,7 +71,8 @@ reshardingTest.withReshardingInBackground(
         // the failpoint. This ensures the deadlock condition is set up: the stepdown is
         // blocked on the session held by the clone command.
         assert.soonRetryOnNetworkErrors(
-            () => !assert.commandWorked(recipientPrimary.adminCommand({hello: 1})).isWritablePrimary,
+            () =>
+                !assert.commandWorked(recipientPrimary.adminCommand({hello: 1})).isWritablePrimary,
             "Timed out waiting for recipient stepdown to commit",
         );
         jsTestLog("Stepdown committed; releasing clone failpoint.");
@@ -76,7 +81,9 @@ reshardingTest.withReshardingInBackground(
         cloneCmdFp.off();
 
         assert.soonRetryOnNetworkErrors(() => {
-            const status = assert.commandWorked(recipientPrimary.adminCommand({replSetGetStatus: 1}));
+            const status = assert.commandWorked(
+                recipientPrimary.adminCommand({replSetGetStatus: 1}),
+            );
             jsTestLog("Recipient myState: " + status.myState);
             return status.myState !== 1;
         }, "DEADLOCK: recipient is permanently stuck as PRIMARY.");

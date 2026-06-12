@@ -11,7 +11,10 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collNameBase = "coll";
@@ -33,7 +36,9 @@ function runTest(readConcernLevel) {
 
     const collName = `${collNameBase}_${readConcernLevel}`;
     assert.commandWorked(
-        primaryDB[collName].insert([{x: 1}, {x: 2}, {x: 3}, {x: 4}, {x: 5}, {x: 6}], {writeConcern: {w: "majority"}}),
+        primaryDB[collName].insert([{x: 1}, {x: 2}, {x: 3}, {x: 4}, {x: 5}, {x: 6}], {
+            writeConcern: {w: "majority"},
+        }),
     );
 
     jsTestLog("Unprepared Abort Setup");
@@ -111,25 +116,38 @@ function runTest(readConcernLevel) {
     jsTestLog("Unprepared Abort Test");
     // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
     if (versionSupportsAbortWaitingForWC) {
-        assert.commandFailedWithCode(session1.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
+        assert.commandFailedWithCode(
+            session1.abortTransaction_forTesting(),
+            ErrorCodes.WriteConcernTimeout,
+        );
     } else {
         assert.commandWorked(session1.abortTransaction_forTesting());
     }
 
     jsTestLog("Prepared Abort Test");
-    assert.commandFailedWithCode(session2.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(
+        session2.abortTransaction_forTesting(),
+        ErrorCodes.WriteConcernTimeout,
+    );
 
     jsTestLog("Prepare Test");
     assert.commandFailedWithCode(
-        session3
-            .getDatabase("admin")
-            .adminCommand({prepareTransaction: 1, writeConcern: {w: "majority", wtimeout: failTimeoutMS}}),
+        session3.getDatabase("admin").adminCommand({
+            prepareTransaction: 1,
+            writeConcern: {w: "majority", wtimeout: failTimeoutMS},
+        }),
         ErrorCodes.WriteConcernTimeout,
     );
-    assert.commandFailedWithCode(session3.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(
+        session3.abortTransaction_forTesting(),
+        ErrorCodes.WriteConcernTimeout,
+    );
 
     jsTestLog("Unprepared Commit Test");
-    assert.commandFailedWithCode(session4.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(
+        session4.commitTransaction_forTesting(),
+        ErrorCodes.WriteConcernTimeout,
+    );
 
     jsTestLog("Prepared Commit Test");
     assert.commandFailedWithCode(
@@ -141,7 +159,10 @@ function runTest(readConcernLevel) {
         ErrorCodes.WriteConcernTimeout,
     );
     // Send commit with the shell helper to reset the shell's state.
-    assert.commandFailedWithCode(session5.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(
+        session5.commitTransaction_forTesting(),
+        ErrorCodes.WriteConcernTimeout,
+    );
 
     jsTestLog("Restart replication");
     restartReplicationOnSecondaries(rst);

@@ -49,7 +49,9 @@ export function assertSchemaMatch(coll, schema, doc, valid) {
     // 'schema' as its document validator in "strict" mode iff 'valid' is true.
     assert.commandWorked(coll.runCommand("drop"));
     assert.commandWorked(coll.insert({_id: 0}));
-    assert.commandWorked(coll.runCommand("collMod", {validator: {$jsonSchema: schema}, validationLevel: "strict"}));
+    assert.commandWorked(
+        coll.runCommand("collMod", {validator: {$jsonSchema: schema}, validationLevel: "strict"}),
+    );
 
     // Before applying the update, remove the _id field if it exists, or the replacement-style
     // update will fail.

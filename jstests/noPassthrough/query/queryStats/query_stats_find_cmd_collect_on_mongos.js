@@ -117,7 +117,9 @@ coll.insert({v: 4});
     const cursor1 = coll2.find({v: {$gt: 0, $lt: 5}}).batchSize(1); // returns 1 doc
     const cursor2 = coll2.find({v: {$gt: 0, $lt: 2}}).batchSize(1); // returns 1 doc
 
-    assert.commandWorked(db.runCommand({killCursors: coll2.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
+    assert.commandWorked(
+        db.runCommand({killCursors: coll2.getName(), cursors: [cursor1.getId(), cursor2.getId()]}),
+    );
     const queryStats = getLatestQueryStatsEntry(db);
     assertExpectedResults({
         results: queryStats,

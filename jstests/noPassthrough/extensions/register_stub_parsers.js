@@ -10,7 +10,10 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -45,7 +48,9 @@ function testTestFooWithFeatureFlag(db, fooExtensionLoaded, featureFlagEnabled) 
     const pipeline = [{$testFoo: {}}];
 
     if (fooExtensionLoaded && featureFlagEnabled) {
-        assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+        assert.commandWorked(
+            db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+        );
     } else {
         assertErrorCode(coll, pipeline, 10918500);
     }
@@ -59,11 +64,15 @@ function runFeatureFlagToggleTests(conn, fooExtensionLoaded) {
     const testDb = conn.getDB("test");
 
     // Test with feature flag DISABLED.
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagExtensionStubParsers: false}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagExtensionStubParsers: false}),
+    );
     testTestFooWithFeatureFlag(testDb, fooExtensionLoaded, false);
 
     // Test with feature flag ENABLED.
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagExtensionStubParsers: true}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagExtensionStubParsers: true}),
+    );
     testTestFooWithFeatureFlag(testDb, fooExtensionLoaded, true);
 }
 

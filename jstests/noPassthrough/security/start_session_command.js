@@ -40,7 +40,10 @@ assert.commandWorked(
 assert(result.id, "failed test that our session response has an id");
 assert.eq(result.timeoutMinutes, 30, "failed test that our session record has the correct timeout");
 
-assert.commandFailed(admin.runCommand(request), "failed test that we can't run startSession when the cache is full");
+assert.commandFailed(
+    admin.runCommand(request),
+    "failed test that we can't run startSession when the cache is full",
+);
 MongoRunner.stopMongod(conn);
 
 //

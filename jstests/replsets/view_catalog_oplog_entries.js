@@ -22,7 +22,9 @@ assert.commandWorked(primary.getDB(dbName).createView(viewName, collName, []));
 
 // Modify the view with the "collMod" command.
 assert.commandWorked(
-    primary.getDB(dbName).runCommand({collMod: viewName, viewOn: collName, pipeline: [{$project: {a: 1}}]}),
+    primary
+        .getDB(dbName)
+        .runCommand({collMod: viewName, viewOn: collName, pipeline: [{$project: {a: 1}}]}),
 );
 
 // There should be exactly one insert into "system.views" for the view creation...
@@ -31,7 +33,8 @@ const createViewOplogEntry = oplog.find({op: "i", ns: dbName + ".system.views"})
 assert.eq(createViewOplogEntry.length, 1);
 assert(
     createViewOplogEntry[0].hasOwnProperty("ui"),
-    "Oplog entry for view creation missing UUID for view catalog: " + tojson(createViewOplogEntry[0]),
+    "Oplog entry for view creation missing UUID for view catalog: " +
+        tojson(createViewOplogEntry[0]),
 );
 const viewCatalogUUID = createViewOplogEntry[0].ui;
 
@@ -40,7 +43,8 @@ const modViewOplogEntry = oplog.find({op: "u", ns: dbName + ".system.views"}).to
 assert.eq(modViewOplogEntry.length, 1);
 assert(
     modViewOplogEntry[0].hasOwnProperty("ui"),
-    "Oplog entry for view modification missing UUID for view catalog: " + tojson(modViewOplogEntry[0]),
+    "Oplog entry for view modification missing UUID for view catalog: " +
+        tojson(modViewOplogEntry[0]),
 );
 
 // Both entries should have the same UUID.

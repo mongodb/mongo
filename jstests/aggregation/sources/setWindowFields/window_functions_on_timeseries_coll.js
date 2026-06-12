@@ -17,7 +17,9 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 const coll = db.window_functions_on_timeseries_coll;
 
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "attributes"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "attributes"}}),
+);
 
 assert.commandWorked(
     coll.insert([
@@ -261,7 +263,10 @@ assertExplainBehaviorAndCorrectResults(
 assertExplainBehaviorAndCorrectResults(
     [
         {
-            $setWindowFields: {partitionBy: "$attributes.sensor", output: {total: {$sum: "$contributions"}}},
+            $setWindowFields: {
+                partitionBy: "$attributes.sensor",
+                output: {total: {$sum: "$contributions"}},
+            },
         },
         {$project: {percentOfTotal: {$divide: ["$contributions", "$total"]}}},
     ],

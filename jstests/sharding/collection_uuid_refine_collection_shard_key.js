@@ -29,7 +29,9 @@ const resetColl = function (shardedColl) {
     shardedColl.drop();
     assert.commandWorked(shardedColl.insert({_id: 0, a: 1, b: 2, c: 3}));
     assert.commandWorked(mongos.getCollection(shardedColl.getFullName()).createIndex(newKeyDoc));
-    assert.commandWorked(mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: oldKeyDoc}));
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: oldKeyDoc}),
+    );
 };
 
 const uuid = function () {
@@ -42,7 +44,11 @@ resetColl(coll);
 
 // The command succeeds when provided with the correct collection UUID.
 assert.commandWorked(
-    mongos.adminCommand({refineCollectionShardKey: coll.getFullName(), key: newKeyDoc, collectionUUID: uuid()}),
+    mongos.adminCommand({
+        refineCollectionShardKey: coll.getFullName(),
+        key: newKeyDoc,
+        collectionUUID: uuid(),
+    }),
 );
 
 // The command fails when provided with a UUID with no corresponding collection.

@@ -3,7 +3,8 @@
 export function verifyServerStatusFields(serverStatusResponse) {
     assert(
         serverStatusResponse.hasOwnProperty("opWriteConcernCounters"),
-        "Expected the serverStatus response to have a 'opWriteConcernCounters' field\n" + tojson(serverStatusResponse),
+        "Expected the serverStatus response to have a 'opWriteConcernCounters' field\n" +
+            tojson(serverStatusResponse),
     );
     assert(
         serverStatusResponse.opWriteConcernCounters.hasOwnProperty("insert"),
@@ -44,7 +45,12 @@ export function verifyServerStatusChange(initialStats, newStats, paths, expected
 
             assert(
                 newParent.hasOwnProperty(pathComponents[i]),
-                "newStats did not contain component " + i + " of path " + path + ", newStats: " + tojson(newStats),
+                "newStats did not contain component " +
+                    i +
+                    " of path " +
+                    path +
+                    ", newStats: " +
+                    tojson(newStats),
             );
             newParent = newParent[pathComponents[i]];
         }
@@ -58,7 +64,10 @@ export function verifyServerStatusChange(initialStats, newStats, paths, expected
         }
         assert(
             newParent.hasOwnProperty(lastPathComponent),
-            "newStats did not contain last component of path " + path + ", newStats: " + tojson(newStats),
+            "newStats did not contain last component of path " +
+                path +
+                ", newStats: " +
+                tojson(newStats),
         );
         assert.eq(
             initialValue + expectedIncrement,

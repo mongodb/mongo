@@ -32,7 +32,9 @@ describe("requiresSearchMetaCursor in sharded search queries", function () {
         assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
 
         // Set primary shard so the unsharded collection lives on a specific shard.
-        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}));
+        assert.commandWorked(
+            testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}),
+        );
 
         shardedColl.drop();
         unshardedColl.drop();
@@ -53,8 +55,12 @@ describe("requiresSearchMetaCursor in sharded search queries", function () {
         assert.commandWorked(unshardedColl.insert([{b: 1}, {b: 3}, {b: 5}]));
 
         // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
-        assert.commandWorked(testDb.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
-        assert.commandWorked(testDb.adminCommand({split: shardedColl.getFullName(), middle: {_id: 10}}));
+        assert.commandWorked(
+            testDb.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}),
+        );
+        assert.commandWorked(
+            testDb.adminCommand({split: shardedColl.getFullName(), middle: {_id: 10}}),
+        );
         assert.commandWorked(
             testDb.adminCommand({
                 moveChunk: shardedColl.getFullName(),
@@ -185,7 +191,11 @@ describe("requiresSearchMetaCursor in sharded search queries", function () {
 
     it("should require search meta cursor when $$SEARCH_META is used in $project after $sort", function () {
         runRequiresSearchMetaCursorTest({
-            pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$project: {_id: 0, foo: "$$SEARCH_META"}}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$sort: {_id: -1}},
+                {$project: {_id: 0, foo: "$$SEARCH_META"}},
+            ],
             coll: shardedColl,
             expectedDocs: [
                 {foo: {count: {lowerBound: NumberLong(8)}}},
@@ -203,7 +213,12 @@ describe("requiresSearchMetaCursor in sharded search queries", function () {
 
     it("should not require search meta cursor for $search with $sort, $limit, and $project without $$SEARCH_META", function () {
         runRequiresSearchMetaCursorTest({
-            pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$limit: 4}, {$project: {_id: 1}}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$sort: {_id: -1}},
+                {$limit: 4},
+                {$project: {_id: 1}},
+            ],
             coll: shardedColl,
             expectedDocs: [{_id: 14}, {_id: 13}, {_id: 12}, {_id: 11}],
             shouldRequireSearchMetaCursor: false,
@@ -212,7 +227,11 @@ describe("requiresSearchMetaCursor in sharded search queries", function () {
 
     it("should require search meta cursor when $$SEARCH_META is used in $addFields", function () {
         runRequiresSearchMetaCursorTest({
-            pipeline: [{$search: mongotQuery}, {$limit: 1}, {$addFields: {meta: "$$SEARCH_META.count.lowerBound"}}],
+            pipeline: [
+                {$search: mongotQuery},
+                {$limit: 1},
+                {$addFields: {meta: "$$SEARCH_META.count.lowerBound"}},
+            ],
             coll: shardedColl,
             shouldRequireSearchMetaCursor: true,
         });

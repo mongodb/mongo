@@ -14,8 +14,12 @@ import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 function runTest(watchType, renameType) {
     // Use minimum distinguishable names to keep database name under 64-byte limit.
-    let dstdb = db.getSiblingDB(jsTestName() + "_dstdb_" + watchType.substr(0, 1) + "_" + renameType.substr(0, 2));
-    let srcdb = dstdb.getSiblingDB(jsTestName() + "_srcdb_" + watchType.substr(0, 1) + "_" + renameType.substr(0, 2));
+    let dstdb = db.getSiblingDB(
+        jsTestName() + "_dstdb_" + watchType.substr(0, 1) + "_" + renameType.substr(0, 2),
+    );
+    let srcdb = dstdb.getSiblingDB(
+        jsTestName() + "_srcdb_" + watchType.substr(0, 1) + "_" + renameType.substr(0, 2),
+    );
     let dstColl = dstdb.getCollection("target");
     let srcColl = srcdb.getCollection("source");
 
@@ -60,7 +64,9 @@ function runTest(watchType, renameType) {
     }
 
     // Fill source collection
-    assert.commandWorked(srcColl.insertMany([{"Key0": "Val0"}, {"Key2": "Val1"}, {"Key2": "Val2"}]));
+    assert.commandWorked(
+        srcColl.insertMany([{"Key0": "Val0"}, {"Key2": "Val1"}, {"Key2": "Val2"}]),
+    );
 
     // Create secondary indexes on source collection
     assert.commandWorked(srcColl.createIndex({"Key0": 1}));
@@ -68,7 +74,12 @@ function runTest(watchType, renameType) {
 
     // Rename
     if (renameType == "newDatabase") {
-        assert.commandWorked(dstdb.adminCommand({renameCollection: srcColl.getFullName(), to: dstColl.getFullName()}));
+        assert.commandWorked(
+            dstdb.adminCommand({
+                renameCollection: srcColl.getFullName(),
+                to: dstColl.getFullName(),
+            }),
+        );
     } else if (renameType == "dropTarget") {
         assert.commandWorked(
             dstdb.adminCommand({
@@ -108,7 +119,10 @@ function runTest(watchType, renameType) {
             // This event contains no useful fields.
             return true;
         } else if (opType == "rename") {
-            if (event.operationDescription.to.db != docKey || event.operationDescription.to.coll != docValue) {
+            if (
+                event.operationDescription.to.db != docKey ||
+                event.operationDescription.to.coll != docValue
+            ) {
                 return false;
             }
         }
@@ -142,8 +156,12 @@ function runTest(watchType, renameType) {
     assert(eventContains(events[1], srcdb.getName(), srcColl.getName(), "insert", "Key0", "Val0"));
     assert(eventContains(events[2], srcdb.getName(), srcColl.getName(), "insert", "Key2", "Val1"));
     assert(eventContains(events[3], srcdb.getName(), srcColl.getName(), "insert", "Key2", "Val2"));
-    assert(eventContains(events[4], srcdb.getName(), srcColl.getName(), "createIndexes", "Key0", null));
-    assert(eventContains(events[5], srcdb.getName(), srcColl.getName(), "createIndexes", "Key2", null));
+    assert(
+        eventContains(events[4], srcdb.getName(), srcColl.getName(), "createIndexes", "Key0", null),
+    );
+    assert(
+        eventContains(events[5], srcdb.getName(), srcColl.getName(), "createIndexes", "Key2", null),
+    );
 
     if (renameType != "noDropTarget") {
         events = testStreamSrc.getNextChanges(cursorSrc, 1);
@@ -163,8 +181,26 @@ function runTest(watchType, renameType) {
         assert(eventContains(events[1], dstdb.getName(), dstColl.getName(), "insert", "c", "x"));
         assert(eventContains(events[2], dstdb.getName(), dstColl.getName(), "insert", "b", "2"));
         assert(eventContains(events[2], dstdb.getName(), dstColl.getName(), "insert", "c", "y"));
-        assert(eventContains(events[3], dstdb.getName(), dstColl.getName(), "createIndexes", "b", null));
-        assert(eventContains(events[4], dstdb.getName(), dstColl.getName(), "createIndexes", "c", null));
+        assert(
+            eventContains(
+                events[3],
+                dstdb.getName(),
+                dstColl.getName(),
+                "createIndexes",
+                "b",
+                null,
+            ),
+        );
+        assert(
+            eventContains(
+                events[4],
+                dstdb.getName(),
+                dstColl.getName(),
+                "createIndexes",
+                "c",
+                null,
+            ),
+        );
     }
 
     if (watchType == "database" && renameType != "noDropTarget") {
@@ -181,7 +217,16 @@ function runTest(watchType, renameType) {
     if (renameType != "noDropTarget") {
         events = testStreamDst.getNextChanges(cursorDst, 1);
         jsTestLog(events);
-        assert(eventContains(events[0], dstdb.getName(), "tmp", "rename", dstdb.getName(), dstColl.getName()));
+        assert(
+            eventContains(
+                events[0],
+                dstdb.getName(),
+                "tmp",
+                "rename",
+                dstdb.getName(),
+                dstColl.getName(),
+            ),
+        );
     }
 
     if (watchType == "collection" && renameType != "noDropTarget") {

@@ -82,7 +82,9 @@ function getShardedViewExceptions(comment) {
                 doc["resolvedViews"] &&
                 doc["command"]["comment"] === comment,
         )
-        .flatMap((doc) => doc["resolvedViews"].flatMap((resolvedView) => resolvedView["dependencyChain"]))
+        .flatMap((doc) =>
+            doc["resolvedViews"].flatMap((resolvedView) => resolvedView["dependencyChain"]),
+        )
         .reduce((prev, curr) => {
             const namespace = "test." + curr;
             if (prev[namespace]) {
@@ -96,7 +98,10 @@ function getShardedViewExceptions(comment) {
 
 function testLookupView({pipeline, expectedResults, expectedExceptions}) {
     const comment = "test " + testCount;
-    assertArrayEq({actual: local.aggregate(pipeline, {comment}).toArray(), expected: expectedResults});
+    assertArrayEq({
+        actual: local.aggregate(pipeline, {comment}).toArray(),
+        expected: expectedResults,
+    });
     if (expectedExceptions) {
         // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that they
         // match the number we were expecting.
@@ -369,9 +374,24 @@ testLookupView({
         {$unwind: "$foreign"},
     ],
     expectedResults: [
-        {_id: 1, f: 1, shard_key: "shard1", foreign: {join_field: 1, _id: 4, f: "a", shard_key: "shard2"}},
-        {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"}},
-        {_id: 3, f: 3, shard_key: "shard1", foreign: {join_field: 3, _id: 6, f: "c", shard_key: "shard2"}},
+        {
+            _id: 1,
+            f: 1,
+            shard_key: "shard1",
+            foreign: {join_field: 1, _id: 4, f: "a", shard_key: "shard2"},
+        },
+        {
+            _id: 2,
+            f: 2,
+            shard_key: "shard1",
+            foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"},
+        },
+        {
+            _id: 3,
+            f: 3,
+            shard_key: "shard1",
+            foreign: {join_field: 3, _id: 6, f: "c", shard_key: "shard2"},
+        },
     ],
     expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0},
 });
@@ -391,7 +411,12 @@ testLookupView({
         {$unwind: "$foreign"},
     ],
     expectedResults: [
-        {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"}},
+        {
+            _id: 2,
+            f: 2,
+            shard_key: "shard1",
+            foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"},
+        },
     ],
     expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0},
 });
@@ -411,7 +436,12 @@ testLookupView({
         {$unwind: "$foreign"},
     ],
     expectedResults: [
-        {_id: 2, f: 2, shard_key: "shard1", foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"}},
+        {
+            _id: 2,
+            f: 2,
+            shard_key: "shard1",
+            foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2"},
+        },
     ],
     expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0},
 });
@@ -445,7 +475,17 @@ testLookupView({
                 as: "foreign",
             },
         },
-        {$addFields: {sum: {$reduce: {input: "$foreign", initialValue: 0, in: {$add: ["$$value", "$$this.sum"]}}}}},
+        {
+            $addFields: {
+                sum: {
+                    $reduce: {
+                        input: "$foreign",
+                        initialValue: 0,
+                        in: {$add: ["$$value", "$$this.sum"]},
+                    },
+                },
+            },
+        },
         {$project: {_id: 1, sum: 1}},
     ],
     expectedResults: [{_id: 2, sum: 16}],
@@ -595,7 +635,10 @@ testLookupView({
         {
             $lookup: {
                 from: "viewOnForeignWithJoinLookupOnLocal",
-                pipeline: [{$unwind: "$local"}, {$match: {$expr: {$eq: ["$join_field", "$local.f"]}}}],
+                pipeline: [
+                    {$unwind: "$local"},
+                    {$match: {$expr: {$eq: ["$join_field", "$local.f"]}}},
+                ],
                 as: "foreign",
             },
         },
@@ -606,7 +649,13 @@ testLookupView({
             _id: 2,
             f: 2,
             shard_key: "shard1",
-            foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2", local: {_id: 2, f: 2, shard_key: "shard1"}},
+            foreign: {
+                join_field: 2,
+                _id: 5,
+                f: "b",
+                shard_key: "shard2",
+                local: {_id: 2, f: 2, shard_key: "shard1"},
+            },
         },
     ],
     expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0},
@@ -631,7 +680,13 @@ testLookupView({
             _id: 2,
             f: 2,
             shard_key: "shard1",
-            foreign: {join_field: 2, _id: 5, f: "b", shard_key: "shard2", local: {_id: 1, f: 1, shard_key: "shard1"}},
+            foreign: {
+                join_field: 2,
+                _id: 5,
+                f: "b",
+                shard_key: "shard2",
+                local: {_id: 1, f: 1, shard_key: "shard1"},
+            },
         },
     ],
     expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0},
@@ -647,7 +702,9 @@ assert.commandWorked(shard2DB.setProfilingLevel(2));
 
 // Add a chunk of the 'foreign' collection to shard1 (the rest is on shard2) to force a merge.
 assert.commandWorked(foreign.insert({_id: 9, shard_key: "shard1", f: "d"}));
-assert.commandWorked(testDB.adminCommand({split: foreign.getFullName(), find: {shard_key: "shard1"}}));
+assert.commandWorked(
+    testDB.adminCommand({split: foreign.getFullName(), find: {shard_key: "shard1"}}),
+);
 moveChunksByShardKey(foreign, "shard1");
 
 testLookupView({

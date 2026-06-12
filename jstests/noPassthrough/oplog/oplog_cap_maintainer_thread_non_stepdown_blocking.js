@@ -55,8 +55,8 @@ jsTest.log.info("Attempting to step down primary");
 assert.commandWorked(primary.adminCommand({replSetStepDown: 0, force: true}));
 waitForState(primary, ReplSetTest.State.SECONDARY);
 
-let interruptCount = assert.commandWorked(primary.getDB("admin").runCommand({serverStatus: 1})).oplogTruncation
-    .interruptCount;
+let interruptCount = assert.commandWorked(primary.getDB("admin").runCommand({serverStatus: 1}))
+    .oplogTruncation.interruptCount;
 assert(interruptCount == 0);
 
 // Assert at this point we haven't completed initial sampling yet.
@@ -66,8 +66,8 @@ assert(checkLog.checkContainsWithCountJson(primary, 22382, {}, /*expectedCount=*
 assert(samplinginProgress(primary));
 assert(samplinginProgress(secondary));
 
-interruptCount = assert.commandWorked(primary.getDB("admin").runCommand({serverStatus: 1})).oplogTruncation
-    .interruptCount;
+interruptCount = assert.commandWorked(primary.getDB("admin").runCommand({serverStatus: 1}))
+    .oplogTruncation.interruptCount;
 assert(interruptCount == 0);
 
 jsTest.log.info("Test complete. Stopping replica set.");

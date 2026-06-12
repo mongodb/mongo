@@ -29,8 +29,12 @@ function testElemMatchWithDifferentSelectivities() {
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
     // No index on 'a' forces a collection scan plan.
 
-    const moreDocsPlan = getWinningPlanFromExplain(coll.find({a: {$elemMatch: {$gt: 5, $lt: 20}}}).explain());
-    const fewerDocsPlan = getWinningPlanFromExplain(coll.find({a: {$elemMatch: {$gt: 5, $lt: 15}}}).explain());
+    const moreDocsPlan = getWinningPlanFromExplain(
+        coll.find({a: {$elemMatch: {$gt: 5, $lt: 20}}}).explain(),
+    );
+    const fewerDocsPlan = getWinningPlanFromExplain(
+        coll.find({a: {$elemMatch: {$gt: 5, $lt: 15}}}).explain(),
+    );
 
     assert(planEstimatedWithHistogram(moreDocsPlan), moreDocsPlan);
     assert(planEstimatedWithHistogram(fewerDocsPlan), fewerDocsPlan);
@@ -57,7 +61,11 @@ function testIndexDoesNotAffectEstimate() {
 
 try {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
     testElemMatchWithDifferentSelectivities();
     testIndexDoesNotAffectEstimate();

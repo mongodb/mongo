@@ -9,21 +9,29 @@ let conn = MongoRunner.runMongod();
 let d = conn.getDB("test");
 assert.commandWorked(
     d.runCommand({
-        applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "temp1", temp: true}}],
+        applyOps: [
+            {op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "temp1", temp: true}},
+        ],
     }),
 );
 d[testname + "temp1"].createIndex({x: 1});
 assert.commandWorked(
-    d.runCommand({applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "temp2", temp: 1}}]}),
+    d.runCommand({
+        applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "temp2", temp: 1}}],
+    }),
 );
 d[testname + "temp2"].createIndex({x: 1});
 assert.commandWorked(
     d.runCommand({
-        applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "keep1", temp: false}}],
+        applyOps: [
+            {op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "keep1", temp: false}},
+        ],
     }),
 );
 assert.commandWorked(
-    d.runCommand({applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "keep2", temp: 0}}]}),
+    d.runCommand({
+        applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + "keep2", temp: 0}}],
+    }),
 );
 d.runCommand({create: testname + "keep3"});
 d[testname + "keep4"].insert({});

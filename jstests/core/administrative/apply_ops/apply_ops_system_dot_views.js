@@ -20,7 +20,9 @@ view.drop();
 
 // Make sure system.views exists before we try to insert to it with applyOps.
 db["unused_apply_ops_view"].drop();
-assert.commandWorked(db.runCommand({create: "unused_apply_ops_view", viewOn: backingColl.getName(), pipeline: []}));
+assert.commandWorked(
+    db.runCommand({create: "unused_apply_ops_view", viewOn: backingColl.getName(), pipeline: []}),
+);
 
 assert.commandWorked(backingColl.insert([{a: 0}, {a: 1}]));
 const ops = [

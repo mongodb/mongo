@@ -32,7 +32,9 @@ let st = new ShardingTest({
                     ],
                 }),
                 progressMonitor: tojson({interval: CUSTOM_INTERVAL, deadline: CUSTOM_DEADLINE}),
-                healthMonitoringIntervals: tojson({values: [{type: "test", interval: CUSTOM_INTERVAL}]}),
+                healthMonitoringIntervals: tojson({
+                    values: [{type: "test", interval: CUSTOM_INTERVAL}],
+                }),
             },
         },
     ],
@@ -73,7 +75,9 @@ assert.commandFailed(
 );
 
 // Tests that test param is unchanged after dns was changed.
-result = assert.commandWorked(st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}));
+result = assert.commandWorked(
+    st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}),
+);
 assert.eq(getIntensity(result, "dns"), "off");
 assert.eq(getIntensity(result, "test"), "non-critical");
 
@@ -88,7 +92,9 @@ assert.commandWorked(
         },
     }),
 );
-result = assert.commandWorked(st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}));
+result = assert.commandWorked(
+    st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}),
+);
 
 assert.eq(getIntensity(result, "dns"), "non-critical");
 assert.eq(getIntensity(result, "ldap"), "off");
@@ -125,7 +131,9 @@ assert.commandFailed(
 );
 
 // Tests that test param is unchanged, dns is set to 100.
-result = assert.commandWorked(st.s1.adminCommand({"getParameter": 1, healthMonitoringIntervals: 1}));
+result = assert.commandWorked(
+    st.s1.adminCommand({"getParameter": 1, healthMonitoringIntervals: 1}),
+);
 assert.eq(getInterval(result, "test"), CUSTOM_INTERVAL);
 assert.eq(getInterval(result, "dns"), 100);
 
@@ -141,7 +149,9 @@ assert.commandWorked(
     }),
 );
 
-result = assert.commandWorked(st.s1.adminCommand({"getParameter": 1, healthMonitoringIntervals: 1}));
+result = assert.commandWorked(
+    st.s1.adminCommand({"getParameter": 1, healthMonitoringIntervals: 1}),
+);
 assert.eq(getInterval(result, "dns"), 2000);
 assert.eq(getInterval(result, "ldap"), 600000);
 
@@ -158,7 +168,10 @@ assert.commandFailed(st.s1.adminCommand({"setParameter": 1, progressMonitor: {de
 
 // Setting parameter properly during runtime.
 assert.commandWorked(
-    st.s1.adminCommand({"setParameter": 1, progressMonitor: {deadline: NumberInt(CUSTOM_DEADLINE + 1)}}),
+    st.s1.adminCommand({
+        "setParameter": 1,
+        progressMonitor: {deadline: NumberInt(CUSTOM_DEADLINE + 1)},
+    }),
 );
 result = st.s1.adminCommand({"getParameter": 1, "progressMonitor": 1});
 assert.eq(result.progressMonitor.deadline, CUSTOM_DEADLINE + 1);
@@ -168,7 +181,10 @@ assert.eq(result.progressMonitor.interval, 1000);
 assert.commandWorked(
     st.s1.adminCommand({
         "setParameter": 1,
-        progressMonitor: {deadline: NumberInt(CUSTOM_DEADLINE + 1), interval: NumberInt(CUSTOM_INTERVAL)},
+        progressMonitor: {
+            deadline: NumberInt(CUSTOM_DEADLINE + 1),
+            interval: NumberInt(CUSTOM_INTERVAL),
+        },
     }),
 );
 result = st.s1.adminCommand({"getParameter": 1, "progressMonitor": 1});

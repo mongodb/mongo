@@ -87,7 +87,10 @@ const andOrSpecs = [
     // Where the predicates are themselves ands/ors: 2 levels of nesting.
     [
         {
-            $or: [{$or: [{"a.b": 1}, {"a.b": 2}]}, {$and: [{x: {$exists: true}}, {"a.b.c": {$exists: true}}]}],
+            $or: [
+                {$or: [{"a.b": 1}, {"a.b": 2}]},
+                {$and: [{x: {$exists: true}}, {"a.b.c": {$exists: true}}]},
+            ],
         },
         {$and: [{$or: [{"a.b.c": 1}, {"a.b.c": 2}]}, {$and: [{a: 1}, {a: 2}]}]},
     ],

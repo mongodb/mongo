@@ -22,7 +22,11 @@ import {
 
     testPersistingConfiguration(st.s);
     for (let isShardedColl of [true, false]) {
-        testConfigurationDeletionDropCollection(st.s, {isShardedColl, isShardedCluster, shardNames});
+        testConfigurationDeletionDropCollection(st.s, {
+            isShardedColl,
+            isShardedCluster,
+            shardNames,
+        });
         testConfigurationDeletionDropDatabase(st.s, {isShardedColl, isShardedCluster, shardNames});
         testConfigurationDeletionRenameCollection(st.s, {
             sameDatabase: true,

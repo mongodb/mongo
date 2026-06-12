@@ -103,9 +103,21 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             majorityWriteUnrelatedDoc: 0.2,
             majorityWriteTxnDoc: 0.2,
         },
-        checkMoneyBalance: {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
-        majorityWriteUnrelatedDoc: {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
-        majorityWriteTxnDoc: {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
+        checkMoneyBalance: {
+            transferMoney: 0.5,
+            majorityWriteUnrelatedDoc: 0.25,
+            majorityWriteTxnDoc: 0.25,
+        },
+        majorityWriteUnrelatedDoc: {
+            transferMoney: 0.5,
+            majorityWriteUnrelatedDoc: 0.25,
+            majorityWriteTxnDoc: 0.25,
+        },
+        majorityWriteTxnDoc: {
+            transferMoney: 0.5,
+            majorityWriteUnrelatedDoc: 0.25,
+            majorityWriteTxnDoc: 0.25,
+        },
     };
 
     return $config;

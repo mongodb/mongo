@@ -82,7 +82,10 @@ function mongoClientArgs(port, extraArgs) {
     assert.eq(0, rc, "TLS 1.3 client should connect successfully to TLS 1.3 server");
 
     assert.soon(
-        () => checkLog.checkContainsOnceJson(mongod, kWindowsTLSAcceptedLogId, {"cipher": kTLS13Cipher}),
+        () =>
+            checkLog.checkContainsOnceJson(mongod, kWindowsTLSAcceptedLogId, {
+                "cipher": kTLS13Cipher,
+            }),
         `Expected TLS 1.3 cipher ${kTLS13Cipher} to appear in server log`,
     );
 
@@ -148,12 +151,20 @@ function mongoClientArgs(port, extraArgs) {
     `;
 
     const rc = runMongoProgram(
-        ...mongoClientArgs(mongod.port, ["--tlsDisabledProtocols", "TLS1_0,TLS1_1,TLS1_2", "--eval", pingLoop]),
+        ...mongoClientArgs(mongod.port, [
+            "--tlsDisabledProtocols",
+            "TLS1_0,TLS1_1,TLS1_2",
+            "--eval",
+            pingLoop,
+        ]),
     );
     assert.eq(0, rc, "All 20 round-trips over a single TLS 1.3 connection should succeed");
 
     assert.soon(
-        () => checkLog.checkContainsOnceJson(mongod, kWindowsTLSAcceptedLogId, {"cipher": kTLS13Cipher}),
+        () =>
+            checkLog.checkContainsOnceJson(mongod, kWindowsTLSAcceptedLogId, {
+                "cipher": kTLS13Cipher,
+            }),
         `Expected TLS 1.3 cipher ${kTLS13Cipher} in server log for post-handshake test`,
     );
 
@@ -173,7 +184,9 @@ function mongoClientArgs(port, extraArgs) {
         tlsDisabledProtocols: "TLS1_0,TLS1_1,TLS1_2",
     });
 
-    const rc = runMongoProgram(...mongoClientArgs(mongod.port, ["--tlsDisabledProtocols", "TLS1_3", "--eval", ";"]));
+    const rc = runMongoProgram(
+        ...mongoClientArgs(mongod.port, ["--tlsDisabledProtocols", "TLS1_3", "--eval", ";"]),
+    );
     assert.neq(0, rc, "TLS 1.2-only client should fail to connect to a TLS 1.3-only server");
 
     MongoRunner.stopMongod(mongod);
@@ -193,7 +206,12 @@ function mongoClientArgs(port, extraArgs) {
     });
 
     const rc = runMongoProgram(
-        ...mongoClientArgs(mongod.port, ["--tlsDisabledProtocols", "TLS1_0,TLS1_1,TLS1_2", "--eval", ";"]),
+        ...mongoClientArgs(mongod.port, [
+            "--tlsDisabledProtocols",
+            "TLS1_0,TLS1_1,TLS1_2",
+            "--eval",
+            ";",
+        ]),
     );
     assert.neq(0, rc, "TLS 1.3-only client should fail to connect to a TLS 1.2-only server");
 

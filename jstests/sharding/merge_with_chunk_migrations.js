@@ -72,7 +72,11 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
 
     // Migrate the chunk on shard1 to shard0.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard0.shardName}),
+        st.s.adminCommand({
+            moveChunk: shardedColl.getFullName(),
+            find: {shardKey: 1},
+            to: st.shard0.shardName,
+        }),
     );
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
@@ -116,10 +120,18 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
     );
 
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard1.shardName}),
+        st.s.adminCommand({
+            moveChunk: shardedColl.getFullName(),
+            find: {shardKey: -1},
+            to: st.shard1.shardName,
+        }),
     );
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard1.shardName}),
+        st.s.adminCommand({
+            moveChunk: shardedColl.getFullName(),
+            find: {shardKey: 1},
+            to: st.shard1.shardName,
+        }),
     );
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
@@ -131,7 +143,11 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
 
     // Reset the chunk distribution.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard0.shardName}),
+        st.s.adminCommand({
+            moveChunk: shardedColl.getFullName(),
+            find: {shardKey: -1},
+            to: st.shard0.shardName,
+        }),
     );
 }
 

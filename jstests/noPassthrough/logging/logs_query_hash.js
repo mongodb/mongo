@@ -118,12 +118,20 @@ const lookupStage = {
 
 // Aggregation $match-$lookup
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {$or: [{a: 1}, {b: 1}]}}, lookupStage] /* pipeline */, "pipeline1" /* comment */),
+    buildAggCommand(
+        [{"$match": {$or: [{a: 1}, {b: 1}]}}, lookupStage] /* pipeline */,
+        "pipeline1" /* comment */,
+    ),
 );
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {a: {$in: [1, 2, 3, 4, 5]}}}, lookupStage] /* pipeline */, "pipeline2" /* comment */),
+    buildAggCommand(
+        [{"$match": {a: {$in: [1, 2, 3, 4, 5]}}}, lookupStage] /* pipeline */,
+        "pipeline2" /* comment */,
+    ),
 );
-runAndVerifySlowQueryLog(buildAggCommand([{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipeline3" /* comment */));
+runAndVerifySlowQueryLog(
+    buildAggCommand([{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipeline3" /* comment */),
+);
 
 // Aggregation $match-$lookup with hint
 const hint = {
@@ -145,11 +153,17 @@ runAndVerifySlowQueryLog(
     ),
 );
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipelineWithHint3" /* comment */, hint),
+    buildAggCommand(
+        [{"$match": {b: 1}}, lookupStage] /* pipeline */,
+        "pipelineWithHint3" /* comment */,
+        hint,
+    ),
 );
 
 // Update
-runAndVerifySlowQueryLog(buildUpdateCommand({d: 1} /* query */, {$set: {d: 1}} /* update */, "update" /* comment */));
+runAndVerifySlowQueryLog(
+    buildUpdateCommand({d: 1} /* query */, {$set: {d: 1}} /* update */, "update" /* comment */),
+);
 
 // Delete
 runAndVerifySlowQueryLog(buildDeleteCommand({d: 1} /* query */, "delete" /* comment */));

@@ -250,7 +250,12 @@ function* makeTests() {
             for (const [sortType, sortDefinition] of Object.entries(sortBys)) {
                 for (const [partitionType, partitionDefinition] of Object.entries(partitionBys)) {
                     let test = {
-                        query: constructQuery(wfDefinition, windowDefinition, sortDefinition, partitionDefinition),
+                        query: constructQuery(
+                            wfDefinition,
+                            windowDefinition,
+                            sortDefinition,
+                            partitionDefinition,
+                        ),
                         expectedResult: expectedResult(wfType, windowType, sortType, partitionType),
                     };
 

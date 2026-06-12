@@ -39,7 +39,9 @@ function crossCheckAggregationStagesFor(collections) {
     }
 
     // Get data to validate
-    const shardedDataDistributionResponse = adminDb.aggregate([{$shardedDataDistribution: {}}]).toArray();
+    const shardedDataDistributionResponse = adminDb
+        .aggregate([{$shardedDataDistribution: {}}])
+        .toArray();
 
     assert.gte(shardedDataDistributionResponse.length, collections.length);
 
@@ -49,7 +51,10 @@ function crossCheckAggregationStagesFor(collections) {
 
         // Check only for namespaces appearing in shardedDataDistributionResponse
         if (collStatsResponse.hasOwnProperty(ns)) {
-            assert.eq(collectionDataDistribution.shards.length, Object.keys(collStatsResponse[ns]).length);
+            assert.eq(
+                collectionDataDistribution.shards.length,
+                Object.keys(collStatsResponse[ns]).length,
+            );
 
             // Check for consistency of each relevant field.
             for (const shard of collectionDataDistribution.shards) {
@@ -59,13 +64,20 @@ function crossCheckAggregationStagesFor(collections) {
                 const numOwnedDocumentsFromDataDistribution = shard.numOwnedDocuments;
                 const numOrphanedDocsFromDataDistribution = shard.numOrphanedDocs;
 
-                assert.eq(true, collStatsResponse[ns].hasOwnProperty(shardNameFromDataDistribution));
+                assert.eq(
+                    true,
+                    collStatsResponse[ns].hasOwnProperty(shardNameFromDataDistribution),
+                );
 
-                const avgObjSize = collStatsResponse[ns][shardNameFromDataDistribution].storageStats.avgObjSize;
-                const numOrphanDocs = collStatsResponse[ns][shardNameFromDataDistribution].storageStats.numOrphanDocs;
-                const storageStatsCount = collStatsResponse[ns][shardNameFromDataDistribution].storageStats.count;
+                const avgObjSize =
+                    collStatsResponse[ns][shardNameFromDataDistribution].storageStats.avgObjSize;
+                const numOrphanDocs =
+                    collStatsResponse[ns][shardNameFromDataDistribution].storageStats.numOrphanDocs;
+                const storageStatsCount =
+                    collStatsResponse[ns][shardNameFromDataDistribution].storageStats.count;
 
-                const ownedSizeBytesFromCollStats = (storageStatsCount - numOrphanDocs) * avgObjSize;
+                const ownedSizeBytesFromCollStats =
+                    (storageStatsCount - numOrphanDocs) * avgObjSize;
                 const orphanedSizeBytesFromCollStats = numOrphanDocs * avgObjSize;
                 const numOwnedDocumentsFromCollStats = storageStatsCount - numOrphanDocs;
                 const numOrphanedDocsFromCollStats = numOrphanDocs;
@@ -144,22 +156,37 @@ jsTest.log("$shardedDataDistribution rejects invalid queries and/or values");
 
 jsTest.log('Test $shardedDataDistribution followed by a $match stage on the "ns" field');
 {
-    assert.eq(1, adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: fooNss}}]).itcount());
+    assert.eq(
+        1,
+        adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: fooNss}}]).itcount(),
+    );
     assert.eq(
         2,
-        adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: {$in: [fooNss, bazNss]}}}]).itcount(),
+        adminDb
+            .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: {$in: [fooNss, bazNss]}}}])
+            .itcount(),
     );
-    assert.eq(0, adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: "test.IDoNotExist"}}]).itcount());
+    assert.eq(
+        0,
+        adminDb
+            .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: "test.IDoNotExist"}}])
+            .itcount(),
+    );
 }
 
 const numShardsInCluster = getNumShards(db);
 
-jsTest.log('Test $shardedDataDistribution followed by a $match stage on the "ns" field and something else');
+jsTest.log(
+    'Test $shardedDataDistribution followed by a $match stage on the "ns" field and something else',
+);
 {
     assert.eq(
         1,
         adminDb
-            .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: fooNss, shards: {$size: numShardsInCluster}}}])
+            .aggregate([
+                {$shardedDataDistribution: {}},
+                {$match: {ns: fooNss, shards: {$size: numShardsInCluster}}},
+            ])
             .itcount(),
     );
     assert.eq(
@@ -173,7 +200,9 @@ jsTest.log('Test $shardedDataDistribution followed by a $match stage on the "ns"
     );
 }
 
-jsTest.log('Test $shardedDataDistribution followed by a $match stage on the "ns" field and other match stages');
+jsTest.log(
+    'Test $shardedDataDistribution followed by a $match stage on the "ns" field and other match stages',
+);
 {
     assert.eq(
         1,
@@ -212,12 +241,20 @@ jsTest.log('Test $shardedDataDistribution followed by a $match stage unrelated t
 {
     assert.neq(
         0,
-        adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {shards: {$size: numShardsInCluster}}}]).itcount(),
+        adminDb
+            .aggregate([
+                {$shardedDataDistribution: {}},
+                {$match: {shards: {$size: numShardsInCluster}}},
+            ])
+            .itcount(),
     );
     assert.eq(
         0,
         adminDb
-            .aggregate([{$shardedDataDistribution: {}}, {$match: {shards: {$size: numShardsInCluster + 9}}}])
+            .aggregate([
+                {$shardedDataDistribution: {}},
+                {$match: {shards: {$size: numShardsInCluster + 9}}},
+            ])
             .itcount(),
     );
 }
@@ -227,7 +264,9 @@ jsTest.log("$shardedDataDistribution supports timeseries collections");
     const testDb = setupTestDatabase(db, `${jsTestName()}_timeseries`);
     const testColl = testDb.getCollection("testColl");
     const nss = testColl.getFullName();
-    assert.commandWorked(db.adminCommand({shardCollection: nss, timeseries: {timeField: "ts"}, key: {ts: 1}}));
+    assert.commandWorked(
+        db.adminCommand({shardCollection: nss, timeseries: {timeField: "ts"}, key: {ts: 1}}),
+    );
     assert.commandWorked(
         testColl.insertOne({
             "metadata": {"sensorId": 5578, "type": "temperature"},
@@ -255,7 +294,9 @@ jsTest.log("$shardedDataDistribution supports timeseries collections");
     );
 }
 
-jsTest.log("$shardedDataDistribution does not return info on untracked or unsplittable collections");
+jsTest.log(
+    "$shardedDataDistribution does not return info on untracked or unsplittable collections",
+);
 {
     const testDb = setupTestDatabase(db, `${jsTestName()}_unsharded`);
     const unshardedColl = testDb.getCollection("testColl");
@@ -264,16 +305,25 @@ jsTest.log("$shardedDataDistribution does not return info on untracked or unspli
     // Create an empty unsharded collection; ensure that it does not appear in the output of
     // $shardedDataDistribution.
     assert.commandWorked(testDb.runCommand({create: unshardedColl.getName()}));
-    assert.eq(0, adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).itcount());
+    assert.eq(
+        0,
+        adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).itcount(),
+    );
 
     // Move the collection to make it tracked; the namespace keeps being invisible to
     // $shardedDataDistribution.
     const nonPrimaryShard = getRandomShardName(db, [testDb.getDatabasePrimaryShardId] /*exclude*/);
     assert.commandWorked(db.adminCommand({moveCollection: nss, toShard: nonPrimaryShard}));
 
-    assert.eq(0, adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).itcount());
+    assert.eq(
+        0,
+        adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).itcount(),
+    );
 
     // Unspittable collections become visible once sharded.
     assert.commandWorked(db.adminCommand({shardCollection: nss, key: {_id: 1}}));
-    assert.eq(1, adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).itcount());
+    assert.eq(
+        1,
+        adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).itcount(),
+    );
 }

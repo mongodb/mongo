@@ -128,7 +128,11 @@ assert(arrayEq(firstBatch, u1result), tojson({got: firstBatch, expected: u1resul
 // unwind an array at the end of a dotted path
 testDB.ut.drop();
 assert.commandWorked(testDB.ut.insert({_id: 4, a: 1, b: {e: 7, f: [4, 3, 2, 1]}, c: 12, d: 17}));
-let u2 = testDB.runCommand({aggregate: "ut", pipeline: [{$unwind: "$b.f"}, {$sort: {"b.f": -1}}], cursor: {}});
+let u2 = testDB.runCommand({
+    aggregate: "ut",
+    pipeline: [{$unwind: "$b.f"}, {$sort: {"b.f": -1}}],
+    cursor: {},
+});
 
 let u2result = [
     {"_id": 4, "a": 1, "b": {"e": 7, "f": 4}, "c": 12, "d": 17},
@@ -336,7 +340,10 @@ assert(arrayEq(firstBatch, p8result), tojson({got: firstBatch, expected: p8resul
 // collapse a dotted path with an intervening array
 let p9 = testDB.runCommand({
     aggregate: "article",
-    pipeline: [{$project: {_id: 0, author: 1, commentsAuthor: "$comments.author"}}, {$sort: {author: 1}}],
+    pipeline: [
+        {$project: {_id: 0, author: 1, commentsAuthor: "$comments.author"}},
+        {$sort: {author: 1}},
+    ],
     cursor: {},
 });
 
@@ -406,7 +413,11 @@ testDB.p11.save({
 
 const p11a = testDB.runCommand({
     aggregate: "p11",
-    pipeline: [{$unwind: "$items.authors"}, {$project: {name: 1, author: "$items.authors"}}, {$sort: {author: 1}}],
+    pipeline: [
+        {$unwind: "$items.authors"},
+        {$project: {name: 1, author: "$items.authors"}},
+        {$sort: {author: 1}},
+    ],
     cursor: {},
 });
 
@@ -497,7 +508,9 @@ assert.docEq(p11e_result, p11e.cursor.firstBatch, "p11e failed");
 // Same as prior test but also set "includeArrayIndex" to true.
 const p11f = testDB.runCommand({
     aggregate: "p11",
-    pipeline: [{$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}}],
+    pipeline: [
+        {$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}},
+    ],
     cursor: {},
 });
 
@@ -518,7 +531,9 @@ let p12 = testDB.runCommand({
     aggregate: "article",
     pipeline: [
         {
-            $project: {theProduct: {$multiply: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]}},
+            $project: {
+                theProduct: {$multiply: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]},
+            },
         },
         {$sort: {_id: 1}},
     ],
@@ -769,7 +784,11 @@ let p21result = [
 assert.docEq(p21result, p21.cursor.firstBatch, "p21 failed");
 
 // simple matching
-let m1 = testDB.runCommand({aggregate: "article", pipeline: [{$match: {author: "dave"}}], cursor: {}});
+let m1 = testDB.runCommand({
+    aggregate: "article",
+    pipeline: [{$match: {author: "dave"}}],
+    cursor: {},
+});
 
 let m1result = [
     {

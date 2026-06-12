@@ -57,7 +57,8 @@ assert.eq(null, doc._id, tojson(doc));
 // Tests that failing to insert an invalid document with a regex for the _id field will not result
 // in the collection being created.
 // Previously in insert2.js (tagged with assumes_no_implicit_collection_creation_after_drop).
-const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+const originalImplicitlyShardOnCreateCollectionOnly =
+    TestData.implicitlyShardOnCreateCollectionOnly;
 try {
     // Some passthroughs, sharded test fixtures for example, may override DB.getCollection() or
     // DB.drop() to create and shard the collection. We should disable the collection creation on

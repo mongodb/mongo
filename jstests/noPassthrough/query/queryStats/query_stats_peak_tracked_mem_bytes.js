@@ -3,7 +3,11 @@
  */
 import {describe, it, before, beforeEach, after} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {getQueryStatsFindCmd, getQueryStatsAggCmd, getQueryExecMetrics} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsFindCmd,
+    getQueryStatsAggCmd,
+    getQueryExecMetrics,
+} from "jstests/libs/query/query_stats_utils.js";
 
 describe("peakTrackedMemBytes in queryStats - standalone", function () {
     before(function () {
@@ -35,16 +39,25 @@ describe("peakTrackedMemBytes in queryStats - standalone", function () {
 
         const queryExecMetrics = getQueryExecMetrics(queryStatsResults[0].metrics);
         assert.gt(queryExecMetrics.peakTrackedMemBytes.sum, 0);
-        assert.eq(queryExecMetrics.clusterPeakTrackedMemBytes.sum, queryExecMetrics.peakTrackedMemBytes.sum);
+        assert.eq(
+            queryExecMetrics.clusterPeakTrackedMemBytes.sum,
+            queryExecMetrics.peakTrackedMemBytes.sum,
+        );
 
         // Clear the cache so the getMore query gets its own fresh entry.
-        assert.commandWorked(this.conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
-        assert.commandWorked(this.conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}));
+        assert.commandWorked(
+            this.conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}),
+        );
+        assert.commandWorked(
+            this.conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}),
+        );
 
         // Use a small batchSize to force multiple getMore calls with an in-memory sort.
         this.coll.find({}).sort({a: -1}).batchSize(5).toArray();
 
-        const getMoreQueryStatsResults = getQueryStatsFindCmd(this.conn, {collName: this.coll.getName()});
+        const getMoreQueryStatsResults = getQueryStatsFindCmd(this.conn, {
+            collName: this.coll.getName(),
+        });
         assert.eq(getMoreQueryStatsResults.length, 1, getMoreQueryStatsResults);
 
         const getMoreQueryExecMetrics = getQueryExecMetrics(getMoreQueryStatsResults[0].metrics);
@@ -55,7 +68,10 @@ describe("peakTrackedMemBytes in queryStats - standalone", function () {
         );
 
         // Check that getMore's peakTracked is not unreasonably higher than initial peakTracked metric to confirm we aren't double-counting.
-        assert.lt(getMoreQueryExecMetrics.peakTrackedMemBytes.sum, 2 * queryExecMetrics.peakTrackedMemBytes.sum);
+        assert.lt(
+            getMoreQueryExecMetrics.peakTrackedMemBytes.sum,
+            2 * queryExecMetrics.peakTrackedMemBytes.sum,
+        );
     });
 });
 
@@ -85,13 +101,22 @@ describe("peakTrackedMemBytes in queryStats - sharded cluster", function () {
         this.coll.drop();
 
         assert.commandWorked(
-            this.mongosDB.adminCommand({enableSharding: "test", primaryShard: this.st.shard0.shardName}),
+            this.mongosDB.adminCommand({
+                enableSharding: "test",
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         //Shard and move documents to all three shards.
-        assert.commandWorked(this.mongosDB.adminCommand({shardCollection: this.coll.getFullName(), key: {a: 1}}));
-        assert.commandWorked(this.mongosDB.adminCommand({split: this.coll.getFullName(), middle: {a: 67}}));
-        assert.commandWorked(this.mongosDB.adminCommand({split: this.coll.getFullName(), middle: {a: 134}}));
+        assert.commandWorked(
+            this.mongosDB.adminCommand({shardCollection: this.coll.getFullName(), key: {a: 1}}),
+        );
+        assert.commandWorked(
+            this.mongosDB.adminCommand({split: this.coll.getFullName(), middle: {a: 67}}),
+        );
+        assert.commandWorked(
+            this.mongosDB.adminCommand({split: this.coll.getFullName(), middle: {a: 134}}),
+        );
         assert.commandWorked(
             this.mongosDB.adminCommand({
                 moveChunk: this.coll.getFullName(),
@@ -121,7 +146,13 @@ describe("peakTrackedMemBytes in queryStats - sharded cluster", function () {
     it("mongos reports both peakTrackedMemBytes and clusterPeakTrackedMemBytes", function () {
         this.coll
             .aggregate([
-                {$group: {_id: {aModulo: {$mod: ["$a", 10]}}, total: {$sum: 1}, data: {$push: "$b"}}},
+                {
+                    $group: {
+                        _id: {aModulo: {$mod: ["$a", 10]}},
+                        total: {$sum: 1},
+                        data: {$push: "$b"},
+                    },
+                },
                 {$sort: {_id: 1}},
             ])
             .toArray();
@@ -132,9 +163,15 @@ describe("peakTrackedMemBytes in queryStats - sharded cluster", function () {
         const mongosLocalPeak = mongosMetrics.peakTrackedMemBytes.sum;
         const mongosTotalPeak = mongosMetrics.clusterPeakTrackedMemBytes.sum;
 
-        const shard0Stats = getQueryStatsAggCmd(this.shard0.getDB("test"), {collName: this.coll.getName()});
-        const shard1Stats = getQueryStatsAggCmd(this.shard1.getDB("test"), {collName: this.coll.getName()});
-        const shard2Stats = getQueryStatsAggCmd(this.shard2.getDB("test"), {collName: this.coll.getName()});
+        const shard0Stats = getQueryStatsAggCmd(this.shard0.getDB("test"), {
+            collName: this.coll.getName(),
+        });
+        const shard1Stats = getQueryStatsAggCmd(this.shard1.getDB("test"), {
+            collName: this.coll.getName(),
+        });
+        const shard2Stats = getQueryStatsAggCmd(this.shard2.getDB("test"), {
+            collName: this.coll.getName(),
+        });
 
         const shard0Exec = getQueryExecMetrics(shard0Stats[0].metrics);
         const shard1Exec = getQueryExecMetrics(shard1Stats[0].metrics);
@@ -181,7 +218,10 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
         this.shard1 = this.st.shard1;
 
         assert.commandWorked(
-            this.mongosDB.adminCommand({enableSharding: "test", primaryShard: this.st.shard0.shardName}),
+            this.mongosDB.adminCommand({
+                enableSharding: "test",
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         // "local_coll" is unsharded and lives entirely on shard0.
@@ -198,7 +238,10 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
         this.foreignColl = this.mongosDB["foreign_coll"];
         this.foreignColl.drop();
         assert.commandWorked(
-            this.mongosDB.adminCommand({shardCollection: this.foreignColl.getFullName(), key: {a: 1}}),
+            this.mongosDB.adminCommand({
+                shardCollection: this.foreignColl.getFullName(),
+                key: {a: 1},
+            }),
         );
         assert.commandWorked(
             this.mongosDB.adminCommand({
@@ -222,8 +265,12 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
     beforeEach(function () {
         // Clear cache before each test.
         for (const node of [this.shard0, this.shard1, this.mongos]) {
-            assert.commandWorked(node.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
-            assert.commandWorked(node.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}));
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}),
+            );
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}),
+            );
         }
     });
 
@@ -243,7 +290,9 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
             ])
             .toArray();
 
-        const shard1Stats = getQueryStatsAggCmd(this.shard1.getDB("test"), {collName: "foreign_coll"});
+        const shard1Stats = getQueryStatsAggCmd(this.shard1.getDB("test"), {
+            collName: "foreign_coll",
+        });
         assert.eq(shard1Stats.length, 1);
         const shard1Exec = getQueryExecMetrics(shard1Stats[0].metrics);
         const shard1Peak = shard1Exec.peakTrackedMemBytes.sum;
@@ -253,7 +302,9 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
         assert.eq(shard1TotalPeak, shard1Peak);
 
         // Shard0 is acting as a router for $lookup.
-        const shard0Stats = getQueryStatsAggCmd(this.shard0.getDB("test"), {collName: "local_coll"});
+        const shard0Stats = getQueryStatsAggCmd(this.shard0.getDB("test"), {
+            collName: "local_coll",
+        });
         assert.eq(shard0Stats.length, 1);
         const shard0Exec = getQueryExecMetrics(shard0Stats[0].metrics);
         const shard0Peak = shard0Exec.peakTrackedMemBytes.sum;
@@ -273,10 +324,15 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
 
     it("$unionWith against sharded collection makes mongod act as router", function () {
         this.localColl
-            .aggregate([{$unionWith: {coll: "foreign_coll", pipeline: [{$sort: {b: 1}}]}}, {$sort: {a: -1}}])
+            .aggregate([
+                {$unionWith: {coll: "foreign_coll", pipeline: [{$sort: {b: 1}}]}},
+                {$sort: {a: -1}},
+            ])
             .toArray();
 
-        const shard1Stats = getQueryStatsAggCmd(this.shard1.getDB("test"), {collName: "foreign_coll"});
+        const shard1Stats = getQueryStatsAggCmd(this.shard1.getDB("test"), {
+            collName: "foreign_coll",
+        });
         assert.eq(shard1Stats.length, 1);
         const shard1Exec = getQueryExecMetrics(shard1Stats[0].metrics);
         const shard1Peak = shard1Exec.peakTrackedMemBytes.sum;
@@ -285,7 +341,9 @@ describe("peakTrackedMemBytes in queryStats - mongod as router", function () {
         assert(shard1Peak > 0);
         assert.eq(shard1TotalPeak, shard1Peak);
 
-        const shard0Stats = getQueryStatsAggCmd(this.shard0.getDB("test"), {collName: "local_coll"});
+        const shard0Stats = getQueryStatsAggCmd(this.shard0.getDB("test"), {
+            collName: "local_coll",
+        });
         assert.eq(shard0Stats.length, 1);
         const shard0Exec = getQueryExecMetrics(shard0Stats[0].metrics);
         const shard0Peak = shard0Exec.peakTrackedMemBytes.sum;

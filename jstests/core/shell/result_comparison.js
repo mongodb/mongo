@@ -165,7 +165,14 @@ function testResultOrderIndifference() {
 
     assertExpectedOutputs(
         [result, resultOutOfOrder],
-        [resultAltered1, resultAltered2, resultAltered3, resultAltered4, resultAltered5, resultAltered6],
+        [
+            resultAltered1,
+            resultAltered2,
+            resultAltered3,
+            resultAltered4,
+            resultAltered5,
+            resultAltered6,
+        ],
     );
 }
 

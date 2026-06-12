@@ -6,7 +6,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -14,17 +17,23 @@ coll.drop();
 const timeField = "t";
 const metaField = "m";
 
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 
 // Insert a measurement to create a bucket.
-assert.commandWorked(coll.insert({[timeField]: ISODate("2024-01-01T00:00:00Z"), [metaField]: 1, v: 1}));
+assert.commandWorked(
+    coll.insert({[timeField]: ISODate("2024-01-01T00:00:00Z"), [metaField]: 1, v: 1}),
+);
 
 // Retrieve the raw bucket so we have a valid bucket document to use in write operations.
 const bucket = getTimeseriesCollForRawOps(coll).find().rawData().toArray()[0];
 assert(bucket, "Expected to find at least one bucket");
 
 // Delete the bucket so we can re-insert it as-is.
-assert.commandWorked(getTimeseriesCollForRawOps(coll).deleteOne({_id: bucket._id}, kRawOperationSpec));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(coll).deleteOne({_id: bucket._id}, kRawOperationSpec),
+);
 
 // Verify that bypassDocumentValidation: true is rejected for inserts via the raw interface.
 assert.commandFailedWithCode(

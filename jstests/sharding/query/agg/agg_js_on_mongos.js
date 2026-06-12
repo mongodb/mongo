@@ -47,6 +47,9 @@ st.restartMongos(0, {"noscripting": "", "restart": true});
 testDB = st.s.getDB("test");
 coll = testDB.coll;
 
-assert.commandFailedWithCode(testDB.runCommand({aggregate: "coll", pipeline: pipeline, cursor: {}}), 31264);
+assert.commandFailedWithCode(
+    testDB.runCommand({aggregate: "coll", pipeline: pipeline, cursor: {}}),
+    31264,
+);
 
 st.stop();

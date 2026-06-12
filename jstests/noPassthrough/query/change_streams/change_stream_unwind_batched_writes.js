@@ -50,7 +50,9 @@ function runTest(conn) {
     // 'batchedDeletesTargetBatchDocs'.
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}),
+    );
 
     // Populate the collection, then open a change stream, then mass-delete the collection.
     assert.commandWorked(
@@ -66,7 +68,10 @@ function runTest(conn) {
     assert.eq(0, coll.find().itcount());
     const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
     const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
-    assert.eq(serverStatusBatchesAfter, serverStatusBatchesBefore + Math.ceil(totalNumDocs / docsPerBatch));
+    assert.eq(
+        serverStatusBatchesAfter,
+        serverStatusBatchesBefore + Math.ceil(totalNumDocs / docsPerBatch),
+    );
     assert.eq(serverStatusDocsAfter, serverStatusDocsBefore + totalNumDocs);
 
     // Verify the change stream emits events for the batched deletion, and capture the events so we
@@ -89,7 +94,11 @@ function runTest(conn) {
 
         for (let x = i + 1; x < changeList.length; ++x) {
             const expectedChangeDoc = changeList[x];
-            assertWriteVisible(resumeCursor, expectedChangeDoc.operationType, expectedChangeDoc.documentKey);
+            assertWriteVisible(
+                resumeCursor,
+                expectedChangeDoc.operationType,
+                expectedChangeDoc.documentKey,
+            );
         }
 
         assertNoChanges(resumeCursor);

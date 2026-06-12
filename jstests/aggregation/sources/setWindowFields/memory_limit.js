@@ -24,17 +24,25 @@ const origMemoryLimit = assert.commandWorked(
 
 try {
     // Test that we can set the memory limit.
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 1200);
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+        1200,
+    );
     // Create a collection with enough documents in a single partition to go over the memory limit.
     const docsPerPartition = 10;
     for (let i = 0; i < docsPerPartition; i++) {
-        assert.commandWorked(coll.insert({_id: i, partitionKey: 1, largeStr: Array(1025).toString()}));
+        assert.commandWorked(
+            coll.insert({_id: i, partitionKey: 1, largeStr: Array(1025).toString()}),
+        );
     }
 
     assert.commandFailedWithCode(
         coll.runCommand({
             aggregate: coll.getName(),
-            pipeline: [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$_id"}}}}],
+            pipeline: [
+                {$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$_id"}}}},
+            ],
             cursor: {},
             allowDiskUse: false,
         }),
@@ -52,7 +60,9 @@ try {
     assert.commandWorked(
         coll.runCommand({
             aggregate: coll.getName(),
-            pipeline: [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$largeStr"}}}}],
+            pipeline: [
+                {$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$largeStr"}}}},
+            ],
             cursor: {},
             allowDiskUse: false,
         }),
@@ -60,7 +70,9 @@ try {
 
     // The query passes with multiple partitions of the same size.
     for (let i = docsPerPartition; i < docsPerPartition * 2; i++) {
-        assert.commandWorked(coll.insert({_id: i, partitionKey: 2, largeStr: Array(1025).toString()}));
+        assert.commandWorked(
+            coll.insert({_id: i, partitionKey: 2, largeStr: Array(1025).toString()}),
+        );
     }
     assert.commandWorked(
         coll.runCommand({

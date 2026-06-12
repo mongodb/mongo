@@ -53,7 +53,14 @@ export const $config = (function () {
                 [this.metaFieldName]: meta,
                 data: Random.rand(),
             });
-            return sideCollection.findOne({[this.metaFieldName]: meta}, null, null, null, null, true /* rawData */);
+            return sideCollection.findOne(
+                {[this.metaFieldName]: meta},
+                null,
+                null,
+                null,
+                null,
+                true /* rawData */,
+            );
         },
     };
 
@@ -115,7 +122,9 @@ export const $config = (function () {
 
         aggregate: function aggregate(db, collName) {
             const coll = this.getMainCollection(db);
-            const agg = coll.aggregate([{$match: {[this.thisThreadKey]: this.tid}}], {rawData: true});
+            const agg = coll.aggregate([{$match: {[this.thisThreadKey]: this.tid}}], {
+                rawData: true,
+            });
             assert.eq(
                 agg.toArray().length,
                 this.addedBucketCount,

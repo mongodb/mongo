@@ -26,7 +26,9 @@ const testCommands = [
     {
         name: "renameCollection",
         execute: (db) =>
-            db.getSiblingDB("admin").runCommand({renameCollection: "testDB.testColl1", to: "testDB.testColl1Renamed"}),
+            db
+                .getSiblingDB("admin")
+                .runCommand({renameCollection: "testDB.testColl1", to: "testDB.testColl1Renamed"}),
     },
     {
         name: "implicitCollectionCreation",
@@ -75,11 +77,13 @@ const testCommands = [
     },
     {
         name: "applyOps with DDL operation",
-        execute: (db) => db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl0"}}]}),
+        execute: (db) =>
+            db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl0"}}]}),
     },
     {
         name: "applyOps with CRUD operation",
-        execute: (db) => db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl0", o: {_id: 1, x: 1}}]}),
+        execute: (db) =>
+            db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl0", o: {_id: 1, x: 1}}]}),
     },
 ];
 
@@ -123,7 +127,12 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         this.createAdminUser(this.rs.getPrimary());
 
         jsTest.log.info("Creating new user with dbOwner permissions on replica set");
-        this.testDBDirectConnection = this.createRegularUser(this.rs.getPrimary(), "testDB", "user", "x");
+        this.testDBDirectConnection = this.createRegularUser(
+            this.rs.getPrimary(),
+            "testDB",
+            "user",
+            "x",
+        );
 
         jsTest.log.info("Inserting data on the replica set");
         assert.commandWorked(this.testDBDirectConnection.testColl0.insertOne({x: 1}));
@@ -137,7 +146,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
     it("Direct DDLs started after the initialization of sharding during promotion", () => {
         jsTest.log.info("Setting fail point hangAfterShardingInitialization");
         const configPrimary = this.cluster.configRS.getPrimary();
-        const shardInitializationFP = configureFailPoint(configPrimary, "hangAfterShardingInitialization");
+        const shardInitializationFP = configureFailPoint(
+            configPrimary,
+            "hangAfterShardingInitialization",
+        );
 
         jsTest.log.info("Starting parallel shell for running addShard");
         const addShardParallelShell = startParallelShell(
@@ -159,7 +171,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             jsTest.log.info(
                 `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
             );
-            assert.commandFailedWithCode(testCommand.execute(this.testDBDirectConnection), ErrorCodes.Unauthorized);
+            assert.commandFailedWithCode(
+                testCommand.execute(this.testDBDirectConnection),
+                ErrorCodes.Unauthorized,
+            );
         });
 
         this.rs
@@ -194,7 +209,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
 
         jsTest.log.info("Setting fail point hangAfterDrainingDDLOperations");
         const configPrimary = this.cluster.configRS.getPrimary();
-        const shardAfterDrainingDDLOperationsFP = configureFailPoint(configPrimary, "hangAfterDrainingDDLOperations");
+        const shardAfterDrainingDDLOperationsFP = configureFailPoint(
+            configPrimary,
+            "hangAfterDrainingDDLOperations",
+        );
 
         jsTest.log.info("Starting parallel shell for running addShard");
         const addShardParallelShell = startParallelShell(
@@ -206,7 +224,9 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             this.cluster.s.port,
         );
 
-        jsTest.log.info("Checking that the draining of DDls operations is timing out (timeout set to 15s)");
+        jsTest.log.info(
+            "Checking that the draining of DDls operations is timing out (timeout set to 15s)",
+        );
         const TIMEOUT_MS = 15000;
         assert(
             !shardAfterDrainingDDLOperationsFP.waitWithTimeout(TIMEOUT_MS),
@@ -248,7 +268,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             jsTest.log.info(
                 `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
             );
-            assert.commandFailedWithCode(testCommand.execute(this.testDBDirectConnection), ErrorCodes.Unauthorized);
+            assert.commandFailedWithCode(
+                testCommand.execute(this.testDBDirectConnection),
+                ErrorCodes.Unauthorized,
+            );
         });
 
         this.rs
@@ -256,7 +279,8 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             .getDB("testDB")
             .grantRolesToUser("user", [{role: "directShardOperations", db: "admin"}]);
         testCommands.forEach((testCommand) => {
-            jsTest.log.info(`Checking that ${testCommand.name} is allowed with directShardOperations special
+            jsTest.log
+                .info(`Checking that ${testCommand.name} is allowed with directShardOperations special
                     permissions`);
             assert.commandWorked(testCommand.execute(this.testDBDirectConnection));
         });
@@ -265,8 +289,13 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         // cannot be run through mongos
         jsTest.log.info("Checking that DDLs are allowed through mongos");
         testCommands.forEach((testCommand) => {
-            if (testCommand.name.includes("cloneCollectionAsCapped") || testCommand.name.includes("applyOps")) {
-                jsTest.log.info(`Skipping ${testCommand.name} check since it is not supported on mongos`);
+            if (
+                testCommand.name.includes("cloneCollectionAsCapped") ||
+                testCommand.name.includes("applyOps")
+            ) {
+                jsTest.log.info(
+                    `Skipping ${testCommand.name} check since it is not supported on mongos`,
+                );
             } else {
                 jsTest.log.info(`Checking that ${testCommand.name} is allowed through mongos`);
                 assert.commandWorked(testCommand.execute(this.cluster.s.getDB("testDB")));

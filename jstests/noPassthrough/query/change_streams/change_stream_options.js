@@ -29,7 +29,9 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     // An invalid string value of 'expireAfterSeconds' should fail.
     assert.commandFailedWithCode(
         adminDB.runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "unknown"}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "unknown"}},
+            },
         }),
         ErrorCodes.BadValue,
     );
@@ -37,7 +39,9 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     // A negative value of 'expireAfterSeconds' should fail.
     assert.commandFailedWithCode(
         adminDB.runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: -1}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: -1}},
+            },
         }),
         ErrorCodes.BadValue,
     );
@@ -54,21 +58,37 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     // options retrieves the expected options.
     assert.commandWorked(
         adminDB.runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}},
+            },
         }),
     );
-    const response1 = assert.commandWorked(adminDB.runCommand({getClusterParameter: "changeStreamOptions"}));
-    assert.eq(response1.clusterParameters[0].preAndPostImages, {expireAfterSeconds: "off"}, response1);
+    const response1 = assert.commandWorked(
+        adminDB.runCommand({getClusterParameter: "changeStreamOptions"}),
+    );
+    assert.eq(
+        response1.clusterParameters[0].preAndPostImages,
+        {expireAfterSeconds: "off"},
+        response1,
+    );
 
     // Set the expiration time for pre- and post-images and validate get change stream options
     // command.
     assert.commandWorked(
         adminDB.runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}},
+            },
         }),
     );
-    const response2 = assert.commandWorked(adminDB.runCommand({getClusterParameter: "changeStreamOptions"}));
-    assert.eq(response2.clusterParameters[0].preAndPostImages, {expireAfterSeconds: NumberLong(10)}, response2);
+    const response2 = assert.commandWorked(
+        adminDB.runCommand({getClusterParameter: "changeStreamOptions"}),
+    );
+    assert.eq(
+        response2.clusterParameters[0].preAndPostImages,
+        {expireAfterSeconds: NumberLong(10)},
+        response2,
+    );
 }
 
 // Tests the set and get change stream options on the standalone configuration.
@@ -79,11 +99,19 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     // Verify that the set command can be issued on a standalone server.
     assert.commandWorked(
         adminDB.runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}},
+            },
         }),
     );
-    const response2 = assert.commandWorked(adminDB.runCommand({getClusterParameter: "changeStreamOptions"}));
-    assert.eq(response2.clusterParameters[0].preAndPostImages, {expireAfterSeconds: NumberLong(10)}, response2);
+    const response2 = assert.commandWorked(
+        adminDB.runCommand({getClusterParameter: "changeStreamOptions"}),
+    );
+    assert.eq(
+        response2.clusterParameters[0].preAndPostImages,
+        {expireAfterSeconds: NumberLong(10)},
+        response2,
+    );
 
     MongoRunner.stopMongod(standalone);
 })();
@@ -101,7 +129,9 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     [primary, secondary].forEach((conn) => {
         assert.commandFailedWithCode(
             conn.getDB(testDBName).runCommand({
-                setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}}},
+                setClusterParameter: {
+                    changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}},
+                },
             }),
             ErrorCodes.Unauthorized,
         );
@@ -127,7 +157,9 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     // while getClusterParameter can.
     assert.commandFailedWithCode(
         adminDB.runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}},
+            },
         }),
         ErrorCodes.NotImplemented,
     );
@@ -142,7 +174,12 @@ function testChangeStreamOptionsWithAdminDB(conn) {
 // Tests that setClusterParameter and getClusterParameter can only be executed by user with
 // privilege actions 'setClusterParameter' and 'getClusterParameter' respectively.
 (function testClusterParameterChangeStreamOptionsForAuthorization() {
-    const replSetTest = new ReplSetTest({name: "shard", nodes: 1, useHostName: true, waitForKeys: false});
+    const replSetTest = new ReplSetTest({
+        name: "shard",
+        nodes: 1,
+        useHostName: true,
+        waitForKeys: false,
+    });
     replSetTest.startSet({keyFile: "jstests/libs/key1"});
     replSetTest.initiate();
 
@@ -160,7 +197,9 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     assert(primary.getDB("admin").auth("adminUser", "adminUser"));
     assert.commandFailedWithCode(
         primary.getDB("admin").runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}},
+            },
         }),
         ErrorCodes.Unauthorized,
     );
@@ -183,10 +222,14 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     assert(primary.getDB("admin").auth("clusterManager", "clusterManager"));
     assert.commandWorked(
         primary.getDB("admin").runCommand({
-            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}}},
+            setClusterParameter: {
+                changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(10)}},
+            },
         }),
     );
-    assert.commandWorked(primary.getDB("admin").runCommand({getClusterParameter: "changeStreamOptions"}));
+    assert.commandWorked(
+        primary.getDB("admin").runCommand({getClusterParameter: "changeStreamOptions"}),
+    );
     primary.getDB("admin").logout();
 
     replSetTest.stopSet();

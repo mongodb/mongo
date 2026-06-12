@@ -42,7 +42,11 @@ const coll = mydb.getCollection("t");
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const numDocs = 2;
@@ -63,15 +67,27 @@ const batchOpsLimit = assert.commandWorked(
     secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}),
 ).replBatchLimitOperations;
 jsTestLog(
-    "Oplog application on secondary " + secondary.host + " is limited to " + batchOpsLimit + " operations per batch.",
+    "Oplog application on secondary " +
+        secondary.host +
+        " is limited to " +
+        batchOpsLimit +
+        " operations per batch.",
 );
 
 // Disable snapshotting on secondary so that further operations do not enter the majority
 // snapshot.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 const numUpdates = 500;
-jsTestLog("Writing " + numUpdates + " updates to " + numDocs + " documents on secondary after disabling snapshots.");
+jsTestLog(
+    "Writing " +
+        numUpdates +
+        " updates to " +
+        numDocs +
+        " documents on secondary after disabling snapshots.",
+);
 for (let i = 0; i < numDocs; ++i) {
     for (let j = 0; j < numUpdates; ++j) {
         assert.commandWorked(coll.update({_id: i}, {$inc: {i: 1}}));
@@ -91,8 +107,8 @@ secondary = rst.restart(1, {
 });
 
 // Verify storage engine cache size in effect during recovery.
-const actualCacheSizeGB = assert.commandWorked(secondary.adminCommand({getCmdLineOpts: 1})).parsed.storage.wiredTiger
-    .engineConfig.cacheSizeGB;
+const actualCacheSizeGB = assert.commandWorked(secondary.adminCommand({getCmdLineOpts: 1})).parsed
+    .storage.wiredTiger.engineConfig.cacheSizeGB;
 jsTestLog("Secondary was restarted with a storage cache size of " + actualCacheSizeGB + " GB.");
 assert.eq(1, actualCacheSizeGB);
 

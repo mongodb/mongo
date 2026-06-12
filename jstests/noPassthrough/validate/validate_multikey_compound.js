@@ -29,7 +29,10 @@ assert.commandWorked(testColl.insert({_id: 0, a: [1, 2, 3], b: "abc", c: "valid_
 
 // 16766 is the error code returned by ExpressionKeysPrivate::getHashKeys() for
 // "hashed indexes do not currently support array values".
-assert.commandFailedWithCode(testColl.insert({_id: 1, a: 456, b: ["d", "e", "f"], c: ["invalid", "hash"]}), 16766);
+assert.commandFailedWithCode(
+    testColl.insert({_id: 1, a: 456, b: ["d", "e", "f"], c: ["invalid", "hash"]}),
+    16766,
+);
 
 assert.commandWorked(testColl.insert({_id: 2, a: 789, b: ["g", "h", " i"], c: "valid_hash_2"}));
 

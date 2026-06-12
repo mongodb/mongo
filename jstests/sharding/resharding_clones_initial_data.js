@@ -42,7 +42,10 @@ reshardingTest.withReshardingInBackground({
 
 function assertClonedContents(shardConn, expectedDocs) {
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
-    assert.eq(expectedDocs, shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray());
+    assert.eq(
+        expectedDocs,
+        shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray(),
+    );
 }
 
 const mongos = inputCollection.getMongo();

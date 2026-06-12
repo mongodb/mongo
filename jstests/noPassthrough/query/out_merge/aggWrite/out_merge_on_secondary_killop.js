@@ -32,7 +32,10 @@ const outColl = primaryDB.getCollection("outColl");
 assert.commandWorked(inputColl.insert({_id: 0, a: 1}, {writeConcern: {w: 2}}));
 assert.commandWorked(inputColl.insert({_id: 1, a: 2}, {writeConcern: {w: 2}}));
 
-const mergeFailpoint = FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "MergeStageInsertWithUpdateBackup")
+const mergeFailpoint = FeatureFlagUtil.isPresentAndEnabled(
+    secondaryDB,
+    "MergeStageInsertWithUpdateBackup",
+)
     ? "hangDuringBatchInsert"
     : "hangDuringBatchUpdate";
 const outFailpoint = "hangDuringBatchInsert";

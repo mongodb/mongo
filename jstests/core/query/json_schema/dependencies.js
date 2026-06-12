@@ -15,7 +15,12 @@ assertSchemaMatch(coll, {dependencies: {foo: {required: ["bar"]}}}, {foo: 1, bar
 assertSchemaMatch(coll, {dependencies: {foo: {required: ["bar"]}}}, {bar: 1}, true);
 assertSchemaMatch(coll, {dependencies: {foo: {required: ["bar"]}}}, {foo: 1}, false);
 
-assertSchemaMatch(coll, {dependencies: {foo: {required: ["bar"], properties: {baz: {type: "string"}}}}}, {}, true);
+assertSchemaMatch(
+    coll,
+    {dependencies: {foo: {required: ["bar"], properties: {baz: {type: "string"}}}}},
+    {},
+    true,
+);
 assertSchemaMatch(
     coll,
     {dependencies: {foo: {required: ["bar"], properties: {baz: {type: "string"}}}}},
@@ -53,24 +58,74 @@ assertSchemaMatch(coll, {dependencies: {foo: ["bar", "baz"]}}, {foo: 1, bar: 1, 
 
 // Nested schema dependency.
 assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}}, {}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}}, {obj: 1}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}}, {obj: {}}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}}, {obj: {bar: 1}}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}}, {obj: {foo: 1}}, false);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}}, {obj: {foo: 1, bar: 1}}, true);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}},
+    {obj: 1},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}},
+    {obj: {}},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}},
+    {obj: {bar: 1}},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}},
+    {obj: {foo: 1}},
+    false,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: {required: ["bar"]}}}}},
+    {obj: {foo: 1, bar: 1}},
+    true,
+);
 
 // Nested property dependency.
 assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: ["bar"]}}}}, {}, true);
 assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: ["bar"]}}}}, {obj: 1}, true);
 assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: ["bar"]}}}}, {obj: {}}, true);
 assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: ["bar"]}}}}, {obj: {bar: 1}}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: ["bar"]}}}}, {obj: {foo: 1}}, false);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {foo: ["bar"]}}}}, {obj: {foo: 1, bar: 1}}, true);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: ["bar"]}}}},
+    {obj: {foo: 1}},
+    false,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {foo: ["bar"]}}}},
+    {obj: {foo: 1, bar: 1}},
+    true,
+);
 
 // Nested property dependency and nested schema dependency.
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}}, {}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}}, {obj: 1}, true);
-assertSchemaMatch(coll, {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}}, {obj: {}}, true);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}},
+    {},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}},
+    {obj: 1},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}},
+    {obj: {}},
+    true,
+);
 assertSchemaMatch(
     coll,
     {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}},

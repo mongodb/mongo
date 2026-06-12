@@ -15,7 +15,9 @@ function performRandomSplitChunks(st, collFullName, maxNumSplits) {
         if (st.config.chunks.find({"min": {x: NumberLong(splitPoint)}}).count() != 0) {
             continue;
         }
-        assert.commandWorked(st.s.adminCommand({split: collFullName, middle: {x: NumberLong(splitPoint)}}));
+        assert.commandWorked(
+            st.s.adminCommand({split: collFullName, middle: {x: NumberLong(splitPoint)}}),
+        );
     }
 }
 
@@ -51,7 +53,11 @@ function performRandomMoveChunks(st, collFullName) {
         const chunks = st.config.chunks.find({"uuid": collUuid}).sort({min: 1}).toArray();
         const chunk = chunks[Math.floor(Math.random() * chunks.length)];
         assert.commandWorked(
-            st.s.adminCommand({moveChunk: collFullName, find: chunk.min, to: getOppositeShard(chunk.shard)}),
+            st.s.adminCommand({
+                moveChunk: collFullName,
+                find: chunk.min,
+                to: getOppositeShard(chunk.shard),
+            }),
         );
     }
 }
@@ -69,7 +75,10 @@ function assertChunksConsistency(chunksColl) {
                 {"onCurrentShardSince": {$exists: 1}},
                 {
                     $expr: {
-                        $eq: ["$onCurrentShardSince", {$getField: {field: "validAfter", input: {$first: "$history"}}}],
+                        $eq: [
+                            "$onCurrentShardSince",
+                            {$getField: {field: "validAfter", input: {$first: "$history"}}},
+                        ],
                     },
                 },
             ],
@@ -106,7 +115,10 @@ function moveAndMergeChunksTest(st, testDB) {
         const lastChunk = chunks[lastChunkToMergeIndex];
 
         assert.commandWorked(
-            st.s.adminCommand({mergeChunks: coll.getFullName(), bounds: [firstChunk.min, lastChunk.max]}),
+            st.s.adminCommand({
+                mergeChunks: coll.getFullName(),
+                bounds: [firstChunk.min, lastChunk.max],
+            }),
         );
     }
 

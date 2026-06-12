@@ -44,7 +44,9 @@ function runTest({shardKey, cmdObj}) {
     // Drop and shard the collection with 'mongos0' as the router.
     assert(mongos0.getCollection(collName).drop());
     assert.commandWorked(
-        mongos0.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+        mongos0.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
     assert.commandWorked(
         st.s0.adminCommand({
@@ -57,7 +59,10 @@ function runTest({shardKey, cmdObj}) {
     // is part of the shard key.
     const middle = shardKeyHasMetaField ? {meta: 1} : {"meta.a": 1};
     assert.commandWorked(
-        mongos0.adminCommand({split: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`, middle}),
+        mongos0.adminCommand({
+            split: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`,
+            middle,
+        }),
     );
 
     const primaryShard = st.getPrimaryShard(dbName);
@@ -79,7 +84,9 @@ function runTest({shardKey, cmdObj}) {
     // Drop and recreate an unsharded collection with 'mongos0' as the router.
     assert(mongos0.getCollection(collName).drop());
     assert.commandWorked(
-        mongos0.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+        mongos0.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
 
     assert.commandWorked(mongos1.runCommand(cmdObj));

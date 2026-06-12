@@ -59,7 +59,10 @@ assert.commandFailedWithCode(
 );
 
 jsTestLog("Test that you can't run delete on a prepared transaction.");
-let res = assert.commandFailedWithCode(sessionColl.remove({_id: 4}), ErrorCodes.PreparedTransactionInProgress);
+let res = assert.commandFailedWithCode(
+    sessionColl.remove({_id: 4}),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 jsTestLog("Test that you can't run distinct on a prepared transaction.");
@@ -99,11 +102,17 @@ assert.commandFailedWithCode(
 );
 
 jsTestLog("Test that you can't insert on a prepared transaction.");
-res = assert.commandFailedWithCode(sessionColl.insert({_id: 5}), ErrorCodes.PreparedTransactionInProgress);
+res = assert.commandFailedWithCode(
+    sessionColl.insert({_id: 5}),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 jsTestLog("Test that you can't run update on a prepared transaction.");
-res = assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}), ErrorCodes.PreparedTransactionInProgress);
+res = assert.commandFailedWithCode(
+    sessionColl.update({_id: 4}, {a: 1}),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandWorked(session.abortTransaction_forTesting());
 

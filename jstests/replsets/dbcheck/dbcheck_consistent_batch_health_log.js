@@ -32,7 +32,8 @@ const db = primary.getDB(dbName);
 const secondarydb = secondary.getDB(dbName);
 
 // Only run this test for debug=off, because we log all batches in debug builds.
-const debugBuild = db.adminCommand("buildInfo").debug || secondarydb.adminCommand("buildInfo").debug;
+const debugBuild =
+    db.adminCommand("buildInfo").debug || secondarydb.adminCommand("buildInfo").debug;
 if (debugBuild) {
     jsTestLog("Skipping the test because debug is on.");
     replSet.stopSet();
@@ -84,7 +85,9 @@ function healthLogConsistent(params) {
             return map;
         }, {});
 
-    jsTestLog(`Verifying that batch healthlog entries should be the same across nodes. Params: ${tojson(params)}`);
+    jsTestLog(
+        `Verifying that batch healthlog entries should be the same across nodes. Params: ${tojson(params)}`,
+    );
     jsTestLog(`Primary health log: ${tojson(primaryHealthLogs)}`);
     assert.eq(
         tojson(primaryHealthLogs),

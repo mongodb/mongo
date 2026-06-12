@@ -15,7 +15,10 @@ try {
         assert.commandWorked(coll.createIndex({"x": 1}));
 
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: {activationProbability: 0.1}}),
+            db.adminCommand({
+                configureFailPoint: "WTWriteConflictException",
+                mode: {activationProbability: 0.1},
+            }),
         );
 
         // Will blow up if writeConflictRetry causes duplicate fields to be appended to result
@@ -36,8 +39,12 @@ try {
             assert.eq(oldRes, newRes);
         }
 
-        assert.commandWorked(db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}),
+        );
     }
 } finally {
-    assert.commandWorked(db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}),
+    );
 }

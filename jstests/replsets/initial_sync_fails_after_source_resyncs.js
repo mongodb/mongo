@@ -10,7 +10,11 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "initial_sync_fails_after_source_resyncs";
-const rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0, votes: 0}}], useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
+    useBridge: true,
+});
 const nodes = rst.startSet();
 rst.initiate();
 
@@ -32,7 +36,10 @@ const initialSyncNode = rst.add({
         // that instead.
         "failpoint.hangBeforeStartingOplogFetcher": tojson({mode: "alwaysOn"}),
         "numInitialSyncAttempts": 1,
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: initialSyncSource.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: initialSyncSource.host},
+        }),
     },
 });
 rst.reInitiate();
@@ -52,10 +59,17 @@ const failPointData = {
     nss: "test.test",
 };
 // Set us up to stop right before the given stage.
-const beforeStageFailPoint = configureFailPoint(initialSyncNodeDb, "hangBeforeClonerStage", failPointData);
+const beforeStageFailPoint = configureFailPoint(
+    initialSyncNodeDb,
+    "hangBeforeClonerStage",
+    failPointData,
+);
 // Release the initial failpoint.
 assert.commandWorked(
-    initialSyncNodeDb.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNodeDb.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 beforeStageFailPoint.wait();
 
@@ -76,10 +90,15 @@ assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
 
 // Release the initial sync source and sync node oplog fetcher so the test completes.
 assert.commandWorked(
-    initialSyncNodeDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+    initialSyncNodeDb.adminCommand({
+        configureFailPoint: "hangBeforeStartingOplogFetcher",
+        mode: "off",
+    }),
 );
 assert.commandWorked(
-    initialSyncSource.getDB("admin").adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+    initialSyncSource
+        .getDB("admin")
+        .adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
 );
 
 // We need to turn off the above failpoints before this one, otherwise the server may already have

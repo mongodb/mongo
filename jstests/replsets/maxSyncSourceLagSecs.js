@@ -25,7 +25,11 @@ let secondaries = replTest.getSecondaries();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 replTest.awaitReplication();
@@ -43,7 +47,9 @@ printjson(replTest.status());
 // so that the shouldChangeSyncSource logic goes into effect
 sleep(4000);
 
-jsTestLog("Lock secondary 1 and add some docs. Force sync target for secondary 2 to change to primary");
+jsTestLog(
+    "Lock secondary 1 and add some docs. Force sync target for secondary 2 to change to primary",
+);
 assert.commandWorked(secondaries[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
 
 assert.soon(
@@ -60,7 +66,10 @@ assert.soon(
 printjson(replTest.status());
 
 assert.soon(function () {
-    return secondaries[1].getDB("foo").bar.count({a: 1}) > 0 && secondaries[1].getDB("foo").bar.count({a: 2}) > 0;
+    return (
+        secondaries[1].getDB("foo").bar.count({a: 1}) > 0 &&
+        secondaries[1].getDB("foo").bar.count({a: 2}) > 0
+    );
 }, "secondary should have caught up after syncing to primary.");
 
 assert.commandWorked(secondaries[0].getDB("admin").fsyncUnlock());

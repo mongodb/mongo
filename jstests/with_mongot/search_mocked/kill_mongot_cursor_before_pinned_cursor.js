@@ -82,7 +82,9 @@ const history = [
     },
 ];
 
-assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+);
 
 // Launch a blocked search query.
 let thread = new Thread(
@@ -133,6 +135,8 @@ MongoRunner.stopMongod(conn);
 thread.join();
 // Now turn off the fail point and let the $search queries complete.
 assert.commandWorked(
-    mongotmock.getConnection().adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}),
+    mongotmock
+        .getConnection()
+        .adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}),
 );
 mongotmock.stop();

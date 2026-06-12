@@ -30,7 +30,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const targetFCV = fcvValues[Random.randInt(2)];
         jsTest.log.info("Executing FCV state, setting to:" + targetFCV);
         try {
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+            );
         } catch (e) {
             if (handleRandomSetFCVErrors(e, targetFCV)) return;
             throw e;
@@ -51,7 +53,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             10778001,
         );
 
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
         $super.teardown.apply(this, arguments);
     };
 

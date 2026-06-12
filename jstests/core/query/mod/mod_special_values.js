@@ -51,7 +51,12 @@ for (const value of ["NaN", "+Inf", "1e19"]) {
 
 // Tests for dividend parameter.
 // Double dividend value is too large.
-testCases.push({inputDocuments: [{attribute: -1e19}], divisor: 1, remainder: 0, expectedResults: []});
+testCases.push({
+    inputDocuments: [{attribute: -1e19}],
+    divisor: 1,
+    remainder: 0,
+    expectedResults: [],
+});
 
 // Decimal dividend value is too large.
 testCases.push({
@@ -95,4 +100,6 @@ testCases.push({
     expectedResults: [],
 });
 
-testCases.forEach((testCase, testCaseIdx) => executeTestCase(testDB.getCollection("coll" + testCaseIdx), testCase));
+testCases.forEach((testCase, testCaseIdx) =>
+    executeTestCase(testDB.getCollection("coll" + testCaseIdx), testCase),
+);

@@ -31,9 +31,15 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}
 assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: shard1.shardName}));
 assert.commandWorked(st.s.getDB(dbName).foreign.insert({_id: 1, x: 1}));
 
-const originalMongosMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
-const originalShard0Metrics = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1})).transactions;
-const originalShard1Metrics = assert.commandWorked(st.shard1.adminCommand({serverStatus: 1})).transactions;
+const originalMongosMetrics = assert.commandWorked(
+    st.s.adminCommand({serverStatus: 1}),
+).transactions;
+const originalShard0Metrics = assert.commandWorked(
+    st.shard0.adminCommand({serverStatus: 1}),
+).transactions;
+const originalShard1Metrics = assert.commandWorked(
+    st.shard1.adminCommand({serverStatus: 1}),
+).transactions;
 
 // Refresh the routing information for the foreign collection in shard0 before running the checks.
 st.s
@@ -56,7 +62,9 @@ let fp = configureFailPoint(st.shard0, "restoreLocksFail");
 let err = assert.throwsWithCode(() => {
     sessionDB
         .getCollection(localColl)
-        .aggregate([{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
+        .aggregate([
+            {$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}},
+        ]);
 }, ErrorCodes.LockTimeout);
 assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
@@ -72,7 +80,10 @@ const mongosMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1}))
 assert.gte(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
 assert.gte(mongosMetrics.currentOpen, 0);
 assert.gte(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
-assert.gte(mongosMetrics.totalContactedParticipants, originalMongosMetrics.totalContactedParticipants + 1);
+assert.gte(
+    mongosMetrics.totalContactedParticipants,
+    originalMongosMetrics.totalContactedParticipants + 1,
+);
 
 const shard0Metrics = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1})).transactions;
 assert.gte(shard0Metrics.totalStarted, originalShard0Metrics.totalStarted + 1);
@@ -87,7 +98,13 @@ assert.eq(shard1Metrics.totalAborted, 0);
 session.abortTransaction();
 
 // TODO(SLS-1414): Remove once DSC supports graceful stepdown.
-if (PersistenceProviderUtil.allNodesHavePropertyWithValue(st.shard1, "supportsLocalCollections", false)) {
+if (
+    PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        st.shard1,
+        "supportsLocalCollections",
+        false,
+    )
+) {
     jsTest.log.info("Manually killing the session as graceful stepdown is not supported in DSC");
     assert.commandWorked(st.shard1.adminCommand({killSessions: [{id: session.getSessionId().id}]}));
 }

@@ -26,7 +26,9 @@ if (Array.contains(storageEngines, "wiredTiger")) {
         assert.eq(info.options.storageEngine.wiredTiger.configString, "block_compressor=zlib");
     }
 
-    assert.commandWorked(db.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}),
+    );
     db.createCollection("sharding_system_namespaces", {
         storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}},
     });
@@ -44,7 +46,9 @@ if (Array.contains(storageEngines, "wiredTiger")) {
 
     let primaryShard = st.getPrimaryShard("test");
     let anotherShard = st.getOther(primaryShard);
-    assert.commandWorked(db.adminCommand({movechunk: coll + "", find: {x: 5}, to: anotherShard.name}));
+    assert.commandWorked(
+        db.adminCommand({movechunk: coll + "", find: {x: 5}, to: anotherShard.name}),
+    );
 
     st.printShardingStatus();
 

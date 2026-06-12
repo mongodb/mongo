@@ -49,12 +49,18 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
     this.createAdminUser = (conn) => {
         const directConnection = conn.getDB("admin");
         directConnection.createUser({user: "admin", pwd: "x", roles: ["root"]});
-        assert(directConnection.auth("admin", "x"), "Authentication admin user failed when creating admin user");
+        assert(
+            directConnection.auth("admin", "x"),
+            "Authentication admin user failed when creating admin user",
+        );
         directConnection.logout();
     };
 
     this.createRegularUser = (conn) => {
-        assert(conn.getDB("admin").auth("admin", "x"), "Authentication admin user failed when creating regular user");
+        assert(
+            conn.getDB("admin").auth("admin", "x"),
+            "Authentication admin user failed when creating regular user",
+        );
         conn.getDB("admin").createUser({user: "user", pwd: "y", roles: ["clusterAdmin"]});
         conn.getDB("admin").logout();
     };
@@ -63,7 +69,10 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
         // Creating connections to main and priority port, as well as priority unix
         // socket if not on Windows system
         const connToMainPort = new Mongo(conn.host);
-        assert(connToMainPort.getDB("admin").auth("user", "y"), "Authentication on main port for regular user failed");
+        assert(
+            connToMainPort.getDB("admin").auth("user", "y"),
+            "Authentication on main port for regular user failed",
+        );
 
         const connToPriorityPort = rs
             ? rs.getNewConnectionToPriorityPort(conn)
@@ -87,11 +96,16 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
         */
 
         const exemptConn = new Mongo(`mongodb://${conn.host}/?appName=${this.exemptAppName}`);
-        assert(exemptConn.getDB("admin").auth("admin", "x"), "Authentication admin user failed on exempt connection");
+        assert(
+            exemptConn.getDB("admin").auth("admin", "x"),
+            "Authentication admin user failed on exempt connection",
+        );
 
         // Enable ingress request rate limiter (increasing the exemptedAdmissions metric counter by 1)
         assert.commandWorked(
-            exemptConn.getDB("admin").adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: true}),
+            exemptConn
+                .getDB("admin")
+                .adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: true}),
         );
         jsTest.log.info("Enabled ingress request rate limiter");
 
@@ -109,21 +123,32 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
                         " to main port rate limited as expected",
                 );
             } else {
-                jsTest.log.info("Request number " + (i + 1) + "/" + this.maxBurstRequests + " to main port successful");
+                jsTest.log.info(
+                    "Request number " +
+                        (i + 1) +
+                        "/" +
+                        this.maxBurstRequests +
+                        " to main port successful",
+                );
             }
         }
 
         // Store the amount of exempted admissions before making requests to priority port
         const initialStatus = exemptConn.adminCommand({serverStatus: 1});
         assert(initialStatus, "Failed to get initial server status");
-        const initialExemptedAdmissions = initialStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
+        const initialExemptedAdmissions =
+            initialStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
 
         // Test that when hitting the ingress request rate limiting, connections to the
         // priority port through TCP and unix socket are exempted from rate limiting
         for (let i = 0; i < this.priorityPortRequests; i++) {
             assert.commandWorked(connToPriorityPort.getDB("admin").runCommand({ping: 1}));
             jsTest.log.info(
-                "Request number " + (i + 1) + "/" + this.priorityPortRequests + " to priority port successful",
+                "Request number " +
+                    (i + 1) +
+                    "/" +
+                    this.priorityPortRequests +
+                    " to priority port successful",
             );
         }
 
@@ -146,7 +171,8 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
         // Check that the exemptedAdmissions metric is consistent
         const finalStatus = exemptConn.adminCommand({serverStatus: 1});
         assert(finalStatus, "Failed to get final server status");
-        const finalExemptedAdmissions = finalStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
+        const finalExemptedAdmissions =
+            finalStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
         jsTest.log.info("Final ingress request rate limiter stats: " + finalExemptedAdmissions);
         assert(finalExemptedAdmissions - initialExemptedAdmissions >= this.priorityPortRequests);
 
@@ -161,7 +187,9 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
 
         // Disable ingress rate limiter
         assert.commandWorked(
-            exemptConn.getDB("admin").adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: false}),
+            exemptConn
+                .getDB("admin")
+                .adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: false}),
         );
         jsTest.log.info("Disabled ingress request rate limiter");
 
@@ -207,7 +235,13 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
             shards: 1,
             mongos: 2,
             usePriorityPorts: true,
-            other: {keyFile: this.keyFile, auth: "", mongosOptions: opts, rsOptions: opts, configOptions: opts},
+            other: {
+                keyFile: this.keyFile,
+                auth: "",
+                mongosOptions: opts,
+                rsOptions: opts,
+                configOptions: opts,
+            },
         });
 
         jsTest.log.info("Creating users for config server");

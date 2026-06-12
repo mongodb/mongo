@@ -73,7 +73,11 @@ function runTestWithoutSubset(client) {
     if (!clientSupportsTLS1_3() && client === "TLS1_3") {
         // If the runtime environment does not support TLS 1.3, a client cannot connect to a
         // server if TLS 1.3 is its only usable protocol version.
-        assert.neq(0, exitStatus, "A client which does not support TLS 1.3 should not be able to connect with it");
+        assert.neq(
+            0,
+            exitStatus,
+            "A client which does not support TLS 1.3 should not be able to connect with it",
+        );
         MongoRunner.stopMongod(conn);
         return;
     }

@@ -24,7 +24,9 @@ const coll = testDb.getCollection(collName);
 assert.commandWorked(coll.insert({a: 1}));
 
 rollbackTest.awaitLastOpCommitted();
-assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 assert.commandWorked(coll.insert({bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: 1}));
 assert.commandWorked(coll.insert({cccccccccccccccccccccccccccccccccccccccccccc: 1}));
@@ -40,7 +42,9 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations();
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}),
+    );
 }
 
 // The fast count checks occur when tearing down the fixture as part of the consistency checks.

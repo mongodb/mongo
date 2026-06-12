@@ -24,7 +24,9 @@ assert.commandFailedWithCode(
                 $setWindowFields: {
                     partitionBy: "$arr",
                     sortBy: {_id: 1},
-                    output: {a: {$sum: "$int_field", window: {documents: ["unbounded", "current"]}}},
+                    output: {
+                        a: {$sum: "$int_field", window: {documents: ["unbounded", "current"]}},
+                    },
                 },
             },
         ],

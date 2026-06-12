@@ -13,7 +13,10 @@ let runCheckOnReplSet = function (db) {
     let adminDB = db.getSiblingDB("admin");
     let primaryInfo = adminDB.isMaster();
 
-    assert(primaryInfo.ismaster, "shell is not connected to the primary or master node: " + tojson(primaryInfo));
+    assert(
+        primaryInfo.ismaster,
+        "shell is not connected to the primary or master node: " + tojson(primaryInfo),
+    );
 
     let testFixture = new ReplSetTest(db.getMongo().host);
     testFixture.checkPreImageCollection("Pre-image consistency");

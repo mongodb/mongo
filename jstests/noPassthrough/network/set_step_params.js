@@ -37,9 +37,9 @@ const primaryOnly = [primary.name];
 let threads = [];
 let currentCheckNum = 0;
 
-const numPools = assert.commandWorked(mongos.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}))[
-    "taskExecutorPoolSize"
-];
+const numPools = assert.commandWorked(
+    mongos.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}),
+)["taskExecutorPoolSize"];
 
 function updateSetParameters(params) {
     let cmd = Object.assign({"setParameter": 1}, params);
@@ -106,16 +106,31 @@ runSubTest("MaxSize", function () {
 
     // Launch 10 blocked finds
     launchFinds(mongos, threads, {times: 10, readPref: "primary"});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {active: 10, hosts: primaryOnly}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {active: 10, hosts: primaryOnly},
+        currentCheckNum,
+    );
 
     // Increase by 5 and Launch another 4 blocked finds
     updateSetParameters({ShardingTaskExecutorPoolMaxSize: 15});
     launchFinds(mongos, threads, {times: 4, readPref: "primary"});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {active: 14, hosts: primaryOnly}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {active: 14, hosts: primaryOnly},
+        currentCheckNum,
+    );
 
     // Launch yet another 2, these should add only 1 connection
     launchFinds(mongos, threads, {times: 2, readPref: "primary"});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {active: 15, hosts: primaryOnly}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {active: 15, hosts: primaryOnly},
+        currentCheckNum,
+    );
 
     fpRs.off();
     currentCheckNum = assertHasConnPoolStats(
@@ -151,24 +166,46 @@ runSubTest("MaxConnecting", function () {
         shouldCheckForInterrupt: true,
         nss: kDbName + ".test",
     });
-    const fpHelloRs = configureFailPointForRS(st.rs0.nodes, "shardWaitInHello", {shouldCheckForInterrupt: true});
+    const fpHelloRs = configureFailPointForRS(st.rs0.nodes, "shardWaitInHello", {
+        shouldCheckForInterrupt: true,
+    });
     dropConnections();
 
     // Go to the limit of maxConnecting, so we're stuck here
     launchFinds(mongos, threads, {times: maxPending1, readPref: "primary"});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {pending: maxPending1}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {pending: maxPending1},
+        currentCheckNum,
+    );
 
     // More won't run right now
     launchFinds(mongos, threads, {times: conns - maxPending1, readPref: "primary"});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {pending: maxPending1}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {pending: maxPending1},
+        currentCheckNum,
+    );
 
     // If we increase our limit, it should fill in some of the connections
     updateSetParameters({ShardingTaskExecutorPoolMaxConnecting: maxPending2});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {pending: maxPending2}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {pending: maxPending2},
+        currentCheckNum,
+    );
 
     // Dropping the limit doesn't cause us to drop pending
     updateSetParameters({ShardingTaskExecutorPoolMaxConnecting: maxPending1});
-    currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {pending: maxPending2}, currentCheckNum);
+    currentCheckNum = assertHasConnPoolStats(
+        mongos,
+        allHosts,
+        {pending: maxPending2},
+        currentCheckNum,
+    );
 
     // Release our pending and walk away
     fpHelloRs.off();
@@ -222,7 +259,9 @@ runSubTest("Timeouts", function () {
     currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {ready: conns}, currentCheckNum);
 
     // Block refreshes and wait for the toRefresh timeout
-    const fpHelloRs = configureFailPointForRS(st.rs0.nodes, "shardWaitInHello", {shouldCheckForInterrupt: true});
+    const fpHelloRs = configureFailPointForRS(st.rs0.nodes, "shardWaitInHello", {
+        shouldCheckForInterrupt: true,
+    });
     sleep(toRefreshTimeoutMS);
 
     // Confirm that we're in pending for all of our conns

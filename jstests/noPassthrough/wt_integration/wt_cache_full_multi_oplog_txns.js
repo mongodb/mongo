@@ -52,7 +52,11 @@ const batchOpsLimit = assert.commandWorked(
     secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}),
 ).replBatchLimitOperations;
 jsTestLog(
-    "Oplog application on secondary " + secondary.host + " is limited to " + batchOpsLimit + " operations per batch.",
+    "Oplog application on secondary " +
+        secondary.host +
+        " is limited to " +
+        batchOpsLimit +
+        " operations per batch.",
 );
 
 jsTestLog("Buffering " + numUpdates + " updates to " + numDocs + " documents on secondary.");

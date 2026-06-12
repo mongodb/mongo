@@ -23,7 +23,11 @@ const fqTestRoleName = {
 const testRolePrivs = [{resource: {db: dbname, collection: ""}, actions: ["insert"]}];
 const testRoleRoles = [fqReadRoleName];
 assert.commandWorked(
-    db.runCommand({createRole: "testRoleJSCoreRolesInfo", privileges: testRolePrivs, roles: testRoleRoles}),
+    db.runCommand({
+        createRole: "testRoleJSCoreRolesInfo",
+        privileges: testRolePrivs,
+        roles: testRoleRoles,
+    }),
 );
 
 function matchRoleFn(match) {
@@ -44,7 +48,10 @@ function requireNoRole(roleSet, role) {
 function checkForUserDefinedRole(roleSet, expectPrivs) {
     const role = requireRole(roleSet, fqTestRoleName);
     if (expectPrivs) {
-        assert(bsonWoCompare(role.privileges, testRolePrivs) === 0, "Unexpected privileges in: " + tojson(role));
+        assert(
+            bsonWoCompare(role.privileges, testRolePrivs) === 0,
+            "Unexpected privileges in: " + tojson(role),
+        );
     } else {
         assert(role.privileges === undefined, "Unexpected privileges in: " + tojson(role));
     }
@@ -75,7 +82,10 @@ function rolesInfoSingle(query, extra = {}) {
 
 // {rolesInfo: 1, showBuiltinRoles: true, showPrivileges: true}
 const allRoles = rolesInfo(1, {showBuiltinRoles: true, showPrivileges: true});
-allRoles.forEach((r) => assert(r.isBuiltin !== undefined), "Role must have 'isBuiltin' property for DB query");
+allRoles.forEach(
+    (r) => assert(r.isBuiltin !== undefined),
+    "Role must have 'isBuiltin' property for DB query",
+);
 checkForUserDefinedRole(allRoles, true);
 checkForBuiltinRole(allRoles, fqReadRoleName);
 requireNoRole(allRoles, {role: "doesNotExist", db: dbname});

@@ -40,7 +40,9 @@ function testFCVChange({fcvDoc, expectConnectionClosed = true} = {}) {
         // (on commands that accept read/write concern), this test must be careful to mimic this
         // behavior.
         if (expectConnectionClosed) {
-            const e = assert.throws(() => testDB.runCommand({find: "coll", readConcern: {level: "local"}}));
+            const e = assert.throws(() =>
+                testDB.runCommand({find: "coll", readConcern: {level: "local"}}),
+            );
             assert.includes(e.toString(), "network error while attempting to run command");
         } else {
             assert.commandWorked(testDB.runCommand({find: "coll", readConcern: {level: "local"}}));
@@ -56,7 +58,9 @@ function testFCVChange({fcvDoc, expectConnectionClosed = true} = {}) {
     findCmdFailPoint.wait();
 
     jsTestLog("Updating featureCompatibilityVersion document to: " + tojson(fcvDoc));
-    assert.commandWorked(adminDB.system.version.update({_id: "featureCompatibilityVersion"}, fcvDoc));
+    assert.commandWorked(
+        adminDB.system.version.update({_id: "featureCompatibilityVersion"}, fcvDoc),
+    );
 
     jsTestLog("Turning off waitInFindBeforeMakingBatch failpoint");
     findCmdFailPoint.off();

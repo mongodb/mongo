@@ -17,7 +17,9 @@ runOplogSyncAggAssertMinOplogTest({
     setupCollection(testDB, testColl) {
         // Create a timeseries collection with a non-"meta" metaField name to exercise the shard
         // key translation path (user-facing field -> internal bucket field).
-        assert.commandWorked(testDB.createCollection("foo", {timeseries: {timeField: "ts", metaField: "sensorId"}}));
+        assert.commandWorked(
+            testDB.createCollection("foo", {timeseries: {timeField: "ts", metaField: "sensorId"}}),
+        );
     },
     findAnchorOplogEntry(localDb, testColl, lastBeforeTs) {
         // Find the first bucket oplog entry written by our inserts. In viewless timeseries

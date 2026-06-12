@@ -18,7 +18,11 @@ let dbpath = MongoRunner.dataPath + baseName + "/";
 
 // Test framework will append --storageEngine command line option.
 let mongod = MongoRunner.runMongod({dbpath: dbpath});
-assert.neq(0, getMongodLockFileSize(dbpath), "mongod.lock should not be empty while server is running");
+assert.neq(
+    0,
+    getMongodLockFileSize(dbpath),
+    "mongod.lock should not be empty while server is running",
+);
 
 MongoRunner.stopMongod(mongod);
 

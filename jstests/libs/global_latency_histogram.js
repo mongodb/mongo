@@ -62,7 +62,14 @@ export function runTests(getHistogramStats, testDB, testColl, isMongos) {
     for (var i = 0; i < numRecords - 1; i++) {
         cursors[i].close();
     }
-    lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, numRecords - 1);
+    lastHistogram = checkHistogramDiff(
+        getHistogramStats,
+        lastHistogram,
+        testDB,
+        0,
+        0,
+        numRecords - 1,
+    );
 
     // Remove
     for (var i = 0; i < numRecords; i++) {
@@ -137,7 +144,9 @@ export function runTests(getHistogramStats, testDB, testColl, isMongos) {
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, 1);
 
     // CollMod
-    assert.commandWorked(testDB.runCommand({collStats: testColl.getName(), validationLevel: "off"}));
+    assert.commandWorked(
+        testDB.runCommand({collStats: testColl.getName(), validationLevel: "off"}),
+    );
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, 1);
 
     // Compact

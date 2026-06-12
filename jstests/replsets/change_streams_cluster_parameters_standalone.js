@@ -26,7 +26,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
         assert.commandWorked(
             primary.getDB("admin").runCommand({
                 setClusterParameter: {
-                    changeStreamOptions: {preAndPostImages: {expireAfterSeconds: kExpireAfterSeconds}},
+                    changeStreamOptions: {
+                        preAndPostImages: {expireAfterSeconds: kExpireAfterSeconds},
+                    },
                 },
             }),
         );
@@ -35,9 +37,18 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
         replicaSet.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
-        const primaryStandalone = MongoRunner.runMongod({dbpath: primary.dbpath, noReplSet: true, noCleanData: true});
+        const primaryStandalone = MongoRunner.runMongod({
+            dbpath: primary.dbpath,
+            noReplSet: true,
+            noCleanData: true,
+        });
 
-        assert.eq(primaryStandalone.getDB("config").clusterParameters.countDocuments({_id: "changeStreamOptions"}), 1);
+        assert.eq(
+            primaryStandalone
+                .getDB("config")
+                .clusterParameters.countDocuments({_id: "changeStreamOptions"}),
+            1,
+        );
 
         MongoRunner.stopMongod(primaryStandalone);
 

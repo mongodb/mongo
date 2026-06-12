@@ -4,7 +4,11 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testReadLoadBalancing(numReplicas) {
-    let s = new ShardingTest({shards: {rs0: {nodes: numReplicas}}, verbose: 2, other: {chunkSize: 1}});
+    let s = new ShardingTest({
+        shards: {rs0: {nodes: numReplicas}},
+        verbose: 2,
+        other: {chunkSize: 1},
+    });
 
     s.adminCommand({enablesharding: "test"});
     s.config.settings.find().forEach(printjson);
@@ -61,7 +65,10 @@ function testReadLoadBalancing(numReplicas) {
         assert.eq(
             10,
             profileCollection.find(profileCriteria).count(),
-            "Wrong number of read queries sent to secondary " + i + " " + tojson(profileCollection.find().toArray()),
+            "Wrong number of read queries sent to secondary " +
+                i +
+                " " +
+                tojson(profileCollection.find().toArray()),
         );
     }
 

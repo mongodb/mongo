@@ -108,8 +108,12 @@ assert.commandFailed(testDb.createCollection("collation", {collation: {}}));
 assert.commandFailed(testDb.createCollection("collation", {collation: {blah: 1}}));
 assert.commandFailed(testDb.createCollection("collation", {collation: {locale: "en", blah: 1}}));
 assert.commandFailed(testDb.createCollection("collation", {collation: {locale: "xx"}}));
-assert.commandFailed(testDb.createCollection("collation", {collation: {locale: "en", strength: 99}}));
-assert.commandFailed(testDb.createCollection("collation", {collation: {locale: "en", strength: 9.9}}));
+assert.commandFailed(
+    testDb.createCollection("collation", {collation: {locale: "en", strength: 99}}),
+);
+assert.commandFailed(
+    testDb.createCollection("collation", {collation: {locale: "en", strength: 9.9}}),
+);
 
 // Attempting to create a collection whose collation version does not match the collator version
 // produced by ICU should result in failure with a special error code.
@@ -393,13 +397,18 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
-assert.eq(1, coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "en_US", strength: 2}}).itcount());
+assert.eq(
+    1,
+    coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "en_US", strength: 2}}).itcount(),
+);
 
 // Aggregation should return correct results when no collation specified and collection has a
 // default collation.
 coll = testDb.collation_agg3;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(1, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
 
@@ -407,7 +416,9 @@ assert.eq(1, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
 // has a default collation.
 coll = testDb.collation_agg4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "simple"}}).itcount());
 
@@ -459,7 +470,9 @@ assert.eq(1, coll.count({str: "FOO"}, {collation: {locale: "en_US", strength: 2}
 // collation.
 coll = testDb.collation_count3;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(1, coll.find({str: "FOO"}).count());
 
@@ -467,7 +480,9 @@ assert.eq(1, coll.find({str: "FOO"}).count());
 // default collation.
 coll = testDb.collation_count4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.eq(0, coll.find({str: "FOO"}).collation({locale: "simple"}).count());
 
@@ -481,7 +496,11 @@ assert.commandWorked(explainRes);
 planStage = getPlanStage(explainRes.executionStats.executionStages, "COLLSCAN");
 assert.neq(null, planStage);
 assert.eq(0, planStage.advanced);
-explainRes = coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US", strength: 2}).count();
+explainRes = coll
+    .explain("executionStats")
+    .find({str: "FOO"})
+    .collation({locale: "en_US", strength: 2})
+    .count();
 assert.commandWorked(explainRes);
 planStage = getPlanStage(explainRes.executionStats.executionStages, "COLLSCAN");
 assert.neq(null, planStage);
@@ -560,7 +579,10 @@ let res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
 assert.eq(1, res.length);
 assert.eq("foo", res[0].toLowerCase());
 assert.eq(2, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 3}}).length);
-assert.eq(2, coll.distinct("_id", {str: "foo"}, {collation: {locale: "en_US", strength: 2}}).length);
+assert.eq(
+    2,
+    coll.distinct("_id", {str: "foo"}, {collation: {locale: "en_US", strength: 2}}).length,
+);
 
 // Distinct should return correct results when collation specified and compatible index exists.
 coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}});
@@ -573,7 +595,9 @@ assert.eq(2, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 3}
 // default collation.
 coll = testDb.collation_distinct3;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.commandWorked(coll.insert({str: "FOO"}));
 assert.eq(1, coll.distinct("str").length);
@@ -583,7 +607,9 @@ assert.eq(2, coll.distinct("_id", {str: "foo"}).length);
 // default collation.
 coll = testDb.collation_distinct4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.commandWorked(coll.insert({str: "FOO"}));
 assert.eq(2, coll.distinct("str", {}, {collation: {locale: "simple"}}).length);
@@ -604,7 +630,9 @@ assert(distinctScanPlanHasFetch(getWinningPlanFromExplain(explain.queryPlanner))
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: "foo"}});
 assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "DISTINCT_SCAN"));
 assert(distinctScanPlanHasFetch(getWinningPlanFromExplain(explain.queryPlanner)));
-assert(!planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "PROJECTION_COVERED"));
+assert(
+    !planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "PROJECTION_COVERED"),
+);
 
 // Distinct scan cannot be used over an index with a collation when the predicate has inexact
 // bounds.
@@ -707,7 +735,10 @@ assert.eq(
 
 // Find should return correct results when collation specified and compatible index exists.
 assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
-assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
+assert.eq(
+    1,
+    coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount(),
+);
 
 // Find should return correct results even when the hinted index has a collation which does not
 // match the command. This degrades to a whole ixscan followed by a fetch with residual filter to
@@ -745,9 +776,15 @@ if (!TestData.isHintsToQuerySettingsSuite) {
             },
         ),
     );
-    assert.eq(1, coll.find({str: "foo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
+    assert.eq(
+        1,
+        coll.find({str: "foo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount(),
+    );
     assert.commandWorked(coll.insert({_id: 3, str: "goo"}));
-    assert.eq(0, coll.find({str: "goo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
+    assert.eq(
+        0,
+        coll.find({str: "goo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount(),
+    );
     assert.commandWorked(coll.remove({_id: 3}));
     assert.commandWorked(coll.dropIndexes());
 }
@@ -772,7 +809,12 @@ assert.eq(res.toArray(), [{a: "a"}, {a: "A"}, {a: "b"}, {a: "B"}]);
 // Hinting the incompatible index should not change the result, but we should still see an ixscan.
 res = coll.find({}, {_id: 0}).collation({locale: "en_US", strength: 3}).sort({a: 1}).hint({a: 1});
 assert.eq(res.toArray(), [{a: "a"}, {a: "A"}, {a: "b"}, {a: "B"}]);
-res = coll.find({}, {_id: 0}).collation({locale: "en_US", strength: 3}).sort({a: 1}).hint({a: 1}).explain();
+res = coll
+    .find({}, {_id: 0})
+    .collation({locale: "en_US", strength: 3})
+    .sort({a: 1})
+    .hint({a: 1})
+    .explain();
 assert(isIxscan(testDb, getWinningPlanFromExplain(res.queryPlanner)));
 
 // Find should return correct results when collation specified and query contains $expr.
@@ -791,14 +833,19 @@ assert.eq(
 // collation.
 coll = testDb.collation_find5;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.commandWorked(coll.insert({str: "FOO"}));
 assert.commandWorked(coll.insert({str: "bar"}));
 assert.eq(3, coll.find({str: {$in: ["foo", "bar"]}}).itcount());
 assert.eq(2, coll.find({str: "foo"}).itcount());
 assert.eq(1, coll.find({str: {$ne: "foo"}}).itcount());
-assert.eq([{str: "bar"}, {str: "foo"}, {str: "FOO"}], coll.find({}, {_id: 0, str: 1}).sort({str: 1}).toArray());
+assert.eq(
+    [{str: "bar"}, {str: "foo"}, {str: "FOO"}],
+    coll.find({}, {_id: 0, str: 1}).sort({str: 1}).toArray(),
+);
 
 // Find should return correct results when hinting an index which has a collation that matches the
 // collection default.
@@ -843,7 +890,9 @@ assert.eq(
 // a default collation.
 coll = testDb.collation_find6;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: "foo"}));
 assert.eq(1, coll.find({_id: "FOO"}).itcount());
 
@@ -851,7 +900,9 @@ assert.eq(1, coll.find({_id: "FOO"}).itcount());
 // collection has a default collation.
 coll = testDb.collation_find7;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert([{a: "A"}, {a: "B"}]));
 assert.eq(1, coll.find({$expr: {$eq: ["$a", "a"]}}).itcount());
 
@@ -859,7 +910,9 @@ assert.eq(1, coll.find({$expr: {$eq: ["$a", "a"]}}).itcount());
 // default collation.
 coll = testDb.collation_find8;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({str: "foo"}));
 assert.commandWorked(coll.insert({str: "FOO"}));
 assert.commandWorked(coll.insert({str: "bar"}));
@@ -880,7 +933,9 @@ assert.eq(
 // default collation.
 coll = testDb.collation_find9;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 3}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 3}}),
+);
 assert.commandWorked(coll.insert({_id: "foo"}));
 assert.commandWorked(coll.insert({_id: "FOO"}));
 assert.eq(2, coll.find({_id: "foo"}).collation({locale: "en_US", strength: 2}).itcount());
@@ -899,7 +954,11 @@ if (!isClustered) {
     coll = testDb.collation_find11;
     coll.drop();
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes = coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
+    explainRes = coll
+        .explain("executionStats")
+        .find({_id: "foo"})
+        .collation({locale: "en_US"})
+        .finish();
     assert.commandWorked(explainRes);
     assert(isIdhackOrExpress(testDb, getWinningPlanFromExplain(explainRes.queryPlanner)));
 
@@ -908,7 +967,11 @@ if (!isClustered) {
     coll = testDb.collation_find12;
     coll.drop();
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes = coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
+    explainRes = coll
+        .explain("executionStats")
+        .find({_id: "foo"})
+        .collation({locale: "fr_CA"})
+        .finish();
     assert.commandWorked(explainRes);
     assert(!isIdhackOrExpress(testDb, getWinningPlanFromExplain(explainRes.queryPlanner)));
 }
@@ -957,17 +1020,29 @@ assert(isIxscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 coll = testDb.collation_find17;
 coll.drop();
 assert.commandWorked(coll.insert({str: "foo"}));
-explainRes = coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
+explainRes = coll
+    .explain("executionStats")
+    .find({str: "FOO"})
+    .collation({locale: "en_US"})
+    .finish();
 assert.commandWorked(explainRes);
 assert.eq(0, explainRes.executionStats.nReturned);
-explainRes = coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US", strength: 2}).finish();
+explainRes = coll
+    .explain("executionStats")
+    .find({str: "FOO"})
+    .collation({locale: "en_US", strength: 2})
+    .finish();
 assert.commandWorked(explainRes);
 assert.eq(1, explainRes.executionStats.nReturned);
 
 // Explain of find should include query collation.
 coll = testDb.collation_find18;
 coll.drop();
-explainRes = coll.explain("executionStats").find({str: "foo"}).collation({locale: "fr_CA"}).finish();
+explainRes = coll
+    .explain("executionStats")
+    .find({str: "foo"})
+    .collation({locale: "fr_CA"})
+    .finish();
 assert.commandWorked(explainRes);
 assert.eq(getQueryCollation(explainRes), {
     locale: "fr_CA",
@@ -1005,7 +1080,11 @@ assert.eq(getQueryCollation(explainRes), {
 coll = testDb.collation_find20;
 coll.drop();
 assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "fr_CA"}}));
-explainRes = coll.explain("executionStats").find({str: "foo"}).collation({locale: "fr_CA"}).finish();
+explainRes = coll
+    .explain("executionStats")
+    .find({str: "foo"})
+    .collation({locale: "fr_CA"})
+    .finish();
 assert.commandWorked(explainRes);
 planStage = getPlanStage(getWinningPlanFromExplain(explainRes.queryPlanner), "IXSCAN");
 assert.neq(null, planStage);
@@ -1048,7 +1127,9 @@ assert.eq(planStage.collation, {
 // Queries that have an index with a matching collation should return correctly ordered results.
 coll = testDb.collation_find22;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en", strength: 2}}),
+);
 assert.commandWorked(coll.createIndex({x: 1, y: 1, z: 1}));
 for (let i = 0; i < 10; ++i) {
     assert.commandWorked(coll.insert({_id: i, x: 1, y: 10 - i, z: "str" + (i % 3)}));
@@ -1080,7 +1161,12 @@ coll = testDb.collation_findmodify1;
 coll.drop();
 assert.eq(
     null,
-    coll.findAndModify({query: {str: "bar"}, update: {$set: {str: "baz"}}, new: true, collation: {locale: "fr"}}),
+    coll.findAndModify({
+        query: {str: "bar"},
+        update: {$set: {str: "baz"}},
+        new: true,
+        collation: {locale: "fr"},
+    }),
 );
 
 // Update-findAndModify should return correct results when collation specified.
@@ -1117,7 +1203,11 @@ assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "bar"}));
 assert.eq(
     {_id: 1, str: "foo"},
-    coll.findAndModify({query: {str: "FOO"}, remove: true, collation: {locale: "en_US", strength: 2}}),
+    coll.findAndModify({
+        query: {str: "FOO"},
+        remove: true,
+        collation: {locale: "en_US", strength: 2},
+    }),
 );
 
 // Explain of delete-findAndModify should return correct results when collation specified.
@@ -1135,7 +1225,9 @@ assert.eq(1, planStage.nWouldDelete);
 // default collation.
 coll = testDb.collation_findmodify4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq({_id: 1, str: "foo"}, coll.findAndModify({query: {str: "FOO"}, update: {$set: {x: 1}}}));
 
@@ -1148,8 +1240,14 @@ assert.eq(
 );
 // Case of _id lookup and hint on a collection with collection-default collation.
 assert.commandWorked(coll.createIndex({x: 1}));
-assert.eq({_id: 1, str: "foo", x: 2}, coll.findAndModify({query: {_id: 1}, update: {$inc: {x: 1}}, hint: {x: 1}}));
-assert.eq({_id: 1, str: "foo", x: 3}, coll.findAndModify({query: {_id: 1}, update: {$inc: {x: 1}}, hint: {_id: 1}}));
+assert.eq(
+    {_id: 1, str: "foo", x: 2},
+    coll.findAndModify({query: {_id: 1}, update: {$inc: {x: 1}}, hint: {x: 1}}),
+);
+assert.eq(
+    {_id: 1, str: "foo", x: 3},
+    coll.findAndModify({query: {_id: 1}, update: {$inc: {x: 1}}, hint: {_id: 1}}),
+);
 
 // Remove the document.
 assert.eq({_id: 1, str: "foo", x: 4}, coll.findAndModify({query: {str: "FOO"}, remove: true}));
@@ -1158,10 +1256,22 @@ assert.eq({_id: 1, str: "foo", x: 4}, coll.findAndModify({query: {str: "FOO"}, r
 // has a default collation.
 coll = testDb.collation_findmodify5;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-assert.eq(null, coll.findAndModify({query: {str: "FOO"}, update: {$set: {x: 1}}, collation: {locale: "simple"}}));
-assert.eq(null, coll.findAndModify({query: {str: "FOO"}, remove: true, collation: {locale: "simple"}}));
+assert.eq(
+    null,
+    coll.findAndModify({
+        query: {str: "FOO"},
+        update: {$set: {x: 1}},
+        collation: {locale: "simple"},
+    }),
+);
+assert.eq(
+    null,
+    coll.findAndModify({query: {str: "FOO"}, remove: true, collation: {locale: "simple"}}),
+);
 
 //
 // Collation tests for mapReduce.
@@ -1188,7 +1298,9 @@ assert.eq(mapReduceOut.results.length, 1);
 // default collation.
 coll = testDb.collation_mapreduce2;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 var mapReduceOut = coll.mapReduce(
     function () {
@@ -1206,7 +1318,9 @@ assert.eq(mapReduceOut.results.length, 1);
 // a default collation.
 coll = testDb.collation_mapreduce3;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 var mapReduceOut = coll.mapReduce(
     function () {
@@ -1229,7 +1343,9 @@ const outCollName = coll.getName() + "_outcoll";
 const outColl = testDb[outCollName];
 coll.drop();
 outColl.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(testDb.createCollection(outColl.getName()));
 assert.commandWorked(coll.insert({_id: 1, str: "foo", amt: 100}));
 assert.commandWorked(coll.insert({_id: 2, str: "FOO", amt: 200}));
@@ -1288,7 +1404,9 @@ assert.eq(1, planStage.nWouldDelete);
 // collation.
 coll = testDb.collation_remove4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 writeRes = coll.remove({str: "FOO"}, {justOne: true});
 assert.commandWorked(writeRes);
@@ -1298,7 +1416,9 @@ assert.eq(1, writeRes.nRemoved);
 // has a default collation.
 coll = testDb.collation_remove5;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: "foo"}));
 writeRes = coll.remove({_id: "FOO"}, {justOne: true});
 assert.commandWorked(writeRes);
@@ -1331,7 +1451,9 @@ if (!isClustered) {
 // a default collation.
 coll = testDb.collation_remove7;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 writeRes = coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
@@ -1341,7 +1463,9 @@ assert.eq(0, writeRes.nRemoved);
 // collection has a default collation.
 coll = testDb.collation_remove8;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: "foo"}));
 writeRes = coll.remove({_id: "FOO"}, {justOne: true, collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
@@ -1353,7 +1477,9 @@ if (!isClustered) {
     coll = testDb.collation_remove9;
     coll.drop();
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes = coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "en_US"}});
+    explainRes = coll
+        .explain("executionStats")
+        .remove({_id: "foo"}, {collation: {locale: "en_US"}});
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
     if (planStage == null) {
@@ -1367,7 +1493,9 @@ if (!isClustered) {
     coll = testDb.collation_remove10;
     coll.drop();
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes = coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
+    explainRes = coll
+        .explain("executionStats")
+        .remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
     assert.eq(null, planStage);
@@ -1382,14 +1510,20 @@ if (!isClustered) {
 // Update should succeed when collation specified and collection does not exist.
 coll = testDb.collation_update1;
 coll.drop();
-assert.commandWorked(coll.update({str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
+assert.commandWorked(
+    coll.update({str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}),
+);
 
 // Update should return correct results when collation specified.
 coll = testDb.collation_update2;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-writeRes = coll.update({str: "FOO"}, {$set: {other: 99}}, {multi: true, collation: {locale: "en_US", strength: 2}});
+writeRes = coll.update(
+    {str: "FOO"},
+    {$set: {other: 99}},
+    {multi: true, collation: {locale: "en_US", strength: 2}},
+);
 assert.eq(2, writeRes.nModified);
 
 // Explain of update should return correct results when collation specified.
@@ -1414,7 +1548,9 @@ assert.eq(2, planStage.nWouldModify);
 // collation.
 coll = testDb.collation_update4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 writeRes = coll.update({str: "FOO"}, {$set: {other: 99}});
 assert.commandWorked(writeRes);
@@ -1424,7 +1560,9 @@ assert.eq(1, writeRes.nMatched);
 // has a default collation.
 coll = testDb.collation_update5;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: "foo"}));
 writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}});
 assert.commandWorked(writeRes);
@@ -1449,7 +1587,9 @@ if (!isClustered) {
 // a default collation.
 coll = testDb.collation_update7;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 writeRes = coll.update({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
@@ -1459,7 +1599,9 @@ assert.eq(0, writeRes.nModified);
 // collection has a default collation.
 coll = testDb.collation_update8;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.insert({_id: "foo"}));
 writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
@@ -1602,7 +1744,9 @@ assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", streng
 // default collation.
 coll = testDb.collation_geonear3;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.eq(1, coll.aggregate([geoNearStage]).itcount());
@@ -1611,7 +1755,9 @@ assert.eq(1, coll.aggregate([geoNearStage]).itcount());
 // a default collation.
 coll = testDb.collation_geonear4;
 coll.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.eq(0, coll.aggregate([geoNearStage], {collation: {locale: "simple"}}).itcount());
@@ -1638,7 +1784,12 @@ coll = testDb.collation_nearsphere2;
 coll.drop();
 assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
-assert.eq(0, coll.find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}).itcount());
+assert.eq(
+    0,
+    coll
+        .find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}})
+        .itcount(),
+);
 assert.eq(
     1,
     coll
@@ -1651,7 +1802,12 @@ assert.eq(
 // string predicate indexed.
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({geo: "2dsphere", str: 1}, add2dsphereVersionIfNeeded()));
-assert.eq(0, coll.find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}).itcount());
+assert.eq(
+    0,
+    coll
+        .find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}})
+        .itcount(),
+);
 assert.eq(
     1,
     coll
@@ -1669,7 +1825,12 @@ assert.commandWorked(
         add2dsphereVersionIfNeeded({collation: {locale: "en_US", strength: 3}}),
     ),
 );
-assert.eq(0, coll.find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}).itcount());
+assert.eq(
+    0,
+    coll
+        .find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}})
+        .itcount(),
+);
 assert.eq(
     1,
     coll
@@ -1687,7 +1848,12 @@ assert.commandWorked(
         add2dsphereVersionIfNeeded({collation: {locale: "en_US", strength: 2}}),
     ),
 );
-assert.eq(0, coll.find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}).itcount());
+assert.eq(
+    0,
+    coll
+        .find({str: "ABC", geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}})
+        .itcount(),
+);
 assert.eq(
     1,
     coll
@@ -1804,7 +1970,10 @@ assert.eq(2, res.deletedCount);
 coll = testDb.collation_findonedelete;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-assert.eq({_id: 1, str: "foo"}, coll.findOneAndDelete({str: "FOO"}, {collation: {locale: "en_US", strength: 2}}));
+assert.eq(
+    {_id: 1, str: "foo"},
+    coll.findOneAndDelete({str: "FOO"}, {collation: {locale: "en_US", strength: 2}}),
+);
 assert.eq(null, coll.findOne({_id: 1}));
 
 // findOneAndReplace().
@@ -1823,7 +1992,11 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.eq(
     {_id: 1, str: "foo"},
-    coll.findOneAndUpdate({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "en_US", strength: 2}}),
+    coll.findOneAndUpdate(
+        {str: "FOO"},
+        {$set: {other: 99}},
+        {collation: {locale: "en_US", strength: 2}},
+    ),
 );
 assert.neq(null, coll.findOne({other: 99}));
 
@@ -1840,7 +2013,11 @@ coll = testDb.collation_updateone;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-res = coll.updateOne({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "en_US", strength: 2}});
+res = coll.updateOne(
+    {str: "FOO"},
+    {$set: {other: 99}},
+    {collation: {locale: "en_US", strength: 2}},
+);
 assert.eq(1, res.modifiedCount);
 
 // updateMany().
@@ -1848,7 +2025,11 @@ coll = testDb.collation_updatemany;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-res = coll.updateMany({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "en_US", strength: 2}});
+res = coll.updateMany(
+    {str: "FOO"},
+    {$set: {other: 99}},
+    {collation: {locale: "en_US", strength: 2}},
+);
 assert.eq(2, res.modifiedCount);
 
 // updateOne with bulkWrite().
@@ -1905,7 +2086,11 @@ assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
 res = coll.bulkWrite([
     {
-        replaceOne: {filter: {str: "FOO"}, replacement: {str: "bar"}, collation: {locale: "en_US", strength: 2}},
+        replaceOne: {
+            filter: {str: "FOO"},
+            replacement: {str: "bar"},
+            collation: {locale: "en_US", strength: 2},
+        },
     },
 ]);
 assert.eq(1, res.matchedCount);
@@ -1915,7 +2100,9 @@ coll = testDb.collation_deleteonebulkwrite;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-res = coll.bulkWrite([{deleteOne: {filter: {str: "FOO"}, collation: {locale: "en_US", strength: 2}}}]);
+res = coll.bulkWrite([
+    {deleteOne: {filter: {str: "FOO"}, collation: {locale: "en_US", strength: 2}}},
+]);
 assert.eq(1, res.deletedCount);
 
 // deleteMany with bulkWrite().
@@ -1923,7 +2110,9 @@ coll = testDb.collation_deletemanybulkwrite;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
 assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-res = coll.bulkWrite([{deleteMany: {filter: {str: "FOO"}, collation: {locale: "en_US", strength: 2}}}]);
+res = coll.bulkWrite([
+    {deleteMany: {filter: {str: "FOO"}, collation: {locale: "en_US", strength: 2}}},
+]);
 assert.eq(2, res.deletedCount);
 
 // Two deleteOne ops with bulkWrite using different collations.
@@ -1941,13 +2130,17 @@ assert.eq(2, res.deletedCount);
 if (!isMongos) {
     coll = testDb.collation_applyops;
     coll.drop();
-    assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.commandWorked(
+        testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+    );
     assert.commandWorked(coll.insert({_id: "foo", x: 5, str: "bar"}));
 
     // <operation>.o2 respects collection default collation.
     assert.commandWorked(
         testDb.runCommand({
-            applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$v: 2, diff: {u: {x: 6}}}}],
+            applyOps: [
+                {op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$v: 2, diff: {u: {x: 6}}}},
+            ],
         }),
     );
     assert.eq(6, coll.findOne({_id: "foo"}).x);
@@ -1965,7 +2158,9 @@ if (!isMongos) {
     clonedColl.drop();
 
     // Create a collection with a non-simple default collation.
-    assert.commandWorked(testDb.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
+    assert.commandWorked(
+        testDb.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}),
+    );
     const originalCollectionInfos = testDb.getCollectionInfos({name: coll.getName()});
     assert.eq(originalCollectionInfos.length, 1, tojson(originalCollectionInfos));
 
@@ -1985,7 +2180,10 @@ if (!isMongos) {
     assert.commandWorked(cloneCollOutput);
     const clonedCollectionInfos = testDb.getCollectionInfos({name: clonedColl.getName()});
     assert.eq(clonedCollectionInfos.length, 1, tojson(clonedCollectionInfos));
-    assert.eq(originalCollectionInfos[0].options.collation, clonedCollectionInfos[0].options.collation);
+    assert.eq(
+        originalCollectionInfos[0].options.collation,
+        clonedCollectionInfos[0].options.collation,
+    );
     assert.eq([{_id: "FOO"}], clonedColl.find({_id: "foo"}).toArray());
 }
 
@@ -2011,7 +2209,13 @@ assert.commandFailedWithCode(err, [ErrorCodes.NoQueryExecutionPlans, 51173]);
 // collations don't match.
 assert.commandWorked(coll.createIndex({str: 1}, {name: "noCollation"}));
 err = assert.throws(() =>
-    coll.find().min({str: "b"}).max({str: "D"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount(),
+    coll
+        .find()
+        .min({str: "b"})
+        .max({str: "D"})
+        .collation({locale: "en_US", strength: 2})
+        .hint({str: 1})
+        .itcount(),
 );
 assert.commandFailedWithCode(err, 51174);
 
@@ -2025,14 +2229,22 @@ const caseInsensitive = {
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({str: 1}));
 err = assert.throws(() =>
-    coll.find({}, {_id: 0}).min({str: MinKey}).max({str: "Hello1"}).hint({str: 1}).collation(caseInsensitive).toArray(),
+    coll
+        .find({}, {_id: 0})
+        .min({str: MinKey})
+        .max({str: "Hello1"})
+        .hint({str: 1})
+        .collation(caseInsensitive)
+        .toArray(),
 );
 assert.commandFailedWithCode(err, 51174);
 
 // After building an index with the case-insensitive US English collation, the query should
 // work. Furthermore, the bounds defined by the min and max should respect the
 // case-insensitive collation.
-assert.commandWorked(coll.createIndex({str: 1}, {name: "withCollation", collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    coll.createIndex({str: 1}, {name: "withCollation", collation: {locale: "en_US", strength: 2}}),
+);
 assert.eq(
     4,
     coll

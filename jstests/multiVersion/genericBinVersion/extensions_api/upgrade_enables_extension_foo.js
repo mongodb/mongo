@@ -57,7 +57,10 @@ const ifrFlags = {
 
 try {
     for (var extensionUnionWithFeatureFlagValue of [true, false]) {
-        const baseUpgradeOptions = multipleExtensionNodeOptions([extensionNames[0], extensionNames[1]]);
+        const baseUpgradeOptions = multipleExtensionNodeOptions([
+            extensionNames[0],
+            extensionNames[1],
+        ]);
         var upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(baseUpgradeOptions);
         if (extensionUnionWithFeatureFlagValue) {
             upgradeNodeOptions = wrapOptionsWithViewsAndUnionWithFeatureFlag(upgradeNodeOptions);
@@ -69,7 +72,8 @@ try {
             whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
             // TODO SERVER-115501 Add validation.
             whenSecondariesAreLatestBinary: () => {},
-            whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+            whenBinariesAreLatestAndFCVIsLastLTS:
+                assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
             whenIfrFlagsAreToggled: assertFooViewAndExtensionVectorSearchUsed,
             whenFullyUpgraded: assertFooViewAndExtensionVectorSearchUsed,
         });
@@ -80,9 +84,11 @@ try {
             setupFn: setupCollection,
             whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
             whenOnlyConfigIsLatestBinary: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
-            whenSecondariesAndConfigAreLatestBinary: assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
+            whenSecondariesAndConfigAreLatestBinary:
+                assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
             whenMongosBinaryIsLastLTS: assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
-            whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+            whenBinariesAreLatestAndFCVIsLastLTS:
+                assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
             whenOnlyRouterHasIFRFlag: assertOnlyRouterHasIFRFlagAndExtensionVectorSearchUsed,
             whenOnlyShardHasIFRFlag: assertOnlyShardHasIFRFlagAndLegacyVectorSearchUsed,
             whenIfrFlagsAreToggled: assertAllNodesHaveIFRFlagAndExtensionVectorSearchUsed,

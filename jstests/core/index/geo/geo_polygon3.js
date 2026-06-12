@@ -30,7 +30,11 @@ bits.forEach((precision) => {
 
     // Look at only a small slice of the data within a triangle
     const options = {allowDiskUse: true};
-    assert.eq(1, t.countDocuments({loc: {"$within": {"$polygon": triangle}}}, options), "Triangle Test");
+    assert.eq(
+        1,
+        t.countDocuments({loc: {"$within": {"$polygon": triangle}}}, options),
+        "Triangle Test",
+    );
 
     let boxBounds = [
         [0, 0],
@@ -39,7 +43,11 @@ bits.forEach((precision) => {
         [10, 0],
     ];
 
-    assert.eq(docs.length, t.countDocuments({loc: {"$within": {"$polygon": boxBounds}}}, options), "Bounding Box Test");
+    assert.eq(
+        docs.length,
+        t.countDocuments({loc: {"$within": {"$polygon": boxBounds}}}, options),
+        "Bounding Box Test",
+    );
 
     // Look in a box much bigger than the one we have data in
     boxBounds = [
@@ -73,7 +81,11 @@ bits.forEach((precision) => {
 
     assert.commandWorked(t.insert({_id: docId++, loc: [1, 3]})); // Add a point that's in
 
-    assert.eq(1, t.countDocuments({loc: {$within: {$polygon: pacman}}}, options), "Pacman single point");
+    assert.eq(
+        1,
+        t.countDocuments({loc: {$within: {$polygon: pacman}}}, options),
+        "Pacman single point",
+    );
 
     docs = [];
     docs.push({_id: docId++, loc: [5, 3]}); // Add a point that's out right in the mouth opening
@@ -81,5 +93,9 @@ bits.forEach((precision) => {
     docs.push({_id: docId++, loc: [3, -1]}); // Add a point above the center of the head
     assert.commandWorked(t.insert(docs));
 
-    assert.eq(1, t.countDocuments({loc: {$within: {$polygon: pacman}}}, options), "Pacman double point");
+    assert.eq(
+        1,
+        t.countDocuments({loc: {$within: {$polygon: pacman}}}, options),
+        "Pacman double point",
+    );
 });

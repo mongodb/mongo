@@ -34,7 +34,10 @@ function testEnableTestCommandsEnabled(pipeline) {
     MongoRunner.stopMongod(conn);
 }
 
-const pipelines = [[{$listMqlEntities: {entityType: "aggregationStages"}}], [{$listCachedAndActiveUsers: {}}]];
+const pipelines = [
+    [{$listMqlEntities: {entityType: "aggregationStages"}}],
+    [{$listCachedAndActiveUsers: {}}],
+];
 
 for (const pipeline of pipelines) {
     testEnableTestCommandsDisabled(pipeline);

@@ -1,7 +1,10 @@
 /*
  * Fast-check models for $match.
  */
-import {getFieldArb, leafParameterArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    getFieldArb,
+    leafParameterArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof, singleKeyObjArb} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -37,7 +40,13 @@ function makeSimpleConditionArb(leafArb, allowedSimpleComparisons) {
  *
  * This helps us clearly define what each arbitrary is modeling.
  */
-function getLeafConditionArb({leafArb, allowedSimpleComparisons, allowedExistsArgs, allowIn, allowNin}) {
+function getLeafConditionArb({
+    leafArb,
+    allowedSimpleComparisons,
+    allowedExistsArgs,
+    allowIn,
+    allowNin,
+}) {
     const leafConditionArbs = [makeSimpleConditionArb(leafArb, allowedSimpleComparisons)];
     if (allowedExistsArgs.length > 0) {
         const existsConditionArb = fc.record({$exists: fc.constantFrom(...allowedExistsArgs)});
@@ -132,9 +141,11 @@ export function getMatchPredicateSpec({
             ),
             // For a full predicate model, we merge up to three single predicates.
             // Example: {a: {$eq: 1}, b: {$or: [...]}}
-            predicate: fc.array(tie("singlePredicate"), {minLength: 1, maxLength: 3}).map((preds) => {
-                return Object.assign({}, ...preds);
-            }),
+            predicate: fc
+                .array(tie("singlePredicate"), {minLength: 1, maxLength: 3})
+                .map((preds) => {
+                    return Object.assign({}, ...preds);
+                }),
         };
     });
 }

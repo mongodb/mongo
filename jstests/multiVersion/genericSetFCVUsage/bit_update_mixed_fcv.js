@@ -21,6 +21,8 @@ testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true})
 
 assert.commandWorked(coll.insert({_id: 0, arr: [0]}));
 
-assert.commandWorked(coll.update({_id: 0}, {$bit: {"a.9": {or: NumberInt(0)}, "a.10": {or: NumberInt(0)}}}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$bit: {"a.9": {or: NumberInt(0)}, "a.10": {or: NumberInt(0)}}}),
+);
 
 rst.stopSet();

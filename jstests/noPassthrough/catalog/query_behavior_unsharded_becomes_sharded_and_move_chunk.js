@@ -59,7 +59,12 @@ function getNewColl(db) {
     // range deletion.
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
     assert.commandWorked(
-        st.s.adminCommand({moveRange: coll.getFullName(), min: {x: MinKey()}, max: {x: MaxKey()}, toShard: shard1}),
+        st.s.adminCommand({
+            moveRange: coll.getFullName(),
+            min: {x: MinKey()},
+            max: {x: MaxKey()},
+            toShard: shard1,
+        }),
     );
 
     // The ongoing query should hold the range deletion task.
@@ -76,7 +81,9 @@ function getNewColl(db) {
 }
 
 {
-    jsTestLog("Running a query on a secondary node. The query must get killed the query on a range deletion");
+    jsTestLog(
+        "Running a query on a secondary node. The query must get killed the query on a range deletion",
+    );
 
     const coll = getNewColl(db);
 
@@ -108,7 +115,12 @@ function getNewColl(db) {
     // range deletion.
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
     assert.commandWorked(
-        st.s.adminCommand({moveRange: coll.getFullName(), min: {x: MinKey()}, max: {x: MaxKey()}, toShard: shard1}),
+        st.s.adminCommand({
+            moveRange: coll.getFullName(),
+            min: {x: MinKey()},
+            max: {x: MaxKey()},
+            toShard: shard1,
+        }),
     );
 
     // Wait for the range deletion to be executed.

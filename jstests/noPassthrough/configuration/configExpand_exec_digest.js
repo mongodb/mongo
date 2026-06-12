@@ -12,7 +12,11 @@ const hash = "f88c7ebe4740db59c873cecf5e1f18e3726a1ad64068a13d764b79028430ab0e";
 // Simple positive case.
 configExpandSuccess({
     setParameter: {
-        scramIterationCount: {__exec: makeReflectionCmd("12345"), digest: hash, digest_key: "736563726574"},
+        scramIterationCount: {
+            __exec: makeReflectionCmd("12345"),
+            digest: hash,
+            digest_key: "736563726574",
+        },
     },
 });
 
@@ -20,7 +24,11 @@ configExpandSuccess({
 configExpandFailure(
     {
         setParameter: {
-            scramIteratorCount: {__exec: makeReflectionCmd("12345"), digest: "123", digest_key: "736563726574"},
+            scramIteratorCount: {
+                __exec: makeReflectionCmd("12345"),
+                digest: "123",
+                digest_key: "736563726574",
+            },
         },
     },
     /digest: Not a valid, even length hex string/,
@@ -30,7 +38,11 @@ configExpandFailure(
 configExpandFailure(
     {
         setParameter: {
-            scramIteratorCount: {__exec: makeReflectionCmd("12345"), digest: hash, digest_key: "736563X26574"},
+            scramIteratorCount: {
+                __exec: makeReflectionCmd("12345"),
+                digest: hash,
+                digest_key: "736563X26574",
+            },
         },
     },
     /digest_key: Not a valid, even length hex string/,
@@ -45,7 +57,9 @@ configExpandFailure(
 // Empty digest_key.
 configExpandFailure(
     {
-        setParameter: {scramIteratorCount: {__exec: makeReflectionCmd("12345"), digest: hash, digest_key: ""}},
+        setParameter: {
+            scramIteratorCount: {__exec: makeReflectionCmd("12345"), digest: hash, digest_key: ""},
+        },
     },
     /digest_key must not be empty/,
 );
@@ -54,7 +68,11 @@ configExpandFailure(
 configExpandFailure(
     {
         setParameter: {
-            scramIteratorCount: {__exec: makeReflectionCmd("12345"), digest: hash, digest_key: "736563726575"},
+            scramIteratorCount: {
+                __exec: makeReflectionCmd("12345"),
+                digest: hash,
+                digest_key: "736563726575",
+            },
         },
     },
     /does not match expected digest/,

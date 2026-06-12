@@ -29,29 +29,45 @@ assert.commandFailedWithCode(
 );
 
 assert.commandFailedWithCode(
-    dbTest.createCollection("basic", {timeseries: {timeField: "time"}, encryptedFields: sampleEncryptedFields}),
+    dbTest.createCollection("basic", {
+        timeseries: {timeField: "time"},
+        encryptedFields: sampleEncryptedFields,
+    }),
     6346401,
     "Create with encryptedFields and timeseries passed",
 );
 
 assert.commandFailedWithCode(
-    dbTest.createCollection("basic", {capped: true, size: 100000, encryptedFields: sampleEncryptedFields}),
+    dbTest.createCollection("basic", {
+        capped: true,
+        size: 100000,
+        encryptedFields: sampleEncryptedFields,
+    }),
     6367301,
     "Create with encryptedFields and capped passed",
 );
 
 assert.commandFailedWithCode(
-    dbTest.createCollection("basic", {validationAction: "warn", encryptedFields: sampleEncryptedFields}),
+    dbTest.createCollection("basic", {
+        validationAction: "warn",
+        encryptedFields: sampleEncryptedFields,
+    }),
     ErrorCodes.BadValue,
 );
 
 assert.commandFailedWithCode(
-    dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields, validationLevel: "off"}),
+    dbTest.createCollection("basic", {
+        encryptedFields: sampleEncryptedFields,
+        validationLevel: "off",
+    }),
     ErrorCodes.BadValue,
 );
 
 assert.commandFailedWithCode(
-    dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields, validationLevel: "moderate"}),
+    dbTest.createCollection("basic", {
+        encryptedFields: sampleEncryptedFields,
+        validationLevel: "moderate",
+    }),
     ErrorCodes.BadValue,
 );
 

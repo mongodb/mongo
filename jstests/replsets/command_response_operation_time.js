@@ -29,9 +29,15 @@ let res, statusRes;
 let testDB = replTest.getPrimary().getDB(name);
 
 jsTestLog("Executing majority write.");
-res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}], writeConcern: {w: "majority"}}));
+res = assert.commandWorked(
+    testDB.runCommand({insert: "foo", documents: [{x: 1}], writeConcern: {w: "majority"}}),
+);
 statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-assertCorrectOperationTime(res.operationTime, statusRes.optimes.lastCommittedOpTime.ts, "committed");
+assertCorrectOperationTime(
+    res.operationTime,
+    statusRes.optimes.lastCommittedOpTime.ts,
+    "committed",
+);
 
 jsTestLog("Executing local write.");
 res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 2}]}));
@@ -41,9 +47,15 @@ assertCorrectOperationTime(res.operationTime, statusRes.optimes.appliedOpTime.ts
 replTest.awaitLastOpCommitted();
 
 jsTestLog("Executing majority read.");
-res = assert.commandWorked(testDB.runCommand({find: "foo", filter: {x: 1}, readConcern: {level: "majority"}}));
+res = assert.commandWorked(
+    testDB.runCommand({find: "foo", filter: {x: 1}, readConcern: {level: "majority"}}),
+);
 statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-assertCorrectOperationTime(res.operationTime, statusRes.optimes.lastCommittedOpTime.ts, "committed");
+assertCorrectOperationTime(
+    res.operationTime,
+    statusRes.optimes.lastCommittedOpTime.ts,
+    "committed",
+);
 
 jsTestLog("Executing local read.");
 res = assert.commandWorked(testDB.runCommand({find: "foo", filter: {x: 1}}));

@@ -13,7 +13,10 @@ function runTest(admindb) {
     let sysCollections = ["system.js", "system.profile", "system.roles", "system.users"];
     let sysPrivs = new Array();
     for (let i in sysCollections) {
-        sysPrivs.push({resource: {db: admindb.getName(), collection: sysCollections[i]}, actions: ["find"]});
+        sysPrivs.push({
+            resource: {db: admindb.getName(), collection: sysCollections[i]},
+            actions: ["find"],
+        });
     }
 
     let findPriv = {resource: {db: admindb.getName(), collection: ""}, actions: ["find"]};

@@ -43,7 +43,9 @@ assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 // Enable fail point which makes the index build to hang before taking a MODE_S lock to block
 // writes.
 const failPoint = "hangAfterIndexBuildDumpsInsertsFromBulk";
-let res = assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+let res = assert.commandWorked(
+    primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}),
+);
 let timesEntered = res.count;
 
 const indexThread = IndexBuildTest.startIndexBuild(

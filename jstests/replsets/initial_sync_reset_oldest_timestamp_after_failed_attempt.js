@@ -14,7 +14,10 @@ import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Set the number of initial sync attempts to 2 so that the test fails on unplanned failures.
-const replTest = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=2"}});
+const replTest = new ReplSetTest({
+    nodes: 2,
+    nodeOptions: {setParameter: "numInitialSyncAttempts=2"},
+});
 replTest.startSet();
 
 // Increase the election timeout to 24 hours so that we do not accidentally trigger an election
@@ -37,7 +40,11 @@ const sessionColl = sessionDB.getCollection(collName);
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 session.startTransaction();
@@ -95,7 +102,9 @@ assert.commandWorked(testColl.update({_id: 1}, {_id: 1, b: 2}));
 
 jsTestLog("Resuming initial sync");
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 
 // Wait for this failpoint to be hit before turning it off and causing initial sync to fail.
 assert.commandWorked(
@@ -109,7 +118,9 @@ assert.commandWorked(
 jsTestLog("Failing first initial sync attempt");
 
 // Turn the failpoint off and cause initial sync to fail.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "failInitialSyncBeforeApplyingBatch", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "failInitialSyncBeforeApplyingBatch", mode: "off"}),
+);
 
 replTest.awaitSecondaryNodes(null, [secondary]);
 

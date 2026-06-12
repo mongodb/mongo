@@ -46,11 +46,15 @@ function testExplainAuth(authSpec) {
     assertCmdResult(cmdResult, authSpec.count);
 
     // .remove()
-    cmdResult = db.runCommand({explain: {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}]}});
+    cmdResult = db.runCommand({
+        explain: {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}]},
+    });
     assertCmdResult(cmdResult, authSpec.remove);
 
     // .update()
-    cmdResult = db.runCommand({explain: {update: coll.getName(), updates: [{q: {a: 1}, u: {$set: {b: 1}}}]}});
+    cmdResult = db.runCommand({
+        explain: {update: coll.getName(), updates: [{q: {a: 1}, u: {$set: {b: 1}}}]},
+    });
     assertCmdResult(cmdResult, authSpec.update);
 }
 

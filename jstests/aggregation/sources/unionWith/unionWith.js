@@ -47,7 +47,11 @@ function getDocsFromCollection(collObj, proj = null) {
 // Test a two collection union.
 let resSet = getDocsFromCollection(collA).concat(getDocsFromCollection(collB));
 checkResults(
-    testDB.runCommand({aggregate: collA.getName(), pipeline: [{$unionWith: collB.getName()}], cursor: {}}),
+    testDB.runCommand({
+        aggregate: collA.getName(),
+        pipeline: [{$unionWith: collB.getName()}],
+        cursor: {},
+    }),
     resSet,
 );
 // Test a sequential four collection union.
@@ -59,7 +63,11 @@ resSet = getDocsFromCollection(collA).concat(
 checkResults(
     testDB.runCommand({
         aggregate: collA.getName(),
-        pipeline: [{$unionWith: collB.getName()}, {$unionWith: collC.getName()}, {$unionWith: collD.getName()}],
+        pipeline: [
+            {$unionWith: collB.getName()},
+            {$unionWith: collC.getName()},
+            {$unionWith: collD.getName()},
+        ],
         cursor: {},
     }),
     resSet,
@@ -73,7 +81,14 @@ checkResults(
             {
                 $unionWith: {
                     coll: collB.getName(),
-                    pipeline: [{$unionWith: {coll: collC.getName(), pipeline: [{$unionWith: collD.getName()}]}}],
+                    pipeline: [
+                        {
+                            $unionWith: {
+                                coll: collC.getName(),
+                                pipeline: [{$unionWith: collD.getName()}],
+                            },
+                        },
+                    ],
                 },
             },
         ],
@@ -110,7 +125,10 @@ checkResults(
                                 coll: collC.getName(),
                                 pipeline: [
                                     {
-                                        $unionWith: {coll: collD.getName(), pipeline: [{"$addFields": {z: 5}}]},
+                                        $unionWith: {
+                                            coll: collD.getName(),
+                                            pipeline: [{"$addFields": {z: 5}}],
+                                        },
                                     },
                                     {"$addFields": {y: 4}},
                                 ],
@@ -199,7 +217,10 @@ resSet = [
 testWithHashAggMemoryLimit(
     {
         aggregate: collA.getName(),
-        pipeline: [{$unionWith: collB.getName()}, {"$group": {_id: "$groupKey", sum: {$sum: "$val"}}}],
+        pipeline: [
+            {$unionWith: collB.getName()},
+            {"$group": {_id: "$groupKey", sum: {$sum: "$val"}}},
+        ],
         cursor: {},
         // we allow disk use to test the case where the pipeline must run on a shard in the sharded
         // passthrough.
@@ -224,7 +245,10 @@ testWithHashAggMemoryLimit(
             {
                 $unionWith: {
                     coll: collB.getName(),
-                    pipeline: [{"$group": {_id: "$groupKey", val: {$sum: "$val"}}}, {"$addFields": {groupKey: 1}}],
+                    pipeline: [
+                        {"$group": {_id: "$groupKey", val: {$sum: "$val"}}},
+                        {"$addFields": {groupKey: 1}},
+                    ],
                 },
             },
             {"$group": {_id: "$groupKey", sum: {$sum: "$val"}}},
@@ -271,7 +295,10 @@ testWithHashAggMemoryLimit(
             {
                 $unionWith: {
                     coll: collB.getName(),
-                    pipeline: [{"$group": {_id: "$groupKey", val: {$min: "$val"}}}, {"$addFields": {groupKey: 1}}],
+                    pipeline: [
+                        {"$group": {_id: "$groupKey", val: {$min: "$val"}}},
+                        {"$addFields": {groupKey: 1}},
+                    ],
                 },
             },
         ],
@@ -289,7 +316,9 @@ resSet = getDocsFromCollection(collA).concat(setBResult);
 checkResults(
     testDB.runCommand({
         aggregate: collA.getName(),
-        pipeline: [{$unionWith: {coll: collB.getName(), pipeline: [{"$sort": {b: 1}}, {"$limit": 2}]}}],
+        pipeline: [
+            {$unionWith: {coll: collB.getName(), pipeline: [{"$sort": {b: 1}}, {"$limit": 2}]}},
+        ],
         cursor: {},
     }),
     resSet,
@@ -298,9 +327,15 @@ checkResults(
 // Test that we get the correct number of documents when using a getmore.
 resSet = getDocsFromCollection(collA).concat(getDocsFromCollection(collD)).length;
 let fullResults = collA
-    .aggregate([{$unionWith: collD.getName()}], {cursor: {batchSize: Math.floor(docsPerCollection / 2)}})
+    .aggregate([{$unionWith: collD.getName()}], {
+        cursor: {batchSize: Math.floor(docsPerCollection / 2)},
+    })
     .itcount();
-assert.eq(resSet, fullResults, "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults));
+assert.eq(
+    resSet,
+    fullResults,
+    "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults),
+);
 
 // Test with a sub-pipeline and a getMore before the initial collection is exhausted.
 resSet = getDocsFromCollection(collA).concat(getDocsFromCollection(collD, {x: 3})).length;
@@ -309,7 +344,11 @@ fullResults = collA
         cursor: {batchSize: Math.floor(docsPerCollection / 2)},
     })
     .itcount();
-assert.eq(resSet, fullResults, "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults));
+assert.eq(
+    resSet,
+    fullResults,
+    "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults),
+);
 
 // Test when a getMore occurs after the initial collection is exhausted. resSet remains the same as
 // only batchSize has changed.
@@ -318,7 +357,11 @@ fullResults = collA
         cursor: {batchSize: docsPerCollection + 1},
     })
     .itcount();
-assert.eq(resSet, fullResults, "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults));
+assert.eq(
+    resSet,
+    fullResults,
+    "Expected: " + resSet + " Got: " + fullResults.length + " from " + tojson(fullResults),
+);
 
 // Test that $unionWith on a non-existent collection succeeds.
 resSet = getDocsFromCollection(collA);
@@ -333,7 +376,9 @@ checkResults(
 checkResults(
     testDB.runCommand({
         aggregate: collA.getName(),
-        pipeline: [{$unionWith: {coll: "nonExistentCollectionBeta", pipeline: [{"$addFields": {ted: 5}}]}}],
+        pipeline: [
+            {$unionWith: {coll: "nonExistentCollectionBeta", pipeline: [{"$addFields": {ted: 5}}]}},
+        ],
         cursor: {},
     }),
     resSet,
@@ -350,7 +395,11 @@ checkResults(
 // Test that $unionWith on an empty collection succeeds.
 assertDropAndRecreateCollection(testDB, "emptyCollection");
 checkResults(
-    testDB.runCommand({aggregate: "emptyCollection", pipeline: [{$unionWith: collA.getName()}], cursor: {}}),
+    testDB.runCommand({
+        aggregate: "emptyCollection",
+        pipeline: [{$unionWith: collA.getName()}],
+        cursor: {},
+    }),
     resSet,
 );
 checkResults(
@@ -362,6 +411,10 @@ checkResults(
     resSet,
 );
 checkResults(
-    testDB.runCommand({aggregate: "emptyCollection", pipeline: [{$unionWith: collA.getName()}], cursor: {}}),
+    testDB.runCommand({
+        aggregate: "emptyCollection",
+        pipeline: [{$unionWith: collA.getName()}],
+        cursor: {},
+    }),
     resSet,
 );

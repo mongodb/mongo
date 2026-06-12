@@ -11,7 +11,14 @@ export function shardCollectionWithChunks(st, coll, numDocs) {
     let numberDoc = numDocs || 20;
     coll.createIndex({x: 1}, {unique: true});
 
-    st.shardColl(coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);
+    st.shardColl(
+        coll.getName(),
+        {x: 1},
+        {x: numberDoc / 2},
+        {x: numberDoc / 2},
+        _db.toString(),
+        true,
+    );
 
     for (let i = 0; i < numberDoc; i++) {
         coll.insert({x: i});
@@ -31,7 +38,10 @@ export function stopServerReplication(conn) {
 
     // Wait until the fail point is actually hit. Don't wait if the node is the primary, because
     // the fail point won't be hit until the node transitions from being the primary.
-    if (assert.commandWorked(conn.adminCommand("replSetGetStatus")).myState != ReplSetTest.State.PRIMARY) {
+    if (
+        assert.commandWorked(conn.adminCommand("replSetGetStatus")).myState !=
+        ReplSetTest.State.PRIMARY
+    ) {
         stopReplProducerFailPoint.wait();
     }
 }
@@ -42,9 +52,11 @@ export function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLoca
     if (changeReplicaSetDefaultWCToLocal == true) {
         // The default WC is majority and this test can't satisfy majority writes.
         assert.commandWorked(
-            rs
-                .getPrimary()
-                .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+            rs.getPrimary().adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"},
+            }),
         );
         rs.awaitReplication();
     }
@@ -55,7 +67,11 @@ export function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLoca
 export function stopReplicationOnSecondariesOfAllShards(st) {
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
-        st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        st.s.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     st._rsObjects.forEach((rs) => stopReplicationOnSecondaries(rs, false));
 }
@@ -124,7 +140,11 @@ export function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, d
     // The default WC is majority and stopServerReplication will prevent the replica set from
     // fulfilling any majority writes
     assert.commandWorked(
-        priConn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        priConn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
 
     // Send a dummy write to this connection so it will have the Client object initialized.

@@ -39,10 +39,22 @@ export const $config = (function () {
         function createIndexes(db, collName) {
             // The number of indexes created here is also stored in data.nIndexes.
             const coll = db[this.threadCollName];
-            assertWorkedHandleTxnErrors(coll.createIndex({text: "text"}), ErrorCodes.IndexBuildAlreadyInProgress);
-            assertWorkedHandleTxnErrors(coll.createIndex({geo: "2dsphere"}), ErrorCodes.IndexBuildAlreadyInProgress);
-            assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}), ErrorCodes.IndexBuildAlreadyInProgress);
-            assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}), ErrorCodes.IndexBuildAlreadyInProgress);
+            assertWorkedHandleTxnErrors(
+                coll.createIndex({text: "text"}),
+                ErrorCodes.IndexBuildAlreadyInProgress,
+            );
+            assertWorkedHandleTxnErrors(
+                coll.createIndex({geo: "2dsphere"}),
+                ErrorCodes.IndexBuildAlreadyInProgress,
+            );
+            assertWorkedHandleTxnErrors(
+                coll.createIndex({integer: 1}),
+                ErrorCodes.IndexBuildAlreadyInProgress,
+            );
+            assertWorkedHandleTxnErrors(
+                coll.createIndex({"$**": 1}),
+                ErrorCodes.IndexBuildAlreadyInProgress,
+            );
         }
 
         function init(db, collName) {
@@ -57,7 +69,9 @@ export const $config = (function () {
             assert.eq(
                 nInsertedDocuments / this.maxInteger,
                 count,
-                "number of " + "documents returned by integer query should match the number " + "inserted",
+                "number of " +
+                    "documents returned by integer query should match the number " +
+                    "inserted",
             );
 
             let coords = [
@@ -77,7 +91,8 @@ export const $config = (function () {
             assert.eq(
                 count,
                 nInsertedDocuments,
-                "number of documents returned by" + " geospatial query should match number inserted",
+                "number of documents returned by" +
+                    " geospatial query should match number inserted",
             );
 
             count = coll.find({$text: {$search: "ipsum"}}).itcount();

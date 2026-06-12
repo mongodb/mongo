@@ -8,7 +8,11 @@ const latestBinary = "latest";
 
 let setFCV = function (adminDB, version) {
     assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: version, confirm: true, writeConcern: {w: 1}}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: version,
+            confirm: true,
+            writeConcern: {w: 1},
+        }),
     );
     checkFCV(adminDB, version);
 };
@@ -23,7 +27,9 @@ let insertDataForConn = function (conn, dbs, nodeOptions) {
                     continue;
                 }
                 // Config servers have a majority write concern.
-                assert.commandWorked(conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: "majority"}}));
+                assert.commandWorked(
+                    conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: "majority"}}),
+                );
             } else {
                 assert.commandWorked(conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: 1}}));
             }
@@ -93,7 +99,9 @@ let recreateUniqueIndexes = function (db, secondary) {
         const idx = pair.spec;
         const dbName = pair.dbName;
         const collName = pair.collName;
-        let res = db.getSiblingDB(dbName).runCommand({dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
+        let res = db
+            .getSiblingDB(dbName)
+            .runCommand({dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
         assert.commandWorked(res);
         res = db.getSiblingDB(dbName).runCommand({
             createIndexes: collName,
@@ -108,7 +116,9 @@ let recreateUniqueIndexes = function (db, secondary) {
         const idx = pair.spec;
         const dbName = pair.dbName;
         const collName = pair.collName;
-        let res = db.getSiblingDB(dbName).runCommand({dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
+        let res = db
+            .getSiblingDB(dbName)
+            .runCommand({dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
         assert.commandWorked(res);
         res = db.getSiblingDB(dbName).runCommand({
             createIndexes: collName,
@@ -127,8 +137,14 @@ resetDbpath(sharedDbPath);
 let startMongodWithVersion = function (nodeOptions, ver, path) {
     let version = ver || latestBinary;
     let dbpath = path || sharedDbPath;
-    let conn = MongoRunner.runMongod(Object.assign({}, nodeOptions, {dbpath: dbpath, binVersion: version}));
-    assert.neq(null, conn, "mongod was unable to start up with version=" + version + " and path=" + dbpath);
+    let conn = MongoRunner.runMongod(
+        Object.assign({}, nodeOptions, {dbpath: dbpath, binVersion: version}),
+    );
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable to start up with version=" + version + " and path=" + dbpath,
+    );
     return conn;
 };
 

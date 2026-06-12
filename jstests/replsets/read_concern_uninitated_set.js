@@ -15,7 +15,10 @@ assert.commandWorked(
         hello: 1,
         "$clusterTime": {
             "clusterTime": Timestamp(1, 1),
-            "signature": {"hash": BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), "keyId": NumberLong(0)},
+            "signature": {
+                "hash": BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+                "keyId": NumberLong(0),
+            },
         },
     }),
 );
@@ -27,7 +30,12 @@ assert.eq([{_id: 0}], res.cursor.firstBatch);
 
 jsTestLog("Majority readConcern should fail with NotPrimaryNoSecondaryOk or NotYetInitialized.");
 assert.commandFailedWithCode(
-    localDB.runCommand({find: "test", filter: {}, maxTimeMS: 60000, readConcern: {level: "majority"}}),
+    localDB.runCommand({
+        find: "test",
+        filter: {},
+        maxTimeMS: 60000,
+        readConcern: {level: "majority"},
+    }),
     // Fails with NotPrimaryNoSecondaryOk as of SERVER-53813.
     [ErrorCodes.NotPrimaryNoSecondaryOk, ErrorCodes.NotYetInitialized],
 );

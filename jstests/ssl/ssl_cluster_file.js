@@ -26,5 +26,9 @@ let mongo = runMongoProgram(
 );
 
 // runMongoProgram returns 0 on success
-assert.eq(0, mongo, "Connection attempt failed when an irrelevant tlsClusterFile was provided to the server!");
+assert.eq(
+    0,
+    mongo,
+    "Connection attempt failed when an irrelevant tlsClusterFile was provided to the server!",
+);
 MongoRunner.stopMongod(mongod);

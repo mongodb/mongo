@@ -21,10 +21,15 @@ assert.commandFailedWithCode(
 
 // Ensure that we can provide a time that is larger than the current epoch time.
 let secondsSinceEpoch = Math.floor(Date.now() / 1000);
-assert.commandWorked(coll.createIndexes([{x_before_epoch: 1}], {expireAfterSeconds: secondsSinceEpoch + 1000}));
+assert.commandWorked(
+    coll.createIndexes([{x_before_epoch: 1}], {expireAfterSeconds: secondsSinceEpoch + 1000}),
+);
 
 // 'expireAfterSeconds' cannot be less than 0.
-assert.commandFailedWithCode(coll.createIndexes([{x: 1}], {expireAfterSeconds: -1}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndexes([{x: 1}], {expireAfterSeconds: -1}),
+    ErrorCodes.CannotCreateIndex,
+);
 assert.commandWorked(coll.createIndexes([{z: 1}], {expireAfterSeconds: 0}));
 
 // Compound indexes are not support with TTL indexes.

@@ -19,8 +19,12 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(coll, {x: 1}, [
     {min: {x: 0}, max: {x: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: -100}, to: st.shard0.shardName}));
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 100}, to: st.shard1.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {x: -100}, to: st.shard0.shardName}),
+);
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {x: 100}, to: st.shard1.shardName}),
+);
 
 // This retryable update command causes a WCOS error if there is no match found and inserts the
 // document on different shard in a distributed transaction. If a match is found, the document is

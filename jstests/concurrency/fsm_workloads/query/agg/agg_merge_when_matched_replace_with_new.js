@@ -37,7 +37,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // If running with causal consistency, the writes may not have propagated to the secondaries
         // yet.
         assert.soon(() => {
-            return db[this.collWithMigrations].find({_id: this.tid, count: this.threadRunCount}).itcount() == 1;
+            return (
+                db[this.collWithMigrations]
+                    .find({_id: this.tid, count: this.threadRunCount})
+                    .itcount() == 1
+            );
         });
 
         this.threadRunCount += 1;

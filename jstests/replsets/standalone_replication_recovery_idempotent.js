@@ -45,9 +45,11 @@ function assertDocsInColl1(node, nums) {
 function assertPrepareConflictColl2(node, id) {
     assert.sameMembers(getColl2(node).find().toArray(), [{_id: id}]);
     assert.commandFailedWithCode(
-        node
-            .getDB(dbName)
-            .runCommand({update: collName2, updates: [{q: {_id: id}, u: {$inc: {x: 1}}}], maxTimeMS: 1000}),
+        node.getDB(dbName).runCommand({
+            update: collName2,
+            updates: [{q: {_id: id}, u: {$inc: {x: 1}}}],
+            maxTimeMS: 1000,
+        }),
         ErrorCodes.MaxTimeMSExpired,
     );
 }
@@ -70,7 +72,11 @@ rst.initiate(
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Create two collections with w:majority and then perform a clean restart to ensure that
@@ -109,7 +115,9 @@ assertDocsInColl1(node, [3, 4]);
 assertPrepareConflictColl2(node, 1);
 assert.commandFailedWithCode(getColl1(node).insert({_id: 7}), ErrorCodes.IllegalOperation);
 
-jsTestLog("Test that on restart with just 'recoverFromOplogAsStandalone' we succeed" + " idempotently.");
+jsTestLog(
+    "Test that on restart with just 'recoverFromOplogAsStandalone' we succeed" + " idempotently.",
+);
 node = rst.restart(node, {
     noReplSet: true,
     setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},

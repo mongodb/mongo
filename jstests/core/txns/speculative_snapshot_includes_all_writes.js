@@ -61,7 +61,11 @@ const failPoint = configureFailPoint(db, "hangAfterCollectionInserts", {
 try {
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
-        testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        testDB.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
 
     jsTest.log("Prepopulate the collections.");
@@ -73,7 +77,10 @@ try {
         assert.commandWorked(
             db
                 .getSiblingDB("test")
-                .speculative_snapshot_includes_all_writes_2.insert({_id: "b"}, {writeConcern: {w: "majority"}}),
+                .speculative_snapshot_includes_all_writes_2.insert(
+                    {_id: "b"},
+                    {writeConcern: {w: "majority"}},
+                ),
         );
     });
 

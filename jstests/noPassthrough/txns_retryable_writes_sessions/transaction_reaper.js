@@ -39,7 +39,9 @@ function Sharding(lifetime) {
             rs: true,
             rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: lifetime}},
             rs0: {nodes: 1},
-            mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+            mongosOptions: {
+                setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+            },
         },
     });
 
@@ -48,7 +50,9 @@ function Sharding(lifetime) {
 
     // Ensure that the sessions collection exists.
     assert.commandWorked(this.st.c0.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.commandWorked(this.st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(
+        this.st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}),
+    );
 
     // Remove the session created by the above shardCollection
     this.st.s.getDB("config").system.sessions.remove({});
@@ -117,7 +121,9 @@ Fixture.prototype.refresh = function () {
 };
 
 Fixture.prototype.reap = function () {
-    assert.commandWorked(this.transactionConn.getDB("admin").runCommand({reapLogicalSessionCacheNow: 1}));
+    assert.commandWorked(
+        this.transactionConn.getDB("admin").runCommand({reapLogicalSessionCacheNow: 1}),
+    );
 };
 
 Fixture.prototype.getDB = function (db) {

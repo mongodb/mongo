@@ -1,4 +1,8 @@
-import {getWinningPlanFromExplain, getExecutionStats, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    getExecutionStats,
+    getRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
 import {
     assertPlanCosted,
     assertPlanNotCosted,
@@ -81,10 +85,23 @@ const compoundIndexes = [
 
 const nFields = Math.max(...compoundIndexes.map((obj) => Object.keys(obj).length));
 const batchSize = getMultiplanningBatchSize();
-const mpEndConditions = {kEOF: "EOF", kFullBatch: "FullBatch", kMaxWorks: "MaxWorks", kSinglePlan: "SinglePlan"};
+const mpEndConditions = {
+    kEOF: "EOF",
+    kFullBatch: "FullBatch",
+    kMaxWorks: "MaxWorks",
+    kSinglePlan: "SinglePlan",
+};
 const rankerStrategies = {kCBR: "CBR", kMP: "MP"};
 
-function checkRanker({qID = "", cName = "", query = {}, order = {}, limit = 0, mpEndCond = "", ranker = ""}) {
+function checkRanker({
+    qID = "",
+    cName = "",
+    query = {},
+    order = {},
+    limit = 0,
+    mpEndCond = "",
+    ranker = "",
+}) {
     const coll = db[collName(cName)];
 
     let cursor = coll.find(query).sort(order);
@@ -173,8 +190,24 @@ try {
         cName: "100",
         query: {
             $and: [
-                {$or: [{f1: {$gte: 100}}, {f2: {$lte: 901}}, {f3: {$gte: 50}}, {f4: {$lte: 990}}, {f5: {$gte: 10}}]},
-                {$or: [{f1: {$lte: 150}}, {f2: {$gte: 910}}, {f3: {$lte: 250}}, {f4: {$gte: 870}}, {f5: {$lte: 25}}]},
+                {
+                    $or: [
+                        {f1: {$gte: 100}},
+                        {f2: {$lte: 901}},
+                        {f3: {$gte: 50}},
+                        {f4: {$lte: 990}},
+                        {f5: {$gte: 10}},
+                    ],
+                },
+                {
+                    $or: [
+                        {f1: {$lte: 150}},
+                        {f2: {$gte: 910}},
+                        {f3: {$lte: 250}},
+                        {f4: {$gte: 870}},
+                        {f5: {$lte: 25}},
+                    ],
+                },
             ],
         },
         order: {f3: 1, f1: 1},
@@ -223,7 +256,11 @@ try {
     // branch uses the text index while other branches have competing index choices, giving us
     // multiple candidate plans that all contain inestimable nodes.
     const queryWithCBRInestimableNodes = {
-        "$or": [{"f1": {"$ne": 72}}, {"s2": {"$regex": "text_"}}, {"$text": {"$search": "text_77"}}],
+        "$or": [
+            {"f1": {"$ne": 72}},
+            {"s2": {"$regex": "text_"}},
+            {"$text": {"$search": "text_77"}},
+        ],
     };
     const queryWithCBRInestimableNodesSort = {"_id": 1};
 
@@ -245,19 +282,28 @@ try {
         const prevDisablePlanCache = assert.commandWorked(
             db.adminCommand({getParameter: 1, internalQueryDisablePlanCache: 1}),
         ).internalQueryDisablePlanCache;
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}),
+        );
 
         try {
             // The first $or branch ({f1: {$ne: 72}}) has 2 candidate plans.
             const expectedWorks = getExpectedWorksPerPlan(db, coll20k, 2);
 
             coll20k.getPlanCache().clear();
-            coll20k.find(queryWithCBRInestimableNodes).sort(queryWithCBRInestimableNodesSort).toArray();
+            coll20k
+                .find(queryWithCBRInestimableNodes)
+                .sort(queryWithCBRInestimableNodesSort)
+                .toArray();
 
             const entries = coll20k.getPlanCache().list();
             // Only the first $or branch goes through multi-planning, producing the single cache
             // entry.
-            assert.eq(entries.length, 1, "Expected exactly one plan cache entry. " + tojson(entries));
+            assert.eq(
+                entries.length,
+                1,
+                "Expected exactly one plan cache entry. " + tojson(entries),
+            );
 
             const entry = entries[0];
             assert.eq(entry.isActive, false);
@@ -272,7 +318,10 @@ try {
             );
         } finally {
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: prevDisablePlanCache}),
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryDisablePlanCache: prevDisablePlanCache,
+                }),
             );
         }
     }
@@ -316,7 +365,10 @@ try {
     // Make this test more stable by increasing the required ratio - it works with the default but
     // sometimes the ratio may occasionally get better.
     const prevRatio = assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice: 3.0}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice: 3.0,
+        }),
     ).was;
     checkRanker({
         qID: "4.1",
@@ -326,7 +378,10 @@ try {
         ranker: rankerStrategies.kMP,
     });
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice: prevRatio}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice: prevRatio,
+        }),
     );
 
     // (5) AutomaticCE chooses CBR because it is cheaper than MP

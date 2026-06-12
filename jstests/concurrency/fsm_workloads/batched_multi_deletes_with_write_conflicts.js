@@ -61,7 +61,9 @@ export const $config = (function () {
             assert.commandWorked(db[collName].remove({}));
         }
 
-        assert.commandWorked(db[collName].createIndex({deleter_tid: 1, delete_query_match: 1, subset_id: 1}));
+        assert.commandWorked(
+            db[collName].createIndex({deleter_tid: 1, delete_query_match: 1, subset_id: 1}),
+        );
     }
 
     // 'teardown' is run once by the parent thread before the cluster
@@ -99,7 +101,11 @@ export const $config = (function () {
 
             const subsetTemplates = Array(this.numInsertSubsets)
                 .fill()
-                .map((_, i) => ({deleter_tid: this.tid, delete_query_match: true, subset_id: i + 1}));
+                .map((_, i) => ({
+                    deleter_tid: this.tid,
+                    delete_query_match: true,
+                    subset_id: i + 1,
+                }));
 
             // Create array of (subsetSize * numInsertSubsets) docs, by repeating the
             // subsetTemplates baseInsertSize times.

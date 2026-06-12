@@ -13,8 +13,15 @@ let coll = db.jstests_bitwise;
 
 function assertQueryCorrect(query, count) {
     let explain = coll.find(query).explain("executionStats");
-    assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected bit test query plan to be COLLSCAN");
-    assert.eq(count, explain.executionStats.nReturned, "bit test query not returning correct documents");
+    assert(
+        isCollscan(db, getWinningPlanFromExplain(explain)),
+        "expected bit test query plan to be COLLSCAN",
+    );
+    assert.eq(
+        count,
+        explain.executionStats.nReturned,
+        "bit test query not returning correct documents",
+    );
 }
 
 // Tests on numbers.
@@ -233,13 +240,18 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({a: BinData(0, "ZG9n")}));
 assert.commandWorked(coll.insert({a: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}));
 assert.commandWorked(coll.insert({a: BinData(1, "JA4A8gAxqTwciCuF5GGzAA==")}));
-assert.commandWorked(coll.insert({a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
+assert.commandWorked(
+    coll.insert({a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}),
+);
 assert.commandWorked(coll.insert({a: BinData(2, "BAAAADEyMzQ=")}));
 
 assertQueryCorrect({a: {$bitsAllSet: BinData(0, "ZG9n")}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: BinData(2, "BAAAADEyMzQ=")}}, 1);
-assertQueryCorrect({a: {$bitsAllSet: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}}, 1);
+assertQueryCorrect(
+    {a: {$bitsAllSet: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}},
+    1,
+);
 assertQueryCorrect({a: {$bitsAllSet: BinData(2, "BAAAADEyMzQ=")}}, 1);
 assertQueryCorrect({a: {$bitsAllClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 5);
 assertQueryCorrect({a: {$bitsAllClear: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 0);
@@ -248,7 +260,12 @@ assertQueryCorrect({a: {$bitsAnySet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 5
 assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 0);
 assertQueryCorrect(
     {
-        a: {$bitsAnyClear: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
+        a: {
+            $bitsAnyClear: BinData(
+                0,
+                "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
+            ),
+        },
     },
     4,
 );

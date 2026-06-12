@@ -25,7 +25,11 @@ assert.eq(
         {_id: 3, y: 4, z: 1, x: 3, b: 5, c: 6, a: 7},
     ],
     coll
-        .aggregate([{$project: {b: 0, c: 0}}, {$addFields: {x: 3, y: 4, b: 5, c: 6, a: 7}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$project: {b: 0, c: 0}},
+            {$addFields: {x: 3, y: 4, b: 5, c: 6, a: 7}},
+            {$sort: {_id: 1}},
+        ])
         .toArray(),
 );
 

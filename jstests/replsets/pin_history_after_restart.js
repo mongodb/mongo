@@ -50,7 +50,11 @@ let primary = replTest.getPrimary();
 // recovery. Repinning across startup happens before replication recovery. Do a majority write for
 // predictability of the test.
 let result = assert.commandWorked(
-    primary.adminCommand({"pinHistoryReplicated": Timestamp(100, 1), round: true, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        "pinHistoryReplicated": Timestamp(100, 1),
+        round: true,
+        writeConcern: {w: "majority"},
+    }),
 );
 let origPinTs = result["pinTs"];
 jsTestLog({"First pin result": result});
@@ -74,14 +78,18 @@ pinnedTs = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned ti
 assert.eq(origPinTs, pinnedTs);
 
 // Create a new pin at "ts + 1". This should succeed, but have no effect.
-result = assert.commandWorked(primary.adminCommand({"pinHistoryReplicated": incTs(result["pinTs"]), round: false}));
+result = assert.commandWorked(
+    primary.adminCommand({"pinHistoryReplicated": incTs(result["pinTs"]), round: false}),
+);
 jsTestLog({"Second pin result": result});
 let newPinTs = result["pinTs"];
 assert.eq(newPinTs, incTs(origPinTs));
 
 // Remove the old pin at "ts".
 assert.commandWorked(
-    primary.getDB("mdb_testing")["pinned_timestamp"].remove({"pinTs": origPinTs}, {writeConcern: {w: "majority"}}),
+    primary
+        .getDB("mdb_testing")
+        ["pinned_timestamp"].remove({"pinTs": origPinTs}, {writeConcern: {w: "majority"}}),
 );
 
 // Restarting the node should observe a pin at "ts + 1".

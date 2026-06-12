@@ -25,7 +25,9 @@ const setUp = function (shardColl = true) {
         coll.drop();
 
         // Enable sharding for the test DB (let the fixture choose the primary shard).
-        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}));
+        assert.commandWorked(
+            testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}),
+        );
 
         // Seed some data before sharding.
         assert.commandWorked(
@@ -43,8 +45,12 @@ const setUp = function (shardColl = true) {
 
         if (shardColl) {
             // Shard the collection on {_id: 1} to make it eligible for resharding.
-            assert.commandWorked(testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
-            assert.commandWorked(testDb.adminCommand({split: coll.getFullName(), middle: {_id: 10}}));
+            assert.commandWorked(
+                testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
+            assert.commandWorked(
+                testDb.adminCommand({split: coll.getFullName(), middle: {_id: 10}}),
+            );
             assert.commandWorked(
                 testDb.adminCommand({
                     moveChunk: coll.getFullName(),
@@ -71,7 +77,9 @@ const setUp = function (shardColl = true) {
 const getSearchIndexAbortCount = function (sectionName) {
     const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
     return topology.configsvr.nodes.reduce((total, nodeAddr) => {
-        const stats = new Mongo(nodeAddr).getDB("admin").serverStatus({}).shardingStatistics[sectionName];
+        const stats = new Mongo(nodeAddr).getDB("admin").serverStatus({}).shardingStatistics[
+            sectionName
+        ];
         return total + ((stats && stats.countSearchIndexAborts) || 0);
     }, 0);
 };

@@ -52,7 +52,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * secondary shard key fields exist as a result of the refineCollectionShardKey command, and
      * thus fills in those fields with the corresponding MinKey/MaxKey values.
      */
-    $config.data.calculateChunkBoundsForShardKey = function calculateChunkBoundsForShardKey(collName, chunk) {
+    $config.data.calculateChunkBoundsForShardKey = function calculateChunkBoundsForShardKey(
+        collName,
+        chunk,
+    ) {
         const shardKeyField = this.shardKeyField[collName];
         let minBound = {};
         let maxBound = {};
@@ -173,7 +176,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // is minKey, so a split is not necessary.
             if (!partition.isLowChunk) {
                 assert.commandWorked(
-                    db.adminCommand({split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}),
+                    db.adminCommand({
+                        split: ns,
+                        middle: {[this.defaultShardKeyField]: partition.lower},
+                    }),
                 );
             }
         }

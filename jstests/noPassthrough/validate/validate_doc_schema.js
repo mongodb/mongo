@@ -11,12 +11,19 @@ const db = conn.getDB(dbName);
 
 function testSchemaValidation(validationAction) {
     assert.commandWorked(
-        db.createCollection(collName, {validator: {a: {$exists: true}}, validationAction: validationAction}),
+        db.createCollection(collName, {
+            validator: {a: {$exists: true}},
+            validationAction: validationAction,
+        }),
     );
     const coll = db.getCollection(collName);
 
     assert.commandWorked(
-        db.runCommand({insert: collName, documents: [{a: 1}, {b: 1}, {c: 1}], bypassDocumentValidation: true}),
+        db.runCommand({
+            insert: collName,
+            documents: [{a: 1}, {b: 1}, {c: 1}],
+            bypassDocumentValidation: true,
+        }),
     );
 
     // Validation detects documents not adhering to the collection schema rules.

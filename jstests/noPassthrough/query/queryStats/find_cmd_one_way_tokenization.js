@@ -26,14 +26,19 @@ function runTest(conn) {
     // Cursor isn't exhausted, so there shouldn't be another entry yet.
     assert.eq(1, queryStats.length);
 
-    assert.commandWorked(db.runCommand({getMore: cursor.getId(), collection: db.test.getName(), batchSize: 2}));
+    assert.commandWorked(
+        db.runCommand({getMore: cursor.getId(), collection: db.test.getName(), batchSize: 2}),
+    );
 
     queryStats = getQueryStatsFindCmd(admin, {transformIdentifiers: true});
     assert.eq(2, queryStats.length);
     assert.eq("find", queryStats[1].key.queryShape.command);
     assert.eq(
         {
-            "$and": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$lt": "?number"}}],
+            "$and": [
+                {[kHashedFieldName]: {"$gt": "?number"}},
+                {[kHashedFieldName]: {"$lt": "?number"}},
+            ],
         },
         queryStats[1].key.queryShape.filter,
     );

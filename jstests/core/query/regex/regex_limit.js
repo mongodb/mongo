@@ -52,5 +52,11 @@ assert.eq(1, coll.find({z: {$in: [new RegExp(patternMaxLen)]}}).itcount());
 
 // Test that a regex pattern exceeding the limit fails.
 const patternTooLong = "c".repeat(2 * kMaxRegexPatternLen + 1);
-assert.commandFailedWithCode(coll.runCommand("find", {filter: {z: {$regex: patternTooLong}}}), 51091);
-assert.commandFailedWithCode(coll.runCommand("find", {filter: {z: {$in: [new RegExp(patternTooLong)]}}}), 51091);
+assert.commandFailedWithCode(
+    coll.runCommand("find", {filter: {z: {$regex: patternTooLong}}}),
+    51091,
+);
+assert.commandFailedWithCode(
+    coll.runCommand("find", {filter: {z: {$in: [new RegExp(patternTooLong)]}}}),
+    51091,
+);

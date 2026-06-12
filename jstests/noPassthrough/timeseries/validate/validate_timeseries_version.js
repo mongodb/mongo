@@ -24,7 +24,9 @@ describe("Validate Timeseries version Tests", function () {
 
         // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
         assert.commandWorked(
-            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+            this.conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
         );
     });
 
@@ -71,7 +73,9 @@ describe("Validate Timeseries version Tests", function () {
         assert.eq(res.nNonCompliantDocuments, 1, res);
         assert.eq(res.errors.length, 1, res);
 
-        const record = getTimeseriesCollForRawOps(this.db, this.coll).findOneWithRawData({"meta.sensorId": 2});
+        const record = getTimeseriesCollForRawOps(this.db, this.coll).findOneWithRawData({
+            "meta.sensorId": 2,
+        });
         assert(record);
         TimeseriesTest.checkForDocumentValidationFailureLog(this.coll, record);
     });
@@ -100,7 +104,9 @@ describe("Validate Timeseries version Tests", function () {
         assert.eq(res.nNonCompliantDocuments, 1, res);
         assert.eq(res.errors.length, 1, res);
 
-        const record = getTimeseriesCollForRawOps(this.db, this.coll).findOneWithRawData({"meta.sensorId": 3});
+        const record = getTimeseriesCollForRawOps(this.db, this.coll).findOneWithRawData({
+            "meta.sensorId": 3,
+        });
         TimeseriesTest.checkForDocumentValidationFailureLog(this.coll, record);
     });
 
@@ -123,7 +129,10 @@ describe("Validate Timeseries version Tests", function () {
         assert.eq(res.nNonCompliantDocuments, 1, res);
         assert.eq(res.errors.length, 1, res);
 
-        const record = getTimeseriesCollForRawOps(this.db, this.coll).find({"meta.sensorId": 4}).rawData().toArray()[0];
+        const record = getTimeseriesCollForRawOps(this.db, this.coll)
+            .find({"meta.sensorId": 4})
+            .rawData()
+            .toArray()[0];
         TimeseriesTest.checkForDocumentValidationFailureLog(this.coll, record);
     });
 
@@ -140,7 +149,10 @@ describe("Validate Timeseries version Tests", function () {
         // Verify multiple buckets exist.
         assert.gt(
             getTimeseriesCollForRawOps(this.db, this.coll)
-                .find({"meta.sensorId": 5, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+                .find({
+                    "meta.sensorId": 5,
+                    "control.version": TimeseriesTest.BucketVersion.kCompressedSorted,
+                })
                 .rawData()
                 .count(),
             1,

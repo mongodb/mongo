@@ -101,7 +101,11 @@ try {
     const dupExpected = getActualCount(deduplicatedQuery);
 
     const dupCE = getCE(dupQuery);
-    assert.eq(dupExpected, dupCE, `duplicate $all values: CE ${dupCE} should match non-duplicate CE ${dupExpected}`);
+    assert.eq(
+        dupExpected,
+        dupCE,
+        `duplicate $all values: CE ${dupCE} should match non-duplicate CE ${dupExpected}`,
+    );
 
     // -----------------------------------------------------------------------
     // Test 3 – Dotted-path $all
@@ -119,7 +123,11 @@ try {
 
     // Both matching documents are invisible to the fast path since it expects top level field names, so CE would be 0.
     // Instead we disallow the fast path for queries with dotted paths, so we should get the correct CE of 2 here.
-    assert.eq(2, dottedCE, `dotted-path $all: Expected cardinality: 2, got estimated cardinality: ${dottedCE}`);
+    assert.eq(
+        2,
+        dottedCE,
+        `dotted-path $all: Expected cardinality: 2, got estimated cardinality: ${dottedCE}`,
+    );
 } finally {
     // Restore server parameter values
     setCBRConfig(db, originalCBRParamValues);

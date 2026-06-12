@@ -30,7 +30,10 @@ for (const index of Array(10).keys()) {
 // This returns `null` when there are no entries, as opposed to erroring when getLatestProfilerEntry
 // encounters an empty profile.
 const getLastAdminEntry = () => {
-    const cursor = adminDB.system.profile.find({ns: "admin.$cmd.aggregate"}).sort({$natural: -1}).limit(1);
+    const cursor = adminDB.system.profile
+        .find({ns: "admin.$cmd.aggregate"})
+        .sort({$natural: -1})
+        .limit(1);
     return [...cursor.toArray(), null][0];
 };
 

@@ -15,22 +15,36 @@ function setupCluster(st, routerConn, kDbName, kCollName, kNss, cursorComment) {
     const kShard1Name = st.shard1.shardName;
     const kShard2Name = st.shard2.shardName;
 
-    assert.commandWorked(routerConn.adminCommand({enableSharding: kDbName, primaryShard: kShard0Name}));
+    assert.commandWorked(
+        routerConn.adminCommand({enableSharding: kDbName, primaryShard: kShard0Name}),
+    );
     assert.commandWorked(routerConn.adminCommand({shardCollection: kNss, key: {x: 1}}));
     assert.commandWorked(routerConn.getCollection(kCollName).insert({x: -10001}));
     assert.commandWorked(routerConn.getCollection(kCollName).insert({x: 0}));
     assert.commandWorked(routerConn.getCollection(kCollName).insert({x: 10001}));
-    let suspendRangeDeletionShard0Fp = configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
+    let suspendRangeDeletionShard0Fp = configureFailPoint(
+        st.rs0.getPrimary(),
+        "suspendRangeDeletion",
+    );
     // Set up a sharded collection with a chunk and a document on each shard.
     assert.commandWorked(routerConn.adminCommand({split: kNss, middle: {x: -10000}}));
     assert.commandWorked(routerConn.adminCommand({split: kNss, middle: {x: 10000}}));
-    assert.commandWorked(routerConn.adminCommand({moveChunk: kNss, find: {x: -10000}, to: kShard1Name}));
+    assert.commandWorked(
+        routerConn.adminCommand({moveChunk: kNss, find: {x: -10000}, to: kShard1Name}),
+    );
     suspendRangeDeletionShard0Fp.wait();
-    assert.commandWorked(routerConn.adminCommand({moveChunk: kNss, find: {x: 10000}, to: kShard2Name}));
+    assert.commandWorked(
+        routerConn.adminCommand({moveChunk: kNss, find: {x: 10000}, to: kShard2Name}),
+    );
     suspendRangeDeletionShard0Fp.wait();
     // Open a cursor with a comment to be consumed on the shard directly.
     assert.commandWorked(
-        routerConn.runCommand({"find": kCollName, batchSize: 0, sort: {$natural: 1}, comment: cursorComment}),
+        routerConn.runCommand({
+            "find": kCollName,
+            batchSize: 0,
+            sort: {$natural: 1},
+            comment: cursorComment,
+        }),
     );
     return suspendRangeDeletionShard0Fp;
 }
@@ -60,7 +74,14 @@ jsTestLog("Check the fast export procedure without auth");
     let kCollName = "coll";
     const kNss = kDbName + "." + kCollName;
     let st = new ShardingTest({shards: 3});
-    let suspendRangeDeletionShard0Fp = setupCluster(st, st.s.getDB(kDbName), kDbName, kCollName, kNss, kNss);
+    let suspendRangeDeletionShard0Fp = setupCluster(
+        st,
+        st.s.getDB(kDbName),
+        kDbName,
+        kCollName,
+        kNss,
+        kNss,
+    );
     function setupShardConn(host, kDbName) {
         let conn = new Mongo(host);
         return conn.getDB(kDbName);
@@ -86,7 +107,14 @@ jsTestLog("Check the fast export procedure with auth");
     let admin = st.s.getDB("admin");
     admin.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
     admin.auth("admin", "password");
-    let suspendRangeDeletionShard0Fp = setupCluster(st, admin.getSiblingDB(kDbName), kDbName, kCollName, kNss, kNss);
+    let suspendRangeDeletionShard0Fp = setupCluster(
+        st,
+        admin.getSiblingDB(kDbName),
+        kDbName,
+        kCollName,
+        kNss,
+        kNss,
+    );
     function setupShardConn(host, kDbName) {
         let conn = new Mongo(host);
         let local = conn.getDB("local");

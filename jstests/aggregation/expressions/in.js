@@ -25,7 +25,10 @@ function testExpressionWithIntersection(options) {
     let pipeline = {
         $project: {
             included: {
-                $in: ["$elementField", {$setIntersection: [{$literal: options.array1}, {$literal: options.array2}]}],
+                $in: [
+                    "$elementField",
+                    {$setIntersection: [{$literal: options.array1}, {$literal: options.array2}]},
+                ],
             },
         },
     };
@@ -78,7 +81,12 @@ function testQueryFormEquivalence(res, options) {
     }
 }
 
-testExpression({element: 1, array: [1, 2, 3], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+testExpression({
+    element: 1,
+    array: [1, 2, 3],
+    elementIsIncluded: true,
+    queryFormShouldBeEquivalent: true,
+});
 
 testExpression({
     element: "A",
@@ -96,7 +104,12 @@ testExpression({
 
 /* ------------------------ Nested Objects Tests ------------------------ */
 
-testExpression({element: {a: 1}, array: [{a: 1}], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+testExpression({
+    element: {a: 1},
+    array: [{a: 1}],
+    elementIsIncluded: true,
+    queryFormShouldBeEquivalent: true,
+});
 
 testExpression({
     element: [1, 2],
@@ -105,7 +118,12 @@ testExpression({
     queryFormShouldBeEquivalent: true,
 });
 
-testExpression({element: [1, 2], array: [[1, 2]], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+testExpression({
+    element: [1, 2],
+    array: [[1, 2]],
+    elementIsIncluded: true,
+    queryFormShouldBeEquivalent: true,
+});
 
 /* ------------------------ Duplicated Elements Tests ------------------------ */
 
@@ -241,7 +259,12 @@ testExpressionHashIndex({
     queryFormShouldBeEquivalent: true,
 });
 
-testExpression({element: 1, array: [], elementIsIncluded: false, queryFormShouldBeEquivalent: true});
+testExpression({
+    element: 1,
+    array: [],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: true,
+});
 
 // Aggregation's $in has parity with query's $in except with regexes matching string values and
 // equality semantics with array values.
@@ -260,9 +283,19 @@ testExpression({
     queryFormShouldBeEquivalent: false,
 });
 
-testExpression({element: [], array: [1, 2, 3], elementIsIncluded: false, queryFormShouldBeEquivalent: false});
+testExpression({
+    element: [],
+    array: [1, 2, 3],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: false,
+});
 
-testExpression({element: [1], array: [1, 2, 3], elementIsIncluded: false, queryFormShouldBeEquivalent: false});
+testExpression({
+    element: [1],
+    array: [1, 2, 3],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: false,
+});
 
 testExpression({
     element: [1, 2],

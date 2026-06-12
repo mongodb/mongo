@@ -8,7 +8,12 @@ assert.commandWorked(bulk.execute());
 let ops = [];
 
 for (let i = 0; i < 50; i++)
-    ops.push({op: "find", ns: t.getFullName(), query: {x: {$gt: 5000}, y: {$gt: 5000}}, readCmd: true});
+    ops.push({
+        op: "find",
+        ns: t.getFullName(),
+        query: {x: {$gt: 5000}, y: {$gt: 5000}},
+        readCmd: true,
+    });
 
 ops[10] = {
     op: "createIndex",

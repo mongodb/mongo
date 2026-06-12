@@ -33,7 +33,11 @@ function explainPipeline(pipeline) {
 
 const emptyAddFields = explainPipeline([{$addFields: {}}]);
 // Allow the .stages to be undefined, which occurs when the pipeline is optimized to a find
-assert.doesNotContain({$addFields: {}}, emptyAddFields.stages || [], "The empty $addFields stage should be removed");
+assert.doesNotContain(
+    {$addFields: {}},
+    emptyAddFields.stages || [],
+    "The empty $addFields stage should be removed",
+);
 
 const nonEmptyAddFields = explainPipeline([{$addFields: {b: 1}}]);
 assert.contains(

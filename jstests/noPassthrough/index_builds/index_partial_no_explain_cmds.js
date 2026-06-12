@@ -32,7 +32,9 @@ let reduceFunc = function (keyId, countArray) {
     return Array.sum(countArray);
 };
 
-assert.commandWorked(coll.mapReduce(mapFunc, reduceFunc, {out: "mrOutput", query: {x: {$gt: 1}, a: 1}}));
+assert.commandWorked(
+    coll.mapReduce(mapFunc, reduceFunc, {out: "mrOutput", query: {x: {$gt: 1}, a: 1}}),
+);
 assert(resultsEq([{"_id": 2, "value": 1}], db.getCollection("mrOutput").find().toArray()));
 
 //

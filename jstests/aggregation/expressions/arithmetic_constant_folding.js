@@ -6,7 +6,10 @@
  *  requires_pipeline_optimization,
  * ]
  */
-import {assertArrayEq, getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
+import {
+    assertArrayEq,
+    getExplainedPipelineFromAggregation,
+} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // TODO(SERVER-18047): Remove database creation once explain behavior is unified between replica
@@ -79,7 +82,12 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
         [$x, 1, 2],
         "Constants should not fold left-to-right after the first non-constant.",
     );
-    assertConstantFoldingResults([1, $x, 2], [1, $x, 2], [1, $x, 2], "Constants should not fold across non-constants.");
+    assertConstantFoldingResults(
+        [1, $x, 2],
+        [1, $x, 2],
+        [1, $x, 2],
+        "Constants should not fold across non-constants.",
+    );
 
     assertConstantFoldingResults(
         [5, 2, $x, 3, 4],
@@ -222,7 +230,11 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
             coll
                 .aggregate(
                     makePipeline({
-                        $multiply: [NumberDecimal("-9.999999999999999999999999999999999E+6144"), "$x", "$y"],
+                        $multiply: [
+                            NumberDecimal("-9.999999999999999999999999999999999E+6144"),
+                            "$x",
+                            "$y",
+                        ],
                     }),
                 )
                 .toArray()[0]._id,
@@ -233,7 +245,11 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
         actual: coll
             .aggregate(
                 makePipeline({
-                    $multiply: [NumberDecimal("-9.999999999999999999999999999999999E+6144"), "$y", "$x"],
+                    $multiply: [
+                        NumberDecimal("-9.999999999999999999999999999999999E+6144"),
+                        "$y",
+                        "$x",
+                    ],
                 }),
             )
             .toArray()

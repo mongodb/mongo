@@ -13,7 +13,10 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, it, before, afterEach, after, beforeEach} from "jstests/libs/mochalite.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 import {
@@ -45,7 +48,9 @@ describe("$changeStream v2", function () {
         adminDb = st.s.getDB("admin");
         db = st.s.getDB(jsTestName());
         //Enable sharding on the the test database and ensure that the primary is shard0.
-        assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+        );
         coll = db.test;
         newShard = null;
     });
@@ -91,7 +96,10 @@ describe("$changeStream v2", function () {
 
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDb);
-        const csCursor = csTest.startWatchingAllChangesForCluster({}, {version: "v2", showExpandedEvents: true});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {},
+            {version: "v2", showExpandedEvents: true},
+        );
 
         // Insert documents into the collection and ensure data distribution.
         coll.insertMany([
@@ -106,7 +114,11 @@ describe("$changeStream v2", function () {
 
         // Reshard collection and allocate to shards {shard1, shard2}.
         assert.commandWorked(
-            st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+            st.s.adminCommand({
+                reshardCollection: coll.getFullName(),
+                key: {a: 1},
+                numInitialChunks: 1,
+            }),
         );
         ensureShardDistribution(db, coll, {
             middle: {a: 2},
@@ -178,10 +190,15 @@ describe("$changeStream v2", function () {
 
     it("can be opened on a cluster without collections and returns events once a collection is created", function () {
         csTest = new ChangeStreamTest(adminDb);
-        const csCursor = csTest.startWatchingAllChangesForCluster({}, {version: "v2", showExpandedEvents: true});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {},
+            {version: "v2", showExpandedEvents: true},
+        );
 
         // Create an unsplittable collection.
-        assert.commandWorked(db.runCommand({createUnsplittableCollection: "test", dataShard: st.shard1.shardName}));
+        assert.commandWorked(
+            db.runCommand({createUnsplittableCollection: "test", dataShard: st.shard1.shardName}),
+        );
 
         // Insert some documents.
         coll.insertMany([
@@ -262,7 +279,9 @@ describe("$changeStream v2", function () {
         assertCreateCollection(db, coll2.getName());
 
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
-        assert.commandWorked(db.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            db.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}),
+        );
         coll.insertMany([
             {_id: -1, a: -1},
             {_id: 1, a: 1},
@@ -300,7 +319,10 @@ describe("$changeStream v2", function () {
         });
         // // Open a change stream.
         csTest = new ChangeStreamTest(adminDb);
-        const csCursor = csTest.startWatchingAllChangesForCluster({}, {version: "v2", showExpandedEvents: true});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {},
+            {version: "v2", showExpandedEvents: true},
+        );
 
         // Insert documents into the collection and ensure data distribution.
         coll.insertMany([
@@ -325,7 +347,11 @@ describe("$changeStream v2", function () {
 
         // Reshard collection and allocate to shards {shard1, shard2}.
         assert.commandWorked(
-            st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+            st.s.adminCommand({
+                reshardCollection: coll.getFullName(),
+                key: {a: 1},
+                numInitialChunks: 1,
+            }),
         );
         ensureShardDistribution(db, coll, {
             middle: {a: 2},
@@ -343,7 +369,11 @@ describe("$changeStream v2", function () {
         // Reshard second collection and allocate to shards {shard1, shard2}.
 
         assert.commandWorked(
-            st.s.adminCommand({reshardCollection: coll2.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+            st.s.adminCommand({
+                reshardCollection: coll2.getFullName(),
+                key: {a: 1},
+                numInitialChunks: 1,
+            }),
         );
         ensureShardDistribution(db, coll2, {
             middle: {a: 3},
@@ -445,11 +475,16 @@ describe("$changeStream v2", function () {
         assertCreateCollection(db2, coll2.getName());
 
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
-        assert.commandWorked(db2.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            db2.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}),
+        );
 
         // // Open a change stream.
         csTest = new ChangeStreamTest(adminDb);
-        const csCursor = csTest.startWatchingAllChangesForCluster({}, {version: "v2", showExpandedEvents: true});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {},
+            {version: "v2", showExpandedEvents: true},
+        );
 
         coll.insertMany([
             {_id: -1, a: -1},
@@ -510,7 +545,10 @@ describe("$changeStream v2", function () {
     it("returns events when new shards are added and a new collection is created", function () {
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDb);
-        const csCursor = csTest.startWatchingAllChangesForCluster({}, {version: "v2", showExpandedEvents: true});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {},
+            {version: "v2", showExpandedEvents: true},
+        );
 
         const rsNodeOptions = {
             setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
@@ -620,7 +658,11 @@ describe("$changeStream v2", function () {
         ]);
 
         assert.commandWorked(
-            st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+            st.s.adminCommand({
+                reshardCollection: coll.getFullName(),
+                key: {a: 1},
+                numInitialChunks: 1,
+            }),
         );
         ensureShardDistribution(db, coll, {
             middle: {a: 2},
@@ -637,7 +679,10 @@ describe("$changeStream v2", function () {
 
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDb);
-        const csCursor = csTest.startWatchingAllChangesForCluster({}, {version: "v2", showExpandedEvents: true});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {},
+            {version: "v2", showExpandedEvents: true},
+        );
 
         const rsNodeOptions = {
             setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
@@ -647,7 +692,11 @@ describe("$changeStream v2", function () {
         newShard.shardName = newShardName;
 
         assert.commandWorked(
-            st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+            st.s.adminCommand({
+                reshardCollection: coll.getFullName(),
+                key: {a: 1},
+                numInitialChunks: 1,
+            }),
         );
         ensureShardDistribution(db, coll, {
             middle: {a: 2},

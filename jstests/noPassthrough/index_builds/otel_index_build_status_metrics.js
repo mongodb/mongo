@@ -58,7 +58,11 @@ const baselineStart = new Date();
 waitForIndexStatusMetrics(
     metricsDir,
     baselineStart,
-    (metrics) => metrics.active === 0 && metrics.started === 0 && metrics.succeeded === 0 && metrics.failed === 0,
+    (metrics) =>
+        metrics.active === 0 &&
+        metrics.started === 0 &&
+        metrics.succeeded === 0 &&
+        metrics.failed === 0,
     "Expected index build metrics to start at zero",
 );
 
@@ -71,7 +75,11 @@ IndexBuildTest.waitForIndexBuildToScanCollection(testDB, successCollName, "a_1")
 waitForIndexStatusMetrics(
     metricsDir,
     successStart,
-    (metrics) => metrics.active === 1 && metrics.started === 1 && metrics.succeeded === 0 && metrics.failed === 0,
+    (metrics) =>
+        metrics.active === 1 &&
+        metrics.started === 1 &&
+        metrics.succeeded === 0 &&
+        metrics.failed === 0,
     "Expected active gauge to reflect successful in-progress build",
 );
 
@@ -81,22 +89,34 @@ awaitSuccess();
 waitForIndexStatusMetrics(
     metricsDir,
     successStart,
-    (metrics) => metrics.active === 0 && metrics.started === 1 && metrics.succeeded === 1 && metrics.failed === 0,
+    (metrics) =>
+        metrics.active === 0 &&
+        metrics.started === 1 &&
+        metrics.succeeded === 1 &&
+        metrics.failed === 0,
     "Expected completed counter to increment after successful build",
 );
 
 jsTest.log.info("Running failing unique index build");
 IndexBuildTest.pauseIndexBuilds(primary);
 const failureStart = new Date();
-const awaitFailure = IndexBuildTest.startIndexBuild(primary, failureColl.getFullName(), {a: 1}, {unique: true}, [
-    ErrorCodes.DuplicateKey,
-]);
+const awaitFailure = IndexBuildTest.startIndexBuild(
+    primary,
+    failureColl.getFullName(),
+    {a: 1},
+    {unique: true},
+    [ErrorCodes.DuplicateKey],
+);
 
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, failureCollName, "a_1");
 waitForIndexStatusMetrics(
     metricsDir,
     failureStart,
-    (metrics) => metrics.active === 1 && metrics.started === 2 && metrics.succeeded === 1 && metrics.failed === 0,
+    (metrics) =>
+        metrics.active === 1 &&
+        metrics.started === 2 &&
+        metrics.succeeded === 1 &&
+        metrics.failed === 0,
     "Expected active gauge to reflect failing in-progress build",
 );
 
@@ -106,22 +126,34 @@ awaitFailure();
 waitForIndexStatusMetrics(
     metricsDir,
     failureStart,
-    (metrics) => metrics.active === 0 && metrics.started === 2 && metrics.succeeded === 1 && metrics.failed === 1,
+    (metrics) =>
+        metrics.active === 0 &&
+        metrics.started === 2 &&
+        metrics.succeeded === 1 &&
+        metrics.failed === 1,
     "Expected failed counter to increment after duplicate-key build failure",
 );
 
 jsTest.log.info("Running externally aborted index build");
 IndexBuildTest.pauseIndexBuilds(primary);
 const abortedStart = new Date();
-const awaitAborted = IndexBuildTest.startIndexBuild(primary, abortedColl.getFullName(), {b: 1}, {}, [
-    ErrorCodes.IndexBuildAborted,
-]);
+const awaitAborted = IndexBuildTest.startIndexBuild(
+    primary,
+    abortedColl.getFullName(),
+    {b: 1},
+    {},
+    [ErrorCodes.IndexBuildAborted],
+);
 
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, abortedCollName, "b_1");
 waitForIndexStatusMetrics(
     metricsDir,
     abortedStart,
-    (metrics) => metrics.active === 1 && metrics.started === 3 && metrics.succeeded === 1 && metrics.failed === 1,
+    (metrics) =>
+        metrics.active === 1 &&
+        metrics.started === 3 &&
+        metrics.succeeded === 1 &&
+        metrics.failed === 1,
     "Expected active gauge to reflect aborted in-progress build",
 );
 
@@ -140,7 +172,11 @@ awaitDrop();
 waitForIndexStatusMetrics(
     metricsDir,
     abortedStart,
-    (metrics) => metrics.active === 0 && metrics.started === 3 && metrics.succeeded === 1 && metrics.failed === 2,
+    (metrics) =>
+        metrics.active === 0 &&
+        metrics.started === 3 &&
+        metrics.succeeded === 1 &&
+        metrics.failed === 2,
     "Expected externally aborted build to increment failed counter",
 );
 

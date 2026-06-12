@@ -31,10 +31,15 @@ function runTest(downgradeFCV) {
                 versions.to +
                 " while creating a collection",
         );
-        assert.commandWorked(primaryDB.adminCommand({setFeatureCompatibilityVersion: versions.from, confirm: true}));
+        assert.commandWorked(
+            primaryDB.adminCommand({setFeatureCompatibilityVersion: versions.from, confirm: true}),
+        );
 
         assert.commandWorked(
-            primaryDB.adminCommand({configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "alwaysOn"}),
+            primaryDB.adminCommand({
+                configureFailPoint: "hangBeforeLoggingCreateCollection",
+                mode: "alwaysOn",
+            }),
         );
         primaryDB.mycoll.drop();
 
@@ -52,7 +57,9 @@ function runTest(downgradeFCV) {
 
             awaitUpgradeFCV = startParallelShell(
                 funWithArgs(function (version) {
-                    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
+                    assert.commandWorked(
+                        db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}),
+                    );
                 }, versions.to),
                 primary.port,
             );
@@ -62,7 +69,10 @@ function runTest(downgradeFCV) {
                 assert.soon(
                     function () {
                         res = assert.commandWorked(
-                            primaryDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+                            primaryDB.adminCommand({
+                                getParameter: 1,
+                                featureCompatibilityVersion: 1,
+                            }),
                         );
                         return (
                             res.featureCompatibilityVersion.version === versions.from &&
@@ -80,7 +90,10 @@ function runTest(downgradeFCV) {
             }
         } finally {
             assert.commandWorked(
-                primaryDB.adminCommand({configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "off"}),
+                primaryDB.adminCommand({
+                    configureFailPoint: "hangBeforeLoggingCreateCollection",
+                    mode: "off",
+                }),
             );
         }
 

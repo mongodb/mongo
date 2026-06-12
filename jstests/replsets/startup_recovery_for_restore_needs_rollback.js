@@ -44,7 +44,11 @@ const paddingStr = "XXXXXXXXX";
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Pre-load some documents.
@@ -127,7 +131,10 @@ restoreNode = rst.start(
     true /* restart */,
 );
 // Make sure we can read the last doc after standalone recovery.
-assert.docEq({_id: lastId, paddingStr: paddingStr}, restoreNode.getDB(dbName)[collName].findOne({_id: lastId}));
+assert.docEq(
+    {_id: lastId, paddingStr: paddingStr},
+    restoreNode.getDB(dbName)[collName].findOne({_id: lastId}),
+);
 
 clearRawMongoProgramOutput();
 jsTestLog("Restarting restore node again, in repl set mode");
@@ -156,7 +163,10 @@ assert.soonNoExcept(function () {
 clearRawMongoProgramOutput();
 
 assert.commandWorked(
-    restoreNode.adminCommand({"configureFailPoint": "hangBeforeUnrecoverableRollbackError", "mode": "off"}),
+    restoreNode.adminCommand({
+        "configureFailPoint": "hangBeforeUnrecoverableRollbackError",
+        "mode": "off",
+    }),
 );
 
 // This node should not come back up, because it has no stable timestamp to recover to.

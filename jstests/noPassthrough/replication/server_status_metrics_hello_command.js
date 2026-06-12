@@ -20,14 +20,22 @@ assert.commandWorked(db.runCommand({hello: 1}));
 serverStatusMetrics = db.serverStatus().metrics.commands;
 assert.eq(getCommandCount("hello"), currentHelloTotal + 1, "commands.hello should increment");
 ++currentHelloTotal;
-assert.eq(getCommandCount("isMaster"), currentIsMasterTotal, "commands.isMaster should not increment");
+assert.eq(
+    getCommandCount("isMaster"),
+    currentIsMasterTotal,
+    "commands.isMaster should not increment",
+);
 
 // Running isMaster command.
 jsTestLog("Running isMaster command");
 assert.commandWorked(db.runCommand({isMaster: 1}));
 serverStatusMetrics = db.serverStatus().metrics.commands;
 assert.eq(getCommandCount("hello"), currentHelloTotal, "commands.hello should not increment");
-assert.eq(getCommandCount("isMaster"), currentIsMasterTotal + 1, "commands.isMaster should increment");
+assert.eq(
+    getCommandCount("isMaster"),
+    currentIsMasterTotal + 1,
+    "commands.isMaster should increment",
+);
 ++currentIsMasterTotal;
 
 // Running ismaster command.
@@ -35,7 +43,11 @@ jsTestLog("Running ismaster command");
 assert.commandWorked(db.runCommand({ismaster: 1}));
 serverStatusMetrics = db.serverStatus().metrics.commands;
 assert.eq(getCommandCount("hello"), currentHelloTotal, "commands.hello should not increment");
-assert.eq(getCommandCount("isMaster"), currentIsMasterTotal + 1, "commands.isMaster should increment");
+assert.eq(
+    getCommandCount("isMaster"),
+    currentIsMasterTotal + 1,
+    "commands.isMaster should increment",
+);
 ++currentIsMasterTotal;
 
 MongoRunner.stopMongod(mongod);

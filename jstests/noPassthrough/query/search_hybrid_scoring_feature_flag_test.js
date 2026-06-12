@@ -3,7 +3,10 @@
  * feature flags are turned off.
  */
 
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 
 // TODO SERVER-85426 Remove this test when 'featureFlagRankFusionBasic',
 // 'featureFlagRankFusionFull' and 'featureFlagSearchHybridScoringFull' are removed.
@@ -66,7 +69,9 @@ import {assertCreateCollection, assertDropCollection} from "jstests/libs/collect
     assert.commandFailedWithCode(
         testDB.runCommand({
             aggregate: coll.getName(),
-            pipeline: [{$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}, scoreDetails: true}}],
+            pipeline: [
+                {$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}, scoreDetails: true}},
+            ],
             cursor: {},
         }),
         ErrorCodes.QueryFeatureNotAllowed,

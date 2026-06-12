@@ -41,7 +41,12 @@ function tailWorker(host, collName, tid, expectedDocs) {
     const iSlash = host.indexOf("/");
     let connString = "mongodb://";
     if (iSlash > 0) {
-        connString += host.substr(iSlash + 1) + "/?appName=tid" + tid + "&replicaSet=" + host.substr(0, iSlash);
+        connString +=
+            host.substr(iSlash + 1) +
+            "/?appName=tid" +
+            tid +
+            "&replicaSet=" +
+            host.substr(0, iSlash);
     } else {
         connString += host + "/?appName=tid" + tid;
     }
@@ -106,11 +111,18 @@ function tailWorker(host, collName, tid, expectedDocs) {
     const expected = db[collName].find().sort({_id: 1}).toArray();
     const actual = cloneColl.find().sort({_id: 1}).toArray();
     assert.eq(expected.length, actual.length, function () {
-        return "number of documents do not match. expected: " + tojson(expected) + " actual: " + tojson(actual);
+        return (
+            "number of documents do not match. expected: " +
+            tojson(expected) +
+            " actual: " +
+            tojson(actual)
+        );
     });
     for (let i = 0; i < actual.length; i++) {
         assert.docEq(actual[i], expected[i], function () {
-            return "mismatched documents. expected: " + tojson(expected) + " actual: " + tojson(actual);
+            return (
+                "mismatched documents. expected: " + tojson(expected) + " actual: " + tojson(actual)
+            );
         });
     }
     print(tid + ": done");
@@ -132,13 +144,25 @@ const expectedDocs = nWriters * insertsPerThread + 1;
 let threads = [];
 
 for (let i = 0; i < nReaders; i++) {
-    const thread = new Thread(tailWorker, db.getMongo().host, collName, threads.length, expectedDocs);
+    const thread = new Thread(
+        tailWorker,
+        db.getMongo().host,
+        collName,
+        threads.length,
+        expectedDocs,
+    );
     thread.start();
     threads.push(thread);
 }
 
 for (let i = 0; i < nWriters; i++) {
-    const thread = new Thread(insertWorker, db.getMongo().host, collName, threads.length, insertsPerThread);
+    const thread = new Thread(
+        insertWorker,
+        db.getMongo().host,
+        collName,
+        threads.length,
+        insertsPerThread,
+    );
     thread.start();
     threads.push(thread);
 }

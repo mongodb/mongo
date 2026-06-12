@@ -14,7 +14,12 @@ const nonEncryptedBinDataElement = BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 // Only elements of type BinData with subtype '6' should match.
 assertSchemaMatch(coll, {properties: {bin: {encrypt: {}}}}, {bin: encryptedBinDataElement}, true);
 assertSchemaMatch(coll, {properties: {bin: {encrypt: {}}}}, {bin: {}}, false);
-assertSchemaMatch(coll, {properties: {bin: {encrypt: {}}}}, {bin: nonEncryptedBinDataElement}, false);
+assertSchemaMatch(
+    coll,
+    {properties: {bin: {encrypt: {}}}},
+    {bin: nonEncryptedBinDataElement},
+    false,
+);
 // Nested in object.
 assertSchemaMatch(
     coll,
@@ -22,7 +27,12 @@ assertSchemaMatch(
     {obj: {a: encryptedBinDataElement}},
     true,
 );
-assertSchemaMatch(coll, {properties: {obj: {type: "object", properties: {a: {encrypt: {}}}}}}, {obj: {a: {}}}, false);
+assertSchemaMatch(
+    coll,
+    {properties: {obj: {type: "object", properties: {a: {encrypt: {}}}}}},
+    {obj: {a: {}}},
+    false,
+);
 assertSchemaMatch(
     coll,
     {properties: {obj: {type: "object", properties: {a: {encrypt: {}}}}}},
@@ -37,7 +47,12 @@ assertSchemaMatch(
     {arr: [encryptedBinDataElement, encryptedBinDataElement]},
     true,
 );
-assertSchemaMatch(coll, {properties: {arr: {type: "array", items: {encrypt: {}}}}}, {arr: [{}, {}]}, false);
+assertSchemaMatch(
+    coll,
+    {properties: {arr: {type: "array", items: {encrypt: {}}}}},
+    {arr: [{}, {}]},
+    false,
+);
 assertSchemaMatch(
     coll,
     {properties: {arr: {type: "array", items: {encrypt: {}}}}},
@@ -55,7 +70,10 @@ assertSchemaMatch(
 
 // Encrypt alongside type/bsontype should fail to parse.
 assert.commandFailedWithCode(
-    coll.runCommand({find: "coll", filter: {$jsonSchema: {properties: {bin: {encrypt: {}, type: "object"}}}}}),
+    coll.runCommand({
+        find: "coll",
+        filter: {$jsonSchema: {properties: {bin: {encrypt: {}, type: "object"}}}},
+    }),
     ErrorCodes.FailedToParse,
 );
 

@@ -52,7 +52,9 @@ try {
     fpDrop.wait();
 
     // Expect version context to be present (or not) according to the feature flag state
-    const currentFCV = db.getSiblingDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"}).version;
+    const currentFCV = db
+        .getSiblingDB("admin")
+        .system.version.findOne({_id: "featureCompatibilityVersion"}).version;
     const expectedVersionContext = FeatureFlagUtil.isEnabled(db, "SnapshotFCVInDDLCoordinators")
         ? {OFCV: currentFCV}
         : undefined;
@@ -89,7 +91,11 @@ try {
         ])
         .toArray();
     assert.eq(1, participantOp.length, tojson(participantOp));
-    assert.docEq(expectedVersionContext, participantOp[0].command.versionContext, tojson(participantOp[0]));
+    assert.docEq(
+        expectedVersionContext,
+        participantOp[0].command.versionContext,
+        tojson(participantOp[0]),
+    );
     assert.docEq(expectedVersionContext, participantOp[0].versionContext, tojson(coordinatorOp[0]));
 } finally {
     fpDrop.off();

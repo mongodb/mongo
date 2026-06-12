@@ -39,7 +39,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.mapReduce = function mapReduce(db, collName) {
         let outDB = db.getSiblingDB(this.outDBName);
         let fullName = outDB[collName].getFullName();
-        assert(outDB[collName].exists() !== null, "output collection '" + fullName + "' should exist");
+        assert(
+            outDB[collName].exists() !== null,
+            "output collection '" + fullName + "' should exist",
+        );
 
         // Have all threads combine their results into the same collection
         let options = {finalize: this.finalizer, out: {merge: collName, db: this.outDBName}};

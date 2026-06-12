@@ -30,7 +30,11 @@ function runAndAssert(args, result) {
     assert.commandWorked(coll.insertOne(document));
 
     // Test again with fields from document.
-    assert.eq(coll.aggregate([{$project: {result: {$split: ["$input", "$delimiter"]}}}]).toArray()[0].result, result);
+    assert.eq(
+        coll.aggregate([{$project: {result: {$split: ["$input", "$delimiter"]}}}]).toArray()[0]
+            .result,
+        result,
+    );
 
     // Clean up.
     coll.drop();

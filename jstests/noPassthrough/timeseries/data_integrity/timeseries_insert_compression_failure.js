@@ -38,11 +38,15 @@ const runTest = function (ordered) {
 
     // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
     assert.commandWorked(
-        conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+        conn
+            .getDB("admin")
+            .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
     );
 
     assert.commandWorked(
-        db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(collName, {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     const timestamps = [
@@ -83,7 +87,9 @@ const runTest = function (ordered) {
             },
         },
     };
-    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)),
+    );
 
     corruptBucket(db, coll, bucket._id);
 
@@ -103,9 +109,15 @@ const runTest = function (ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
+    assert.eq(
+        0,
+        TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"),
+    );
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
+    assert.eq(
+        0,
+        TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"),
+    );
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
@@ -149,9 +161,15 @@ const runTest = function (ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
+    assert.eq(
+        0,
+        TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"),
+    );
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
+    assert.eq(
+        0,
+        TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"),
+    );
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
@@ -179,9 +197,15 @@ const runTest = function (ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
+    assert.eq(
+        0,
+        TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"),
+    );
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
+    assert.eq(
+        2,
+        TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"),
+    );
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));

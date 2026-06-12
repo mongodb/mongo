@@ -27,7 +27,10 @@ import {
     MoveCollectionCommand,
     RenameToNonExistentDifferentDbCommand,
 } from "jstests/libs/util/change_stream/change_stream_commands.js";
-import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
+import {
+    ChangeStreamReader,
+    ChangeStreamReadingMode,
+} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {
     buildExpectedEvents,
     createMatcher,
@@ -35,7 +38,10 @@ import {
     runTeardownSteps,
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
-import {Verifier, SingleReaderVerificationTestCase} from "jstests/libs/util/change_stream/change_stream_verifier.js";
+import {
+    Verifier,
+    SingleReaderVerificationTestCase,
+} from "jstests/libs/util/change_stream/change_stream_verifier.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 
 describe("change stream cross-db rename after moveCollection", function () {
@@ -65,7 +71,9 @@ describe("change stream cross-db rename after moveCollection", function () {
         const collName = "coll";
         const watchMode = ChangeStreamWatchMode.kDb;
 
-        new CreateDatabaseCommand({dbName, shardSet: shards, primaryShard: shards[0]._id}).execute(mongos);
+        new CreateDatabaseCommand({dbName, shardSet: shards, primaryShard: shards[0]._id}).execute(
+            mongos,
+        );
 
         // Fixed command sequence: create → insert → moveCollection → cross-DB rename.
         // getChangeEvents(kDb) for each yields: create, insert, reshardCollection, drop.

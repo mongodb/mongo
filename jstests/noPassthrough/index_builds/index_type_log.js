@@ -15,7 +15,9 @@ describe("Index validation log message", function () {
         this.db = this.conn.getDB("test");
 
         // Set verbosity to 1 to show otherwise production-only logs.
-        assert.commandWorked(this.db.adminCommand({setParameter: 1, logComponentVerbosity: {index: {verbosity: 1}}}));
+        assert.commandWorked(
+            this.db.adminCommand({setParameter: 1, logComponentVerbosity: {index: {verbosity: 1}}}),
+        );
     });
 
     const tests = [

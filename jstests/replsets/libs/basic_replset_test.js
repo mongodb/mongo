@@ -33,7 +33,11 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     // Check that both the 'called' and 'successful' fields of the 'electionTimeout' election reason
     // counter have been incremented in serverStatus.
     const primaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
-    verifyServerStatusElectionReasonCounterValue(primaryStatus.electionMetrics, "electionTimeout", 1);
+    verifyServerStatusElectionReasonCounterValue(
+        primaryStatus.electionMetrics,
+        "electionTimeout",
+        1,
+    );
 
     // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
     assert.gt(primary.getDB("local").oplog.rs.count({op: "n", o: {msg: "new primary"}}), 0);

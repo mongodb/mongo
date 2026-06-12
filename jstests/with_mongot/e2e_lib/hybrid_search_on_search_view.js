@@ -92,7 +92,9 @@ createSearchIndex(coll, {name: searchIndexFoo, definition: {"mappings": {"dynami
 createSearchIndex(coll, {
     name: vectorSearchIndexV,
     type: "vectorSearch",
-    definition: {"fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]},
+    definition: {
+        "fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}],
+    },
 });
 
 export const searchPipelineFoo = {
@@ -139,7 +141,12 @@ const mongotInputPipelines = new Set([
     vectorSearchPipelineZ,
 ]);
 
-export function createHybridSearchPipeline(inputPipelines, viewPipeline, stage, isRankFusion = true) {
+export function createHybridSearchPipeline(
+    inputPipelines,
+    viewPipeline,
+    stage,
+    isRankFusion = true,
+) {
     let hybridSearchStage = stage.$rankFusion;
     if (!isRankFusion) {
         hybridSearchStage = stage.$scoreFusion;
@@ -181,7 +188,11 @@ const createViews = () => {
 
 const [viewNames, views] = createViews();
 
-export function runHybridSearchOnSearchViewsTest(inputPipelines, checkCorrectness = true, createPipelineFn) {
+export function runHybridSearchOnSearchViewsTest(
+    inputPipelines,
+    checkCorrectness = true,
+    createPipelineFn,
+) {
     const hybridSearchPipeline = createPipelineFn(inputPipelines);
 
     // Check if any of the input pipelines are mongot input pipelines.
@@ -204,13 +215,22 @@ export function runHybridSearchOnSearchViewsTest(inputPipelines, checkCorrectnes
                 10623000,
             );
             assert.commandFailedWithCode(
-                searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+                searchView.runCommand("aggregate", {
+                    pipeline: hybridSearchPipeline,
+                    explain: true,
+                    cursor: {},
+                }),
                 10623000,
             );
         } else {
-            const hybridSearchPipelineWithViewPrepended = createPipelineFn(inputPipelines, viewPipelines[i]);
+            const hybridSearchPipelineWithViewPrepended = createPipelineFn(
+                inputPipelines,
+                viewPipelines[i],
+            );
 
-            const expectedResultsNoSearchIndexOnView = coll.aggregate(hybridSearchPipelineWithViewPrepended);
+            const expectedResultsNoSearchIndexOnView = coll.aggregate(
+                hybridSearchPipelineWithViewPrepended,
+            );
 
             assert.commandWorked(
                 coll.runCommand("aggregate", {
@@ -223,7 +243,11 @@ export function runHybridSearchOnSearchViewsTest(inputPipelines, checkCorrectnes
             const viewResultsNoSearchIndexOnColl = searchView.aggregate(hybridSearchPipeline);
 
             assert.commandWorked(
-                searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+                searchView.runCommand("aggregate", {
+                    pipeline: hybridSearchPipeline,
+                    explain: true,
+                    cursor: {},
+                }),
             );
 
             if (checkCorrectness) {
@@ -236,7 +260,10 @@ export function runHybridSearchOnSearchViewsTest(inputPipelines, checkCorrectnes
     }
 }
 
-export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines, createPipelineFn) {
+export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(
+    inputPipelines,
+    createPipelineFn,
+) {
     const hybridSearchPipeline = createPipelineFn(inputPipelines);
     for (let i = 0; i < views.length; i++) {
         const searchView = views[i];
@@ -257,7 +284,11 @@ export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inpu
 
         // Explain for this query should fail.
         assert.commandFailedWithCode(
-            searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+            searchView.runCommand("aggregate", {
+                pipeline: hybridSearchPipeline,
+                explain: true,
+                cursor: {},
+            }),
             10623000,
         );
     }

@@ -22,7 +22,9 @@ let mongos = st.s0;
 let admin = mongos.getDB("admin");
 let coll = mongos.getCollection("migration_server_status.coll");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
@@ -32,9 +34,12 @@ for (let x = -2600; x < 2400; x++) {
     documents.push({_id: x});
 }
 assert.commandWorked(
-    mongos
-        .getDB("migration_server_status")
-        .runCommand({insert: "coll", documents: documents, lsid: {id: UUID()}, txnNumber: NumberLong(1)}),
+    mongos.getDB("migration_server_status").runCommand({
+        insert: "coll",
+        documents: documents,
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(1),
+    }),
 );
 
 // Pause the migration once it starts on both shards -- somewhat arbitrary pause point.
@@ -78,18 +83,27 @@ let assertSessionMigrationStatusSource = function (
     if (expectedEntriesToBeMigrated == null) {
         assert(migrationResult.sessionOplogEntriesToBeMigratedSoFar);
     } else {
-        assert.eq(migrationResult.sessionOplogEntriesToBeMigratedSoFar, expectedEntriesToBeMigrated);
+        assert.eq(
+            migrationResult.sessionOplogEntriesToBeMigratedSoFar,
+            expectedEntriesToBeMigrated,
+        );
     }
 
     // If the expected value is null, just check that the field exists
     if (expectedEntriesSkippedLowerBound == null) {
         assert(migrationResult.sessionOplogEntriesSkippedSoFarLowerBound);
     } else {
-        assert.eq(migrationResult.sessionOplogEntriesSkippedSoFarLowerBound, expectedEntriesSkippedLowerBound);
+        assert.eq(
+            migrationResult.sessionOplogEntriesSkippedSoFarLowerBound,
+            expectedEntriesSkippedLowerBound,
+        );
     }
 };
 
-let assertSessionMigrationStatusDestination = function (serverStatusResult, expectedEntriesMigrated) {
+let assertSessionMigrationStatusDestination = function (
+    serverStatusResult,
+    expectedEntriesMigrated,
+) {
     let migrationResult = serverStatusResult.sharding.migrations;
 
     // If the expected value is null, just check that the field exists
@@ -156,7 +170,11 @@ assertMigrationStatusOnServerStatus(
 // fields are present for a config shard.
 const expectedEntriesMigrated = TestData.configShard ? undefined : 2400;
 const expectedEntriesSkipped = TestData.configShard ? undefined : 2600;
-assertSessionMigrationStatusSource(shard0ServerStatus, expectedEntriesMigrated, expectedEntriesSkipped);
+assertSessionMigrationStatusSource(
+    shard0ServerStatus,
+    expectedEntriesMigrated,
+    expectedEntriesSkipped,
+);
 
 // Destination shard should have the correct server status
 shard1ServerStatus = st.shard1.getDB("admin").runCommand({serverStatus: 1});
@@ -170,7 +188,11 @@ assertMigrationStatusOnServerStatus(
     {"_id": {"$maxKey": 1}},
     coll + "",
 );
-assertSessionMigrationStatusDestination(shard1ServerStatus, expectedEntriesMigrated, expectedEntriesSkipped);
+assertSessionMigrationStatusDestination(
+    shard1ServerStatus,
+    expectedEntriesMigrated,
+    expectedEntriesSkipped,
+);
 
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 

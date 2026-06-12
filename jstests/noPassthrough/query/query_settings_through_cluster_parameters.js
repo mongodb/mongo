@@ -57,20 +57,31 @@ let test = (db) => {
 
     // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after
     // invoking setQuerySettings command.
-    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(querySettings, query)]);
+    qsutils.assertQueryShapeConfiguration([
+        qsutils.makeQueryShapeConfiguration(querySettings, query),
+    ]);
 
     // Ensure 'getClusterParameter' doesn't accept query settings parameter directly.
-    assert.commandFailedWithCode(db.adminCommand({getClusterParameter: "querySettings"}), ErrorCodes.NoSuchKey);
+    assert.commandFailedWithCode(
+        db.adminCommand({getClusterParameter: "querySettings"}),
+        ErrorCodes.NoSuchKey,
+    );
     assert.commandFailedWithCode(
         db.adminCommand({
-            getClusterParameter: ["testIntClusterParameter", "querySettings", "testStrClusterParameter"],
+            getClusterParameter: [
+                "testIntClusterParameter",
+                "querySettings",
+                "testStrClusterParameter",
+            ],
         }),
         ErrorCodes.NoSuchKey,
     );
 
     // Ensure 'getClusterParameter' doesn't print query settings value with other cluster
     // parameters.
-    const clusterParameters = assert.commandWorked(db.adminCommand({getClusterParameter: "*"})).clusterParameters;
+    const clusterParameters = assert.commandWorked(
+        db.adminCommand({getClusterParameter: "*"}),
+    ).clusterParameters;
     assert(
         !clusterParameters.some((parameter) => parameter._id === "querySettings"),
         "unexpected _id = 'querySettings' in " + tojson(clusterParameters),

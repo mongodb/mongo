@@ -26,7 +26,11 @@ function checkResponseFields(command, commandType) {
     );
 
     if (commandType === "hello") {
-        assert.eq("boolean", typeof res.isWritablePrimary, "isWritablePrimary field is not a boolean" + tojson(res));
+        assert.eq(
+            "boolean",
+            typeof res.isWritablePrimary,
+            "isWritablePrimary field is not a boolean" + tojson(res),
+        );
         assert(res.isWritablePrimary === true, "isWritablePrimary field is false" + tojson(res));
     } else {
         assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));

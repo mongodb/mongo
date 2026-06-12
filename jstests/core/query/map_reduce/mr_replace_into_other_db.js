@@ -28,7 +28,9 @@ const reduceFn = function (k, vs) {
     return Array.sum(vs);
 };
 
-let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
+let res = assert.commandWorked(
+    coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}),
+);
 const expected = [
     {_id: 1, value: 1},
     {_id: 2, value: 2},

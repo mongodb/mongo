@@ -37,7 +37,11 @@ let boxBounds = [
     [10, 0],
 ];
 
-assert.eq(docs.length, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Bounding Box Test");
+assert.eq(
+    docs.length,
+    t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(),
+    "Bounding Box Test",
+);
 
 // Make sure we can add object-based polygons
 assert.eq(
@@ -54,7 +58,11 @@ boxBounds = [
     [100, 100],
     [100, -100],
 ];
-assert.eq(docs.length, t.countDocuments({loc: {"$within": {"$polygon": boxBounds}}}), "Big Bounding Box Test");
+assert.eq(
+    docs.length,
+    t.countDocuments({loc: {"$within": {"$polygon": boxBounds}}}),
+    "Big Bounding Box Test",
+);
 
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
@@ -88,8 +96,14 @@ assert.commandWorked(
 assert.eq(1, t.countDocuments({loc: {$within: {$polygon: pacman}}}), "Pacman double point");
 
 // Make sure we can't add bad polygons
-assert.throwsWithCode(() => t.find({loc: {$within: {$polygon: [1, 2]}}}).toArray(), ErrorCodes.BadValue);
-assert.throwsWithCode(() => t.find({loc: {$within: {$polygon: [[1, 2]]}}}).toArray(), ErrorCodes.BadValue);
+assert.throwsWithCode(
+    () => t.find({loc: {$within: {$polygon: [1, 2]}}}).toArray(),
+    ErrorCodes.BadValue,
+);
+assert.throwsWithCode(
+    () => t.find({loc: {$within: {$polygon: [[1, 2]]}}}).toArray(),
+    ErrorCodes.BadValue,
+);
 assert.throwsWithCode(
     () =>
         t

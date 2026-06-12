@@ -18,14 +18,21 @@ const fullCollName = coll.getFullName();
 coll.drop();
 
 // Shard the test collection on x.
-assert.commandWorked(mongos.adminCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({
+        enableSharding: coll.getDB().getName(),
+        primaryShard: st.shard0.shardName,
+    }),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: fullCollName, key: {x: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
 assert.commandWorked(mongos.adminCommand({split: fullCollName, middle: {x: 0}}));
 
 // Move the [0, MaxKey] chunk to st.shard1.shardName.
-assert.commandWorked(mongos.adminCommand({moveChunk: fullCollName, find: {x: 1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: fullCollName, find: {x: 1}, to: st.shard1.shardName}),
+);
 
 // Write a document.
 assert.commandWorked(coll.insert({x: -1, _id: 0}));
@@ -62,7 +69,9 @@ const joinMoveChunk = startParallelShell(
             // moveChunk before an updateOne is received by shard 0 or shard 1
             // depending on the scenario tested.
             sleep(100);
-            assert.commandWorked(db.adminCommand({moveChunk: fullCollName, find: {x: -1}, to: shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: fullCollName, find: {x: -1}, to: shardName}),
+            );
         },
         coll.getFullName(),
         st.shard1.shardName,

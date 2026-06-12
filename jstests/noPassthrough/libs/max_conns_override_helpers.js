@@ -14,14 +14,20 @@ export var MaxConnsOverrideHelpers = (function () {
 
                 const currentCount = serverStatus.connections.current;
                 if (currentCount != totalCount) {
-                    print(`Not yet at the expected count of connections: ${currentCount} != ${totalCount}`);
+                    print(
+                        `Not yet at the expected count of connections: ${currentCount} != ${totalCount}`,
+                    );
                     return false;
                 }
 
                 if (adminThreads > 0) {
-                    const readyAdminThreads = executors.reserved.threadsRunning - executors.reserved.clientsRunning;
+                    const readyAdminThreads =
+                        executors.reserved.threadsRunning - executors.reserved.clientsRunning;
                     if (readyAdminThreads < adminThreads) {
-                        print("Not enough admin threads yet: " + `${readyAdminThreads} < ${adminThreads}`);
+                        print(
+                            "Not enough admin threads yet: " +
+                                `${readyAdminThreads} < ${adminThreads}`,
+                        );
                         return false;
                     }
                 }
@@ -31,7 +37,10 @@ export var MaxConnsOverrideHelpers = (function () {
                 const adminClients = adminThreads > 0 ? executors.reserved.clientsInTotal : 0;
                 const threadedExecutorCount = nonAdminClients + adminClients;
                 if (threadedCount != threadedExecutorCount) {
-                    print("Not enough running threaded clients yet: " + `${threadedCount} != ${threadedExecutorCount}`);
+                    print(
+                        "Not enough running threaded clients yet: " +
+                            `${threadedCount} != ${threadedExecutorCount}`,
+                    );
                     return false;
                 }
 
@@ -55,7 +64,9 @@ export var MaxConnsOverrideHelpers = (function () {
         // Log these serverStatus sections so we can debug this easily.
         const filteredSections = {
             connections: connectionsStatus,
-            network: {serviceExecutors: {passthrough: executorStatus, reserved: reservedExecutorStatus}},
+            network: {
+                serviceExecutors: {passthrough: executorStatus, reserved: reservedExecutorStatus},
+            },
         };
         print(`serverStatus: ${tojson(filteredSections)}`);
 
@@ -83,8 +94,14 @@ export var MaxConnsOverrideHelpers = (function () {
 
         // Clients on the reserved executor run on a thread and cannot wait asynchronously.
         if (adminThreads > 0) {
-            assert.eq(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["clientsInTotal"]);
-            assert.lte(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["threadsRunning"]);
+            assert.eq(
+                reservedExecutorStatus["clientsRunning"],
+                reservedExecutorStatus["clientsInTotal"],
+            );
+            assert.lte(
+                reservedExecutorStatus["clientsRunning"],
+                reservedExecutorStatus["threadsRunning"],
+            );
             assert.eq(reservedExecutorStatus["clientsWaitingForData"], 0);
         }
     }

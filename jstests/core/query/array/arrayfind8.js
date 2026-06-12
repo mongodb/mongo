@@ -144,4 +144,10 @@ checkQuery({b: {$elemMatch: {$gte: 1, $lte: 1}}}, [{b: [1]}]);
 checkQuery({b: {$elemMatch: {$gte: 1, $lte: 4}}}, [{b: [1]}]);
 
 checkQuery({b: {$elemMatch: {$gte: 1, $lte: 4}}}, [{b: [2]}], null, null, {"a.b": {$in: [2, 5]}});
-checkQuery({b: {$elemMatch: {$in: [1, 2]}, $in: [2, 3]}}, [{b: [2]}], null, [{b: [1]}, {b: [3]}], null);
+checkQuery(
+    {b: {$elemMatch: {$in: [1, 2]}, $in: [2, 3]}},
+    [{b: [2]}],
+    null,
+    [{b: [1]}, {b: [3]}],
+    null,
+);

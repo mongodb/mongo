@@ -11,7 +11,10 @@ function testSettingParameter() {
     clearRawMongoProgramOutput();
     const tooLowThreadCount = 0;
     assert.throws(() =>
-        MongoRunner.runMongod({replSet: "rs0", setParameter: "replWriterThreadCount=" + tooLowThreadCount.toString()}),
+        MongoRunner.runMongod({
+            replSet: "rs0",
+            setParameter: "replWriterThreadCount=" + tooLowThreadCount.toString(),
+        }),
     );
     assert.soon(
         () => rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount"),
@@ -22,7 +25,10 @@ function testSettingParameter() {
     clearRawMongoProgramOutput();
     const tooHighThreadCount = 257;
     assert.throws(() =>
-        MongoRunner.runMongod({replSet: "rs0", setParameter: "replWriterThreadCount=" + tooHighThreadCount.toString()}),
+        MongoRunner.runMongod({
+            replSet: "rs0",
+            setParameter: "replWriterThreadCount=" + tooHighThreadCount.toString(),
+        }),
     );
     assert.soon(
         () => rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount"),
@@ -83,8 +89,16 @@ function testSettingParameter() {
 
     // getParameter to confirm the server parameter value:
     {
-        const result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1, replWriterMinThreadCount: 1});
-        assert.eq(acceptableThreadCount, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
+        const result = adminDB.runCommand({
+            getParameter: 1,
+            replWriterThreadCount: 1,
+            replWriterMinThreadCount: 1,
+        });
+        assert.eq(
+            acceptableThreadCount,
+            result.replWriterThreadCount,
+            "replWriterThreadCount was not set internally",
+        );
         assert.eq(
             acceptableMinThreadCount,
             result.replWriterMinThreadCount,
@@ -95,7 +109,9 @@ function testSettingParameter() {
     // Make sure using setParameter with a wrong max thread count still fails:
     {
         // Can't set max to 0
-        assert.commandFailed(adminDB.runCommand({setParameter: 1, replWriterThreadCount: tooLowThreadCount}));
+        assert.commandFailed(
+            adminDB.runCommand({setParameter: 1, replWriterThreadCount: tooLowThreadCount}),
+        );
         let result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
         assert.eq(
             acceptableThreadCount,
@@ -104,7 +120,10 @@ function testSettingParameter() {
         );
         // Can't set max to less than min (4)
         assert.commandFailed(
-            adminDB.runCommand({setParameter: 1, replWriterThreadCount: acceptableMinThreadCount - 1}),
+            adminDB.runCommand({
+                setParameter: 1,
+                replWriterThreadCount: acceptableMinThreadCount - 1,
+            }),
         );
         result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
         assert.eq(
@@ -113,7 +132,9 @@ function testSettingParameter() {
             "replWriterThreadCount was overwritten by invalid value",
         );
         // Can't set max to >256
-        assert.commandFailed(adminDB.runCommand({setParameter: 1, replWriterThreadCount: tooHighThreadCount}));
+        assert.commandFailed(
+            adminDB.runCommand({setParameter: 1, replWriterThreadCount: tooHighThreadCount}),
+        );
         result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
         assert.eq(
             acceptableThreadCount,
@@ -134,7 +155,10 @@ function testSettingParameter() {
         );
         // Can't set min to >max
         assert.commandFailed(
-            adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: acceptableThreadCount + 1}),
+            adminDB.runCommand({
+                setParameter: 1,
+                replWriterMinThreadCount: acceptableThreadCount + 1,
+            }),
         );
         result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
         assert.eq(
@@ -144,7 +168,10 @@ function testSettingParameter() {
         );
         // Can't set min to > pool size, even if max is higher
         assert.commandFailed(
-            adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: actualExpectedMaxThreads + 1}),
+            adminDB.runCommand({
+                setParameter: 1,
+                replWriterMinThreadCount: actualExpectedMaxThreads + 1,
+            }),
         );
         result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
         assert.eq(
@@ -161,18 +188,28 @@ function testSettingParameter() {
         // If this is not the case, we cannot continue with the test
         assert(
             lowerMax >= acceptableMinThreadCount,
-            "Must have at least 3 cores available to run this test (current number: " + numCores + ")",
+            "Must have at least 3 cores available to run this test (current number: " +
+                numCores +
+                ")",
         );
 
-        assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterThreadCount: lowerMax}));
+        assert.commandWorked(
+            adminDB.runCommand({setParameter: 1, replWriterThreadCount: lowerMax}),
+        );
         const result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
-        assert.eq(lowerMax, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
+        assert.eq(
+            lowerMax,
+            result.replWriterThreadCount,
+            "replWriterThreadCount was not set internally",
+        );
     }
 
     // increase maximum thread count
     {
         jsTest.log.info("Increasing max thread count");
-        assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterThreadCount: actualExpectedMaxThreads}));
+        assert.commandWorked(
+            adminDB.runCommand({setParameter: 1, replWriterThreadCount: actualExpectedMaxThreads}),
+        );
         const result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
         assert.eq(
             actualExpectedMaxThreads,
@@ -186,18 +223,30 @@ function testSettingParameter() {
         jsTest.log.info("Increasing min thread count");
         const higherMin = acceptableMinThreadCount + 2;
         // we have already ensured that there are at least 3 cores.
-        assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: higherMin}));
+        assert.commandWorked(
+            adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: higherMin}),
+        );
         const result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
-        assert.eq(higherMin, result.replWriterMinThreadCount, "replWriterMinThreadCount was not set internally");
+        assert.eq(
+            higherMin,
+            result.replWriterMinThreadCount,
+            "replWriterMinThreadCount was not set internally",
+        );
     }
 
     // decrease minimum thread count
     {
         jsTest.log.info("Decreasing min thread count");
         const lowerMin = acceptableMinThreadCount;
-        assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: lowerMin}));
+        assert.commandWorked(
+            adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: lowerMin}),
+        );
         const result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
-        assert.eq(lowerMin, result.replWriterMinThreadCount, "replWriterMinThreadCount was not set internally");
+        assert.eq(
+            lowerMin,
+            result.replWriterMinThreadCount,
+            "replWriterMinThreadCount was not set internally",
+        );
     }
 
     // increase maximum thread count above number of cores * 2
@@ -205,7 +254,9 @@ function testSettingParameter() {
         jsTest.log.info("Increase maximum threads over number of cores * 2");
         const maxAboveActualPoolMaxSize = threadCountCap + 4;
 
-        assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterThreadCount: maxAboveActualPoolMaxSize}));
+        assert.commandWorked(
+            adminDB.runCommand({setParameter: 1, replWriterThreadCount: maxAboveActualPoolMaxSize}),
+        );
         const result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
         assert.eq(
             maxAboveActualPoolMaxSize,
@@ -236,10 +287,18 @@ function testSettingParameter() {
 
             const initMaxThreadCount = 8;
             const initMinThreadCount = 6;
-            assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterThreadCount: initMaxThreadCount}));
-            assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: initMinThreadCount}));
+            assert.commandWorked(
+                adminDB.runCommand({setParameter: 1, replWriterThreadCount: initMaxThreadCount}),
+            );
+            assert.commandWorked(
+                adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: initMinThreadCount}),
+            );
             let result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
-            assert.eq(initMaxThreadCount, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
+            assert.eq(
+                initMaxThreadCount,
+                result.replWriterThreadCount,
+                "replWriterThreadCount was not set internally",
+            );
             result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
             assert.eq(
                 initMinThreadCount,
@@ -326,10 +385,18 @@ function testOplogApplication() {
 
     jsTest.log.info("Set thread pool size to four threads per core");
     for (const secondary of secondaries) {
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: fourThreadsPerCore}));
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, replWriterThreadCount: fourThreadsPerCore}),
+        );
         let result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
-        assert.eq(fourThreadsPerCore, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: fourThreadsPerCore}));
+        assert.eq(
+            fourThreadsPerCore,
+            result.replWriterThreadCount,
+            "replWriterThreadCount was not set internally",
+        );
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: fourThreadsPerCore}),
+        );
         result = secondary.adminCommand({getParameter: 1, replWriterMinThreadCount: 1});
         assert.eq(
             fourThreadsPerCore,
@@ -370,12 +437,24 @@ function testOplogApplication() {
 
     jsTest.log.info("Decrease thread pool size to one thread per core");
     for (const secondary of secondaries) {
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: numCores}));
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: numCores}),
+        );
         let result = secondary.adminCommand({getParameter: 1, replWriterMinThreadCount: 1});
-        assert.eq(numCores, result.replWriterMinThreadCount, "replWriterMinThreadCount was not set internally");
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: numCores}));
+        assert.eq(
+            numCores,
+            result.replWriterMinThreadCount,
+            "replWriterMinThreadCount was not set internally",
+        );
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, replWriterThreadCount: numCores}),
+        );
         result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
-        assert.eq(numCores, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
+        assert.eq(
+            numCores,
+            result.replWriterThreadCount,
+            "replWriterThreadCount was not set internally",
+        );
     }
     // Ensure thread pool size has changed
     for (let i = numWrites; i < numWrites * 2; i++) {
@@ -398,7 +477,9 @@ function testOplogApplication() {
                 rawMongoProgramOutput("Reaping this thread as we are above maxThreads").match(
                     '"numThreads":' + threadNum + ',"maxThreads":' + numCores,
                 ),
-            "the right number of threads were not reaped to meet maxThreads (" + threadNum + " was not present)",
+            "the right number of threads were not reaped to meet maxThreads (" +
+                threadNum +
+                " was not present)",
         );
     }
     // Should not have reaped more than numCores threads
@@ -413,12 +494,24 @@ function testOplogApplication() {
     jsTest.log.info("Increase thread pool size");
     const newThreads = numCores + 2;
     for (const secondary of secondaries) {
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: newThreads}));
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, replWriterThreadCount: newThreads}),
+        );
         let result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
-        assert.eq(newThreads, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: newThreads}));
+        assert.eq(
+            newThreads,
+            result.replWriterThreadCount,
+            "replWriterThreadCount was not set internally",
+        );
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: newThreads}),
+        );
         result = secondary.adminCommand({getParameter: 1, replWriterMinThreadCount: 1});
-        assert.eq(newThreads, result.replWriterMinThreadCount, "replWriterMinThreadCount was not set internally");
+        assert.eq(
+            newThreads,
+            result.replWriterMinThreadCount,
+            "replWriterMinThreadCount was not set internally",
+        );
     }
     // check that new threads were spawned to meet minThreads
     for (let i = numCores; i < newThreads; i++) {
@@ -453,7 +546,9 @@ function testOplogApplication() {
 }
 
 function testPreparedTransactionWithThreadCountChange() {
-    jsTest.log.info("Testing prepared transaction with replWriterThreadCount change between prepare and commit");
+    jsTest.log.info(
+        "Testing prepared transaction with replWriterThreadCount change between prepare and commit",
+    );
     clearRawMongoProgramOutput();
 
     const rst = new ReplSetTest({name: jsTest.name() + "_preparedTxn", nodes: 2});
@@ -473,9 +568,15 @@ function testPreparedTransactionWithThreadCountChange() {
     const numCores = hostInfoRes.system.numCores;
     jsTest.log.info("System info: numCores=", numCores);
     const fourThreadsPerCore = numCores * 4;
-    assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: fourThreadsPerCore}));
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, replWriterThreadCount: fourThreadsPerCore}),
+    );
     let result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
-    assert.eq(fourThreadsPerCore, result.replWriterThreadCount, "replWriterThreadCount was not set to initial value");
+    assert.eq(
+        fourThreadsPerCore,
+        result.replWriterThreadCount,
+        "replWriterThreadCount was not set to initial value",
+    );
 
     // Prepare but do not commit a transaction.
     const session = primary.startSession();
@@ -505,12 +606,22 @@ function testPreparedTransactionWithThreadCountChange() {
 
     // Reduce the replWriterThreadCount on the secondary.
     const reducedThreadCount = 1;
-    assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: reducedThreadCount}));
-    assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: reducedThreadCount}));
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: reducedThreadCount}),
+    );
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, replWriterThreadCount: reducedThreadCount}),
+    );
     result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
-    assert.eq(reducedThreadCount, result.replWriterThreadCount, "replWriterThreadCount was not reduced");
+    assert.eq(
+        reducedThreadCount,
+        result.replWriterThreadCount,
+        "replWriterThreadCount was not reduced",
+    );
 
-    jsTest.log.info("Reduced replWriterThreadCount from " + fourThreadsPerCore + " to " + reducedThreadCount);
+    jsTest.log.info(
+        "Reduced replWriterThreadCount from " + fourThreadsPerCore + " to " + reducedThreadCount,
+    );
 
     // Commit the transaction, to test that the server can handle a different number of writer vectors between prepare and commit.
     const commitTimestamp = Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);

@@ -57,7 +57,11 @@ if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB(dbName), "PrimaryDrivenIn
             return ns && ns.startsWith(dbName + ".");
         },
     });
-    assert.gt(completedBuilds.length, 0, "Expected at least one resumable build-completion log on the primary");
+    assert.gt(
+        completedBuilds.length,
+        0,
+        "Expected at least one resumable build-completion log on the primary",
+    );
     for (const entry of completedBuilds) {
         assert.gt(
             entry.attr.numIndexesBefore,

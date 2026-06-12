@@ -37,8 +37,10 @@ export const $config = (function () {
             const documents = getAllDocuments(this.session, collection, this.numAccounts, {
                 retryOnKilledSession: this.retryOnKilledSession,
             });
-            assert.eq(this.numAccounts * this.initialValue, computeTotalOfAllBalances(documents), () =>
-                tojson(documents),
+            assert.eq(
+                this.numAccounts * this.initialValue,
+                computeTotalOfAllBalances(documents),
+                () => tojson(documents),
             );
         }
 
@@ -116,7 +118,9 @@ export const $config = (function () {
 
     function teardown(db, collName, cluster) {
         const documents = db[collName].find().toArray();
-        assert.eq(this.numAccounts * this.initialValue, computeTotalOfAllBalances(documents), () => tojson(documents));
+        assert.eq(this.numAccounts * this.initialValue, computeTotalOfAllBalances(documents), () =>
+            tojson(documents),
+        );
 
         // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
         // majority by setting CWWC to {w: majority}.

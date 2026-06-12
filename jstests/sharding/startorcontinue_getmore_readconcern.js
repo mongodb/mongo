@@ -23,7 +23,11 @@ let txnNumber = 0;
 let stmtId = 0;
 let shard0db = st.getPrimaryShard(dbName).getDB(dbName);
 
-let insertResult = shard0db.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: "majority"}});
+let insertResult = shard0db.runCommand({
+    insert: collName,
+    documents: [{a: 1}],
+    writeConcern: {w: "majority"},
+});
 assert.commandWorked(insertResult);
 let clusterTime = shard0db.getSession().getOperationTime();
 

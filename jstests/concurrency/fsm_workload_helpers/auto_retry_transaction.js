@@ -91,7 +91,8 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
             // If commit fails with a killed session code, the commit must be retried because it is
             // unknown if the interrupted commit succeeded. This is safe because commitTransaction
             // is a retryable write.
-            const failedWithInterruption = !commitRes.ok && KilledSessionUtil.isKilledSessionCode(commitRes.code);
+            const failedWithInterruption =
+                !commitRes.ok && KilledSessionUtil.isKilledSessionCode(commitRes.code);
             const wcFailedWithInterruption = KilledSessionUtil.hasKilledSessionWCError(commitRes);
             if (retryOnKilledSession && (failedWithInterruption || wcFailedWithInterruption)) {
                 print(

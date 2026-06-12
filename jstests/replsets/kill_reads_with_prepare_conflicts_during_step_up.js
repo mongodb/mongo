@@ -44,7 +44,10 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Advance the clusterTime with another insert.
 const clusterTimeAfterPrepare = assert.commandWorked(
-    primaryColl.runCommand("insert", {documents: [{advanceClusterTime: 1}], writeConcern: {w: "majority"}}),
+    primaryColl.runCommand("insert", {
+        documents: [{advanceClusterTime: 1}],
+        writeConcern: {w: "majority"},
+    }),
 ).operationTime;
 
 // Ensure that the secondary replicates the prepare and the additional insert.

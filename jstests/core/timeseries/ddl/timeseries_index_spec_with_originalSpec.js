@@ -176,6 +176,8 @@ jsTestLog("Running with no default collection collation");
 const collNoCollation = db.getCollection(collName + "_no_collation");
 collNoCollation.drop();
 assert.commandWorked(
-    db.createCollection(collNoCollation.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(collNoCollation.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 runTest(collNoCollation, /*isCaseSensitiveCollation*/ false);

@@ -5,7 +5,10 @@
 
 import "jstests/multiVersion/libs/multi_cluster.js";
 
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -88,11 +91,17 @@ expectedEvents.push({operationType: "delete", documentKey: {_id: "a", shard: 1}}
 assert.commandWorked(testColl.remove({_id: "b"}));
 expectedEvents.push({operationType: "delete", documentKey: {_id: "b", shard: 2}});
 
-assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: testColl.getFullName(), key: {shard: 1, _id: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({refineCollectionShardKey: testColl.getFullName(), key: {shard: 1, _id: 1}}),
+);
 expectedEvents.push({operationType: "refineCollectionShardKey"});
 
 assert.commandWorked(
-    st.s.adminCommand({reshardCollection: testColl.getFullName(), key: {_id: 1}, numInitialChunks: 2}),
+    st.s.adminCommand({
+        reshardCollection: testColl.getFullName(),
+        key: {_id: 1},
+        numInitialChunks: 2,
+    }),
 );
 expectedEvents.push({operationType: "reshardCollection"});
 
@@ -100,7 +109,9 @@ assert.commandWorked(testColl.dropIndex({value: 1}));
 expectedEvents.push({operationType: "dropIndexes"}, {operationType: "dropIndexes"});
 
 // Create view on a collection.
-assert.commandWorked(testDB.runCommand({create: viewName, viewOn: collName, pipeline: [{$match: {foo: "bar"}}]}));
+assert.commandWorked(
+    testDB.runCommand({create: viewName, viewOn: collName, pipeline: [{$match: {foo: "bar"}}]}),
+);
 expectedEvents.push({operationType: "create"});
 
 assert.commandWorked(testDB.runCommand({drop: viewName}));
@@ -125,7 +136,11 @@ assert.commandWorked(testDB.dropDatabase());
 // event because one such event is generated on each shard, and will be reported if we resume after
 // the invalidate. This second dropDatabase acts as a sentinel here, signifying that we have reached
 // the end of the test stream.
-expectedEvents.push({operationType: "dropDatabase"}, {operationType: "invalidate"}, {operationType: "dropDatabase"});
+expectedEvents.push(
+    {operationType: "dropDatabase"},
+    {operationType: "invalidate"},
+    {operationType: "dropDatabase"},
+);
 
 // Leave only one of two "dropIndexes" events when they have identical resume tokens, because the
 // second event will be skipped when resuming from the first event's token in such a case.
@@ -138,7 +153,11 @@ let resumeTokensLastLTS = [];
         batchSize: 0,
     });
     const hwmToken = csCursor.getResumeToken();
-    assert.eq(decodeResumeToken(hwmToken).tokenType, highWaterMarkResumeTokenType, "expected a high-watermark token");
+    assert.eq(
+        decodeResumeToken(hwmToken).tokenType,
+        highWaterMarkResumeTokenType,
+        "expected a high-watermark token",
+    );
     resumeTokensLastLTS.push(hwmToken);
 
     const dropIndexesEvents = [];
@@ -156,7 +175,9 @@ let resumeTokensLastLTS = [];
     csCursor.close();
     assert.eq(2, dropIndexesEvents.length, "unexpected number of 'dropIndexes' events");
     if (bsonWoCompare(dropIndexesEvents[0]._id, dropIndexesEvents[1]._id) === 0) {
-        const dropIndexPosition = expectedEvents.findIndex((event) => event.operationType === "dropIndexes");
+        const dropIndexPosition = expectedEvents.findIndex(
+            (event) => event.operationType === "dropIndexes",
+        );
         expectedEvents.splice(dropIndexPosition, 1);
         resumeTokensLastLTS.splice(dropIndexPosition + 1, 1);
     }
@@ -173,8 +194,12 @@ function assertEventMatches(event, expectedEvent, errorMsg) {
 function assertTokenResumability() {
     for (let i = 1; i < expectedEvents.length; ++i) {
         const options = {startAfter: resumeTokensLastLTS[i]};
-        const csCursor = testDB.watch([], {showExpandedEvents: true, startAfter: resumeTokensLastLTS[i]});
-        const errorMsg = "could not retrieve the expected event matching " + tojson(expectedEvents[i]);
+        const csCursor = testDB.watch([], {
+            showExpandedEvents: true,
+            startAfter: resumeTokensLastLTS[i],
+        });
+        const errorMsg =
+            "could not retrieve the expected event matching " + tojson(expectedEvents[i]);
         assert.soon(() => csCursor.hasNext());
         const event = csCursor.next();
         assertEventMatches(event, expectedEvents[i], errorMsg);
@@ -194,7 +219,9 @@ testDB = st.s.getDB(jsTestName());
 assertTokenResumability();
 
 // Downgrade back to the original version.
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 st.downgradeCluster("last-lts", {waitUntilStable: true});
 
 testDB = st.s.getDB(jsTestName());

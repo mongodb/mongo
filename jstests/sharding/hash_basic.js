@@ -3,7 +3,9 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let st = new ShardingTest({shards: 2, chunkSize: 1});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: "test.user", key: {x: "hashed"}}));
 
 let configDB = st.s0.getDB("config");
@@ -35,7 +37,10 @@ cmdRes = assert.commandWorked(
     "Split failed with middle [" + middle + "]",
 );
 
-cmdRes = assert.commandWorked(st.s0.adminCommand({split: "test.user", find: {x: 7}}), "Split failed with find.");
+cmdRes = assert.commandWorked(
+    st.s0.adminCommand({split: "test.user", find: {x: 7}}),
+    "Split failed with find.",
+);
 
 let chunkList = findChunksUtil.findChunksByNs(configDB, "test.user").sort({min: 1}).toArray();
 assert.eq(chunkCountBefore + 3, chunkList.length);
@@ -43,7 +48,15 @@ assert.eq(chunkCountBefore + 3, chunkList.length);
 chunkList.forEach(function (chunkToMove) {
     let toShard = configDB.shards.findOne({_id: {$ne: chunkToMove.shard}})._id;
 
-    print("Moving chunk " + chunkToMove._id + " from shard " + chunkToMove.shard + " to " + toShard + " ...");
+    print(
+        "Moving chunk " +
+            chunkToMove._id +
+            " from shard " +
+            chunkToMove.shard +
+            " to " +
+            toShard +
+            " ...",
+    );
 
     assert.commandWorked(
         st.s0.adminCommand({

@@ -20,11 +20,25 @@ createSearchIndex(coll, getMovieVectorSearchIndexSpec());
 
 function testInvalidDereference(metaType) {
     assert.throwsWithCode(
-        () => coll.aggregate([{$setWindowFields: {sortBy: {score: {$meta: metaType}}, output: {rank: {$rank: {}}}}}]),
+        () =>
+            coll.aggregate([
+                {
+                    $setWindowFields: {
+                        sortBy: {score: {$meta: metaType}},
+                        output: {rank: {$rank: {}}},
+                    },
+                },
+            ]),
         kUnavailableMetadataErrCode,
     );
-    assert.throwsWithCode(() => coll.aggregate([{$sort: {score: {$meta: metaType}}}]), kUnavailableMetadataErrCode);
-    assert.throwsWithCode(() => coll.aggregate([{$set: {score: {$meta: metaType}}}]), kUnavailableMetadataErrCode);
+    assert.throwsWithCode(
+        () => coll.aggregate([{$sort: {score: {$meta: metaType}}}]),
+        kUnavailableMetadataErrCode,
+    );
+    assert.throwsWithCode(
+        () => coll.aggregate([{$set: {score: {$meta: metaType}}}]),
+        kUnavailableMetadataErrCode,
+    );
 }
 
 testInvalidDereference("searchScore");

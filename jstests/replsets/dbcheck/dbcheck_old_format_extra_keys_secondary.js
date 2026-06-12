@@ -7,7 +7,10 @@
  * ]
  */
 
-import {DbCheckOldFormatKeysTest, defaultNumDocs} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
+import {
+    DbCheckOldFormatKeysTest,
+    defaultNumDocs,
+} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
 import {
     assertCompleteCoverage,
     checkHealthLog,

@@ -99,7 +99,9 @@ class KeyVault {
             writeConcern: {w: "majority"},
         };
 
-        assert.commandWorked(this._runCommand(this.keyColl.getDB(), this.keyColl.getDB().runCommand, [insertCmdObj]));
+        assert.commandWorked(
+            this._runCommand(this.keyColl.getDB(), this.keyColl.getDB().runCommand, [insertCmdObj]),
+        );
         return uuid;
     }
 

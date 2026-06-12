@@ -54,8 +54,14 @@ assert.commandWorked(sourceCollection.insert([{key: 200}, {key: -200}]));
 const txnCoordinator = st.rs1.getPrimary();
 
 // Create a thread which leaves the TransactionCoordinator in a state right before it tries to delete the coordinator doc. Set up a failpoint for after deleting the coordinator doc because commitTransaction will return before deleting the coordinator, and we want to ensure that we wait for the deletion to finish before we allow the test to proceed.
-const hangBeforeDeletingCoordinatorDocFp = configureFailPoint(txnCoordinator, "hangBeforeDeletingCoordinatorDoc");
-const hangAfterDeletingCoordinatorDocFp = configureFailPoint(txnCoordinator, "hangAfterDeletingCoordinatorDoc");
+const hangBeforeDeletingCoordinatorDocFp = configureFailPoint(
+    txnCoordinator,
+    "hangBeforeDeletingCoordinatorDoc",
+);
+const hangAfterDeletingCoordinatorDocFp = configureFailPoint(
+    txnCoordinator,
+    "hangAfterDeletingCoordinatorDoc",
+);
 const deleteCoordinatorDocThread = new Thread(
     function runTwoPhaseCommitTxn(host, dbName, collName) {
         const conn = new Mongo(host);
@@ -99,7 +105,10 @@ hangBeforeWritingDecisionFp.wait({timesEntered: 1});
 // Create a thread which leaves the TransactionCoordinator in a state where write operations has
 // been run on both participant shards and it is about to start the two-phase-commit protocol (e.g.
 // before writing the participant list).
-const hangBeforeWritingParticipantListFp = configureFailPoint(txnCoordinator, "hangBeforeWritingParticipantList");
+const hangBeforeWritingParticipantListFp = configureFailPoint(
+    txnCoordinator,
+    "hangBeforeWritingParticipantList",
+);
 const commitTxnThread = new Thread(
     function runTwoPhaseCommitTxn(host, dbName, collName) {
         const conn = new Mongo(host);

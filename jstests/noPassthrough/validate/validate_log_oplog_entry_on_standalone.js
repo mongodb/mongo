@@ -31,7 +31,10 @@ assert.commandWorked(
 let coll = db.getCollection(collName);
 assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
 assert.commandWorked(
-    coll.createIndex({a: "text", b: "text", c: "text"}, {weights: {a: 5, b: 5, c: 10}, name: "abcText"}),
+    coll.createIndex(
+        {a: "text", b: "text", c: "text"},
+        {weights: {a: 5, b: 5, c: 10}, name: "abcText"},
+    ),
 );
 
 const doc = {

@@ -21,16 +21,26 @@ const mongosColl = mongosDB["coll"];
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the test collection on _id.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey).
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
 
 // Move the [0, MaxKey) chunk to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 1},
+        to: st.rs1.getURL(),
+    }),
+);
 
 // Write a document to each chunk.
 assert.commandWorked(mongosColl.insert({_id: -1}));
@@ -69,7 +79,11 @@ assert.commandWorked(mongosColl.update({_id: -1000}, {$set: {updatedCount: 2}}))
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 500}}));
 // Move the [500, MaxKey) chunk back to st.shard0.shardName.
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1000}, to: st.rs0.getURL()}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 1000},
+        to: st.rs0.getURL(),
+    }),
 );
 
 for (let nextId of [1000, -1000]) {

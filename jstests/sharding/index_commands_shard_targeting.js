@@ -60,7 +60,8 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
 
     if (testCase.bumpExpectedCollectionVersionAfterCommand) {
-        latestCollectionVersion = testCase.bumpExpectedCollectionVersionAfterCommand(latestCollectionVersion);
+        latestCollectionVersion =
+            testCase.bumpExpectedCollectionVersionAfterCommand(latestCollectionVersion);
     }
 
     // Assert that the targeted shards have the latest collection version after the command is
@@ -74,7 +75,14 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
  * migration after shard0 enters the read-only phase of the critical section, and runs
  * the given command function. Asserts that the command is blocked behind the critical section.
  */
-function assertCommandBlocksIfCriticalSectionInProgress(st, staticMongod, dbName, collName, allShards, testCase) {
+function assertCommandBlocksIfCriticalSectionInProgress(
+    st,
+    staticMongod,
+    dbName,
+    collName,
+    allShards,
+    testCase,
+) {
     const ns = dbName + "." + collName;
     const fromShard = st.shard0;
     const toShard = st.shard1;
@@ -94,7 +102,14 @@ function assertCommandBlocksIfCriticalSectionInProgress(st, staticMongod, dbName
     // Turn on the fail point, and move one of the chunks to shard1 so that there are two
     // shards that own chunks for the collection. Wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.chunkDataCommitted);
-    let joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {_id: 0}, null, ns, toShard.shardName);
+    let joinMoveChunk = moveChunkParallel(
+        staticMongod,
+        st.s.host,
+        {_id: 0},
+        null,
+        ns,
+        toShard.shardName,
+    );
     waitForMoveChunkStep(fromShard, moveChunkStepNames.chunkDataCommitted);
 
     // Run the command with maxTimeMS.
@@ -160,7 +175,9 @@ const testCases = {
         const ns = dbName + "." + collName;
         const createIndexOnAllShards = () => {
             allShards.forEach(function (shard) {
-                assert.commandWorked(shard.getDB(dbName).runCommand({createIndexes: collName, indexes: [index]}));
+                assert.commandWorked(
+                    shard.getDB(dbName).runCommand({createIndexes: collName, indexes: [index]}),
+                );
             });
         };
         return {
@@ -173,7 +190,10 @@ const testCases = {
                     // When the dropIndexes command spawns a sharding DDL coordinator that stops and
                     // resumes migrations via setAllowMigrations, the collection version is bumped
                     // twice: once for stopping migrations, and once for resuming migrations.
-                    return new Timestamp(expectedCollVersion.getTime(), expectedCollVersion.getInc() + 2);
+                    return new Timestamp(
+                        expectedCollVersion.getTime(),
+                        expectedCollVersion.getInc() + 2,
+                    );
                 }
                 // With featureFlagAuthoritativeShardsDDL enabled, the coordinator stops/resumes
                 // migrations via setAllowChunkOperations, which updates the collection metadata
@@ -229,7 +249,9 @@ const testCases = {
     },
 };
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Test that the index commands send and check shard vesions, and only target the shards
 // that own chunks for the collection.
@@ -264,7 +286,14 @@ for (const command of Object.keys(testCases)) {
     let testCase = testCases[command](collName);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-    assertCommandBlocksIfCriticalSectionInProgress(st, staticMongod, dbName, collName, allShards, testCase);
+    assertCommandBlocksIfCriticalSectionInProgress(
+        st,
+        staticMongod,
+        dbName,
+        collName,
+        allShards,
+        testCase,
+    );
 }
 
 st.stop();

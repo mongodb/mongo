@@ -65,7 +65,10 @@ function runTest(pipeline, expectRejected) {
         if (stage.stage.includes("JOIN_EMBEDDING") || stage.stage.includes("COLLSCAN")) {
             assert(
                 stage.hasOwnProperty("cardinalityEstimate"),
-                "Cardinality estimate not found in stage: " + tojson(stage) + ", " + tojson(explain),
+                "Cardinality estimate not found in stage: " +
+                    tojson(stage) +
+                    ", " +
+                    tojson(explain),
             );
             assert.gt(stage.cardinalityEstimate, 0, "Cardinality estimate is not greater than 0");
             assert(
@@ -82,19 +85,32 @@ function runTest(pipeline, expectRejected) {
     }
     for (const plan of rejectedPlans) {
         // All plans should use join optimization.
-        assert(plan.usedJoinOptimization, "Join optimizer was not used as expected: " + tojson(explain));
+        assert(
+            plan.usedJoinOptimization,
+            "Join optimizer was not used as expected: " + tojson(explain),
+        );
 
         // Should have CE.
         assert(
             plan.queryPlan.hasOwnProperty("cardinalityEstimate"),
-            "Cardinality estimate not found in rejected plan: " + tojson(plan.queryPlan) + ", " + tojson(explain),
+            "Cardinality estimate not found in rejected plan: " +
+                tojson(plan.queryPlan) +
+                ", " +
+                tojson(explain),
         );
-        assert.gt(plan.queryPlan.cardinalityEstimate, 0, "Cardinality estimate is not greater than 0");
+        assert.gt(
+            plan.queryPlan.cardinalityEstimate,
+            0,
+            "Cardinality estimate is not greater than 0",
+        );
 
         // Should have cost.
         assert(
             plan.queryPlan.hasOwnProperty("costEstimate"),
-            "Cost estimate not found in rejected plan: " + tojson(plan.queryPlan) + ", " + tojson(explain),
+            "Cost estimate not found in rejected plan: " +
+                tojson(plan.queryPlan) +
+                ", " +
+                tojson(explain),
         );
         assert.gt(plan.queryPlan.costEstimate, 0, "Cost estimate is not greater than 0");
 
@@ -141,13 +157,21 @@ runTest(pipeline, true /* expectRejected */);
 
 // Test joinCostComponents explain output (internalQueryExplainJoinCostComponents knob).
 {
-    const validMackertLohmanCases = new Set(["collection-fits-cache", "returned-docs-fit-cache", "partial-eviction"]);
+    const validMackertLohmanCases = new Set([
+        "collection-fits-cache",
+        "returned-docs-fit-cache",
+        "partial-eviction",
+    ]);
 
     // Verify that when the knob is OFF, joinCostComponents is absent (default behaviour).
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}),
+    );
     {
         const explain = coll1.explain().aggregate(pipeline);
-        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
+            plannerStageIsJoinOptNode,
+        );
         assert.gt(joinStages.length, 0, "Expected join opt stages: " + tojson(explain));
         for (const stage of joinStages) {
             assert(
@@ -168,7 +192,9 @@ runTest(pipeline, true /* expectRejected */);
     );
     {
         const explain = coll1.explain().aggregate(pipeline);
-        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
+            plannerStageIsJoinOptNode,
+        );
         assert.gt(joinStages.length, 0, "Expected join opt stages: " + tojson(explain));
 
         for (const stage of joinStages) {
@@ -179,8 +205,17 @@ runTest(pipeline, true /* expectRejected */);
             const c = stage.joinCostComponents;
 
             // All join types expose these numeric fields.
-            for (const field of ["docsProcessed", "docsOutput", "sequentialIOPages", "randomIOPages", "localOpCost"]) {
-                assert(c.hasOwnProperty(field), field + " missing from joinCostComponents: " + tojson(c));
+            for (const field of [
+                "docsProcessed",
+                "docsOutput",
+                "sequentialIOPages",
+                "randomIOPages",
+                "localOpCost",
+            ]) {
+                assert(
+                    c.hasOwnProperty(field),
+                    field + " missing from joinCostComponents: " + tojson(c),
+                );
                 assert.gte(c[field], 0, field + " must be non-negative: " + tojson(c));
             }
 

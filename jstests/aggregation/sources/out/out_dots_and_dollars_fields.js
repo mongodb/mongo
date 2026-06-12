@@ -28,6 +28,8 @@ const test = {
     "aFi.$eld": 1,
 };
 [coll, from].forEach((c) => {
-    assert.doesNotThrow(() => coll.aggregate([{$replaceWith: {$const: test}}, {$out: c.getName()}]));
+    assert.doesNotThrow(() =>
+        coll.aggregate([{$replaceWith: {$const: test}}, {$out: c.getName()}]),
+    );
     assert.eq(c.find().toArray(), [test]);
 });

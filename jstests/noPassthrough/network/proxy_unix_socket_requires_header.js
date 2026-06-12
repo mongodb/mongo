@@ -26,16 +26,27 @@ function makeProxySocketPath(prefix, port) {
 }
 
 function assertConnectionFails(conn, path) {
-    assert.throws(() => new Mongo(path), [], `Expected direct connection to proxy socket to fail: ${path}`);
+    assert.throws(
+        () => new Mongo(path),
+        [],
+        `Expected direct connection to proxy socket to fail: ${path}`,
+    );
 
     assert(
-        checkLog.checkContainsOnceJsonStringMatch(conn, 6067900, "msg", "Error while parsing proxy protocol header"),
+        checkLog.checkContainsOnceJsonStringMatch(
+            conn,
+            6067900,
+            "msg",
+            "Error while parsing proxy protocol header",
+        ),
         "Expected connection to fail because the PROXY protocol header was missing",
     );
 }
 
 function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version, shouldSucceed) {
-    const proxyServer = new ProxyProtocolServer(ingressPort, egressPort, version, {egressUnixSocket: proxySocketPath});
+    const proxyServer = new ProxyProtocolServer(ingressPort, egressPort, version, {
+        egressUnixSocket: proxySocketPath,
+    });
     proxyServer.setTLVs([{"type": 0xe0, "value": "unix-proxy"}]);
     proxyServer.start();
     try {
@@ -53,7 +64,9 @@ function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version
 
 function getFileGid(path) {
     const outFile = `${MongoRunner.dataDir}/socket_gid.txt`;
-    const statCmd = isMacOS() ? `stat -f %g '${path}' > '${outFile}'` : `stat -c %g '${path}' > '${outFile}'`;
+    const statCmd = isMacOS()
+        ? `stat -f %g '${path}' > '${outFile}'`
+        : `stat -c %g '${path}' > '${outFile}'`;
     assert.eq(0, runNonMongoProgram("bash", "-c", statCmd), `stat failed for ${path}`);
     return Number(cat(outFile).trim());
 }
@@ -78,10 +91,14 @@ function runPeerCredentialValidationTest(conn, prefix) {
     try {
         {
             // Matching remoteGid should succeed.
-            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-                mode: "alwaysOn",
-                data: {remoteGid: NumberInt(kExpectedGid)},
-            });
+            const fp = configureFailPoint(
+                conn,
+                "proxyUnixDomainSocketPeerCredentialValidationOverride",
+                {
+                    mode: "alwaysOn",
+                    data: {remoteGid: NumberInt(kExpectedGid)},
+                },
+            );
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             new Mongo(uri);
             fp.off();
@@ -89,10 +106,14 @@ function runPeerCredentialValidationTest(conn, prefix) {
 
         {
             // Differing remoteGid should fail.
-            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-                mode: "alwaysOn",
-                data: {remoteGid: NumberInt(kExpectedGid - 1)},
-            });
+            const fp = configureFailPoint(
+                conn,
+                "proxyUnixDomainSocketPeerCredentialValidationOverride",
+                {
+                    mode: "alwaysOn",
+                    data: {remoteGid: NumberInt(kExpectedGid - 1)},
+                },
+            );
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             assert.throws(() => new Mongo(uri));
             checkLog.containsRelaxedJson(conn, 11793400, {}, 1, 30 * 1000);
@@ -118,10 +139,14 @@ function runPeerCredentialValidationTest(conn, prefix) {
 
         {
             // Test failure log if server is unable to validate.
-            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-                mode: "alwaysOn",
-                data: {code: kInternalErrorCode},
-            });
+            const fp = configureFailPoint(
+                conn,
+                "proxyUnixDomainSocketPeerCredentialValidationOverride",
+                {
+                    mode: "alwaysOn",
+                    data: {code: kInternalErrorCode},
+                },
+            );
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             assert.throws(() => new Mongo(uri));
             checkLog.containsRelaxedJson(conn, 11793401, {}, 1, 30 * 1000);

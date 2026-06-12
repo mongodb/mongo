@@ -26,7 +26,11 @@ function getInconsistentHashBuckets(partialHashes) {
         assert(partialHashes[i]);
         const hashBuckets = partialHashes[i];
         for (let bucketKey in hashBuckets) {
-            const bucket = [bucketKey, hashBuckets[bucketKey]["hash"], hashBuckets[bucketKey]["count"]];
+            const bucket = [
+                bucketKey,
+                hashBuckets[bucketKey]["hash"],
+                hashBuckets[bucketKey]["count"],
+            ];
             partialHashBucketCounts[bucket] = (partialHashBucketCounts[bucket] || 0) + 1;
         }
     }
@@ -64,7 +68,9 @@ function drillDownToDoc(getValidateResults) {
             } else {
                 // Update 'docCount' if it changes to be larger than 1, which means the prefix needs to be drilled down more.
                 drillDownPrefixesCounts[hashPrefix] = [
-                    drillDownPrefixesCounts[hashPrefix][0] === 1 ? docCount : drillDownPrefixesCounts[hashPrefix][0],
+                    drillDownPrefixesCounts[hashPrefix][0] === 1
+                        ? docCount
+                        : drillDownPrefixesCounts[hashPrefix][0],
                     drillDownPrefixesCounts[hashPrefix][1] + 1,
                 ];
             }
@@ -93,9 +99,10 @@ function drillDownToDoc(getValidateResults) {
 
 function getRevealedHashedIds(hashedIds, getValidateResults) {
     let revealedIds = new Set();
-    const revealedIdsAllNodes = getValidateResults({collHash: true, revealHashedIds: hashedIds}).map(
-        (res) => res.revealedIds,
-    );
+    const revealedIdsAllNodes = getValidateResults({
+        collHash: true,
+        revealHashedIds: hashedIds,
+    }).map((res) => res.revealedIds);
     for (let i = 0; i < revealedIdsAllNodes.length; ++i) {
         for (const [_, ids] of Object.entries(revealedIdsAllNodes[i])) {
             ids.forEach((doc) => revealedIds.add(doc["_id"]));
@@ -140,13 +147,17 @@ function logInconsistentDocs(colls, inconsistentIds) {
 
 export function runValidateFindDivergenceTests(colls, numDocs, getValidateResults) {
     (function runEmptyCollectionTest() {
-        jsTest.log.info("Testing extended validate returns the same results on an empty collection");
+        jsTest.log.info(
+            "Testing extended validate returns the same results on an empty collection",
+        );
         const allHashes = getValidateResults({collHash: true}).map((res) => res.all);
         assert(sameAllHashes(allHashes), allHashes);
     })();
 
     (function allNodesConsistent() {
-        jsTest.log.info("Testing extended validate returns the same results on the same collection");
+        jsTest.log.info(
+            "Testing extended validate returns the same results on the same collection",
+        );
         setUpNodes(colls, numDocs);
         const allHashes = getValidateResults({collHash: true}).map((res) => res.all);
         assert(sameAllHashes(allHashes), allHashes);
@@ -154,7 +165,9 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
     })();
 
     (function differentNumberOfDocuments() {
-        jsTest.log.info("Testing extended validate identifies the missing or extra documents in the cluster");
+        jsTest.log.info(
+            "Testing extended validate identifies the missing or extra documents in the cluster",
+        );
         setUpNodes(colls, numDocs);
 
         const missingDocIdNode1 = Math.floor(Math.random() * numDocs);
@@ -171,7 +184,8 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         assert(!sameAllHashes(allHashes), allHashes);
 
         // 2. Drill down iteratively until the hashes of the inconsistent documents are identified.
-        const [missingOrExtraDocHashes, inconsistentDocIdHashes] = drillDownToDoc(getValidateResults);
+        const [missingOrExtraDocHashes, inconsistentDocIdHashes] =
+            drillDownToDoc(getValidateResults);
         jsTest.log.info(
             `Hash prefixes of missing or extra documents: [${missingOrExtraDocHashes}].\nHash prefixes of inconsistent documents: [${inconsistentDocIdHashes}]`,
         );
@@ -182,13 +196,18 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         const revealedIds = getRevealedHashedIds(missingOrExtraDocHashes, getValidateResults);
         jsTest.log.info(`'_id' fields of inconsistent documents: [${revealedIds}]`);
 
-        assert(sameIds(new Set(revealedIds), new Set([missingDocIdNode1, missingDocIdNode2])), revealedIds);
+        assert(
+            sameIds(new Set(revealedIds), new Set([missingDocIdNode1, missingDocIdNode2])),
+            revealedIds,
+        );
         logInconsistentDocs(colls, revealedIds);
         clearCollections(colls);
     })();
 
     (function differentDocumentValues() {
-        jsTest.log.info("Testing extended validate identifies documents with different values in the cluster");
+        jsTest.log.info(
+            "Testing extended validate identifies documents with different values in the cluster",
+        );
         setUpNodes(colls, numDocs);
 
         let diffDocIds = [];
@@ -197,7 +216,9 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         const diffDocIdNode1 = Math.floor(Math.random() * (numDocs - numDiffDocs));
         for (let i = 0; i < numDiffDocs; ++i) {
             diffDocIds.push(diffDocIdNode1 + i);
-            assert.commandWorked(colls[1].updateOne({_id: diffDocIdNode1 + i}, {$inc: {field1: 1}}));
+            assert.commandWorked(
+                colls[1].updateOne({_id: diffDocIdNode1 + i}, {$inc: {field1: 1}}),
+            );
         }
         jsTest.log.info(`Modify documents with ids [${diffDocIds}] on node1`);
 
@@ -207,7 +228,8 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         assert(!sameAllHashes(allHashes), allHashes);
 
         // 2. Drill down iteratively until the hashes of the inconsistent documents are identified.
-        const [missingOrExtraDocHashes, inconsistentDocIdHashes] = drillDownToDoc(getValidateResults);
+        const [missingOrExtraDocHashes, inconsistentDocIdHashes] =
+            drillDownToDoc(getValidateResults);
         jsTest.log.info(
             `Hash prefixes of missing or extra documents: [${missingOrExtraDocHashes}].\nHash prefixes of inconsistent documents: [${inconsistentDocIdHashes}]`,
         );
@@ -235,7 +257,9 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         const diffDocIdNode2 = Math.floor(Math.random() * (numDocs - numDiffDocs));
         for (let i = 0; i < numDiffDocs; ++i) {
             diffDocIds.push(diffDocIdNode2 + i);
-            assert.commandWorked(colls[2].updateOne({_id: diffDocIdNode2 + i}, {$set: {extraField: null}}));
+            assert.commandWorked(
+                colls[2].updateOne({_id: diffDocIdNode2 + i}, {$set: {extraField: null}}),
+            );
         }
         jsTest.log.info(`Modify documents with ids [${diffDocIds}] on node2`);
 
@@ -245,7 +269,8 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         assert(!sameAllHashes(allHashes), allHashes);
 
         // 2. Drill down iteratively until the hashes of the inconsistent documents are identified.
-        const [missingOrExtraDocHashes, inconsistentDocIdHashes] = drillDownToDoc(getValidateResults);
+        const [missingOrExtraDocHashes, inconsistentDocIdHashes] =
+            drillDownToDoc(getValidateResults);
         jsTest.log.info(
             `Hash prefixes of missing or extra documents: [${missingOrExtraDocHashes}].\nHash prefixes of inconsistent documents: [${inconsistentDocIdHashes}]`,
         );
@@ -262,7 +287,9 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
     })();
 
     (function differentDocumentFieldType() {
-        jsTest.log.info("Testing extended validate identifies documents with different field types in the cluster");
+        jsTest.log.info(
+            "Testing extended validate identifies documents with different field types in the cluster",
+        );
         setUpNodes(colls, numDocs);
 
         let diffDocIds = [];
@@ -272,7 +299,10 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         for (let i = 0; i < numDiffDocs; ++i) {
             diffDocIds.push(diffDocIdNode2 + i);
             assert.commandWorked(
-                colls[2].updateOne({_id: diffDocIdNode2 + i}, {$set: {field1: NumberDecimal(diffDocIdNode2 + i)}}),
+                colls[2].updateOne(
+                    {_id: diffDocIdNode2 + i},
+                    {$set: {field1: NumberDecimal(diffDocIdNode2 + i)}},
+                ),
             );
         }
         jsTest.log.info(`Modify documents with ids [${diffDocIds}] on node2`);
@@ -283,7 +313,8 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         assert(!sameAllHashes(allHashes), allHashes);
 
         // 2. Drill down iteratively until the hashes of the inconsistent documents are identified.
-        const [missingOrExtraDocHashes, inconsistentDocIdHashes] = drillDownToDoc(getValidateResults);
+        const [missingOrExtraDocHashes, inconsistentDocIdHashes] =
+            drillDownToDoc(getValidateResults);
         jsTest.log.info(
             `Hash prefixes of missing or extra documents: [${missingOrExtraDocHashes}].\nHash prefixes of inconsistent documents: [${inconsistentDocIdHashes}]`,
         );

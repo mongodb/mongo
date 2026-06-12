@@ -93,11 +93,17 @@ function isStagePresent(explain, stageName) {
 }
 
 function assertStageAbsent(explain, stageName) {
-    assert(!isStagePresent(explain, stageName), "expected stage to be erased", {stageName, explain});
+    assert(!isStagePresent(explain, stageName), "expected stage to be erased", {
+        stageName,
+        explain,
+    });
 }
 
 function assertStagePresent(explain, stageName) {
-    assert(isStagePresent(explain, stageName), "expected stage to be present", {stageName, explain});
+    assert(isStagePresent(explain, stageName), "expected stage to be present", {
+        stageName,
+        explain,
+    });
 }
 
 // Executes `userPipeline` on the view and asserts it returns the same documents as the fully
@@ -108,7 +114,9 @@ function assertStagePresent(explain, stageName) {
 // arbitrary output order.
 function assertViewMatchesResolved(viewName, userPipeline = [], baseColl = coll) {
     const viaView = testDb[viewName].aggregate(userPipeline).toArray();
-    const resolved = baseColl.aggregate([...viewResolvedPipeline[viewName], ...userPipeline]).toArray();
+    const resolved = baseColl
+        .aggregate([...viewResolvedPipeline[viewName], ...userPipeline])
+        .toArray();
     assertArrayEq({
         actual: viaView,
         expected: resolved,
@@ -171,7 +179,8 @@ describe("$testVectorSearchOptimization in views", function () {
 
     describe("applyPipelineBounds limit extraction in a view", function () {
         function assertBounds(explain, expected) {
-            const {minBoundsType, maxBoundsType, extractedLimit} = getPipelineSuffixBoundsFromExplain(explain);
+            const {minBoundsType, maxBoundsType, extractedLimit} =
+                getPipelineSuffixBoundsFromExplain(explain);
             assert.eq(minBoundsType, expected.minBoundsType, "wrong minBoundsType", {explain});
             assert.eq(maxBoundsType, expected.maxBoundsType, "wrong maxBoundsType", {explain});
             assert.eq(extractedLimit, expected.extractedLimit, "wrong extractedLimit", {explain});
@@ -199,7 +208,12 @@ describe("$testVectorSearchOptimization in views", function () {
         });
 
         it("discrete bounds when $limit is in outer of nested view", function () {
-            const viewName = makeNestedView("bounds_nested", coll.getName(), [desugarFalseStage], [{$limit: 6}]);
+            const viewName = makeNestedView(
+                "bounds_nested",
+                coll.getName(),
+                [desugarFalseStage],
+                [{$limit: 6}],
+            );
             assertBounds(explainView(viewName), {
                 minBoundsType: "discrete",
                 maxBoundsType: "discrete",
@@ -273,7 +287,10 @@ describe("$testVectorSearchOptimization in views", function () {
     describe("optimization fires when extension + interacting stage are both in the user pipeline, run on an unrelated view", function () {
         const viewPrefixes = [
             {suffix: "match_prefix", pipeline: [{$match: {x: {$gte: 1}}}]},
-            {suffix: "addfields_match_prefix", pipeline: [{$addFields: {y: 1}}, {$match: {x: {$lte: 3}}}]},
+            {
+                suffix: "addfields_match_prefix",
+                pipeline: [{$addFields: {y: 1}}, {$match: {x: {$lte: 3}}}],
+            },
         ];
 
         for (const {suffix, pipeline} of viewPrefixes) {
@@ -294,9 +311,8 @@ describe("$testVectorSearchOptimization in views", function () {
             it(`applyPipelineBounds extracts the limit over view prefix [${suffix}]`, function () {
                 const viewName = makeView("user_bounds_over_" + suffix, coll.getName(), pipeline);
                 const user = [desugarFalseStage, {$limit: 5}];
-                const {minBoundsType, maxBoundsType, extractedLimit} = getPipelineSuffixBoundsFromExplain(
-                    explainView(viewName, user),
-                );
+                const {minBoundsType, maxBoundsType, extractedLimit} =
+                    getPipelineSuffixBoundsFromExplain(explainView(viewName, user));
                 assert.eq(minBoundsType, "discrete", "wrong minBoundsType");
                 assert.eq(maxBoundsType, "discrete", "wrong maxBoundsType");
                 assert.eq(extractedLimit, 5, "wrong extractedLimit");
@@ -319,7 +335,11 @@ describe("$readNDocuments / $produceIds in views", function () {
     // Documents looked up by $_internalSearchIdLookup for the ids $produceIds generates. Seeded so
     // that value === _id * 2 and label === "doc_<_id>", matching readNDocuments_pushdown.js.
     const numDocs = 5;
-    const expectedDocs = Array.from({length: numDocs}, (_, i) => ({_id: i, value: i * 2, label: `doc_${i}`}));
+    const expectedDocs = Array.from({length: numDocs}, (_, i) => ({
+        _id: i,
+        value: i * 2,
+        label: `doc_${i}`,
+    }));
 
     const readN = (opts) => ({$readNDocuments: opts});
 
@@ -335,9 +355,14 @@ describe("$readNDocuments / $produceIds in views", function () {
         assert(spec !== undefined, "expected $produceIds spec in explain", {explain});
         // startId defaults to 0 and is only serialized when non-zero, so treat an absent startId as
         // 0 - otherwise asserting an expected fold of `_id >= 0` (startId 0) would spuriously fail.
-        assert.eq(spec.startId ?? 0, expectedStartId, "expected applyMatchPushdown to fold the $match into startId", {
-            spec,
-        });
+        assert.eq(
+            spec.startId ?? 0,
+            expectedStartId,
+            "expected applyMatchPushdown to fold the $match into startId",
+            {
+                spec,
+            },
+        );
     }
 
     function assertMatchNotPushedDown(explain) {
@@ -360,7 +385,10 @@ describe("$readNDocuments / $produceIds in views", function () {
         const expectedGte2 = expectedDocs.filter((d) => d._id >= 2);
 
         it("folds $match into startId when both are in the view definition", function () {
-            const viewName = makeView("match_in_def", produceColl.getName(), [readN({numDocs}), matchGte2]);
+            const viewName = makeView("match_in_def", produceColl.getName(), [
+                readN({numDocs}),
+                matchGte2,
+            ]);
             assertMatchPushedDown(explainView(viewName), 2);
             assertViewReturns(viewName, [], expectedGte2);
         });
@@ -372,7 +400,12 @@ describe("$readNDocuments / $produceIds in views", function () {
         });
 
         it("folds $match into startId in a nested view", function () {
-            const viewName = makeNestedView("match_nested", produceColl.getName(), [readN({numDocs})], [matchGte2]);
+            const viewName = makeNestedView(
+                "match_nested",
+                produceColl.getName(),
+                [readN({numDocs})],
+                [matchGte2],
+            );
             assertMatchPushedDown(explainView(viewName), 2);
             assertViewReturns(viewName, [], expectedGte2);
         });
@@ -396,14 +429,20 @@ describe("$readNDocuments / $produceIds in views", function () {
         const expectedIdOnly = expectedDocs.map((d) => ({_id: d._id}));
 
         it("suppresses value and label when {_id:1} project is in the view definition", function () {
-            const viewName = makeView("project_in_def", produceColl.getName(), [readN({numDocs}), projectIdOnly]);
+            const viewName = makeView("project_in_def", produceColl.getName(), [
+                readN({numDocs}),
+                projectIdOnly,
+            ]);
             assertProjectPushedDown(explainView(viewName), {skipValue: true, skipLabel: true});
             assertViewReturns(viewName, [], expectedIdOnly);
         });
 
         it("suppresses value and label across the view boundary", function () {
             const viewName = makeView("project_on_view", produceColl.getName(), [readN({numDocs})]);
-            assertProjectPushedDown(explainView(viewName, [projectIdOnly]), {skipValue: true, skipLabel: true});
+            assertProjectPushedDown(explainView(viewName, [projectIdOnly]), {
+                skipValue: true,
+                skipLabel: true,
+            });
             assertViewReturns(viewName, [projectIdOnly], expectedIdOnly);
         });
 
@@ -419,9 +458,14 @@ describe("$readNDocuments / $produceIds in views", function () {
         });
 
         it("suppresses only label when {_id:1, value:1} project crosses the boundary", function () {
-            const viewName = makeView("project_selective", produceColl.getName(), [readN({numDocs})]);
+            const viewName = makeView("project_selective", produceColl.getName(), [
+                readN({numDocs}),
+            ]);
             const user = [{$project: {_id: 1, value: 1}}];
-            assertProjectPushedDown(explainView(viewName, user), {skipValue: false, skipLabel: true});
+            assertProjectPushedDown(explainView(viewName, user), {
+                skipValue: false,
+                skipLabel: true,
+            });
             assertViewReturns(
                 viewName,
                 user,
@@ -440,7 +484,9 @@ describe("$readNDocuments / $produceIds in views", function () {
                 .aggregate(userPipeline)
                 .toArray()
                 .map((d) => d._id);
-            assert.eq(ids, expectedIdOrder, "expected ascending-by-_id order after sort removal", {ids});
+            assert.eq(ids, expectedIdOrder, "expected ascending-by-_id order after sort removal", {
+                ids,
+            });
         }
 
         it("erases $sort when sortById extension and sort are both in view def", function () {
@@ -452,7 +498,9 @@ describe("$readNDocuments / $produceIds in views", function () {
         });
 
         it("erases $sort across the view boundary", function () {
-            const viewName = makeView("sortid_on_view", produceColl.getName(), [readN({numDocs, sortById: true})]);
+            const viewName = makeView("sortid_on_view", produceColl.getName(), [
+                readN({numDocs, sortById: true}),
+            ]);
             assertSortRemovedAndOrdered(viewName, [sortById]);
         });
 
@@ -467,7 +515,9 @@ describe("$readNDocuments / $produceIds in views", function () {
         });
 
         it("does NOT erase $sort when sortById is not set (no sort pattern established)", function () {
-            const viewName = makeView("sortid_no_pattern", produceColl.getName(), [readN({numDocs})]);
+            const viewName = makeView("sortid_no_pattern", produceColl.getName(), [
+                readN({numDocs}),
+            ]);
             assertStagePresent(explainView(viewName, [sortById]), "$sort");
             assert.eq(
                 testDb[viewName]

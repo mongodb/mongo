@@ -39,13 +39,17 @@ function optimesAndWallTimesAreEqual(replTest, isPersistent) {
     let prevOptime = prevReplStatus.optimes.appliedOpTime.ts;
     let prevAppliedWallTime = prevReplStatus.optimes.lastAppliedWallTime;
     let prevDurableWallTime = prevReplStatus.optimes.lastDurableWallTime;
-    let prevWrittenWallTime = reduceMajorityWriteLatency ? prevReplStatus.optimes.lastWrittenWallTime : null;
+    let prevWrittenWallTime = reduceMajorityWriteLatency
+        ? prevReplStatus.optimes.lastWrittenWallTime
+        : null;
     for (let i = 1; i < replTest.nodes.length; i++) {
         let currentReplStatus = replTest.nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
         let currOptime = currentReplStatus.optimes.appliedOpTime.ts;
         let currAppliedWallTime = currentReplStatus.optimes.lastAppliedWallTime;
         let currDurableWallTime = currentReplStatus.optimes.lastDurableWallTime;
-        let currWrittenWallTime = reduceMajorityWriteLatency ? currentReplStatus.optimes.lastWrittenWallTime : null;
+        let currWrittenWallTime = reduceMajorityWriteLatency
+            ? currentReplStatus.optimes.lastWrittenWallTime
+            : null;
         if (
             timestampCompare(prevOptime, currOptime) != 0 ||
             wallTimeCompare(prevAppliedWallTime, currAppliedWallTime) != 0 ||

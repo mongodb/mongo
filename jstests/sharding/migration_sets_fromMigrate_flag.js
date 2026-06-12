@@ -59,9 +59,15 @@ jsTest.log("Inserting 5 docs into donor shard, ensuring one orphan on the recipi
 // order to get an orphan onto the recipient shard with the correct UUID for the collection.
 assert.commandWorked(coll.insert({_id: 2}));
 assert.eq(1, donorColl.count());
-assert.commandWorked(recipient.adminCommand({configureFailPoint: "failMigrationOnRecipient", mode: "alwaysOn"}));
-assert.commandFailed(admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 2}, to: st.shard1.shardName}));
-assert.commandWorked(recipient.adminCommand({configureFailPoint: "failMigrationOnRecipient", mode: "off"}));
+assert.commandWorked(
+    recipient.adminCommand({configureFailPoint: "failMigrationOnRecipient", mode: "alwaysOn"}),
+);
+assert.commandFailed(
+    admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 2}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    recipient.adminCommand({configureFailPoint: "failMigrationOnRecipient", mode: "off"}),
+);
 
 // Insert the remaining documents into the collection.
 assert.commandWorked(coll.insert({_id: 0}));
@@ -164,10 +170,13 @@ if (!donorOplogRes) {
 assertEqAndDumpOpLog(
     1,
     donorOplogRes,
-    "fromMigrate flag wasn't set on the donor shard's oplog for " + "migrating delete op on {_id: 2}! Test #2 failed.",
+    "fromMigrate flag wasn't set on the donor shard's oplog for " +
+        "migrating delete op on {_id: 2}! Test #2 failed.",
 );
 
-donorOplogRes = donorLocal.oplog.rs.find({op: "d", fromMigrate: {$exists: false}, "o._id": 4}).count();
+donorOplogRes = donorLocal.oplog.rs
+    .find({op: "d", fromMigrate: {$exists: false}, "o._id": 4})
+    .count();
 if (!donorOplogRes) {
     // Validate this is a batched delete, which generates one applyOps entry instead of a 'd' entry.
     donorOplogRes = donorLocal.oplog.rs
@@ -181,10 +190,13 @@ if (!donorOplogRes) {
 assertEqAndDumpOpLog(
     1,
     donorOplogRes,
-    "Real delete of {_id: 4} on donor shard incorrectly set the " + "fromMigrate flag in the oplog! Test #5 failed.",
+    "Real delete of {_id: 4} on donor shard incorrectly set the " +
+        "fromMigrate flag in the oplog! Test #5 failed.",
 );
 
-let recipientOplogRes = recipientLocal.oplog.rs.find({op: "i", fromMigrate: true, "o._id": 2}).count();
+let recipientOplogRes = recipientLocal.oplog.rs
+    .find({op: "i", fromMigrate: true, "o._id": 2})
+    .count();
 // Expect to see one insert oplog entry for _id:2 because that doc was cloned on its own as part
 // of the failed migrate.  Also expect to see one applyOps entry containing _id:2 as part of a
 // batched insert from the second migrate
@@ -224,7 +236,8 @@ recipientOplogRes = recipientLocal.oplog.rs.find({op: "u", fromMigrate: true, "o
 assertEqAndDumpOpLog(
     1,
     recipientOplogRes,
-    "fromMigrate flag wasn't set on the recipient shard's " + "oplog for update op on {_id: 3}! Test #4 failed.",
+    "fromMigrate flag wasn't set on the recipient shard's " +
+        "oplog for update op on {_id: 3}! Test #4 failed.",
 );
 
 recipientOplogRes = recipientLocal.oplog.rs.find({op: "d", fromMigrate: true, "o._id": 4}).count();

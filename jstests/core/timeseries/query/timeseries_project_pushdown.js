@@ -19,7 +19,9 @@ const coll = db[jsTestName()];
 function runTest({docs, pipeline, expectedResults}) {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
     );
     assert.commandWorked(coll.insertMany(docs));
     const results = coll.aggregate(pipeline).toArray();
@@ -102,7 +104,9 @@ function runTest({docs, pipeline, expectedResults}) {
         pipeline: [
             {
                 $project: {
-                    new: {$add: [`$${metaField}`, {$getField: {$concat: ["m", "e", "t", "a", "1"]}}]},
+                    new: {
+                        $add: [`$${metaField}`, {$getField: {$concat: ["m", "e", "t", "a", "1"]}}],
+                    },
                 },
             },
         ],
@@ -123,7 +127,9 @@ function runTest({docs, pipeline, expectedResults}) {
         ],
         pipeline: [
             {
-                $project: {new: {$add: [`$${metaField}`, {$getField: {$cond: [false, null, "a.b.c"]}}]}},
+                $project: {
+                    new: {$add: [`$${metaField}`, {$getField: {$cond: [false, null, "a.b.c"]}}]},
+                },
             },
         ],
         expectedResults: [
@@ -174,7 +180,10 @@ function runTest({docs, pipeline, expectedResults}) {
             {
                 $project: {
                     new: {
-                        $add: [`$${metaField}`, {$getField: {input: "$a", field: {$literal: "$meta1"}}}],
+                        $add: [
+                            `$${metaField}`,
+                            {$getField: {input: "$a", field: {$literal: "$meta1"}}},
+                        ],
                     },
                 },
             },
@@ -198,7 +207,10 @@ function runTest({docs, pipeline, expectedResults}) {
             {
                 $addFields: {
                     new: {
-                        $add: [`$${metaField}`, {$getField: {input: "$a", field: {$literal: "$meta1"}}}],
+                        $add: [
+                            `$${metaField}`,
+                            {$getField: {input: "$a", field: {$literal: "$meta1"}}},
+                        ],
                     },
                 },
             },

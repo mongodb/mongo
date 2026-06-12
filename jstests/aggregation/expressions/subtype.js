@@ -24,7 +24,10 @@ function runAndAssert(operand, result) {
     assert.commandWorked(coll.insertOne(document));
 
     // Test again with fields from document.
-    assert.eq(coll.aggregate([{$project: {result: {$subtype: "$op"}}}]).toArray()[0].result, result);
+    assert.eq(
+        coll.aggregate([{$project: {result: {$subtype: "$op"}}}]).toArray()[0].result,
+        result,
+    );
 
     // Clean up.
     coll.drop();
@@ -32,7 +35,9 @@ function runAndAssert(operand, result) {
 }
 
 function runAndAssertThrows(operand, code) {
-    const error = assert.throws(() => coll.aggregate([{$project: {result: {$subtype: operand}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {result: {$subtype: operand}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, code);
 }
 
@@ -73,7 +78,11 @@ testExpression(
     4,
 );
 testExpression(coll, {$subtype: UUID("81fd5473-1747-4c9d-8743-f10642b3bb99")}, 4);
-testExpression(coll, {$subtype: {$convert: {input: "🙂😎", to: {type: "binData", subtype: 0}, format: "utf8"}}}, 0);
+testExpression(
+    coll,
+    {$subtype: {$convert: {input: "🙂😎", to: {type: "binData", subtype: 0}, format: "utf8"}}},
+    0,
+);
 
 // Test on values without subtype.
 const noSubtypeErrorCode = 10389300;

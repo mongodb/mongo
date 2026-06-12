@@ -8,7 +8,10 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {generateTimeValue, makeBucketFilter} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {
+    generateTimeValue,
+    makeBucketFilter,
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {getExecutionStages} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {TimeseriesMultiUpdateUtil} from "jstests/sharding/libs/timeseries_update_multi_util.js";
@@ -74,7 +77,10 @@ const requestConfigurations = {
         expectedExplain: {
             [primaryShardName]: {
                 bucketFilter: makeBucketFilter({
-                    "$and": [{"control.min.f": {"$_internalExprLte": 0}}, {"control.max.f": {"$_internalExprGte": 0}}],
+                    "$and": [
+                        {"control.min.f": {"$_internalExprLte": 0}},
+                        {"control.max.f": {"$_internalExprGte": 0}},
+                    ],
                 }),
                 residualFilter: {"f": {"$eq": 0}},
                 nBucketsUnpacked: 1,
@@ -83,7 +89,10 @@ const requestConfigurations = {
             },
             [otherShardName]: {
                 bucketFilter: makeBucketFilter({
-                    "$and": [{"control.min.f": {"$_internalExprLte": 0}}, {"control.max.f": {"$_internalExprGte": 0}}],
+                    "$and": [
+                        {"control.min.f": {"$_internalExprLte": 0}},
+                        {"control.max.f": {"$_internalExprGte": 0}},
+                    ],
                 }),
                 residualFilter: {"f": {"$eq": 0}},
                 nBucketsUnpacked: 0,
@@ -109,21 +118,31 @@ const requestConfigurations = {
                         {"_id": {"$gte": ObjectId("386d35700000000000000000")}},
                         {"control.max.f": {"$_internalExprGte": 0}},
                         {
-                            "control.max.time": {"$_internalExprGte": ISODate("2000-01-01T00:00:00Z")},
+                            "control.max.time": {
+                                "$_internalExprGte": ISODate("2000-01-01T00:00:00Z"),
+                            },
                         },
                         {
-                            "control.min.time": {"$_internalExprGte": ISODate("1999-12-31T23:00:00Z")},
+                            "control.min.time": {
+                                "$_internalExprGte": ISODate("1999-12-31T23:00:00Z"),
+                            },
                         },
                         {
-                            "control.max.time": {"$_internalExprLte": ISODate("2000-01-01T01:00:00Z")},
+                            "control.max.time": {
+                                "$_internalExprLte": ISODate("2000-01-01T01:00:00Z"),
+                            },
                         },
                         {"control.min.f": {"$_internalExprLte": 0}},
                         {
-                            "control.min.time": {"$_internalExprLte": ISODate("2000-01-01T00:00:00Z")},
+                            "control.min.time": {
+                                "$_internalExprLte": ISODate("2000-01-01T00:00:00Z"),
+                            },
                         },
                     ],
                 }),
-                residualFilter: {"$and": [{"f": {"$eq": 0}}, {[timeField]: {"$eq": generateTimeValue(0)}}]},
+                residualFilter: {
+                    "$and": [{"f": {"$eq": 0}}, {[timeField]: {"$eq": generateTimeValue(0)}}],
+                },
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -207,7 +226,9 @@ const requestConfigurations = {
         ],
         expectedExplain: {
             [otherShardName]: {
-                residualFilter: {"$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}]},
+                residualFilter: {
+                    "$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}],
+                },
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -312,7 +333,9 @@ const requestConfigurations = {
         ],
         expectedExplain: {
             [otherShardName]: {
-                residualFilter: {"$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}]},
+                residualFilter: {
+                    "$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}],
+                },
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -382,7 +405,9 @@ const requestConfigurations = {
         ],
         expectedExplain: {
             [otherShardName]: {
-                residualFilter: {"$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}]},
+                residualFilter: {
+                    "$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}],
+                },
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -466,13 +491,20 @@ function runExplainTest(collConfig, reqConfig, insertFn) {
     );
 
     // We can only run the explain on one update at a time.
-    assert.eq(reqConfig.updateList.length, 1, `The updateList can only contain one update: ${tojson(reqConfig)}`);
+    assert.eq(
+        reqConfig.updateList.length,
+        1,
+        `The updateList can only contain one update: ${tojson(reqConfig)}`,
+    );
     const update = reqConfig.updateList[0];
     const expectedExplainOutput = reqConfig.expectedExplain;
 
     // Run explain on the update and examine the execution stages for the expected results.
     const explainOutput = assert.commandWorked(
-        coll.runCommand({explain: {update: coll.getName(), updates: [update]}, verbosity: "executionStats"}),
+        coll.runCommand({
+            explain: {update: coll.getName(), updates: [update]},
+            verbosity: "executionStats",
+        }),
     );
     const execStages = getExecutionStages(explainOutput);
     assert.eq(
@@ -489,8 +521,16 @@ function runExplainTest(collConfig, reqConfig, insertFn) {
             `No expected explain output included for the execution stage: ${tojson(execStage)}`,
         );
 
-        assert.eq("TS_MODIFY", execStage.stage, `TS_MODIFY stage not found in executionStages: ${tojson(execStage)}`);
-        assert.eq("updateMany", execStage.opType, `TS_MODIFY stage not found in executionStages: ${tojson(execStage)}`);
+        assert.eq(
+            "TS_MODIFY",
+            execStage.stage,
+            `TS_MODIFY stage not found in executionStages: ${tojson(execStage)}`,
+        );
+        assert.eq(
+            "updateMany",
+            execStage.opType,
+            `TS_MODIFY stage not found in executionStages: ${tojson(execStage)}`,
+        );
 
         // Check the bucket and residual filters if they are provided in the expected explain
         // result.

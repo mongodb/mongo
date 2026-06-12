@@ -19,7 +19,9 @@ assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
 const primaryShardName = shardNames[0];
 const otherShardName = shardNames[1];
 
-assert.commandWorked(db.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}),
+);
 
 const innerCollName = "innerColl";
 const searchIndexName = "excludeStateBirdIndex";
@@ -75,7 +77,9 @@ function testSearchStoredSourceInSubpipeline(pipeline, expectedResults) {
     );
 
     // Shard the inner collection and move a chunk (with _id: 10000) to the other shard.
-    assert.commandWorked(testDb.adminCommand({shardCollection: innerColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        testDb.adminCommand({shardCollection: innerColl.getFullName(), key: {_id: 1}}),
+    );
     assert.commandWorked(testDb.adminCommand({split: innerColl.getFullName(), middle: {_id: 3}}));
     assert.commandWorked(
         testDb.adminCommand({

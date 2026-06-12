@@ -51,7 +51,8 @@ t.drop();
 const key = {
     _id: 1,
 };
-const expectedMessage = "E11000 duplicate key error collection: " + t + " index: _id_ dup key: { _id: 1.0 }";
+const expectedMessage =
+    "E11000 duplicate key error collection: " + t + " index: _id_ dup key: { _id: 1.0 }";
 assert.commandWorked(t.insert(key));
 res = t.insert(key);
 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);

@@ -7,4 +7,7 @@ const idx = {
     key: {"a": 1},
     name: "foo\0bar",
 };
-assert.commandFailedWithCode(coll.runCommand("createIndexes", {indexes: [idx]}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.runCommand("createIndexes", {indexes: [idx]}),
+    ErrorCodes.CannotCreateIndex,
+);

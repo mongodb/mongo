@@ -80,7 +80,9 @@ function testDataConsistencyAndMissingKeysCheck() {
     secondary = replSet.getSecondary();
     secondaryHealthLog = secondary.getDB("local").system.healthlog;
 
-    jsTestLog("Testing that dbCheck logs minKey and maxKey in data consistency check in one batch.");
+    jsTestLog(
+        "Testing that dbCheck logs minKey and maxKey in data consistency check in one batch.",
+    );
     runDbCheck(
         replSet,
         primary.getDB(dbName),
@@ -119,7 +121,9 @@ function testDataConsistencyAndMissingKeysCheck() {
     );
 
     clearHealthLog(replSet);
-    jsTestLog("Testing that dbCheck logs minKey and maxKey in data consistency check in multiple batches.");
+    jsTestLog(
+        "Testing that dbCheck logs minKey and maxKey in data consistency check in multiple batches.",
+    );
     // Insert docs to have more than one batch.
     for (let i = 1; i <= 3; i++) {
         primaryDB.getCollection(collName).insertOne({_id: i, a: i});
@@ -135,14 +139,30 @@ function testDataConsistencyAndMissingKeysCheck() {
     // Verify that both the primary and secondary log minKey and maxKey.
     checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
     checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, 3);
-    checkHealthLog(primaryHealthLog, {...logQueries.infoBatchQuery, "data.batchStart._id": MinKey}, 1);
-    checkHealthLog(primaryHealthLog, {...logQueries.infoBatchQuery, "data.batchEnd._id": MaxKey}, 1);
+    checkHealthLog(
+        primaryHealthLog,
+        {...logQueries.infoBatchQuery, "data.batchStart._id": MinKey},
+        1,
+    );
+    checkHealthLog(
+        primaryHealthLog,
+        {...logQueries.infoBatchQuery, "data.batchEnd._id": MaxKey},
+        1,
+    );
     // TODO SERVER-92609: Standardize batch bounds between extra index keys check and collection
     // check so we can use assertCompleteCoverage assertCompleteCoverage(
     //     primaryHealthLog, 2 /*nDocs*/, "_id" /*indexName*/, "" /*docSuffix*/);
 
-    checkHealthLog(secondaryHealthLog, {...logQueries.inconsistentBatchQuery, "data.batchStart._id": MinKey}, 1);
-    checkHealthLog(secondaryHealthLog, {...logQueries.inconsistentBatchQuery, "data.batchEnd._id": MaxKey}, 1);
+    checkHealthLog(
+        secondaryHealthLog,
+        {...logQueries.inconsistentBatchQuery, "data.batchStart._id": MinKey},
+        1,
+    );
+    checkHealthLog(
+        secondaryHealthLog,
+        {...logQueries.inconsistentBatchQuery, "data.batchEnd._id": MaxKey},
+        1,
+    );
 
     // There should be 1 inconsistent batch (docs 0 and 1), 1 consistent batch (doc 2), 1
     // inconsistent batch (docs 3, 4, 5).
@@ -189,9 +209,13 @@ function testExtraIndexKeysCheck() {
     assert.eq(secondaryColl.find({}).count(), 3);
 
     // Set up inconsistency.
-    const skipUnindexingDocumentWhenDeleted = configureFailPoint(secondaryDB, "skipUnindexingDocumentWhenDeleted", {
-        indexName: "a_1",
-    });
+    const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+        secondaryDB,
+        "skipUnindexingDocumentWhenDeleted",
+        {
+            indexName: "a_1",
+        },
+    );
     jsTestLog("Deleting docs");
     assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -205,8 +229,16 @@ function testExtraIndexKeysCheck() {
         secondaryIndex: "a_1",
     };
 
-    jsTestLog("Testing that dbCheck logs minKey and maxKey in extra index keys check in one batch.");
-    runDbCheck(replSet, primary.getDB(dbName), collName, dbCheckParameters, true /*awaitCompletion*/);
+    jsTestLog(
+        "Testing that dbCheck logs minKey and maxKey in extra index keys check in one batch.",
+    );
+    runDbCheck(
+        replSet,
+        primary.getDB(dbName),
+        collName,
+        dbCheckParameters,
+        true /*awaitCompletion*/,
+    );
 
     // Verify that both the primary and secondary log minKey and maxKey.
     checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
@@ -237,7 +269,9 @@ function testExtraIndexKeysCheck() {
     );
 
     clearHealthLog(replSet);
-    jsTestLog("Testing that dbCheck logs minKey and maxKey in extra index keys check in multiple batches.");
+    jsTestLog(
+        "Testing that dbCheck logs minKey and maxKey in extra index keys check in multiple batches.",
+    );
     // Insert docs to have more than one batch.
     for (let i = 1; i <= 3; i++) {
         primaryDB.getCollection(collName).insertOne({_id: i, a: i});
@@ -247,17 +281,35 @@ function testExtraIndexKeysCheck() {
         secondaryIndex: "a_1",
         maxDocsPerBatch: 1,
     };
-    runDbCheck(replSet, primary.getDB(dbName), collName, dbCheckParameters, true /*awaitCompletion*/);
+    runDbCheck(
+        replSet,
+        primary.getDB(dbName),
+        collName,
+        dbCheckParameters,
+        true /*awaitCompletion*/,
+    );
 
     // Verify that both the primary and secondary log minKey and maxKey.
     checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
     checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, 3);
-    checkHealthLog(primaryHealthLog, {...logQueries.infoBatchQuery, "data.batchStart.a": MinKey}, 1);
+    checkHealthLog(
+        primaryHealthLog,
+        {...logQueries.infoBatchQuery, "data.batchStart.a": MinKey},
+        1,
+    );
     checkHealthLog(primaryHealthLog, {...logQueries.infoBatchQuery, "data.batchEnd.a": MaxKey}, 1);
     assertCompleteCoverage(primaryHealthLog, 3 /*nDocs*/, "a" /*indexName*/, "" /*docSuffix*/);
 
-    checkHealthLog(secondaryHealthLog, {...logQueries.inconsistentBatchQuery, "data.batchStart.a": MinKey}, 1);
-    checkHealthLog(secondaryHealthLog, {...logQueries.inconsistentBatchQuery, "data.batchEnd.a": MaxKey}, 1);
+    checkHealthLog(
+        secondaryHealthLog,
+        {...logQueries.inconsistentBatchQuery, "data.batchStart.a": MinKey},
+        1,
+    );
+    checkHealthLog(
+        secondaryHealthLog,
+        {...logQueries.inconsistentBatchQuery, "data.batchEnd.a": MaxKey},
+        1,
+    );
 
     // There should be 1 inconsistent batch (docs 0 and 1), 1 consistent batch (doc 2), 1
     // inconsistent batch (docs 3, 4, 5).

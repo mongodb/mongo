@@ -62,7 +62,12 @@ function testStandaloneVectorSearchStoredSourceParameterOn(mongotMock, testDB, c
     const history = [
         {
             expectedCommand,
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
     ];
 
@@ -102,7 +107,12 @@ function testStandaloneVectorSearchStoredSourceParameterOff(mongotMock, testDB, 
     const history = [
         {
             expectedCommand,
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
     ];
 
@@ -112,9 +122,17 @@ function testStandaloneVectorSearchStoredSourceParameterOff(mongotMock, testDB, 
     assertArrayEq({actual: results, expected: expectedDocs});
 }
 
-function testShardedVectorSearchStoredSourceParameterOn(stWithMock, testDB, collectionUUID, shard0Conn, shard1Conn) {
+function testShardedVectorSearchStoredSourceParameterOn(
+    stWithMock,
+    testDB,
+    collectionUUID,
+    shard0Conn,
+    shard1Conn,
+) {
     // Set mock responses on each shard.
-    const shard0Batch = [{$vectorSearchScore: 0.654, storedSource: {_id: 1, title: "mcdonald's", arches: true}}];
+    const shard0Batch = [
+        {$vectorSearchScore: 0.654, storedSource: {_id: 1, title: "mcdonald's", arches: true}},
+    ];
     const history0 = [
         {
             expectedCommand: mongotCommandForVectorSearchQuery({
@@ -167,7 +185,13 @@ function testShardedVectorSearchStoredSourceParameterOn(stWithMock, testDB, coll
     assertArrayEq({actual: results, expected: expectedDocs});
 }
 
-function testShardedVectorSearchStoredSourceParameterOff(stWithMock, testDB, collectionUUID, shard0Conn, shard1Conn) {
+function testShardedVectorSearchStoredSourceParameterOff(
+    stWithMock,
+    testDB,
+    collectionUUID,
+    shard0Conn,
+    shard1Conn,
+) {
     // When the cluster parameter is off, $vectorSearch should always act as if returnStoredSource
     // is false, regardless of its actual value.
     const shard0Batch = [{_id: 1, $vectorSearchScore: 0.654}];
@@ -247,13 +271,17 @@ function testShardedVectorSearchStoredSourceParameterOff(stWithMock, testDB, col
 
     // Disable the cluster parameter and run tests again.
     assert.commandWorked(
-        testDB.adminCommand({setClusterParameter: {internalVectorSearchStoredSource: {enabled: false}}}),
+        testDB.adminCommand({
+            setClusterParameter: {internalVectorSearchStoredSource: {enabled: false}},
+        }),
     );
     testStandaloneVectorSearchStoredSourceParameterOff(mongotMock, testDB, collectionUUID);
 
     // Re-enable the cluster parameter and run tests again.
     assert.commandWorked(
-        testDB.adminCommand({setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}}}),
+        testDB.adminCommand({
+            setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}},
+        }),
     );
     testStandaloneVectorSearchStoredSourceParameterOn(mongotMock, testDB, collectionUUID);
 
@@ -275,7 +303,9 @@ function testShardedVectorSearchStoredSourceParameterOff(stWithMock, testDB, col
     const coll = testDB.getCollection(collName);
 
     // Enable sharding on the database and collection.
-    assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+    );
 
     // Populate collection.
     assert.commandWorked(
@@ -297,21 +327,45 @@ function testShardedVectorSearchStoredSourceParameterOff(stWithMock, testDB, col
 
     // Enable cluster parameter.
     assert.commandWorked(
-        testDB.adminCommand({setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}}}),
+        testDB.adminCommand({
+            setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}},
+        }),
     );
-    testShardedVectorSearchStoredSourceParameterOn(stWithMock, testDB, collectionUUID, shard0Conn, shard1Conn);
+    testShardedVectorSearchStoredSourceParameterOn(
+        stWithMock,
+        testDB,
+        collectionUUID,
+        shard0Conn,
+        shard1Conn,
+    );
 
     // Disable the cluster parameter and run tests again.
     assert.commandWorked(
-        testDB.adminCommand({setClusterParameter: {internalVectorSearchStoredSource: {enabled: false}}}),
+        testDB.adminCommand({
+            setClusterParameter: {internalVectorSearchStoredSource: {enabled: false}},
+        }),
     );
-    testShardedVectorSearchStoredSourceParameterOff(stWithMock, testDB, collectionUUID, shard0Conn, shard1Conn);
+    testShardedVectorSearchStoredSourceParameterOff(
+        stWithMock,
+        testDB,
+        collectionUUID,
+        shard0Conn,
+        shard1Conn,
+    );
 
     // Re-enable the cluster parameter and run tests again.
     assert.commandWorked(
-        testDB.adminCommand({setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}}}),
+        testDB.adminCommand({
+            setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}},
+        }),
     );
-    testShardedVectorSearchStoredSourceParameterOn(stWithMock, testDB, collectionUUID, shard0Conn, shard1Conn);
+    testShardedVectorSearchStoredSourceParameterOn(
+        stWithMock,
+        testDB,
+        collectionUUID,
+        shard0Conn,
+        shard1Conn,
+    );
 
     stWithMock.stop();
 })();

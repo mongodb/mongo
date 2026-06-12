@@ -24,11 +24,15 @@ const coll = db.getCollection(jsTestName());
 const timeFieldName = "time";
 const resetCollection = () => {
     coll.drop();
-    assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}),
+    );
 };
 
 const timeseriesBucketMaxSize = (() => {
-    const res = assert.commandWorked(db.adminCommand({getParameter: 1, timeseriesBucketMaxSize: 1}));
+    const res = assert.commandWorked(
+        db.adminCommand({getParameter: 1, timeseriesBucketMaxSize: 1}),
+    );
     return res.timeseriesBucketMaxSize;
 })();
 
@@ -38,7 +42,10 @@ const checkAverageBucketSize = () => {
     jsTestLog("Average bucket size: " + timeseriesStats.avgBucketSize);
     assert.lte(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize);
 
-    const firstBucket = getTimeseriesCollForRawOps(db, coll).find().rawData().sort({"control.min._id": 1})[0];
+    const firstBucket = getTimeseriesCollForRawOps(db, coll)
+        .find()
+        .rawData()
+        .sort({"control.min._id": 1})[0];
     assert.eq(0, firstBucket.control.min._id);
     assert.eq(9, firstBucket.control.max._id);
 };

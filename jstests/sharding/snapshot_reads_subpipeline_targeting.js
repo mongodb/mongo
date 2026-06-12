@@ -30,7 +30,9 @@ const db = st.s.getDB(dbName);
 const local = db.local;
 const foreign = db.foreign;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Create local collection, shard it and distribute among shards.
 CreateShardedCollectionUtil.shardCollectionWithChunks(local, {_id: 1}, [
@@ -48,7 +50,10 @@ assert.commandWorked(local.insert({_id: 5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(foreign.insert({a: -5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(foreign.insert({a: 5}, {writeConcern: {w: "majority"}}));
 
-const pipeline = [{$lookup: {from: "foreign", localField: "_id", foreignField: "a", as: "f"}}, {$sort: {_id: 1}}];
+const pipeline = [
+    {$lookup: {from: "foreign", localField: "_id", foreignField: "a", as: "f"}},
+    {$sort: {_id: 1}},
+];
 
 const opTime = db.runCommand({ping: 1}).operationTime;
 const readConcern = {
@@ -68,7 +73,9 @@ assert.commandWorked(
         .getCollection("foreign")
         .updateOne({a: -5}, {$set: {a: 5}}),
 );
-assert.commandWorked(db.adminCommand({moveChunk: foreign.getFullName(), find: {a: 5}, to: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: foreign.getFullName(), find: {a: 5}, to: st.shard0.shardName}),
+);
 
 const resAfter = local.aggregate(pipeline, {readConcern: readConcern}).toArray();
 assert.eq(resBefore, resAfter);

@@ -50,7 +50,11 @@ function generateBatch(size) {
 
 st.startBalancer();
 function runTest(shardKey) {
-    assert.commandWorked(mainDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        mainDB.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
+    );
     const coll = mainDB.getCollection(collName);
 
     // Shard timeseries collection.

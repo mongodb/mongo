@@ -21,9 +21,13 @@ const collName = jsTestName();
 
 function runTest(lastVersion, validator, featureFlag) {
     if (featureFlag) {
-        const res = assert.commandWorked(primary.adminCommand({"getParameter": 1, [featureFlag]: 1}));
+        const res = assert.commandWorked(
+            primary.adminCommand({"getParameter": 1, [featureFlag]: 1}),
+        );
         if (!res[featureFlag].value) {
-            jsTest.log.warning("Skipping test because the " + featureFlag + " feature flag is disabled");
+            jsTest.log.warning(
+                "Skipping test because the " + featureFlag + " feature flag is disabled",
+            );
             return;
         }
     }
@@ -64,7 +68,9 @@ function runTest(lastVersion, validator, featureFlag) {
 
     // Reset for the next test.
     assertDropCollection(primary.getDB("test"), collName);
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 }
 
 // TODO(SERVER-90514): Remove arrayIndexAs query when feature flag is removed.

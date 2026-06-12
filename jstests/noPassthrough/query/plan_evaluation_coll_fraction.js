@@ -18,7 +18,9 @@ function resetKnobsForTest() {
     // To avoid needing a huge collection to see the effects of the collFraction limit kick in.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 1}));
     // Ensure total coll fraction is always used in this test instead of the per-plan limit.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationCollFraction: 1}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationCollFraction: 1}),
+    );
 }
 
 function generateCombinations(n) {
@@ -96,7 +98,10 @@ const query = {
 // with the given 'collFraction' setting.
 function getStoppingCondition(collFraction, limit = 0) {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlanTotalEvaluationCollFraction: collFraction}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlanTotalEvaluationCollFraction: collFraction,
+        }),
     );
 
     const before = db.serverStatus().metrics.query.multiPlanner.stoppingCondition;
@@ -122,7 +127,9 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
             describe("fallback to CBR", function () {
                 it("does not update multi-planner metrics when plan cache is disabled", function () {
                     // We do not measure works for the chosen CBR plan, so MP metrics must not change.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}),
+                    );
 
                     assert.docEq(
                         {
@@ -146,7 +153,9 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                 it("records hitWorksLimit when CBR fallback is measured with low collFraction", function () {
                     // With plan cache enabled, we measure works for the CBR-chosen plan.
                     // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}),
+                    );
 
                     assert.docEq(
                         {
@@ -161,7 +170,9 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                 it("records hitEof when CBR fallback is measured with high collFraction", function () {
                     // With a higher collFraction, CBR can run until EOF instead of hitting works limit.
                     // With plan cache enabled, this should be reflected as hitEof.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}),
+                    );
 
                     assert.docEq(
                         {
@@ -188,7 +199,9 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                     });
 
                     // Ensure the first-phase MP trials have enough works to reach the matching doc and EOF.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 15}));
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 15}),
+                    );
 
                     assert.docEq(
                         {
@@ -211,7 +224,9 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                         selective: -1,
                     });
 
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 15}));
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 15}),
+                    );
 
                     // Limit(1) forces the batch results limit to be the stopping condition.
                     assert.docEq(

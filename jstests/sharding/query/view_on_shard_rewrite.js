@@ -28,7 +28,9 @@ const viewNs = dbName + "." + viewName;
 const mongosDB = st.s.getDB(dbName);
 const mongosView = mongosDB[viewName];
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 const shard0Primary = st.rs0.getPrimary();
 assert.commandWorked(shard0Primary.getDB(dbName).setProfilingLevel(2, -1));
@@ -117,11 +119,19 @@ assertReadOnView(mongosView, true /* expectKickBackToMongos */);
     // kicked-back to mongos, since shard1 owned the underlying collection at the transaction
     // snapshot.
     assert.throwsWithCode(
-        () => assertReadOnView(session1.getDatabase(dbName)[viewName], true /* expectKickBackToMongos */),
+        () =>
+            assertReadOnView(
+                session1.getDatabase(dbName)[viewName],
+                true /* expectKickBackToMongos */,
+            ),
         ErrorCodes.StaleChunkHistory,
     );
     assert.throwsWithCode(
-        () => assertReadOnView(session2.getDatabase(dbName)[viewName], true /* expectKickBackToMongos */),
+        () =>
+            assertReadOnView(
+                session2.getDatabase(dbName)[viewName],
+                true /* expectKickBackToMongos */,
+            ),
         ErrorCodes.MigrationConflict,
     );
 

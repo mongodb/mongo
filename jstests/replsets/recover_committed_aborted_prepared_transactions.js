@@ -47,7 +47,9 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
 
 // Prevent the stable timestamp from moving beyond the following prepared transactions so
 // that when we replay the oplog from the stable timestamp, we correctly recover them.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 // The following transactions will be prepared before the common point, so they must be in
 // prepare after rollback recovery.
@@ -76,7 +78,9 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations();
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}),
+    );
 }
 
 // Make sure there are two transactions in the transactions table.

@@ -121,11 +121,15 @@ function runTest() {
     assert.eq(res.itcount(), 1);
 
     // Tests an $and of the negated $geoWithin and an expression on a non-geo field.
-    res = coll.find({$and: [{loc: {$not: {$geoWithin: {$geometry: targetPolygonWithin}}}}, {a: 0}]});
+    res = coll.find({
+        $and: [{loc: {$not: {$geoWithin: {$geometry: targetPolygonWithin}}}}, {a: 0}],
+    });
     assert.eq(res.itcount(), 1);
 
     // Tests an $and of the negated $geoIntersects and an expression on a non-geo field.
-    res = coll.find({$and: [{loc: {$not: {$geoIntersects: {$geometry: targetLineIntersect}}}}, {a: 0}]});
+    res = coll.find({
+        $and: [{loc: {$not: {$geoIntersects: {$geometry: targetLineIntersect}}}}, {a: 0}],
+    });
     assert.eq(res.itcount(), 1);
 }
 

@@ -48,9 +48,15 @@ const arrayFieldValueArb = fc.oneof(
     fc.array(fc.boolean(), {maxLength: 3}),
     fc.array(fc.integer(), {maxLength: 3}),
     fc.array(fc.constantFrom("foo", "bar", "baz", ""), {maxLength: 4}),
-    fc.array(fc.date({min: new Date("1991-01-01T00:00:00.000Z"), max: new Date("2001-01-01T00:00:00.000Z")}), {
-        maxLength: 4,
-    }),
+    fc.array(
+        fc.date({
+            min: new Date("1991-01-01T00:00:00.000Z"),
+            max: new Date("2001-01-01T00:00:00.000Z"),
+        }),
+        {
+            maxLength: 4,
+        },
+    ),
 );
 
 const documentArb = fc.record(
@@ -123,8 +129,14 @@ function verifyReadOperations(collection, query, projectSpec) {
     const expressLimitAggRes = collection.aggregate(agg).toArray();
     const fallbackLimitRes = collection.find(query, projectSpec).hint({_id: 1}).toArray();
 
-    assert(arrayContainsElement(fallbackLimitRes, expressLimitRes), [fallbackLimitRes, expressLimitRes]);
-    assert(arrayContainsElement(fallbackLimitRes, expressLimitAggRes), [fallbackLimitRes, expressLimitAggRes]);
+    assert(arrayContainsElement(fallbackLimitRes, expressLimitRes), [
+        fallbackLimitRes,
+        expressLimitRes,
+    ]);
+    assert(arrayContainsElement(fallbackLimitRes, expressLimitAggRes), [
+        fallbackLimitRes,
+        expressLimitAggRes,
+    ]);
 }
 
 function verifyWriteOperations(collection, query, updateValue) {
@@ -151,85 +163,93 @@ function verifyInvalidWriteOperations(collection, query, updateValue) {
 }
 
 fc.assert(
-    fc.property(testCaseArb, ({indexSpec, docs, projectSpec, isIndexUnique, isClustered, updateValue}) => {
-        const fields = Object.keys(indexSpec);
-        fc.pre(!hasDuplicates(docs.map((doc) => doc._id.toString())));
+    fc.property(
+        testCaseArb,
+        ({indexSpec, docs, projectSpec, isIndexUnique, isClustered, updateValue}) => {
+            const fields = Object.keys(indexSpec);
+            fc.pre(!hasDuplicates(docs.map((doc) => doc._id.toString())));
 
-        fc.pre(
-            !isIndexUnique ||
-                !hasDuplicates(
-                    docs
-                        .map((doc) => {
-                            let d = doc[fields[0]];
-                            if (d == null || typeof d == "undefined") {
-                                return "null";
-                            } else if (Array.isArray(d) && d.length == 0) {
-                                return "[]";
-                            } else if (typeof d.getTime === "function") {
-                                return d.getTime();
-                            } else {
-                                return d;
-                            }
-                        })
-                        .flat(),
-                ),
-        );
+            fc.pre(
+                !isIndexUnique ||
+                    !hasDuplicates(
+                        docs
+                            .map((doc) => {
+                                let d = doc[fields[0]];
+                                if (d == null || typeof d == "undefined") {
+                                    return "null";
+                                } else if (Array.isArray(d) && d.length == 0) {
+                                    return "[]";
+                                } else if (typeof d.getTime === "function") {
+                                    return d.getTime();
+                                } else {
+                                    return d;
+                                }
+                            })
+                            .flat(),
+                    ),
+            );
 
-        const collName = jsTestName();
-        if (isClustered) {
-            assertDropAndRecreateCollection(db, collName, {clusteredIndex: {key: {_id: 1}, unique: true}});
-        } else {
-            assertDropAndRecreateCollection(db, collName);
-        }
-        const coll = db[collName];
-
-        // don't create duplicative _id-only index
-        if (!indexSpec.hasOwnProperty("_id") || fields.length != 1) {
-            if (isIndexUnique && FixtureHelpers.isSharded(coll)) {
-                isIndexUnique = false; // sharded collections can't have unique indexes
+            const collName = jsTestName();
+            if (isClustered) {
+                assertDropAndRecreateCollection(db, collName, {
+                    clusteredIndex: {key: {_id: 1}, unique: true},
+                });
+            } else {
+                assertDropAndRecreateCollection(db, collName);
             }
-            assert.commandWorked(coll.createIndex(indexSpec, {unique: isIndexUnique}));
-        }
-        assert.commandWorked(coll.insert(docs));
+            const coll = db[collName];
 
-        let queryList = [],
-            invalidQueryList = [];
-        const indexes = ["_id", fields[0]];
-        indexes.forEach((curField) => {
-            const value = docs[0][curField];
-            queryList.push({[curField]: value});
-            queryList.push({[curField]: {$eq: value}});
-            if (Array.isArray(value) && value.length > 0) {
-                queryList.push({[curField]: value[0]});
-                queryList.push({[curField]: {$eq: value[0]}});
+            // don't create duplicative _id-only index
+            if (!indexSpec.hasOwnProperty("_id") || fields.length != 1) {
+                if (isIndexUnique && FixtureHelpers.isSharded(coll)) {
+                    isIndexUnique = false; // sharded collections can't have unique indexes
+                }
+                assert.commandWorked(coll.createIndex(indexSpec, {unique: isIndexUnique}));
             }
-            // test queries with no expected matches too
-            queryList.push({[curField]: "no match"});
-            queryList.push({[curField]: 123});
-            queryList.push({[curField]: {$eq: 123}});
-            // test queries with invalid predicates
-            const cfs = String([curField]);
-            invalidQueryList.push(_buildBsonObj(cfs, value, cfs, value));
-            invalidQueryList.push(_buildBsonObj(cfs, value, cfs, 0));
-            invalidQueryList.push(_buildBsonObj(cfs, {$eq: value}, cfs, 0));
-        });
+            assert.commandWorked(coll.insert(docs));
 
-        jsTest.log.info("Generated test data", {docs, indexSpec, projectSpec});
+            let queryList = [],
+                invalidQueryList = [];
+            const indexes = ["_id", fields[0]];
+            indexes.forEach((curField) => {
+                const value = docs[0][curField];
+                queryList.push({[curField]: value});
+                queryList.push({[curField]: {$eq: value}});
+                if (Array.isArray(value) && value.length > 0) {
+                    queryList.push({[curField]: value[0]});
+                    queryList.push({[curField]: {$eq: value[0]}});
+                }
+                // test queries with no expected matches too
+                queryList.push({[curField]: "no match"});
+                queryList.push({[curField]: 123});
+                queryList.push({[curField]: {$eq: 123}});
+                // test queries with invalid predicates
+                const cfs = String([curField]);
+                invalidQueryList.push(_buildBsonObj(cfs, value, cfs, value));
+                invalidQueryList.push(_buildBsonObj(cfs, value, cfs, 0));
+                invalidQueryList.push(_buildBsonObj(cfs, {$eq: value}, cfs, 0));
+            });
 
-        queryList.forEach((query) => {
-            jsTest.log.info("Verifying read operation", {query});
-            verifyReadOperations(coll, query, projectSpec);
-        });
+            jsTest.log.info("Generated test data", {docs, indexSpec, projectSpec});
 
-        // queryList[0] should always produce exactly 1 match.
-        jsTest.log.info("Verifying write operation", {query: queryList[0], update: updateValue});
-        verifyWriteOperations(coll, queryList[0], updateValue);
+            queryList.forEach((query) => {
+                jsTest.log.info("Verifying read operation", {query});
+                verifyReadOperations(coll, query, projectSpec);
+            });
 
-        invalidQueryList.forEach((query) => {
-            verifyReadOperations(coll, query, projectSpec);
-            verifyInvalidWriteOperations(coll, query, {newField: updateValue});
-        });
-    }),
+            // queryList[0] should always produce exactly 1 match.
+            jsTest.log.info("Verifying write operation", {
+                query: queryList[0],
+                update: updateValue,
+            });
+            verifyWriteOperations(coll, queryList[0], updateValue);
+
+            invalidQueryList.forEach((query) => {
+                verifyReadOperations(coll, query, projectSpec);
+                verifyInvalidWriteOperations(coll, query, {newField: updateValue});
+            });
+        },
+    ),
     {
         seed: 413,
         // The search space for this PBT is small because express path covers a narrow range of

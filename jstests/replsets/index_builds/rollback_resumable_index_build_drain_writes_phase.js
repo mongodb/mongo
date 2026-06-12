@@ -114,7 +114,10 @@ const runRollbackTo = function (rollbackEndFailPoint) {
 runRollbackTo({name: "hangAfterSettingUpIndexBuild", logIdWithBuildUUID: 20387});
 
 // Rollback to the collection scan phase.
-runRollbackTo({name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386});
+runRollbackTo({
+    name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+    logIdWithBuildUUID: 20386,
+});
 
 // Rollback to the bulk load phase.
 runRollbackTo({name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400});

@@ -142,7 +142,13 @@ testPipeline(
 // Case where the first $limit can be pushed down, but the second overflows and thus remains in
 // place.
 testPipeline(
-    [{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775800")}, {$limit: 7}, {$skip: 10}, {$limit: 1}],
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("9223372036854775800")},
+        {$limit: 7},
+        {$skip: 10},
+        {$limit: 1},
+    ],
     sbeFullyEnabled
         ? {
               SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},
@@ -160,7 +166,13 @@ testPipeline(
 // Case with multiple $limit and $skip stages where the second $limit ends up being the
 // smallest. There is no overflow in this case.
 testPipeline(
-    [{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775800")}, {$limit: 7}, {$skip: 3}, {$limit: 1}],
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("9223372036854775800")},
+        {$limit: 7},
+        {$skip: 3},
+        {$limit: 1},
+    ],
     {
         SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775804")]},
         SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775803")]},
@@ -221,7 +233,11 @@ testPipeline(
 
 // Cases where both limit and skip == MAX_LONG.
 testPipeline(
-    [{$sort: {x: -1}}, {$limit: NumberLong("9223372036854775807")}, {$skip: NumberLong("9223372036854775807")}],
+    [
+        {$sort: {x: -1}},
+        {$limit: NumberLong("9223372036854775807")},
+        {$skip: NumberLong("9223372036854775807")},
+    ],
     {
         SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},
         SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]},
@@ -230,7 +246,11 @@ testPipeline(
 );
 
 testPipeline(
-    [{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775807")}, {$limit: NumberLong("9223372036854775807")}],
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("9223372036854775807")},
+        {$limit: NumberLong("9223372036854775807")},
+    ],
     sbeFullyEnabled
         ? {
               LIMIT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},

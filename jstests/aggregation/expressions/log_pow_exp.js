@@ -141,7 +141,11 @@ for (const test of logTestCases) {
     for (const input of inputs) {
         for (const base of bases) {
             const hasDecimalInput = isNumberDecimal(input) || isNumberDecimal(base);
-            testOp({$log: [input, base]}, hasDecimalInput ? test.decResult : test.doubleResult, test);
+            testOp(
+                {$log: [input, base]},
+                hasDecimalInput ? test.decResult : test.doubleResult,
+                test,
+            );
         }
     }
 }
@@ -281,8 +285,14 @@ testOp({$pow: [-2, NumberInt("2")]}, 4);
 testOp({$pow: [NumberDecimal("10.0"), -2]}, NumberDecimal("0.01000000000000000000000000000000000"));
 testOp({$pow: [0.5, NumberDecimal("-1")]}, NumberDecimal("2.000000000000000000000000000000000"));
 testOp({$pow: [-2, NumberDecimal("2")]}, NumberDecimal("4.000000000000000000000000000000000"));
-testOp({$pow: [NumberInt("2"), NumberDecimal("2")]}, NumberDecimal("4.000000000000000000000000000000000"));
-testOp({$pow: [NumberDecimal("-2.0"), NumberInt("2")]}, NumberDecimal("4.000000000000000000000000000000000"));
+testOp(
+    {$pow: [NumberInt("2"), NumberDecimal("2")]},
+    NumberDecimal("4.000000000000000000000000000000000"),
+);
+testOp(
+    {$pow: [NumberDecimal("-2.0"), NumberInt("2")]},
+    NumberDecimal("4.000000000000000000000000000000000"),
+);
 testOp({$pow: [NumberDecimal("10.0"), 2]}, NumberDecimal("100.0000000000000000000000000000000"));
 
 // If exponent is negative and base not -1, 0, or 1, return a double.
@@ -295,7 +305,10 @@ testOp({$pow: [NumberLong("-1"), NumberLong("-3")]}, NumberLong("-1"));
 // If result would overflow a long, return a double.
 testOp({$pow: [NumberInt("2"), NumberLong("63")]}, 9223372036854776000);
 // Exact decimal result
-testOp({$pow: [NumberInt("5"), NumberDecimal("-112")]}, NumberDecimal("5192296858534827628530496329220096E-112"));
+testOp(
+    {$pow: [NumberInt("5"), NumberDecimal("-112")]},
+    NumberDecimal("5192296858534827628530496329220096E-112"),
+);
 
 // Result would be incorrect if double were returned.
 testOp({$pow: [NumberInt("3"), NumberInt("35")]}, NumberLong("50031545098999707"));

@@ -15,7 +15,8 @@ function shardingStatisticsDifference(stats1, stats2) {
     return {
         numOperationsAttempted: stats1.numOperationsAttempted - stats2.numOperationsAttempted,
         numOperationsRetriedAtLeastOnceDueToOverload:
-            stats1.numOperationsRetriedAtLeastOnceDueToOverload - stats2.numOperationsRetriedAtLeastOnceDueToOverload,
+            stats1.numOperationsRetriedAtLeastOnceDueToOverload -
+            stats2.numOperationsRetriedAtLeastOnceDueToOverload,
         numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded:
             stats1.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded -
             stats2.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded,
@@ -23,9 +24,11 @@ function shardingStatisticsDifference(stats1, stats2) {
             stats1.numRetriesDueToOverloadAttempted - stats2.numRetriesDueToOverloadAttempted,
         numRetriesRetargetedDueToOverload:
             stats1.numRetriesRetargetedDueToOverload - stats2.numRetriesRetargetedDueToOverload,
-        numOverloadErrorsReceived: stats1.numOverloadErrorsReceived - stats2.numOverloadErrorsReceived,
+        numOverloadErrorsReceived:
+            stats1.numOverloadErrorsReceived - stats2.numOverloadErrorsReceived,
         totalBackoffTimeMillis: stats1.totalBackoffTimeMillis - stats2.totalBackoffTimeMillis,
-        retryBudgetTokenBucketBalance: stats1.retryBudgetTokenBucketBalance - stats2.retryBudgetTokenBucketBalance,
+        retryBudgetTokenBucketBalance:
+            stats1.retryBudgetTokenBucketBalance - stats2.retryBudgetTokenBucketBalance,
     };
 }
 
@@ -59,7 +62,14 @@ function getShardingStats(conn) {
     return conn.getDB("admin").serverStatus().shardingStatistics.shards[shardId];
 }
 
-function runTestOnlyPrimaryFails(commandName, command, readPref, mongos, shard, overloadRetargeting) {
+function runTestOnlyPrimaryFails(
+    commandName,
+    command,
+    readPref,
+    mongos,
+    shard,
+    overloadRetargeting,
+) {
     jsTestLog(
         "Running primary-failure test with command '" +
             commandName +
@@ -145,9 +155,16 @@ function runTestAllNodesFail(commandName, command, readPref, mongos, shard, over
     assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 1);
     assert.gt(shardStatsDiff.totalBackoffTimeMillis, 0);
     // Each error should be associated with a retry.
-    assert.eq(shardStatsDiff.numOverloadErrorsReceived, shardStatsDiff.numRetriesDueToOverloadAttempted);
+    assert.eq(
+        shardStatsDiff.numOverloadErrorsReceived,
+        shardStatsDiff.numRetriesDueToOverloadAttempted,
+    );
 
-    if (!readPref || readPref === "primary" || (readPref === "primaryPreferred" && !overloadRetargeting)) {
+    if (
+        !readPref ||
+        readPref === "primary" ||
+        (readPref === "primaryPreferred" && !overloadRetargeting)
+    ) {
         // All retries will be performed against the same primary.
         assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, kNumFailures);
         assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
@@ -216,7 +233,14 @@ function runTestSharded() {
         ]),
     );
 
-    const readPrefs = [null, "primary", "primaryPreferred", "secondary", "secondaryPreferred", "nearest"];
+    const readPrefs = [
+        null,
+        "primary",
+        "primaryPreferred",
+        "secondary",
+        "secondaryPreferred",
+        "nearest",
+    ];
 
     const readCommands = [
         ["find", {find: kCollName, filter: {name: "test0"}}],
@@ -229,7 +253,14 @@ function runTestSharded() {
     const writeCommands = [
         ["insert", {insert: kCollName, documents: [{name: "test0"}]}],
         ["update", {update: kCollName, updates: [{q: {"foo": "barr"}, u: {"$set": {"x": 2}}}]}],
-        ["aggregate", {aggregate: kCollName, pipeline: [{"$match": {"foo": "bar"}}, {"$out": "newColl"}], cursor: {}}],
+        [
+            "aggregate",
+            {
+                aggregate: kCollName,
+                pipeline: [{"$match": {"foo": "bar"}}, {"$out": "newColl"}],
+                cursor: {},
+            },
+        ],
         [
             "createIndexes",
             {
@@ -246,12 +277,24 @@ function runTestSharded() {
 
     for (let overloadRetargeting of [false, true]) {
         jsTestLog(
-            "Testing retry behavior when every node in the shard fails. (retargeting: " + overloadRetargeting + ")",
+            "Testing retry behavior when every node in the shard fails. (retargeting: " +
+                overloadRetargeting +
+                ")",
         );
-        st.s.adminCommand({setParameter: 1, overloadAwareServerSelectionEnabled: overloadRetargeting});
+        st.s.adminCommand({
+            setParameter: 1,
+            overloadAwareServerSelectionEnabled: overloadRetargeting,
+        });
         for (let readPref of readPrefs) {
             for (let readCommand of readCommands) {
-                runTestAllNodesFail(readCommand[0], readCommand[1], readPref, st.s, shard, overloadRetargeting);
+                runTestAllNodesFail(
+                    readCommand[0],
+                    readCommand[1],
+                    readPref,
+                    st.s,
+                    shard,
+                    overloadRetargeting,
+                );
             }
         }
         for (let writeCommand of writeCommands) {
@@ -261,11 +304,25 @@ function runTestSharded() {
         jsTestLog("Testing retry behavior when only the primary fails");
         for (let readPref of [null, "primary", "primaryPreferred"]) {
             for (let readCommand of readCommands) {
-                runTestOnlyPrimaryFails(readCommand[0], readCommand[1], readPref, st.s, shard, overloadRetargeting);
+                runTestOnlyPrimaryFails(
+                    readCommand[0],
+                    readCommand[1],
+                    readPref,
+                    st.s,
+                    shard,
+                    overloadRetargeting,
+                );
             }
         }
         for (let writeCommand of writeCommands) {
-            runTestOnlyPrimaryFails(writeCommand[0], writeCommand[1], null, st.s, shard, overloadRetargeting);
+            runTestOnlyPrimaryFails(
+                writeCommand[0],
+                writeCommand[1],
+                null,
+                st.s,
+                shard,
+                overloadRetargeting,
+            );
         }
     }
 

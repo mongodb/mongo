@@ -31,7 +31,10 @@ const kNonRetryableCommands = new Set([
 
 function isRetryableException(e) {
     // Check if exception or error object has FailedToSatisfyReadPreference or PrimarySteppedDown error.
-    return e.code === ErrorCodes.FailedToSatisfyReadPreference || e.code === ErrorCodes.PrimarySteppedDown;
+    return (
+        e.code === ErrorCodes.FailedToSatisfyReadPreference ||
+        e.code === ErrorCodes.PrimarySteppedDown
+    );
 }
 
 function isRetryableError(res) {
@@ -97,9 +100,15 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             }
 
             if (shouldRetry(cmdObj, res)) {
-                jsTest.log.info("Retrying on config server stepdown error from " + cmdName + ". Attempt: " + attempt, {
-                    res,
-                });
+                jsTest.log.info(
+                    "Retrying on config server stepdown error from " +
+                        cmdName +
+                        ". Attempt: " +
+                        attempt,
+                    {
+                        res,
+                    },
+                );
                 return kRetry;
             }
 
@@ -118,6 +127,8 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
     return res;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicitly_retry_on_config_stepdowns.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicitly_retry_on_config_stepdowns.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithRetries);

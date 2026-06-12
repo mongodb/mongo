@@ -68,7 +68,9 @@ describe("listCollections fastCount fields", function () {
         const entries = res.cursor.firstBatch;
 
         const withTs = entries.filter((e) => e.info?.fastCount?.hasOwnProperty("timestampStoreTs"));
-        assert.eq(1, withTs.length, "expected timestampStoreTs on exactly one collection entry", {entries});
+        assert.eq(1, withTs.length, "expected timestampStoreTs on exactly one collection entry", {
+            entries,
+        });
     });
 
     it("does not emit fastCount when rawData is not set", function () {

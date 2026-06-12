@@ -45,7 +45,9 @@ function prepareCompressedBucket() {
     coll = db.getCollection(collNamePrefix + count++);
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     // Insert enough documents to trigger bucket compression.
@@ -62,10 +64,18 @@ function prepareCompressedBucket() {
     assert.commandWorked(coll.insert(docs));
 
     // Check the buckets to make sure it generated what we expect.
-    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(coll)
+        .find()
+        .rawData()
+        .sort({"control.min._id": 1})
+        .toArray();
     if (TestData.canAssumeCanonicalTimeseriesBucketsLayout()) {
         assert.eq(2, bucketDocs.length, tojson(bucketDocs));
-        assert.eq(0, bucketDocs[0].control.min.f, "Expected first bucket to start at 0. " + tojson(bucketDocs));
+        assert.eq(
+            0,
+            bucketDocs[0].control.min.f,
+            "Expected first bucket to start at 0. " + tojson(bucketDocs),
+        );
         assert.eq(
             bucketMaxCount - 1,
             bucketDocs[0].control.max.f,
@@ -92,7 +102,11 @@ function prepareCompressedBucket() {
         assert.lte(2, bucketDocs.length, tojson(bucketDocs));
         let currMin = 0;
         bucketDocs.forEach((doc) => {
-            assert.eq(currMin, doc.control.min.f, `Expected bucket to start at ${currMin}. ${tojson(bucketDocs)}`);
+            assert.eq(
+                currMin,
+                doc.control.min.f,
+                `Expected bucket to start at ${currMin}. ${tojson(bucketDocs)}`,
+            );
             assert(TimeseriesTest.isBucketCompressed(doc.control.version));
             currMin = doc.control.max.f + 1;
         });
@@ -124,5 +138,9 @@ assert.eq(
     1,
     "Expected exactly one record matching the filter to be updated.",
 );
-assert.eq(coll.countDocuments({updated: 1}), 1, "Expected records not matching the filter not to be updated.");
+assert.eq(
+    coll.countDocuments({updated: 1}),
+    1,
+    "Expected records not matching the filter not to be updated.",
+);
 assertBucketsAreCompressed(db, coll);

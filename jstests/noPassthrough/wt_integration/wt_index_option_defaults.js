@@ -96,7 +96,8 @@ function runTest(collOptions) {
         let indexSpec = getIndexSpecByName(testDB.coll, "without_options");
         assert(
             !indexSpec.hasOwnProperty("storageEngine"),
-            "no storage engine options should have been set in the index spec: " + tojson(indexSpec),
+            "no storage engine options should have been set in the index spec: " +
+                tojson(indexSpec),
         );
 
         let creationString = indexDetails.without_options.creationString;
@@ -111,7 +112,8 @@ function runTest(collOptions) {
             assert.lte(
                 0,
                 creationString.indexOf(collectionWideConfigString),
-                "collection-wide index option not present in the creation string: " + creationString,
+                "collection-wide index option not present in the creation string: " +
+                    creationString,
             );
         } else {
             assert.lte(
@@ -131,7 +133,9 @@ function runTest(collOptions) {
         assert.eq(
             -1,
             creationString.indexOf(indexSpecificConfigString),
-            "index-specific option present in creation string even though it was not" + " specified: " + creationString,
+            "index-specific option present in creation string even though it was not" +
+                " specified: " +
+                creationString,
         );
     }
 

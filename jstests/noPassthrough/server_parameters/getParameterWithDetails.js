@@ -33,17 +33,35 @@ function checkSpecificParameters(dbConn, parameters) {
         const expectedDetailedResultObj = parameter["result"];
         const expectedValue = expectedDetailedResultObj["value"];
         const plainErrMsg =
-            "Expecting plain result to contain: " + tojson(parameter) + "but found: " + tojson(resultsPlain);
+            "Expecting plain result to contain: " +
+            tojson(parameter) +
+            "but found: " +
+            tojson(resultsPlain);
         const detailErrMsg =
-            "Expecting detail result to contain: " + tojson(parameter) + "but found: " + tojson(resultsWithDetail);
+            "Expecting detail result to contain: " +
+            tojson(parameter) +
+            "but found: " +
+            tojson(resultsWithDetail);
         const startupErrMsg =
-            "Expecting startup-only result to contain: " + tojson(parameter) + "but found: " + tojson(startupResults);
+            "Expecting startup-only result to contain: " +
+            tojson(parameter) +
+            "but found: " +
+            tojson(startupResults);
         const runtimeErrMsg =
-            "Expecting runtime-only result to contain: " + tojson(parameter) + "but found: " + tojson(runtimeResults);
+            "Expecting runtime-only result to contain: " +
+            tojson(parameter) +
+            "but found: " +
+            tojson(runtimeResults);
         const unexpectedStartupErrMsg =
-            "Expecting startup-only result to omit: " + tojson(parameter) + "but found: " + tojson(startupResults);
+            "Expecting startup-only result to omit: " +
+            tojson(parameter) +
+            "but found: " +
+            tojson(startupResults);
         const unexpectedRuntimeErrMsg =
-            "Expecting runtime-only result to omit: " + tojson(parameter) + "but found: " + tojson(runtimeResults);
+            "Expecting runtime-only result to omit: " +
+            tojson(parameter) +
+            "but found: " +
+            tojson(runtimeResults);
 
         assert.eq(resultsPlain[parameter["name"]], expectedValue, plainErrMsg);
         assert.docEq(expectedDetailedResultObj, resultsWithDetail[parameter["name"]], detailErrMsg);

@@ -16,7 +16,9 @@ for (let i = 0; i < 5; i++) {
 }
 
 // Test that validation runs to completion when encountering a index traversal issue
-assert.commandWorked(primary.adminCommand({configureFailPoint: "failIndexTraversal", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "failIndexTraversal", mode: "alwaysOn"}),
+);
 let res = assert.commandWorked(coll.validate());
 jsTestLog(res);
 assert(!res.valid);

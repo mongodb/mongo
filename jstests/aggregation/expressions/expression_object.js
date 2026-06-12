@@ -37,7 +37,9 @@ const testCases = [
         resultDoc: {_id: "doc1", label5: false},
     },
     {
-        projectionDoc: {label6: {"$eq": [{label61: {"$eq": [{label611: "$fieldRef611"}, "$_id"]}}, "$_id"]}},
+        projectionDoc: {
+            label6: {"$eq": [{label61: {"$eq": [{label611: "$fieldRef611"}, "$_id"]}}, "$_id"]},
+        },
         resultDoc: {_id: "doc1", label6: false},
     },
 ];

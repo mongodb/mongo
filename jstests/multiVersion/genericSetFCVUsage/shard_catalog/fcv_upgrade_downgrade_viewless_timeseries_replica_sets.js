@@ -24,7 +24,9 @@ const db = rst.getPrimary().getDB(jsTestName());
 const coll = db.myts;
 
 // Create a viewless timeseries collection with two measurements going into the same bucket.
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 assert.commandWorked(coll.createIndex({foo: 1}));
 assert.commandWorked(coll.insertOne({t: ISODate(), m: 123}));
 assert.commandWorked(coll.insertOne({t: ISODate(), m: 123}));
@@ -57,7 +59,11 @@ function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
     } else {
         // In the case of viewful format, the UUID is detached to the system.buckets collection,
         // but the rest of the metadata matches that of the viewless format.
-        const expectedViewfulMetadata = Object.extend({}, expectedViewlessMetadata, true /* deep */);
+        const expectedViewfulMetadata = Object.extend(
+            {},
+            expectedViewlessMetadata,
+            true /* deep */,
+        );
         delete expectedViewfulMetadata.info.uuid;
         assert.docEq(expectedViewfulMetadata, nodeColl.getMetadata());
         assert.eq(expectedViewlessMetadata.info.uuid, getTimeseriesBucketsColl(nodeColl).getUUID());

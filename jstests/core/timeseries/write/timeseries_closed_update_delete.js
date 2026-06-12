@@ -13,7 +13,10 @@
  *   requires_collstats,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -27,7 +30,9 @@ TimeseriesTest.run((insert) => {
     coll.drop();
     jsTestLog("Running metadata update/delete respects control.closed test");
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     // Ensure _id order of raw buckets documents by using constant times.
     let docs = [

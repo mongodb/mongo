@@ -64,7 +64,9 @@ export function prepMongotResponse(
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 
     return [
         {_id: 1, shardKey: 0, x: "ow"},
@@ -90,7 +92,9 @@ export function prepCollection(conn, dbName, collName, shouldShard = false) {
         // Create and shard the collection so the commands can succeed.
         assert.commandWorked(db.createCollection(collName));
         assert.commandWorked(conn.adminCommand({enableSharding: dbName}));
-        assert.commandWorked(conn.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
+        assert.commandWorked(
+            conn.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}),
+        );
     }
 
     assert.commandWorked(
@@ -144,7 +148,9 @@ export function setUpMongotReturnExplain({
     maybeUnused = false,
 }) {
     {
-        const history = [{expectedCommand: searchCmd, response: {explain: explainContents, ok: 1}, maybeUnused}];
+        const history = [
+            {expectedCommand: searchCmd, response: {explain: explainContents, ok: 1}, maybeUnused},
+        ];
         mongotMock.setMockResponses(history, cursorId);
     }
 }
@@ -238,7 +244,15 @@ export function setUpMongotReturnExplainAndMultiCursor({
  * Helper to set up getMores for history. Adds a getMore to history starting from the 2nd entry
  * in batchList.
  */
-function setUpGetMoreHistory(history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents) {
+function setUpGetMoreHistory(
+    history,
+    batchList,
+    collName,
+    collNS,
+    cursorId,
+    explainContents,
+    lastExplainContents,
+) {
     assert(batchList.length > 1, "To set up getMore's, batchList must have at least 2 responses.");
     for (let i = 1; i < batchList.length - 1; i++) {
         let getMoreResponse = {
@@ -302,7 +316,15 @@ export function setUpMongotReturnExplainAndCursorGetMore({
         response: mongotResponseForBatch(batchList[0], cursorId, collNS, 1, explainContents, vars),
     });
 
-    history = setUpGetMoreHistory(history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents);
+    history = setUpGetMoreHistory(
+        history,
+        batchList,
+        collName,
+        collNS,
+        cursorId,
+        explainContents,
+        lastExplainContents,
+    );
     mongotMock.setMockResponses(history, cursorId);
 }
 
@@ -445,7 +467,10 @@ export function getShardedMongotStagesAndValidateExplainExecutionStats({
     numFilteredList = null,
 }) {
     assert.eq(nReturnedList.length, expectedNumStages);
-    assert(result.hasOwnProperty("shards"), tojson(result) + "has no shards property, but it should.");
+    assert(
+        result.hasOwnProperty("shards"),
+        tojson(result) + "has no shards property, but it should.",
+    );
 
     let counter = 0;
     // Since the explain object shard results are unordered, we manually check which shard
@@ -466,7 +491,12 @@ export function getShardedMongotStagesAndValidateExplainExecutionStats({
         }
         assert(
             stage,
-            "Unable to find stageType: " + stageType + " for shard " + index + " in result: " + tojson(result),
+            "Unable to find stageType: " +
+                stageType +
+                " for shard " +
+                index +
+                " in result: " +
+                tojson(result),
         );
 
         validateMongotStageExplainExecutionStats({

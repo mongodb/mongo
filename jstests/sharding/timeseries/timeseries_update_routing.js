@@ -25,10 +25,14 @@ const otherShard = st.shard1;
 const otherShardDB = otherShard.getDB(dbName);
 
 testDB.dropDatabase();
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}),
+);
 
 assert.commandWorked(
-    testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}),
+    testDB.createCollection(collName, {
+        timeseries: {timeField: "time", metaField: "location", granularity: "hours"},
+    }),
 );
 
 const testColl = testDB[collName];
@@ -68,7 +72,10 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
 
 (function setUpTestColl() {
     assert.commandWorked(
-        testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"location.city": 1, time: 1}}),
+        testDB.adminCommand({
+            shardCollection: testColl.getFullName(),
+            key: {"location.city": 1, time: 1},
+        }),
     );
 
     const data = [

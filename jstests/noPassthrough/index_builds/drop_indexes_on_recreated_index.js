@@ -40,7 +40,10 @@ TestData.indexSpec = indexSpec;
 // Abort {a: 1} while it is being built.
 let awaitDropIndexes = startParallelShell(() => {
     assert.commandWorked(
-        db.getSiblingDB(TestData.dbName).getCollection(TestData.collName).dropIndexes(TestData.indexSpec),
+        db
+            .getSiblingDB(TestData.dbName)
+            .getCollection(TestData.collName)
+            .dropIndexes(TestData.indexSpec),
     );
 }, conn.port);
 

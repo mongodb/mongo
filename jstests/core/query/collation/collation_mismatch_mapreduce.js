@@ -19,7 +19,9 @@ const outCollName = coll.getName() + "_outcoll";
 const outColl = testDb[outCollName];
 coll.drop();
 outColl.drop();
-assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    testDb.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}),
+);
 assert.commandWorked(testDb.createCollection(outColl.getName()));
 try {
     coll.mapReduce(

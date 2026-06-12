@@ -17,17 +17,30 @@ describe("shardDrainingStatus correct functionality test", function () {
     beforeEach(() => {
         // Add sharded collections
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: this.st.shard1.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: "TestDB",
+                primaryShard: this.st.shard1.shardName,
+            }),
         );
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}));
-        assert.commandWorked(this.st.s.getDB("TestDB").Coll.insert({_id: -1, value: "Negative value"}));
-        assert.commandWorked(this.st.s.getDB("TestDB").Coll.insert({_id: 1, value: "Positive value"}));
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}),
+        );
+        assert.commandWorked(
+            this.st.s.getDB("TestDB").Coll.insert({_id: -1, value: "Negative value"}),
+        );
+        assert.commandWorked(
+            this.st.s.getDB("TestDB").Coll.insert({_id: 1, value: "Positive value"}),
+        );
 
         // Add unsharded collections
-        assert.commandWorked(this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}));
+        assert.commandWorked(
+            this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}),
+        );
 
         // Start shard draining
-        assert.commandWorked(this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}),
+        );
         this.st.configRS.awaitReplication();
     });
 
@@ -82,7 +95,10 @@ describe("shardDrainingStatus correct functionality test", function () {
         }
         const res = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
         assert.commandWorked(res);
-        assert(res.hasOwnProperty("remaining"), "Response should have 'remaining' field: " + tojson(res));
+        assert(
+            res.hasOwnProperty("remaining"),
+            "Response should have 'remaining' field: " + tojson(res),
+        );
         assert(
             res.remaining.hasOwnProperty("estimatedRemainingBytes"),
             "Response should have 'estimatedRemainingBytes' field: " + tojson(res),
@@ -102,12 +118,16 @@ describe("shardDrainingStatus correct functionality test", function () {
 
     it("draining status is 'drainingComplete' when shard is completely drained", () => {
         // Move the unsharded collections
-        assert.commandWorked(this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}),
+        );
 
         // Wait for the shard to be completely drained, then shardDrainingStatus must return
         // completed.
         assert.soon(() => {
-            const drainingStatus_completed = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
+            const drainingStatus_completed = this.st.s.adminCommand({
+                shardDrainingStatus: this.st.shard1.shardName,
+            });
             assert.commandWorked(drainingStatus_completed);
             return "drainingComplete" == drainingStatus_completed.state;
         }, "shardDrainingStatus did not return 'drainingCompleted' status within the timeout.");
@@ -119,7 +139,9 @@ describe("shardDrainingStatus correct functionality test", function () {
             return;
         }
         // Move the unsharded collections to complete draining
-        assert.commandWorked(this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}),
+        );
 
         // Wait for the shard to be completely drained
         assert.soon(() => {
@@ -127,11 +149,15 @@ describe("shardDrainingStatus correct functionality test", function () {
             assert.commandWorked(res);
             if (res.state === "drainingComplete") {
                 // Verify estimatedRemainingBytes is 0 when draining is complete
-                if (res.hasOwnProperty("remaining") && res.remaining.hasOwnProperty("estimatedRemainingBytes")) {
+                if (
+                    res.hasOwnProperty("remaining") &&
+                    res.remaining.hasOwnProperty("estimatedRemainingBytes")
+                ) {
                     assert.eq(
                         res.remaining.estimatedRemainingBytes,
                         0,
-                        "estimatedRemainingBytes should be 0 when draining is complete: " + tojson(res),
+                        "estimatedRemainingBytes should be 0 when draining is complete: " +
+                            tojson(res),
                     );
                 }
                 return true;
@@ -141,7 +167,10 @@ describe("shardDrainingStatus correct functionality test", function () {
     });
 
     it("status not returned for non existent shard", () => {
-        assert.commandFailedWithCode(this.st.s.adminCommand({shardDrainingStatus: "shard1"}), ErrorCodes.ShardNotFound);
+        assert.commandFailedWithCode(
+            this.st.s.adminCommand({shardDrainingStatus: "shard1"}),
+            ErrorCodes.ShardNotFound,
+        );
     });
 
     it("status not returned for non-draining shard", () => {

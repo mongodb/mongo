@@ -5,7 +5,8 @@
  * https://github.com/mongodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
  */
 
-const kShellDefaultShouldRetryWrites = typeof _shouldRetryWrites === "function" ? _shouldRetryWrites() : false;
+const kShellDefaultShouldRetryWrites =
+    typeof _shouldRetryWrites === "function" ? _shouldRetryWrites() : false;
 
 /**
  * @param {*} obj
@@ -44,7 +45,9 @@ function SessionOptions(rawOptions = {}) {
     let _writeConcern = rawOptions.writeConcern;
 
     // Causal consistency is implicitly enabled when a session is explicitly started.
-    const _causalConsistency = rawOptions.hasOwnProperty("causalConsistency") ? rawOptions.causalConsistency : true;
+    const _causalConsistency = rawOptions.hasOwnProperty("causalConsistency")
+        ? rawOptions.causalConsistency
+        : true;
 
     // If the user specified --retryWrites to the mongo shell, then we enable retryable
     // writes automatically.
@@ -163,7 +166,9 @@ function SessionAwareClient(client) {
     };
 
     function serverSupports(wireVersion) {
-        return client.getMinWireVersion() <= wireVersion && wireVersion <= client.getMaxWireVersion();
+        return (
+            client.getMinWireVersion() <= wireVersion && wireVersion <= client.getMaxWireVersion()
+        );
     }
 
     // TODO: Update this allowlist, or convert it to a denylist depending on the outcome of
@@ -199,7 +204,9 @@ function SessionAwareClient(client) {
             Array.isArray(cmdObj.pipeline) &&
             cmdObj.pipeline.length !== 0
         ) {
-            const stages = cmdObj.pipeline.map((obj) => (obj instanceof Object ? Object.keys(obj)[0] : ""));
+            const stages = cmdObj.pipeline.map((obj) =>
+                obj instanceof Object ? Object.keys(obj)[0] : "",
+            );
             if (stages.some((stage) => kAggStagesThatNotSupportReadConcern.has(stage))) {
                 return false;
             }
@@ -297,7 +304,10 @@ function SessionAwareClient(client) {
                     clusterTimeToGossip = sessionClusterTime;
                 } else {
                     clusterTimeToGossip =
-                        bsonWoCompare({_: clientClusterTime.clusterTime}, {_: sessionClusterTime.clusterTime}) >= 0
+                        bsonWoCompare(
+                            {_: clientClusterTime.clusterTime},
+                            {_: sessionClusterTime.clusterTime},
+                        ) >= 0
                             ? clientClusterTime
                             : sessionClusterTime;
                 }
@@ -321,7 +331,8 @@ function SessionAwareClient(client) {
 
         // Retryable writes code should execute only we are not in an active transaction.
         if (
-            (jsTest.options().alwaysInjectTransactionNumber || Object.keys(cmdObj)[0] == "testInternalTransactions") &&
+            (jsTest.options().alwaysInjectTransactionNumber ||
+                Object.keys(cmdObj)[0] == "testInternalTransactions") &&
             serverSupports(kWireVersionSupportingRetryableWrites) &&
             driverSession.getOptions().shouldRetryWrites() &&
             _ServerSession.canRetryWrites(cmdObj)
@@ -351,7 +362,12 @@ function SessionAwareClient(client) {
         );
     }
 
-    function runClientFunctionWithRetries(driverSession, cmdObj, clientFunction, clientFunctionArguments) {
+    function runClientFunctionWithRetries(
+        driverSession,
+        cmdObj,
+        clientFunction,
+        clientFunctionArguments,
+    ) {
         let cmdName = Object.keys(cmdObj)[0];
 
         // TODO SERVER-33921: Revisit how the mongo shell decides whether it should
@@ -405,7 +421,11 @@ function SessionAwareClient(client) {
             if (res !== undefined && res.code === ErrorCodes.ReauthenticationRequired) {
                 try {
                     const accessToken = client._refreshAccessToken();
-                    assert(client.getDB("$external").auth({oidcAccessToken: accessToken, mechanism: "MONGODB-OIDC"}));
+                    assert(
+                        client
+                            .getDB("$external")
+                            .auth({oidcAccessToken: accessToken, mechanism: "MONGODB-OIDC"}),
+                    );
                     continue;
                 } catch (e) {
                     // Could not automatically reauthenticate, return the error response
@@ -454,7 +474,9 @@ function SessionAwareClient(client) {
                 if (Array.isArray(res.writeErrors)) {
                     // If any of the write operations in the batch fails with a
                     // retryable error, then we retry the entire batch.
-                    const writeError = res.writeErrors.find((writeError) => isRetryableCode(writeError.code));
+                    const writeError = res.writeErrors.find((writeError) =>
+                        isRetryableCode(writeError.code),
+                    );
 
                     if (writeError !== undefined) {
                         if (jsTest.options().logRetryAttempts) {
@@ -470,13 +492,20 @@ function SessionAwareClient(client) {
                             );
                         }
                         if (client.isReplicaSetConnection()) {
-                            client._markNodeAsFailed(res._mongo.host, writeError.code, writeError.errmsg);
+                            client._markNodeAsFailed(
+                                res._mongo.host,
+                                writeError.code,
+                                writeError.errmsg,
+                            );
                         }
                         continue;
                     }
                 }
 
-                if (res.hasOwnProperty("writeConcernError") && isRetryableCode(res.writeConcernError.code)) {
+                if (
+                    res.hasOwnProperty("writeConcernError") &&
+                    isRetryableCode(res.writeConcernError.code)
+                ) {
                     if (jsTest.options().logRetryAttempts) {
                         jsTest.log(
                             "Retrying " +
@@ -499,7 +528,10 @@ function SessionAwareClient(client) {
                     continue;
                 }
 
-                if (res.hasOwnProperty("errorLabels") && res.errorLabels.includes("RetryableWriteError")) {
+                if (
+                    res.hasOwnProperty("errorLabels") &&
+                    res.errorLabels.includes("RetryableWriteError")
+                ) {
                     if (jsTest.options().logRetryAttempts) {
                         jsTest.log(
                             "Retrying " +
@@ -521,7 +553,11 @@ function SessionAwareClient(client) {
     this.runCommand = function runCommand(driverSession, dbName, cmdObj, options) {
         cmdObj = this.prepareCommandRequest(driverSession, cmdObj);
 
-        const res = runClientFunctionWithRetries(driverSession, cmdObj, client.runCommand, [dbName, cmdObj, options]);
+        const res = runClientFunctionWithRetries(driverSession, cmdObj, client.runCommand, [
+            dbName,
+            cmdObj,
+            options,
+        ]);
 
         processCommandResponse(driverSession, client, res);
         return res;
@@ -570,7 +606,9 @@ function ServerSession(client) {
     this.handle = client._startSession();
 
     function serverSupports(wireVersion) {
-        return client.getMinWireVersion() <= wireVersion && wireVersion <= client.getMaxWireVersion();
+        return (
+            client.getMinWireVersion() <= wireVersion && wireVersion <= client.getMaxWireVersion()
+        );
     }
 
     const hasTxnState = (name) => this.handle.getTxnState() === name;
@@ -634,7 +672,10 @@ function ServerSession(client) {
     this.assignTxnInfo = function assignTxnInfo(cmdObj) {
         // We will want to reset the transaction state to 'inactive' if a normal operation
         // follows a committed or aborted transaction.
-        if (hasTxnState("aborted") || (hasTxnState("committed") && Object.keys(cmdObj)[0] !== "commitTransaction")) {
+        if (
+            hasTxnState("aborted") ||
+            (hasTxnState("committed") && Object.keys(cmdObj)[0] !== "commitTransaction")
+        ) {
             setTxnState("inactive");
         }
 
@@ -840,7 +881,9 @@ ServerSession.canRetryWrites = function canRetryWrites(cmdObj) {
 
         // We use bsonWoCompare() in order to handle cases where the limit is specified as a
         // NumberInt() or NumberLong() instance.
-        const hasMultiDelete = cmdObj.deletes.some((deleteOp) => bsonWoCompare({_: deleteOp.limit}, {_: 0}) === 0);
+        const hasMultiDelete = cmdObj.deletes.some(
+            (deleteOp) => bsonWoCompare({_: deleteOp.limit}, {_: 0}) === 0,
+        );
         if (hasMultiDelete) {
             // Operations that modify multiple documents (e.g. deleteMany()) cannot be retried.
             return false;
@@ -923,7 +966,10 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         };
 
         this.advanceOperationTime = function advanceOperationTime(operationTime) {
-            if (!isNonNullObject(_operationTime) || bsonWoCompare({_: operationTime}, {_: _operationTime}) > 0) {
+            if (
+                !isNonNullObject(_operationTime) ||
+                bsonWoCompare({_: operationTime}, {_: _operationTime}) > 0
+            ) {
                 _operationTime = operationTime;
             }
         };
@@ -1027,7 +1073,8 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         this.stack = this.toString() + "\n" + new Error().stack;
     };
     driverSessionConstructor.UnsupportedError.prototype = Object.create(Error.prototype);
-    driverSessionConstructor.UnsupportedError.prototype.constructor = driverSessionConstructor.UnsupportedError;
+    driverSessionConstructor.UnsupportedError.prototype.constructor =
+        driverSessionConstructor.UnsupportedError;
 
     return driverSessionConstructor;
 }
@@ -1127,19 +1174,22 @@ const DummyDriverSession = makeDriverSessionConstructor(
 
                 startTransaction: function startTransaction() {
                     throw new Error(
-                        "Must call startSession() on the Mongo connection " + "object before starting a transaction.",
+                        "Must call startSession() on the Mongo connection " +
+                            "object before starting a transaction.",
                     );
                 },
 
                 commitTransaction: function commitTransaction() {
                     throw new Error(
-                        "Must call startSession() on the Mongo connection " + "object before committing a transaction.",
+                        "Must call startSession() on the Mongo connection " +
+                            "object before committing a transaction.",
                     );
                 },
 
                 abortTransaction: function abortTransaction() {
                     throw new Error(
-                        "Must call startSession() on the Mongo connection " + "object before aborting a transaction.",
+                        "Must call startSession() on the Mongo connection " +
+                            "object before aborting a transaction.",
                     );
                 },
             };
@@ -1159,4 +1209,10 @@ const _DummyDriverSession = DummyDriverSession;
 const _DelegatingDriverSession = DelegatingDriverSession;
 const _ServerSession = ServerSession;
 
-export {DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession, _ServerSession};
+export {
+    DriverSession,
+    SessionOptions,
+    _DummyDriverSession,
+    _DelegatingDriverSession,
+    _ServerSession,
+};

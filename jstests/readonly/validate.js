@@ -14,11 +14,16 @@ runReadOnlyTest(
             load: function (writableCollection) {
                 const db = writableCollection.getDB();
                 assert.commandWorked(
-                    db.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "alwaysOn"}),
+                    db.adminCommand({
+                        configureFailPoint: "skipUpdateIndexMultikey",
+                        mode: "alwaysOn",
+                    }),
                 );
                 assert.commandWorked(writableCollection.createIndex({a: 1, b: 1}, {name: "idx"}));
                 assert.commandWorked(writableCollection.insert({_id: 0, a: [0, 1]}));
-                assert.commandWorked(db.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "off"}));
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "off"}),
+                );
             },
             exec: function (readableCollection) {
                 // Make sure we don't try to adjust multikey indices in read-only mode

@@ -51,7 +51,11 @@ function runCachedPlanTest(conn, coll) {
     const expectedDocs = 5;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {y: {$gt: "?number"}}]}};
 
-    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -69,10 +73,14 @@ function runCachedPlanTest(conn, coll) {
             key: queryStatsKey,
             expectedDocs: expectedDocs,
         });
-        assertAggregatedBoolean(getQueryPlannerMetrics(queryStatsColdCache.metrics), "fromPlanCache", {
-            trueCount: 0,
-            falseCount: 1,
-        });
+        assertAggregatedBoolean(
+            getQueryPlannerMetrics(queryStatsColdCache.metrics),
+            "fromPlanCache",
+            {
+                trueCount: 0,
+                falseCount: 1,
+            },
+        );
 
         // Inactive entry in the plan cache - we still won't use the plan cache here.
         const queryStatsInactiveCache = exhaustCursorAndGetQueryStats({
@@ -81,10 +89,14 @@ function runCachedPlanTest(conn, coll) {
             key: queryStatsKey,
             expectedDocs: expectedDocs,
         });
-        assertAggregatedBoolean(getQueryPlannerMetrics(queryStatsInactiveCache.metrics), "fromPlanCache", {
-            trueCount: 0,
-            falseCount: 2,
-        });
+        assertAggregatedBoolean(
+            getQueryPlannerMetrics(queryStatsInactiveCache.metrics),
+            "fromPlanCache",
+            {
+                trueCount: 0,
+                falseCount: 2,
+            },
+        );
 
         // Active entry in the plan cache - we will use the plan cache.
         const queryStatsActiveCache = exhaustCursorAndGetQueryStats({
@@ -93,10 +105,14 @@ function runCachedPlanTest(conn, coll) {
             key: queryStatsKey,
             expectedDocs: expectedDocs,
         });
-        assertAggregatedBoolean(getQueryPlannerMetrics(queryStatsActiveCache.metrics), "fromPlanCache", {
-            trueCount: 1,
-            falseCount: 2,
-        });
+        assertAggregatedBoolean(
+            getQueryPlannerMetrics(queryStatsActiveCache.metrics),
+            "fromPlanCache",
+            {
+                trueCount: 1,
+                falseCount: 2,
+            },
+        );
     }
 }
 

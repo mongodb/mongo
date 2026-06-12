@@ -26,7 +26,11 @@ function testInvalidDBName(invalidName) {
 
         // On sharding ensure no entry was added to config.databases
         if (isMongos) {
-            assert.eq(db.getSiblingDB("config").databases.countDocuments({_id: invalidName}), 0, errMsg);
+            assert.eq(
+                db.getSiblingDB("config").databases.countDocuments({_id: invalidName}),
+                0,
+                errMsg,
+            );
         }
     }
 

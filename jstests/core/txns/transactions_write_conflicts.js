@@ -57,9 +57,21 @@ print("insert-insert conflict.");
 let t1Op = {insert: collName, documents: [{_id: 1, t1: 1}]};
 let t2Op = {insert: collName, documents: [{_id: 1, t2: 1}]};
 let expectedDocs1 = [{_id: 1, t1: 1}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs1,
+    WriteConflictHelpers.T1StartsFirstAndWins,
+);
 let expectedDocs2 = [{_id: 1, t2: 1}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs2,
+    WriteConflictHelpers.T2StartsSecondAndWins,
+);
 
 print("update-update conflict");
 let initOp = {insert: collName, documents: [{_id: 1}]}; // the document to update.
@@ -230,9 +242,21 @@ t2Op = {
     documents: [{_id: 2}, {_id: 3}, {_id: 4}],
 };
 expectedDocs1 = [{_id: 1}, {_id: 2}, {_id: 3}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs1,
+    WriteConflictHelpers.T1StartsFirstAndWins,
+);
 expectedDocs2 = [{_id: 2}, {_id: 3}, {_id: 4}];
-WriteConflictHelpers.writeConflictTest(coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+WriteConflictHelpers.writeConflictTest(
+    coll,
+    t1Op,
+    t2Op,
+    expectedDocs2,
+    WriteConflictHelpers.T2StartsSecondAndWins,
+);
 
 print("multiupdate-multiupdate conflict");
 initOp = {

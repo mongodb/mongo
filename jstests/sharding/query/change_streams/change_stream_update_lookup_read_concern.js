@@ -63,14 +63,20 @@ assert.commandWorked(st.s.adminCommand({addShard: rst.name + "/" + rst.getPrimar
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 assert.commandWorked(mongosColl.insert({_id: 1}));
 rst.awaitReplication();
@@ -155,7 +161,12 @@ const newClosestSecondaryDB = newClosestSecondary.getDB(mongosDB.getName());
 const originalClosestSecondaryDB = closestSecondaryDB;
 
 // Wait for the mongos to acknowledge the new tags from our reconfig.
-awaitRSClientHosts(st.s, newClosestSecondary, {ok: true, secondary: true, tags: {tag: "closestSecondary"}}, rst);
+awaitRSClientHosts(
+    st.s,
+    newClosestSecondary,
+    {ok: true, secondary: true, tags: {tag: "closestSecondary"}},
+    rst,
+);
 awaitRSClientHosts(
     st.s,
     originalClosestSecondaryDB.getMongo(),

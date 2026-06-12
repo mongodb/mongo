@@ -19,14 +19,18 @@ assert.eq(
         return z.a;
     }),
 );
-result = coll.aggregate([{$unwind: {path: "$a", includeArrayIndex: "i"}}, {$sort: {i: 1}}]).toArray();
+result = coll
+    .aggregate([{$unwind: {path: "$a", includeArrayIndex: "i"}}, {$sort: {i: 1}}])
+    .toArray();
 assert.eq(
     [NumberLong(0), NumberLong(0), NumberLong(1), NumberLong(1), NumberLong(2)],
     result.map(function (z) {
         return z.i;
     }),
 );
-result = coll.aggregate([{$unwind: {path: "$a", includeArrayIndex: "i"}}, {$sort: {i: -1}}]).toArray();
+result = coll
+    .aggregate([{$unwind: {path: "$a", includeArrayIndex: "i"}}, {$sort: {i: -1}}])
+    .toArray();
 assert.eq(
     [NumberLong(2), NumberLong(1), NumberLong(1), NumberLong(0), NumberLong(0)],
     result.map(function (z) {

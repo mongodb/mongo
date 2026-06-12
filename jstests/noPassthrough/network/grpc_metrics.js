@@ -90,7 +90,12 @@ function runTest(conn) {
 
     // Connect with {failureURI} to have the server abort the connection during the reply cycle.
     const failureURI = uri + "&appName=Failure%20Client";
-    configureFailPoint(conn, "sessionWorkflowDelayOrFailSendMessage", {appName: "Failure Client"}, "alwaysOn");
+    configureFailPoint(
+        conn,
+        "sessionWorkflowDelayOrFailSendMessage",
+        {appName: "Failure Client"},
+        "alwaysOn",
+    );
 
     runCmd(uri, "admin", {ping: 1});
     expectSuccess();

@@ -58,10 +58,15 @@ function runTest(testCase) {
         const session = st.s.startSession();
         session.startTransaction({readConcern: {level: "snapshot"}});
         session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
-        let hangDonorAtStartOfRangeDel = configureFailPoint(st.rs1.getPrimary(), "suspendRangeDeletion");
+        let hangDonorAtStartOfRangeDel = configureFailPoint(
+            st.rs1.getPrimary(),
+            "suspendRangeDeletion",
+        );
 
         // Move all chunks for testDb.testColl to shard0.
-        assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {x: 0}, to: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: nss, find: {x: 0}, to: st.shard0.shardName}),
+        );
         hangDonorAtStartOfRangeDel.wait();
 
         // This write cmd MUST fail, the data moved to another shard, we can't try on shard0 nor
@@ -74,7 +79,9 @@ function runTest(testCase) {
         hangDonorAtStartOfRangeDel.off();
 
         // Reset the chunk distribution for the next test.
-        assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {x: 0}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: nss, find: {x: 0}, to: st.shard1.shardName}),
+        );
     });
 }
 

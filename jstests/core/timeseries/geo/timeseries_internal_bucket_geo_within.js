@@ -27,7 +27,9 @@ const timeFieldName = "time";
 const metaFieldName = "m";
 
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 let pipeline = [
@@ -80,9 +82,24 @@ for (let collScanStage of collScanStages) {
 // Test that $geoWithin still gives the correct result, when the events are in the same bucket.
 assert.commandWorked(
     coll.insert([
-        {a: 1, loc: {type: "Point", coordinates: [0, 1]}, [timeFieldName]: ISODate(), [metaFieldName]: {sensorId: 100}},
-        {a: 2, loc: {type: "Point", coordinates: [2, 7]}, [timeFieldName]: ISODate(), [metaFieldName]: {sensorId: 100}},
-        {a: 3, loc: {type: "Point", coordinates: [2, 1]}, [timeFieldName]: ISODate(), [metaFieldName]: {sensorId: 100}},
+        {
+            a: 1,
+            loc: {type: "Point", coordinates: [0, 1]},
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {sensorId: 100},
+        },
+        {
+            a: 2,
+            loc: {type: "Point", coordinates: [2, 7]},
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {sensorId: 100},
+        },
+        {
+            a: 3,
+            loc: {type: "Point", coordinates: [2, 1]},
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {sensorId: 100},
+        },
     ]),
 );
 let results = coll.aggregate(pipeline).toArray();
@@ -92,9 +109,24 @@ assert.eq(results.length, 1, results);
 // Test that $geoWithin still gives the correct result, when the events are in different buckets.
 assert.commandWorked(
     coll.insert([
-        {a: 1, loc: {type: "Point", coordinates: [0, 1]}, [timeFieldName]: ISODate(), [metaFieldName]: {sensorId: 101}},
-        {a: 2, loc: {type: "Point", coordinates: [2, 7]}, [timeFieldName]: ISODate(), [metaFieldName]: {sensorId: 102}},
-        {a: 3, loc: {type: "Point", coordinates: [2, 1]}, [timeFieldName]: ISODate(), [metaFieldName]: {sensorId: 103}},
+        {
+            a: 1,
+            loc: {type: "Point", coordinates: [0, 1]},
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {sensorId: 101},
+        },
+        {
+            a: 2,
+            loc: {type: "Point", coordinates: [2, 7]},
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {sensorId: 102},
+        },
+        {
+            a: 3,
+            loc: {type: "Point", coordinates: [2, 1]},
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {sensorId: 103},
+        },
     ]),
 );
 results = coll.aggregate(pipeline).toArray();
@@ -105,7 +137,9 @@ assert.eq(results.length, 2, results);
 // 'a' is a mixture of objects and scalars.
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -114,20 +148,28 @@ assert.commandWorked(
         {[timeFieldName]: ISODate(), a: ISODate("2020-01-01")},
     ]),
 );
-results = coll.aggregate([{$match: {"a.b": {$geoWithin: {$centerSphere: [[0, 0], 100]}}}}]).toArray();
+results = coll
+    .aggregate([{$match: {"a.b": {$geoWithin: {$centerSphere: [[0, 0], 100]}}}}])
+    .toArray();
 assert.eq(results.length, 1, results);
 assert.docEq({b: {type: "Point", coordinates: [0, 0]}}, results[0].a);
 
 // Test a scenario where $geoWithin does implicit array traversal.
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
         {
             [timeFieldName]: ISODate(),
-            a: [12345, {type: "Point", coordinates: [180, 0]}, {"1": {type: "Point", coordinates: [0, 0]}}],
+            a: [
+                12345,
+                {type: "Point", coordinates: [180, 0]},
+                {"1": {type: "Point", coordinates: [0, 0]}},
+            ],
         },
     ]),
 );
@@ -174,7 +216,9 @@ pipeline = [
 const now = ISODate();
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -214,15 +258,35 @@ assert.commandWorked(
 );
 results = coll.aggregate(pipeline).toArray();
 assert.sameMembers(results, [
-    {_id: 0, a: 1, loc: {type: "Point", coordinates: [0, 0]}, [timeFieldName]: now, [metaFieldName]: {sensorId: 101}},
-    {_id: 1, a: 2, loc: {type: "Point", coordinates: [1, 2]}, [timeFieldName]: now, [metaFieldName]: {sensorId: 102}},
-    {_id: 2, a: 3, loc: {type: "Point", coordinates: [2, 1]}, [timeFieldName]: now, [metaFieldName]: {sensorId: 103}},
+    {
+        _id: 0,
+        a: 1,
+        loc: {type: "Point", coordinates: [0, 0]},
+        [timeFieldName]: now,
+        [metaFieldName]: {sensorId: 101},
+    },
+    {
+        _id: 1,
+        a: 2,
+        loc: {type: "Point", coordinates: [1, 2]},
+        [timeFieldName]: now,
+        [metaFieldName]: {sensorId: 102},
+    },
+    {
+        _id: 2,
+        a: 3,
+        loc: {type: "Point", coordinates: [2, 1]},
+        [timeFieldName]: now,
+        [metaFieldName]: {sensorId: 103},
+    },
 ]);
 
 // Test if a Point with an unexpected field still matches
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -264,7 +328,9 @@ assert.sameMembers(results, [
 // types such as date and array
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -283,13 +349,21 @@ assert.commandWorked(
 );
 results = coll.aggregate(pipeline).toArray();
 assert.sameMembers(results, [
-    {_id: 4, a: 3, loc: {type: "Point", coordinates: [2, 1]}, [timeFieldName]: now, [metaFieldName]: {sensorId: 103}},
+    {
+        _id: 4,
+        a: 3,
+        loc: {type: "Point", coordinates: [2, 1]},
+        [timeFieldName]: now,
+        [metaFieldName]: {sensorId: 103},
+    },
 ]);
 
 // Try to make $_internalBucketGeoWithin fail with null/undefined fields within a bucket
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -306,7 +380,13 @@ assert.commandWorked(
 );
 results = coll.aggregate(pipeline).toArray();
 assert.sameMembers(results, [
-    {_id: 2, a: 3, loc: {type: "Point", coordinates: [2, 1]}, [timeFieldName]: now, [metaFieldName]: {sensorId: 103}},
+    {
+        _id: 2,
+        a: 3,
+        loc: {type: "Point", coordinates: [2, 1]},
+        [timeFieldName]: now,
+        [metaFieldName]: {sensorId: 103},
+    },
 ]);
 
 // Query on a field within object, so that we can test for correct behavior if the object containing
@@ -336,7 +416,9 @@ pipeline = [
 // Missing y field within x object should still allow us to match the bucket and find points within
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -371,7 +453,9 @@ assert.sameMembers(results, [
 // x can be undefined/null/empty, but we should still match the bucket
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([
@@ -415,7 +499,9 @@ assert.sameMembers(results, [
 // x can be some other object such as a date or an array, again we still match
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 assert.commandWorked(
     coll.insert([

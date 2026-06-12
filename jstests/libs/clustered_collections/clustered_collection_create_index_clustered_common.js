@@ -16,7 +16,10 @@ export const CreateIndexesClusteredTest = (function () {
         assert.commandWorked(testDB.createCollection(collName));
 
         // Start with the collection empty.
-        assert.commandFailedWithCode(testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6243700);
+        assert.commandFailedWithCode(
+            testColl.createIndex({_id: 1}, {clustered: true, unique: true}),
+            6243700,
+        );
 
         // Pass non-boolean value to safeBool 'clustered' option. Should be equivalent to next
         // command.
@@ -28,7 +31,10 @@ export const CreateIndexesClusteredTest = (function () {
             6243700,
         );
 
-        assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}), 6243700);
+        assert.commandFailedWithCode(
+            testColl.createIndex({a: 1}, {clustered: true, unique: true}),
+            6243700,
+        );
 
         // Check using clustered : false, which is disallowed, fails in an empty collection
         assert.commandFailedWithCode(
@@ -47,7 +53,10 @@ export const CreateIndexesClusteredTest = (function () {
             bulk.insert({_id: i, a: -i});
         }
         assert.commandWorked(bulk.execute());
-        assert.commandFailedWithCode(testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6243700);
+        assert.commandFailedWithCode(
+            testColl.createIndex({_id: 1}, {clustered: true, unique: true}),
+            6243700,
+        );
 
         // Pass non-boolean value to safeBool 'clustered' option. Should be equivalent to next
         // command.
@@ -59,10 +68,16 @@ export const CreateIndexesClusteredTest = (function () {
             6243700,
         );
 
-        assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}), 6243700);
+        assert.commandFailedWithCode(
+            testColl.createIndex({a: 1}, {clustered: true, unique: true}),
+            6243700,
+        );
 
         // Check using clustered : false, which is disallowed, fails in non empty collection
-        assert.commandFailedWithCode(testColl.createIndex({_id: 1}, {clustered: false, unique: true}), 6492800);
+        assert.commandFailedWithCode(
+            testColl.createIndex({_id: 1}, {clustered: false, unique: true}),
+            6492800,
+        );
     };
 
     /**
@@ -111,7 +126,10 @@ export const CreateIndexesClusteredTest = (function () {
         );
 
         // 'clustered' is not a valid option for an index not on the cluster key.
-        assert.commandFailedWithCode(testColl.createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6243700);
+        assert.commandFailedWithCode(
+            testColl.createIndex({notMyIndex: 1}, {clustered: true, unique: true}),
+            6243700,
+        );
 
         // Check using clustered : false, which is disallowed, fails in empty collection
         assert.commandFailedWithCode(
@@ -145,7 +163,10 @@ export const CreateIndexesClusteredTest = (function () {
         );
 
         // 'clustered' is still not a valid option for an index not on the cluster key.
-        assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}), 6243700);
+        assert.commandFailedWithCode(
+            testColl.createIndex({a: 1}, {clustered: true, unique: true}),
+            6243700,
+        );
 
         assert.commandFailedWithCode(
             testDB.runCommand({
@@ -166,7 +187,10 @@ export const CreateIndexesClusteredTest = (function () {
         assert.commandWorked(testColl.createIndex({_id: 1}, {name: "notTheClusterKeyName"}));
 
         // Check using clustered : false, which is disallowed, fails non empty collection
-        assert.commandFailedWithCode(testColl.createIndex({_id: 1}, {clustered: false, unique: true}), 6492800);
+        assert.commandFailedWithCode(
+            testColl.createIndex({_id: 1}, {clustered: false, unique: true}),
+            6492800,
+        );
 
         ClusteredCollectionUtil.validateListIndexes(testDB, collName, fullCreateOptions);
     };

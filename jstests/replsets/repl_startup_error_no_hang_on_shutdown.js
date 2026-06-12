@@ -12,7 +12,9 @@ const rst = new ReplSetTest({
     nodes: [
         {
             setParameter: {
-                "failpoint.throwBeforeRecoveringTenantMigrationAccessBlockers": tojson({mode: "alwaysOn"}),
+                "failpoint.throwBeforeRecoveringTenantMigrationAccessBlockers": tojson({
+                    mode: "alwaysOn",
+                }),
             },
         },
     ],

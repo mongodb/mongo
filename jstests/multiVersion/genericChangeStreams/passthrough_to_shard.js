@@ -77,13 +77,43 @@ assertNextEvent(dbCursor, {operationType: "create", ns, nsType: "collection"});
 assertNextEvent(dbCursor0, {operationType: "create", ns, nsType: "collection"});
 assertNextEvent(collCursor0, {operationType: "create", ns, nsType: "collection"});
 
-assertNextEvent(dbCursor, {operationType: "insert", ns, documentKey: {_id: 0}, fullDocument: {_id: 0}});
-assertNextEvent(dbCursor0, {operationType: "insert", ns, documentKey: {_id: 0}, fullDocument: {_id: 0}});
-assertNextEvent(collCursor0, {operationType: "insert", ns, documentKey: {_id: 0}, fullDocument: {_id: 0}});
+assertNextEvent(dbCursor, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 0},
+    fullDocument: {_id: 0},
+});
+assertNextEvent(dbCursor0, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 0},
+    fullDocument: {_id: 0},
+});
+assertNextEvent(collCursor0, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 0},
+    fullDocument: {_id: 0},
+});
 
-assertNextEvent(dbCursor, {operationType: "insert", ns, documentKey: {_id: 1}, fullDocument: {_id: 1}});
-assertNextEvent(dbCursor0, {operationType: "insert", ns, documentKey: {_id: 1}, fullDocument: {_id: 1}});
-assertNextEvent(collCursor0, {operationType: "insert", ns, documentKey: {_id: 1}, fullDocument: {_id: 1}});
+assertNextEvent(dbCursor, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 1},
+    fullDocument: {_id: 1},
+});
+assertNextEvent(dbCursor0, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 1},
+    fullDocument: {_id: 1},
+});
+assertNextEvent(collCursor0, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 1},
+    fullDocument: {_id: 1},
+});
 
 // No changes to shard1 until here.
 assertNoChanges(dbCursor1);
@@ -101,15 +131,47 @@ assertNextEvent(collCursor0, {operationType: "shardCollection", ns});
 assert.commandWorked(coll.insert({_id: -1}));
 assert.commandWorked(coll.insert({_id: 2}));
 
-assertNextEvent(dbCursor, {operationType: "insert", ns, documentKey: {_id: -1}, fullDocument: {_id: -1}});
-assertNextEvent(dbCursor0, {operationType: "insert", ns, documentKey: {_id: -1}, fullDocument: {_id: -1}});
-assertNextEvent(collCursor0, {operationType: "insert", ns, documentKey: {_id: -1}, fullDocument: {_id: -1}});
-assertNextEvent(dbCursor, {operationType: "insert", ns, documentKey: {_id: 2}, fullDocument: {_id: 2}});
-assertNextEvent(dbCursor1, {operationType: "insert", ns, documentKey: {_id: 2}, fullDocument: {_id: 2}});
-assertNextEvent(collCursor1, {operationType: "insert", ns, documentKey: {_id: 2}, fullDocument: {_id: 2}});
+assertNextEvent(dbCursor, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: -1},
+    fullDocument: {_id: -1},
+});
+assertNextEvent(dbCursor0, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: -1},
+    fullDocument: {_id: -1},
+});
+assertNextEvent(collCursor0, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: -1},
+    fullDocument: {_id: -1},
+});
+assertNextEvent(dbCursor, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 2},
+    fullDocument: {_id: 2},
+});
+assertNextEvent(dbCursor1, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 2},
+    fullDocument: {_id: 2},
+});
+assertNextEvent(collCursor1, {
+    operationType: "insert",
+    ns,
+    documentKey: {_id: 2},
+    fullDocument: {_id: 2},
+});
 
 // Reshard the collection. This should not emit any events.
-assert.commandWorked(st.s.adminCommand({reshardCollection: coll.getFullName(), key: {_id: 1}, numInitialChunks: 2}));
+assert.commandWorked(
+    st.s.adminCommand({reshardCollection: coll.getFullName(), key: {_id: 1}, numInitialChunks: 2}),
+);
 assertNoChanges(dbCursor);
 assertNoChanges(dbCursor0);
 assertNoChanges(dbCursor1);
@@ -117,7 +179,9 @@ assertNoChanges(collCursor0);
 assertNoChanges(collCursor1);
 
 // Unshard the collection. This should emit an event only on the previous primary shard (shard0).
-assert.commandWorked(st.s.adminCommand({unshardCollection: coll.getFullName(), toShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({unshardCollection: coll.getFullName(), toShard: st.shard1.shardName}),
+);
 assertNextEvent(dbCursor, {
     operationType: "reshardCollection",
     ns,

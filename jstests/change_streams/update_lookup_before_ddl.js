@@ -3,7 +3,10 @@
  * nss by default and does an additional collection UUID check when
  * 'matchCollectionUUIDForUpdateLookup: true' option is set.
  */
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
@@ -63,7 +66,9 @@ function assertUpdateLookupResultBeforeOp(op, changeStreamOptions) {
             b: "extra field in the new document in the new collection",
         };
         assert.commandWorked(db.getCollection(collNameA).insert(newDocInNewCollA));
-        expectedFullDocument = changeStreamOptions.matchCollectionUUIDForUpdateLookup ? null : newDocInNewCollA;
+        expectedFullDocument = changeStreamOptions.matchCollectionUUIDForUpdateLookup
+            ? null
+            : newDocInNewCollA;
     } else if (op === "shardCollection") {
         if (FixtureHelpers.isSharded(db.getCollection(collNameA))) {
             jsTest.log("Early exit, because collection 'collA' is already sharded");
@@ -98,7 +103,9 @@ function assertUpdateLookupResultBeforeOp(op, changeStreamOptions) {
                 numInitialChunks: 2,
             }),
         );
-        expectedFullDocument = changeStreamOptions.matchCollectionUUIDForUpdateLookup ? null : updatedDocInCollA;
+        expectedFullDocument = changeStreamOptions.matchCollectionUUIDForUpdateLookup
+            ? null
+            : updatedDocInCollA;
     }
 
     // If this test is running with secondary read preference, it's necessary for the update
@@ -123,10 +130,16 @@ assertUpdateLookupResultBeforeOp("renameCollection", {matchCollectionUUIDForUpda
 
 if (FixtureHelpers.isMongos(db)) {
     assertUpdateLookupResultBeforeOp("shardCollection", {});
-    assertUpdateLookupResultBeforeOp("shardCollection", {matchCollectionUUIDForUpdateLookup: false});
+    assertUpdateLookupResultBeforeOp("shardCollection", {
+        matchCollectionUUIDForUpdateLookup: false,
+    });
     assertUpdateLookupResultBeforeOp("shardCollection", {matchCollectionUUIDForUpdateLookup: true});
 
     assertUpdateLookupResultBeforeOp("reshardCollection", {});
-    assertUpdateLookupResultBeforeOp("reshardCollection", {matchCollectionUUIDForUpdateLookup: false});
-    assertUpdateLookupResultBeforeOp("reshardCollection", {matchCollectionUUIDForUpdateLookup: true});
+    assertUpdateLookupResultBeforeOp("reshardCollection", {
+        matchCollectionUUIDForUpdateLookup: false,
+    });
+    assertUpdateLookupResultBeforeOp("reshardCollection", {
+        matchCollectionUUIDForUpdateLookup: true,
+    });
 }

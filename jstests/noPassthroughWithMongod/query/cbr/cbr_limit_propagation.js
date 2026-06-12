@@ -45,14 +45,22 @@ coll.createIndex({baz: 1});
 function getOnlyPlan(pipeline) {
     const explain = coll.explain().aggregate(pipeline);
     const plans = helpers.getPlans(explain);
-    assert(plans.length == 1, {msg: "pipeline produces unexpected number of plans", pipeline, plans});
+    assert(plans.length == 1, {
+        msg: "pipeline produces unexpected number of plans",
+        pipeline,
+        plans,
+    });
     return plans[0];
 }
 
 function getPlanWithStage(pipeline, stage) {
     const explain = coll.explain().aggregate(pipeline);
     const plans = helpers.getPlansWithStage(explain, stage);
-    assert(plans.length > 0, {msg: "pipeline does not produce a plan with requested stage", pipeline, stage});
+    assert(plans.length > 0, {
+        msg: "pipeline does not produce a plan with requested stage",
+        pipeline,
+        stage,
+    });
     return plans[0];
 }
 
@@ -98,7 +106,13 @@ getOnlyPlan([{"$match": {"bar": 0}}, {"$match": baz_eq_0}, {"$limit": 10}])
     // To propagate the limit to the IXSCAN _before_ that filter, the limit must be scaled up.
     // We expect the IXSCAN to, on average, produce 30 values by the time the FETCH matches 10 (the
     // limit).
-    .expect("IXSCAN", keyPattern({bar: 1}), ce.near(30), ce.near(10 * (500 / 166)), numKeys.near(10 * (500 / 166)));
+    .expect(
+        "IXSCAN",
+        keyPattern({bar: 1}),
+        ce.near(30),
+        ce.near(10 * (500 / 166)),
+        numKeys.near(10 * (500 / 166)),
+    );
 
 // IXSCAN with a residual filter
 // Regex will match ~1/10 values (incrementing counter, checking last digit == 0)
@@ -107,7 +121,13 @@ getOnlyPlan([{"$match": foo_regex}])
     // Fetch does not need to filter anything
     .expect("FETCH", filter(undefined), ce.near(100))
     // IXSCAN can scan the key prefix foobar, but will have a residual filter to apply the full regex
-    .expect("IXSCAN", keyPattern({foo_str: 1}), filter(foo_regex), ce.near(100), numKeys.near(1000));
+    .expect(
+        "IXSCAN",
+        keyPattern({foo_str: 1}),
+        filter(foo_regex),
+        ce.near(100),
+        numKeys.near(1000),
+    );
 
 getOnlyPlan([{"$match": foo_regex}, {"$limit": 10}])
     .expect("FETCH", filter(undefined), ce.eq(10))
@@ -115,7 +135,9 @@ getOnlyPlan([{"$match": foo_regex}, {"$limit": 10}])
     .expect("IXSCAN", keyPattern({foo_str: 1}), filter(foo_regex), ce.eq(10), numKeys.near(100));
 
 // Enable sort-based index intersection and force index intersections plans.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}),
+);
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
 
 // Validate that limits are scaled up proportionately when applied to the children of an AND
@@ -130,7 +152,11 @@ getPlanWithStage([{"$match": {bar: 1, baz: 1}}, {"$limit": 10}], "AND_SORTED")
     .expect("IXSCAN", keyPattern({bar: 1}), ce.near(500 * (10 / 80)))
     .expect("IXSCAN", keyPattern({baz: 1}), ce.near(333 * (10 / 80)));
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}),
+);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}),
+);
 
 // TODO: Test OR; currently subplanner will be used, and cardinality is not estimated.

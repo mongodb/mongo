@@ -51,7 +51,9 @@ assert.eq(1, t.count({loc: {$within: {$center: [[30, 30], 10], $uniqueDocs: fals
 const notUniqueNotInclude = t
     .aggregate({$geoNear: {near: [50, 50], distanceField: "dis", uniqueDocs: false}})
     .toArray();
-const uniqueNotInclude = t.aggregate({$geoNear: {near: [50, 50], distanceField: "dis", uniqueDocs: true}}).toArray();
+const uniqueNotInclude = t
+    .aggregate({$geoNear: {near: [50, 50], distanceField: "dis", uniqueDocs: true}})
+    .toArray();
 const notUniqueInclude = t
     .aggregate({
         $geoNear: {

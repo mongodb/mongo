@@ -88,13 +88,22 @@ const coll = db[jsTestName()];
         {a: 5, b: 4, c: 7, d: [1, 2, 3]},
     ]);
 
-    validateAggPlanCacheUse(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
+    validateAggPlanCacheUse(coll, [
+        {$sort: {a: 1, b: 1}},
+        {$group: {_id: "$a", accum: {$first: "$b"}}},
+    ]);
 
-    validateAggPlanCacheUse(coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
+    validateAggPlanCacheUse(coll, [
+        {$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}},
+    ]);
 
     section("DISTINCT_SCAN with embedded FETCH utilizes plan cache");
 
-    validateAggPlanCacheUse(coll, [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}]);
+    validateAggPlanCacheUse(coll, [
+        {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}},
+    ]);
 
-    validateAggPlanCacheUse(coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
+    validateAggPlanCacheUse(coll, [
+        {$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}},
+    ]);
 }

@@ -190,20 +190,28 @@ describe("object-bracket predicates on wildcard", function () {
     });
 
     it("$exists:true: non-generic entry", function () {
-        const plans = assertResultsAndGetIxscans(coll, {a: 3, "b.c": {$exists: true}, c: {$lt: 3}}, [
-            {a: 3, b: {c: 1}, c: 2},
-            {a: 3, b: {c: {nested: 1}}, c: 2},
-            {a: 3, b: {c: {}}, c: 2},
-            {a: 3, b: {c: null}, c: 2},
-        ]);
+        const plans = assertResultsAndGetIxscans(
+            coll,
+            {a: 3, "b.c": {$exists: true}, c: {$lt: 3}},
+            [
+                {a: 3, b: {c: 1}, c: 2},
+                {a: 3, b: {c: {nested: 1}}, c: 2},
+                {a: 3, b: {c: {}}, c: 2},
+                {a: 3, b: {c: null}, c: 2},
+            ],
+        );
         assertAllPlansIxScan(plans.slice(0, 1), kNonGenericScan_bc_object);
     });
 
     it("$type:object: non-generic entry", function () {
-        const plans = assertResultsAndGetIxscans(coll, {a: 3, "b.c": {$type: "object"}, c: {$lt: 3}}, [
-            {a: 3, b: {c: {nested: 1}}, c: 2},
-            {a: 3, b: {c: {}}, c: 2},
-        ]);
+        const plans = assertResultsAndGetIxscans(
+            coll,
+            {a: 3, "b.c": {$type: "object"}, c: {$lt: 3}},
+            [
+                {a: 3, b: {c: {nested: 1}}, c: 2},
+                {a: 3, b: {c: {}}, c: 2},
+            ],
+        );
         assertAllPlansIxScan(plans.slice(0, 1), kNonGenericScan_bc_object);
     });
 
@@ -234,9 +242,11 @@ describe("object-bracket predicates on wildcard", function () {
     });
 
     it("$eq:{nested:1}: generic entry", function () {
-        const plans = assertResultsAndGetIxscans(coll, {a: 3, "b.c": {$eq: {nested: 1}}, c: {$lt: 3}}, [
-            {a: 3, b: {c: {nested: 1}}, c: 2},
-        ]);
+        const plans = assertResultsAndGetIxscans(
+            coll,
+            {a: 3, "b.c": {$eq: {nested: 1}}, c: {$lt: 3}},
+            [{a: 3, b: {c: {nested: 1}}, c: 2}],
+        );
         assertAllPlansIxScan(plans, kGenericScan_a3);
     });
 });
@@ -262,9 +272,11 @@ describe("$expr predicate", function () {
     });
 
     it("$expr eq null", function () {
-        const exprPlans = assertResultsAndGetIxscans(coll, {a: 1, $expr: {$eq: ["$b.x", null]}, c: 1}, [
-            {a: 1, b: {x: null}, c: 1},
-        ]);
+        const exprPlans = assertResultsAndGetIxscans(
+            coll,
+            {a: 1, $expr: {$eq: ["$b.x", null]}, c: 1},
+            [{a: 1, b: {x: null}, c: 1}],
+        );
         assertAllPlansIxScan(exprPlans, kGenericScan_a1);
 
         const matchPlans = assertResultsAndGetIxscans(coll, {a: 1, "b.x": null, c: 1}, [
@@ -294,7 +306,9 @@ describe("predicates matching missing/null + wildcard projection", function () {
 
     before(function () {
         coll.drop();
-        assert.commandWorked(coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {b: 1, c: 1}}));
+        assert.commandWorked(
+            coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {b: 1, c: 1}}),
+        );
         assert.commandWorked(
             coll.insertMany([
                 {a: 1, c: 1},
@@ -376,9 +390,11 @@ describe("IXSCAN with predicate on unindexed field", function () {
 
     // $expr{$eq} cannot give us narrower bounds on 'b.x'.
     it("$expr eq with residual", function () {
-        const plans = assertResultsAndGetIxscans(coll, {a: 3, $expr: {$eq: ["$b.x", 1]}, c: {$gte: 5}, d: "foo"}, [
-            {a: 3, b: {x: 1}, c: 7, d: "foo"},
-        ]);
+        const plans = assertResultsAndGetIxscans(
+            coll,
+            {a: 3, $expr: {$eq: ["$b.x", 1]}, c: {$gte: 5}, d: "foo"},
+            [{a: 3, b: {x: 1}, c: 7, d: "foo"}],
+        );
         assertAllPlansIxScan(plans, kGenericScan_a3);
     });
 });
@@ -409,18 +425,30 @@ describe("two wildcard predicates", function () {
         const kNonGenericScan_bx = {
             indexName: kIndexName,
             keyPattern: {a: 1, "$_path": 1, "b.x": 1, c: 1},
-            indexBounds: {a: ["[1.0, 1.0]"], "$_path": ['["b.x", "b.x"]'], "b.x": ["[1.0, 1.0]"], c: ["[1.0, 1.0]"]},
+            indexBounds: {
+                a: ["[1.0, 1.0]"],
+                "$_path": ['["b.x", "b.x"]'],
+                "b.x": ["[1.0, 1.0]"],
+                c: ["[1.0, 1.0]"],
+            },
         };
         const kNonGenericScan_by = {
             indexName: kIndexName,
             keyPattern: {a: 1, "$_path": 1, "b.y": 1, c: 1},
-            indexBounds: {a: ["[1.0, 1.0]"], "$_path": ['["b.y", "b.y"]'], "b.y": ["[2.0, 2.0]"], c: ["[1.0, 1.0]"]},
+            indexBounds: {
+                a: ["[1.0, 1.0]"],
+                "$_path": ['["b.y", "b.y"]'],
+                "b.y": ["[2.0, 2.0]"],
+                c: ["[1.0, 1.0]"],
+            },
         };
         const plans = assertResultsAndGetIxscans(coll, {a: 1, "b.x": 1, "b.y": 2, c: 1}, [
             {a: 1, b: {x: 1, y: 2}, c: 1},
         ]);
         const winningScans = plans[0];
-        assert.eq(winningScans.length, 1, "expected exactly one IXSCAN in winning plan", {winningScans});
+        assert.eq(winningScans.length, 1, "expected exactly one IXSCAN in winning plan", {
+            winningScans,
+        });
         const usesBx = winningScans[0].keyPattern.hasOwnProperty("b.x");
         assertAllPlansIxScan(plans.slice(0, 1), usesBx ? kNonGenericScan_bx : kNonGenericScan_by);
     });
@@ -431,7 +459,9 @@ describe("two wildcard predicates + wildcard projection", function () {
 
     before(function () {
         coll.drop();
-        assert.commandWorked(coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {b: 1, c: 1}}));
+        assert.commandWorked(
+            coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {b: 1, c: 1}}),
+        );
         assert.commandWorked(
             coll.insertMany([
                 {a: 1, b: 1, c: 1},

@@ -71,7 +71,8 @@ function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata, pre
             assert.eq(
                 flagRes.errmsg,
                 "no option found to get",
-                "Unexpected failure running getParameter for featureFlagSymmetricFCV: " + tojson(flagRes),
+                "Unexpected failure running getParameter for featureFlagSymmetricFCV: " +
+                    tojson(flagRes),
             );
         }
         if (!isSymmetricFCV) {
@@ -98,9 +99,17 @@ function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata, pre
     // This query specifies an explicit readConcern because some FCV tests pass a connection that
     // has manually run isMaster with internalClient, and mongod expects internalClients (ie. other
     // cluster members) to include read/write concern (on commands that accept read/write concern).
-    let doc = adminDB.system.version.find({_id: "featureCompatibilityVersion"}).limit(1).readConcern("local").next();
+    let doc = adminDB.system.version
+        .find({_id: "featureCompatibilityVersion"})
+        .limit(1)
+        .readConcern("local")
+        .next();
     assert.eq(doc.version, version, "FCV document 'version' field does not match: " + tojson(doc));
-    assert.eq(doc.targetVersion, targetVersion, "FCV document 'targetVersion' field does not match: " + tojson(doc));
+    assert.eq(
+        doc.targetVersion,
+        targetVersion,
+        "FCV document 'targetVersion' field does not match: " + tojson(doc),
+    );
     assert.eq(
         doc.previousVersion,
         expectedPreviousVersion,
@@ -116,7 +125,8 @@ function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata, pre
         assert.eq(
             doc.isCleaningServerMetadata,
             undefined,
-            "FCV document 'isCleaningServerMetadata' field should not exist, but did: " + tojson(doc),
+            "FCV document 'isCleaningServerMetadata' field should not exist, but did: " +
+                tojson(doc),
         );
     }
 }
@@ -145,7 +155,12 @@ function removeFCVDocument(adminDB) {
 
     // Create new collection with no FCV document, and then delete the
     // original collection.
-    let createNewAdminSystemVersionCollection = {op: "c", ns: "admin.$cmd", ui: newUUID, o: {create: "system.version"}};
+    let createNewAdminSystemVersionCollection = {
+        op: "c",
+        ns: "admin.$cmd",
+        ui: newUUID,
+        o: {create: "system.version"},
+    };
     let dropOriginalAdminSystemVersionCollection = {
         op: "c",
         ns: "admin.$cmd",
@@ -154,7 +169,10 @@ function removeFCVDocument(adminDB) {
     };
     assert.commandWorked(
         adminDB.runCommand({
-            applyOps: [createNewAdminSystemVersionCollection, dropOriginalAdminSystemVersionCollection],
+            applyOps: [
+                createNewAdminSystemVersionCollection,
+                dropOriginalAdminSystemVersionCollection,
+            ],
         }),
     );
 

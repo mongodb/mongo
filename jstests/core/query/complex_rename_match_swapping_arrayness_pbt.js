@@ -51,7 +51,10 @@ const leafArb = fc.oneof(
 );
 
 // {$project: {[dest]: "$src"}} using dotted paths on both sides.
-const projectRenameArb = getComputedProjectArb(nonEmptyDottedFieldArb, nonEmptyDottedDollarFieldArb);
+const projectRenameArb = getComputedProjectArb(
+    nonEmptyDottedFieldArb,
+    nonEmptyDottedDollarFieldArb,
+);
 
 // {$addFields: {[dest]: "$src"}} using dotted paths on both sides.
 const addFieldsRenameArb = getAddFieldsVarArb(nonEmptyDottedFieldArb, nonEmptyDottedDollarFieldArb);
@@ -122,7 +125,9 @@ function getWorkloadModelForArraynessComplexRenameMatchSwap() {
         {def: {"t.m": 1}, options: {}},
     ]);
     const extraIndexes = fc.array(indexModel, {minLength: 0, maxLength: 6});
-    const indexesModel = fc.tuple(guaranteedIndexes, extraIndexes).map(([base, extra]) => [...base, ...extra]);
+    const indexesModel = fc
+        .tuple(guaranteedIndexes, extraIndexes)
+        .map(([base, extra]) => [...base, ...extra]);
 
     return fc.record({
         collSpec: getCollectionModel({docsModel, indexesModel}),

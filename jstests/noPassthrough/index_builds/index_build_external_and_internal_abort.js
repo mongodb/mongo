@@ -24,10 +24,19 @@ const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({point: {x: -15.0, y: "abc"}}));
 
-let indexBuilderThreadFP = configureFailPoint(testDB, "hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort");
+let indexBuilderThreadFP = configureFailPoint(
+    testDB,
+    "hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort",
+);
 
 // Will fail with error code 13026: "geo values must be 'legacy coordinate pairs' for 2d indexes"
-const waitForIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {point: "2d"}, {}, 13026);
+const waitForIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    {point: "2d"},
+    {},
+    13026,
+);
 
 // Wait for the index builder to detect the malformed geo value and to hang before transitioning
 // the index build state to kAwaitPrimaryAbort.

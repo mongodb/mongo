@@ -64,7 +64,12 @@ configureFailPoint(st.s, "connectionPoolDropConnectionsBeforeGetConnection", {},
  * Mimic timeout from timer in the NetworkInterface. This general timeout should not return a
  * retryable error.
  */
-configureFailPoint(st.s, "triggerSendRequestNetworkTimeout", {"collectionNS": testColl}, {times: 1});
+configureFailPoint(
+    st.s,
+    "triggerSendRequestNetworkTimeout",
+    {"collectionNS": testColl},
+    {times: 1},
+);
 // Run a long query to make sure the network fail points fail the command.
 assert.throwsWithCode(function () {
     coll.findOne({

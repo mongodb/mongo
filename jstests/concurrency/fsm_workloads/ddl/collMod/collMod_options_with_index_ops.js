@@ -19,7 +19,8 @@ export const $config = (function () {
             db[collName].insertMany(data);
         },
         collMod: function (db, collName) {
-            const collModOp = Random.randInt(2) == 0 ? {validator: {y: {$exists: false}}} : {validator: {}};
+            const collModOp =
+                Random.randInt(2) == 0 ? {validator: {y: {$exists: false}}} : {validator: {}};
             assert.commandWorkedOrFailedWithCode(db.runCommand({collMod: collName, ...collModOp}), [
                 // Conflicted with another thread's collMod command
                 ErrorCodes.ConflictingOperationInProgress,

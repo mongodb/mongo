@@ -22,9 +22,13 @@ export const OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM = getX509Path("intermediate_ca_w
 export const OCSP_INTERMEDIATE_CA_ONLY_CERT = getX509Path("intermediate_ca_only_ocsp.crt");
 export const OCSP_INTERMEDIATE_CA_ONLY_KEY = getX509Path("intermediate_ca_only_ocsp.key");
 
-export const OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM = getX509Path("server_signed_by_intermediate_ca_ocsp.pem");
+export const OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM = getX509Path(
+    "server_signed_by_intermediate_ca_ocsp.pem",
+);
 
-export const OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM = getX509Path("server_and_intermediate_ca_appended_ocsp.pem");
+export const OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM = getX509Path(
+    "server_and_intermediate_ca_appended_ocsp.pem",
+);
 
 export var clearOCSPCache = function () {
     let provider = determineSSLProvider();

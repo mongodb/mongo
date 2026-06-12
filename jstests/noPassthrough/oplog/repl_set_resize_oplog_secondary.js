@@ -31,12 +31,16 @@ describe("replSetResizeOplog on replica set members", function () {
     });
 
     it("succeeds on a secondary", function () {
-        assert.commandWorked(secondary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 990}));
+        assert.commandWorked(
+            secondary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 990}),
+        );
         assert.eq(secondary.getDB("local").oplog.rs.stats().maxSize, 990 * MB);
     });
 
     it("succeeds on a primary", function () {
-        assert.commandWorked(primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 1000}));
+        assert.commandWorked(
+            primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 1000}),
+        );
         assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 1000 * MB);
     });
 });

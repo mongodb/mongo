@@ -56,7 +56,9 @@ export const $config = (function () {
                         .toArray();
                     assert.gt(arr.length, 0, "Failed to retrieve documents");
                     arr.sort((d1, d2) => d1._id - d2._id);
-                    assert(orderedArrayEq(this.expectedDocuments, arr), () => arrayDiff(this.expectedDocuments, arr));
+                    assert(orderedArrayEq(this.expectedDocuments, arr), () =>
+                        arrayDiff(this.expectedDocuments, arr),
+                    );
                 },
                 100 /* numRetries */,
                 0 /* sleepMs */,
@@ -69,7 +71,10 @@ export const $config = (function () {
     };
 
     let setup = function setup(db, unusedCollName, cluster) {
-        this.expectedDocuments = Array.from({length: this.nDocumentsToInsert}).map((_, i) => ({_id: i, x: i}));
+        this.expectedDocuments = Array.from({length: this.nDocumentsToInsert}).map((_, i) => ({
+            _id: i,
+            x: i,
+        }));
         assert.commandWorked(db[this.collName].insertMany(this.expectedDocuments));
         if (cluster.isReplication()) {
             cluster.awaitReplication();

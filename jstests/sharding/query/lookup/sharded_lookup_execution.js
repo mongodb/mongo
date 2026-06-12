@@ -16,7 +16,10 @@
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
-import {profilerHasNumMatchingEntriesOrThrow, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {
+    profilerHasNumMatchingEntriesOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
@@ -25,7 +28,9 @@ const testName = "sharded_lookup";
 const mongosDB = st.s0.getDB(testName);
 const shardList = [st.shard0.getDB(testName), st.shard1.getDB(testName)];
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Turn on the profiler and increase the query log level for both shards.
 assert.commandWorked(st.shard0.getDB(testName).setProfilingLevel(2));
@@ -51,7 +56,13 @@ function assertLocalReadCount(comment, actualCount, expectedCount) {
     assert.eq(
         actualCount,
         expectedCount,
-        "Expected to find " + expectedCount + " local reads but found " + actualCount + " instead for " + comment + ".",
+        "Expected to find " +
+            expectedCount +
+            " local reads but found " +
+            actualCount +
+            " instead for " +
+            comment +
+            ".",
     );
 }
 
@@ -157,7 +168,11 @@ function assertLookupExecution(pipeline, opts, expected, forceRoutingTableRefres
         } else {
             // If merger is randomly delegated, we can't know in advance if reads will be local or
             // remote.
-            const localReadCount = getLocalReadCount(getNode(i), reviewsColl.getFullName(), opts.comment);
+            const localReadCount = getLocalReadCount(
+                getNode(i),
+                reviewsColl.getFullName(),
+                opts.comment,
+            );
             if (localReadCount === 0) {
                 profilerHasNumMatchingEntriesOrThrow({
                     profileDB: shardList[i],
@@ -226,7 +241,10 @@ function assertLookupExecution(pipeline, opts, expected, forceRoutingTableRefres
             // Confirm that the second $lookup subpipeline execution is as expected.
             profilerHasNumMatchingEntriesOrThrow({
                 profileDB: shardList[i],
-                filter: {"command.aggregate": updatesColl.getName(), "command.comment": opts.comment},
+                filter: {
+                    "command.aggregate": updatesColl.getName(),
+                    "command.comment": opts.comment,
+                },
                 numExpectedMatches: expected.multipleLookups.subpipelineExec[i],
             });
 
@@ -243,13 +261,24 @@ function assertLookupExecution(pipeline, opts, expected, forceRoutingTableRefres
 }
 
 // Test unsharded local collection and sharded foreign collection, with a targeted $lookup.
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 
 let pipeline = [
     {$match: {customer: "Alice"}},
     {$unwind: "$products"},
     {
-        $lookup: {from: "reviews", localField: "products._id", foreignField: "product_id", as: "reviews"},
+        $lookup: {
+            from: "reviews",
+            localField: "products._id",
+            foreignField: "product_id",
+            as: "reviews",
+        },
     },
     {
         $group: {
@@ -309,12 +338,23 @@ assertLookupExecution(
 
 // Test sharded local collection and sharded foreign collection, with a targeted $lookup.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 
 pipeline = [
     {$unwind: "$products"},
     {
-        $lookup: {from: "reviews", localField: "products._id", foreignField: "product_id", as: "reviews"},
+        $lookup: {
+            from: "reviews",
+            localField: "products._id",
+            foreignField: "product_id",
+            as: "reviews",
+        },
     },
     {
         $group: {
@@ -385,7 +425,13 @@ assertLookupExecution(
 // Test sharded local collection and sharded foreign collection with a targeted top-level $lookup
 // and a nested $lookup on an unsharded foreign collection.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 
 pipeline = [
     {$match: {customer: "Alice"}},
@@ -400,7 +446,9 @@ pipeline = [
                     $lookup: {
                         from: "updates",
                         let: {review_id: "$_id"},
-                        pipeline: [{$match: {$expr: {$eq: ["$original_review_id", "$$review_id"]}}}],
+                        pipeline: [
+                            {$match: {$expr: {$eq: ["$original_review_id", "$$review_id"]}}},
+                        ],
                         as: "updates",
                     },
                 },
@@ -457,7 +505,13 @@ assertLookupExecution(
 // Test sharded local collection and sharded foreign collection with a targeted top-level $lookup
 // and a nested targeted $lookup on a sharded foreign collection.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 st.shardColl(
     updatesColl,
     {original_review_id: 1},
@@ -488,7 +542,13 @@ assertLookupExecution(
 // Test sharded local collection and sharded foreign collection with a targeted top-level $lookup
 // and a nested untargeted $lookup on a sharded foreign collection.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 st.shardColl(updatesColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 
 assertLookupExecution(
@@ -513,7 +573,13 @@ assertLookupExecution(
 // $lookup against a sharded collection. Note that the $lookup in the view should be treated as
 // "nested" $lookup and should execute on the merging node.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 st.shardColl(
     updatesColl,
     {original_review_id: 1},
@@ -584,7 +650,13 @@ assertLookupExecution(
 
 // Test that a targeted $lookup on a sharded collection can execute correctly on mongos.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 
 pipeline = [
     {$match: {customer: "Alice"}},
@@ -648,7 +720,13 @@ assertLookupExecution(
 // Test that a targeted $lookup on a sharded collection can execute correctly when mongos delegates
 // to a merging shard.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 
 assertLookupExecution(
     pipeline,
@@ -686,7 +764,13 @@ assertLookupExecution(
 
 // Test that multiple top-level $lookup stages are able to be run in parallel.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
-st.shardColl(reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(
+    reviewsColl,
+    {product_id: 1},
+    {product_id: "hat"},
+    {product_id: "hat"},
+    mongosDB.getName(),
+);
 st.shardColl(
     updatesColl,
     {original_review_id: 1},
@@ -699,11 +783,21 @@ pipeline = [
     {$match: {customer: "Alice"}},
     {$unwind: "$products"},
     {
-        $lookup: {from: "reviews", localField: "products._id", foreignField: "product_id", as: "reviews"},
+        $lookup: {
+            from: "reviews",
+            localField: "products._id",
+            foreignField: "product_id",
+            as: "reviews",
+        },
     },
     {$unwind: "$reviews"},
     {
-        $lookup: {from: "updates", localField: "reviews._id", foreignField: "original_review_id", as: "updates"},
+        $lookup: {
+            from: "updates",
+            localField: "reviews._id",
+            foreignField: "original_review_id",
+            as: "updates",
+        },
     },
     {$project: {_id: 0, "reviews._id": 1, "updates.updated_stars": 1}},
 ];
@@ -728,7 +822,11 @@ assertLookupExecution(
         // The second $lookup stage's expected execution behavior is similar to the first, executing in
         // parallel on every shard that contains the 'updates' collection and, for each node, targeting
         // shards to execute the subpipeline.
-        multipleLookups: {toplevelExec: [1, 1], subpipelineExec: [0, 2], subpipelineLocalExec: [1, 0]},
+        multipleLookups: {
+            toplevelExec: [1, 1],
+            subpipelineExec: [0, 2],
+            subpipelineLocalExec: [1, 0],
+        },
     },
 );
 
@@ -748,7 +846,13 @@ pipeline = [
             from: "reviews",
             let: {customer_product_name: "$products._id"},
             pipeline: [
-                {$group: {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}},
+                {
+                    $group: {
+                        _id: "$product_id",
+                        avg_stars: {$avg: "$stars"},
+                        name: {$first: "$product_id"},
+                    },
+                },
                 {$match: {$expr: {$eq: ["$name", "$$customer_product_name"]}}},
             ],
             as: "avg_review",
@@ -803,7 +907,13 @@ pipeline = [
             from: "reviews",
             let: {customer_product_name: "$products._id"},
             pipeline: [
-                {$group: {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}},
+                {
+                    $group: {
+                        _id: "$product_id",
+                        avg_stars: {$avg: "$stars"},
+                        name: {$first: "$product_id"},
+                    },
+                },
                 {$match: {$expr: {$eq: ["$name", "$$customer_product_name"]}}},
             ],
             as: "avg_review",
@@ -898,7 +1008,12 @@ st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 pipeline = [
     {$unwind: "$products"},
     {
-        $lookup: {from: "reviews", localField: "products._id", foreignField: "product_id", as: "reviews"},
+        $lookup: {
+            from: "reviews",
+            localField: "products._id",
+            foreignField: "product_id",
+            as: "reviews",
+        },
     },
     {$project: {"item": "$products._id", "reviews.stars": 1}},
 ];
@@ -960,7 +1075,9 @@ st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 // Perform a query through the stale mongos to ensure the cache is populated and indicates that
 // the foreign collection is unsharded. Then, shard the collection from the other mongos.
 assert.eq(0, mongosDB[reviewsColl.getName()].find().itcount());
-assert.commandWorked(freshMongos.adminCommand({shardCollection: freshReviews.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(
+    freshMongos.adminCommand({shardCollection: freshReviews.getFullName(), key: {_id: "hashed"}}),
+);
 
 // Test that the stale mongos still returns correct results.
 assertLookupExecution(

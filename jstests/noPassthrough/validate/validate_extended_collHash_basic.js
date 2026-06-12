@@ -19,7 +19,9 @@ function runCollHashValidateTest(expectSameHash, contents1, contents2) {
     assert.commandWorked(db1.createCollection("coll"));
     assert.commandWorked(db2.createCollection("coll"));
 
-    jsTest.log.info(`Inserting on db1.coll: ${tojson(contents1)} and on db2.coll: ${tojson(contents2)}`);
+    jsTest.log.info(
+        `Inserting on db1.coll: ${tojson(contents1)} and on db2.coll: ${tojson(contents2)}`,
+    );
     assert.commandWorked(db1.coll.insert(contents1));
     assert.commandWorked(db2.coll.insert(contents2));
 
@@ -40,7 +42,11 @@ runCollHashValidateTest(false, [{_id: 4}, {_id: 2}, {_id: 3}], [{_id: 1}, {_id: 
 // Differing contents: missing document
 runCollHashValidateTest(false, [{_id: 2}, {_id: 3}], [{_id: 1}, {_id: 2}, {_id: 3}]);
 // Differing contents: additional field
-runCollHashValidateTest(false, [{_id: 1}, {_id: 2}, {_id: 3}], [{_id: 1, a: 1}, {_id: 2}, {_id: 3}]);
+runCollHashValidateTest(
+    false,
+    [{_id: 1}, {_id: 2}, {_id: 3}],
+    [{_id: 1, a: 1}, {_id: 2}, {_id: 3}],
+);
 // Differing contents: one collection is empty
 runCollHashValidateTest(false, [], [{_id: 1}, {_id: 2}, {_id: 3}]);
 

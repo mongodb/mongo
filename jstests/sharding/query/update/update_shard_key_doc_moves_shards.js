@@ -45,7 +45,8 @@ const mongos = st.s0;
 const shard0 = st.shard0.shardName;
 const ns = kDbName + ".foo";
 
-const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
+const updateDocumentShardKeyUsingTransactionApiEnabled =
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
@@ -92,7 +93,16 @@ function changeShardKeyWhenFailpointsSet(
                 splitDoc,
             );
         } else {
-            runFindAndModifyCmdFail(st, kDbName, session, sessionDB, runInTxn, {x: 300}, {$set: {x: 30}}, false);
+            runFindAndModifyCmdFail(
+                st,
+                kDbName,
+                session,
+                sessionDB,
+                runInTxn,
+                {x: 300},
+                {$set: {x: 30}},
+                false,
+            );
         }
     } else {
         if (!runInTxn && updateDocumentShardKeyUsingTransactionApiEnabled) {
@@ -149,7 +159,16 @@ function changeShardKeyWhenFailpointsSet(
             }),
     );
     if (isFindAndModify) {
-        runFindAndModifyCmdFail(st, kDbName, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}}, false);
+        runFindAndModifyCmdFail(
+            st,
+            kDbName,
+            session,
+            sessionDB,
+            runInTxn,
+            {"x": 300},
+            {"$set": {"x": 30}},
+            false,
+        );
     } else {
         runUpdateCmdFail(
             st,
@@ -406,7 +425,18 @@ changeShardKeyOptions.forEach(function (updateConfig) {
         upsert,
     );
 
-    assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {}, upsert);
+    assertCanUnsetSKField(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        {"x": 300},
+        {},
+        upsert,
+    );
 
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
@@ -438,7 +468,16 @@ changeShardKeyOptions.forEach(function (updateConfig) {
             },
         );
         if (!isFindAndModify) {
-            assertCannotUpdateWithMultiTrue(st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"x": 30});
+            assertCannotUpdateWithMultiTrue(
+                st,
+                kDbName,
+                ns,
+                session,
+                sessionDB,
+                runInTxn,
+                {"x": 300},
+                {"x": 30},
+            );
         }
         assertCannotUpdateSKToArray(
             st,
@@ -459,7 +498,13 @@ changeShardKeyOptions.forEach(function (updateConfig) {
 let session = st.s.startSession({retryWrites: true});
 let sessionDB = session.getDatabase(kDbName);
 
-let docsToInsert = [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+let docsToInsert = [
+    {"x": 4, "a": 3},
+    {"x": 78},
+    {"x": 100},
+    {"x": 300, "a": 3},
+    {"x": 500, "a": 6},
+];
 
 // ----Assert correct behavior when collection is hash sharded----
 

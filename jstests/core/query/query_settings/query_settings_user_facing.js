@@ -34,7 +34,10 @@ const querySettings = {
     indexHints: {ns, allowedIndexes: [{a: 1}]},
 };
 
-const flagEnabled = FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "AllowUserFacingQuerySettings");
+const flagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db.getMongo(),
+    "AllowUserFacingQuerySettings",
+);
 
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 const qstests = new QuerySettingsIndexHintsTests(qsutils);
@@ -53,7 +56,9 @@ function assertEngine(cmd, expectedEngine) {
 
 describe("User-facing querySettings when flag is off", function () {
     if (flagEnabled) {
-        jsTest.log.info("Skipping flag-off tests: featureFlagAllowUserFacingQuerySettings is enabled");
+        jsTest.log.info(
+            "Skipping flag-off tests: featureFlagAllowUserFacingQuerySettings is enabled",
+        );
         return;
     }
 
@@ -66,7 +71,12 @@ describe("User-facing querySettings when flag is off", function () {
 
     it("should reject querySettings on aggregate", function () {
         assert.commandFailedWithCode(
-            db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {a: 1}}], cursor: {}, querySettings}),
+            db.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [{$match: {a: 1}}],
+                cursor: {},
+                querySettings,
+            }),
             [7708000, 7708001],
         );
     });
@@ -81,14 +91,21 @@ describe("User-facing querySettings when flag is off", function () {
 
 describe("User-facing querySettings when flag is on", function () {
     if (!flagEnabled) {
-        jsTest.log.info("Skipping flag-on tests: featureFlagAllowUserFacingQuerySettings is disabled");
+        jsTest.log.info(
+            "Skipping flag-on tests: featureFlagAllowUserFacingQuerySettings is disabled",
+        );
         return;
     }
 
     it("should accept querySettings on find, aggregate, and distinct", function () {
         assert.commandWorked(db.runCommand({find: coll.getName(), filter: {a: 1}, querySettings}));
         assert.commandWorked(
-            db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {a: 1}}], cursor: {}, querySettings}),
+            db.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [{$match: {a: 1}}],
+                cursor: {},
+                querySettings,
+            }),
         );
         assert.commandWorked(db.runCommand({distinct: coll.getName(), key: "a", querySettings}));
     });
@@ -99,7 +116,12 @@ describe("User-facing querySettings when flag is on", function () {
     });
 
     it("should apply index hints to aggregate via explain", function () {
-        const cmd = {aggregate: coll.getName(), pipeline: [{$match: {a: 1, b: 1}}], cursor: {}, querySettings};
+        const cmd = {
+            aggregate: coll.getName(),
+            pipeline: [{$match: {a: 1, b: 1}}],
+            cursor: {},
+            querySettings,
+        };
         qstests.assertIndexScanStage(cmd, {a: 1}, ns);
     });
 
@@ -126,7 +148,11 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
             const clusterSettings = {indexHints: {ns, allowedIndexes: [{b: 1}]}};
             const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
             qsutils.withQuerySettings(findQuery, clusterSettings, () => {
-                const cmd = {find: coll.getName(), filter: {a: 1, b: 1}, querySettings: userSettings};
+                const cmd = {
+                    find: coll.getName(),
+                    filter: {a: 1, b: 1},
+                    querySettings: userSettings,
+                };
                 qstests.assertIndexScanStage(cmd, {b: 1}, ns);
             });
         });
@@ -148,7 +174,9 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
 
     describe("aggregate", function () {
         it("cluster PQS wins on index hint conflict", function () {
-            const aggQuery = qsutils.makeAggregateQueryInstance({pipeline: [{$match: {a: 1, b: 1}}]});
+            const aggQuery = qsutils.makeAggregateQueryInstance({
+                pipeline: [{$match: {a: 1, b: 1}}],
+            });
             const clusterSettings = {indexHints: {ns, allowedIndexes: [{b: 1}]}};
             const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
             qsutils.withQuerySettings(aggQuery, clusterSettings, () => {
@@ -170,7 +198,9 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
             };
             assertEngine(aggCmd, "classic");
 
-            const aggQuery = qsutils.makeAggregateQueryInstance({pipeline: [{$match: {a: 1, b: 1}}]});
+            const aggQuery = qsutils.makeAggregateQueryInstance({
+                pipeline: [{$match: {a: 1, b: 1}}],
+            });
             const clusterSettings = {queryFramework: "sbe"};
             const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
             qsutils.withQuerySettings(aggQuery, clusterSettings, () => {
@@ -185,7 +215,10 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
         describe("distinct", function () {
             it("cluster PQS wins on index hint conflict", function () {
                 // Cluster forces {b:1}, user requests {a:1} -- cluster should win.
-                const distinctQuery = qsutils.makeDistinctQueryInstance({key: "a", query: {a: 1, b: 1}});
+                const distinctQuery = qsutils.makeDistinctQueryInstance({
+                    key: "a",
+                    query: {a: 1, b: 1},
+                });
                 const clusterSettings = {indexHints: {ns, allowedIndexes: [{b: 1}]}};
                 const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
                 qsutils.withQuerySettings(distinctQuery, clusterSettings, () => {
@@ -204,9 +237,16 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
 
                 // Baseline: without any settings, the query should use classic engine.
                 const baselineExplain = assert.commandWorked(db.runCommand({explain: distinctCmd}));
-                assert.eq(getEngine(baselineExplain), "classic", "Expected classic engine as baseline");
+                assert.eq(
+                    getEngine(baselineExplain),
+                    "classic",
+                    "Expected classic engine as baseline",
+                );
 
-                const distinctQuery = qsutils.makeDistinctQueryInstance({key: "a", query: {a: {$gt: 0}}});
+                const distinctQuery = qsutils.makeDistinctQueryInstance({
+                    key: "a",
+                    query: {a: {$gt: 0}},
+                });
                 const clusterSettings = {queryFramework: "sbe"};
                 const userSettings = {indexHints: {ns, allowedIndexes: [{a: 1}]}};
                 qsutils.withQuerySettings(distinctQuery, clusterSettings, () => {
@@ -217,7 +257,11 @@ describe("Merging cluster PQS with user-supplied querySettings", function () {
 
                     //NOTE: while sbe engine is hinted, it is not applied in favor of DISTINCT_SCAN.
                     const explain = assert.commandWorked(db.runCommand({explain: cmd}));
-                    assert.eq(getEngine(explain), "classic", "Expected classic engine from cluster PQS");
+                    assert.eq(
+                        getEngine(explain),
+                        "classic",
+                        "Expected classic engine from cluster PQS",
+                    );
                 });
             });
         });

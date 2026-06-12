@@ -17,13 +17,19 @@ const coll = db[collName];
 assert.commandWorked(coll.insert({a: "first"}));
 
 assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "WTIndexUassertDuplicateRecordForKeyOnIdUnindex", mode: "alwaysOn"}),
+    primary.adminCommand({
+        configureFailPoint: "WTIndexUassertDuplicateRecordForKeyOnIdUnindex",
+        mode: "alwaysOn",
+    }),
 );
 
 assert.commandFailedWithCode(coll.remove({a: "first"}), ErrorCodes.DataCorruptionDetected);
 
 assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "WTIndexUassertDuplicateRecordForKeyOnIdUnindex", mode: "off"}),
+    primary.adminCommand({
+        configureFailPoint: "WTIndexUassertDuplicateRecordForKeyOnIdUnindex",
+        mode: "off",
+    }),
 );
 
 replSet.stopSet();

@@ -26,7 +26,9 @@ const coll = db.getCollection(collName);
 coll.drop();
 
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 {
@@ -34,8 +36,14 @@ assert.commandWorked(
     // be the same index as the result of createIndex({timeField: 1}). Therefore we cannot create
     // nor drop an identical index with a different name.
     if (!isShardedTimeseries(coll)) {
-        assert.commandWorked(coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
-        TimeseriesTest.verifyAndDropIndex(coll, /*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
+        assert.commandWorked(
+            coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}),
+        );
+        TimeseriesTest.verifyAndDropIndex(
+            coll,
+            /*shouldHaveOriginalSpec=*/ false,
+            "timefield_downgradable",
+        );
     }
 }
 
@@ -55,7 +63,11 @@ function testIndexSpec(indexSpec) {
             `unexpected value for '${key}' index property. Full index entry: ${tojson(indexEntry)}`,
         );
     }
-    TimeseriesTest.verifyAndDropIndex(coll, indexSpec.shouldHaveOriginalSpec, indexSpec.options.name);
+    TimeseriesTest.verifyAndDropIndex(
+        coll,
+        indexSpec.shouldHaveOriginalSpec,
+        indexSpec.options.name,
+    );
 }
 
 const indexSpecs = [
@@ -104,7 +116,9 @@ for (const indexSpec of indexSpecs) {
     // Creating a raw index directly over the bucket documents is permitted. However, these types
     // of index creations will not have an "originalSpec" field and rely on the reverse mapping
     // mechanism.
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.min.y": 1, "control.max.y": 1}, {name: "y"}),
+    );
 
     let foundIndex = false;
     let bucketIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);

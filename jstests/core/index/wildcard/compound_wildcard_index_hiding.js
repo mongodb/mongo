@@ -53,7 +53,9 @@ function setIndexVisibilityByKeyPattern(collectionName, keyPattern, hidden) {
 }
 
 function setIndexVisibilityByIndexName(collectionName, indexName, hidden) {
-    assert.commandWorked(db.runCommand({collMod: collectionName, index: {name: indexName, hidden}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collectionName, index: {name: indexName, hidden}}),
+    );
 }
 
 function testCompoundWildcardIndexesHiding(cwiList, collectionName) {

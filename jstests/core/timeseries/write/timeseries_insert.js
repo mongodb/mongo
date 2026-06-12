@@ -10,7 +10,11 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 const coll = db[jsTestName()];
 coll.drop();
 
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "measurement"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: "time", metaField: "measurement"},
+    }),
+);
 
 Random.setRandomSeed();
 

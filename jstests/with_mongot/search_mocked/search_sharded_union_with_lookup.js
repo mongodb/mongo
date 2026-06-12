@@ -3,7 +3,11 @@
  * explain results.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getAggPlanStage, getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getAggPlanStages,
+    getUnionWithStage,
+} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
@@ -35,7 +39,9 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 // Ensure db's primary shard is shard1 so we only set the correct mongot to have history.
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 
 const shardedSearchColl = testDB.getCollection("search_sharded");
 const unshardedSearchColl = testDB.getCollection("search_unsharded");
@@ -125,7 +131,11 @@ function searchQueryExpectedByMock(searchColl, protocolVersion = null, explainVe
 function shard1HistorySharded(explainVerbosity = null) {
     return [
         {
-            expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
+            expectedCommand: searchQueryExpectedByMock(
+                shardedSearchColl,
+                protocolVersion,
+                explainVerbosity,
+            ),
             response: mongotMultiCursorResponseForBatch(
                 [
                     {_id: 0, $searchScore: 0.99},
@@ -147,7 +157,11 @@ function shard1HistorySharded(explainVerbosity = null) {
 function shard0HistorySharded(explainVerbosity = null) {
     return [
         {
-            expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
+            expectedCommand: searchQueryExpectedByMock(
+                shardedSearchColl,
+                protocolVersion,
+                explainVerbosity,
+            ),
             response: mongotMultiCursorResponseForBatch(
                 [
                     {_id: 4, $searchScore: 0.33},
@@ -260,7 +274,10 @@ function setupMockRequest(searchColl, mongot, requestType, explainVerbosity = nu
                     ok: 1,
                     protocolVersion: protocolVersion,
                     // Sum counts in the shard metadata.
-                    metaPipeline: [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}],
+                    metaPipeline: [
+                        {$group: {_id: null, count: {$sum: "$count"}}},
+                        {$project: {_id: 0, count: 1}},
+                    ],
                 },
                 maybeUnused: requestType == kPlanMaybe,
             },
@@ -305,14 +322,21 @@ function lookupTest(baseColl, searchColl, mockResponses) {
     baseColl.aggregate([{$lookup: {from: searchColl.getName(), pipeline: [], as: "out"}}]);
 
     setupAllMockRequests(searchColl, mockResponses);
-    assert.sameMembers(expectedLookupResults, baseColl.aggregate(makeLookupPipeline(searchColl)).toArray());
+    assert.sameMembers(
+        expectedLookupResults,
+        baseColl.aggregate(makeLookupPipeline(searchColl)).toArray(),
+    );
     stWithMock.assertEmptyMocks();
 }
 
 // Test all combinations of sharded/unsharded base/search collection.
 lookupTest(unshardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
-lookupTest(unshardedBaseColl, shardedSearchColl, {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
+lookupTest(unshardedBaseColl, shardedSearchColl, {
+    mongos: [],
+    primary: [kPlan, kSearch],
+    secondary: [kSearch],
+});
 
 lookupTest(shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
@@ -357,14 +381,21 @@ const expectedUnionWithResult = [
 
 function unionTest(baseColl, searchColl, mockResponses) {
     setupAllMockRequests(searchColl, mockResponses);
-    assert.sameMembers(baseColl.aggregate(makeUnionWithPipeline(searchColl)).toArray(), expectedUnionWithResult);
+    assert.sameMembers(
+        baseColl.aggregate(makeUnionWithPipeline(searchColl)).toArray(),
+        expectedUnionWithResult,
+    );
     stWithMock.assertEmptyMocks();
 }
 
 // Test all combinations of sharded/unsharded base/search collection.
 unionTest(unshardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
-unionTest(unshardedBaseColl, shardedSearchColl, {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
+unionTest(unshardedBaseColl, shardedSearchColl, {
+    mongos: [],
+    primary: [kPlan, kSearch],
+    secondary: [kSearch],
+});
 
 unionTest(shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
@@ -393,7 +424,12 @@ if (!FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecut
 
 // We can't mock all responses with the explain verbosity since $lookup doesn't propogate the
 // explain to its pipeline if run on a sharded collection.
-function lookupWithExplainExecStatsDoesNotThrow(baseColl, searchColl, mockResponsesWithExplain, mockResponses) {
+function lookupWithExplainExecStatsDoesNotThrow(
+    baseColl,
+    searchColl,
+    mockResponsesWithExplain,
+    mockResponses,
+) {
     setupAllMockRequests(searchColl, mockResponsesWithExplain, {verbosity: "executionStats"});
     setupAllMockRequests(searchColl, mockResponses);
     let result = baseColl.explain("executionStats").aggregate(makeLookupPipeline(searchColl));
@@ -448,8 +484,13 @@ for (let stage of lookupStages) {
     assert.eq(NumberLong(1), stage["nReturned"]);
 }
 
-if (checkSbeRestrictedOrFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")) {
-    jsTestLog("Skipping explain $unionWith tests because it only applies to $search in classic engine.");
+if (
+    checkSbeRestrictedOrFullyEnabled(testDB) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")
+) {
+    jsTestLog(
+        "Skipping explain $unionWith tests because it only applies to $search in classic engine.",
+    );
     stWithMock.stop();
     quit();
 }

@@ -65,7 +65,10 @@ result = coll
                 partitionBy: "$publisher",
                 sortBy: {_id: 1},
                 output: {
-                    adjacentBooksFromPublisher: {$concatArrays: "$books", window: {documents: [-1, 0]}},
+                    adjacentBooksFromPublisher: {
+                        $concatArrays: "$books",
+                        window: {documents: [-1, 0]},
+                    },
                 },
             },
         },

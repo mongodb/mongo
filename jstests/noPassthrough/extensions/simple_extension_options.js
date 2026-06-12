@@ -24,16 +24,25 @@ function testStageRegistration(expectedOptionA, conn) {
     const db = conn.getDB("test");
     const coll = db[jsTestName()];
 
-    const [registered, unregistered] = expectedOptionA ? ["$optionA", "$optionB"] : ["$optionB", "$optionA"];
+    const [registered, unregistered] = expectedOptionA
+        ? ["$optionA", "$optionB"]
+        : ["$optionB", "$optionA"];
 
     {
         const pipeline = [{[registered]: {}}];
-        assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+        assert.commandWorked(
+            db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+        );
     }
 
     {
         const pipeline = [{[unregistered]: {}}];
-        assertErrorCode(coll, pipeline, 40324, `Unrecognized pipeline stage name: '${unregistered}'`);
+        assertErrorCode(
+            coll,
+            pipeline,
+            40324,
+            `Unrecognized pipeline stage name: '${unregistered}'`,
+        );
     }
 }
 

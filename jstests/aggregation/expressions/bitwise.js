@@ -33,7 +33,13 @@ runAndAssert("$bitOr", [127, 3, 3, 7]);
 runAndAssert("$bitXor", [127, 3, 1, 6]);
 
 for (const operator of ["$bitAnd", "$bitOr", "$bitXor"]) {
-    for (const operand of [Number(12.0), NumberDecimal("12"), "$c", ["$c"], [[NumberInt(1), NumberInt(2)]]]) {
+    for (const operand of [
+        Number(12.0),
+        NumberDecimal("12"),
+        "$c",
+        ["$c"],
+        [[NumberInt(1), NumberInt(2)]],
+    ]) {
         assert.commandFailedWithCode(
             coll.runCommand({
                 aggregate: collName,

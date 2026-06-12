@@ -26,7 +26,9 @@ function getNewDb() {
 (function testManyInconsistencies() {
     // Introduce a misplaced inconsistency
     const db = getNewDb();
-    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.shard1.getDB(db.getName()).coll.insert({_id: "foo"}));
 
     const kFakeInconsistenciesPerShard = 1000;
@@ -56,7 +58,9 @@ function getNewDb() {
     const checkOptions = {"checkIndexes": 1};
     const kIndexes = 60;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     CreateShardedCollectionUtil.shardCollectionWithChunks(db.coll, {x: 1}, [
         {min: {x: MinKey}, max: {x: 1}, shard: st.shard0.shardName},

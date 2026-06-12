@@ -66,12 +66,19 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
             );
 
             assert.commandWorked(
-                db.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+                db.adminCommand({
+                    commitTransaction: 1,
+                    lsid: lsid,
+                    txnNumber: txnNumber,
+                    autocommit: false,
+                }),
             );
         }
         // Launch a parallel shell to start a new transaction, insert a document, and commit. These
         // operations should block behind the previous prepared transaction on the session.
-        awaitShell = startParallelShell(funWithArgs(runTransactionOnSession, dbName, collName, lsid));
+        awaitShell = startParallelShell(
+            funWithArgs(runTransactionOnSession, dbName, collName, lsid),
+        );
 
         // Wait until parallel shell insert is blocked on prepare.
         hangTxnFailPoint.wait();
@@ -90,7 +97,11 @@ function runConcurrentCollectionCreate(dbName, collName) {
     // Make sure we specify the collection we are testing on to avoid triggering the failpoint
     // on unrelated createCollection commands that happen to run concurrently.
     const fpData = {nss: dbName + "." + collName};
-    const hangCreateFailPoint = configureFailPoint(db, "hangAndFailAfterCreateCollectionReservesOpTime", fpData);
+    const hangCreateFailPoint = configureFailPoint(
+        db,
+        "hangAndFailAfterCreateCollectionReservesOpTime",
+        fpData,
+    );
 
     function runCollCreate(dbName, collName) {
         assert.commandFailedWithCode(db.getSiblingDB(dbName).createCollection(collName), 51267);
@@ -116,7 +127,11 @@ testDB.runCommand({drop: collName});
 try {
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
-        testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        testDB.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
@@ -144,12 +159,17 @@ try {
     // Note that we are not using PrepareHelpers.commitTransaction because it calls
     // commitTransaction twice, and the second call races with txn1.
     assert.commandWorked(
-        session.getDatabase("admin").adminCommand({commitTransaction: 1, commitTimestamp: prepareTimestamp}),
+        session
+            .getDatabase("admin")
+            .adminCommand({commitTransaction: 1, commitTimestamp: prepareTimestamp}),
     );
 
     // Release this failpoint so that the createCollection command can finish.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "hangAndFailAfterCreateCollectionReservesOpTime", mode: "off"}),
+        db.adminCommand({
+            configureFailPoint: "hangAndFailAfterCreateCollectionReservesOpTime",
+            mode: "off",
+        }),
     );
 
     // txn1 should be able to commit without getting a WriteConflictError.

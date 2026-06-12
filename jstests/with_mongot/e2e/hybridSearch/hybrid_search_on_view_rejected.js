@@ -49,11 +49,19 @@ const matchExprViewPipeline = {
 assert.commandWorked(db.createView(matchExprViewName, coll.getName(), [matchExprViewPipeline]));
 const matchExprView = db[matchExprViewName];
 assert.throwsWithCode(
-    () => createSearchIndex(matchExprView, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}}),
+    () =>
+        createSearchIndex(matchExprView, {
+            name: searchIndexName,
+            definition: {"mappings": {"dynamic": true}},
+        }),
     ErrorCodes.BadValue,
 );
 assert.throwsWithCode(
-    () => createSearchIndex(matchExprView, {name: vectorSearchIndexName, definition: {"mappings": {"dynamic": true}}}),
+    () =>
+        createSearchIndex(matchExprView, {
+            name: vectorSearchIndexName,
+            definition: {"mappings": {"dynamic": true}},
+        }),
     ErrorCodes.BadValue,
 );
 

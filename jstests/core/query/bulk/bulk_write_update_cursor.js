@@ -8,7 +8,11 @@
  *   requires_fcv_80
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator,
+} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db[jsTestName()];
 const collName = coll.getFullName();
@@ -28,7 +32,14 @@ let res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 1, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
@@ -55,7 +66,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -75,7 +93,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 1});
 
@@ -94,7 +119,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 0, nModified: 0});
 
@@ -112,9 +144,22 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 1});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 1,
+});
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 0, upserted: {_id: 1}});
+cursorEntryValidator(res.cursor.firstBatch[0], {
+    ok: 1,
+    idx: 0,
+    n: 1,
+    nModified: 0,
+    upserted: {_id: 1},
+});
 
 assert.eq("MongoDB2", coll.findOne().skey);
 
@@ -138,9 +183,22 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 1});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 1,
+});
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 0, upserted: {_id: 1}});
+cursorEntryValidator(res.cursor.firstBatch[0], {
+    ok: 1,
+    idx: 0,
+    n: 1,
+    nModified: 0,
+    upserted: {_id: 1},
+});
 
 assert.eq("MongoDB", coll.findOne().skey);
 
@@ -158,7 +216,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 1, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
@@ -183,7 +248,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 1});
 
@@ -208,7 +280,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 4);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 3, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 3,
+    nDeleted: 0,
+    nMatched: 1,
+    nModified: 1,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -236,7 +315,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 1, nDeleted: 0, nMatched: 2, nModified: 2, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 2,
+    nModified: 2,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
@@ -258,8 +344,21 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 1});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 1,
+});
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 0, upserted: {_id: 1}});
+cursorEntryValidator(res.cursor.firstBatch[0], {
+    ok: 1,
+    idx: 0,
+    n: 1,
+    nModified: 0,
+    upserted: {_id: 1},
+});
 
 assert(coll2.drop());

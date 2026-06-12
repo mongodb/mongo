@@ -32,6 +32,8 @@ var res = testDb.runCommand({cloneCollectionAsCapped: "foo", toCollection: "bar"
 assert.eq(res.ok, 0, "cloning a nonexistent collection to capped should not have worked");
 assert.eq(
     res.errmsg,
-    isSharded ? "no such cmd: cloneCollectionAsCapped" : "source collection " + dbname + ".foo does not exist",
+    isSharded
+        ? "no such cmd: cloneCollectionAsCapped"
+        : "source collection " + dbname + ".foo does not exist",
     "converting a nonexistent to capped failed but for the wrong reason",
 );

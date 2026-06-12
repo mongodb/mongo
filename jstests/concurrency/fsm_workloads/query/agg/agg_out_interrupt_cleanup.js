@@ -24,7 +24,11 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/ag
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.aggregate = function aggregate(db, collName) {
         // $out to the same collection so that concurrent aggregate commands would cause congestion.
-        db[collName].runCommand({aggregate: collName, pipeline: [{$out: "interrupt_temp_out"}], cursor: {}});
+        db[collName].runCommand({
+            aggregate: collName,
+            pipeline: [{$out: "interrupt_temp_out"}],
+            cursor: {},
+        });
     };
 
     // This test sets up aggregations just to tear them down. There's no benefit to using large

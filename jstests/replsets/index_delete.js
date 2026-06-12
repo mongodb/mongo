@@ -41,11 +41,17 @@ let size = 100;
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Make sure that the index build does not terminate on the secondary.
-assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}),
+);
 
 let bulk = primaryDB[collName].initializeUnorderedBulkOp();
 for (let i = 0; i < size; ++i) {
@@ -65,7 +71,9 @@ try {
     }, "index not started on secondary");
 } finally {
     // Turn off failpoint and let the index build resume.
-    assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}),
+    );
 }
 
 jsTest.log("Index created on secondary");

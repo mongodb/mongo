@@ -49,7 +49,14 @@ export function shouldSkipCommand(_commandName, commandObj) {
     return false;
 }
 
-export function sendCommandToInitialSyncNodeInReplSet(conn, _commandName, commandObj, func, makeFuncArgs, rsType) {
+export function sendCommandToInitialSyncNodeInReplSet(
+    conn,
+    _commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+    rsType,
+) {
     const replSetStatus = conn.adminCommand({replSetGetStatus: 1});
     assert.commandWorked(replSetStatus);
 

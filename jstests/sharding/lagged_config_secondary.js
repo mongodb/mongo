@@ -72,7 +72,9 @@ let msgB = /Command timed out waiting for read concern to be satisfied.*"db":"co
 
 assert.soon(
     function () {
-        let logMessages = assert.commandWorked(delayedConfigSecondary.adminCommand({getLog: "global"})).log;
+        let logMessages = assert.commandWorked(
+            delayedConfigSecondary.adminCommand({getLog: "global"}),
+        ).log;
         for (let i = 0; i < logMessages.length; i++) {
             if (
                 (logMessages[i].indexOf(msgAA) != -1 && logMessages[i].indexOf(msgAB) != -1) ||
@@ -83,7 +85,12 @@ assert.soon(
         }
         return false;
     },
-    "Did not see any log entries containing the following message: " + msgAA + " ... " + msgAB + " or " + msgB,
+    "Did not see any log entries containing the following message: " +
+        msgAA +
+        " ... " +
+        msgAB +
+        " or " +
+        msgB,
     180000,
     300,
 );

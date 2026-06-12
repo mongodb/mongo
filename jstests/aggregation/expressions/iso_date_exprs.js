@@ -131,7 +131,11 @@ const SUNDAY = 7;
             testOp("$isoWeekYear", endOfFirstWeekInYear, year);
             testOp("$isoWeek", startOfSecondWeekInYear, 2);
             testOp("$isoWeekYear", startOfSecondWeekInYear, year);
-            testOp("$dateToString", {format: "%G-W%V-%u", date: newYear}, "" + year + "-W01-" + day);
+            testOp(
+                "$dateToString",
+                {format: "%G-W%V-%u", date: newYear},
+                "" + year + "-W01-" + day,
+            );
         } else if (day == FRIDAY || (day == SATURDAY && type === "commonAfterLeap")) {
             // A year starting on Friday will always start with week 53 of the previous year.
             // A common year starting on a Saturday and after a leap year will also start with
@@ -142,7 +146,11 @@ const SUNDAY = 7;
             testOp("$isoWeekYear", endOfFirstWeekInYear, year - 1);
             testOp("$isoWeek", startOfSecondWeekInYear, 1);
             testOp("$isoWeekYear", startOfSecondWeekInYear, year);
-            testOp("$dateToString", {format: "%G-W%V-%u", date: newYear}, "" + (year - 1) + "-W53-" + day);
+            testOp(
+                "$dateToString",
+                {format: "%G-W%V-%u", date: newYear},
+                "" + (year - 1) + "-W53-" + day,
+            );
         } else {
             // A year starting on Saturday (except after a leap year) or Sunday will always
             // start with week 52 of the previous year.
@@ -152,7 +160,11 @@ const SUNDAY = 7;
             testOp("$isoWeekYear", endOfFirstWeekInYear, year - 1);
             testOp("$isoWeek", startOfSecondWeekInYear, 1);
             testOp("$isoWeekYear", startOfSecondWeekInYear, year);
-            testOp("$dateToString", {format: "%G-W%V-%u", date: newYear}, "" + (year - 1) + "-W52-" + day);
+            testOp(
+                "$dateToString",
+                {format: "%G-W%V-%u", date: newYear},
+                "" + (year - 1) + "-W52-" + day,
+            );
         }
 
         if (type === "leap") {
@@ -220,7 +232,11 @@ const SUNDAY = 7;
                 testOp("$isoWeekYear", endOfSecondToLastWeekInYear, year);
                 testOp("$isoWeek", startOfLastWeekInYear, 1);
                 testOp("$isoWeekYear", startOfLastWeekInYear, year + 1);
-                testOp("$dateToString", {format: "%G-W%V-%u", date: newYearsEve}, "" + (year + 1) + "-W01-" + day);
+                testOp(
+                    "$dateToString",
+                    {format: "%G-W%V-%u", date: newYearsEve},
+                    "" + (year + 1) + "-W01-" + day,
+                );
             } else if (day === THURSDAY) {
                 // A common year starting on Thursday will always end with week 53.
                 testOp("$isoWeek", newYearsEve, 53);
@@ -229,7 +245,11 @@ const SUNDAY = 7;
                 testOp("$isoWeekYear", endOfSecondToLastWeekInYear, year);
                 testOp("$isoWeek", startOfLastWeekInYear, 53);
                 testOp("$isoWeekYear", startOfLastWeekInYear, year);
-                testOp("$dateToString", {format: "%G-W%V-%u", date: newYearsEve}, "" + year + "-W53-" + day);
+                testOp(
+                    "$dateToString",
+                    {format: "%G-W%V-%u", date: newYearsEve},
+                    "" + year + "-W53-" + day,
+                );
             } else {
                 // A common year starting on between Friday and Sunday will always end with week
                 // 52.
@@ -239,7 +259,11 @@ const SUNDAY = 7;
                 testOp("$isoWeekYear", endOfSecondToLastWeekInYear, year);
                 testOp("$isoWeek", startOfLastWeekInYear, 52);
                 testOp("$isoWeekYear", startOfLastWeekInYear, year);
-                testOp("$dateToString", {format: "%G-W%V-%u", date: newYearsEve}, "" + year + "-W52-" + day);
+                testOp(
+                    "$dateToString",
+                    {format: "%G-W%V-%u", date: newYearsEve},
+                    "" + year + "-W52-" + day,
+                );
             }
         }
     });

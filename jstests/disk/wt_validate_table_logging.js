@@ -57,7 +57,11 @@ let res = assert.commandWorked(primary.getDB(dbName).runCommand({validate: collN
 assert(!res.valid);
 assert.eq(res.errors.length, 2);
 checkLog.containsJson(primary, 6898101, {uri: collUri(primary), expected: false});
-checkLog.containsJson(primary, 6898101, {index: "_id_", uri: indexUri(primary, "_id_"), expected: false});
+checkLog.containsJson(primary, 6898101, {
+    index: "_id_",
+    uri: indexUri(primary, "_id_"),
+    expected: false,
+});
 
 // Create the collection and indexes as a replica set, which will cause the tables to not be logged.
 assert.commandWorked(primary.getDB(dbName).runCommand({drop: collName}));

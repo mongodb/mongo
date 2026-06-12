@@ -24,7 +24,12 @@ function moveRange(chunk, ns, fromShard, toShard) {
     assert.eq(fromShard.shardName, configDB.chunks.findOne({_id: chunk._id}).shard);
 
     assert.commandWorked(
-        mongos.adminCommand({moveRange: ns, min: chunk.min, max: chunk.max, toShard: toShard.shardName}),
+        mongos.adminCommand({
+            moveRange: ns,
+            min: chunk.min,
+            max: chunk.max,
+            toShard: toShard.shardName,
+        }),
     );
 
     // Ensure that the chunk was successfully moved from the original shard to the new location.
@@ -36,8 +41,16 @@ function moveRange(chunk, ns, fromShard, toShard) {
 }
 
 function assertRecordIdsNEQ(recordIds1, recordIds2, docs) {
-    assert.neq(recordIds1["Bing"], recordIds2["Bing"], `Unexpected value for record ID: Bing: ${tojson(docs)}`);
-    assert.neq(recordIds1["Louie"], recordIds2["Louie"], `Unexpected value for record ID: Louie: ${tojson(docs)}`);
+    assert.neq(
+        recordIds1["Bing"],
+        recordIds2["Bing"],
+        `Unexpected value for record ID: Bing: ${tojson(docs)}`,
+    );
+    assert.neq(
+        recordIds1["Louie"],
+        recordIds2["Louie"],
+        `Unexpected value for record ID: Louie: ${tojson(docs)}`,
+    );
     assert.neq(
         recordIds2["Bing"],
         recordIds2["Louie"],
@@ -68,7 +81,9 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
             {name: "Louie", b: 400}, // record ID: 4
         ]),
     );
-    jsTest.log.info(`All documents in ${ns} before deletion: ${tojson(coll.find().showRecordId().toArray())}`);
+    jsTest.log.info(
+        `All documents in ${ns} before deletion: ${tojson(coll.find().showRecordId().toArray())}`,
+    );
     assert.commandWorked(coll.remove({name: {$in: ["Ale", "Benny"]}}));
     const docs = coll.find().showRecordId().toArray();
     assert.eq(
@@ -112,7 +127,11 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
     // Since the collection was moved, the record IDs should have been rewritten to start from 1.
     const docsAfterMoveRange = shard1.getCollection(ns).find().showRecordId().toArray();
     const collRecordIdsAfterMoveRange = mapFieldToMatchingDocRid(docsAfterMoveRange, "name");
-    assertRecordIdsNEQ(collRecordIdsBeforeMoveRange, collRecordIdsAfterMoveRange, docsAfterMoveRange);
+    assertRecordIdsNEQ(
+        collRecordIdsBeforeMoveRange,
+        collRecordIdsAfterMoveRange,
+        docsAfterMoveRange,
+    );
 
     // Ensure collection option 'recordIdsReplicated' is preserved on destination shard.
     assert(

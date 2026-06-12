@@ -35,14 +35,24 @@ describe("standalone", function () {
     it("aggregate on mongod logs collectionType as normal", function () {
         const comment = "standalone_aggregate";
         this.db[collName].aggregate(pipeline, {comment}).toArray();
-        checkCollectionType({db: this.db, comment, command: "aggregate", expectedCollType: "normal"});
+        checkCollectionType({
+            db: this.db,
+            comment,
+            command: "aggregate",
+            expectedCollType: "normal",
+        });
     });
 
     it("getMore on mongod omits collectionType", function () {
         const comment = "standalone_getMore";
         const cursor = this.db[collName].aggregate(pipeline, {cursor: {batchSize: 1}, comment});
         cursor.toArray();
-        checkCollectionType({db: this.db, comment, command: "getMore", expectedCollType: undefined});
+        checkCollectionType({
+            db: this.db,
+            comment,
+            command: "getMore",
+            expectedCollType: undefined,
+        });
     });
 });
 
@@ -59,13 +69,23 @@ describe("sharded", function () {
     it("aggregate on mongos omits collectionType", function () {
         const comment = "sharded_aggregate";
         this.db[collName].aggregate(pipeline, {comment}).toArray();
-        checkCollectionType({db: this.db, comment, command: "aggregate", expectedCollType: undefined});
+        checkCollectionType({
+            db: this.db,
+            comment,
+            command: "aggregate",
+            expectedCollType: undefined,
+        });
     });
 
     it("getMore on mongos omits collectionType", function () {
         const comment = "sharded_getMore";
         const cursor = this.db[collName].aggregate(pipeline, {cursor: {batchSize: 1}, comment});
         cursor.toArray();
-        checkCollectionType({db: this.db, comment, command: "getMore", expectedCollType: undefined});
+        checkCollectionType({
+            db: this.db,
+            comment,
+            command: "getMore",
+            expectedCollType: undefined,
+        });
     });
 });

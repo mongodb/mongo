@@ -15,7 +15,11 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getUnionWithStage, getNestedProperties, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getUnionWithStage,
+    getNestedProperties,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -26,7 +30,9 @@ TimeseriesTest.run((insert) => {
     // TODO SERVER-93961: It may be possible to remove this when the shard role API is ready.
     // In slower builds, inserts may get stuck behind resharding operations. This fix lowers the
     // chance for that to occur.
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}),
+    );
     assert.commandWorked(testDB.dropDatabase());
     const collOptions = [null, {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}];
     const numHosts = 10;
@@ -35,7 +41,10 @@ TimeseriesTest.run((insert) => {
 
     let testFunc = function (collAOption, collBOption) {
         const scenario =
-            "collA=" + (collAOption ? "timeseries" : "regular") + ", collB=" + (collBOption ? "timeseries" : "regular");
+            "collA=" +
+            (collAOption ? "timeseries" : "regular") +
+            ", collB=" +
+            (collBOption ? "timeseries" : "regular");
 
         // Prepare two time-series collections.
         const collA = testDB.getCollection("a");
@@ -72,7 +81,12 @@ TimeseriesTest.run((insert) => {
         assert.eq(
             numHosts,
             results.length,
-            "Scenario: " + scenario + ". Expected " + numHosts + " groups. Results: " + tojson(results),
+            "Scenario: " +
+                scenario +
+                ". Expected " +
+                numHosts +
+                " groups. Results: " +
+                tojson(results),
         );
         for (let i = 0; i < numHosts; i++) {
             assert.eq(
@@ -113,7 +127,9 @@ function setUpCollections() {
     collB.drop();
     collC.drop();
     assert.commandWorked(
-        testDB.createCollection(collB.getName(), {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}),
+        testDB.createCollection(collB.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: tagFieldName},
+        }),
     );
 
     assert.commandWorked(collA.insertMany([{hostname: "host_0"}, {hostname: "host_1"}]));
@@ -127,14 +143,19 @@ function setUpCollections() {
 }
 
 function getUnpackStage(explain) {
-    const errMsg = "Expected to find an unpack stage in the $unionWith subpipeline. Explain: " + tojson(explain);
+    const errMsg =
+        "Expected to find an unpack stage in the $unionWith subpipeline. Explain: " +
+        tojson(explain);
     const unionWithStage = getUnionWithStage(explain);
     if (checkSbeFullFeatureFlagEnabled(db)) {
         const unpack = getWinningPlanFromExplain(unionWithStage["$unionWith"]);
         assert.eq(unpack.stage, "UNPACK_TS_BUCKET", errMsg);
         return unpack;
     }
-    const unpack = getNestedProperties(unionWithStage["$unionWith"]["pipeline"], "$_internalUnpackBucket");
+    const unpack = getNestedProperties(
+        unionWithStage["$unionWith"]["pipeline"],
+        "$_internalUnpackBucket",
+    );
     assert(unpack.length > 0, errMsg);
     return unpack[0];
 }
@@ -187,7 +208,10 @@ function getUnpackStage(explain) {
 
     // Run explain to ensure the optimization took place.
     const unionWithStage = getUnionWithStage(collA.explain().aggregate(pipeline));
-    const parsedQuery = getNestedProperties(unionWithStage["$unionWith"]["pipeline"], "parsedQuery");
+    const parsedQuery = getNestedProperties(
+        unionWithStage["$unionWith"]["pipeline"],
+        "parsedQuery",
+    );
     // If the optimization took place, the parsedQuery in the unionWith subpipeline will be non-empty and have the
     // $match predicate inside.
     assert(
@@ -219,6 +243,7 @@ function getUnpackStage(explain) {
     assertArrayEq({
         actual: includeArray,
         expected: ["tags", "hostname"],
-        message: "Expected the unpack stage to internalize the projection. Explain: " + tojson(explain),
+        message:
+            "Expected the unpack stage to internalize the projection. Explain: " + tojson(explain),
     });
 })();

@@ -38,13 +38,18 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const coll = testDB.getCollection(collName);
 
-if (checkSbeRestrictedOrFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")) {
+if (
+    checkSbeRestrictedOrFullyEnabled(testDB) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")
+) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     stWithMock.stop();
     quit();
 }
 
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 assert.commandWorked(coll.insert({_id: 1, name: "Sozin", element: "fire"}));
 assert.commandWorked(coll.insert({_id: 2, name: "Zuko", element: "fire"}));
@@ -134,7 +139,9 @@ function runExplainTest(verbosity) {
         ];
         const pipeline = [{$searchMeta: searchQuery}];
         if (verbosity == "queryPlanner") {
-            stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
+            stWithMock
+                .getMockConnectedToHost(stWithMock.st.s)
+                .setMockResponses(mergingPipelineHistory, cursorId);
             setUpMongotReturnExplain({
                 searchCmd,
                 mongotMock: s0Mongot,
@@ -152,10 +159,17 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(0), NumberLong(0)],
                 expectedExplainContents,
             });
-            verifyShardsPartExplainOutput({result, searchType: "$searchMeta", metaPipeline, protocolVersion});
+            verifyShardsPartExplainOutput({
+                result,
+                searchType: "$searchMeta",
+                metaPipeline,
+                protocolVersion,
+            });
         } else {
             {
-                stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
+                stWithMock
+                    .getMockConnectedToHost(stWithMock.st.s)
+                    .setMockResponses(mergingPipelineHistory, cursorId);
 
                 setUpMongotReturnExplainAndMultiCursor({
                     searchCmd,
@@ -189,10 +203,17 @@ function runExplainTest(verbosity) {
                     nReturnedList: [NumberLong(3), NumberLong(2)],
                     expectedExplainContents,
                 });
-                verifyShardsPartExplainOutput({result, searchType: "$searchMeta", metaPipeline, protocolVersion});
+                verifyShardsPartExplainOutput({
+                    result,
+                    searchType: "$searchMeta",
+                    metaPipeline,
+                    protocolVersion,
+                });
             }
             {
-                stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
+                stWithMock
+                    .getMockConnectedToHost(stWithMock.st.s)
+                    .setMockResponses(mergingPipelineHistory, cursorId);
 
                 setUpMongotReturnExplainAndMultiCursorGetMore({
                     searchCmd,
@@ -225,7 +246,9 @@ function runExplainTest(verbosity) {
                     ],
                     metaBatchList: [[{val: 2}, {val: 3}], [{val: 4}], [{val: 1}]],
                 });
-                const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
+                const result = coll
+                    .explain(verbosity)
+                    .aggregate(pipeline, {cursor: {batchSize: 2}});
                 getShardedMongotStagesAndValidateExplainExecutionStats({
                     result,
                     stageType: "$searchMeta",
@@ -234,7 +257,12 @@ function runExplainTest(verbosity) {
                     nReturnedList: [NumberLong(6), NumberLong(4)],
                     expectedExplainContents,
                 });
-                verifyShardsPartExplainOutput({result, searchType: "$searchMeta", metaPipeline, protocolVersion});
+                verifyShardsPartExplainOutput({
+                    result,
+                    searchType: "$searchMeta",
+                    metaPipeline,
+                    protocolVersion,
+                });
             }
         }
     }

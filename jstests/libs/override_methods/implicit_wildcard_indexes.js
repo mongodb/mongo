@@ -147,10 +147,14 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
         // If we're listing indexes, we need to make sure we eliminate any of the
         // implicitly created indexes from consideration.
         if (TestData.hideImplicitlyCreatedIndexesFromListIndexes && res.cursor.firstBatch) {
-            res.cursor.firstBatch = res.cursor.firstBatch.filter((idx) => !idx.name.startsWith(prefix));
+            res.cursor.firstBatch = res.cursor.firstBatch.filter(
+                (idx) => !idx.name.startsWith(prefix),
+            );
         }
     } else if (cmdName == "insert" && res.ok) {
-        const writeErrors = res.writeErrors ? res.writeErrors.filter((err) => err.code === 7246301) : [];
+        const writeErrors = res.writeErrors
+            ? res.writeErrors.filter((err) => err.code === 7246301)
+            : [];
         if (writeErrors.length > 0) {
             // We are trying to make a non-wildcard component of the index multikey.
             // Drop all the implicitly created indexes and try again, since we can't be
@@ -162,7 +166,10 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
             // problematic) so we just drop them all.
             const hiddenIndexes = getHiddenIndexes(dbName, collName).map((idx) => idx.name);
             assert.commandWorked(
-                originalRunCommand.apply(conn, makeRunCommandArgs({dropIndexes: collName, index: hiddenIndexes})),
+                originalRunCommand.apply(
+                    conn,
+                    makeRunCommandArgs({dropIndexes: collName, index: hiddenIndexes}),
+                ),
             );
 
             // Now run the original command again.
@@ -173,5 +180,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
     return res;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicit_wildcard_indexes.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicit_wildcard_indexes.js",
+);
 OverrideHelpers.overrideRunCommand(runCommandOverride);

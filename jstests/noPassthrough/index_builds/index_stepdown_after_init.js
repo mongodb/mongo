@@ -29,7 +29,9 @@ const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
-assert.commandWorked(primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}),
+);
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
@@ -44,7 +46,9 @@ try {
     // Step down the primary.
     assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}),
+    );
 }
 
 // Wait for the index build to stop.

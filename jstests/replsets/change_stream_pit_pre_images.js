@@ -42,8 +42,16 @@ function assertPreImagesCollectionOnPrimaryMatchesSecondary() {
     }
     const preImagesCollOnPrimary = getPreImagesCollection(replTest.getPrimary());
     const preImagesCollOnSecondary = getPreImagesCollection(replTest.getSecondary());
-    assert.eq(preImagesCollOnPrimary.find().itcount(), preImagesCollOnSecondary.find().itcount(), detailedError);
-    assert.eq(preImagesCollOnPrimary.hashAllDocs(), preImagesCollOnSecondary.hashAllDocs(), detailedError);
+    assert.eq(
+        preImagesCollOnPrimary.find().itcount(),
+        preImagesCollOnSecondary.find().itcount(),
+        detailedError,
+    );
+    assert.eq(
+        preImagesCollOnPrimary.hashAllDocs(),
+        preImagesCollOnSecondary.hashAllDocs(),
+        detailedError,
+    );
 }
 
 for (const [collectionName, collectionOptions] of [
@@ -69,10 +77,16 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.insert({_id: 5, v: 1}));
 
         // Issue "findAndModify" command to return a document version before update.
-        assert.docEq({_id: 5, v: 1}, coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: false}));
+        assert.docEq(
+            {_id: 5, v: 1},
+            coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: false}),
+        );
 
         // Issue "findAndModify" command to return a document version after update.
-        assert.docEq({_id: 5, v: 3}, coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: true}));
+        assert.docEq(
+            {_id: 5, v: 3},
+            coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: true}),
+        );
 
         // Issue "findAndModify" command to return a document version before deletion.
         assert.docEq(
@@ -214,7 +228,9 @@ for (const [collectionName, collectionOptions] of [
         // data situation during oplog application.
         const initialSyncNode = replTest.add({
             rsConfig: {priority: 0},
-            setParameter: {"failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"})},
+            setParameter: {
+                "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+            },
         });
 
         // Wait until the new node starts and pauses on the fail point.
@@ -239,7 +255,10 @@ for (const [collectionName, collectionOptions] of [
 
         // Resume the initial sync process.
         assert.commandWorked(
-            initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+            initialSyncNode.adminCommand({
+                configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+                mode: "off",
+            }),
         );
 
         // Wait until the initial sync process is complete and the new node becomes a fully
@@ -267,7 +286,10 @@ for (const [collectionName, collectionOptions] of [
 
         // Pause check-pointing on the primary node to ensure new pre-images are not flushed to the
         // disk.
-        const pauseCheckpointThreadFailPoint = configureFailPoint(replTest.getPrimary(), "pauseCheckpointThread");
+        const pauseCheckpointThreadFailPoint = configureFailPoint(
+            replTest.getPrimary(),
+            "pauseCheckpointThread",
+        );
         pauseCheckpointThreadFailPoint.wait();
 
         // Update the document on the primary node.

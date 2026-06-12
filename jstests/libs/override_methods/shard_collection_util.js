@@ -107,7 +107,10 @@ export var ShardingOverrideCommon = (function () {
                 // unsharded.
                 assert.commandFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
                 jsTest.log(
-                    "Ignoring failure while " + opDescription + " due to a concurrent drop operation: " + tojson(res),
+                    "Ignoring failure while " +
+                        opDescription +
+                        " due to a concurrent drop operation: " +
+                        tojson(res),
                 );
             } else {
                 assert.commandWorked(res, opDescription + " failed");

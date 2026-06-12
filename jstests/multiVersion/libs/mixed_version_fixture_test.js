@@ -110,14 +110,18 @@ export function testPerformReplSetRollingRestart({
 
         // Enable flag on primary.
         for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
-            assert.commandWorked(getAdminDB(primaryConnection).runCommand({setParameter: 1, [flagName]: flagValue}));
+            assert.commandWorked(
+                getAdminDB(primaryConnection).runCommand({setParameter: 1, [flagName]: flagValue}),
+            );
         }
 
         // Enable flag on all secondaries.
         for (const node of rst.nodes) {
             if (node !== primaryConnection) {
                 for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
-                    assert.commandWorked(getAdminDB(node).runCommand({setParameter: 1, [flagName]: flagValue}));
+                    assert.commandWorked(
+                        getAdminDB(node).runCommand({setParameter: 1, [flagName]: flagValue}),
+                    );
                 }
             }
         }

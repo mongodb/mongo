@@ -75,7 +75,9 @@ describe("operationResponseMaxMS parameter", () => {
         // entries, find no matching change events, and — when interrupted by the timeout —
         // return an empty batch whose PBRT has advanced past the last scanned entry.
         const kNumDocs = 500;
-        assert.commandWorked(unrelatedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: i}))));
+        assert.commandWorked(
+            unrelatedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: i}))),
+        );
 
         // Issues a getMore in a background thread while the hangCollScanDoWork failpoint keeps
         // the oplog scan blocked inside CollectionScan::doWork() for longer than
@@ -130,38 +132,74 @@ describe("operationResponseMaxMS parameter", () => {
         // unrelatedColl. The batch is empty (no matching events), but the PBRT has advanced.
         const res1 = runSlowGetMore(cursorId);
 
-        assert.eq(0, res1.cursor.nextBatch.length, "Expected empty batch: watched collection has no change events", {
-            res1,
-        });
+        assert.eq(
+            0,
+            res1.cursor.nextBatch.length,
+            "Expected empty batch: watched collection has no change events",
+            {
+                res1,
+            },
+        );
 
         const pbrt1 = res1.cursor.postBatchResumeToken;
         assert(pbrt1, "Expected PBRT in first getMore response", {res1});
-        assert.gt(bsonWoCompare(pbrt1, initialPBRT), 0, "PBRT must advance after a partial oplog scan", {
-            initialPBRT,
-            pbrt1,
-        });
+        assert.gt(
+            bsonWoCompare(pbrt1, initialPBRT),
+            0,
+            "PBRT must advance after a partial oplog scan",
+            {
+                initialPBRT,
+                pbrt1,
+            },
+        );
 
-        assert.eq(res1.cursor.id, cursorId, "Cursor must remain open after a timeout-interrupted scan", {res1});
+        assert.eq(
+            res1.cursor.id,
+            cursorId,
+            "Cursor must remain open after a timeout-interrupted scan",
+            {res1},
+        );
 
         // Insert a second batch so the second getMore has new oplog entries to scan. The first
         // getMore's second loadBatch() consumed the initial inserts while draining to the oplog
         // tail after the timeout fired.
-        assert.commandWorked(unrelatedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: kNumDocs + i}))));
+        assert.commandWorked(
+            unrelatedColl.insertMany(
+                Array.from({length: kNumDocs}, (_, i) => ({_id: kNumDocs + i})),
+            ),
+        );
 
         // Second getMore: the scan resumes from where it was interrupted, processes the next
         // oplog entry from unrelatedColl, and is interrupted again. The PBRT advances further.
         const res2 = runSlowGetMore(cursorId);
 
-        assert.eq(0, res2.cursor.nextBatch.length, "Expected empty batch from second partial scan", {res2});
+        assert.eq(
+            0,
+            res2.cursor.nextBatch.length,
+            "Expected empty batch from second partial scan",
+            {res2},
+        );
 
         const pbrt2 = res2.cursor.postBatchResumeToken;
         assert(pbrt2, "Expected PBRT in second getMore response", {res2});
-        assert.gt(bsonWoCompare(pbrt2, pbrt1), 0, "PBRT must advance further in second partial scan", {pbrt1, pbrt2});
+        assert.gt(
+            bsonWoCompare(pbrt2, pbrt1),
+            0,
+            "PBRT must advance further in second partial scan",
+            {pbrt1, pbrt2},
+        );
 
-        assert.eq(cursorId, res2.cursor.id, "Cursor must remain open after second timeout-interrupted scan", {res2});
+        assert.eq(
+            cursorId,
+            res2.cursor.id,
+            "Cursor must remain open after second timeout-interrupted scan",
+            {res2},
+        );
 
         // Clean up the change stream cursor and session.
-        assert.commandWorked(sessionDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}));
+        assert.commandWorked(
+            sessionDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
+        );
         session.endSession();
     });
 });

@@ -97,7 +97,9 @@ function runTest(mongo) {
     assertIsBuiltinRole(testMulti[1], kTestReadRole, kTestReadPrivs, true);
 
     const testRole1Privs = [{resource: {db: "test", collection: ""}, actions: ["insert"]}];
-    assert.commandWorked(test.runCommand({createRole: "role1", roles: ["read"], privileges: testRole1Privs}));
+    assert.commandWorked(
+        test.runCommand({createRole: "role1", roles: ["read"], privileges: testRole1Privs}),
+    );
 
     const testRoles = rolesInfo(test, 1);
     const testUserRoles = testRoles.filter((r) => !r.isBuiltin);

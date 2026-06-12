@@ -22,13 +22,19 @@ describe("removeShard interoperability with new removeShard interface", function
         this.rs1.initiate();
         assert.commandWorked(this.st.s.adminCommand({addShard: this.rs1.getURL(), name: "repl1"}));
         // Add sharded collections
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: "repl1"}));
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: "repl1"}),
+        );
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}),
+        );
         this.st.s.getDB("TestDB").Coll.insert({_id: -1, value: "Negative value"});
         this.st.s.getDB("TestDB").Coll.insert({_id: 1, value: "Positive value"});
 
         // Add unsharded collections
-        assert.commandWorked(this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}));
+        assert.commandWorked(
+            this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}),
+        );
 
         this.rs2.startSet({shardsvr: ""});
         this.rs2.initiate();
@@ -64,7 +70,9 @@ describe("removeShard interoperability with new removeShard interface", function
         assert.eq("ongoing", removeStatus_ongoing.state);
 
         // Move the unsharded collection off st.shard1.shardName
-        assert.commandWorked(this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}),
+        );
 
         // Wait for the shard to be completely drained, then removeShard must remove the shard.
         assert.soon(() => {

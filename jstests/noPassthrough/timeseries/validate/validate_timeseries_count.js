@@ -25,7 +25,9 @@ testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(
-    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+    db.createCollection(collName, {
+        timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+    }),
 );
 coll = db.getCollection(collName);
 
@@ -43,7 +45,9 @@ testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(
-    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+    db.createCollection(collName, {
+        timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+    }),
 );
 coll = db.getCollection(collName);
 // Using insertMany means that these inserts will be performed in the same WriteBatch because the
@@ -60,7 +64,9 @@ coll.insertMany(
 );
 
 // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
-assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+assert.commandWorked(
+    conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+);
 
 // Write the incorrect control.count
 getTimeseriesCollForRawOps(db, coll).updateOne(
@@ -70,7 +76,11 @@ getTimeseriesCollForRawOps(db, coll).updateOne(
 );
 
 // Disable allowing inconsistent state on buckets
-assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
+assert.commandWorked(
+    conn
+        .getDB("admin")
+        .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
+);
 
 res = coll.validate();
 assert(!res.valid, tojson(res));

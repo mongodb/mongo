@@ -56,6 +56,7 @@ assert.throwsWithCode(
     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
 );
 assert.throwsWithCode(
-    () => t.find().sort({a: -1}).allowDiskUse(false).hint({b: 1}).showDiskLoc().limit(100).itcount(),
+    () =>
+        t.find().sort({a: -1}).allowDiskUse(false).hint({b: 1}).showDiskLoc().limit(100).itcount(),
     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
 );

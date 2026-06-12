@@ -5,7 +5,11 @@
  * @tags: [requires_fcv_90]
  */
 import {it} from "jstests/libs/mochalite.js";
-import {getQueryStatsUpdateCmd, kHashedFieldName, kHashedIdField} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsUpdateCmd,
+    kHashedFieldName,
+    kHashedIdField,
+} from "jstests/libs/query/query_stats_utils.js";
 import {runTokenizationTestsForTopology} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -197,7 +201,9 @@ function updateTokenizationTests(ctxFn) {
         assertModifierUpdateTokenization(testDB, coll, {
             update: {$push: {v: {$each: [10], $position: 0}}},
             insert: {v: [1]},
-            expectedU: {$push: {[kHashedFieldName]: {$each: "?array<?number>", $position: "?number"}}},
+            expectedU: {
+                $push: {[kHashedFieldName]: {$each: "?array<?number>", $position: "?number"}},
+            },
         });
     });
 
@@ -283,12 +289,19 @@ function updateTokenizationTests(ctxFn) {
         assert.eq(1, queryStats.length);
         assert.eq("update", queryStats[0].key.queryShape.command);
 
-        const kHashedFieldForQuery = kHashedFieldName + ".wS5alCkV8OxkXnAw663TrK9STI0nka+n6aiaHJBU+wU=";
+        const kHashedFieldForQuery =
+            kHashedFieldName + ".wS5alCkV8OxkXnAw663TrK9STI0nka+n6aiaHJBU+wU=";
         assert.eq({[kHashedFieldForQuery]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
 
         const kHashedFieldForArrayElement = kHashedFieldName + ".$[" + kHashedFieldForA + "]";
-        assert.eq({$set: {[kHashedFieldForArrayElement]: "?number"}}, queryStats[0].key.queryShape.u);
-        assert.eq({[kHashedFieldForA]: {"$eq": "?number"}}, queryStats[0].key.queryShape.arrayFilters[0]);
+        assert.eq(
+            {$set: {[kHashedFieldForArrayElement]: "?number"}},
+            queryStats[0].key.queryShape.u,
+        );
+        assert.eq(
+            {[kHashedFieldForA]: {"$eq": "?number"}},
+            queryStats[0].key.queryShape.arrayFilters[0],
+        );
     });
 
     //
@@ -303,7 +316,11 @@ function updateTokenizationTests(ctxFn) {
                 updates: [
                     {
                         q: {v: 1},
-                        u: [{$addFields: {v: 2}}, {$project: {_id: 1}}, {$replaceRoot: {newRoot: {v: 3}}}],
+                        u: [
+                            {$addFields: {v: 2}},
+                            {$project: {_id: 1}},
+                            {$replaceRoot: {newRoot: {v: 3}}},
+                        ],
                     },
                 ],
                 comment: "pipeline update!",
@@ -332,7 +349,11 @@ function updateTokenizationTests(ctxFn) {
                 updates: [
                     {
                         q: {v: 1},
-                        u: [{$set: {v: "newValue"}}, {$unset: "v"}, {$replaceWith: {newDoc: {v: 5}}}],
+                        u: [
+                            {$set: {v: "newValue"}},
+                            {$unset: "v"},
+                            {$replaceWith: {newDoc: {v: 5}}},
+                        ],
                     },
                 ],
                 comment: "pipeline with stage aliases update!",
@@ -372,7 +393,10 @@ function updateTokenizationTests(ctxFn) {
         assert.eq(1, queryStats.length);
         assert.eq("update", queryStats[0].key.queryShape.command);
         assert.eq({[kHashedFieldName]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
-        assert.eq([{$set: {[kHashedFieldName]: kHashedUsedConstant}}], queryStats[0].key.queryShape.u);
+        assert.eq(
+            [{$set: {[kHashedFieldName]: kHashedUsedConstant}}],
+            queryStats[0].key.queryShape.u,
+        );
         assert.eq({[kHashedConstant]: "?number"}, queryStats[0].key.queryShape.c);
     });
 }

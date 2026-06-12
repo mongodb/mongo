@@ -18,7 +18,10 @@ function testCursorCountVsArrLen(dbConn) {
     let fromCount = coll.find({}, {b: 1}).count();
     let fromArrLen = coll.find({}, {b: 1}).toArray().length;
 
-    assert(fromCount == fromArrLen, "count from cursor [" + fromCount + "] !=  count from arrlen [" + fromArrLen + "]");
+    assert(
+        fromCount == fromArrLen,
+        "count from cursor [" + fromCount + "] !=  count from arrlen [" + fromArrLen + "]",
+    );
 }
 
 testCursorCountVsArrLen(db);

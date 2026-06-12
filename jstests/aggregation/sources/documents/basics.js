@@ -27,7 +27,9 @@ assert.eq(docs[0], {a1: 1});
 assert.eq(docs[1], {a1: 2});
 
 // $documents evaluates to an array of objects.
-const docs1 = currDB.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in: {x: "$$this"}}}}]).toArray();
+const docs1 = currDB
+    .aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in: {x: "$$this"}}}}])
+    .toArray();
 
 assert.eq(100, docs1.length);
 for (let i = 0; i < 100; i++) {
@@ -148,7 +150,9 @@ assert.throwsWithCode(() => {
 assert.throwsWithCode(() => {
     nonExistingDB.aggregate([
         {
-            $unionWith: {pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in: {x: "$$this"}}}}]},
+            $unionWith: {
+                pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in: {x: "$$this"}}}}],
+            },
         },
     ]);
 }, ErrorCodes.InvalidNamespace);

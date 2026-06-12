@@ -29,11 +29,15 @@ const db = st.getDB(dbName);
 const coll = db.getCollection(collName);
 
 // Shard collection with shard0 as db primary.
-assert.commandWorked(mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 // shard0 owns docs with shard key [MinKey, 0), shard1 owns docs with shard key [0, MaxKey)
-assert.commandWorked(st.s.adminCommand({moveRange: ns, min: {x: 0}, max: {x: MaxKey}, toShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveRange: ns, min: {x: 0}, max: {x: MaxKey}, toShard: st.shard1.shardName}),
+);
 
 // Check that there are only 2 chunks before starting draining.
 const chunksBeforeDrain = findChunksUtil.findChunksByNs(configDB, ns).toArray();

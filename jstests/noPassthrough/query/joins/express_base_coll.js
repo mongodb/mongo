@@ -45,7 +45,10 @@ let expressPipeline = [
 let explain = coll.explain().aggregate(expressPipeline);
 
 assert(isExpress(db, explain), "Expected the query to be express" + tojson(explain));
-assert(!joinOptUsed(explain), "Join optimizer was used when it was not expected to: " + tojson(explain));
+assert(
+    !joinOptUsed(explain),
+    "Join optimizer was used when it was not expected to: " + tojson(explain),
+);
 
 let hashJoinPipeline = [...expressPipeline, {$unwind: "$x"}];
 explain = coll.explain().aggregate(hashJoinPipeline);

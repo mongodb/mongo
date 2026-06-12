@@ -14,8 +14,14 @@
  *   featureFlagExtensionsOptimizations,
  * ]
  */
-import {profilerHasSingleMatchingEntryOrThrow, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -29,7 +35,10 @@ withExtensions(
 
         // Ensure shard0 is the primary shard.
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: shardingTest.shard0.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: shardingTest.shard0.shardName,
+            }),
         );
 
         // Shard on _id with a split at 5:
@@ -103,10 +112,18 @@ withExtensions(
         const idsInRange = (n) => Array.from({length: n}, (_, i) => i);
 
         // Source stage: filter [0, 3) falls entirely on shard0.
-        assertTargetsShard0Only([{$readNDocuments: {numDocs: 3}}], idsInRange(3), "source_single_shard_targeted");
+        assertTargetsShard0Only(
+            [{$readNDocuments: {numDocs: 3}}],
+            idsInRange(3),
+            "source_single_shard_targeted",
+        );
 
         // Source stage: filter [0, 8) spans both shards.
-        assertTargetsBothShards([{$readNDocuments: {numDocs: 8}}], idsInRange(8), "source_both_shards_targeted");
+        assertTargetsBothShards(
+            [{$readNDocuments: {numDocs: 8}}],
+            idsInRange(8),
+            "source_both_shards_targeted",
+        );
 
         // Transform stage: filter {_id: {$gte: 0, $lt: 3}} falls entirely on shard0. $testBar is
         // a no-op passthrough, so all docs from shard0 (ids 0-4) are returned.

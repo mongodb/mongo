@@ -11,7 +11,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 3});
 
 const db = st.s.getDB(jsTestName());
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const shardedColl1 = db.sharded_1;
 const shardedColl2 = db.sharded_2;
@@ -27,15 +29,27 @@ const uuid = function (coll) {
         .cursor.firstBatch.find((c) => c.name === coll.getName()).info.uuid;
 };
 
-assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl1.getFullName(), key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl2.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: shardedColl1.getFullName(), key: {_id: 1}}),
+);
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: shardedColl2.getFullName(), key: {_id: 1}}),
+);
 
 // Move shardedColl1's chunk to shard1 and shardedColl2's chunk to shard2.
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: shardedColl1.getFullName(), find: {_id: 0}, to: st.shard1.shardName}),
+    st.s.adminCommand({
+        moveChunk: shardedColl1.getFullName(),
+        find: {_id: 0},
+        to: st.shard1.shardName,
+    }),
 );
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: shardedColl2.getFullName(), find: {_id: 0}, to: st.shard2.shardName}),
+    st.s.adminCommand({
+        moveChunk: shardedColl2.getFullName(),
+        find: {_id: 0},
+        to: st.shard2.shardName,
+    }),
 );
 
 // Cannot use the collectionUUID parameter with a pipeline that executes entirely on mongos.

@@ -24,7 +24,13 @@ function verifyResults(results, valueFunction) {
         assert.eq(
             correctDoc.rank,
             results[i].rank,
-            "Got: " + tojson(results[i]) + "\nExpected: " + tojson(correctDoc) + "\n at position " + i + "\n",
+            "Got: " +
+                tojson(results[i]) +
+                "\nExpected: " +
+                tojson(correctDoc) +
+                "\n at position " +
+                i +
+                "\n",
         );
     }
 }

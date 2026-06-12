@@ -41,7 +41,9 @@ function testRegexFindAgg(inputObj, expectedOutputForFindAll) {
 
     // For each of the output document, if there is at least one element in the array, then
     // there is a match.
-    const expectedOutputForMatch = expectedOutputForFindAll.map((element) => ({matches: element.matches.length != 0}));
+    const expectedOutputForMatch = expectedOutputForFindAll.map((element) => ({
+        matches: element.matches.length != 0,
+    }));
     testRegex("$regexMatch", inputObj, expectedOutputForMatch);
 }
 
@@ -52,7 +54,8 @@ function testRegexFindAgg(inputObj, expectedOutputForFindAll) {
 function testRegexFindAggForKey(key, inputObj, expectedOutputForFindAll) {
     testRegexForKey("$regexFindAll", key, inputObj, expectedOutputForFindAll);
 
-    const expectedOutputForFind = expectedOutputForFindAll.length == 0 ? null : expectedOutputForFindAll[0];
+    const expectedOutputForFind =
+        expectedOutputForFindAll.length == 0 ? null : expectedOutputForFindAll[0];
     testRegexForKey("$regexFind", key, inputObj, expectedOutputForFind);
 
     const expectedOutputForMatch = expectedOutputForFindAll.length != 0;
@@ -133,15 +136,23 @@ function testRegexAggException(inputObj, exceptionCode) {
     ]);
 
     // Regex email pattern.
-    assert.commandWorked(coll.insert({_id: 1, text: "Some field text with email mongo@mongodb.com"}));
-    testRegexFindAggForKey(1, {input: "$text", regex: "([a-zA-Z0-9._-]+)@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+"}, [
-        {"match": "mongo@mongodb.com", "idx": 27, "captures": ["mongo"]},
-    ]);
+    assert.commandWorked(
+        coll.insert({_id: 1, text: "Some field text with email mongo@mongodb.com"}),
+    );
+    testRegexFindAggForKey(
+        1,
+        {input: "$text", regex: "([a-zA-Z0-9._-]+)@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+"},
+        [{"match": "mongo@mongodb.com", "idx": 27, "captures": ["mongo"]}],
+    );
 
     // Regex digits.
     assert.commandWorked(coll.insert({_id: 5, text: "Text with 02 digits"}));
-    testRegexFindAggForKey(5, {input: "$text", regex: /[0-9]+/}, [{"match": "02", "idx": 10, "captures": []}]);
-    testRegexFindAggForKey(5, {input: "$text", regex: /(\d+)/}, [{"match": "02", "idx": 10, "captures": ["02"]}]);
+    testRegexFindAggForKey(5, {input: "$text", regex: /[0-9]+/}, [
+        {"match": "02", "idx": 10, "captures": []},
+    ]);
+    testRegexFindAggForKey(5, {input: "$text", regex: /(\d+)/}, [
+        {"match": "02", "idx": 10, "captures": ["02"]},
+    ]);
 
     // Regex a non-capture group.
     assert.commandWorked(coll.insert({_id: 6, text: "1,2,3,4,5,6,7,8,9,10"}));
@@ -214,12 +225,16 @@ function testRegexAggException(inputObj, exceptionCode) {
 
     // Regex quantifier.
     assert.commandWorked(coll.insert({_id: 7, text: "abc12defgh345jklm"}));
-    testRegexFindAggForKey(7, {input: "$text", regex: /[0-9]{3}/}, [{"match": "345", "idx": 10, "captures": []}]);
+    testRegexFindAggForKey(7, {input: "$text", regex: /[0-9]{3}/}, [
+        {"match": "345", "idx": 10, "captures": []},
+    ]);
 
     // Regex case insensitive option.
     assert.commandWorked(coll.insert({_id: 8, text: "This Is Camel Case"}));
     testRegexFindAggForKey(8, {input: "$text", regex: /camel/}, []);
-    testRegexFindAggForKey(8, {input: "$text", regex: /camel/i}, [{"match": "Camel", "idx": 8, "captures": []}]);
+    testRegexFindAggForKey(8, {input: "$text", regex: /camel/i}, [
+        {"match": "Camel", "idx": 8, "captures": []},
+    ]);
     testRegexFindAggForKey(8, {input: "$text", regex: /camel/, options: "i"}, [
         {"match": "Camel", "idx": 8, "captures": []},
     ]);
@@ -255,11 +270,15 @@ function testRegexAggException(inputObj, exceptionCode) {
         {"match": "Foo", "idx": 10, "captures": []},
         {"match": "Foo", "idx": 20, "captures": []},
     ]);
-    testRegexFindAggForKey(9, {input: "$text", regex: "F o o # a comment \n\n# ignored", options: "x"}, [
-        {"match": "Foo", "idx": 0, "captures": []},
-        {"match": "Foo", "idx": 10, "captures": []},
-        {"match": "Foo", "idx": 20, "captures": []},
-    ]);
+    testRegexFindAggForKey(
+        9,
+        {input: "$text", regex: "F o o # a comment \n\n# ignored", options: "x"},
+        [
+            {"match": "Foo", "idx": 0, "captures": []},
+            {"match": "Foo", "idx": 10, "captures": []},
+            {"match": "Foo", "idx": 20, "captures": []},
+        ],
+    );
     testRegexFindAggForKey(9, {input: "$text", regex: "(F o o) # a comment", options: "x"}, [
         {"match": "Foo", "idx": 0, "captures": ["Foo"]},
         {"match": "Foo", "idx": 10, "captures": ["Foo"]},
@@ -280,7 +299,9 @@ function testRegexAggException(inputObj, exceptionCode) {
     assert.commandWorked(coll.insert({_id: "Empty input", text: ""}));
 
     // Empty input matches empty regex.
-    testRegexFindAggForKey("Empty input", {input: "$text", regex: ""}, [{"match": "", "idx": 0, "captures": []}]);
+    testRegexFindAggForKey("Empty input", {input: "$text", regex: ""}, [
+        {"match": "", "idx": 0, "captures": []},
+    ]);
 
     // Empty capture groups.
     testRegexFindAggForKey("Empty input", {input: "$text", regex: "(missing)|()"}, [
@@ -319,7 +340,9 @@ function testRegexAggException(inputObj, exceptionCode) {
     // (*LF) would change the feed system to UNIX like and (*CR) to windows like. So '\n' would
     // match '.' with CR but not LF.
     testRegexFindAggForKey(3, {input: "$text", regex: "(*LF)ab.cd"}, []);
-    testRegexFindAggForKey(3, {input: "$text", regex: "(*CR)ab.cd"}, [{"match": "ab\ncd", "idx": 0, "captures": []}]);
+    testRegexFindAggForKey(3, {input: "$text", regex: "(*CR)ab.cd"}, [
+        {"match": "ab\ncd", "idx": 0, "captures": []},
+    ]);
 
     // Multiple start options.
     testRegexFindAggForKey(2, {input: "$text", regex: String.raw`(*LIMIT_MATCH=5)(*UCP)^(\w+)`}, [
@@ -333,8 +356,12 @@ function testRegexAggException(inputObj, exceptionCode) {
     // Unicode index counting.
     assert.commandWorked(coll.insert({_id: 2, text: "cafétéria"}));
     assert.commandWorked(coll.insert({_id: 3, text: "मा०गो डीबि"}));
-    testRegexFindAggForKey(2, {input: "$text", regex: "té"}, [{"match": "té", "idx": 4, "captures": []}]);
-    testRegexFindAggForKey(3, {input: "$text", regex: /म/}, [{"match": "म", "idx": 0, "captures": []}]);
+    testRegexFindAggForKey(2, {input: "$text", regex: "té"}, [
+        {"match": "té", "idx": 4, "captures": []},
+    ]);
+    testRegexFindAggForKey(3, {input: "$text", regex: /म/}, [
+        {"match": "म", "idx": 0, "captures": []},
+    ]);
     // Unicode with capture group.
     testRegexFindAggForKey(3, {input: "$text", regex: /(गो )|(missing)/}, [
         {"match": "गो ", "idx": 3, "captures": ["गो ", null]},
@@ -358,8 +385,12 @@ function testRegexAggException(inputObj, exceptionCode) {
     ]);
     // For ASCII characters.
     assert.commandWorked(coll.insert({_id: 4, text: "123444"}));
-    testRegexFindAggForKey(4, {input: "$text", regex: "(*UTF8)(44)"}, [{"match": "44", "idx": 3, "captures": ["44"]}]);
-    testRegexFindAggForKey(4, {input: "$text", regex: "(*UTF)(44)"}, [{"match": "44", "idx": 3, "captures": ["44"]}]);
+    testRegexFindAggForKey(4, {input: "$text", regex: "(*UTF8)(44)"}, [
+        {"match": "44", "idx": 3, "captures": ["44"]},
+    ]);
+    testRegexFindAggForKey(4, {input: "$text", regex: "(*UTF)(44)"}, [
+        {"match": "44", "idx": 3, "captures": ["44"]},
+    ]);
 
     // When the (*UCP) option is specified, Unicode "word" characters are included in the '\w'
     // character type.
@@ -474,7 +505,11 @@ function testRegexAggException(inputObj, exceptionCode) {
         {"matches": [{"match": "string1string2", "idx": 0, "captures": ["string1string2"]}]},
     ]);
     // None match.
-    testRegexFindAgg({input: "$a", regex: "(^.*[7-9]$)"}, [{"matches": []}, {"matches": []}, {"matches": []}]);
+    testRegexFindAgg({input: "$a", regex: "(^.*[7-9]$)"}, [
+        {"matches": []},
+        {"matches": []},
+        {"matches": []},
+    ]);
 
     // All documents match when using variable regex.
     testRegexFindAgg({input: "$a", regex: "$regex"}, [
@@ -497,7 +532,9 @@ function testRegexAggException(inputObj, exceptionCode) {
 (function testInsideCondOperator() {
     coll.drop();
     assert.commandWorked(coll.insert({_id: 0, level: "Public Knowledge", info: "Company Name"}));
-    assert.commandWorked(coll.insert({_id: 1, level: "Private Information", info: "Company Secret"}));
+    assert.commandWorked(
+        coll.insert({_id: 1, level: "Private Information", info: "Company Secret"}),
+    );
     const expectedResults = [
         {"_id": 0, "information": "Company Name"},
         {"_id": 1, "information": "REDACTED"},
@@ -525,7 +562,11 @@ function testRegexAggException(inputObj, exceptionCode) {
             {
                 "$project": {
                     "information": {
-                        "$cond": [{"$regexMatch": {input: "$level", regex: /public/i}}, "$info", "REDACTED"],
+                        "$cond": [
+                            {"$regexMatch": {input: "$level", regex: /public/i}},
+                            "$info",
+                            "REDACTED",
+                        ],
                     },
                 },
             },

@@ -21,7 +21,11 @@ const origParamValue = assert.commandWorked(
 
 try {
     // Lower limit for testing.
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceDensifyMaxMemoryBytes", 1000);
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalDocumentSourceDensifyMaxMemoryBytes",
+        1000,
+    );
     const coll = db[jsTestName()];
     coll.drop();
     let numDocs = 10;
@@ -34,10 +38,17 @@ try {
     bulk.execute();
 
     const pipeline = {
-        $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
+        $densify: {
+            field: "val",
+            partitionByFields: ["part"],
+            range: {step: 1, bounds: "partition"},
+        },
     };
 
-    assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}), 6007200);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}),
+        6007200,
+    );
 
     // Test that densify succeeds when the memory limit would be exceeded, but documents don't need to
     // be densified.
@@ -47,8 +58,14 @@ try {
         bulk.insert({_id: i, otherVal: i, part: longString + i});
     }
     bulk.execute();
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}),
+    );
 } finally {
     // Reset limit for other tests.
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceDensifyMaxMemoryBytes", origParamValue);
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalDocumentSourceDensifyMaxMemoryBytes",
+        origParamValue,
+    );
 }

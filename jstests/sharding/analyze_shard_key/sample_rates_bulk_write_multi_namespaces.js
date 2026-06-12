@@ -61,7 +61,9 @@ function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNam
     const samplesPerSecond = 3;
     const durationSecs = 30;
 
-    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
+    assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}),
+    );
     sleep(queryAnalysisSamplerConfigurationRefreshSecs * 1000);
 
     const targetNumBulkWriteDeletePerSec = 15;
@@ -94,17 +96,26 @@ function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNam
         return true;
     });
 
-    jsTest.log("Finished waiting for sampled queries: " + tojsononeline({actualSampleSize: sampleSize}));
+    jsTest.log(
+        "Finished waiting for sampled queries: " + tojsononeline({actualSampleSize: sampleSize}),
+    );
 
     assert.eq(sampleSize.total, sampleSize.bulkWrite);
 
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
     const expectedTotalCount = durationSecs * samplesPerSecond;
-    AnalyzeShardKeyUtil.assertDiffPercentage(sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
+    AnalyzeShardKeyUtil.assertDiffPercentage(
+        sampleSize.total,
+        expectedTotalCount,
+        10 /* maxDiffPercentage */,
+    );
 
     // Verify that no operation against the notSampledNs was sampled.
-    const queriesNotSampledColl = conn.getCollection("config.sampledQueries").find({ns: notSampledNs}).toArray();
+    const queriesNotSampledColl = conn
+        .getCollection("config.sampledQueries")
+        .find({ns: notSampledNs})
+        .toArray();
     assert.eq(queriesNotSampledColl.length, 0, () => tojson(queriesNotSampledColl));
 }
 

@@ -342,7 +342,13 @@ function assertResultsExpectedFuzzyTest() {
                 "_id": 5,
             },
         ];
-        assertDocArrExpectedFuzzy(expected, actual, undefined, 0.2, FuzzingStrategy.EnforceTolerancePerDoc);
+        assertDocArrExpectedFuzzy(
+            expected,
+            actual,
+            undefined,
+            0.2,
+            FuzzingStrategy.EnforceTolerancePerDoc,
+        );
     }
 
     // Test that with the same array length and tolerance, a swap of 2 positions is not accepted.
@@ -389,7 +395,13 @@ function assertResultsExpectedFuzzyTest() {
         ];
         assertionExpected(expected, actual, 0.2, FuzzingStrategy.EnforceTolerancePerDoc);
         // However, if tolerance is shared across docs, this should be accepted.
-        assertDocArrExpectedFuzzy(expected, actual, undefined, 0.2, FuzzingStrategy.ShareToleranceAcrossDocs);
+        assertDocArrExpectedFuzzy(
+            expected,
+            actual,
+            undefined,
+            0.2,
+            FuzzingStrategy.ShareToleranceAcrossDocs,
+        );
     }
 
     // Test that shared tolerance fuzzing strategy passes on a tight tolerance with a single outlier
@@ -461,7 +473,13 @@ function assertResultsExpectedFuzzyTest() {
                 "_id": 9,
             },
         ];
-        assertDocArrExpectedFuzzy(expected, actual, undefined, 0.1, FuzzingStrategy.ShareToleranceAcrossDocs);
+        assertDocArrExpectedFuzzy(
+            expected,
+            actual,
+            undefined,
+            0.1,
+            FuzzingStrategy.ShareToleranceAcrossDocs,
+        );
     }
 
     // Same as above, but shows any other swap at any distance will cause global cap to be reached.

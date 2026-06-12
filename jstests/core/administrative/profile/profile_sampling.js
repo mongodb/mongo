@@ -67,7 +67,8 @@ try {
     // accepted from parser
     if ("slowms" in originalProfilingSettings) profileCmd.slowms = originalProfilingSettings.slowms;
 
-    if ("sampleRate" in originalProfilingSettings) profileCmd.sampleRate = originalProfilingSettings.sampleRate;
+    if ("sampleRate" in originalProfilingSettings)
+        profileCmd.sampleRate = originalProfilingSettings.sampleRate;
 
     if ("filter" in originalProfilingSettings) profileCmd.filter = originalProfilingSettings.filter;
 

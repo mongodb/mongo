@@ -52,12 +52,19 @@ const peopleDocs = [
 assert.commandWorked(employees.insertMany(employeeDocs));
 assert.commandWorked(people.insertMany(peopleDocs));
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+);
 
 {
     const pipeline = [
         {
-            $lookup: {from: people.getName(), localField: "personId", foreignField: "pID", as: "matched"},
+            $lookup: {
+                from: people.getName(),
+                localField: "personId",
+                foreignField: "pID",
+                as: "matched",
+            },
         },
     ];
     jsTest.log.info("Running basic pipeline test: " + tojson(pipeline));
@@ -78,7 +85,14 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
 
 {
     const pipelineWithLimit = [
-        {$lookup: {from: people.getName(), localField: "personId", foreignField: "pID", as: "matches"}},
+        {
+            $lookup: {
+                from: people.getName(),
+                localField: "personId",
+                foreignField: "pID",
+                as: "matches",
+            },
+        },
         {$limit: 2},
     ];
     jsTest.log.info("Running pipeline with $limit: " + tojson(pipelineWithLimit));
@@ -101,7 +115,12 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
 {
     const pipeline = [
         {
-            $lookup: {from: people.getName(), localField: "personId", foreignField: "pID", as: "matches"},
+            $lookup: {
+                from: people.getName(),
+                localField: "personId",
+                foreignField: "pID",
+                as: "matches",
+            },
         },
     ];
     jsTest.log.info("Running pipeline that will spill: " + tojson(pipeline));

@@ -38,12 +38,16 @@ let primary = replTest.getPrimary();
 let dbFoo = primary.getDB("foo");
 
 assert.commandWorked(
-    dbFoo.runCommand({applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}),
+    dbFoo.runCommand({
+        applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}],
+    }),
 );
 checkCollectionTemp(dbFoo, "tempColl", true);
 
 // Rename the collection.
-assert.commandWorked(primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl"}));
+assert.commandWorked(
+    primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl"}),
+);
 
 // Confirm that it is no longer temporary.
 checkCollectionTemp(dbFoo, "permanentColl", false);
@@ -62,7 +66,9 @@ checkCollectionTemp(secondaryFoo, "permanentColl", false);
 dbFoo.permanentColl.drop();
 
 assert.commandWorked(
-    dbFoo.runCommand({applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}),
+    dbFoo.runCommand({
+        applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}],
+    }),
 );
 checkCollectionTemp(dbFoo, "tempColl", true);
 
@@ -71,7 +77,11 @@ assert.commandWorked(dbFoo.runCommand({create: "permanentColl"}));
 
 // Rename, dropping "permanentColl" and replacing it.
 assert.commandWorked(
-    primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl", dropTarget: true}),
+    primary.adminCommand({
+        renameCollection: "foo.tempColl",
+        to: "foo.permanentColl",
+        dropTarget: true,
+    }),
 );
 
 checkCollectionTemp(dbFoo, "permanentColl", false);

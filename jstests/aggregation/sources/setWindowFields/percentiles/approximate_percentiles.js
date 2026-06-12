@@ -7,7 +7,10 @@
  * ]
  */
 
-import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 import {
     assertResultEqToVal,
     runSetWindowStage,
@@ -32,7 +35,11 @@ const n = docsOrderedByPrice.length;
 
 // Run the suite of partition and bounds tests against the $percentile function. Will run tests with
 // removable and non-removable windows.
-testAccumAgainstGroup(coll, "$percentile", [null, null], {p: [0.1, 0.6], input: "$price", method: "approximate"});
+testAccumAgainstGroup(coll, "$percentile", [null, null], {
+    p: [0.1, 0.6],
+    input: "$price",
+    method: "approximate",
+});
 testAccumAgainstGroup(coll, "$median", null, {input: "$price", method: "approximate"});
 
 // Test that $median and $percentile return null for windows which do not contain numeric values.
@@ -52,7 +59,11 @@ results = runSetWindowStage(
 );
 // Since our percentiles are 0.01 and 0.99 and our collection is small, we will always return the
 // minimum and maximum value in the collection.
-assertResultEqToVal({resultArray: results, percentile: [minDoc.price, maxDoc.price], median: medianDoc.price});
+assertResultEqToVal({
+    resultArray: results,
+    percentile: [minDoc.price, maxDoc.price],
+    median: medianDoc.price,
+});
 
 // Test that an expression can be used for 'input'.
 results = runSetWindowStage(
@@ -77,7 +88,11 @@ results = runSetWindowStage(
 );
 // Since our percentiles are 0.01 and 0.99 and our collection is small, we will always return the
 // minimum and maximum value in the collection.
-assertResultEqToVal({resultArray: results, percentile: [minDoc.price, maxDoc.price], median: medianDoc.price});
+assertResultEqToVal({
+    resultArray: results,
+    percentile: [minDoc.price, maxDoc.price],
+    median: medianDoc.price,
+});
 
 // Test that a removable window calculates $percentile and $median correctly using an approximate
 // method.
@@ -103,13 +118,21 @@ testError(
     {$percentile: {p: [0.1, 0.6], input: "$str", method: "approximate"}, window: [-1, 1]},
     ErrorCodes.FailedToParse,
 );
-testError(coll, {$median: {input: "$str", method: "approximate"}, window: [-1, 1]}, ErrorCodes.FailedToParse);
+testError(
+    coll,
+    {$median: {input: "$str", method: "approximate"}, window: [-1, 1]},
+    ErrorCodes.FailedToParse,
+);
 testError(
     coll,
     {$percentile: {p: [0.6], input: "$str", method: "approximate"}, window: {documents: []}},
     ErrorCodes.FailedToParse,
 );
-testError(coll, {$median: {input: "$str", method: "approximate"}, window: {documents: []}}, ErrorCodes.FailedToParse);
+testError(
+    coll,
+    {$median: {input: "$str", method: "approximate"}, window: {documents: []}},
+    ErrorCodes.FailedToParse,
+);
 
 // Extra argument in the window function.
 testError(
@@ -117,13 +140,21 @@ testError(
     {$percentile: {p: [0.1, 0.6], input: "$str", method: "approximate"}, extra: "extra"},
     ErrorCodes.FailedToParse,
 );
-testError(coll, {$median: {input: "$str", method: "approximate"}, extra: "extra"}, ErrorCodes.FailedToParse);
+testError(
+    coll,
+    {$median: {input: "$str", method: "approximate"}, extra: "extra"},
+    ErrorCodes.FailedToParse,
+);
 
 // Invalid input for the accumulators.
 testError(coll, {$percentile: "not an object"}, 7429703);
 testError(coll, {$median: "not an object"}, 7436100);
 
-testError(coll, {$percentile: {p: [0.1, 0.6], input: "$str", method: false}}, ErrorCodes.TypeMismatch);
+testError(
+    coll,
+    {$percentile: {p: [0.1, 0.6], input: "$str", method: false}},
+    ErrorCodes.TypeMismatch,
+);
 testError(coll, {$median: {input: "$str", method: false}}, ErrorCodes.TypeMismatch);
 
 // invalid expressions or variables for 'p'
@@ -143,11 +174,23 @@ testError(
     {$percentile: {input: "$str", method: "approximate"}},
     ErrorCodes.IDLFailedToParse /* IDL required field error */,
 );
-testError(coll, {$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}}, ErrorCodes.IDLUnknownField);
+testError(
+    coll,
+    {$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}},
+    ErrorCodes.IDLUnknownField,
+);
 
 if (!FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
-    testError(coll, {$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
+    testError(
+        coll,
+        {$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}},
+        ErrorCodes.BadValue,
+    );
     testError(coll, {$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
-    testError(coll, {$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
+    testError(
+        coll,
+        {$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}},
+        ErrorCodes.BadValue,
+    );
     testError(coll, {$median: {input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
 }

@@ -12,7 +12,8 @@ if (determineSSLProvider() !== "openssl") {
 // Fails when used without clusterAuthMode == 'X509'
 {
     const opts = {auth: "", tlsClusterAuthX509ExtensionValue: "foo"};
-    const errmsg = "net.tls.clusterAuthX509.extensionValue requires a clusterAuthMode which allows for usage of X509";
+    const errmsg =
+        "net.tls.clusterAuthX509.extensionValue requires a clusterAuthMode which allows for usage of X509";
 
     jsTest.log("No clusterAuthMode set");
     clearRawMongoProgramOutput();

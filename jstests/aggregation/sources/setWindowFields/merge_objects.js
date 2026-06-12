@@ -31,7 +31,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -57,7 +62,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", 1]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", 1]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -83,7 +93,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -91,8 +106,16 @@ describe("$mergeObjects as a window function", function () {
 
             assert.eq(3, results.length, results);
             assert.docEq({_id: 0, obj: {a: 1, b: 10}, merged: {a: 1, b: 10}}, results[0], results);
-            assert.docEq({_id: 1, obj: {a: 2, c: 20}, merged: {a: 2, b: 10, c: 20}}, results[1], results);
-            assert.docEq({_id: 2, obj: {a: 3, d: 30}, merged: {a: 3, b: 10, c: 20, d: 30}}, results[2], results);
+            assert.docEq(
+                {_id: 1, obj: {a: 2, c: 20}, merged: {a: 2, b: 10, c: 20}},
+                results[1],
+                results,
+            );
+            assert.docEq(
+                {_id: 2, obj: {a: 3, d: 30}, merged: {a: 3, b: 10, c: 20, d: 30}},
+                results[2],
+                results,
+            );
         });
 
         it("should handle empty documents in window", function () {
@@ -109,7 +132,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -138,7 +166,12 @@ describe("$mergeObjects as a window function", function () {
                         $setWindowFields: {
                             partitionBy: "$key",
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -166,7 +199,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -192,7 +230,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {range: ["unbounded", "unbounded"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {range: ["unbounded", "unbounded"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -221,7 +264,12 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
@@ -248,16 +296,33 @@ describe("$mergeObjects as a window function", function () {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {merged: {$mergeObjects: "$obj", window: {documents: ["unbounded", "current"]}}},
+                            output: {
+                                merged: {
+                                    $mergeObjects: "$obj",
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
                         },
                     },
                 ])
                 .toArray();
 
             assert.eq(3, results.length, results);
-            assert.docEq({_id: 0, obj: {a: [1, 2], b: {x: 1}}, merged: {a: [1, 2], b: {x: 1}}}, results[0], results);
-            assert.docEq({_id: 1, obj: {a: [3, 4], b: {y: 2}}, merged: {a: [3, 4], b: {y: 2}}}, results[1], results);
-            assert.docEq({_id: 2, obj: {c: "test"}, merged: {a: [3, 4], b: {y: 2}, c: "test"}}, results[2], results);
+            assert.docEq(
+                {_id: 0, obj: {a: [1, 2], b: {x: 1}}, merged: {a: [1, 2], b: {x: 1}}},
+                results[0],
+                results,
+            );
+            assert.docEq(
+                {_id: 1, obj: {a: [3, 4], b: {y: 2}}, merged: {a: [3, 4], b: {y: 2}}},
+                results[1],
+                results,
+            );
+            assert.docEq(
+                {_id: 2, obj: {c: "test"}, merged: {a: [3, 4], b: {y: 2}, c: "test"}},
+                results[2],
+                results,
+            );
         });
     });
 
@@ -278,7 +343,12 @@ describe("$mergeObjects as a window function", function () {
                             {
                                 $setWindowFields: {
                                     sortBy: {_id: 1},
-                                    output: {merged: {$mergeObjects: "$obj", window: {documents: [-1, "current"]}}},
+                                    output: {
+                                        merged: {
+                                            $mergeObjects: "$obj",
+                                            window: {documents: [-1, "current"]},
+                                        },
+                                    },
                                 },
                             },
                         ])

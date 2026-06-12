@@ -29,7 +29,9 @@ const secondaryColl = secondaryDB.getCollection(collName);
 
 function setup(numToInsert) {
     jsTest.log.info("Creating clustered collection");
-    assert.commandWorked(testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(
+        testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+    );
 
     jsTest.log.info(`Inserting ${numToInsert} documents`);
     let docs = [];
@@ -50,7 +52,9 @@ function doTest(startIndex, endIndex, originalDocs, docsBeforeTruncate) {
     const expectedDocs = docsBeforeTruncate.filter((item) => item._id < minId || item._id > maxId);
     const recordsDeleted = docsBeforeTruncate.length - expectedDocs.length;
 
-    jsTest.log.info(`Truncating ${recordsDeleted} documents from {_id: ${minId}} to {_id: ${maxId}}`);
+    jsTest.log.info(
+        `Truncating ${recordsDeleted} documents from {_id: ${minId}} to {_id: ${maxId}}`,
+    );
     const applyOpsCmd = {
         applyOps: [
             {

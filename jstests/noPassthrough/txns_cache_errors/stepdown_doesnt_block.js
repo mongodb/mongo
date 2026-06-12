@@ -19,7 +19,10 @@ let replSet = new ReplSetTest({
     nodeOptions: {
         wiredTigerEngineConfigString:
             "cache_size=256M,cache_stuck_timeout_ms=600000,eviction=(threads_min=1,threads_max=1)",
-        setParameter: {cachePressureQueryPeriodMilliseconds: 0, transactionLifetimeLimitSeconds: 600},
+        setParameter: {
+            cachePressureQueryPeriodMilliseconds: 0,
+            transactionLifetimeLimitSeconds: 600,
+        },
     },
 });
 
@@ -43,7 +46,9 @@ const doTxnsFn = function (dbName, collName) {
         let session = testDb.getMongo().startSession();
         try {
             session.startTransaction();
-            assert.commandWorked(session.getDatabase(dbName).getCollection(collName).insert(largeDoc));
+            assert.commandWorked(
+                session.getDatabase(dbName).getCollection(collName).insert(largeDoc),
+            );
         } catch (e) {
             jsTestLog("Non-fatal exception: " + e);
         }

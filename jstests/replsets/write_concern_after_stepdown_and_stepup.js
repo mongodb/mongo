@@ -46,7 +46,11 @@ assert.eq(nodes[0], primary);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 
@@ -61,10 +65,14 @@ assert.commandWorked(
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
 // Stop the primary from calling into awaitReplication()
-const hangBeforeWaitingForWriteConcern = configureFailPoint(nodes[0], "hangBeforeWaitingForWriteConcern");
+const hangBeforeWaitingForWriteConcern = configureFailPoint(
+    nodes[0],
+    "hangBeforeWaitingForWriteConcern",
+);
 
 jsTestLog(
-    "Do w:majority write that won't enter awaitReplication() until after the primary " + "has stepped down and back up",
+    "Do w:majority write that won't enter awaitReplication() until after the primary " +
+        "has stepped down and back up",
 );
 let doMajorityWrite = function () {
     // Run hello command with 'hangUpOnStepDown' set to false to mark this connection as
@@ -108,7 +116,8 @@ nodes[0].reconnect(nodes[1]);
 nodes[0].reconnect(nodes[2]);
 
 jsTest.log(
-    "Wait for the old primary to step down, roll back its write, and apply the " + "new writes from the new primary",
+    "Wait for the old primary to step down, roll back its write, and apply the " +
+        "new writes from the new primary",
 );
 waitForState(nodes[0], ReplSetTest.State.SECONDARY);
 rst.awaitReplication();
@@ -124,7 +133,9 @@ assert.soonNoExcept(function () {
         assert.neq(
             null,
             node.getDB(dbName).getCollection(collName).findOne({a: 3}),
-            "Node " + node.host + " was missing op from branch of history that should have persisted",
+            "Node " +
+                node.host +
+                " was missing op from branch of history that should have persisted",
         );
     });
     return true;

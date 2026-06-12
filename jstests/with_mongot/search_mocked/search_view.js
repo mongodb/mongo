@@ -2,7 +2,10 @@
  * Test that a $search in a view is desugared on each query against the view.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForQuery, mongotResponseForBatch} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mongotCommandForQuery,
+    mongotResponseForBatch,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
@@ -26,7 +29,9 @@ const testDB = st.s.getDB(dbName);
 const coll = testDB.getCollection(collName);
 
 // Make shard0 primary shard, but do not shard the collection.
-assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    st.s.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 assert.commandWorked(
     coll.insert([
@@ -64,7 +69,12 @@ const mockMongots = function () {
                     db: dbName,
                     collectionUUID: collUUID,
                 }),
-                response: mongotResponseForBatch(responseBatch, NumberLong(0), coll.getFullName(), 1),
+                response: mongotResponseForBatch(
+                    responseBatch,
+                    NumberLong(0),
+                    coll.getFullName(),
+                    1,
+                ),
             },
         ],
         cursorId,
@@ -90,7 +100,9 @@ assert.eq([{$search: mongotQuery}], getPipelineFromViewDef(searchView.getFullNam
 // Ensure that $searchMeta does not desugar in view definition parsing.
 {
     const searchMetaViewName = collName + "_search_meta_view";
-    assert.commandWorked(testDB.createView(searchMetaViewName, collName, [{$searchMeta: mongotQuery}]));
+    assert.commandWorked(
+        testDB.createView(searchMetaViewName, collName, [{$searchMeta: mongotQuery}]),
+    );
     const searchMetaView = testDB.getCollection(searchMetaViewName);
     assert.eq([{$searchMeta: mongotQuery}], getPipelineFromViewDef(searchMetaView.getFullName()));
 }

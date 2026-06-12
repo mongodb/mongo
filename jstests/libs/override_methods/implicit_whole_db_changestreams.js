@@ -47,7 +47,9 @@ globalThis.ChangeStreamPassthroughHelpers = {
             csParams = Object.keys(testSpec);
         if (
             csParams.length > 0 &&
-            csParams.every((csParam) => testSpec[csParam] === cmdObj.pipeline[0].$changeStream[csParam])
+            csParams.every(
+                (csParam) => testSpec[csParam] === cmdObj.pipeline[0].$changeStream[csParam],
+            )
         ) {
             return false;
         }
@@ -98,7 +100,11 @@ globalThis.ChangeStreamPassthroughHelpers = {
         // the command's execution 'namespace' to 1.
         let pipeline = [
             {
-                $changeStream: Object.assign({}, cmdObj.pipeline[0].$changeStream, this.changeStreamSpec()),
+                $changeStream: Object.assign(
+                    {},
+                    cmdObj.pipeline[0].$changeStream,
+                    this.changeStreamSpec(),
+                ),
             },
         ];
         pipeline.push(this.nsMatchFilter(db, cmdObj.aggregate));
@@ -125,12 +131,16 @@ const passthroughRunCommandImpl = function (dbName, cmdObj, options) {
     // Check whether this command is an upconvertable $changeStream request. If the command is an
     // explain, we check the wrapped command object.
     let csCmdObj = cmdObj.explain ? cmdObj.explain : cmdObj;
-    const upconvertCursor = globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(
-        this,
-        csCmdObj,
-    );
+    const upconvertCursor =
+        globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(
+            this,
+            csCmdObj,
+        );
     if (upconvertCursor) {
-        [dbName, csCmdObj] = globalThis.ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(this, csCmdObj);
+        [dbName, csCmdObj] = globalThis.ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(
+            this,
+            csCmdObj,
+        );
     }
 
     // If this is an explain, put the upconverted agg back into the explain command.
@@ -144,7 +154,10 @@ const passthroughRunCommandImpl = function (dbName, cmdObj, options) {
     // whole-db. Ensure that we update the 'collection' field to be the collectionless
     // namespace.
     if (cmdObj && cmdObj.getMore && upconvertedCursors.has(cmdObj.getMore.toString())) {
-        [dbName, cmdObj] = globalThis.ChangeStreamPassthroughHelpers.upconvertGetMoreRequest(this, cmdObj);
+        [dbName, cmdObj] = globalThis.ChangeStreamPassthroughHelpers.upconvertGetMoreRequest(
+            this,
+            cmdObj,
+        );
     }
 
     // Pass the modified command to the original runCommand implementation.
@@ -164,7 +177,9 @@ const passthroughRunCommandImpl = function (dbName, cmdObj, options) {
 // passthrough wherever Collection.watch is called.
 DBCollection.prototype.watch = function (pipeline, options) {
     pipeline = Object.assign([], pipeline);
-    pipeline.unshift(globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter(this.getDB(), this.getName()));
+    pipeline.unshift(
+        globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter(this.getDB(), this.getName()),
+    );
     return this.getDB().watch(pipeline, options);
 };
 

@@ -22,7 +22,9 @@ const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
@@ -55,7 +57,10 @@ assert.commandWorked(
     }),
 );
 
-const hangBeforeDeleteFp = configureFailPoint(coordinatorPrimary, "hangBeforeDeletingCoordinatorDoc");
+const hangBeforeDeleteFp = configureFailPoint(
+    coordinatorPrimary,
+    "hangBeforeDeletingCoordinatorDoc",
+);
 
 const commitThread = new Thread(
     (host, lsidId, txnNumber) => {
@@ -115,7 +120,9 @@ coordinatorRS.nodes.forEach((node) => {
 });
 
 jsTest.log("Verify that the transaction committed");
-const res = assert.commandWorked(st.s.getDB(dbName).runCommand({find: collName, filter: {$or: docs}, lsid: lsid}));
+const res = assert.commandWorked(
+    st.s.getDB(dbName).runCommand({find: collName, filter: {$or: docs}, lsid: lsid}),
+);
 assert.eq(2, res.cursor.firstBatch.length);
 
 st.stop();

@@ -18,8 +18,12 @@ const runTest = (testDB) => {
     );
 
     // Test command in both V1 and V2.
-    assert.commandWorked(testDB.runCommand({testVersions1And2: 1, apiVersion: "1", apiStrict: true}));
-    assert.commandWorked(testDB.runCommand({testVersions1And2: 1, apiVersion: "2", apiStrict: true}));
+    assert.commandWorked(
+        testDB.runCommand({testVersions1And2: 1, apiVersion: "1", apiStrict: true}),
+    );
+    assert.commandWorked(
+        testDB.runCommand({testVersions1And2: 1, apiVersion: "2", apiStrict: true}),
+    );
 
     // Test command in V1, deprecated in V2.
     assert.commandWorked(

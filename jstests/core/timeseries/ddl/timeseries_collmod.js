@@ -20,7 +20,9 @@ const bucketingValueMax = 86400 * 365; // Seconds in a year.
 const idlInvalidValueError = 51024;
 
 coll.drop();
-assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time", granularity: "seconds"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "time", granularity: "seconds"}}),
+);
 
 // This test cannot use the index with the key {'time': 1}, since that is the same as the implicitly
 // created shard key and thus we cannot hide the index. We will use a different index here to avoid
@@ -38,7 +40,12 @@ assert.commandFailedWithCode(
 );
 
 // Successfully hides a time-series secondary index.
-assert.commandWorked(db.runCommand({"collMod": collName, "index": {"keyPattern": {[indexField]: 1}, "hidden": true}}));
+assert.commandWorked(
+    db.runCommand({
+        "collMod": collName,
+        "index": {"keyPattern": {[indexField]: 1}, "hidden": true},
+    }),
+);
 
 // Hiding the internal clustered index fails, since the index is not exposed to users.
 assert.commandFailedWithCode(
@@ -74,7 +81,9 @@ assert.commandFailedWithCode(
 assert.commandWorked(db.runCommand({"collMod": collName, "expireAfterSeconds": 60}));
 
 // Successfully sets the granularity to a higher value for a time-series collection.
-assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}),
+);
 
 // Tries to set current granularity to a lower value.
 assert.commandFailedWithCode(
@@ -88,11 +97,17 @@ assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granula
 // Tries to set one seconds parameter without the other (bucketMaxSpanSeconds or
 // bucketRoundingSeconds).
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "timeseries": {"bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}}),
+    db.runCommand({
+        "collMod": collName,
+        "timeseries": {"bucketMaxSpanSeconds": bucketMaxSpanSecondsHours},
+    }),
     ErrorCodes.InvalidOptions,
 );
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "timeseries": {"bucketRoundingSeconds": bucketRoundingSecondsHours}}),
+    db.runCommand({
+        "collMod": collName,
+        "timeseries": {"bucketRoundingSeconds": bucketRoundingSecondsHours},
+    }),
     ErrorCodes.InvalidOptions,
 );
 
@@ -218,7 +233,9 @@ assert.commandWorked(
 // Successfully sets granularity from a collection created with custom maxSpanSeconds and
 // bucketRoundingSeconds since the default values for 'minutes' are greater than the previous
 // seconds.
-assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}),
+);
 
 // Fails to set bucketMaxSpanSeconds and bucketRoundingSeconds past the bucketing limit.
 assert.commandFailedWithCode(
@@ -236,7 +253,10 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     db.runCommand({
         "collMod": collName,
-        "timeseries": {"bucketMaxSpanSeconds": bucketingValueMax, "bucketRoundingSeconds": bucketingValueMax},
+        "timeseries": {
+            "bucketMaxSpanSeconds": bucketingValueMax,
+            "bucketRoundingSeconds": bucketingValueMax,
+        },
     }),
 );
 

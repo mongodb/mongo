@@ -49,18 +49,26 @@ let collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
 
 // Create the database for the unsharded collection
 assert.commandWorked(
-    admin.runCommand({enableSharding: collUnsharded.getDB().toString(), primaryShard: st.shard0.shardName}),
+    admin.runCommand({
+        enableSharding: collUnsharded.getDB().toString(),
+        primaryShard: st.shard0.shardName,
+    }),
 );
 assert.commandWorked(collUnsharded.insert({some: "doc"}));
 assert.commandWorked(collUnsharded.remove({}));
 
 // Create the database for the sharded collection
 assert.commandWorked(
-    admin.runCommand({enableSharding: collSharded.getDB().toString(), primaryShard: st.shard0.shardName}),
+    admin.runCommand({
+        enableSharding: collSharded.getDB().toString(),
+        primaryShard: st.shard0.shardName,
+    }),
 );
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
-assert.commandWorked(admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 // Secondaries do not refresh their in-memory routing table until a request with a higher
 // version is received, and refreshing requires communication with the primary to obtain the

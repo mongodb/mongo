@@ -47,8 +47,9 @@ const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullNam
     ErrorCodes.OutOfDiskSpace,
 ]);
 
-const buildUUID = IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true})["a_1"]
-    .buildUUID;
+const buildUUID = IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+})["a_1"].buildUUID;
 
 configureFailPoint(primaryDB, "failIndexBuildWithErrorInSecondDrain", {
     buildUUID: buildUUID,
@@ -61,7 +62,10 @@ failpointHangAfterInit.off();
 // Wait for the index build to be in clean up path.
 hangBeforeCleanup.wait();
 
-const hangAfterCollDropHasLocks = configureFailPoint(primaryDB, "hangAbortIndexBuildByBuildUUIDAfterLocks");
+const hangAfterCollDropHasLocks = configureFailPoint(
+    primaryDB,
+    "hangAbortIndexBuildByBuildUUIDAfterLocks",
+);
 
 const collDrop = startParallelShell(
     funWithArgs(

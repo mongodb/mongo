@@ -71,7 +71,8 @@ const $baseConfig = {
                 const res = assert.commandWorked(
                     db.adminCommand({
                         setParameter: 1,
-                        reshardingMinimumOperationDurationMillis: this.originalReshardingMinimumOperationDurationMillis,
+                        reshardingMinimumOperationDurationMillis:
+                            this.originalReshardingMinimumOperationDurationMillis,
                     }),
                 );
             });
@@ -116,7 +117,9 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
 
         if (!result.ok) {
             if (result.code === ErrorCodes.NamespaceNotFound) {
-                jsTestLog(`Move collection result for ${namespace} to shard ${toShard}: ${tojson(result)}`);
+                jsTestLog(
+                    `Move collection result for ${namespace} to shard ${toShard}: ${tojson(result)}`,
+                );
                 return;
             }
         }
@@ -126,12 +129,19 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
         this.moveCollectionsPerformed++;
     };
 
-    $config.states.untrackUnshardedCollection = function untrackUnshardedCollection(db, collName, connCache) {
+    $config.states.untrackUnshardedCollection = function untrackUnshardedCollection(
+        db,
+        collName,
+        connCache,
+    ) {
         const namespace = `${db}.${collName}`;
         jsTestLog(`Attempting to untrack collection ${namespace}`);
         const res = db.adminCommand({untrackUnshardedCollection: namespace});
         if (!res.ok) {
-            if (res.code === ErrorCodes.OperationFailed || res.code === ErrorCodes.InvalidNamespace) {
+            if (
+                res.code === ErrorCodes.OperationFailed ||
+                res.code === ErrorCodes.InvalidNamespace
+            ) {
                 jsTestLog(`Untrack collection result for ${namespace}: ${tojson(res)}`);
                 return;
             }

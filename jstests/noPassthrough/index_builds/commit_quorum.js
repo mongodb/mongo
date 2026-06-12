@@ -83,7 +83,11 @@ try {
 
     // Test setting various commit quorums on the index build in our two node replica set.
     assert.commandFailed(
-        testDB.runCommand({setIndexCommitQuorum: "twoPhaseIndexBuild", indexNames: ["a_1"], commitQuorum: 3}),
+        testDB.runCommand({
+            setIndexCommitQuorum: "twoPhaseIndexBuild",
+            indexNames: ["a_1"],
+            commitQuorum: 3,
+        }),
     );
     assert.commandFailed(
         testDB.runCommand({
@@ -94,7 +98,11 @@ try {
     );
 
     assert.commandWorked(
-        testDB.runCommand({setIndexCommitQuorum: "twoPhaseIndexBuild", indexNames: ["a_1"], commitQuorum: 2}),
+        testDB.runCommand({
+            setIndexCommitQuorum: "twoPhaseIndexBuild",
+            indexNames: ["a_1"],
+            commitQuorum: 2,
+        }),
     );
     assert.commandWorked(
         testDB.runCommand({

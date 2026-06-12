@@ -107,9 +107,10 @@ const originalKnobValue = getServerParameter(getMoreRetriesKnob);
     // getMore retries pinning the cursor if releaseMemory holds the pin, but it does it for a
     // limited amount of retries.
     setServerParameter(getMoreRetriesKnob, 2);
-    assert.commandFailedWithCode(db.runCommand({getMore: cursorIdForGetMore, collection: jsTestName()}), [
-        ErrorCodes.CursorInUse,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({getMore: cursorIdForGetMore, collection: jsTestName()}),
+        [ErrorCodes.CursorInUse],
+    );
 
     releaseMemoryFailPoint.off();
     joinReleaseMemory();

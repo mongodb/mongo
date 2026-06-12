@@ -33,7 +33,11 @@ const numQueriesPerRun = 30;
 
 const experimentColl = db[jsTestName()];
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "heuristicCE",
+    }),
 );
 testProperty(
     createPlanStabilityProperty(experimentColl, true /* assertCeExists */),

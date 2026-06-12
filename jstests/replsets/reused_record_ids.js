@@ -51,7 +51,9 @@ stopReplicationOnSecondaries(rst);
 // Inserting the documents
 jsTestLog("Inserting documents into primary.");
 for (let i = 0; i < numDocs; i++) {
-    assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [{"_id": i}], writeConcern: {w: 1}}));
+    assert.commandWorked(
+        primDB.runCommand({insert: replRidCollName, documents: [{"_id": i}], writeConcern: {w: 1}}),
+    );
 }
 
 jsTestLog("Checking records IDs on primary.");
@@ -93,7 +95,11 @@ jsTestLog("Re-inserting documents on primary node");
 // documents.
 for (let i = 0; i < numDocs; i++) {
     assert.commandWorked(
-        primDB.runCommand({insert: replRidCollName, documents: [{"_id": idOffset + i}], writeConcern: {w: 1}}),
+        primDB.runCommand({
+            insert: replRidCollName,
+            documents: [{"_id": idOffset + i}],
+            writeConcern: {w: 1},
+        }),
     );
 }
 assert.eq(primDB[replRidCollName].count(), numDocs);

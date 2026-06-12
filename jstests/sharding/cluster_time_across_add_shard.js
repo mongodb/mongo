@@ -118,7 +118,10 @@ if (isShardSvrRst) {
             Object.assign(
                 {
                     configsvr: "",
-                    setParameter: {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true},
+                    setParameter: {
+                        skipShardingConfigurationChecks: false,
+                        featureFlagTransitionToCatalogShard: true,
+                    },
                 },
                 upgradeOpts,
             ),
@@ -168,7 +171,10 @@ if (isShardSvrRst) {
             // cluster time validation testing is completed, make the TTL monitor have a large
             // sleep interval at first and then lower it at the end of the test when verifying that
             // the documents do get deleted by the TTL monitor.
-            setParameter: {newShardExistingClusterTimeKeysExpirationSecs: 1, ttlMonitorSleepSecs: 3600},
+            setParameter: {
+                newShardExistingClusterTimeKeysExpirationSecs: 1,
+                ttlMonitorSleepSecs: 3600,
+            },
         },
     });
     assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
@@ -186,9 +192,11 @@ if (isShardSvrRst) {
             // Transitioning from last-lts to last-continuous is only allowed when
             // setFeatureCompatibilityVersion is called with fromConfigServer: true.
             assert.commandWorked(
-                rst
-                    .getPrimary()
-                    .adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true, fromConfigServer: true}),
+                rst.getPrimary().adminCommand({
+                    setFeatureCompatibilityVersion: fcv,
+                    confirm: true,
+                    fromConfigServer: true,
+                }),
             );
 
             // Wait for the new FCV to propagate to all configsvr nodes.
@@ -239,16 +247,23 @@ for (let session of sessions) {
         assert.neq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 
         // Verify that the old cluster time can also be used against the mongos and config server
-        assert.commandWorked(st.s.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
         assert.commandWorked(
-            st.configRS.getPrimary().getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}),
+            st.s.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}),
+        );
+        assert.commandWorked(
+            st.configRS
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({hello: 1, $clusterTime: lastClusterTime}),
         );
     } else {
         // Verify that the new cluster time was signed with the existing key.
         assert.eq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 
         // Verify that the old cluster time can also be used against the mongos.
-        assert.commandWorked(mongos.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
+        assert.commandWorked(
+            mongos.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}),
+        );
     }
 
     fp.off();

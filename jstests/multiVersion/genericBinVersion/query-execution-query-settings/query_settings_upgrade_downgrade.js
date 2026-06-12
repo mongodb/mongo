@@ -33,8 +33,12 @@ describe("QuerySettings", function () {
             queryA = qsutils.makeFindQueryInstance({filter: {a: 15}});
             queryB = qsutils.makeFindQueryInstance({filter: {b: 15}});
 
-            assert.commandWorked(db.adminCommand({setQuerySettings: queryA, settings: exampleQuerySettings}));
-            assert.commandWorked(db.adminCommand({setQuerySettings: queryB, settings: exampleQuerySettings}));
+            assert.commandWorked(
+                db.adminCommand({setQuerySettings: queryA, settings: exampleQuerySettings}),
+            );
+            assert.commandWorked(
+                db.adminCommand({setQuerySettings: queryB, settings: exampleQuerySettings}),
+            );
         };
 
         const assertQueryShapeConfigurations = function (isFullyUpgraded) {
@@ -46,21 +50,29 @@ describe("QuerySettings", function () {
 
                 // Ensure that the 'representativeQueries' are migrated to the dedicated
                 // collection.
-                const isBackfillEnabled = FeatureFlagUtil.isPresentAndEnabled(getDB(conn).getMongo(), "PQSBackfill");
-                const expectedRepresentativeQueries = isFullyUpgraded && isBackfillEnabled ? [queryA, queryB] : [];
+                const isBackfillEnabled = FeatureFlagUtil.isPresentAndEnabled(
+                    getDB(conn).getMongo(),
+                    "PQSBackfill",
+                );
+                const expectedRepresentativeQueries =
+                    isFullyUpgraded && isBackfillEnabled ? [queryA, queryB] : [];
                 qsutils.assertRepresentativeQueries(expectedRepresentativeQueries);
             };
         };
 
-        const assertQueryShapeConfigurationsWithEmptyRepresentativeQueries = assertQueryShapeConfigurations(false);
-        const assertQueryShapeConfigurationsWithMigratedRepresentativeQueries = assertQueryShapeConfigurations(true);
+        const assertQueryShapeConfigurationsWithEmptyRepresentativeQueries =
+            assertQueryShapeConfigurations(false);
+        const assertQueryShapeConfigurationsWithMigratedRepresentativeQueries =
+            assertQueryShapeConfigurations(true);
 
         it("in replica set", function () {
             testPerformUpgradeReplSet({
                 setupFn,
                 whenFullyDowngraded: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
-                whenSecondariesAreLatestBinary: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
-                whenBinariesAreLatestAndFCVIsLastLTS: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
+                whenSecondariesAreLatestBinary:
+                    assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
+                whenBinariesAreLatestAndFCVIsLastLTS:
+                    assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
                 whenFullyUpgraded: assertQueryShapeConfigurationsWithMigratedRepresentativeQueries,
             });
         });
@@ -69,10 +81,14 @@ describe("QuerySettings", function () {
             testPerformUpgradeSharded({
                 setupFn,
                 whenFullyDowngraded: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
-                whenOnlyConfigIsLatestBinary: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
-                whenSecondariesAndConfigAreLatestBinary: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
-                whenMongosBinaryIsLastLTS: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
-                whenBinariesAreLatestAndFCVIsLastLTS: assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
+                whenOnlyConfigIsLatestBinary:
+                    assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
+                whenSecondariesAndConfigAreLatestBinary:
+                    assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
+                whenMongosBinaryIsLastLTS:
+                    assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
+                whenBinariesAreLatestAndFCVIsLastLTS:
+                    assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
                 whenFullyUpgraded: assertQueryShapeConfigurationsWithMigratedRepresentativeQueries,
             });
         });
@@ -81,15 +97,23 @@ describe("QuerySettings", function () {
     describe("should migrate as many 'representativeQuery's as possible on FCV downgrade and not fail with BSONObjectTooLarge exception", function () {
         function runTest(db) {
             const qsutils = new QuerySettingsUtils(db, collName);
-            const queryA = qsutils.makeFindQueryInstance({filter: {a: "a".repeat(9 * 1024 * 1024)}});
-            const queryB = qsutils.makeFindQueryInstance({filter: {b: "b".repeat(10 * 1024 * 1024)}});
+            const queryA = qsutils.makeFindQueryInstance({
+                filter: {a: "a".repeat(9 * 1024 * 1024)},
+            });
+            const queryB = qsutils.makeFindQueryInstance({
+                filter: {b: "b".repeat(10 * 1024 * 1024)},
+            });
             for (const queryInstance of [queryA, queryB]) {
-                assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: {reject: true}}));
+                assert.commandWorked(
+                    db.adminCommand({setQuerySettings: queryInstance, settings: {reject: true}}),
+                );
             }
 
             // Perform FCV downgrade to the last LTS version, which should migrate
             // representativeQueries back to the 'querySettings' cluster parameter.
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            );
 
             const expectedQuerySettings = [
                 {
@@ -141,13 +165,17 @@ describe("QuerySettings", function () {
     describe("should perform FCV upgrade and downgrade successully after first failed attempt due to repeated failure of setClusterParamater command", function () {
         function runTest(db) {
             // Ensure we are on the last LTS FCV before starting the test.
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            );
 
             const qsutils = new QuerySettingsUtils(db, collName);
             const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
             const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
             for (const queryInstance of [queryA, queryB]) {
-                assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: {reject: true}}));
+                assert.commandWorked(
+                    db.adminCommand({setQuerySettings: queryInstance, settings: {reject: true}}),
+                );
             }
             qsutils.assertQueryShapeConfiguration(
                 [
@@ -158,26 +186,41 @@ describe("QuerySettings", function () {
             );
 
             // Attempt to upgrade the FCV, which should fail due to the failpoint.
-            qsutils.withFailpoint("throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter", {}, () => {
-                assert.commandFailedWithCode(
-                    db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-                    ErrorCodes.TemporarilyUnavailable,
-                );
-            });
+            qsutils.withFailpoint(
+                "throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter",
+                {},
+                () => {
+                    assert.commandFailedWithCode(
+                        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+                        ErrorCodes.TemporarilyUnavailable,
+                    );
+                },
+            );
 
             // Run FCV upgrade command again, which should succeed now.
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+            );
 
             // Attempt to downgrade the FCV, which should fail due to the failpoint.
-            qsutils.withFailpoint("throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter", {}, () => {
-                assert.commandFailedWithCode(
-                    db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-                    ErrorCodes.TemporarilyUnavailable,
-                );
-            });
+            qsutils.withFailpoint(
+                "throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter",
+                {},
+                () => {
+                    assert.commandFailedWithCode(
+                        db.adminCommand({
+                            setFeatureCompatibilityVersion: lastLTSFCV,
+                            confirm: true,
+                        }),
+                        ErrorCodes.TemporarilyUnavailable,
+                    );
+                },
+            );
 
             // Run FCV downgrade command again, which should succeed now.
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            );
 
             // Clean up all query settings.
             qsutils.removeAllQuerySettings();

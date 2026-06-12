@@ -11,7 +11,9 @@ let mongos = st.s;
 let coll = mongos.getCollection("foo.bar");
 
 // Enable sharding of the collection
-assert.commandWorked(mongos.adminCommand({enablesharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enablesharding: coll.getDB() + "", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
 
 let numChunks = 30;
@@ -40,7 +42,9 @@ jsTest.log("Moving a bunch of chunks to stack cleanup...");
 
 // Move a bunch of chunks, but don't close the cursor so they stack.
 for (let i = 0; i < numChunks; i++) {
-    assert.commandWorked(mongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: st.shard1.shardName}),
+    );
 }
 
 jsTest.log("Verifying that the donor still has the range deletion task docs...");

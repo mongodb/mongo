@@ -193,7 +193,13 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             csTest = new ChangeStreamTest(db);
             const csCursor = csTest.startWatchingChanges({
                 pipeline: [
-                    {$changeStream: {version: "v2", startAtOperationTime: currentTime, ignoreRemovedShards: true}},
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            startAtOperationTime: currentTime,
+                            ignoreRemovedShards: true,
+                        },
+                    },
                 ],
                 collection: coll,
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
@@ -245,8 +251,11 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(st.s, logOffset, [{from: S.Uninitialized, to: S.Waiting}], () =>
-                csTest.assertNoChange(csCursor),
+            awaitV2StageStateTransitions(
+                st.s,
+                logOffset,
+                [{from: S.Uninitialized, to: S.Waiting}],
+                () => csTest.assertNoChange(csCursor),
             );
         });
 
@@ -267,14 +276,23 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             csTest = new ChangeStreamTest(db);
             const csCursor = csTest.startWatchingChanges({
                 pipeline: [
-                    {$changeStream: {version: "v2", startAtOperationTime: futureTime, ignoreRemovedShards: true}},
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            startAtOperationTime: futureTime,
+                            ignoreRemovedShards: true,
+                        },
+                    },
                 ],
                 collection: coll,
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(st.s, logOffset, [{from: S.Uninitialized, to: S.Waiting}], () =>
-                csTest.assertNoChange(csCursor),
+            awaitV2StageStateTransitions(
+                st.s,
+                logOffset,
+                [{from: S.Uninitialized, to: S.Waiting}],
+                () => csTest.assertNoChange(csCursor),
             );
         });
 
@@ -378,7 +396,10 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                     {from: S.Uninitialized, to: S.Waiting},
                     {from: S.Waiting, to: S.FetchingInitialization},
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
@@ -398,7 +419,9 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
 
             coll = db[collName];
             assert.commandWorked(db.createCollection(coll.getName()));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
             assert.commandWorked(
                 db.adminCommand({
@@ -449,7 +472,11 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             awaitLogMessageCodes(st.s, [kHandleMoveChunk], () => csTest.assertNoChange(csCursor));
 
             // The stage must not have left FetchingGettingChangeEvent.
-            assertNoV2StageStateTransitionFrom(st.s, logOffsetAfterInit, S.FetchingGettingChangeEvent);
+            assertNoV2StageStateTransitionFrom(
+                st.s,
+                logOffsetAfterInit,
+                S.FetchingGettingChangeEvent,
+            );
         });
 
         it("IRS mode: stays in FetchingNormalGettingChangeEvent during moveChunk", () => {
@@ -459,7 +486,9 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
 
             coll = db[collName];
             assert.commandWorked(db.createCollection(coll.getName()));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
             assert.commandWorked(
                 db.adminCommand({
@@ -484,7 +513,13 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             csTest = new ChangeStreamTest(db);
             const csCursor = csTest.startWatchingChanges({
                 pipeline: [
-                    {$changeStream: {version: "v2", startAtOperationTime: currentTime, ignoreRemovedShards: true}},
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            startAtOperationTime: currentTime,
+                            ignoreRemovedShards: true,
+                        },
+                    },
                 ],
                 collection: coll,
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
@@ -517,7 +552,11 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             awaitLogMessageCodes(st.s, [kHandleMoveChunk], () => csTest.assertNoChange(csCursor));
 
             // The stage must not have left FetchingNormalGettingChangeEvent.
-            assertNoV2StageStateTransitionFrom(st.s, logOffsetAfterInit, S.FetchingNormalGettingChangeEvent);
+            assertNoV2StageStateTransitionFrom(
+                st.s,
+                logOffsetAfterInit,
+                S.FetchingNormalGettingChangeEvent,
+            );
         });
     });
 });

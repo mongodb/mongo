@@ -48,9 +48,15 @@ const verifySortOptimizationApplied = (
         getAggPlanStages(explainOutput, "$sort").length > 0;
 
     if (shouldOptimize) {
-        assert(!sortFound, "Expected $sort to be removed by optimization, but it was found in the explain output");
+        assert(
+            !sortFound,
+            "Expected $sort to be removed by optimization, but it was found in the explain output",
+        );
     } else {
-        assert(sortFound, "Expected $sort to remain in pipeline, but it was not found in the explain output");
+        assert(
+            sortFound,
+            "Expected $sort to remain in pipeline, but it was not found in the explain output",
+        );
     }
 };
 
@@ -62,7 +68,10 @@ const runTestStoredSourceFalse = () => {
     const multiFieldSort = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}, x: 1}};
 
     verifySortOptimizationApplied(validStage);
-    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore, sortStageVectorSearchScore]);
+    verifySortOptimizationApplied(validStage, [
+        sortStageVectorSearchScore,
+        sortStageVectorSearchScore,
+    ]);
     verifySortOptimizationApplied(validStage, [
         sortStageVectorSearchScore,
         sortStageVectorSearchScore,
@@ -72,7 +81,9 @@ const runTestStoredSourceFalse = () => {
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
     // TODO SERVER-127594: expect sort removal once intervening stages set preservesOrderAndMetadata=true.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
-    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$addFields: {"cats": 67}}]);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [
+        {$addFields: {"cats": 67}},
+    ]);
 };
 
 // storedSource=true desugars to [$testVectorSearch, $replaceRoot, ...].
@@ -84,7 +95,11 @@ const runTestStoredSourceTrue = () => {
     const multiFieldSort = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}, x: 1}};
 
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], true);
-    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore, sortStageVectorSearchScore], true);
+    verifySortOptimizationApplied(
+        validStage,
+        [sortStageVectorSearchScore, sortStageVectorSearchScore],
+        true,
+    );
     verifySortOptimizationApplied(
         validStage,
         [sortStageVectorSearchScore, sortStageVectorSearchScore, sortStageVectorSearchScore],
@@ -94,7 +109,9 @@ const runTestStoredSourceTrue = () => {
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
     // TODO SERVER-127594: expect sort removal once intervening stages set preservesOrderAndMetadata=true.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
-    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$addFields: {"cats": 67}}]);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [
+        {$addFields: {"cats": 67}},
+    ]);
 };
 
 runTestStoredSourceFalse();
@@ -138,7 +155,8 @@ const getPipelineSuffixBoundsFromExplain = (explainOutput) => {
 };
 
 const assertPipelineSuffixBounds = (name, explainOutput, expected) => {
-    const {minBoundsType, maxBoundsType, extractedLimit} = getPipelineSuffixBoundsFromExplain(explainOutput);
+    const {minBoundsType, maxBoundsType, extractedLimit} =
+        getPipelineSuffixBoundsFromExplain(explainOutput);
     assert.eq(
         minBoundsType,
         expected.expectedMinBoundsType,
@@ -279,15 +297,17 @@ const testPipelineSuffixBounds = () => {
         },
     ];
 
-    testCases.forEach(({name, stages, expectedMinBoundsType, expectedMaxBoundsType, expectedExtractedLimit}) => {
-        const pipeline = [desugarFalseStage, ...stages];
-        const explainOutput = coll.explain("queryPlanner").aggregate(pipeline);
-        assertPipelineSuffixBounds(name, explainOutput, {
-            expectedMinBoundsType,
-            expectedMaxBoundsType,
-            expectedExtractedLimit,
-        });
-    });
+    testCases.forEach(
+        ({name, stages, expectedMinBoundsType, expectedMaxBoundsType, expectedExtractedLimit}) => {
+            const pipeline = [desugarFalseStage, ...stages];
+            const explainOutput = coll.explain("queryPlanner").aggregate(pipeline);
+            assertPipelineSuffixBounds(name, explainOutput, {
+                expectedMinBoundsType,
+                expectedMaxBoundsType,
+                expectedExtractedLimit,
+            });
+        },
+    );
 };
 
 testPipelineSuffixBounds();
@@ -336,7 +356,14 @@ testPipelineSuffixBounds();
     ];
 
     desugaredCases.forEach(
-        ({name, stage, suffix, expectedMinBoundsType, expectedMaxBoundsType, expectedExtractedLimit}) => {
+        ({
+            name,
+            stage,
+            suffix,
+            expectedMinBoundsType,
+            expectedMaxBoundsType,
+            expectedExtractedLimit,
+        }) => {
             const explainOutput = coll.explain("queryPlanner").aggregate([stage, ...suffix]);
             assertPipelineSuffixBounds(name, explainOutput, {
                 expectedMinBoundsType,
@@ -370,7 +397,10 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
 {
     const explain = coll.explain("queryPlanner").aggregate([desugarFalseStage]);
     const stageSpec = getTestVectorSearchSpecFromExplain(explain);
-    assert(stageSpec !== undefined, "Expected $testVectorSearch spec in explain: " + tojson(explain));
+    assert(
+        stageSpec !== undefined,
+        "Expected $testVectorSearch spec in explain: " + tojson(explain),
+    );
     assert.eq(
         stageSpec.inPlaceRuleApplied,
         true,
@@ -380,13 +410,19 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
 
 // Verify the in-place rule fires when the stage desugars (storedSource: true).
 {
-    const explain = coll.explain("queryPlanner").aggregate([buildTestVectorSearchOptStage({storedSource: true})]);
+    const explain = coll
+        .explain("queryPlanner")
+        .aggregate([buildTestVectorSearchOptStage({storedSource: true})]);
     const stageSpec = getTestVectorSearchSpecFromExplain(explain);
-    assert(stageSpec !== undefined, "Expected $testVectorSearch spec in explain: " + tojson(explain));
+    assert(
+        stageSpec !== undefined,
+        "Expected $testVectorSearch spec in explain: " + tojson(explain),
+    );
     assert.eq(
         stageSpec.inPlaceRuleApplied,
         true,
-        "Expected inPlaceRuleApplied:true for desugared (storedSource:true), got: " + tojson(stageSpec),
+        "Expected inPlaceRuleApplied:true for desugared (storedSource:true), got: " +
+            tojson(stageSpec),
     );
 }
 
@@ -431,7 +467,8 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
         !getStageFromSplitPipeline(explain, "$extensionLimit"),
-        "Expected $extensionLimit to be erased by eraseExtensionLimit rule, but found it in: " + tojson(explain),
+        "Expected $extensionLimit to be erased by eraseExtensionLimit rule, but found it in: " +
+            tojson(explain),
     );
     assert(
         getStageFromSplitPipeline(explain, "$addFields"),
@@ -459,6 +496,7 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
         getStageFromSplitPipeline(explain, "$skip"),
-        "Expected $skip to remain since eraseExtensionLimit should not fire, but got: " + tojson(explain),
+        "Expected $skip to remain since eraseExtensionLimit should not fire, but got: " +
+            tojson(explain),
     );
 }

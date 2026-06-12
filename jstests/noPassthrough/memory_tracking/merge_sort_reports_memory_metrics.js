@@ -32,7 +32,9 @@ if (checkSbeFullyEnabled(db)) {
     quit();
 }
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}),
+);
 
 const collName = jsTestName();
 const coll = db[collName];

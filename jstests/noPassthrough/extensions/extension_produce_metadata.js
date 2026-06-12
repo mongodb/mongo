@@ -11,7 +11,10 @@
  *   featureFlagExtensionsOptimizations,
  * ]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -39,7 +42,11 @@ function runTests(conn, shardingTest) {
     // Runs a pipeline and asserts each result has score = _id * 5 in the given field.
     function assertScoreMetadata(pipeline, expectedCount, scoreField) {
         const results = coll.aggregate(pipeline).toArray();
-        assert.eq(results.length, expectedCount, `Expected ${expectedCount} results, got: ${tojson(results)}`);
+        assert.eq(
+            results.length,
+            expectedCount,
+            `Expected ${expectedCount} results, got: ${tojson(results)}`,
+        );
         for (const doc of results) {
             const expectedScore = doc._id * 5;
             assert.eq(
@@ -52,15 +59,24 @@ function runTests(conn, shardingTest) {
 
     // When the suffix does NOT reference $score, the metadata should not be produced.
     {
-        const results = coll.aggregate([{$readNDocuments: {numDocs: 3}}, {$project: {_id: 1, val: 1}}]).toArray();
+        const results = coll
+            .aggregate([{$readNDocuments: {numDocs: 3}}, {$project: {_id: 1, val: 1}}])
+            .toArray();
         assert.eq(results.length, 3, `Expected 3 results, got: ${tojson(results)}`);
         for (const doc of results) {
-            assert(!doc.hasOwnProperty("score"), `score should not appear in document fields: ${tojson(doc)}`);
+            assert(
+                !doc.hasOwnProperty("score"),
+                `score should not appear in document fields: ${tojson(doc)}`,
+            );
         }
     }
 
     // When the suffix references {$meta: "score"}, the metadata IS produced.
-    assertScoreMetadata([{$readNDocuments: {numDocs: 10}}, {$project: {_id: 1, score: {$meta: "score"}}}], 10, "score");
+    assertScoreMetadata(
+        [{$readNDocuments: {numDocs: 10}}, {$project: {_id: 1, score: {$meta: "score"}}}],
+        10,
+        "score",
+    );
 
     // Score metadata with an intervening $limit and a non-score $addFields — deps analysis should
     // see through multiple stages to find the downstream $meta: "score" reference.
@@ -76,11 +92,17 @@ function runTests(conn, shardingTest) {
     );
 
     // Score metadata via $addFields — also triggers needsMetadata("score").
-    assertScoreMetadata([{$readNDocuments: {numDocs: 3}}, {$addFields: {myScore: {$meta: "score"}}}], 3, "myScore");
+    assertScoreMetadata(
+        [{$readNDocuments: {numDocs: 3}}, {$addFields: {myScore: {$meta: "score"}}}],
+        3,
+        "myScore",
+    );
 
     // Score metadata via $sort — sorting by score triggers needsMetadata("score") on its own.
     {
-        const results = coll.aggregate([{$readNDocuments: {numDocs: 5}}, {$sort: {score: {$meta: "score"}}}]).toArray();
+        const results = coll
+            .aggregate([{$readNDocuments: {numDocs: 5}}, {$sort: {score: {$meta: "score"}}}])
+            .toArray();
         assert.eq(results.length, 5, `Expected 5 results, got: ${tojson(results)}`);
         // {$meta: "score"} sorts descending by default. score = _id * 5, so _ids should be
         // in descending order.
@@ -94,4 +116,9 @@ function runTests(conn, shardingTest) {
     }
 }
 
-withExtensions({"libread_n_documents_mongo_extension.so": {}}, runTests, ["standalone", "sharded"], {shards: 2});
+withExtensions(
+    {"libread_n_documents_mongo_extension.so": {}},
+    runTests,
+    ["standalone", "sharded"],
+    {shards: 2},
+);

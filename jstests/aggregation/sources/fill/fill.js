@@ -61,7 +61,10 @@ const testCases = [
         ],
     ], // 1
     [
-        [{$project: {linear: 0, part: 0, nested: 0}}, {$fill: {sortBy: {_id: 1}, output: {other: {method: "locf"}}}}],
+        [
+            {$project: {linear: 0, part: 0, nested: 0}},
+            {$fill: {sortBy: {_id: 1}, output: {other: {method: "locf"}}}},
+        ],
         [
             {_id: 1, other: 1},
             {_id: 2, other: 1},
@@ -362,5 +365,9 @@ const testCases = [
 
 for (let i = 0; i < testCases.length; i++) {
     const result = coll.aggregate(testCases[i][0]).toArray();
-    assertArrayEq({actual: result, expected: testCases[i][1], extraErrorMsg: " during testCase " + i});
+    assertArrayEq({
+        actual: result,
+        expected: testCases[i][1],
+        extraErrorMsg: " during testCase " + i,
+    });
 }

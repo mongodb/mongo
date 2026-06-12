@@ -8,7 +8,10 @@
  */
 import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
 import {code, line, linebreak, subSection} from "jstests/libs/query/pretty_md.js";
-import {getJoinOrderOneLine, getWinningJoinOrderOneLine} from "jstests/query_golden/libs/pretty_plan.js";
+import {
+    getJoinOrderOneLine,
+    getWinningJoinOrderOneLine,
+} from "jstests/query_golden/libs/pretty_plan.js";
 import {getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {joinTestWrapper, joinOptUsed} from "jstests/libs/query/join_utils.js";
@@ -65,7 +68,9 @@ function runTestForHints(coll, pipeline, hintTests) {
     );
     const allOrders = getAllOrders(
         coll,
-        [{$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}}].concat(pipeline),
+        [{$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}}].concat(
+            pipeline,
+        ),
         {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]},
     );
     subSection(`Total number of join orders: ${allOrders.size}`);
@@ -101,11 +106,17 @@ joinTestWrapper(db, () => {
         [
             {
                 testCase: "INLJ only, all plans",
-                hint: {perSubsetLevelMode: [{level: NumberInt(0), hint: {method: "INLJ"}, mode: "ALL"}]},
+                hint: {
+                    perSubsetLevelMode: [
+                        {level: NumberInt(0), hint: {method: "INLJ"}, mode: "ALL"},
+                    ],
+                },
             },
             {
                 testCase: "HJ only, all plans",
-                hint: {perSubsetLevelMode: [{level: NumberInt(0), hint: {method: "HJ"}, mode: "ALL"}]},
+                hint: {
+                    perSubsetLevelMode: [{level: NumberInt(0), hint: {method: "HJ"}, mode: "ALL"}],
+                },
             },
             {
                 testCase: "Fixed methods: HJ then NLJ, all plans",
@@ -144,8 +155,16 @@ joinTestWrapper(db, () => {
                 hint: {
                     perSubsetLevelMode: [
                         {level: NumberInt(0), hint: {node: NumberInt(2)}, mode: "ALL"},
-                        {level: NumberInt(1), hint: {node: NumberInt(1), isLeftChild: true}, mode: "ALL"},
-                        {level: NumberInt(2), hint: {node: NumberInt(0), isLeftChild: true}, mode: "ALL"},
+                        {
+                            level: NumberInt(1),
+                            hint: {node: NumberInt(1), isLeftChild: true},
+                            mode: "ALL",
+                        },
+                        {
+                            level: NumberInt(2),
+                            hint: {node: NumberInt(0), isLeftChild: true},
+                            mode: "ALL",
+                        },
                     ],
                 },
             },
@@ -155,8 +174,16 @@ joinTestWrapper(db, () => {
                 hint: {
                     perSubsetLevelMode: [
                         {level: NumberInt(0), hint: {node: NumberInt(2)}, mode: "CHEAPEST"},
-                        {level: NumberInt(1), hint: {node: NumberInt(1), isLeftChild: true}, mode: "CHEAPEST"},
-                        {level: NumberInt(2), hint: {node: NumberInt(0), isLeftChild: true}, mode: "CHEAPEST"},
+                        {
+                            level: NumberInt(1),
+                            hint: {node: NumberInt(1), isLeftChild: true},
+                            mode: "CHEAPEST",
+                        },
+                        {
+                            level: NumberInt(2),
+                            hint: {node: NumberInt(0), isLeftChild: true},
+                            mode: "CHEAPEST",
+                        },
                     ],
                 },
             },

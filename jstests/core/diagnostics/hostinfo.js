@@ -56,7 +56,11 @@
             ["", null, -1],
             "Missing Number of Cores Available To Process",
         );
-        assertNoneOf(hostinfo.system.numPhysicalCores, ["", null, 0], "Missing Number of Physical Cores");
+        assertNoneOf(
+            hostinfo.system.numPhysicalCores,
+            ["", null, 0],
+            "Missing Number of Physical Cores",
+        );
         assertNoneOf(hostinfo.system.numCpuSockets, ["", null, 0], "Missing Number of CPU Sockets");
         assertNoneOf(hostinfo.system.cpuArch, ["", null], "Missing CPU Architecture");
         assertNoneOf(hostinfo.system.numaEnabled, ["", null], "Missing NUMA flag");

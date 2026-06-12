@@ -19,13 +19,21 @@ let sessionDB = session.getDatabase("unsharded_lookup_in_txn");
 const shardedColl = sessionDB.sharded;
 const unshardedColl = sessionDB.unsharded;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: sessionDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: sessionDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
-assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}),
+);
 
 // Move all of the data to shard 1.
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {_id: 0}, to: st.shard1.shardName}),
+    st.s.adminCommand({
+        moveChunk: shardedColl.getFullName(),
+        find: {_id: 0},
+        to: st.shard1.shardName,
+    }),
 );
 flushRoutersAndRefreshShardMetadata(st, {ns: shardedColl.getFullName()});
 
@@ -79,7 +87,9 @@ const testLookupDoesNotSeeDocumentsOutsideSnapshot = function () {
 
             // Do writes on the unsharded collection from outside the session.
             (function () {
-                const unshardedCollOutsideSession = st.s.getDB(sessionDB.getName())[unshardedColl.getName()];
+                const unshardedCollOutsideSession = st.s.getDB(sessionDB.getName())[
+                    unshardedColl.getName()
+                ];
                 assert.commandWorked(unshardedCollOutsideSession.insert({b: 1, xyz: 1}));
                 assert.commandWorked(unshardedCollOutsideSession.insert({b: 1, xyz: 2}));
             })();
@@ -107,7 +117,11 @@ testLookupDoesNotSeeDocumentsOutsideSnapshot();
 // Move some data to shard 0, so that the merging shard will be targeted.
 assert.commandWorked(st.s.adminCommand({split: shardedColl.getFullName(), middle: {_id: 0}}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {_id: -1}, to: st.shard0.shardName}),
+    st.s.adminCommand({
+        moveChunk: shardedColl.getFullName(),
+        find: {_id: -1},
+        to: st.shard0.shardName,
+    }),
 );
 flushRoutersAndRefreshShardMetadata(st, {ns: shardedColl.getFullName()});
 

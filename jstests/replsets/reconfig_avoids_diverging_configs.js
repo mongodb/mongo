@@ -107,7 +107,9 @@ parallelShell();
 // new primary. Make sure all secondaries are out of a recovering state before
 // attempting to shutdown the replica set.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({appendOplogNote: 1, data: {msg: "dummy write to the new primary"}}),
+    rst
+        .getPrimary()
+        .adminCommand({appendOplogNote: 1, data: {msg: "dummy write to the new primary"}}),
 );
 rst.awaitReplication();
 rst.stopSet();

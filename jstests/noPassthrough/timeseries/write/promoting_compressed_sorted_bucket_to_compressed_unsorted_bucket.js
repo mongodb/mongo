@@ -21,7 +21,9 @@ const testDB = conn.getDB(dbName);
 const coll = testDB[collName];
 
 coll.drop();
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+);
 
 const measurements = [
     {_id: 0, [timeFieldName]: ISODate("2024-02-15T10:10:10.000Z"), a: 1},

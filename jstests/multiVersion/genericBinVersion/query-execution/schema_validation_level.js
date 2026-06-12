@@ -15,7 +15,11 @@ rst.initiate();
 const db = rst.getPrimary().getDB("test");
 
 assert.commandWorked(
-    db.createCollection("test", {validator: {a: 1}, validationAction: "error", validationLevel: "constraint"}),
+    db.createCollection("test", {
+        validator: {a: 1},
+        validationAction: "error",
+        validationLevel: "constraint",
+    }),
 );
 
 // Can't downgrade FCV to lastLTS when collection has constraint validation level.
@@ -37,7 +41,9 @@ assert.commandWorked(db.runCommand({collMod: "test", prepareConstraintValidation
 // After removing constraint validation level and prepareConstraintValidationLevel, we should
 // eventually be able to downgrade.
 assert.soon(() => {
-    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     return true;
 });
 

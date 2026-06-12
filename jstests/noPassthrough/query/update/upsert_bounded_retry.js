@@ -22,7 +22,10 @@ function runOnReplsetAndShardedCluster(callbackFn) {
 
         const testDB = st.s.getDB("test");
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: st.shard0.shardName,
+            }),
         );
 
         callbackFn(st.s);
@@ -36,7 +39,9 @@ function main(conn) {
 
     // Partial index, non-transactional upsert and findAndModify.
     assert(db.test.drop());
-    assert.commandWorked(db.test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}));
+    assert.commandWorked(
+        db.test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}),
+    );
     assert.commandWorked(db.test.insert({userId: 1}));
     assert.commandWorked(db.test.insert({userId: 1, indexed: true}));
     assert.writeError(db.test.update({userId: 1}, {$set: {indexed: true}}, {upsert: true}));
@@ -70,7 +75,9 @@ function main(conn) {
         let session = conn.startSession();
         let test = session.getDatabase("test").getCollection("test");
         assert(test.drop());
-        assert.commandWorked(test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}));
+        assert.commandWorked(
+            test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}),
+        );
         assert.commandWorked(test.insert({userId: 1}));
         assert.commandWorked(test.insert({userId: 1, indexed: true}));
         session.startTransaction();

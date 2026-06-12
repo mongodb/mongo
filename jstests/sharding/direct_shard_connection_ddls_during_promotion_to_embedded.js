@@ -21,7 +21,9 @@ const testCommands = [
     {
         name: "renameCollection",
         execute: (db) =>
-            db.getSiblingDB("admin").runCommand({renameCollection: "testDB.testColl1", to: "testDB.testColl1Renamed"}),
+            db
+                .getSiblingDB("admin")
+                .runCommand({renameCollection: "testDB.testColl1", to: "testDB.testColl1Renamed"}),
     },
     {
         name: "implicitCollectionCreation",
@@ -70,11 +72,13 @@ const testCommands = [
     },
     {
         name: "applyOps with DDL operation",
-        execute: (db) => db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl0"}}]}),
+        execute: (db) =>
+            db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl0"}}]}),
     },
     {
         name: "applyOps with CRUD operation",
-        execute: (db) => db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl0", o: {_id: 1, x: 1}}]}),
+        execute: (db) =>
+            db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl0", o: {_id: 1, x: 1}}]}),
     },
 ];
 
@@ -186,12 +190,19 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         this.createAdminUser(this.configRS.getPrimary());
 
         jsTest.log.info("Creating new user with dbOwner permissions on config server replica set");
-        this.testDBDirectConnection = this.createRegularUser(this.configRS.getPrimary(), "testDB", "user", "x");
+        this.testDBDirectConnection = this.createRegularUser(
+            this.configRS.getPrimary(),
+            "testDB",
+            "user",
+            "x",
+        );
 
         jsTest.log.info("Inserting data on the config server replica set");
         assert.commandWorked(this.testDBDirectConnection.testColl.insertOne({x: 1}));
 
-        jsTest.log.info("Restarting config server replica set nodes with configsvr and maintenance mode options");
+        jsTest.log.info(
+            "Restarting config server replica set nodes with configsvr and maintenance mode options",
+        );
         this.doRollingRestart(this.configRS, {
             configsvr: "",
             replicaSetConfigShardMaintenanceMode: "",
@@ -211,7 +222,9 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         this.configRS.asCluster(
             this.configRS.getPrimary(),
             () => {
-                assert.commandWorked(this.configRS.getPrimary().adminCommand({replSetReconfig: config}));
+                assert.commandWorked(
+                    this.configRS.getPrimary().adminCommand({replSetReconfig: config}),
+                );
             },
             this.keyFile,
         );
@@ -226,14 +239,21 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         this.testDBDirectConnection = newConn.getDB("testDB");
         assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
 
-        jsTest.log.info("Checking that sharding is not yet initialized on the config server replica set");
+        jsTest.log.info(
+            "Checking that sharding is not yet initialized on the config server replica set",
+        );
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
-            const res = assert.commandWorked(this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}));
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}),
+            );
             assert.eq(res.enabled, false);
         });
 
         jsTest.log.info("Starting mongos node binded to config server replica set");
-        this.mongos = MongoRunner.runMongos({keyFile: this.keyFile, configdb: this.configRS.getURL()});
+        this.mongos = MongoRunner.runMongos({
+            keyFile: this.keyFile,
+            configdb: this.configRS.getURL(),
+        });
     });
 
     afterEach(function () {
@@ -243,7 +263,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
 
     it("Direct DDLs started after the initialization of sharding during promotion", () => {
         jsTest.log.info("Setting fail point hangAfterShardingInitialization");
-        const shardInitializationFP = configureFailPoint(this.configRS.getPrimary(), "hangAfterShardingInitialization");
+        const shardInitializationFP = configureFailPoint(
+            this.configRS.getPrimary(),
+            "hangAfterShardingInitialization",
+        );
 
         jsTest.log.info(
             "Starting parallel shell for promoting replica set to sharded cluster with embedded config server",
@@ -262,7 +285,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             jsTest.log.info(
                 `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
             );
-            assert.commandFailedWithCode(testCommand.execute(this.testDBDirectConnection), ErrorCodes.Unauthorized);
+            assert.commandFailedWithCode(
+                testCommand.execute(this.testDBDirectConnection),
+                ErrorCodes.Unauthorized,
+            );
         });
 
         this.configRS.asCluster(
@@ -288,14 +314,19 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
 
         jsTest.log.info("Checking that sharding is initialized on the config server replica set");
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
-            const res = assert.commandWorked(this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}));
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}),
+            );
             assert.eq(res.enabled, true);
         });
     });
 
     it("Direct DDLs draining after initialization of sharding during promotion", () => {
         jsTest.log.info("Setting fail point hangDuringDropCollection");
-        const dropCmdFP = configureFailPoint(this.configRS.getPrimary(), "hangDuringDropCollection");
+        const dropCmdFP = configureFailPoint(
+            this.configRS.getPrimary(),
+            "hangDuringDropCollection",
+        );
 
         jsTest.log.info("Starting parallel shell for running direct DDL operation");
         const dropCmdParallelShell = startParallelShell(() => {
@@ -309,7 +340,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
 
         jsTest.log.info("Setting fail point hangAfterDrainingDDLOperations");
         const configPrimary = this.configRS.getPrimary();
-        const shardAfterDrainingDDLOperationsFP = configureFailPoint(configPrimary, "hangAfterDrainingDDLOperations");
+        const shardAfterDrainingDDLOperationsFP = configureFailPoint(
+            configPrimary,
+            "hangAfterDrainingDDLOperations",
+        );
 
         jsTest.log.info(
             "Starting parallel shell for promoting replica set to sharded cluster with embedded config server",
@@ -320,7 +354,9 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             db.getSiblingDB("admin").logout();
         }, this.mongos.port);
 
-        jsTest.log.info("Checking that the draining of DDls operations is timing out (timeout set to 15s)");
+        jsTest.log.info(
+            "Checking that the draining of DDls operations is timing out (timeout set to 15s)",
+        );
         const TIMEOUT_MS = 15000;
         assert(
             !shardAfterDrainingDDLOperationsFP.waitWithTimeout(TIMEOUT_MS),
@@ -347,7 +383,9 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Promote to sharded");
         const adminDBMongosConnection = this.mongos.getDB("admin");
         assert(adminDBMongosConnection.auth("admin", "x"), "Authentication failed");
-        assert.commandWorked(adminDBMongosConnection.adminCommand({"transitionFromDedicatedConfigServer": 1}));
+        assert.commandWorked(
+            adminDBMongosConnection.adminCommand({"transitionFromDedicatedConfigServer": 1}),
+        );
 
         jsTest.log.info("Check that the transaction was aborted");
         const res = session.getDatabase("testDB").runCommand({insert: "foo", documents: [{x: 1}]});
@@ -359,14 +397,19 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Promoting replica set to sharded cluster with embedded config server");
         const adminDBMongosConnection = this.mongos.getDB("admin");
         assert(adminDBMongosConnection.auth("admin", "x"), "Authentication failed");
-        assert.commandWorked(adminDBMongosConnection.adminCommand({"transitionFromDedicatedConfigServer": 1}));
+        assert.commandWorked(
+            adminDBMongosConnection.adminCommand({"transitionFromDedicatedConfigServer": 1}),
+        );
 
         jsTest.log.info("Checking that direct DDLs are disallowed without special permissions");
         testCommands.forEach((testCommand) => {
             jsTest.log.info(
                 `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
             );
-            assert.commandFailedWithCode(testCommand.execute(this.testDBDirectConnection), ErrorCodes.Unauthorized);
+            assert.commandFailedWithCode(
+                testCommand.execute(this.testDBDirectConnection),
+                ErrorCodes.Unauthorized,
+            );
         });
 
         this.configRS.asCluster(
@@ -380,7 +423,8 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             this.keyFile,
         );
         testCommands.forEach((testCommand) => {
-            jsTest.log.info(`Checking that ${testCommand.name} is allowed with directShardOperations special
+            jsTest.log
+                .info(`Checking that ${testCommand.name} is allowed with directShardOperations special
                     permissions`);
             assert.commandWorked(testCommand.execute(this.testDBDirectConnection));
         });
@@ -389,8 +433,13 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         // cannot be run through mongos
         jsTest.log.info("Checking that DDLs are allowed through mongos");
         testCommands.forEach((testCommand) => {
-            if (testCommand.name.includes("cloneCollectionAsCapped") || testCommand.name.includes("applyOps")) {
-                jsTest.log.info(`Skipping ${testCommand.name} check since it is not supported on mongos`);
+            if (
+                testCommand.name.includes("cloneCollectionAsCapped") ||
+                testCommand.name.includes("applyOps")
+            ) {
+                jsTest.log.info(
+                    `Skipping ${testCommand.name} check since it is not supported on mongos`,
+                );
             } else {
                 jsTest.log.info(`Checking that ${testCommand.name} is allowed through mongos`);
                 assert.commandWorked(testCommand.execute(this.mongos.getDB("testDB")));

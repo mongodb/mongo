@@ -18,7 +18,9 @@ const bucketRoundingSecondsHours = 60 * 60 * 24;
 function createTestColl() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "time", granularity: "seconds"}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "time", granularity: "seconds"},
+        }),
     );
 
     // This test cannot use the index with the key {'time': 1}, since that is the same as the implicitly

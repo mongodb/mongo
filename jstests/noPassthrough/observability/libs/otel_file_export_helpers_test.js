@@ -128,8 +128,14 @@ describe("getLatestMetrics", function () {
             assert.neq(result, null);
             assert(result.hasOwnProperty("m.latest"), "Should contain metric from latest file");
             assert.eq(result["m.latest"].value, 30);
-            assert(!result.hasOwnProperty("m.early"), "Should not contain metrics from older files");
-            assert(!result.hasOwnProperty("m.middle"), "Should not contain metrics from older files");
+            assert(
+                !result.hasOwnProperty("m.early"),
+                "Should not contain metrics from older files",
+            );
+            assert(
+                !result.hasOwnProperty("m.middle"),
+                "Should not contain metrics from older files",
+            );
         });
 
         it("uses only the last record from each file", function () {
@@ -247,7 +253,12 @@ describe("getLatestMetrics", function () {
             const dir = createTestDir("gauge_multi");
 
             writeMetricsFile(dir, "test-metrics.jsonl", [
-                makeRecord([makeGaugeMetric("active_conns", [makeDataPoint(3, kTime1Ns), makeDataPoint(7, kTime1Ns)])]),
+                makeRecord([
+                    makeGaugeMetric("active_conns", [
+                        makeDataPoint(3, kTime1Ns),
+                        makeDataPoint(7, kTime1Ns),
+                    ]),
+                ]),
             ]);
 
             const result = getLatestMetrics(dir);
@@ -268,7 +279,9 @@ describe("getLatestMetrics", function () {
                 explicitBounds: [5, 10, 25, 50],
             });
 
-            writeMetricsFile(dir, "test-metrics.jsonl", [makeRecord([makeHistogramMetric("duration", [histDP])])]);
+            writeMetricsFile(dir, "test-metrics.jsonl", [
+                makeRecord([makeHistogramMetric("duration", [histDP])]),
+            ]);
 
             const result = getLatestMetrics(dir);
             assert.neq(result, null);
@@ -370,7 +383,10 @@ describe("getLatestMetrics", function () {
             });
 
             writeMetricsFile(dir, "test-metrics.jsonl", [
-                makeRecord([makeSumMetric("m1", [makeDataPoint(1, kTime1Ns)]), makeHistogramMetric("h1", [histDP])]),
+                makeRecord([
+                    makeSumMetric("m1", [makeDataPoint(1, kTime1Ns)]),
+                    makeHistogramMetric("h1", [histDP]),
+                ]),
             ]);
 
             const result = getLatestMetrics(dir);
@@ -402,7 +418,10 @@ describe("extractPrometheusMetricIntValue", function () {
 
     it("replaces dots with underscores in the metric name for matching", function () {
         assert.eq(
-            extractPrometheusMetricIntValue(/*metricsText=*/ "a_b_c_total{} 7 123456\n", /*metricName=*/ "a.b.c"),
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "a_b_c_total{} 7 123456\n",
+                /*metricName=*/ "a.b.c",
+            ),
             7,
         );
     });
@@ -419,14 +438,20 @@ describe("extractPrometheusMetricIntValue", function () {
 
     it("returns null for null metricsText", function () {
         assert.eq(
-            extractPrometheusMetricIntValue(/*metricsText=*/ null, /*metricName=*/ "network.connections_processed"),
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ null,
+                /*metricName=*/ "network.connections_processed",
+            ),
             null,
         );
     });
 
     it("returns null for empty metricsText", function () {
         assert.eq(
-            extractPrometheusMetricIntValue(/*metricsText=*/ "", /*metricName=*/ "network.connections_processed"),
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "",
+                /*metricName=*/ "network.connections_processed",
+            ),
             null,
         );
     });
@@ -439,8 +464,14 @@ describe("extractPrometheusMetricIntValue", function () {
                 'db_operations_total{otel_scope_name="mongodb"} 200 123456',
             ].join("\n") + "\n";
 
-        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"), 50);
-        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.bytes_sent"), 1024);
+        assert.eq(
+            extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"),
+            50,
+        );
+        assert.eq(
+            extractPrometheusMetricIntValue(text, /*metricName=*/ "network.bytes_sent"),
+            1024,
+        );
         assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "db.operations"), 200);
     });
 
@@ -452,7 +483,10 @@ describe("extractPrometheusMetricIntValue", function () {
                 'network_connections_processed_total{otel_scope_name="mongodb"} 77 123456',
             ].join("\n") + "\n";
 
-        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"), 77);
+        assert.eq(
+            extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"),
+            77,
+        );
     });
 
     it("matches metrics with a single unit suffix", function () {
@@ -504,7 +538,10 @@ describe("extractPrometheusMetricIntValue", function () {
 
 describe("extractPrometheusMetricTime", function () {
     it("returns the timestamp from a target_info line with empty braces", function () {
-        assert.eq(extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 1 1700000000000\n"), 1700000000000);
+        assert.eq(
+            extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 1 1700000000000\n"),
+            1700000000000,
+        );
     });
 
     it("returns the timestamp from a target_info line with attributes", function () {
@@ -546,6 +583,9 @@ describe("extractPrometheusMetricTime", function () {
     });
 
     it("ignores the value and only returns the timestamp", function () {
-        assert.eq(extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 99 1700000055555\n"), 1700000055555);
+        assert.eq(
+            extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 99 1700000055555\n"),
+            1700000055555,
+        );
     });
 });

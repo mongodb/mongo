@@ -46,7 +46,9 @@ let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 jsTestLog("Bucket size: " + timeseriesStats.avgBucketSize);
 
 const timeseriesBucketMaxSize = (() => {
-    const res = assert.commandWorked(db.adminCommand({getParameter: 1, timeseriesBucketMaxSize: 1}));
+    const res = assert.commandWorked(
+        db.adminCommand({getParameter: 1, timeseriesBucketMaxSize: 1}),
+    );
     return res.timeseriesBucketMaxSize;
 })();
 

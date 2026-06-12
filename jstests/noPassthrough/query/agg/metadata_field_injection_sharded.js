@@ -106,7 +106,9 @@ function assertStoredFieldSurvivesSingleShard(coll, id1, id2, fieldName) {
 function setupShardedCollection(st, ns, splitPoint) {
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: splitPoint}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: splitPoint}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: splitPoint}, to: st.shard1.shardName}),
+    );
 }
 
 describe("metadata field handling on sharded clusters", function () {
@@ -114,7 +116,12 @@ describe("metadata field handling on sharded clusters", function () {
     before(function () {
         this.st = new ShardingTest({shards: 2});
         const db = this.st.s.getDB("test");
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: "test", primaryShard: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enableSharding: "test",
+                primaryShard: this.st.shard0.shardName,
+            }),
+        );
 
         this.injectColl = db.metadata_inject;
         setupShardedCollection(this.st, "test.metadata_inject", 0);

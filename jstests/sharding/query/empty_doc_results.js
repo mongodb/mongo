@@ -7,11 +7,15 @@ let mongos = st.s0;
 let coll = mongos.getCollection("foo.bar");
 let admin = mongos.getDB("admin");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 st.printShardingStatus();
 

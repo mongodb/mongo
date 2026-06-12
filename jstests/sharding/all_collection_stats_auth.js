@@ -23,11 +23,19 @@ function testPrivileges() {
     assert.commandWorked(adminDb.runCommand({createUser: "user_no_priv", pwd: "pwd", roles: []}));
 
     assert.commandWorked(
-        adminDb.runCommand({createUser: "user_priv1", pwd: "pwd", roles: [{role: "role_ok_priv", db: "admin"}]}),
+        adminDb.runCommand({
+            createUser: "user_priv1",
+            pwd: "pwd",
+            roles: [{role: "role_ok_priv", db: "admin"}],
+        }),
     );
 
     assert.commandWorked(
-        adminDb.runCommand({createUser: "user_priv2", pwd: "pwd", roles: [{role: "clusterMonitor", db: "admin"}]}),
+        adminDb.runCommand({
+            createUser: "user_priv2",
+            pwd: "pwd",
+            roles: [{role: "clusterMonitor", db: "admin"}],
+        }),
     );
 
     assert(adminDb.logout());

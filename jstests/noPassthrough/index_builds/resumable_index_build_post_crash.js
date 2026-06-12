@@ -77,7 +77,14 @@ let secondary = rst.getSecondary();
  * @param {boolean} expectResume
  * @param {string} expectResumePhase
  */
-const runTest = function (test, subtestName, nodeToCrash, failPointToHang, expectResume, expectResumePhase) {
+const runTest = function (
+    test,
+    subtestName,
+    nodeToCrash,
+    failPointToHang,
+    expectResume,
+    expectResumePhase,
+) {
     const collName = jsTestName() + "_" + subtestName;
 
     jsTest.log.info("Prepare data");
@@ -120,13 +127,15 @@ const runTest = function (test, subtestName, nodeToCrash, failPointToHang, expec
             assert.commandWorked(primary.getDB(dbName).getCollection(collName).insert({a: i}));
 
             if (sideUpdate(i)) {
-                modWrites = () => sideWriteOps.push((coll) => coll.update({a: i}, {$inc: {a: sideWriteDelta}}));
+                modWrites = () =>
+                    sideWriteOps.push((coll) => coll.update({a: i}, {$inc: {a: sideWriteDelta}}));
             }
             if (sideDelete(i)) {
                 modWrites = () => sideWriteOps.push((coll) => coll.deleteOne({a: i}));
             }
             if (postUpdate(i)) {
-                modWrites = () => postWriteOps.push((coll) => coll.update({a: i}, {$inc: {a: postWriteDelta}}));
+                modWrites = () =>
+                    postWriteOps.push((coll) => coll.update({a: i}, {$inc: {a: postWriteDelta}}));
             }
         }
         if (insertDuringBuild(i)) {

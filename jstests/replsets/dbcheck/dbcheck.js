@@ -56,7 +56,11 @@ function checkLogAllConsistent(conn) {
     ]);
 
     assert(maxResult.hasNext(), "dbCheck put no batches in health log");
-    assert.eq(maxResult.next().key, {"_id": {"$maxKey": 1}}, "dbCheck batches should end at MaxKey");
+    assert.eq(
+        maxResult.next().key,
+        {"_id": {"$maxKey": 1}},
+        "dbCheck batches should end at MaxKey",
+    );
 
     let minResult = healthlog.aggregate([
         {$match: {operation: "dbCheckBatch"}},
@@ -64,7 +68,11 @@ function checkLogAllConsistent(conn) {
     ]);
 
     assert(minResult.hasNext(), "dbCheck put no batches in health log");
-    assert.eq(minResult.next().key, {"_id": {"$minKey": 1}}, "dbCheck batches should start at MinKey");
+    assert.eq(
+        minResult.next().key,
+        {"_id": {"$minKey": 1}},
+        "dbCheck batches should start at MinKey",
+    );
 
     // Assert no errors (i.e., found inconsistencies).
     let errs = healthlog.find({"severity": {"$ne": "info"}});
@@ -161,7 +169,10 @@ function simpleTestNonSnapshot() {
     assert.neq(primary, undefined);
     let db = primary.getDB(dbName);
     // "dbCheck no longer supports snapshotRead:false"
-    assert.commandFailedWithCode(db.runCommand({"dbCheck": multiBatchSimpleCollName, snapshotRead: false}), 6769500);
+    assert.commandFailedWithCode(
+        db.runCommand({"dbCheck": multiBatchSimpleCollName, snapshotRead: false}),
+        6769500,
+    );
     // "dbCheck no longer supports snapshotRead:false"
     assert.commandFailedWithCode(db.runCommand({"dbCheck": 1, snapshotRead: false}), 6769501);
 }
@@ -290,7 +301,8 @@ function testDbCheckParameters() {
 
         let query = {"operation": "dbCheckBatch"};
         const expectedBatches =
-            multiBatchSimpleCollSize / maxDocsPerBatch + (multiBatchSimpleCollSize % maxDocsPerBatch ? 1 : 0);
+            multiBatchSimpleCollSize / maxDocsPerBatch +
+            (multiBatchSimpleCollSize % maxDocsPerBatch ? 1 : 0);
         checkHealthLog(healthlog, query, expectedBatches);
 
         query = {"operation": "dbCheckBatch", "data.count": maxDocsPerBatch};
@@ -396,7 +408,10 @@ function runMultiBatchTests(collOpts) {
 function testErrorOnNonexistent() {
     let primary = replSet.getPrimary();
     let db = primary.getDB("this-probably-doesnt-exist");
-    assert.commandFailed(db.runCommand({dbCheck: 1}), "dbCheck spuriously succeeded on nonexistent database");
+    assert.commandFailed(
+        db.runCommand({dbCheck: 1}),
+        "dbCheck spuriously succeeded on nonexistent database",
+    );
     db = primary.getDB(dbName);
     assert.commandFailed(
         db.runCommand({dbCheck: "this-also-probably-doesnt-exist"}),
@@ -414,7 +429,10 @@ function testErrorOnUnreplicated() {
     let primary = replSet.getPrimary();
     let db = primary.getDB("local");
 
-    assert.commandFailed(db.runCommand({dbCheck: "oplog.rs"}), "dbCheck spuriously succeeded on oplog");
+    assert.commandFailed(
+        db.runCommand({dbCheck: "oplog.rs"}),
+        "dbCheck spuriously succeeded on oplog",
+    );
     assert.commandFailed(
         primary.getDB(dbName).runCommand({dbCheck: "system.profile"}),
         "dbCheck spuriously succeeded on system.profile",
@@ -461,10 +479,11 @@ function simpleTestCatchesExtra(collOpts) {
     );
 }
 
-[{validationLevel: "off"}, {validationLevel: "off", clusteredIndex: {key: {_id: 1}, unique: true}}].forEach(
-    (collOpts) => {
-        simpleTestCatchesExtra(collOpts);
-    },
-);
+[
+    {validationLevel: "off"},
+    {validationLevel: "off", clusteredIndex: {key: {_id: 1}, unique: true}},
+].forEach((collOpts) => {
+    simpleTestCatchesExtra(collOpts);
+});
 
 replSet.stopSet();

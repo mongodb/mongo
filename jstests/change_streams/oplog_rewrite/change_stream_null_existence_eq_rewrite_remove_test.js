@@ -20,7 +20,9 @@ const collName = "coll1";
 
 // Define the filters that we want to apply to each field.
 function generateExprFilters(fieldPath) {
-    const valuesToTest = fieldsToBeTested[fieldPath].values.concat(fieldsToBeTested[fieldPath].extraValues);
+    const valuesToTest = fieldsToBeTested[fieldPath].values.concat(
+        fieldsToBeTested[fieldPath].extraValues,
+    );
 
     const exprFieldPath = "$" + fieldPath;
     const exprs = [
@@ -37,14 +39,23 @@ function generateExprFilters(fieldPath) {
     return exprs;
 }
 
-const {startPoint, fieldsToBeTested} = generateEventsAndFieldsToBeTestedForOplogRewrites(db, dbName, collName);
+const {startPoint, fieldsToBeTested} = generateEventsAndFieldsToBeTestedForOplogRewrites(
+    db,
+    dbName,
+    collName,
+);
 
 let predicatesToTest = [];
 for (let fieldToTest in fieldsToBeTested) {
     predicatesToTest = predicatesToTest.concat(generateExprFilters(fieldToTest, fieldsToBeTested));
 }
 
-const failedTestCases = compareOptimizedAndNonOptimizedChangeStreamResults(db, dbName, predicatesToTest, startPoint);
+const failedTestCases = compareOptimizedAndNonOptimizedChangeStreamResults(
+    db,
+    dbName,
+    predicatesToTest,
+    startPoint,
+);
 
 // Assert that there were no failed test cases.
 assert(failedTestCases.length == 0, failedTestCases);

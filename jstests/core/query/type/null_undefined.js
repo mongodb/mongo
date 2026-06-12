@@ -179,11 +179,17 @@ const expectedRes = [
 assert.commandWorked(coll.createIndex({a: 1}));
 runQuery(typeUndefined, expectedRes);
 let explain = coll.find(typeUndefined).explain();
-assert(isIxscan(db, explain), "Expected $type query to be able to use index, but it did not: " + tojson(explain));
+assert(
+    isIxscan(db, explain),
+    "Expected $type query to be able to use index, but it did not: " + tojson(explain),
+);
 
 // A partial filter index with {a: $eq: null} cannot be used for {a: {$type: undefined}}
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$eq: null}}}));
 runQuery(typeUndefined, expectedRes);
 explain = coll.find(typeUndefined).explain();
-assert(isCollscan(db, explain), "Expected $type query to use collection scan, but it did not: " + tojson(explain));
+assert(
+    isCollscan(db, explain),
+    "Expected $type query to use collection scan, but it did not: " + tojson(explain),
+);

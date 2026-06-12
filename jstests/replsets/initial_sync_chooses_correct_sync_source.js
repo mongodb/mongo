@@ -23,7 +23,9 @@ const waitForHeartbeats = (initialSyncNode) => {
     // Wait until the initial sync node knows who the primary is, and for heartbeats from the
     // primary to increase the ping time.
     assert.soon(() => {
-        const replSetGetStatus = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
+        const replSetGetStatus = assert.commandWorked(
+            initialSyncNode.adminCommand({replSetGetStatus: 1}),
+        );
         // The primary should always be node 0, since node 1 has priority 0.
         const primaryPingTime = replSetGetStatus.members[0].pingMs;
         const primaryState = replSetGetStatus.members[0].state;
@@ -32,7 +34,10 @@ const waitForHeartbeats = (initialSyncNode) => {
 
     // Allow the node to advance past the sync source selection stage.
     assert.commandWorked(
-        initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeChoosingSyncSource", mode: "off"}),
+        initialSyncNode.adminCommand({
+            configureFailPoint: "initialSyncHangBeforeChoosingSyncSource",
+            mode: "off",
+        }),
     );
     assert.commandWorked(
         initialSyncNode.adminCommand({
@@ -44,7 +49,9 @@ const waitForHeartbeats = (initialSyncNode) => {
 };
 
 const restartAndWaitForHeartbeats = (rst, initialSyncNode, setParameterOpts = {}) => {
-    setParameterOpts["failpoint.initialSyncHangBeforeChoosingSyncSource"] = tojson({mode: "alwaysOn"});
+    setParameterOpts["failpoint.initialSyncHangBeforeChoosingSyncSource"] = tojson({
+        mode: "alwaysOn",
+    });
     setParameterOpts["failpoint.initialSyncHangBeforeCreatingOplog"] = tojson({mode: "alwaysOn"});
 
     rst.restart(initialSyncNode, {
@@ -62,7 +69,11 @@ const restartAndWaitForHeartbeats = (rst, initialSyncNode, setParameterOpts = {}
 
 const delayMillis = 300; // Adds a delay long enough to make a node not the "nearest" sync source.
 const testName = "initial_sync_chooses_correct_sync_source";
-const rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}], useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: [{}, {rsConfig: {priority: 0}}],
+    useBridge: true,
+});
 const nodes = rst.startSet();
 rst.initiate();
 
@@ -104,17 +115,27 @@ let res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1
 // With zero votes and a default initialSyncSourceReadPreference, the secondary should be the sync
 // source because this is equivalent to "nearest" and the primary is delayed.
 assert.eq(res.syncSourceHost, secondary.host);
-initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCreatingOplog", mode: "off"});
+initialSyncNode.adminCommand({
+    configureFailPoint: "initialSyncHangBeforeCreatingOplog",
+    mode: "off",
+});
 
 /*-----------------------------------------------------------------------------------------------*/
-jsTestLog("Testing chaining enabled, 'primaryPreferred' initialSyncSourceReadPreference, non-voting node");
-restartAndWaitForHeartbeats(rst, initialSyncNode, {"initialSyncSourceReadPreference": "primaryPreferred"});
+jsTestLog(
+    "Testing chaining enabled, 'primaryPreferred' initialSyncSourceReadPreference, non-voting node",
+);
+restartAndWaitForHeartbeats(rst, initialSyncNode, {
+    "initialSyncSourceReadPreference": "primaryPreferred",
+});
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With an initialSyncSourceReadPreference of 'primaryPreferred', the primary should be the sync
 // source even when it is delayed.
 assert.eq(res.syncSourceHost, primary.host);
-initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCreatingOplog", mode: "off"});
+initialSyncNode.adminCommand({
+    configureFailPoint: "initialSyncHangBeforeCreatingOplog",
+    mode: "off",
+});
 
 /*-----------------------------------------------------------------------------------------------*/
 /* Switch to a configuration with a voting node, which should prefer the primary normally.       */
@@ -133,16 +154,26 @@ res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 // With a voting node and a default initialSyncSourceReadPreference, the primary should be the sync
 // source, though it is delayed.
 assert.eq(res.syncSourceHost, primary.host);
-initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCreatingOplog", mode: "off"});
+initialSyncNode.adminCommand({
+    configureFailPoint: "initialSyncHangBeforeCreatingOplog",
+    mode: "off",
+});
 
 /*-----------------------------------------------------------------------------------------------*/
-jsTestLog("Testing chaining enabled, 'secondaryPreferred' initialSyncSourceReadPreference, voting node");
-restartAndWaitForHeartbeats(rst, initialSyncNode, {"initialSyncSourceReadPreference": "secondaryPreferred"});
+jsTestLog(
+    "Testing chaining enabled, 'secondaryPreferred' initialSyncSourceReadPreference, voting node",
+);
+restartAndWaitForHeartbeats(rst, initialSyncNode, {
+    "initialSyncSourceReadPreference": "secondaryPreferred",
+});
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // Even with a voting node, the secondary should be chosen when 'secondaryPreferred' is used.
 assert.eq(res.syncSourceHost, secondary.host);
-initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCreatingOplog", mode: "off"});
+initialSyncNode.adminCommand({
+    configureFailPoint: "initialSyncHangBeforeCreatingOplog",
+    mode: "off",
+});
 
 /*-----------------------------------------------------------------------------------------------*/
 /* Switch back to a non-voting node, and disable chaining also.                                  */
@@ -160,7 +191,10 @@ res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With chaining disabled, the default should be to select the primary even though it is delayed.
 assert.eq(res.syncSourceHost, primary.host);
-initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCreatingOplog", mode: "off"});
+initialSyncNode.adminCommand({
+    configureFailPoint: "initialSyncHangBeforeCreatingOplog",
+    mode: "off",
+});
 
 /*-----------------------------------------------------------------------------------------------*/
 jsTestLog("Testing chaining disabled, 'nearest' initialSyncSourceReadPreference, non-voting node");
@@ -170,7 +204,10 @@ res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 // With chaining disabled, we choose the delayed secondary over the non-delayed primary when
 // readPreference is explicitly 'nearest'.
 assert.eq(res.syncSourceHost, secondary.host);
-initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCreatingOplog", mode: "off"});
+initialSyncNode.adminCommand({
+    configureFailPoint: "initialSyncHangBeforeCreatingOplog",
+    mode: "off",
+});
 
 // Once we become secondary, the secondary read preference no longer matters and we choose the
 // primary because chaining is disallowed.

@@ -23,7 +23,8 @@ function getDbPrefixRegExp(dbName) {
 }
 
 function listDatabases(options) {
-    return assert.commandWorked(st.s.adminCommand(Object.assign({listDatabases: 1}, options))).databases;
+    return assert.commandWorked(st.s.adminCommand(Object.assign({listDatabases: 1}, options)))
+        .databases;
 }
 
 function assertDatabaseExists(dbName) {
@@ -107,13 +108,17 @@ jsTest.log("Test dropping database that contains regex characters");
 // Original bugs [SERVER-4954, SERVER-4955]
 {
     const db = st.s.getDB("onlysmallcaseletters");
-    assert.commandWorked(st.s.adminCommand({enablesharding: db.getName(), primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enablesharding: db.getName(), primaryShard: st.shard1.shardName}),
+    );
     st.shardColl(db["data"], {num: 1});
     assertDatabaseExists(db.getName());
 
     const specialDB = st.s.getDB("[a-z]+");
     const specialColl = db["special"];
-    assert.commandWorked(st.s.adminCommand({enablesharding: specialDB.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enablesharding: specialDB.getName(), primaryShard: st.shard0.shardName}),
+    );
     assertDatabaseExists(specialDB.getName());
     st.shardColl(specialColl, {num: 1});
     assert(specialColl.exists());
@@ -145,7 +150,9 @@ jsTest.log("Test dropping sharded database with multiple collections");
     assertDatabaseDropped(db.getName());
 }
 
-jsTest.log("Tests that dropping a database also removes the zones associated with the collections in the database.");
+jsTest.log(
+    "Tests that dropping a database also removes the zones associated with the collections in the database.",
+);
 {
     const db = getNewDb();
     const coll = db["sharededColl"];
@@ -155,7 +162,12 @@ jsTest.log("Tests that dropping a database also removes the zones associated wit
     st.shardColl(coll, {x: 1});
     assertDatabaseExists(db.getName());
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: coll.getFullName(), min: {x: 0}, max: {x: 10}, zone: zoneName}),
+        st.s.adminCommand({
+            updateZoneKeyRange: coll.getFullName(),
+            min: {x: 0},
+            max: {x: 10},
+            zone: zoneName,
+        }),
     );
 
     assert.eq(1, configDB.tags.countDocuments({ns: getDbPrefixRegExp(db.getName())}));
@@ -213,7 +225,12 @@ jsTest.log("Tests that dropping a database also removes the zones associated wit
                 }),
             );
             assert.commandWorked(
-                st.s.adminCommand({updateZoneKeyRange: "otherDb.coll", min: {x: 20}, max: {x: 25}, zone: zoneName}),
+                st.s.adminCommand({
+                    updateZoneKeyRange: "otherDb.coll",
+                    min: {x: 20},
+                    max: {x: 25},
+                    zone: zoneName,
+                }),
             );
 
             // Assert that has been added some entries on 'config.tags'
@@ -312,7 +329,11 @@ jsTest.log("Tests that dropping a database doesn't affects other database with t
     //  - SomePrefix_A
     //  - SomePrefix_b
     const dbPrefix = dbNamePrefix + "Prefix";
-    const databases = [st.s.getDB(dbPrefix), st.s.getDB(dbPrefix + "_A"), st.s.getDB(dbPrefix + "_B")];
+    const databases = [
+        st.s.getDB(dbPrefix),
+        st.s.getDB(dbPrefix + "_A"),
+        st.s.getDB(dbPrefix + "_B"),
+    ];
     // Assert all database have the same prefix
     assert.containsPrefix(
         dbNamePrefix,
@@ -350,7 +371,10 @@ jsTest.log("Tests that dropping a database doesn't affects other database with t
     // Ensure that the others databases exists and still contains all the collections
     databases.slice(1).forEach((db) => {
         assertDatabaseExists(db.getName());
-        assert.eq(numColls, configDB.collections.countDocuments({_id: getDbPrefixRegExp(db.getName())}));
+        assert.eq(
+            numColls,
+            configDB.collections.countDocuments({_id: getDbPrefixRegExp(db.getName())}),
+        );
 
         // Assert that all the collections still have all the documents
         for (let collID = 0; collID < numColls; collID++) {
@@ -359,7 +383,9 @@ jsTest.log("Tests that dropping a database doesn't affects other database with t
     });
 }
 
-jsTest.log("Test that dropping a non-sharded database, relevant events are properly logged on CSRS");
+jsTest.log(
+    "Test that dropping a non-sharded database, relevant events are properly logged on CSRS",
+);
 {
     // Create a non-sharded database
     const db = getNewDb();
@@ -369,7 +395,10 @@ jsTest.log("Test that dropping a non-sharded database, relevant events are prope
     assert.commandWorked(db.dropDatabase());
 
     // Verify that the drop database start event has been logged
-    const startLogCount = configDB.changelog.countDocuments({what: "dropDatabase.start", ns: db.getName()});
+    const startLogCount = configDB.changelog.countDocuments({
+        what: "dropDatabase.start",
+        ns: db.getName(),
+    });
     assert.gte(startLogCount, 1, "dropDatabase start event not found in changelog");
 
     // Verify that the drop database end event has been logged
@@ -387,7 +416,10 @@ jsTest.log("Test that dropping a sharded database, relevant events are properly 
     assert.commandWorked(db.dropDatabase());
 
     // Verify that the drop database start event has been logged
-    const startLogCount = configDB.changelog.countDocuments({what: "dropDatabase.start", ns: db.getName()});
+    const startLogCount = configDB.changelog.countDocuments({
+        what: "dropDatabase.start",
+        ns: db.getName(),
+    });
     assert.gte(startLogCount, 1, "dropDatabase start event not found in changelog");
 
     // Verify that the drop database end event has been logged

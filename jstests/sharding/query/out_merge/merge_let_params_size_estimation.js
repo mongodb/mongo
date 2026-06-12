@@ -144,7 +144,10 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
         testFixture.awaitReplication();
     }
 
-    assert.commandFailedWithCode(aggColl.runCommand("aggregate", aggCommand), ErrorCodes.BSONObjectTooLarge);
+    assert.commandFailedWithCode(
+        aggColl.runCommand("aggregate", aggCommand),
+        ErrorCodes.BSONObjectTooLarge,
+    );
 }
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {

@@ -52,11 +52,19 @@ assert.soon(testConn, "Client could not connect to server with valid ciphersuite
 MongoRunner.stopMongod(mongod);
 
 // test an unsuccessful connection when mandating a cipher suite which OpenSSL disables by default
-jsTest.log.info("Testing for unsuccessful connection with cipher suite config which OpenSSL disables by default.");
+jsTest.log.info(
+    "Testing for unsuccessful connection with cipher suite config which OpenSSL disables by default.",
+);
 mongod = MongoRunner.runMongod(
-    Object.merge(baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_128_CCM_8_SHA256"}}),
+    Object.merge(baseParams, {
+        setParameter: {opensslCipherSuiteConfig: "TLS_AES_128_CCM_8_SHA256"},
+    }),
 );
 sleep(30000);
 
-assert.eq(false, testConn(), "Client successfully connected to server with invalid ciphersuite config.");
+assert.eq(
+    false,
+    testConn(),
+    "Client successfully connected to server with invalid ciphersuite config.",
+);
 MongoRunner.stopMongod(mongod);

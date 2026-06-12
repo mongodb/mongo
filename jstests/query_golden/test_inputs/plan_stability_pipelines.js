@@ -223,7 +223,10 @@ export const pipelines = [
     /* clusterSize: 1310, queryRank: 11.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [15, 7, 14, 16, 16]}}, {"h_idx": {"$exists": False}}],
+                "$nor": [
+                    {"a_compound": {"$all": [15, 7, 14, 16, 16]}},
+                    {"h_idx": {"$exists": False}},
+                ],
                 "d_noidx": {"$exists": True},
             },
         },
@@ -297,7 +300,10 @@ export const pipelines = [
     /* clusterSize: 1054, queryRank: 14.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [18, 14, 14, 16]}}, {"z_compound": {"$in": [13, 4, 14]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [18, 14, 14, 16]}},
+                    {"z_compound": {"$in": [13, 4, 14]}},
+                ],
                 "d_compound": {"$exists": True},
                 "d_idx": {"$exists": True},
             },
@@ -314,7 +320,12 @@ export const pipelines = [
                     {"d_noidx": {"$exists": True}},
                     {"a_idx": {"$elemMatch": {"$exists": True}}},
                     {"a_idx": {"$elemMatch": {"$nin": [9, 8, 6, 4, 4, 18]}}},
-                    {"$nor": [{"a_compound": {"$all": [9, 17, 2]}}, {"k_compound": {"$exists": False}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$all": [9, 17, 2]}},
+                            {"k_compound": {"$exists": False}},
+                        ],
+                    },
                 ],
                 "a_noidx": {"$gt": 19},
             },
@@ -368,7 +379,11 @@ export const pipelines = [
                 "$and": [
                     {
                         "$and": [
-                            {"a_compound": {"$elemMatch": {"$exists": True, "$lt": 12, "$nin": [14, 11]}}},
+                            {
+                                "a_compound": {
+                                    "$elemMatch": {"$exists": True, "$lt": 12, "$nin": [14, 11]},
+                                },
+                            },
                             {"a_compound": {"$exists": True}},
                         ],
                     },
@@ -634,7 +649,12 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [
-                    {"$and": [{"h_compound": {"$in": [6, 9]}}, {"a_compound": {"$all": [18, 14, 12]}}]},
+                    {
+                        "$and": [
+                            {"h_compound": {"$in": [6, 9]}},
+                            {"a_compound": {"$all": [18, 14, 12]}},
+                        ],
+                    },
                     {"h_idx": {"$in": [18, 13, 17, 20]}},
                     {"k_compound": {"$in": [12, 10, 3]}},
                 ],
@@ -649,7 +669,10 @@ export const pipelines = [
     /* clusterSize: 569, queryRank: 6.03 */ [
         {
             "$match": {
-                "$and": [{"i_compound": {"$exists": True}}, {"z_compound": {"$nin": [12, 16, 3, 18, 2]}}],
+                "$and": [
+                    {"i_compound": {"$exists": True}},
+                    {"z_compound": {"$nin": [12, 16, 3, 18, 2]}},
+                ],
                 "d_compound": {"$exists": True},
             },
         },
@@ -659,7 +682,13 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"a_compound": {"$all": [1, 12]}},
-                    {"$or": [{"a_idx": {"$all": [19, 10]}}, {"i_idx": {"$gte": 19}}, {"i_compound": {"$ne": 5}}]},
+                    {
+                        "$or": [
+                            {"a_idx": {"$all": [19, 10]}},
+                            {"i_idx": {"$gte": 19}},
+                            {"i_compound": {"$ne": 5}},
+                        ],
+                    },
                 ],
             },
         },
@@ -712,7 +741,11 @@ export const pipelines = [
     /* clusterSize: 540, queryRank: 13.02 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$exists": True}}, {"a_compound": {"$exists": False}}, {"a_compound": {"$gte": 1}}],
+                "$or": [
+                    {"a_idx": {"$exists": True}},
+                    {"a_compound": {"$exists": False}},
+                    {"a_compound": {"$gte": 1}},
+                ],
                 "a_idx": {"$nin": [17, 1, 20]},
                 "k_compound": {"$exists": True},
             },
@@ -734,7 +767,11 @@ export const pipelines = [
     /* clusterSize: 531, queryRank: 12.03 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [10, 10, 12, 19]}}, {"k_compound": {"$lt": 15}}, {"k_compound": {"$eq": 8}}],
+                "$or": [
+                    {"a_idx": {"$all": [10, 10, 12, 19]}},
+                    {"k_compound": {"$lt": 15}},
+                    {"k_compound": {"$eq": 8}},
+                ],
                 "a_idx": {"$in": [13, 9, 12]},
             },
         },
@@ -795,7 +832,10 @@ export const pipelines = [
     /* clusterSize: 497, queryRank: 10.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$elemMatch": {"$nin": [13, 1, 18, 5]}}}, {"a_compound": {"$all": [4, 3]}}],
+                "$or": [
+                    {"a_compound": {"$elemMatch": {"$nin": [13, 1, 18, 5]}}},
+                    {"a_compound": {"$all": [4, 3]}},
+                ],
                 "a_idx": {"$in": [10, 20, 2]},
             },
         },
@@ -958,7 +998,11 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_noidx": 1}},
     ],
     /* clusterSize: 427, queryRank: 9.03 */ [
-        {"$match": {"$or": [{"z_compound": {"$exists": True}}, {"a_idx": {"$all": [6, 20, 6, 18]}}]}},
+        {
+            "$match": {
+                "$or": [{"z_compound": {"$exists": True}}, {"a_idx": {"$all": [6, 20, 6, 18]}}],
+            },
+        },
         {"$sort": {"d_idx": -1}},
         {"$project": {"_id": 0, "k_noidx": 1}},
     ],
@@ -982,7 +1026,10 @@ export const pipelines = [
     /* clusterSize: 412, queryRank: 14.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [13, 13, 9, 18, 5]}}, {"z_compound": {"$in": [8, 20]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [13, 13, 9, 18, 5]}},
+                    {"z_compound": {"$in": [8, 20]}},
+                ],
                 "a_compound": {"$gt": 19},
             },
         },
@@ -998,7 +1045,11 @@ export const pipelines = [
                                 "$and": [
                                     {"a_compound": {"$elemMatch": {"$exists": False, "$gte": 8}}},
                                     {"a_noidx": {"$elemMatch": {"$in": [11, 2]}}},
-                                    {"a_idx": {"$elemMatch": {"$exists": True, "$gte": 7, "$lte": 2}}},
+                                    {
+                                        "a_idx": {
+                                            "$elemMatch": {"$exists": True, "$gte": 7, "$lte": 2},
+                                        },
+                                    },
                                     {"a_idx": {"$eq": 8}},
                                 ],
                             },
@@ -1066,7 +1117,11 @@ export const pipelines = [
     /* clusterSize: 399, queryRank: 12.02 */ [
         {
             "$match": {
-                "$nor": [{"i_noidx": {"$gt": 4}}, {"a_compound": {"$gt": 16}}, {"a_compound": {"$all": [12, 20, 11]}}],
+                "$nor": [
+                    {"i_noidx": {"$gt": 4}},
+                    {"a_compound": {"$gt": 16}},
+                    {"a_compound": {"$all": [12, 20, 11]}},
+                ],
                 "d_idx": {"$ne": 1},
             },
         },
@@ -1126,7 +1181,10 @@ export const pipelines = [
     /* clusterSize: 379, queryRank: 13.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [12, 5, 5, 1]}}, {"h_noidx": {"$nin": [2, 19, 16, 12]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [12, 5, 5, 1]}},
+                    {"h_noidx": {"$nin": [2, 19, 16, 12]}},
+                ],
                 "a_compound": {"$elemMatch": {"$gt": 9}},
                 "c_compound": {"$exists": True},
                 "c_noidx": {"$lt": 14},
@@ -1139,7 +1197,10 @@ export const pipelines = [
     /* clusterSize: 374, queryRank: 12.02 */ [
         {
             "$match": {
-                "$or": [{"i_idx": {"$nin": [8, 14]}}, {"a_compound": {"$all": [7, 12, 8, 5, 16, 6]}}],
+                "$or": [
+                    {"i_idx": {"$nin": [8, 14]}},
+                    {"a_compound": {"$all": [7, 12, 8, 5, 16, 6]}},
+                ],
                 "d_idx": {"$exists": True},
             },
         },
@@ -1164,7 +1225,10 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [{"c_compound": {"$exists": False}}, {"d_idx": {"$eq": 11}}],
-                "$or": [{"d_compound": {"$exists": False}}, {"a_compound": {"$elemMatch": {"$in": [20, 16, 9, 16]}}}],
+                "$or": [
+                    {"d_compound": {"$exists": False}},
+                    {"a_compound": {"$elemMatch": {"$in": [20, 16, 9, 16]}}},
+                ],
                 "a_compound": {"$exists": True},
                 "k_compound": {"$nin": [10, 16]},
             },
@@ -1188,7 +1252,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"a_compound": {"$all": [11, 9, 1]}},
-                    {"$or": [{"i_compound": {"$exists": True}}, {"a_compound": {"$all": [15, 8, 8]}}]},
+                    {
+                        "$or": [
+                            {"i_compound": {"$exists": True}},
+                            {"a_compound": {"$all": [15, 8, 8]}},
+                        ],
+                    },
                     {"$or": [{"d_idx": {"$exists": False}}, {"a_idx": {"$exists": False}}]},
                     {"a_idx": {"$all": [15, 9, 16, 13, 1, 11]}},
                 ],
@@ -1201,7 +1270,10 @@ export const pipelines = [
     /* clusterSize: 369, queryRank: 11.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$all": [6, 19, 14]}}, {"a_compound": {"$elemMatch": {"$lte": 9}}}],
+                "$or": [
+                    {"a_compound": {"$all": [6, 19, 14]}},
+                    {"a_compound": {"$elemMatch": {"$lte": 9}}},
+                ],
                 "a_idx": {"$exists": True},
             },
         },
@@ -1219,7 +1291,12 @@ export const pipelines = [
                 "$or": [
                     {"d_compound": {"$lte": 14}},
                     {"z_compound": {"$lt": 20}},
-                    {"$and": [{"a_compound": {"$all": [18, 10, 7]}}, {"a_compound": {"$all": [15, 12, 3]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$all": [18, 10, 7]}},
+                            {"a_compound": {"$all": [15, 12, 3]}},
+                        ],
+                    },
                 ],
                 "a_idx": {"$elemMatch": {"$lte": 11, "$nin": [16, 8, 12]}},
                 "a_noidx": {"$all": [3, 19, 9]},
@@ -1244,7 +1321,13 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"d_idx": {"$in": [2, 4]}},
-                    {"$or": [{"a_idx": {"$elemMatch": {"$lt": 6}}}, {"a_idx": {"$gte": 13}}, {"i_noidx": {"$eq": 14}}]},
+                    {
+                        "$or": [
+                            {"a_idx": {"$elemMatch": {"$lt": 6}}},
+                            {"a_idx": {"$gte": 13}},
+                            {"i_noidx": {"$eq": 14}},
+                        ],
+                    },
                     {
                         "$or": [
                             {"a_idx": {"$all": [8, 16, 15]}},
@@ -1253,7 +1336,11 @@ export const pipelines = [
                         ],
                     },
                 ],
-                "$or": [{"a_idx": {"$ne": 8}}, {"k_idx": {"$in": [18, 4, 10]}}, {"a_idx": {"$all": [5, 1]}}],
+                "$or": [
+                    {"a_idx": {"$ne": 8}},
+                    {"k_idx": {"$in": [18, 4, 10]}},
+                    {"a_idx": {"$all": [5, 1]}},
+                ],
                 "a_idx": {"$nin": [14, 7, 9, 7]},
             },
         },
@@ -1263,7 +1350,11 @@ export const pipelines = [
     /* clusterSize: 363, queryRank: 11.02 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$ne": 18}}, {"a_idx": {"$all": [16, 2]}}, {"c_compound": {"$gt": 18}}],
+                "$or": [
+                    {"a_compound": {"$ne": 18}},
+                    {"a_idx": {"$all": [16, 2]}},
+                    {"c_compound": {"$gt": 18}},
+                ],
                 "h_noidx": {"$ne": 2},
             },
         },
@@ -1294,7 +1385,10 @@ export const pipelines = [
                     {"i_compound": {"$nin": [4, 8, 18, 13]}},
                     {"a_idx": {"$elemMatch": {"$nin": [6, 18]}}},
                 ],
-                "$nor": [{"a_compound": {"$nin": [12, 14, 2]}}, {"a_noidx": {"$elemMatch": {"$exists": False}}}],
+                "$nor": [
+                    {"a_compound": {"$nin": [12, 14, 2]}},
+                    {"a_noidx": {"$elemMatch": {"$exists": False}}},
+                ],
                 "a_compound": {"$all": [2, 11]},
             },
         },
@@ -1365,7 +1459,13 @@ export const pipelines = [
         {"$project": {"a_compound": 1, "d_noidx": 1}},
     ],
     /* clusterSize: 332, queryRank: 6.02 */ [
-        {"$match": {"a_compound": {"$lte": 9}, "d_compound": {"$in": [4, 4, 2, 9]}, "d_idx": {"$lt": 16}}},
+        {
+            "$match": {
+                "a_compound": {"$lte": 9},
+                "d_compound": {"$in": [4, 4, 2, 9]},
+                "d_idx": {"$lt": 16},
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$project": {"_id": 0, "a_noidx": 1, "c_idx": 1, "i_compound": 1}},
     ],
@@ -1386,7 +1486,11 @@ export const pipelines = [
     /* clusterSize: 329, queryRank: 9.03 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [8, 8]}}, {"a_idx": {"$all": [1, 15, 14, 15]}}, {"z_compound": {"$lt": 13}}],
+                "$or": [
+                    {"a_idx": {"$all": [8, 8]}},
+                    {"a_idx": {"$all": [1, 15, 14, 15]}},
+                    {"z_compound": {"$lt": 13}},
+                ],
                 "a_idx": {"$exists": True},
             },
         },
@@ -1395,7 +1499,10 @@ export const pipelines = [
     /* clusterSize: 324, queryRank: 12.02 */ [
         {
             "$match": {
-                "$and": [{"i_compound": {"$exists": True}}, {"a_idx": {"$elemMatch": {"$in": [18, 9, 17]}}}],
+                "$and": [
+                    {"i_compound": {"$exists": True}},
+                    {"a_idx": {"$elemMatch": {"$in": [18, 9, 17]}}},
+                ],
                 "$or": [
                     {
                         "$and": [
@@ -1456,7 +1563,10 @@ export const pipelines = [
     /* clusterSize: 310, queryRank: 13.02 */ [
         {
             "$match": {
-                "$and": [{"c_idx": {"$nin": [20, 3, 7, 17, 6]}}, {"i_compound": {"$nin": [13, 20, 6]}}],
+                "$and": [
+                    {"c_idx": {"$nin": [20, 3, 7, 17, 6]}},
+                    {"i_compound": {"$nin": [13, 20, 6]}},
+                ],
                 "$nor": [{"k_idx": {"$exists": False}}, {"a_compound": {"$all": [6, 16, 18]}}],
                 "a_noidx": {"$in": [19, 15]},
             },
@@ -1472,7 +1582,12 @@ export const pipelines = [
                     {"a_idx": {"$elemMatch": {"$lte": 16}}},
                     {"a_compound": {"$in": [16, 3]}},
                     {"c_compound": {"$nin": [20, 11, 15, 9]}},
-                    {"$nor": [{"a_idx": {"$nin": [8, 16, 3]}}, {"a_compound": {"$all": [20, 6, 2]}}]},
+                    {
+                        "$nor": [
+                            {"a_idx": {"$nin": [8, 16, 3]}},
+                            {"a_compound": {"$all": [20, 6, 2]}},
+                        ],
+                    },
                 ],
                 "a_noidx": {"$gt": 14},
             },
@@ -1558,7 +1673,13 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"$or": [{"a_compound": {"$lte": 18}}, {"a_idx": {"$all": [1, 5, 13, 19]}}]},
-                    {"$and": [{"h_noidx": {"$eq": 2}}, {"i_noidx": {"$lt": 16}}, {"a_compound": {"$gt": 11}}]},
+                    {
+                        "$and": [
+                            {"h_noidx": {"$eq": 2}},
+                            {"i_noidx": {"$lt": 16}},
+                            {"a_compound": {"$gt": 11}},
+                        ],
+                    },
                 ],
                 "a_idx": {"$in": [15, 3, 14]},
                 "i_compound": {"$gt": 18},
@@ -1576,7 +1697,12 @@ export const pipelines = [
                     {
                         "$or": [
                             {"h_idx": {"$nin": [1, 13]}},
-                            {"$and": [{"k_compound": {"$exists": True}}, {"z_noidx": {"$exists": False}}]},
+                            {
+                                "$and": [
+                                    {"k_compound": {"$exists": True}},
+                                    {"z_noidx": {"$exists": False}},
+                                ],
+                            },
                             {"a_compound": {"$all": [14, 3]}},
                         ],
                     },
@@ -1620,7 +1746,12 @@ export const pipelines = [
                 "$nor": [
                     {"d_compound": {"$lt": 7}},
                     {"i_idx": {"$eq": 5}},
-                    {"$and": [{"a_compound": {"$all": [16, 20]}}, {"a_compound": {"$nin": [10, 10, 5, 10]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$all": [16, 20]}},
+                            {"a_compound": {"$nin": [10, 10, 5, 10]}},
+                        ],
+                    },
                 ],
                 "k_compound": {"$exists": True},
             },
@@ -1666,7 +1797,11 @@ export const pipelines = [
     /* clusterSize: 284, queryRank: 13.02 */ [
         {
             "$match": {
-                "$nor": [{"k_compound": {"$gt": 13}}, {"a_compound": {"$all": [13, 14]}}, {"h_idx": {"$gte": 12}}],
+                "$nor": [
+                    {"k_compound": {"$gt": 13}},
+                    {"a_compound": {"$all": [13, 14]}},
+                    {"h_idx": {"$gte": 12}},
+                ],
                 "h_idx": {"$lte": 11},
             },
         },
@@ -1812,7 +1947,10 @@ export const pipelines = [
     /* clusterSize: 274, queryRank: 12.03 */ [
         {
             "$match": {
-                "$or": [{"c_compound": {"$in": [15, 17, 1, 8]}}, {"a_compound": {"$all": [4, 6, 4]}}],
+                "$or": [
+                    {"c_compound": {"$in": [15, 17, 1, 8]}},
+                    {"a_compound": {"$all": [4, 6, 4]}},
+                ],
                 "a_idx": {"$all": [4, 18]},
             },
         },
@@ -1823,7 +1961,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"a_compound": {"$elemMatch": {"$gt": 1}}},
-                    {"$or": [{"a_idx": {"$all": [16, 11, 2, 1]}}, {"a_compound": {"$exists": True}}]},
+                    {
+                        "$or": [
+                            {"a_idx": {"$all": [16, 11, 2, 1]}},
+                            {"a_compound": {"$exists": True}},
+                        ],
+                    },
                 ],
                 "a_noidx": {"$nin": [1, 18]},
             },
@@ -1866,7 +2009,13 @@ export const pipelines = [
         {"$sort": {"h_idx": 1}},
     ],
     /* clusterSize: 268, queryRank: 6.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "c_compound": {"$exists": True}, "h_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "c_compound": {"$exists": True},
+                "h_compound": {"$exists": True},
+            },
+        },
         {"$sort": {"c_idx": -1}},
         {"$limit": 226},
     ],
@@ -1961,7 +2110,12 @@ export const pipelines = [
                 "$and": [
                     {"h_idx": {"$nin": [5, 12]}},
                     {"a_compound": {"$all": [4, 14, 4]}},
-                    {"$or": [{"a_idx": {"$all": [1, 5]}}, {"a_compound": {"$elemMatch": {"$in": [19, 20, 14]}}}]},
+                    {
+                        "$or": [
+                            {"a_idx": {"$all": [1, 5]}},
+                            {"a_compound": {"$elemMatch": {"$in": [19, 20, 14]}}},
+                        ],
+                    },
                 ],
             },
         },
@@ -1978,7 +2132,15 @@ export const pipelines = [
                     {
                         "$or": [
                             {"z_noidx": {"$gt": 1}},
-                            {"a_noidx": {"$elemMatch": {"$exists": True, "$in": [20, 20], "$nin": [2, 10]}}},
+                            {
+                                "a_noidx": {
+                                    "$elemMatch": {
+                                        "$exists": True,
+                                        "$in": [20, 20],
+                                        "$nin": [2, 10],
+                                    },
+                                },
+                            },
                             {"a_compound": {"$exists": True}},
                         ],
                     },
@@ -2016,7 +2178,10 @@ export const pipelines = [
     /* clusterSize: 259, queryRank: 6.03 */ [
         {
             "$match": {
-                "$nor": [{"i_compound": {"$nin": [20, 10, 2, 14]}}, {"a_compound": {"$in": [8, 18, 4]}}],
+                "$nor": [
+                    {"i_compound": {"$nin": [20, 10, 2, 14]}},
+                    {"a_compound": {"$in": [8, 18, 4]}},
+                ],
                 "c_noidx": {"$nin": [2, 15, 17]},
                 "k_compound": {"$nin": [12, 15]},
             },
@@ -2025,7 +2190,10 @@ export const pipelines = [
     /* clusterSize: 258, queryRank: 12.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [18, 14, 13, 1, 1]}}, {"c_noidx": {"$in": [9, 13, 5]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [18, 14, 13, 1, 1]}},
+                    {"c_noidx": {"$in": [9, 13, 5]}},
+                ],
                 "a_compound": {"$lte": 9},
             },
         },
@@ -2066,7 +2234,11 @@ export const pipelines = [
                     {
                         "$or": [
                             {"c_idx": {"$eq": 16}},
-                            {"a_compound": {"$elemMatch": {"$exists": True, "$gt": 7, "$nin": [19, 13, 17]}}},
+                            {
+                                "a_compound": {
+                                    "$elemMatch": {"$exists": True, "$gt": 7, "$nin": [19, 13, 17]},
+                                },
+                            },
                             {"a_compound": {"$all": [19, 12]}},
                             {"h_idx": {"$lt": 2}},
                         ],
@@ -2235,7 +2407,11 @@ export const pipelines = [
     /* clusterSize: 243, queryRank: 14.02 */ [
         {
             "$match": {
-                "$nor": [{"k_compound": {"$gte": 19}}, {"h_noidx": {"$ne": 7}}, {"a_compound": {"$all": [6, 16, 1]}}],
+                "$nor": [
+                    {"k_compound": {"$gte": 19}},
+                    {"h_noidx": {"$ne": 7}},
+                    {"a_compound": {"$all": [6, 16, 1]}},
+                ],
                 "i_compound": {"$lte": 18},
             },
         },
@@ -2254,7 +2430,11 @@ export const pipelines = [
     /* clusterSize: 234, queryRank: 11.02 */ [
         {
             "$match": {
-                "$or": [{"k_compound": {"$gt": 15}}, {"a_compound": {"$ne": 8}}, {"a_idx": {"$all": [17, 17, 8]}}],
+                "$or": [
+                    {"k_compound": {"$gt": 15}},
+                    {"a_compound": {"$ne": 8}},
+                    {"a_idx": {"$all": [17, 17, 8]}},
+                ],
             },
         },
         {"$sort": {"h_idx": -1}},
@@ -2267,7 +2447,12 @@ export const pipelines = [
                 "$and": [
                     {
                         "$nor": [
-                            {"$and": [{"a_idx": {"$elemMatch": {"$exists": False}}}, {"c_compound": {"$nin": [7, 5]}}]},
+                            {
+                                "$and": [
+                                    {"a_idx": {"$elemMatch": {"$exists": False}}},
+                                    {"c_compound": {"$nin": [7, 5]}},
+                                ],
+                            },
                             {"c_compound": {"$in": [19, 14]}},
                         ],
                     },
@@ -2301,7 +2486,13 @@ export const pipelines = [
         },
     ],
     /* clusterSize: 233, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "c_idx": {"$exists": True}, "d_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "c_idx": {"$exists": True},
+                "d_compound": {"$exists": True},
+            },
+        },
         {"$limit": 36},
     ],
     /* clusterSize: 232, queryRank: 11.02 */ [
@@ -2360,7 +2551,12 @@ export const pipelines = [
                 ],
                 "$or": [
                     {"$and": [{"a_compound": {"$in": [10, 16]}}, {"a_idx": {"$all": [15, 6, 17]}}]},
-                    {"$and": [{"c_compound": {"$exists": True}}, {"d_compound": {"$exists": False}}]},
+                    {
+                        "$and": [
+                            {"c_compound": {"$exists": True}},
+                            {"d_compound": {"$exists": False}},
+                        ],
+                    },
                     {"a_compound": {"$elemMatch": {"$exists": False}}},
                     {"z_compound": {"$lte": 2}},
                 ],
@@ -2436,7 +2632,12 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"a_idx": {"$in": [4, 17, 8]}},
-                    {"$nor": [{"a_compound": {"$all": [16, 5, 18, 3]}}, {"d_idx": {"$exists": False}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$all": [16, 5, 18, 3]}},
+                            {"d_idx": {"$exists": False}},
+                        ],
+                    },
                 ],
                 "a_idx": {"$nin": [18, 2, 9]},
             },
@@ -2641,7 +2842,13 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_noidx": 1}},
     ],
     /* clusterSize: 212, queryRank: 6.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "k_compound": {"$exists": True}, "z_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "k_compound": {"$exists": True},
+                "z_compound": {"$exists": True},
+            },
+        },
         {"$limit": 32},
         {"$project": {"a_idx": 1, "a_noidx": 1, "d_compound": 1, "z_compound": 1}},
     ],
@@ -2681,9 +2888,19 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$or": [{"a_compound": {"$elemMatch": {"$in": [6, 14]}}}, {"a_idx": {"$eq": 6}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$elemMatch": {"$in": [6, 14]}}},
+                            {"a_idx": {"$eq": 6}},
+                        ],
+                    },
                     {"a_idx": {"$elemMatch": {"$lte": 17, "$nin": [19, 16, 2]}}},
-                    {"$or": [{"a_compound": {"$all": [17, 5]}}, {"a_compound": {"$all": [15, 15, 16, 5, 13]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [17, 5]}},
+                            {"a_compound": {"$all": [15, 15, 16, 5, 13]}},
+                        ],
+                    },
                 ],
                 "a_compound": {"$elemMatch": {"$lte": 17}},
                 "z_compound": {"$in": [15, 5]},
@@ -2793,7 +3010,11 @@ export const pipelines = [
                     {"z_noidx": {"$exists": True}},
                     {"h_idx": {"$nin": [17, 10, 2, 18]}},
                 ],
-                "$or": [{"k_compound": {"$gt": 11}}, {"a_idx": {"$all": [15, 11, 2]}}, {"a_idx": {"$exists": True}}],
+                "$or": [
+                    {"k_compound": {"$gt": 11}},
+                    {"a_idx": {"$all": [15, 11, 2]}},
+                    {"a_idx": {"$exists": True}},
+                ],
                 "c_compound": {"$nin": [13, 12]},
             },
         },
@@ -2817,7 +3038,13 @@ export const pipelines = [
         {"$project": {"a_compound": 1, "a_idx": 1, "k_idx": 1}},
     ],
     /* clusterSize: 206, queryRank: 9.03 */ [
-        {"$match": {"a_compound": {"$all": [1, 1, 6]}, "h_idx": {"$nin": [7, 14, 16]}, "z_compound": {"$ne": 18}}},
+        {
+            "$match": {
+                "a_compound": {"$all": [1, 1, 6]},
+                "h_idx": {"$nin": [7, 14, 16]},
+                "z_compound": {"$ne": 18},
+            },
+        },
         {"$sort": {"k_idx": -1}},
         {"$limit": 54},
     ],
@@ -2929,7 +3156,11 @@ export const pipelines = [
     /* clusterSize: 196, queryRank: 9.03 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$lte": 2}}, {"i_compound": {"$eq": 20}}, {"a_idx": {"$all": [14, 17, 17, 1]}}],
+                "$or": [
+                    {"a_idx": {"$lte": 2}},
+                    {"i_compound": {"$eq": 20}},
+                    {"a_idx": {"$all": [14, 17, 17, 1]}},
+                ],
                 "a_idx": {"$gte": 10},
             },
         },
@@ -3102,9 +3333,18 @@ export const pipelines = [
                     {"z_compound": {"$exists": True}},
                 ],
                 "$or": [
-                    {"$and": [{"c_compound": {"$exists": False}}, {"d_compound": {"$exists": False}}]},
+                    {
+                        "$and": [
+                            {"c_compound": {"$exists": False}},
+                            {"d_compound": {"$exists": False}},
+                        ],
+                    },
                     {"c_idx": {"$nin": [17, 5]}},
-                    {"a_compound": {"$elemMatch": {"$exists": False, "$in": [17, 9, 5], "$nin": [10, 1]}}},
+                    {
+                        "a_compound": {
+                            "$elemMatch": {"$exists": False, "$in": [17, 9, 5], "$nin": [10, 1]},
+                        },
+                    },
                 ],
             },
         },
@@ -3128,7 +3368,10 @@ export const pipelines = [
     /* clusterSize: 187, queryRank: 14.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [13, 6, 11]}}, {"a_idx": {"$nin": [5, 13, 13, 3]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [13, 6, 11]}},
+                    {"a_idx": {"$nin": [5, 13, 13, 3]}},
+                ],
                 "k_compound": {"$lt": 8},
             },
         },
@@ -3207,7 +3450,12 @@ export const pipelines = [
                 "$nor": [
                     {"a_noidx": {"$elemMatch": {"$gte": 20}}},
                     {"a_noidx": {"$gt": 15}},
-                    {"$nor": [{"z_compound": {"$lte": 12}}, {"a_compound": {"$all": [18, 1, 7, 12, 6]}}]},
+                    {
+                        "$nor": [
+                            {"z_compound": {"$lte": 12}},
+                            {"a_compound": {"$all": [18, 1, 7, 12, 6]}},
+                        ],
+                    },
                 ],
                 "a_compound": {"$in": [14, 8, 13]},
             },
@@ -3235,7 +3483,13 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"a_idx": {"$gt": 12}},
-                    {"$or": [{"k_compound": {"$ne": 15}}, {"d_idx": {"$ne": 12}}, {"a_compound": {"$all": [12, 15]}}]},
+                    {
+                        "$or": [
+                            {"k_compound": {"$ne": 15}},
+                            {"d_idx": {"$ne": 12}},
+                            {"a_compound": {"$all": [12, 15]}},
+                        ],
+                    },
                     {"a_compound": {"$in": [16, 13, 2, 14]}},
                 ],
             },
@@ -3293,7 +3547,11 @@ export const pipelines = [
         {"$sort": {"z_idx": -1}},
     ],
     /* clusterSize: 179, queryRank: 10.02 */ [
-        {"$match": {"$or": [{"i_compound": {"$exists": True}}, {"a_compound": {"$all": [13, 16, 8]}}]}},
+        {
+            "$match": {
+                "$or": [{"i_compound": {"$exists": True}}, {"a_compound": {"$all": [13, 16, 8]}}],
+            },
+        },
         {"$sort": {"k_idx": -1}},
         {"$skip": 87},
         {"$project": {"a_compound": 1, "a_noidx": 1}},
@@ -3305,7 +3563,16 @@ export const pipelines = [
                     {
                         "$or": [
                             {"a_compound": {"$all": [12, 1, 6]}},
-                            {"a_idx": {"$elemMatch": {"$exists": True, "$in": [1, 1], "$ne": 1, "$nin": [16, 5]}}},
+                            {
+                                "a_idx": {
+                                    "$elemMatch": {
+                                        "$exists": True,
+                                        "$in": [1, 1],
+                                        "$ne": 1,
+                                        "$nin": [16, 5],
+                                    },
+                                },
+                            },
                             {"h_idx": {"$in": [11, 3, 11]}},
                             {"a_idx": {"$elemMatch": {"$in": [8, 20]}}},
                             {"a_idx": {"$exists": False}},
@@ -3330,7 +3597,16 @@ export const pipelines = [
                             },
                             {
                                 "$and": [
-                                    {"a_noidx": {"$elemMatch": {"$exists": True, "$gt": 1, "$in": [2, 12], "$lt": 19}}},
+                                    {
+                                        "a_noidx": {
+                                            "$elemMatch": {
+                                                "$exists": True,
+                                                "$gt": 1,
+                                                "$in": [2, 12],
+                                                "$lt": 19,
+                                            },
+                                        },
+                                    },
                                     {"a_noidx": {"$elemMatch": {"$lte": 4}}},
                                     {"a_idx": {"$exists": True}},
                                 ],
@@ -3460,7 +3736,10 @@ export const pipelines = [
     /* clusterSize: 170, queryRank: 13.02 */ [
         {
             "$match": {
-                "$nor": [{"i_compound": {"$exists": False}}, {"a_compound": {"$all": [14, 17, 15]}}],
+                "$nor": [
+                    {"i_compound": {"$exists": False}},
+                    {"a_compound": {"$all": [14, 17, 15]}},
+                ],
                 "d_compound": {"$in": [14, 12, 9, 8, 5]},
             },
         },
@@ -3597,13 +3876,22 @@ export const pipelines = [
     /* clusterSize: 165, queryRank: 11.03 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [2, 14]}}, {"z_idx": {"$exists": True}}, {"a_idx": {"$all": [19, 14, 13]}}],
+                "$or": [
+                    {"a_idx": {"$all": [2, 14]}},
+                    {"z_idx": {"$exists": True}},
+                    {"a_idx": {"$all": [19, 14, 13]}},
+                ],
             },
         },
         {"$sort": {"h_idx": 1}},
     ],
     /* clusterSize: 165, queryRank: 10.02 */ [
-        {"$match": {"$or": [{"a_compound": {"$all": [13, 7, 15]}}, {"k_compound": {"$ne": 6}}], "a_idx": {"$lte": 14}}},
+        {
+            "$match": {
+                "$or": [{"a_compound": {"$all": [13, 7, 15]}}, {"k_compound": {"$ne": 6}}],
+                "a_idx": {"$lte": 14},
+            },
+        },
         {"$limit": 243},
         {"$project": {"_id": 0, "a_compound": 1}},
     ],
@@ -3703,7 +3991,12 @@ export const pipelines = [
                 ],
                 "$or": [
                     {"a_idx": {"$in": [6, 14, 1]}},
-                    {"$and": [{"a_noidx": {"$elemMatch": {"$nin": [20, 1, 11]}}}, {"a_compound": {"$all": [4, 10]}}]},
+                    {
+                        "$and": [
+                            {"a_noidx": {"$elemMatch": {"$nin": [20, 1, 11]}}},
+                            {"a_compound": {"$all": [4, 10]}},
+                        ],
+                    },
                     {"a_compound": {"$gte": 15}},
                 ],
                 "d_idx": {"$nin": [14, 17]},
@@ -3807,7 +4100,15 @@ export const pipelines = [
             "$match": {
                 "$nor": [
                     {"a_compound": {"$all": [2, 4]}},
-                    {"a_compound": {"$elemMatch": {"$exists": True, "$in": [20, 2, 9, 18], "$nin": [20, 17]}}},
+                    {
+                        "a_compound": {
+                            "$elemMatch": {
+                                "$exists": True,
+                                "$in": [20, 2, 9, 18],
+                                "$nin": [20, 17],
+                            },
+                        },
+                    },
                     {"z_noidx": {"$exists": False}},
                 ],
                 "k_compound": {"$lt": 13},
@@ -3920,7 +4221,10 @@ export const pipelines = [
     /* clusterSize: 146, queryRank: 14.03 */ [
         {
             "$match": {
-                "$nor": [{"d_compound": {"$exists": False}}, {"a_compound": {"$all": [11, 8, 12, 15]}}],
+                "$nor": [
+                    {"d_compound": {"$exists": False}},
+                    {"a_compound": {"$all": [11, 8, 12, 15]}},
+                ],
                 "a_noidx": {"$exists": True},
                 "k_compound": {"$eq": 6},
             },
@@ -3935,7 +4239,10 @@ export const pipelines = [
                     {"a_compound": {"$nin": [11, 12, 16, 4]}},
                     {"z_compound": {"$nin": [12, 16]}},
                 ],
-                "$nor": [{"a_compound": {"$all": [13, 5, 9, 3]}}, {"c_compound": {"$exists": False}}],
+                "$nor": [
+                    {"a_compound": {"$all": [13, 5, 9, 3]}},
+                    {"c_compound": {"$exists": False}},
+                ],
                 "c_compound": {"$exists": True},
             },
         },
@@ -4007,7 +4314,10 @@ export const pipelines = [
     /* clusterSize: 141, queryRank: 10.02 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$all": [14, 16]}}, {"a_compound": {"$elemMatch": {"$in": [3, 18, 11, 2]}}}],
+                "$or": [
+                    {"a_compound": {"$all": [14, 16]}},
+                    {"a_compound": {"$elemMatch": {"$in": [3, 18, 11, 2]}}},
+                ],
                 "c_idx": {"$lt": 10},
                 "h_noidx": {"$gte": 16},
             },
@@ -4092,7 +4402,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"c_compound": {"$in": [5, 11]}},
-                    {"$and": [{"h_noidx": {"$exists": False}}, {"i_compound": {"$in": [14, 12, 13]}}]},
+                    {
+                        "$and": [
+                            {"h_noidx": {"$exists": False}},
+                            {"i_compound": {"$in": [14, 12, 13]}},
+                        ],
+                    },
                     {"z_compound": {"$nin": [7, 2]}},
                 ],
                 "a_compound": {"$nin": [9, 2, 17]},
@@ -4157,7 +4472,12 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [
-                    {"$or": [{"a_compound": {"$all": [17, 16, 19, 20]}}, {"z_idx": {"$exists": False}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [17, 16, 19, 20]}},
+                            {"z_idx": {"$exists": False}},
+                        ],
+                    },
                     {"z_idx": {"$exists": False}},
                     {"z_compound": {"$exists": False}},
                 ],
@@ -4221,7 +4541,12 @@ export const pipelines = [
         {"$project": {"z_idx": 1}},
     ],
     /* clusterSize: 136, queryRank: 7.03 */ [
-        {"$match": {"$or": [{"a_idx": {"$all": [19, 15]}}, {"a_compound": {"$lt": 3}}], "z_noidx": {"$in": [2, 2, 1]}}},
+        {
+            "$match": {
+                "$or": [{"a_idx": {"$all": [19, 15]}}, {"a_compound": {"$lt": 3}}],
+                "z_noidx": {"$in": [2, 2, 1]},
+            },
+        },
         {"$sort": {"d_idx": -1}},
         {"$limit": 40},
     ],
@@ -4231,7 +4556,12 @@ export const pipelines = [
                 "$or": [
                     {"c_compound": {"$exists": True}},
                     {"a_compound": {"$elemMatch": {"$nin": [10, 13]}}},
-                    {"$and": [{"z_noidx": {"$nin": [7, 10, 4]}}, {"i_compound": {"$in": [6, 5, 17]}}]},
+                    {
+                        "$and": [
+                            {"z_noidx": {"$nin": [7, 10, 4]}},
+                            {"i_compound": {"$in": [6, 5, 17]}},
+                        ],
+                    },
                     {"h_idx": {"$in": [3, 6, 7]}},
                     {"z_idx": {"$in": [13, 1]}},
                 ],
@@ -4300,7 +4630,10 @@ export const pipelines = [
     /* clusterSize: 133, queryRank: 12.02 */ [
         {
             "$match": {
-                "$nor": [{"z_compound": {"$exists": False}}, {"a_compound": {"$all": [9, 13, 8, 9]}}],
+                "$nor": [
+                    {"z_compound": {"$exists": False}},
+                    {"a_compound": {"$all": [9, 13, 8, 9]}},
+                ],
                 "a_compound": {"$elemMatch": {"$gte": 19}},
             },
         },
@@ -4310,14 +4643,22 @@ export const pipelines = [
         {"$project": {"a_noidx": 1, "k_noidx": 1}},
     ],
     /* clusterSize: 130, queryRank: 11.03 */ [
-        {"$match": {"$or": [{"a_idx": {"$all": [9, 7]}}, {"a_idx": {"$all": [1, 4]}}], "i_compound": {"$lte": 11}}},
+        {
+            "$match": {
+                "$or": [{"a_idx": {"$all": [9, 7]}}, {"a_idx": {"$all": [1, 4]}}],
+                "i_compound": {"$lte": 11},
+            },
+        },
         {"$sort": {"c_idx": -1, "i_idx": 1}},
         {"$limit": 12},
     ],
     /* clusterSize: 129, queryRank: 12.02 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$elemMatch": {"$ne": 14}}}, {"a_compound": {"$all": [8, 14]}}],
+                "$or": [
+                    {"a_compound": {"$elemMatch": {"$ne": 14}}},
+                    {"a_compound": {"$all": [8, 14]}},
+                ],
                 "a_compound": {"$elemMatch": {"$exists": True}},
                 "a_noidx": {"$in": [5, 12]},
                 "d_idx": {"$lt": 14},
@@ -4387,7 +4728,11 @@ export const pipelines = [
     /* clusterSize: 128, queryRank: 11.03 */ [
         {
             "$match": {
-                "$or": [{"c_compound": {"$lt": 7}}, {"a_idx": {"$all": [12, 2, 17]}}, {"a_idx": {"$all": [5, 18]}}],
+                "$or": [
+                    {"c_compound": {"$lt": 7}},
+                    {"a_idx": {"$all": [12, 2, 17]}},
+                    {"a_idx": {"$all": [5, 18]}},
+                ],
             },
         },
         {"$sort": {"c_idx": 1}},
@@ -4395,9 +4740,17 @@ export const pipelines = [
     /* clusterSize: 127, queryRank: 15.02 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$nin": [16, 12, 19]}}, {"a_compound": {"$nin": [1, 4, 2, 6]}}],
+                "$and": [
+                    {"a_compound": {"$nin": [16, 12, 19]}},
+                    {"a_compound": {"$nin": [1, 4, 2, 6]}},
+                ],
                 "$nor": [
-                    {"$and": [{"a_compound": {"$all": [5, 10]}}, {"i_compound": {"$in": [9, 17, 2, 14]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$all": [5, 10]}},
+                            {"i_compound": {"$in": [9, 17, 2, 14]}},
+                        ],
+                    },
                     {"i_noidx": {"$in": [6, 2, 5]}},
                     {"h_noidx": {"$exists": False}},
                 ],
@@ -4481,7 +4834,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "c_compound": 1}},
     ],
     /* clusterSize: 124, queryRank: 7.03 */ [
-        {"$match": {"$nor": [{"a_compound": {"$all": [13, 13, 5]}}, {"d_idx": {"$gte": 17}}], "a_idx": {"$ne": 17}}},
+        {
+            "$match": {
+                "$nor": [{"a_compound": {"$all": [13, 13, 5]}}, {"d_idx": {"$gte": 17}}],
+                "a_idx": {"$ne": 17},
+            },
+        },
         {"$sort": {"h_idx": -1}},
     ],
     /* clusterSize: 124, queryRank: 8.03 */ [
@@ -4524,7 +4882,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"a_idx": {"$nin": [15, 2]}},
-                    {"$or": [{"a_compound": {"$all": [15, 8, 10]}}, {"i_compound": {"$in": [10, 4]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [15, 8, 10]}},
+                            {"i_compound": {"$in": [10, 4]}},
+                        ],
+                    },
                 ],
                 "a_compound": {"$elemMatch": {"$exists": True, "$nin": [19, 11]}},
                 "a_noidx": {"$exists": True},
@@ -4601,7 +4964,10 @@ export const pipelines = [
     /* clusterSize: 123, queryRank: 12.03 */ [
         {
             "$match": {
-                "$nor": [{"a_noidx": {"$exists": False}}, {"a_compound": {"$all": [9, 16, 15, 18]}}],
+                "$nor": [
+                    {"a_noidx": {"$exists": False}},
+                    {"a_compound": {"$all": [9, 16, 15, 18]}},
+                ],
                 "i_compound": {"$exists": True},
             },
         },
@@ -4690,7 +5056,10 @@ export const pipelines = [
     /* clusterSize: 120, queryRank: 11.02 */ [
         {
             "$match": {
-                "$or": [{"k_compound": {"$nin": [10, 7, 9, 19]}}, {"a_compound": {"$all": [11, 7]}}],
+                "$or": [
+                    {"k_compound": {"$nin": [10, 7, 9, 19]}},
+                    {"a_compound": {"$all": [11, 7]}},
+                ],
                 "a_compound": {"$elemMatch": {"$in": [16, 1], "$nin": [4, 4]}},
                 "c_noidx": {"$nin": [16, 7, 13]},
             },
@@ -4712,7 +5081,13 @@ export const pipelines = [
                             {"k_idx": {"$ne": 11}},
                         ],
                     },
-                    {"$or": [{"c_idx": {"$gte": 2}}, {"a_idx": {"$all": [11, 12]}}, {"d_compound": {"$exists": True}}]},
+                    {
+                        "$or": [
+                            {"c_idx": {"$gte": 2}},
+                            {"a_idx": {"$all": [11, 12]}},
+                            {"d_compound": {"$exists": True}},
+                        ],
+                    },
                 ],
                 "a_compound": {"$all": [2, 5]},
             },
@@ -4723,7 +5098,13 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$or": [{"k_idx": {"$exists": False}}, {"a_idx": {"$all": [16, 13]}}, {"c_compound": {"$ne": 4}}]},
+                    {
+                        "$or": [
+                            {"k_idx": {"$exists": False}},
+                            {"a_idx": {"$all": [16, 13]}},
+                            {"c_compound": {"$ne": 4}},
+                        ],
+                    },
                     {"a_idx": {"$in": [18, 7, 8]}},
                 ],
                 "a_compound": {"$in": [11, 5, 9]},
@@ -4746,7 +5127,13 @@ export const pipelines = [
                     },
                 ],
                 "$or": [
-                    {"$nor": [{"k_idx": {"$gt": 20}}, {"d_noidx": {"$gte": 12}}, {"h_noidx": {"$exists": False}}]},
+                    {
+                        "$nor": [
+                            {"k_idx": {"$gt": 20}},
+                            {"d_noidx": {"$gte": 12}},
+                            {"h_noidx": {"$exists": False}},
+                        ],
+                    },
                     {"a_idx": {"$nin": [4, 11, 18, 1]}},
                 ],
                 "c_compound": {"$nin": [9, 12]},
@@ -4795,7 +5182,15 @@ export const pipelines = [
                             },
                             {
                                 "$or": [
-                                    {"a_idx": {"$elemMatch": {"$exists": False, "$lte": 7, "$nin": [15, 9]}}},
+                                    {
+                                        "a_idx": {
+                                            "$elemMatch": {
+                                                "$exists": False,
+                                                "$lte": 7,
+                                                "$nin": [15, 9],
+                                            },
+                                        },
+                                    },
                                     {"a_compound": {"$in": [3, 20, 14]}},
                                     {"i_idx": {"$gt": 3}},
                                     {"a_compound": {"$lt": 4}},
@@ -4901,7 +5296,9 @@ export const pipelines = [
                     },
                     {"z_idx": {"$in": [12, 5, 17]}},
                 ],
-                "a_compound": {"$elemMatch": {"$exists": True, "$in": [12, 19, 4, 13], "$nin": [2, 3]}},
+                "a_compound": {
+                    "$elemMatch": {"$exists": True, "$in": [12, 19, 4, 13], "$nin": [2, 3]},
+                },
                 "a_idx": {"$lte": 6},
             },
         },
@@ -4932,7 +5329,10 @@ export const pipelines = [
                     {"h_noidx": {"$lte": 8}},
                     {"$nor": [{"k_idx": {"$exists": False}}, {"c_idx": {"$exists": False}}]},
                 ],
-                "$or": [{"a_compound": {"$nin": [4, 19, 19]}}, {"a_idx": {"$all": [18, 15, 17, 16]}}],
+                "$or": [
+                    {"a_compound": {"$nin": [4, 19, 19]}},
+                    {"a_idx": {"$all": [18, 15, 17, 16]}},
+                ],
                 "k_compound": {"$nin": [2, 3, 11]},
             },
         },
@@ -4977,7 +5377,12 @@ export const pipelines = [
         {"$limit": 37},
     ],
     /* clusterSize: 113, queryRank: 6.02 */ [
-        {"$match": {"$nor": [{"a_compound": {"$all": [8, 4]}}, {"k_noidx": {"$ne": 17}}], "a_idx": {"$lte": 17}}},
+        {
+            "$match": {
+                "$nor": [{"a_compound": {"$all": [8, 4]}}, {"k_noidx": {"$ne": 17}}],
+                "a_idx": {"$lte": 17},
+            },
+        },
         {"$sort": {"c_idx": -1}},
         {"$limit": 83},
         {"$project": {"_id": 0, "d_idx": 1}},
@@ -4994,7 +5399,11 @@ export const pipelines = [
     /* clusterSize: 113, queryRank: 11.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$lt": 10}}, {"a_idx": {"$all": [3, 14, 7]}}, {"a_idx": {"$all": [15, 7, 1]}}],
+                "$or": [
+                    {"a_compound": {"$lt": 10}},
+                    {"a_idx": {"$all": [3, 14, 7]}},
+                    {"a_idx": {"$all": [15, 7, 1]}},
+                ],
                 "i_idx": {"$in": [20, 14]},
             },
         },
@@ -5009,7 +5418,9 @@ export const pipelines = [
         {"$limit": 81},
         {"$project": {"a_compound": 1, "a_noidx": 1}},
     ],
-    /* clusterSize: 112, queryRank: 4.03 */ [{"$match": {"a_compound": {"$gte": 17}, "d_compound": {"$gte": 1}}}],
+    /* clusterSize: 112, queryRank: 4.03 */ [
+        {"$match": {"a_compound": {"$gte": 17}, "d_compound": {"$gte": 1}}},
+    ],
     /* clusterSize: 112, queryRank: 16.03 */ [
         {
             "$match": {
@@ -5033,7 +5444,12 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$and": [{"h_noidx": {"$nin": [2, 2, 8]}}, {"d_compound": {"$exists": False}}]},
+                    {
+                        "$and": [
+                            {"h_noidx": {"$nin": [2, 2, 8]}},
+                            {"d_compound": {"$exists": False}},
+                        ],
+                    },
                     {"k_compound": {"$lte": 4}},
                     {"a_idx": {"$elemMatch": {"$nin": [16, 2]}}},
                     {"a_compound": {"$elemMatch": {"$nin": [13, 11, 18, 17]}}},
@@ -5163,7 +5579,11 @@ export const pipelines = [
                         ],
                     },
                 ],
-                "$or": [{"z_compound": {"$lt": 13}}, {"d_idx": {"$exists": True}}, {"a_compound": {"$all": [6, 7]}}],
+                "$or": [
+                    {"z_compound": {"$lt": 13}},
+                    {"d_idx": {"$exists": True}},
+                    {"a_compound": {"$all": [6, 7]}},
+                ],
             },
         },
         {"$sort": {"a_idx": -1, "z_idx": -1}},
@@ -5178,7 +5598,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"a_compound": {"$all": [19, 17, 8, 1]}}, {"i_compound": {"$ne": 11}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [19, 17, 8, 1]}},
+                            {"i_compound": {"$ne": 11}},
+                        ],
+                    },
                     {"i_noidx": {"$eq": 16}},
                 ],
                 "z_noidx": {"$in": [3, 16]},
@@ -5312,7 +5737,12 @@ export const pipelines = [
         {"$sort": {"h_idx": -1}},
     ],
     /* clusterSize: 104, queryRank: 6.02 */ [
-        {"$match": {"$or": [{"z_compound": {"$ne": 15}}, {"z_compound": {"$eq": 16}}], "a_compound": {"$lt": 2}}},
+        {
+            "$match": {
+                "$or": [{"z_compound": {"$ne": 15}}, {"z_compound": {"$eq": 16}}],
+                "a_compound": {"$lt": 2},
+            },
+        },
         {"$skip": 9},
         {"$project": {"_id": 0, "a_idx": 1, "a_noidx": 1, "c_compound": 1}},
     ],
@@ -5382,7 +5812,10 @@ export const pipelines = [
     /* clusterSize: 102, queryRank: 7.02 */ [
         {
             "$match": {
-                "$nor": [{"z_compound": {"$nin": [12, 11, 20, 1]}}, {"d_compound": {"$nin": [9, 17, 10]}}],
+                "$nor": [
+                    {"z_compound": {"$nin": [12, 11, 20, 1]}},
+                    {"d_compound": {"$nin": [9, 17, 10]}},
+                ],
                 "c_compound": {"$nin": [20, 4, 7]},
             },
         },
@@ -5449,7 +5882,10 @@ export const pipelines = [
     /* clusterSize: 102, queryRank: 13.02 */ [
         {
             "$match": {
-                "$nor": [{"a_idx": {"$elemMatch": {"$in": [19, 4, 14]}}}, {"a_compound": {"$all": [7, 3, 17]}}],
+                "$nor": [
+                    {"a_idx": {"$elemMatch": {"$in": [19, 4, 14]}}},
+                    {"a_compound": {"$all": [7, 3, 17]}},
+                ],
                 "k_compound": {"$nin": [8, 13]},
             },
         },
@@ -5593,7 +6029,12 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"a_noidx": {"$elemMatch": {"$gt": 13}}},
-                    {"$and": [{"c_compound": {"$lte": 19}}, {"a_compound": {"$elemMatch": {"$nin": [2, 9]}}}]},
+                    {
+                        "$and": [
+                            {"c_compound": {"$lte": 19}},
+                            {"a_compound": {"$elemMatch": {"$nin": [2, 9]}}},
+                        ],
+                    },
                     {"$and": [{"z_noidx": {"$nin": [7, 9]}}, {"k_compound": {"$gte": 1}}]},
                 ],
                 "a_compound": {"$elemMatch": {"$gte": 16}},
@@ -5663,7 +6104,10 @@ export const pipelines = [
     /* clusterSize: 99, queryRank: 14.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [7, 7]}}, {"a_compound": {"$all": [5, 11, 20, 3]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [7, 7]}},
+                    {"a_compound": {"$all": [5, 11, 20, 3]}},
+                ],
                 "a_compound": {"$elemMatch": {"$exists": True, "$gt": 1}},
             },
         },
@@ -5759,7 +6203,10 @@ export const pipelines = [
     /* clusterSize: 97, queryRank: 11.03 */ [
         {
             "$match": {
-                "$nor": [{"a_idx": {"$elemMatch": {"$exists": False}}}, {"a_noidx": {"$nin": [11, 20, 17]}}],
+                "$nor": [
+                    {"a_idx": {"$elemMatch": {"$exists": False}}},
+                    {"a_noidx": {"$nin": [11, 20, 17]}},
+                ],
                 "$or": [
                     {"c_idx": {"$lte": 1}},
                     {
@@ -5805,7 +6252,10 @@ export const pipelines = [
     /* clusterSize: 95, queryRank: 10.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$elemMatch": {"$in": [9, 3, 12, 14]}}}, {"a_idx": {"$all": [15, 1, 7]}}],
+                "$or": [
+                    {"a_compound": {"$elemMatch": {"$in": [9, 3, 12, 14]}}},
+                    {"a_idx": {"$all": [15, 1, 7]}},
+                ],
                 "a_compound": {"$in": [11, 16]},
             },
         },
@@ -5885,7 +6335,11 @@ export const pipelines = [
     /* clusterSize: 94, queryRank: 10.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$all": [1, 9]}}, {"a_idx": {"$all": [18, 15]}}, {"a_idx": {"$gte": 12}}],
+                "$or": [
+                    {"a_compound": {"$all": [1, 9]}},
+                    {"a_idx": {"$all": [18, 15]}},
+                    {"a_idx": {"$gte": 12}},
+                ],
                 "d_idx": {"$in": [15, 9]},
             },
         },
@@ -5897,7 +6351,12 @@ export const pipelines = [
             "$match": {
                 "$nor": [
                     {"a_compound": {"$all": [4, 1, 15, 5]}},
-                    {"$or": [{"a_noidx": {"$in": [18, 13]}}, {"a_idx": {"$elemMatch": {"$gt": 18}}}]},
+                    {
+                        "$or": [
+                            {"a_noidx": {"$in": [18, 13]}},
+                            {"a_idx": {"$elemMatch": {"$gt": 18}}},
+                        ],
+                    },
                 ],
                 "h_noidx": {"$exists": True},
             },
@@ -5934,7 +6393,11 @@ export const pipelines = [
     /* clusterSize: 93, queryRank: 13.02 */ [
         {
             "$match": {
-                "$or": [{"i_compound": {"$lte": 7}}, {"a_compound": {"$in": [20, 12]}}, {"a_idx": {"$exists": False}}],
+                "$or": [
+                    {"i_compound": {"$lte": 7}},
+                    {"a_compound": {"$in": [20, 12]}},
+                    {"a_idx": {"$exists": False}},
+                ],
                 "a_compound": {"$in": [5, 20]},
                 "k_compound": {"$nin": [10, 7, 20]},
             },
@@ -5957,7 +6420,12 @@ export const pipelines = [
         {"$skip": 52},
     ],
     /* clusterSize: 93, queryRank: 12.03 */ [
-        {"$match": {"$or": [{"a_idx": {"$all": [5, 2]}}, {"a_compound": {"$all": [9, 10]}}], "a_compound": {"$gt": 3}}},
+        {
+            "$match": {
+                "$or": [{"a_idx": {"$all": [5, 2]}}, {"a_compound": {"$all": [9, 10]}}],
+                "a_compound": {"$gt": 3},
+            },
+        },
         {"$sort": {"h_idx": -1}},
     ],
     /* clusterSize: 93, queryRank: 11.03 */ [
@@ -5971,7 +6439,10 @@ export const pipelines = [
     /* clusterSize: 92, queryRank: 13.03 */ [
         {
             "$match": {
-                "$nor": [{"z_compound": {"$exists": False}}, {"a_compound": {"$all": [10, 16, 15]}}],
+                "$nor": [
+                    {"z_compound": {"$exists": False}},
+                    {"a_compound": {"$all": [10, 16, 15]}},
+                ],
                 "a_compound": {"$all": [3, 3]},
                 "a_idx": {"$nin": [4, 18, 17]},
             },
@@ -5986,12 +6457,22 @@ export const pipelines = [
                     {"a_idx": {"$elemMatch": {"$in": [16, 8, 3]}}},
                 ],
                 "$or": [
-                    {"$and": [{"k_idx": {"$nin": [7, 5, 19, 20]}}, {"a_idx": {"$all": [16, 15, 10]}}]},
+                    {
+                        "$and": [
+                            {"k_idx": {"$nin": [7, 5, 19, 20]}},
+                            {"a_idx": {"$all": [16, 15, 10]}},
+                        ],
+                    },
                     {"z_idx": {"$exists": True}},
                     {
                         "$or": [
                             {"a_compound": {"$all": [14, 11, 4, 12]}},
-                            {"$nor": [{"a_compound": {"$all": [2, 16]}}, {"a_idx": {"$all": [3, 3]}}]},
+                            {
+                                "$nor": [
+                                    {"a_compound": {"$all": [2, 16]}},
+                                    {"a_idx": {"$all": [3, 3]}},
+                                ],
+                            },
                             {"a_compound": {"$elemMatch": {"$exists": False}}},
                             {"a_compound": {"$nin": [20, 3]}},
                         ],
@@ -6028,7 +6509,12 @@ export const pipelines = [
                                 ],
                             },
                             {"z_noidx": {"$exists": False}},
-                            {"$and": [{"a_idx": {"$lt": 6}}, {"a_compound": {"$elemMatch": {"$lte": 20}}}]},
+                            {
+                                "$and": [
+                                    {"a_idx": {"$lt": 6}},
+                                    {"a_compound": {"$elemMatch": {"$lte": 20}}},
+                                ],
+                            },
                             {"a_idx": {"$all": [8, 20]}},
                         ],
                     },
@@ -6190,7 +6676,10 @@ export const pipelines = [
     /* clusterSize: 88, queryRank: 11.03 */ [
         {
             "$match": {
-                "$nor": [{"a_idx": {"$elemMatch": {"$in": [5, 14]}}}, {"a_compound": {"$all": [12, 17, 13]}}],
+                "$nor": [
+                    {"a_idx": {"$elemMatch": {"$in": [5, 14]}}},
+                    {"a_compound": {"$all": [12, 17, 13]}},
+                ],
                 "a_compound": {"$lt": 4},
                 "z_noidx": {"$in": [1, 11, 16]},
             },
@@ -6254,7 +6743,12 @@ export const pipelines = [
                         "$and": [
                             {"a_idx": {"$all": [7, 13, 19, 10, 5]}},
                             {"z_compound": {"$exists": True}},
-                            {"$nor": [{"a_idx": {"$nin": [12, 20, 15, 20]}}, {"a_compound": {"$gte": 19}}]},
+                            {
+                                "$nor": [
+                                    {"a_idx": {"$nin": [12, 20, 15, 20]}},
+                                    {"a_compound": {"$gte": 19}},
+                                ],
+                            },
                             {"a_compound": {"$elemMatch": {"$in": [4, 13]}}},
                         ],
                     },
@@ -6290,7 +6784,16 @@ export const pipelines = [
                     {
                         "$or": [
                             {"a_compound": {"$exists": True}},
-                            {"a_compound": {"$elemMatch": {"$exists": True, "$gte": 20, "$lt": 11, "$lte": 6}}},
+                            {
+                                "a_compound": {
+                                    "$elemMatch": {
+                                        "$exists": True,
+                                        "$gte": 20,
+                                        "$lt": 11,
+                                        "$lte": 6,
+                                    },
+                                },
+                            },
                             {"z_idx": {"$nin": [14, 16]}},
                         ],
                     },
@@ -6335,7 +6838,12 @@ export const pipelines = [
                     {"a_noidx": {"$nin": [15, 12]}},
                 ],
                 "$or": [
-                    {"$and": [{"i_noidx": {"$nin": [7, 10, 8, 15]}}, {"a_idx": {"$elemMatch": {"$gte": 9}}}]},
+                    {
+                        "$and": [
+                            {"i_noidx": {"$nin": [7, 10, 8, 15]}},
+                            {"a_idx": {"$elemMatch": {"$gte": 9}}},
+                        ],
+                    },
                     {"c_compound": {"$nin": [15, 5]}},
                 ],
                 "a_compound": {"$in": [5, 18]},
@@ -6349,7 +6857,12 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$and": [{"i_compound": {"$nin": [10, 10]}}, {"a_noidx": {"$all": [15, 15, 2]}}]},
+                    {
+                        "$and": [
+                            {"i_compound": {"$nin": [10, 10]}},
+                            {"a_noidx": {"$all": [15, 15, 2]}},
+                        ],
+                    },
                     {"a_compound": {"$lt": 5}},
                 ],
                 "k_compound": {"$exists": True},
@@ -6375,10 +6888,19 @@ export const pipelines = [
     /* clusterSize: 84, queryRank: 13.02 */ [
         {
             "$match": {
-                "$and": [{"a_idx": {"$lte": 10}}, {"a_idx": {"$lte": 2}}, {"z_noidx": {"$exists": True}}],
+                "$and": [
+                    {"a_idx": {"$lte": 10}},
+                    {"a_idx": {"$lte": 2}},
+                    {"z_noidx": {"$exists": True}},
+                ],
                 "$nor": [
                     {"a_idx": {"$elemMatch": {"$exists": False, "$lte": 4}}},
-                    {"$or": [{"a_idx": {"$elemMatch": {"$exists": False}}}, {"a_noidx": {"$gte": 17}}]},
+                    {
+                        "$or": [
+                            {"a_idx": {"$elemMatch": {"$exists": False}}},
+                            {"a_noidx": {"$gte": 17}},
+                        ],
+                    },
                     {"a_compound": {"$all": [11, 1]}},
                     {"k_compound": {"$lt": 15}},
                 ],
@@ -6437,7 +6959,10 @@ export const pipelines = [
     /* clusterSize: 82, queryRank: 12.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$elemMatch": {"$exists": True}}}, {"a_compound": {"$all": [11, 15, 14]}}],
+                "$or": [
+                    {"a_compound": {"$elemMatch": {"$exists": True}}},
+                    {"a_compound": {"$all": [11, 15, 14]}},
+                ],
                 "a_compound": {"$in": [2, 1, 19]},
             },
         },
@@ -6456,7 +6981,12 @@ export const pipelines = [
                     {"z_compound": {"$ne": 13}},
                     {"a_compound": {"$elemMatch": {"$exists": False, "$in": [18, 12], "$lt": 6}}},
                     {"a_compound": {"$nin": [15, 19, 12]}},
-                    {"$and": [{"h_compound": {"$exists": False}}, {"a_compound": {"$all": [10, 1]}}]},
+                    {
+                        "$and": [
+                            {"h_compound": {"$exists": False}},
+                            {"a_compound": {"$all": [10, 1]}},
+                        ],
+                    },
                 ],
                 "a_compound": {"$gte": 10},
             },
@@ -6466,9 +6996,18 @@ export const pipelines = [
     /* clusterSize: 82, queryRank: 14.02 */ [
         {
             "$match": {
-                "$and": [{"k_compound": {"$gte": 9}}, {"z_idx": {"$lte": 7}}, {"z_noidx": {"$in": [2, 20, 2]}}],
+                "$and": [
+                    {"k_compound": {"$gte": 9}},
+                    {"z_idx": {"$lte": 7}},
+                    {"z_noidx": {"$in": [2, 20, 2]}},
+                ],
                 "$or": [
-                    {"$and": [{"a_compound": {"$nin": [18, 10, 3, 17]}}, {"a_noidx": {"$nin": [5, 15, 15]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$nin": [18, 10, 3, 17]}},
+                            {"a_noidx": {"$nin": [5, 15, 15]}},
+                        ],
+                    },
                     {"d_compound": {"$in": [6, 5]}},
                     {"h_compound": {"$exists": False}},
                     {"k_compound": {"$in": [18, 4, 16]}},
@@ -6533,8 +7072,18 @@ export const pipelines = [
                     {
                         "$and": [
                             {"z_idx": {"$lt": 3}},
-                            {"$or": [{"a_compound": {"$elemMatch": {"$eq": 4}}}, {"a_idx": {"$all": [16, 12, 6]}}]},
-                            {"$nor": [{"c_idx": {"$in": [16, 10, 11, 14]}}, {"i_compound": {"$in": [14, 7]}}]},
+                            {
+                                "$or": [
+                                    {"a_compound": {"$elemMatch": {"$eq": 4}}},
+                                    {"a_idx": {"$all": [16, 12, 6]}},
+                                ],
+                            },
+                            {
+                                "$nor": [
+                                    {"c_idx": {"$in": [16, 10, 11, 14]}},
+                                    {"i_compound": {"$in": [14, 7]}},
+                                ],
+                            },
                         ],
                     },
                 ],
@@ -6548,7 +7097,10 @@ export const pipelines = [
     /* clusterSize: 80, queryRank: 6.03 */ [
         {
             "$match": {
-                "$and": [{"a_idx": {"$elemMatch": {"$exists": True}}}, {"a_compound": {"$exists": True}}],
+                "$and": [
+                    {"a_idx": {"$elemMatch": {"$exists": True}}},
+                    {"a_compound": {"$exists": True}},
+                ],
                 "c_compound": {"$ne": 3},
             },
         },
@@ -6560,7 +7112,10 @@ export const pipelines = [
             "$match": {
                 "$and": [{"a_idx": {"$exists": True}}, {"a_compound": {"$lte": 2}}],
                 "$nor": [{"k_noidx": {"$in": [17, 1]}}, {"a_idx": {"$exists": False}}],
-                "$or": [{"i_compound": {"$nin": [20, 3]}}, {"a_compound": {"$elemMatch": {"$exists": False}}}],
+                "$or": [
+                    {"i_compound": {"$nin": [20, 3]}},
+                    {"a_compound": {"$elemMatch": {"$exists": False}}},
+                ],
                 "a_compound": {"$gt": 17},
                 "h_compound": {"$ne": 16},
             },
@@ -6583,7 +7138,12 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$and": [{"c_compound": {"$exists": True}}, {"a_compound": {"$all": [13, 14, 15, 18, 4]}}]},
+                    {
+                        "$and": [
+                            {"c_compound": {"$exists": True}},
+                            {"a_compound": {"$all": [13, 14, 15, 18, 4]}},
+                        ],
+                    },
                     {"c_compound": {"$lt": 13}},
                 ],
                 "a_compound": {"$exists": True},
@@ -6597,7 +7157,10 @@ export const pipelines = [
     /* clusterSize: 80, queryRank: 6.03 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$in": [13, 16]}}, {"a_compound": {"$elemMatch": {"$exists": True}}}],
+                "$and": [
+                    {"a_compound": {"$in": [13, 16]}},
+                    {"a_compound": {"$elemMatch": {"$exists": True}}},
+                ],
                 "i_compound": {"$exists": True},
             },
         },
@@ -6607,7 +7170,13 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$nor": [{"a_compound": {"$exists": False}}, {"a_idx": {"$ne": 6}}, {"z_idx": {"$in": [11, 18]}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$exists": False}},
+                            {"a_idx": {"$ne": 6}},
+                            {"z_idx": {"$in": [11, 18]}},
+                        ],
+                    },
                     {"k_idx": {"$exists": True}},
                 ],
                 "k_compound": {"$lte": 12},
@@ -6695,7 +7264,12 @@ export const pipelines = [
             "$match": {
                 "$nor": [
                     {"i_idx": {"$exists": False}},
-                    {"$nor": [{"a_compound": {"$all": [20, 3, 20, 16]}}, {"k_compound": {"$gte": 6}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$all": [20, 3, 20, 16]}},
+                            {"k_compound": {"$gte": 6}},
+                        ],
+                    },
                     {"k_idx": {"$exists": False}},
                     {"z_noidx": {"$gt": 9}},
                 ],
@@ -6878,7 +7452,12 @@ export const pipelines = [
                 "$and": [
                     {"i_noidx": {"$nin": [2, 20]}},
                     {"k_compound": {"$nin": [7, 18]}},
-                    {"$and": [{"c_compound": {"$nin": [15, 5, 8]}}, {"k_compound": {"$in": [18, 2, 6, 7]}}]},
+                    {
+                        "$and": [
+                            {"c_compound": {"$nin": [15, 5, 8]}},
+                            {"k_compound": {"$in": [18, 2, 6, 7]}},
+                        ],
+                    },
                     {"$and": [{"a_noidx": {"$in": [15, 1, 1]}}, {"a_compound": {"$lte": 16}}]},
                 ],
                 "a_noidx": {"$elemMatch": {"$lte": 10}},
@@ -6902,7 +7481,12 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"i_idx": {"$nin": [16, 9, 7, 3, 8]}},
-                    {"$or": [{"a_compound": {"$all": [14, 5, 1, 10]}}, {"h_compound": {"$gte": 6}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [14, 5, 1, 10]}},
+                            {"h_compound": {"$gte": 6}},
+                        ],
+                    },
                 ],
                 "k_compound": {"$gte": 1},
             },
@@ -6918,7 +7502,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"i_compound": {"$exists": True}}, {"i_compound": {"$nin": [8, 5, 6]}}]},
+                    {
+                        "$or": [
+                            {"i_compound": {"$exists": True}},
+                            {"i_compound": {"$nin": [8, 5, 6]}},
+                        ],
+                    },
                     {
                         "$or": [
                             {"a_compound": {"$all": [5, 6, 7, 14]}},
@@ -6965,7 +7554,10 @@ export const pipelines = [
                         ],
                     },
                 ],
-                "$or": [{"a_idx": {"$all": [17, 3, 17]}}, {"a_compound": {"$elemMatch": {"$exists": True, "$lt": 15}}}],
+                "$or": [
+                    {"a_idx": {"$all": [17, 3, 17]}},
+                    {"a_compound": {"$elemMatch": {"$exists": True, "$lt": 15}}},
+                ],
             },
         },
         {"$sort": {"d_idx": -1, "i_idx": 1, "z_idx": 1}},
@@ -7007,7 +7599,11 @@ export const pipelines = [
     /* clusterSize: 70, queryRank: 14.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [6, 9, 11]}}, {"k_compound": {"$eq": 4}}, {"k_noidx": {"$eq": 6}}],
+                "$nor": [
+                    {"a_compound": {"$all": [6, 9, 11]}},
+                    {"k_compound": {"$eq": 4}},
+                    {"k_noidx": {"$eq": 6}},
+                ],
                 "a_compound": {"$exists": True},
             },
         },
@@ -7016,7 +7612,10 @@ export const pipelines = [
     /* clusterSize: 70, queryRank: 13.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$nin": [1, 6, 16]}}, {"a_compound": {"$all": [3, 9, 12]}}],
+                "$nor": [
+                    {"a_compound": {"$nin": [1, 6, 16]}},
+                    {"a_compound": {"$all": [3, 9, 12]}},
+                ],
                 "a_compound": {"$elemMatch": {"$eq": 6}},
             },
         },
@@ -7138,7 +7737,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"a_compound": {"$all": [14, 8, 8]}}, {"a_compound": {"$nin": [9, 1, 17, 13]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [14, 8, 8]}},
+                            {"a_compound": {"$nin": [9, 1, 17, 13]}},
+                        ],
+                    },
                     {
                         "$and": [
                             {"z_compound": {"$lte": 20}},
@@ -7165,7 +7769,12 @@ export const pipelines = [
                 "$nor": [{"z_compound": {"$in": [4, 12]}}, {"c_compound": {"$in": [9, 9, 3]}}],
                 "$or": [
                     {"a_compound": {"$gt": 1}},
-                    {"$and": [{"a_compound": {"$all": [17, 16]}}, {"k_compound": {"$in": [7, 15, 17, 3]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$all": [17, 16]}},
+                            {"k_compound": {"$in": [7, 15, 17, 3]}},
+                        ],
+                    },
                     {"z_idx": {"$ne": 18}},
                     {"a_idx": {"$all": [7, 20, 7]}},
                 ],
@@ -7235,8 +7844,19 @@ export const pipelines = [
             "$match": {
                 "$nor": [
                     {"a_noidx": {"$lt": 4}},
-                    {"$or": [{"c_noidx": {"$in": [9, 11]}}, {"a_compound": {"$all": [13, 7, 2, 3]}}]},
-                    {"$or": [{"i_compound": {"$lt": 4}}, {"a_idx": {"$eq": 7}}, {"a_compound": {"$exists": False}}]},
+                    {
+                        "$or": [
+                            {"c_noidx": {"$in": [9, 11]}},
+                            {"a_compound": {"$all": [13, 7, 2, 3]}},
+                        ],
+                    },
+                    {
+                        "$or": [
+                            {"i_compound": {"$lt": 4}},
+                            {"a_idx": {"$eq": 7}},
+                            {"a_compound": {"$exists": False}},
+                        ],
+                    },
                 ],
                 "h_compound": {"$nin": [19, 13, 13]},
             },
@@ -7255,7 +7875,12 @@ export const pipelines = [
                             {"a_compound": {"$exists": False}},
                         ],
                     },
-                    {"$and": [{"a_compound": {"$elemMatch": {"$nin": [13, 18]}}}, {"a_noidx": {"$lt": 3}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$elemMatch": {"$nin": [13, 18]}}},
+                            {"a_noidx": {"$lt": 3}},
+                        ],
+                    },
                     {"i_compound": {"$in": [5, 10, 8, 9]}},
                 ],
                 "a_idx": {"$elemMatch": {"$nin": [10, 11, 8]}},
@@ -7266,7 +7891,12 @@ export const pipelines = [
         {"$limit": 55},
     ],
     /* clusterSize: 67, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$exists": True, "$gte": 7}}, "c_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$exists": True, "$gte": 7}},
+                "c_compound": {"$exists": True},
+            },
+        },
         {"$sort": {"c_idx": -1}},
         {"$limit": 48},
     ],
@@ -7289,7 +7919,12 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$and": [{"a_noidx": {"$exists": True}}, {"a_compound": {"$elemMatch": {"$nin": [7, 6]}}}]},
+                    {
+                        "$and": [
+                            {"a_noidx": {"$exists": True}},
+                            {"a_compound": {"$elemMatch": {"$nin": [7, 6]}}},
+                        ],
+                    },
                     {"a_compound": {"$nin": [18, 19]}},
                 ],
                 "k_compound": {"$gte": 6},
@@ -7380,7 +8015,11 @@ export const pipelines = [
     /* clusterSize: 66, queryRank: 8.03 */ [
         {
             "$match": {
-                "$or": [{"c_idx": {"$lte": 19}}, {"a_compound": {"$nin": [11, 11, 5]}}, {"a_idx": {"$all": [18, 14]}}],
+                "$or": [
+                    {"c_idx": {"$lte": 19}},
+                    {"a_compound": {"$nin": [11, 11, 5]}},
+                    {"a_idx": {"$all": [18, 14]}},
+                ],
                 "h_compound": {"$nin": [7, 6, 8]},
             },
         },
@@ -7388,7 +8027,13 @@ export const pipelines = [
         {"$limit": 237},
     ],
     /* clusterSize: 65, queryRank: 6.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "a_idx": {"$nin": [5, 12, 4]}, "i_compound": {"$gte": 20}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "a_idx": {"$nin": [5, 12, 4]},
+                "i_compound": {"$gte": 20},
+            },
+        },
         {"$sort": {"h_idx": -1}},
         {"$project": {"_id": 0, "a_compound": 1}},
     ],
@@ -7408,7 +8053,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$and": [{"a_compound": {"$elemMatch": {"$exists": True}}}, {"h_compound": {"$exists": True}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$elemMatch": {"$exists": True}}},
+                            {"h_compound": {"$exists": True}},
+                        ],
+                    },
                     {
                         "$or": [
                             {"c_idx": {"$eq": 7}},
@@ -7432,7 +8082,11 @@ export const pipelines = [
                             {"i_compound": {"$exists": True}},
                             {
                                 "$and": [
-                                    {"a_noidx": {"$elemMatch": {"$lte": 18, "$nin": [17, 13, 16, 19, 1]}}},
+                                    {
+                                        "a_noidx": {
+                                            "$elemMatch": {"$lte": 18, "$nin": [17, 13, 16, 19, 1]},
+                                        },
+                                    },
                                     {"a_noidx": {"$lte": 15}},
                                     {"a_idx": {"$elemMatch": {"$gte": 20}}},
                                 ],
@@ -7537,7 +8191,10 @@ export const pipelines = [
     /* clusterSize: 62, queryRank: 14.02 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$elemMatch": {"$nin": [17, 12, 15, 5]}}}, {"a_compound": {"$lte": 12}}],
+                "$and": [
+                    {"a_compound": {"$elemMatch": {"$nin": [17, 12, 15, 5]}}},
+                    {"a_compound": {"$lte": 12}},
+                ],
                 "$or": [
                     {"a_compound": {"$all": [5, 1, 19, 11, 12]}},
                     {"a_idx": {"$nin": [8, 4]}},
@@ -7615,7 +8272,12 @@ export const pipelines = [
                     {"a_idx": {"$nin": [3, 12]}},
                     {"a_idx": {"$gt": 14}},
                     {"z_compound": {"$in": [6, 8, 17, 7, 2]}},
-                    {"$or": [{"a_compound": {"$elemMatch": {"$in": [8, 18, 4]}}}, {"a_compound": {"$gte": 15}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$elemMatch": {"$in": [8, 18, 4]}}},
+                            {"a_compound": {"$gte": 15}},
+                        ],
+                    },
                     {"k_idx": {"$nin": [20, 4]}},
                 ],
             },
@@ -7640,7 +8302,11 @@ export const pipelines = [
     /* clusterSize: 61, queryRank: 8.02 */ [
         {
             "$match": {
-                "$nor": [{"k_idx": {"$lt": 8}}, {"i_compound": {"$lte": 5}}, {"a_compound": {"$all": [17, 8]}}],
+                "$nor": [
+                    {"k_idx": {"$lt": 8}},
+                    {"i_compound": {"$lte": 5}},
+                    {"a_compound": {"$all": [17, 8]}},
+                ],
                 "a_noidx": {"$elemMatch": {"$lte": 8}},
             },
         },
@@ -7677,7 +8343,12 @@ export const pipelines = [
                 "$or": [
                     {"a_idx": {"$all": [18, 8]}},
                     {"k_compound": {"$gte": 7}},
-                    {"$or": [{"a_compound": {"$elemMatch": {"$exists": True}}}, {"d_compound": {"$ne": 6}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$elemMatch": {"$exists": True}}},
+                            {"d_compound": {"$ne": 6}},
+                        ],
+                    },
                 ],
                 "z_compound": {"$exists": True},
             },
@@ -7697,7 +8368,15 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_compound": 1, "k_compound": 1}},
     ],
     /* clusterSize: 61, queryRank: 6.03 */ [
-        {"$match": {"$and": [{"a_compound": {"$gte": 11}}, {"k_compound": {"$ne": 3}}, {"k_idx": {"$exists": True}}]}},
+        {
+            "$match": {
+                "$and": [
+                    {"a_compound": {"$gte": 11}},
+                    {"k_compound": {"$ne": 3}},
+                    {"k_idx": {"$exists": True}},
+                ],
+            },
+        },
         {"$sort": {"d_idx": -1}},
         {"$project": {"_id": 0, "a_compound": 1, "c_noidx": 1}},
     ],
@@ -7762,7 +8441,11 @@ export const pipelines = [
     /* clusterSize: 60, queryRank: 12.03 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$all": [16, 8, 13]}}, {"h_idx": {"$gte": 12}}, {"a_idx": {"$nin": [7, 8]}}],
+                "$or": [
+                    {"a_compound": {"$all": [16, 8, 13]}},
+                    {"h_idx": {"$gte": 12}},
+                    {"a_idx": {"$nin": [7, 8]}},
+                ],
                 "c_compound": {"$in": [8, 1]},
                 "i_compound": {"$exists": True},
             },
@@ -7775,7 +8458,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"a_idx": {"$all": [3, 20, 14, 8, 3]}},
-                    {"$nor": [{"a_idx": {"$elemMatch": {"$nin": [19, 8, 6]}}}, {"k_compound": {"$lt": 10}}]},
+                    {
+                        "$nor": [
+                            {"a_idx": {"$elemMatch": {"$nin": [19, 8, 6]}}},
+                            {"k_compound": {"$lt": 10}},
+                        ],
+                    },
                     {"c_idx": {"$in": [6, 3]}},
                     {"d_compound": {"$lt": 11}},
                 ],
@@ -7827,7 +8515,10 @@ export const pipelines = [
     /* clusterSize: 58, queryRank: 15.03 */ [
         {
             "$match": {
-                "$nor": [{"k_compound": {"$in": [4, 12, 15]}}, {"a_compound": {"$all": [13, 11, 5, 3]}}],
+                "$nor": [
+                    {"k_compound": {"$in": [4, 12, 15]}},
+                    {"a_compound": {"$all": [13, 11, 5, 3]}},
+                ],
                 "a_idx": {"$in": [16, 18]},
                 "d_idx": {"$gt": 7},
                 "z_idx": {"$in": [4, 8]},
@@ -7867,9 +8558,19 @@ export const pipelines = [
                 "$or": [
                     {"a_compound": {"$exists": True}},
                     {"z_compound": {"$lte": 5}},
-                    {"$or": [{"d_compound": {"$ne": 18}}, {"a_idx": {"$elemMatch": {"$in": [3, 18, 12]}}}]},
+                    {
+                        "$or": [
+                            {"d_compound": {"$ne": 18}},
+                            {"a_idx": {"$elemMatch": {"$in": [3, 18, 12]}}},
+                        ],
+                    },
                     {"i_compound": {"$in": [19, 3, 16]}},
-                    {"$and": [{"a_noidx": {"$elemMatch": {"$exists": False}}}, {"d_idx": {"$gte": 16}}]},
+                    {
+                        "$and": [
+                            {"a_noidx": {"$elemMatch": {"$exists": False}}},
+                            {"d_idx": {"$gte": 16}},
+                        ],
+                    },
                 ],
             },
         },
@@ -7879,7 +8580,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"a_compound": {"$all": [8, 5, 2]}}, {"a_compound": {"$nin": [5, 14]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [8, 5, 2]}},
+                            {"a_compound": {"$nin": [5, 14]}},
+                        ],
+                    },
                     {"k_idx": {"$ne": 17}},
                 ],
                 "$or": [
@@ -7906,7 +8612,11 @@ export const pipelines = [
                     {"a_noidx": {"$elemMatch": {"$exists": True, "$lt": 6}}},
                     {"a_idx": {"$exists": True}},
                 ],
-                "$or": [{"z_idx": {"$nin": [5, 8, 9]}}, {"i_compound": {"$nin": [3, 1]}}, {"c_compound": {"$lt": 12}}],
+                "$or": [
+                    {"z_idx": {"$nin": [5, 8, 9]}},
+                    {"i_compound": {"$nin": [3, 1]}},
+                    {"c_compound": {"$lt": 12}},
+                ],
             },
         },
         {"$project": {"a_idx": 1, "a_noidx": 1}},
@@ -7916,7 +8626,12 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"c_idx": {"$in": [11, 1, 14, 17]}},
-                    {"$nor": [{"a_compound": {"$all": [13, 5, 10, 9]}}, {"z_idx": {"$exists": False}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$all": [13, 5, 10, 9]}},
+                            {"z_idx": {"$exists": False}},
+                        ],
+                    },
                 ],
                 "c_compound": {"$eq": 1},
             },
@@ -7947,7 +8662,12 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [
-                    {"$or": [{"a_compound": {"$all": [10, 1, 3]}}, {"a_compound": {"$exists": False}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [10, 1, 3]}},
+                            {"a_compound": {"$exists": False}},
+                        ],
+                    },
                     {"k_noidx": {"$in": [19, 14]}},
                 ],
                 "a_compound": {"$nin": [18, 3]},
@@ -7968,7 +8688,10 @@ export const pipelines = [
     /* clusterSize: 57, queryRank: 6.03 */ [
         {
             "$match": {
-                "$and": [{"d_compound": {"$exists": True}}, {"a_compound": {"$elemMatch": {"$exists": True}}}],
+                "$and": [
+                    {"d_compound": {"$exists": True}},
+                    {"a_compound": {"$elemMatch": {"$exists": True}}},
+                ],
                 "a_idx": {"$elemMatch": {"$lte": 15}},
             },
         },
@@ -8062,7 +8785,12 @@ export const pipelines = [
                 "$and": [
                     {"z_idx": {"$exists": True}},
                     {"k_compound": {"$exists": True}},
-                    {"$and": [{"a_compound": {"$elemMatch": {"$exists": True}}}, {"a_noidx": {"$nin": [8, 20]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$elemMatch": {"$exists": True}}},
+                            {"a_noidx": {"$nin": [8, 20]}},
+                        ],
+                    },
                 ],
             },
         },
@@ -8135,7 +8863,15 @@ export const pipelines = [
                             {
                                 "$nor": [
                                     {"k_compound": {"$nin": [4, 2]}},
-                                    {"a_noidx": {"$elemMatch": {"$eq": 1, "$exists": True, "$nin": [2, 2, 6]}}},
+                                    {
+                                        "a_noidx": {
+                                            "$elemMatch": {
+                                                "$eq": 1,
+                                                "$exists": True,
+                                                "$nin": [2, 2, 6],
+                                            },
+                                        },
+                                    },
                                 ],
                             },
                         ],
@@ -8250,7 +8986,10 @@ export const pipelines = [
     /* clusterSize: 54, queryRank: 12.02 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$all": [11, 18, 17, 20, 1, 12]}}, {"d_idx": {"$nin": [12, 3]}}],
+                "$or": [
+                    {"a_compound": {"$all": [11, 18, 17, 20, 1, 12]}},
+                    {"d_idx": {"$nin": [12, 3]}},
+                ],
                 "h_compound": {"$lte": 5},
             },
         },
@@ -8294,7 +9033,12 @@ export const pipelines = [
                     {"i_idx": {"$eq": 12}},
                     {
                         "$and": [
-                            {"$nor": [{"z_compound": {"$exists": True}}, {"a_idx": {"$all": [14, 9, 19, 20]}}]},
+                            {
+                                "$nor": [
+                                    {"z_compound": {"$exists": True}},
+                                    {"a_idx": {"$all": [14, 9, 19, 20]}},
+                                ],
+                            },
                             {"c_compound": {"$exists": True}},
                         ],
                     },
@@ -8310,7 +9054,10 @@ export const pipelines = [
     /* clusterSize: 53, queryRank: 11.02 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$elemMatch": {"$exists": True}}}, {"a_noidx": {"$exists": True}}],
+                "$and": [
+                    {"a_compound": {"$elemMatch": {"$exists": True}}},
+                    {"a_noidx": {"$exists": True}},
+                ],
                 "$or": [{"a_idx": {"$all": [18, 16, 19]}}, {"d_compound": {"$nin": [20, 18]}}],
                 "a_noidx": {"$elemMatch": {"$gt": 15, "$nin": [10, 5, 2]}},
             },
@@ -8327,8 +9074,18 @@ export const pipelines = [
             "$match": {
                 "$nor": [{"a_idx": {"$gte": 18}}, {"a_idx": {"$all": [1, 11, 20]}}],
                 "$or": [
-                    {"$and": [{"a_noidx": {"$all": [8, 9]}}, {"a_idx": {"$elemMatch": {"$nin": [13, 4, 12]}}}]},
-                    {"$or": [{"a_idx": {"$all": [4, 14]}}, {"a_compound": {"$all": [20, 5, 17, 14, 20]}}]},
+                    {
+                        "$and": [
+                            {"a_noidx": {"$all": [8, 9]}},
+                            {"a_idx": {"$elemMatch": {"$nin": [13, 4, 12]}}},
+                        ],
+                    },
+                    {
+                        "$or": [
+                            {"a_idx": {"$all": [4, 14]}},
+                            {"a_compound": {"$all": [20, 5, 17, 14, 20]}},
+                        ],
+                    },
                     {"a_compound": {"$elemMatch": {"$in": [10, 15, 11]}}},
                 ],
             },
@@ -8345,7 +9102,12 @@ export const pipelines = [
                         "$nor": [
                             {"i_compound": {"$nin": [18, 9, 15]}},
                             {"a_idx": {"$elemMatch": {"$exists": False}}},
-                            {"$and": [{"c_idx": {"$nin": [19, 12, 15]}}, {"d_compound": {"$in": [20, 15, 2]}}]},
+                            {
+                                "$and": [
+                                    {"c_idx": {"$nin": [19, 12, 15]}},
+                                    {"d_compound": {"$in": [20, 15, 2]}},
+                                ],
+                            },
                         ],
                     },
                     {"a_compound": {"$lte": 6}},
@@ -8380,7 +9142,12 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"a_compound": {"$exists": True}},
-                    {"$nor": [{"k_compound": {"$exists": False}}, {"a_compound": {"$all": [12, 2]}}]},
+                    {
+                        "$nor": [
+                            {"k_compound": {"$exists": False}},
+                            {"a_compound": {"$all": [12, 2]}},
+                        ],
+                    },
                     {"k_idx": {"$nin": [4, 19, 14]}},
                 ],
                 "z_noidx": {"$exists": True},
@@ -8408,10 +9175,23 @@ export const pipelines = [
                     {"a_idx": {"$elemMatch": {"$in": [19, 9], "$ne": 5}}},
                     {
                         "$or": [
-                            {"$and": [{"h_compound": {"$in": [13, 6, 4, 13]}}, {"a_idx": {"$all": [17, 1]}}]},
+                            {
+                                "$and": [
+                                    {"h_compound": {"$in": [13, 6, 4, 13]}},
+                                    {"a_idx": {"$all": [17, 1]}},
+                                ],
+                            },
                             {"d_idx": {"$gt": 13}},
                             {"a_idx": {"$all": [19, 20]}},
-                            {"a_compound": {"$elemMatch": {"$exists": True, "$in": [12, 3], "$nin": [17, 6, 14, 5]}}},
+                            {
+                                "a_compound": {
+                                    "$elemMatch": {
+                                        "$exists": True,
+                                        "$in": [12, 3],
+                                        "$nin": [17, 6, 14, 5],
+                                    },
+                                },
+                            },
                         ],
                     },
                 ],
@@ -8463,7 +9243,10 @@ export const pipelines = [
     /* clusterSize: 51, queryRank: 12.02 */ [
         {
             "$match": {
-                "$and": [{"d_compound": {"$exists": True}}, {"a_compound": {"$elemMatch": {"$exists": True}}}],
+                "$and": [
+                    {"d_compound": {"$exists": True}},
+                    {"a_compound": {"$elemMatch": {"$exists": True}}},
+                ],
                 "$or": [
                     {"a_compound": {"$elemMatch": {"$exists": False, "$in": [9, 2, 15]}}},
                     {"a_compound": {"$elemMatch": {"$ne": 3}}},
@@ -8552,7 +9335,10 @@ export const pipelines = [
     /* clusterSize: 51, queryRank: 11.02 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$elemMatch": {"$nin": [18, 9]}}}, {"a_compound": {"$all": [12, 1]}}],
+                "$or": [
+                    {"a_compound": {"$elemMatch": {"$nin": [18, 9]}}},
+                    {"a_compound": {"$all": [12, 1]}},
+                ],
                 "z_compound": {"$exists": True},
             },
         },
@@ -8575,7 +9361,11 @@ export const pipelines = [
     /* clusterSize: 50, queryRank: 13.02 */ [
         {
             "$match": {
-                "$or": [{"c_compound": {"$gt": 4}}, {"a_idx": {"$all": [3, 18]}}, {"a_compound": {"$gt": 5}}],
+                "$or": [
+                    {"c_compound": {"$gt": 4}},
+                    {"a_idx": {"$all": [3, 18]}},
+                    {"a_compound": {"$gt": 5}},
+                ],
                 "a_compound": {"$all": [18, 18]},
             },
         },
@@ -8583,7 +9373,13 @@ export const pipelines = [
         {"$project": {"a_compound": 1, "a_idx": 1, "a_noidx": 1}},
     ],
     /* clusterSize: 50, queryRank: 6.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "d_compound": {"$lt": 7}, "z_idx": {"$lt": 13}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "d_compound": {"$lt": 7},
+                "z_idx": {"$lt": 13},
+            },
+        },
         {"$sort": {"k_idx": -1}},
     ],
     /* clusterSize: 50, queryRank: 8.02 */ [
@@ -8610,7 +9406,13 @@ export const pipelines = [
                 "$nor": [
                     {"a_noidx": {"$all": [11, 8]}},
                     {"a_compound": {"$all": [10, 3, 8, 17]}},
-                    {"$nor": [{"i_idx": {"$exists": True}}, {"a_idx": {"$ne": 7}}, {"a_compound": {"$exists": True}}]},
+                    {
+                        "$nor": [
+                            {"i_idx": {"$exists": True}},
+                            {"a_idx": {"$ne": 7}},
+                            {"a_compound": {"$exists": True}},
+                        ],
+                    },
                 ],
                 "$or": [
                     {
@@ -8648,7 +9450,12 @@ export const pipelines = [
                 "$and": [
                     {"a_noidx": {"$ne": 16}},
                     {"c_noidx": {"$exists": True}},
-                    {"$nor": [{"a_compound": {"$all": [13, 2, 13, 20, 12]}}, {"i_idx": {"$lte": 6}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$all": [13, 2, 13, 20, 12]}},
+                            {"i_idx": {"$lte": 6}},
+                        ],
+                    },
                 ],
             },
         },
@@ -8753,7 +9560,12 @@ export const pipelines = [
         {"$limit": 146},
     ],
     /* clusterSize: 49, queryRank: 6.02 */ [
-        {"$match": {"$or": [{"h_compound": {"$gt": 11}}, {"a_idx": {"$all": [17, 4, 19]}}], "a_idx": {"$gte": 7}}},
+        {
+            "$match": {
+                "$or": [{"h_compound": {"$gt": 11}}, {"a_idx": {"$all": [17, 4, 19]}}],
+                "a_idx": {"$gte": 7},
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$limit": 119},
         {"$project": {"a_compound": 1, "a_noidx": 1}},
@@ -8805,7 +9617,13 @@ export const pipelines = [
                             {"a_idx": {"$elemMatch": {"$exists": True, "$nin": [14, 8, 2]}}},
                         ],
                     },
-                    {"$or": [{"c_compound": {"$lt": 8}}, {"a_idx": {"$eq": 4}}, {"a_compound": {"$nin": [15, 4]}}]},
+                    {
+                        "$or": [
+                            {"c_compound": {"$lt": 8}},
+                            {"a_idx": {"$eq": 4}},
+                            {"a_compound": {"$nin": [15, 4]}},
+                        ],
+                    },
                 ],
                 "h_idx": {"$exists": True},
             },
@@ -8834,7 +9652,10 @@ export const pipelines = [
     /* clusterSize: 48, queryRank: 5.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$in": [3, 12, 8]}}, {"a_compound": {"$elemMatch": {"$eq": 12}}}],
+                "$nor": [
+                    {"a_compound": {"$in": [3, 12, 8]}},
+                    {"a_compound": {"$elemMatch": {"$eq": 12}}},
+                ],
                 "a_compound": {"$elemMatch": {"$exists": True, "$lte": 2}},
             },
         },
@@ -8896,7 +9717,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"h_idx": {"$gte": 8}},
-                    {"$and": [{"i_compound": {"$exists": True}}, {"a_compound": {"$all": [2, 9, 19, 3, 20]}}]},
+                    {
+                        "$and": [
+                            {"i_compound": {"$exists": True}},
+                            {"a_compound": {"$all": [2, 9, 19, 3, 20]}},
+                        ],
+                    },
                 ],
                 "a_compound": {"$lte": 11},
                 "z_idx": {"$exists": True},
@@ -8929,7 +9755,11 @@ export const pipelines = [
                     },
                     {"a_noidx": {"$exists": True}},
                 ],
-                "$or": [{"a_idx": {"$in": [19, 12]}}, {"a_compound": {"$ne": 7}}, {"a_idx": {"$ne": 1}}],
+                "$or": [
+                    {"a_idx": {"$in": [19, 12]}},
+                    {"a_compound": {"$ne": 7}},
+                    {"a_idx": {"$ne": 1}},
+                ],
             },
         },
         {"$sort": {"a_idx": -1}},
@@ -8971,7 +9801,11 @@ export const pipelines = [
                     {"$or": [{"a_idx": {"$exists": True}}, {"a_idx": {"$exists": True}}]},
                     {"h_noidx": {"$gt": 10}},
                 ],
-                "$or": [{"a_idx": {"$all": [17, 12]}}, {"d_compound": {"$gte": 2}}, {"i_compound": {"$exists": True}}],
+                "$or": [
+                    {"a_idx": {"$all": [17, 12]}},
+                    {"d_compound": {"$gte": 2}},
+                    {"i_compound": {"$exists": True}},
+                ],
             },
         },
         {"$sort": {"i_idx": 1}},
@@ -9009,7 +9843,12 @@ export const pipelines = [
                 "$or": [
                     {"a_idx": {"$all": [6, 17, 17, 16, 12]}},
                     {"i_compound": {"$gte": 18}},
-                    {"$or": [{"a_idx": {"$all": [8, 15]}}, {"a_idx": {"$elemMatch": {"$lte": 16}}}]},
+                    {
+                        "$or": [
+                            {"a_idx": {"$all": [8, 15]}},
+                            {"a_idx": {"$elemMatch": {"$lte": 16}}},
+                        ],
+                    },
                     {"c_idx": {"$gte": 18}},
                 ],
             },
@@ -9040,7 +9879,11 @@ export const pipelines = [
                                             {"z_compound": {"$gt": 3}},
                                             {
                                                 "a_noidx": {
-                                                    "$elemMatch": {"$in": [11, 17], "$lte": 3, "$nin": [3, 14, 20, 8]},
+                                                    "$elemMatch": {
+                                                        "$in": [11, 17],
+                                                        "$lte": 3,
+                                                        "$nin": [3, 14, 20, 8],
+                                                    },
                                                 },
                                             },
                                         ],
@@ -9063,7 +9906,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_idx": 1, "i_idx": 1}},
     ],
     /* clusterSize: 45, queryRank: 5.03 */ [
-        {"$match": {"$or": [{"a_compound": {"$in": [3, 2, 20]}}, {"z_idx": {"$lt": 18}}], "i_compound": {"$ne": 2}}},
+        {
+            "$match": {
+                "$or": [{"a_compound": {"$in": [3, 2, 20]}}, {"z_idx": {"$lt": 18}}],
+                "i_compound": {"$ne": 2},
+            },
+        },
         {"$sort": {"z_idx": 1}},
         {"$project": {"_id": 0, "h_compound": 1, "z_noidx": 1}},
     ],
@@ -9110,7 +9958,12 @@ export const pipelines = [
                                 "$and": [
                                     {"i_compound": {"$exists": True}},
                                     {"a_compound": {"$in": [11, 3]}},
-                                    {"$nor": [{"h_idx": {"$eq": 15}}, {"k_compound": {"$in": [5, 19, 20]}}]},
+                                    {
+                                        "$nor": [
+                                            {"h_idx": {"$eq": 15}},
+                                            {"k_compound": {"$in": [5, 19, 20]}},
+                                        ],
+                                    },
                                     {"a_compound": {"$elemMatch": {"$exists": True}}},
                                 ],
                             },
@@ -9153,7 +10006,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"a_compound": {"$elemMatch": {"$gt": 13}}}, {"a_compound": {"$exists": True}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$elemMatch": {"$gt": 13}}},
+                            {"a_compound": {"$exists": True}},
+                        ],
+                    },
                     {"k_compound": {"$in": [14, 6]}},
                 ],
                 "k_idx": {"$nin": [3, 20]},
@@ -9168,7 +10026,12 @@ export const pipelines = [
                     {"a_compound": {"$ne": 17}},
                     {
                         "$or": [
-                            {"$and": [{"a_noidx": {"$all": [19, 2, 7, 10]}}, {"a_idx": {"$all": [4, 2]}}]},
+                            {
+                                "$and": [
+                                    {"a_noidx": {"$all": [19, 2, 7, 10]}},
+                                    {"a_idx": {"$all": [4, 2]}},
+                                ],
+                            },
                             {"k_compound": {"$eq": 3}},
                             {"a_idx": {"$elemMatch": {"$in": [10, 6]}}},
                             {"a_compound": {"$exists": True}},
@@ -9184,7 +10047,11 @@ export const pipelines = [
     /* clusterSize: 43, queryRank: 11.02 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [1, 13]}}, {"z_compound": {"$in": [19, 3]}}, {"i_compound": {"$gt": 17}}],
+                "$or": [
+                    {"a_idx": {"$all": [1, 13]}},
+                    {"z_compound": {"$in": [19, 3]}},
+                    {"i_compound": {"$gt": 17}},
+                ],
                 "h_idx": {"$nin": [6, 1]},
             },
         },
@@ -9254,7 +10121,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_compound": 1}},
     ],
     /* clusterSize: 43, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$exists": True, "$lt": 8}}, "z_compound": {"$ne": 12}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$exists": True, "$lt": 8}},
+                "z_compound": {"$ne": 12},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 43, queryRank: 10.03 */ [
@@ -9329,7 +10201,12 @@ export const pipelines = [
                             {"a_compound": {"$exists": False}},
                             {
                                 "$and": [
-                                    {"$nor": [{"a_compound": {"$ne": 18}}, {"d_noidx": {"$lte": 20}}]},
+                                    {
+                                        "$nor": [
+                                            {"a_compound": {"$ne": 18}},
+                                            {"d_noidx": {"$lte": 20}},
+                                        ],
+                                    },
                                     {"c_compound": {"$exists": False}},
                                 ],
                             },
@@ -9431,7 +10308,11 @@ export const pipelines = [
     /* clusterSize: 40, queryRank: 5.03 */ [
         {
             "$match": {
-                "$or": [{"c_idx": {"$in": [16, 6]}}, {"a_compound": {"$lte": 20}}, {"c_compound": {"$exists": False}}],
+                "$or": [
+                    {"c_idx": {"$in": [16, 6]}},
+                    {"a_compound": {"$lte": 20}},
+                    {"c_compound": {"$exists": False}},
+                ],
                 "a_idx": {"$elemMatch": {"$exists": True, "$in": [16, 10, 6]}},
             },
         },
@@ -9463,7 +10344,11 @@ export const pipelines = [
     /* clusterSize: 40, queryRank: 15.02 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [4, 5, 14, 4]}}, {"d_compound": {"$exists": True}}, {"h_idx": {"$gt": 12}}],
+                "$or": [
+                    {"a_idx": {"$all": [4, 5, 14, 4]}},
+                    {"d_compound": {"$exists": True}},
+                    {"h_idx": {"$gt": 12}},
+                ],
                 "c_compound": {"$lt": 6},
                 "i_compound": {"$ne": 10},
             },
@@ -9504,7 +10389,12 @@ export const pipelines = [
                     {
                         "$and": [
                             {"c_compound": {"$in": [13, 1, 20, 15]}},
-                            {"$or": [{"c_noidx": {"$exists": True}}, {"a_noidx": {"$all": [8, 19]}}]},
+                            {
+                                "$or": [
+                                    {"c_noidx": {"$exists": True}},
+                                    {"a_noidx": {"$all": [8, 19]}},
+                                ],
+                            },
                         ],
                     },
                     {
@@ -9515,7 +10405,11 @@ export const pipelines = [
                                     {
                                         "$or": [
                                             {"a_idx": {"$exists": True}},
-                                            {"a_noidx": {"$elemMatch": {"$gte": 15, "$in": [4, 9]}}},
+                                            {
+                                                "a_noidx": {
+                                                    "$elemMatch": {"$gte": 15, "$in": [4, 9]},
+                                                },
+                                            },
                                             {"k_noidx": {"$exists": True}},
                                         ],
                                     },
@@ -9563,7 +10457,10 @@ export const pipelines = [
     /* clusterSize: 40, queryRank: 14.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [4, 9, 18, 2]}}, {"h_compound": {"$exists": False}}],
+                "$nor": [
+                    {"a_compound": {"$all": [4, 9, 18, 2]}},
+                    {"h_compound": {"$exists": False}},
+                ],
                 "a_compound": {"$elemMatch": {"$exists": True, "$nin": [1, 6, 6]}},
             },
         },
@@ -9576,7 +10473,10 @@ export const pipelines = [
                     {"$nor": [{"a_compound": {"$all": [1, 5, 19]}}, {"c_compound": {"$gte": 8}}]},
                     {"a_compound": {"$elemMatch": {"$exists": True}}},
                 ],
-                "$nor": [{"i_compound": {"$in": [1, 11]}}, {"a_noidx": {"$elemMatch": {"$in": [1, 12]}}}],
+                "$nor": [
+                    {"i_compound": {"$in": [1, 11]}},
+                    {"a_noidx": {"$elemMatch": {"$in": [1, 12]}}},
+                ],
             },
         },
         {"$sort": {"k_idx": -1}},
@@ -9690,7 +10590,14 @@ export const pipelines = [
                             {
                                 "$or": [
                                     {"c_compound": {"$lte": 11}},
-                                    {"a_compound": {"$elemMatch": {"$in": [19, 6, 14], "$nin": [5, 12, 11, 16, 15]}}},
+                                    {
+                                        "a_compound": {
+                                            "$elemMatch": {
+                                                "$in": [19, 6, 14],
+                                                "$nin": [5, 12, 11, 16, 15],
+                                            },
+                                        },
+                                    },
                                     {"h_idx": {"$gt": 5}},
                                     {"i_compound": {"$nin": [6, 9]}},
                                 ],
@@ -9707,7 +10614,10 @@ export const pipelines = [
     /* clusterSize: 38, queryRank: 6.03 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$elemMatch": {"$lte": 17}}}, {"z_compound": {"$nin": [9, 9]}}],
+                "$and": [
+                    {"a_compound": {"$elemMatch": {"$lte": 17}}},
+                    {"z_compound": {"$nin": [9, 9]}},
+                ],
                 "a_compound": {"$eq": 2},
             },
         },
@@ -9715,7 +10625,11 @@ export const pipelines = [
     /* clusterSize: 38, queryRank: 8.03 */ [
         {
             "$match": {
-                "$nor": [{"k_noidx": {"$in": [15, 4]}}, {"z_idx": {"$gte": 12}}, {"a_compound": {"$all": [15, 10]}}],
+                "$nor": [
+                    {"k_noidx": {"$in": [15, 4]}},
+                    {"z_idx": {"$gte": 12}},
+                    {"a_compound": {"$all": [15, 10]}},
+                ],
                 "a_compound": {"$elemMatch": {"$nin": [2, 15]}},
             },
         },
@@ -9724,7 +10638,10 @@ export const pipelines = [
     /* clusterSize: 38, queryRank: 5.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [3, 18]}}, {"a_idx": {"$elemMatch": {"$in": [8, 2]}}}],
+                "$nor": [
+                    {"a_compound": {"$all": [3, 18]}},
+                    {"a_idx": {"$elemMatch": {"$in": [8, 2]}}},
+                ],
                 "h_noidx": {"$in": [5, 11]},
             },
         },
@@ -9734,7 +10651,11 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [{"k_idx": {"$exists": False}}, {"i_noidx": {"$nin": [9, 11, 14, 2]}}],
-                "$or": [{"a_idx": {"$all": [20, 7, 15, 7]}}, {"a_idx": {"$gte": 19}}, {"a_compound": {"$all": [2, 4]}}],
+                "$or": [
+                    {"a_idx": {"$all": [20, 7, 15, 7]}},
+                    {"a_idx": {"$gte": 19}},
+                    {"a_compound": {"$all": [2, 4]}},
+                ],
             },
         },
         {"$sort": {"c_idx": 1, "k_idx": -1, "z_idx": 1}},
@@ -9760,7 +10681,10 @@ export const pipelines = [
     /* clusterSize: 38, queryRank: 11.02 */ [
         {
             "$match": {
-                "$or": [{"a_compound": {"$elemMatch": {"$gt": 12}}}, {"a_idx": {"$all": [14, 5, 19]}}],
+                "$or": [
+                    {"a_compound": {"$elemMatch": {"$gt": 12}}},
+                    {"a_idx": {"$all": [14, 5, 19]}},
+                ],
                 "d_compound": {"$exists": True},
             },
         },
@@ -9771,7 +10695,10 @@ export const pipelines = [
     /* clusterSize: 38, queryRank: 8.03 */ [
         {
             "$match": {
-                "$or": [{"d_compound": {"$exists": True}}, {"k_compound": {"$nin": [19, 18, 20, 19]}}],
+                "$or": [
+                    {"d_compound": {"$exists": True}},
+                    {"k_compound": {"$nin": [19, 18, 20, 19]}},
+                ],
                 "a_compound": {"$eq": 4},
                 "k_compound": {"$nin": [3, 13, 17]},
             },
@@ -9812,13 +10739,18 @@ export const pipelines = [
     /* clusterSize: 38, queryRank: 12.03 */ [
         {
             "$match": {
-                "$nor": [{"h_compound": {"$in": [4, 14, 13, 16, 7, 9]}}, {"a_compound": {"$all": [1, 7, 16, 14, 15]}}],
+                "$nor": [
+                    {"h_compound": {"$in": [4, 14, 13, 16, 7, 9]}},
+                    {"a_compound": {"$all": [1, 7, 16, 14, 15]}},
+                ],
                 "d_noidx": {"$exists": True},
             },
         },
         {"$sort": {"c_idx": 1}},
     ],
-    /* clusterSize: 37, queryRank: 6.03 */ [{"$match": {"a_compound": {"$all": [2, 3]}, "a_idx": {"$gte": 6}}}],
+    /* clusterSize: 37, queryRank: 6.03 */ [
+        {"$match": {"a_compound": {"$all": [2, 3]}, "a_idx": {"$gte": 6}}},
+    ],
     /* clusterSize: 37, queryRank: 12.03 */ [
         {
             "$match": {
@@ -9858,7 +10790,11 @@ export const pipelines = [
     /* clusterSize: 37, queryRank: 8.03 */ [
         {
             "$match": {
-                "$and": [{"c_noidx": {"$exists": True}}, {"a_idx": {"$gte": 3}}, {"d_compound": {"$lte": 17}}],
+                "$and": [
+                    {"c_noidx": {"$exists": True}},
+                    {"a_idx": {"$gte": 3}},
+                    {"d_compound": {"$lte": 17}},
+                ],
                 "a_compound": {"$exists": True},
                 "i_compound": {"$gte": 3},
             },
@@ -9916,7 +10852,13 @@ export const pipelines = [
         },
     ],
     /* clusterSize: 36, queryRank: 7.02 */ [
-        {"$match": {"a_compound": {"$exists": True}, "k_compound": {"$ne": 3}, "z_compound": {"$lte": 10}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "k_compound": {"$ne": 3},
+                "z_compound": {"$lte": 10},
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$limit": 87},
         {"$project": {"_id": 0, "a_idx": 1, "h_idx": 1}},
@@ -9924,7 +10866,10 @@ export const pipelines = [
     /* clusterSize: 36, queryRank: 12.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$nin": [16, 14, 17, 16]}}, {"a_compound": {"$all": [10, 18, 14]}}],
+                "$nor": [
+                    {"a_compound": {"$nin": [16, 14, 17, 16]}},
+                    {"a_compound": {"$all": [10, 18, 14]}},
+                ],
                 "h_compound": {"$exists": True},
             },
         },
@@ -9933,7 +10878,10 @@ export const pipelines = [
     /* clusterSize: 36, queryRank: 14.02 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [4, 14, 7, 17]}}, {"a_compound": {"$nin": [7, 16]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [4, 14, 7, 17]}},
+                    {"a_compound": {"$nin": [7, 16]}},
+                ],
                 "a_compound": {"$gte": 14},
                 "a_noidx": {"$lte": 4},
             },
@@ -10098,14 +11046,25 @@ export const pipelines = [
         {"$sort": {"d_idx": -1}},
     ],
     /* clusterSize: 35, queryRank: 11.03 */ [
-        {"$match": {"$or": [{"a_idx": {"$all": [17, 10]}}, {"k_compound": {"$eq": 11}}, {"c_compound": {"$lt": 5}}]}},
+        {
+            "$match": {
+                "$or": [
+                    {"a_idx": {"$all": [17, 10]}},
+                    {"k_compound": {"$eq": 11}},
+                    {"c_compound": {"$lt": 5}},
+                ],
+            },
+        },
         {"$sort": {"a_idx": 1}},
         {"$project": {"a_idx": 1}},
     ],
     /* clusterSize: 35, queryRank: 9.02 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [13, 17, 6]}}, {"a_compound": {"$elemMatch": {"$exists": True, "$lte": 8}}}],
+                "$or": [
+                    {"a_idx": {"$all": [13, 17, 6]}},
+                    {"a_compound": {"$elemMatch": {"$exists": True, "$lte": 8}}},
+                ],
                 "a_noidx": {"$eq": 11},
             },
         },
@@ -10127,7 +11086,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"a_compound": {"$all": [14, 9, 19, 8]}}, {"k_idx": {"$exists": True}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [14, 9, 19, 8]}},
+                            {"k_idx": {"$exists": True}},
+                        ],
+                    },
                     {"a_noidx": {"$elemMatch": {"$eq": 4}}},
                 ],
                 "a_idx": {"$lte": 6},
@@ -10172,7 +11136,11 @@ export const pipelines = [
     /* clusterSize: 34, queryRank: 7.03 */ [
         {
             "$match": {
-                "$and": [{"a_idx": {"$lt": 15}}, {"a_compound": {"$nin": [15, 13, 2]}}, {"a_idx": {"$gte": 15}}],
+                "$and": [
+                    {"a_idx": {"$lt": 15}},
+                    {"a_compound": {"$nin": [15, 13, 2]}},
+                    {"a_idx": {"$gte": 15}},
+                ],
                 "i_compound": {"$nin": [4, 7, 1]},
             },
         },
@@ -10182,7 +11150,13 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [
-                    {"$and": [{"i_compound": {"$gt": 6}}, {"h_idx": {"$nin": [10, 19]}}, {"a_compound": {"$lt": 1}}]},
+                    {
+                        "$and": [
+                            {"i_compound": {"$gt": 6}},
+                            {"h_idx": {"$nin": [10, 19]}},
+                            {"a_compound": {"$lt": 1}},
+                        ],
+                    },
                     {"h_noidx": {"$exists": False}},
                 ],
                 "h_compound": {"$exists": True},
@@ -10244,7 +11218,13 @@ export const pipelines = [
             "$match": {
                 "$and": [
                     {"a_compound": {"$nin": [13, 9, 10]}},
-                    {"$and": [{"z_idx": {"$lte": 12}}, {"a_compound": {"$lt": 5}}, {"c_compound": {"$gte": 1}}]},
+                    {
+                        "$and": [
+                            {"z_idx": {"$lte": 12}},
+                            {"a_compound": {"$lt": 5}},
+                            {"c_compound": {"$gte": 1}},
+                        ],
+                    },
                 ],
             },
         },
@@ -10316,14 +11296,25 @@ export const pipelines = [
     /* clusterSize: 32, queryRank: 9.03 */ [
         {
             "$match": {
-                "$or": [{"k_idx": {"$in": [3, 9]}}, {"i_idx": {"$gt": 12}}, {"a_compound": {"$all": [19, 19, 12, 5]}}],
+                "$or": [
+                    {"k_idx": {"$in": [3, 9]}},
+                    {"i_idx": {"$gt": 12}},
+                    {"a_compound": {"$all": [19, 19, 12, 5]}},
+                ],
                 "a_compound": {"$in": [9, 3, 2]},
             },
         },
         {"$project": {"_id": 0, "z_noidx": 1}},
     ],
     /* clusterSize: 32, queryRank: 9.03 */ [
-        {"$match": {"$and": [{"a_idx": {"$elemMatch": {"$lt": 4, "$lte": 8}}}, {"a_compound": {"$all": [2, 13, 3]}}]}},
+        {
+            "$match": {
+                "$and": [
+                    {"a_idx": {"$elemMatch": {"$lt": 4, "$lte": 8}}},
+                    {"a_compound": {"$all": [2, 13, 3]}},
+                ],
+            },
+        },
         {"$sort": {"z_idx": 1}},
     ],
     /* clusterSize: 32, queryRank: 12.02 */ [
@@ -10343,7 +11334,12 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$and": [{"h_idx": {"$gte": 11}}, {"a_idx": {"$elemMatch": {"$exists": True, "$in": [14, 10]}}}]},
+                    {
+                        "$and": [
+                            {"h_idx": {"$gte": 11}},
+                            {"a_idx": {"$elemMatch": {"$exists": True, "$in": [14, 10]}}},
+                        ],
+                    },
                     {"c_compound": {"$gte": 4}},
                     {"a_idx": {"$in": [4, 1, 2]}},
                 ],
@@ -10463,7 +11459,12 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [
-                    {"$or": [{"a_compound": {"$all": [4, 5, 20]}}, {"a_compound": {"$in": [7, 8, 17]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [4, 5, 20]}},
+                            {"a_compound": {"$in": [7, 8, 17]}},
+                        ],
+                    },
                     {"a_compound": {"$elemMatch": {"$eq": 11}}},
                     {"a_compound": {"$exists": False}},
                 ],
@@ -10508,7 +11509,9 @@ export const pipelines = [
             },
         },
     ],
-    /* clusterSize: 31, queryRank: 4.03 */ [{"$match": {"k_compound": {"$lte": 8}, "z_compound": {"$gte": 1}}}],
+    /* clusterSize: 31, queryRank: 4.03 */ [
+        {"$match": {"k_compound": {"$lte": 8}, "z_compound": {"$gte": 1}}},
+    ],
     /* clusterSize: 31, queryRank: 6.03 */ [
         {
             "$match": {
@@ -10604,7 +11607,10 @@ export const pipelines = [
     /* clusterSize: 30, queryRank: 6.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$nin": [6, 18, 11, 19]}}, {"a_compound": {"$in": [16, 3]}}],
+                "$nor": [
+                    {"a_compound": {"$nin": [6, 18, 11, 19]}},
+                    {"a_compound": {"$in": [16, 3]}},
+                ],
                 "a_compound": {"$lte": 3},
             },
         },
@@ -10626,7 +11632,11 @@ export const pipelines = [
     /* clusterSize: 30, queryRank: 11.03 */ [
         {
             "$match": {
-                "$or": [{"d_compound": {"$gte": 5}}, {"k_compound": {"$gt": 10}}, {"z_compound": {"$in": [12, 14]}}],
+                "$or": [
+                    {"d_compound": {"$gte": 5}},
+                    {"k_compound": {"$gt": 10}},
+                    {"z_compound": {"$in": [12, 14]}},
+                ],
                 "k_compound": {"$exists": True},
             },
         },
@@ -10636,7 +11646,10 @@ export const pipelines = [
     /* clusterSize: 29, queryRank: 8.02 */ [
         {
             "$match": {
-                "$nor": [{"a_idx": {"$elemMatch": {"$eq": 10}}}, {"c_compound": {"$in": [4, 3, 11]}}],
+                "$nor": [
+                    {"a_idx": {"$elemMatch": {"$eq": 10}}},
+                    {"c_compound": {"$in": [4, 3, 11]}},
+                ],
                 "a_compound": {"$exists": True},
                 "a_idx": {"$gte": 7},
                 "i_compound": {"$exists": True},
@@ -10688,7 +11701,13 @@ export const pipelines = [
         {"$project": {"a_idx": 1, "i_compound": 1}},
     ],
     /* clusterSize: 29, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "a_idx": {"$exists": True}, "h_noidx": {"$in": [19, 8, 20]}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "a_idx": {"$exists": True},
+                "h_noidx": {"$in": [19, 8, 20]},
+            },
+        },
         {"$project": {"_id": 0, "a_idx": 1, "a_noidx": 1}},
     ],
     /* clusterSize: 29, queryRank: 11.03 */ [
@@ -10743,7 +11762,9 @@ export const pipelines = [
         },
         {"$sort": {"z_idx": -1}},
     ],
-    /* clusterSize: 29, queryRank: 4.03 */ [{"$match": {"i_compound": {"$in": [3, 16]}, "k_compound": {"$lte": 13}}}],
+    /* clusterSize: 29, queryRank: 4.03 */ [
+        {"$match": {"i_compound": {"$in": [3, 16]}, "k_compound": {"$lte": 13}}},
+    ],
     /* clusterSize: 29, queryRank: 14.03 */ [
         {
             "$match": {
@@ -10870,7 +11891,10 @@ export const pipelines = [
     /* clusterSize: 28, queryRank: 8.03 */ [
         {
             "$match": {
-                "$or": [{"z_compound": {"$exists": True}}, {"a_compound": {"$elemMatch": {"$lt": 18}}}],
+                "$or": [
+                    {"z_compound": {"$exists": True}},
+                    {"a_compound": {"$elemMatch": {"$lt": 18}}},
+                ],
                 "i_compound": {"$exists": True},
             },
         },
@@ -10912,7 +11936,13 @@ export const pipelines = [
         },
     ],
     /* clusterSize: 28, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "a_idx": {"$exists": True}, "h_noidx": {"$in": [11, 10]}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "a_idx": {"$exists": True},
+                "h_noidx": {"$in": [11, 10]},
+            },
+        },
         {"$sort": {"i_idx": -1, "k_idx": 1}},
     ],
     /* clusterSize: 28, queryRank: 9.02 */ [
@@ -10942,7 +11972,11 @@ export const pipelines = [
                     {"a_compound": {"$gte": 15}},
                     {
                         "$and": [
-                            {"a_compound": {"$elemMatch": {"$gte": 5, "$nin": [2, 12, 17, 13, 15, 14]}}},
+                            {
+                                "a_compound": {
+                                    "$elemMatch": {"$gte": 5, "$nin": [2, 12, 17, 13, 15, 14]},
+                                },
+                            },
                             {"z_idx": {"$nin": [20, 4]}},
                             {"i_compound": {"$ne": 12}},
                         ],
@@ -10956,7 +11990,10 @@ export const pipelines = [
     /* clusterSize: 28, queryRank: 13.02 */ [
         {
             "$match": {
-                "$and": [{"h_compound": {"$gte": 5}}, {"a_compound": {"$elemMatch": {"$lt": 8, "$nin": [10, 19]}}}],
+                "$and": [
+                    {"h_compound": {"$gte": 5}},
+                    {"a_compound": {"$elemMatch": {"$lt": 8, "$nin": [10, 19]}}},
+                ],
                 "$or": [
                     {"a_compound": {"$nin": [18, 15]}},
                     {"a_idx": {"$exists": False}},
@@ -10990,7 +12027,12 @@ export const pipelines = [
         {"$sort": {"h_idx": 1}},
     ],
     /* clusterSize: 27, queryRank: 4.03 */ [
-        {"$match": {"a_compound": {"$nin": [8, 5, 16, 3, 7]}, "a_idx": {"$elemMatch": {"$lte": 19}}}},
+        {
+            "$match": {
+                "a_compound": {"$nin": [8, 5, 16, 3, 7]},
+                "a_idx": {"$elemMatch": {"$lte": 19}},
+            },
+        },
         {"$sort": {"k_idx": 1}},
         {"$project": {"_id": 0, "a_noidx": 1, "i_compound": 1}},
     ],
@@ -11002,7 +12044,12 @@ export const pipelines = [
                         "$and": [
                             {"c_idx": {"$lte": 15}},
                             {"a_idx": {"$nin": [8, 3]}},
-                            {"$or": [{"h_compound": {"$exists": False}}, {"z_compound": {"$exists": True}}]},
+                            {
+                                "$or": [
+                                    {"h_compound": {"$exists": False}},
+                                    {"z_compound": {"$exists": True}},
+                                ],
+                            },
                         ],
                     },
                     {"a_idx": {"$elemMatch": {"$exists": True}}},
@@ -11035,7 +12082,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$or": [{"a_compound": {"$all": [20, 6, 17, 5]}}, {"z_compound": {"$lte": 14}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [20, 6, 17, 5]}},
+                            {"z_compound": {"$lte": 14}},
+                        ],
+                    },
                     {"z_idx": {"$lte": 10}},
                 ],
                 "c_compound": {"$in": [1, 3, 2]},
@@ -11133,7 +12185,11 @@ export const pipelines = [
     /* clusterSize: 25, queryRank: 6.03 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$gt": 10}}, {"a_compound": {"$all": [9, 7]}}, {"h_compound": {"$exists": False}}],
+                "$or": [
+                    {"a_idx": {"$gt": 10}},
+                    {"a_compound": {"$all": [9, 7]}},
+                    {"h_compound": {"$exists": False}},
+                ],
                 "c_idx": {"$exists": True},
             },
         },
@@ -11155,7 +12211,9 @@ export const pipelines = [
         {"$sort": {"a_idx": 1}},
         {"$project": {"a_noidx": 1}},
     ],
-    /* clusterSize: 25, queryRank: 3.03 */ [{"$match": {"a_idx": {"$in": [15, 15]}, "i_compound": {"$ne": 14}}}],
+    /* clusterSize: 25, queryRank: 3.03 */ [
+        {"$match": {"a_idx": {"$in": [15, 15]}, "i_compound": {"$ne": 14}}},
+    ],
     /* clusterSize: 25, queryRank: 13.02 */ [
         {
             "$match": {
@@ -11271,7 +12329,11 @@ export const pipelines = [
     /* clusterSize: 24, queryRank: 5.03 */ [
         {
             "$match": {
-                "$and": [{"i_noidx": {"$exists": True}}, {"a_noidx": {"$exists": True}}, {"a_compound": {"$lte": 3}}],
+                "$and": [
+                    {"i_noidx": {"$exists": True}},
+                    {"a_noidx": {"$exists": True}},
+                    {"a_compound": {"$lte": 3}},
+                ],
                 "k_compound": {"$exists": True},
             },
         },
@@ -11280,7 +12342,11 @@ export const pipelines = [
     /* clusterSize: 24, queryRank: 8.03 */ [
         {
             "$match": {
-                "$nor": [{"i_compound": {"$lt": 1}}, {"a_compound": {"$all": [9, 6]}}, {"a_compound": {"$gte": 5}}],
+                "$nor": [
+                    {"i_compound": {"$lt": 1}},
+                    {"a_compound": {"$all": [9, 6]}},
+                    {"a_compound": {"$gte": 5}},
+                ],
                 "a_noidx": {"$nin": [8, 13, 19, 11]},
             },
         },
@@ -11288,18 +12354,32 @@ export const pipelines = [
     /* clusterSize: 24, queryRank: 7.03 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [16, 13]}}, {"a_compound": {"$elemMatch": {"$lte": 20}}}],
+                "$or": [
+                    {"a_idx": {"$all": [16, 13]}},
+                    {"a_compound": {"$elemMatch": {"$lte": 20}}},
+                ],
                 "h_noidx": {"$lt": 1},
             },
         },
         {"$sort": {"i_idx": 1}},
     ],
     /* clusterSize: 24, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$exists": True, "$gte": 3}}, "h_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$exists": True, "$gte": 3}},
+                "h_compound": {"$exists": True},
+            },
+        },
         {"$project": {"_id": 0, "h_idx": 1}},
     ],
     /* clusterSize: 23, queryRank: 6.03 */ [
-        {"$match": {"a_compound": {"$gt": 17}, "h_compound": {"$nin": [17, 19]}, "i_compound": {"$ne": 13}}},
+        {
+            "$match": {
+                "a_compound": {"$gt": 17},
+                "h_compound": {"$nin": [17, 19]},
+                "i_compound": {"$ne": 13},
+            },
+        },
         {"$sort": {"i_idx": -1}},
     ],
     /* clusterSize: 23, queryRank: 11.02 */ [
@@ -11324,7 +12404,9 @@ export const pipelines = [
         },
         {"$limit": 32},
     ],
-    /* clusterSize: 23, queryRank: 4.03 */ [{"$match": {"a_compound": {"$in": [17, 15]}, "z_compound": {"$ne": 5}}}],
+    /* clusterSize: 23, queryRank: 4.03 */ [
+        {"$match": {"a_compound": {"$in": [17, 15]}, "z_compound": {"$ne": 5}}},
+    ],
     /* clusterSize: 23, queryRank: 8.03 */ [
         {
             "$match": {
@@ -11335,7 +12417,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "z_compound": 1}},
     ],
     /* clusterSize: 23, queryRank: 6.03 */ [
-        {"$match": {"$or": [{"i_compound": {"$ne": 14}}, {"k_compound": {"$exists": True}}], "a_idx": {"$ne": 10}}},
+        {
+            "$match": {
+                "$or": [{"i_compound": {"$ne": 14}}, {"k_compound": {"$exists": True}}],
+                "a_idx": {"$ne": 10},
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$project": {"_id": 0, "a_noidx": 1, "d_noidx": 1}},
     ],
@@ -11520,7 +12607,11 @@ export const pipelines = [
     /* clusterSize: 22, queryRank: 9.03 */ [
         {
             "$match": {
-                "$nor": [{"k_noidx": {"$lt": 9}}, {"a_compound": {"$all": [6, 2, 7]}}, {"h_noidx": {"$lte": 2}}],
+                "$nor": [
+                    {"k_noidx": {"$lt": 9}},
+                    {"a_compound": {"$all": [6, 2, 7]}},
+                    {"h_noidx": {"$lte": 2}},
+                ],
                 "a_idx": {"$nin": [13, 7]},
                 "c_noidx": {"$nin": [11, 18, 7]},
             },
@@ -11529,7 +12620,10 @@ export const pipelines = [
     /* clusterSize: 22, queryRank: 12.03 */ [
         {
             "$match": {
-                "$nor": [{"z_idx": {"$in": [7, 11, 12, 18, 5]}}, {"a_compound": {"$all": [4, 3, 1]}}],
+                "$nor": [
+                    {"z_idx": {"$in": [7, 11, 12, 18, 5]}},
+                    {"a_compound": {"$all": [4, 3, 1]}},
+                ],
                 "i_compound": {"$nin": [20, 8, 1]},
             },
         },
@@ -11554,7 +12648,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$nor": [{"d_compound": {"$in": [2, 4, 8, 18, 8]}}, {"d_idx": {"$in": [14, 4, 5]}}]},
+                    {
+                        "$nor": [
+                            {"d_compound": {"$in": [2, 4, 8, 18, 8]}},
+                            {"d_idx": {"$in": [14, 4, 5]}},
+                        ],
+                    },
                     {"c_idx": {"$in": [7, 1, 10, 11]}},
                 ],
             },
@@ -11628,7 +12727,11 @@ export const pipelines = [
     /* clusterSize: 21, queryRank: 6.03 */ [
         {
             "$match": {
-                "$and": [{"d_idx": {"$lte": 13}}, {"i_compound": {"$nin": [17, 19, 1]}}, {"d_compound": {"$lte": 6}}],
+                "$and": [
+                    {"d_idx": {"$lte": 13}},
+                    {"i_compound": {"$nin": [17, 19, 1]}},
+                    {"d_compound": {"$lte": 6}},
+                ],
             },
         },
         {"$sort": {"a_idx": 1}},
@@ -11649,7 +12752,12 @@ export const pipelines = [
         {"$limit": 18},
     ],
     /* clusterSize: 21, queryRank: 5.03 */ [
-        {"$match": {"$or": [{"c_idx": {"$exists": True}}, {"k_compound": {"$in": [1, 11]}}], "d_compound": {"$eq": 7}}},
+        {
+            "$match": {
+                "$or": [{"c_idx": {"$exists": True}}, {"k_compound": {"$in": [1, 11]}}],
+                "d_compound": {"$eq": 7},
+            },
+        },
         {"$project": {"_id": 0, "a_compound": 1}},
     ],
     /* clusterSize: 21, queryRank: 4.03 */ [
@@ -11673,7 +12781,11 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"a_compound": {"$elemMatch": {"$nin": [7, 11]}}},
-                    {"a_compound": {"$elemMatch": {"$eq": 13, "$exists": True, "$gt": 3, "$gte": 17}}},
+                    {
+                        "a_compound": {
+                            "$elemMatch": {"$eq": 13, "$exists": True, "$gt": 3, "$gte": 17},
+                        },
+                    },
                     {"a_compound": {"$exists": False}},
                 ],
                 "i_idx": {"$lte": 10},
@@ -11682,7 +12794,12 @@ export const pipelines = [
         {"$sort": {"i_idx": 1}},
     ],
     /* clusterSize: 21, queryRank: 10.03 */ [
-        {"$match": {"$or": [{"a_compound": {"$all": [10, 8]}}, {"k_compound": {"$gt": 12}}], "i_noidx": {"$ne": 5}}},
+        {
+            "$match": {
+                "$or": [{"a_compound": {"$all": [10, 8]}}, {"k_compound": {"$gt": 12}}],
+                "i_noidx": {"$ne": 5},
+            },
+        },
         {"$sort": {"z_idx": 1}},
     ],
     /* clusterSize: 21, queryRank: 12.02 */ [
@@ -11723,12 +12840,22 @@ export const pipelines = [
         {"$sort": {"i_idx": 1}},
     ],
     /* clusterSize: 21, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$in": [13, 3, 10]}, "a_idx": {"$lt": 9}, "d_compound": {"$in": [7, 10]}}},
+        {
+            "$match": {
+                "a_compound": {"$in": [13, 3, 10]},
+                "a_idx": {"$lt": 9},
+                "d_compound": {"$in": [7, 10]},
+            },
+        },
     ],
     /* clusterSize: 21, queryRank: 12.03 */ [
         {
             "$match": {
-                "$or": [{"c_compound": {"$nin": [7, 14]}}, {"c_compound": {"$lt": 2}}, {"a_idx": {"$all": [1, 9]}}],
+                "$or": [
+                    {"c_compound": {"$nin": [7, 14]}},
+                    {"c_compound": {"$lt": 2}},
+                    {"a_idx": {"$all": [1, 9]}},
+                ],
                 "k_compound": {"$gte": 8},
             },
         },
@@ -11779,7 +12906,9 @@ export const pipelines = [
         {"$limit": 243},
         {"$project": {"a_idx": 1, "h_noidx": 1}},
     ],
-    /* clusterSize: 20, queryRank: 3.03 */ [{"$match": {"a_compound": {"$nin": [8, 2]}, "a_idx": {"$exists": True}}}],
+    /* clusterSize: 20, queryRank: 3.03 */ [
+        {"$match": {"a_compound": {"$nin": [8, 2]}, "a_idx": {"$exists": True}}},
+    ],
     /* clusterSize: 20, queryRank: 5.03 */ [
         {
             "$match": {
@@ -11803,7 +12932,13 @@ export const pipelines = [
         {"$sort": {"i_idx": -1}},
     ],
     /* clusterSize: 20, queryRank: 4.03 */ [
-        {"$match": {"a_noidx": {"$all": [1, 8]}, "h_compound": {"$exists": True}, "i_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_noidx": {"$all": [1, 8]},
+                "h_compound": {"$exists": True},
+                "i_compound": {"$exists": True},
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$project": {"_id": 0, "a_idx": 1, "z_idx": 1}},
     ],
@@ -11817,7 +12952,14 @@ export const pipelines = [
                         "$nor": [
                             {
                                 "$nor": [
-                                    {"a_compound": {"$elemMatch": {"$in": [10, 19, 17], "$nin": [8, 8, 2, 5]}}},
+                                    {
+                                        "a_compound": {
+                                            "$elemMatch": {
+                                                "$in": [10, 19, 17],
+                                                "$nin": [8, 8, 2, 5],
+                                            },
+                                        },
+                                    },
                                     {
                                         "$nor": [
                                             {"i_compound": {"$eq": 4}},
@@ -11879,7 +13021,11 @@ export const pipelines = [
     /* clusterSize: 19, queryRank: 13.03 */ [
         {
             "$match": {
-                "$and": [{"c_compound": {"$lte": 7}}, {"a_idx": {"$ne": 5}}, {"a_noidx": {"$elemMatch": {"$lt": 20}}}],
+                "$and": [
+                    {"c_compound": {"$lte": 7}},
+                    {"a_idx": {"$ne": 5}},
+                    {"a_noidx": {"$elemMatch": {"$lt": 20}}},
+                ],
                 "$or": [
                     {"c_compound": {"$nin": [8, 9]}},
                     {"a_compound": {"$gte": 18}},
@@ -11907,7 +13053,11 @@ export const pipelines = [
     /* clusterSize: 19, queryRank: 5.02 */ [
         {
             "$match": {
-                "$nor": [{"i_compound": {"$eq": 8}}, {"z_idx": {"$gte": 7}}, {"k_idx": {"$lt": 20}}],
+                "$nor": [
+                    {"i_compound": {"$eq": 8}},
+                    {"z_idx": {"$gte": 7}},
+                    {"k_idx": {"$lt": 20}},
+                ],
                 "a_noidx": {"$elemMatch": {"$gte": 19}},
             },
         },
@@ -11917,7 +13067,11 @@ export const pipelines = [
     /* clusterSize: 19, queryRank: 5.03 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$ne": 14}}, {"a_compound": {"$exists": True}}, {"c_noidx": {"$in": [1, 3]}}],
+                "$and": [
+                    {"a_compound": {"$ne": 14}},
+                    {"a_compound": {"$exists": True}},
+                    {"c_noidx": {"$in": [1, 3]}},
+                ],
             },
         },
         {"$sort": {"c_idx": -1}},
@@ -11999,7 +13153,12 @@ export const pipelines = [
                             {"a_noidx": {"$gte": 4}},
                             {
                                 "$and": [
-                                    {"$and": [{"z_noidx": {"$exists": False}}, {"h_compound": {"$nin": [6, 3]}}]},
+                                    {
+                                        "$and": [
+                                            {"z_noidx": {"$exists": False}},
+                                            {"h_compound": {"$nin": [6, 3]}},
+                                        ],
+                                    },
                                     {"c_compound": {"$eq": 1}},
                                     {"a_idx": {"$all": [12, 5, 20]}},
                                 ],
@@ -12035,7 +13194,12 @@ export const pipelines = [
         },
     ],
     /* clusterSize: 18, queryRank: 7.03 */ [
-        {"$match": {"$nor": [{"a_compound": {"$lt": 1}}, {"a_compound": {"$all": [19, 8]}}], "h_idx": {"$gte": 19}}},
+        {
+            "$match": {
+                "$nor": [{"a_compound": {"$lt": 1}}, {"a_compound": {"$all": [19, 8]}}],
+                "h_idx": {"$gte": 19},
+            },
+        },
     ],
     /* clusterSize: 18, queryRank: 10.02 */ [
         {
@@ -12166,7 +13330,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$nor": [{"c_compound": {"$exists": False}}, {"a_compound": {"$in": [16, 19]}}]},
+                    {
+                        "$nor": [
+                            {"c_compound": {"$exists": False}},
+                            {"a_compound": {"$in": [16, 19]}},
+                        ],
+                    },
                     {"a_compound": {"$nin": [11, 12, 7]}},
                     {"i_idx": {"$exists": True}},
                     {"a_idx": {"$lte": 11}},
@@ -12181,7 +13350,11 @@ export const pipelines = [
     /* clusterSize: 17, queryRank: 7.02 */ [
         {
             "$match": {
-                "$or": [{"a_idx": {"$all": [9, 19]}}, {"d_idx": {"$lte": 1}}, {"a_compound": {"$exists": True}}],
+                "$or": [
+                    {"a_idx": {"$all": [9, 19]}},
+                    {"d_idx": {"$lte": 1}},
+                    {"a_compound": {"$exists": True}},
+                ],
                 "c_noidx": {"$lt": 8},
                 "k_noidx": {"$nin": [11, 17, 15]},
             },
@@ -12258,7 +13431,10 @@ export const pipelines = [
     /* clusterSize: 17, queryRank: 14.03 */ [
         {
             "$match": {
-                "$and": [{"a_noidx": {"$elemMatch": {"$gt": 14}}}, {"d_compound": {"$nin": [13, 7, 1]}}],
+                "$and": [
+                    {"a_noidx": {"$elemMatch": {"$gt": 14}}},
+                    {"d_compound": {"$nin": [13, 7, 1]}},
+                ],
                 "$nor": [
                     {"a_compound": {"$elemMatch": {"$in": [13, 3], "$nin": [1, 1]}}},
                     {"a_compound": {"$all": [8, 1, 20, 3]}},
@@ -12283,7 +13459,12 @@ export const pipelines = [
         {"$sort": {"h_idx": -1}},
     ],
     /* clusterSize: 17, queryRank: 4.03 */ [
-        {"$match": {"$or": [{"a_idx": {"$gt": 4}}, {"a_compound": {"$ne": 3}}], "d_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "$or": [{"a_idx": {"$gt": 4}}, {"a_compound": {"$ne": 3}}],
+                "d_compound": {"$exists": True},
+            },
+        },
         {"$project": {"h_idx": 1}},
     ],
     /* clusterSize: 17, queryRank: 11.03 */ [
@@ -12423,7 +13604,15 @@ export const pipelines = [
                         "$or": [
                             {
                                 "$or": [
-                                    {"a_idx": {"$elemMatch": {"$gt": 16, "$in": [1, 1], "$nin": [17, 16, 15]}}},
+                                    {
+                                        "a_idx": {
+                                            "$elemMatch": {
+                                                "$gt": 16,
+                                                "$in": [1, 1],
+                                                "$nin": [17, 16, 15],
+                                            },
+                                        },
+                                    },
                                     {"c_compound": {"$in": [9, 8, 18]}},
                                     {"a_compound": {"$all": [5, 15, 4]}},
                                     {"a_compound": {"$gt": 18}},
@@ -12472,7 +13661,12 @@ export const pipelines = [
                             {"i_idx": {"$exists": False}},
                             {
                                 "$nor": [
-                                    {"$or": [{"h_idx": {"$exists": False}}, {"h_compound": {"$gt": 10}}]},
+                                    {
+                                        "$or": [
+                                            {"h_idx": {"$exists": False}},
+                                            {"h_compound": {"$gt": 10}},
+                                        ],
+                                    },
                                     {"k_noidx": {"$nin": [4, 2, 1]}},
                                     {"c_idx": {"$in": [13, 18]}},
                                 ],
@@ -12487,7 +13681,13 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_compound": 1}},
     ],
     /* clusterSize: 15, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$exists": True}, "c_idx": {"$nin": [7, 15]}, "d_idx": {"$nin": [2, 4, 7, 19]}}},
+        {
+            "$match": {
+                "a_compound": {"$exists": True},
+                "c_idx": {"$nin": [7, 15]},
+                "d_idx": {"$nin": [2, 4, 7, 19]},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 15, queryRank: 11.03 */ [
@@ -12505,7 +13705,10 @@ export const pipelines = [
         {"$limit": 228},
         {"$project": {"a_idx": 1, "c_idx": 1}},
     ],
-    /* clusterSize: 15, queryRank: 3.03 */ [{"$match": {"a_compound": {"$in": [1, 8]}}}, {"$sort": {"i_idx": -1}}],
+    /* clusterSize: 15, queryRank: 3.03 */ [
+        {"$match": {"a_compound": {"$in": [1, 8]}}},
+        {"$sort": {"i_idx": -1}},
+    ],
     /* clusterSize: 15, queryRank: 12.02 */ [
         {
             "$match": {
@@ -12553,7 +13756,12 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"k_idx": {"$gt": 17}},
-                    {"$and": [{"a_noidx": {"$in": [11, 8, 9]}}, {"h_compound": {"$nin": [20, 18, 1, 4]}}]},
+                    {
+                        "$and": [
+                            {"a_noidx": {"$in": [11, 8, 9]}},
+                            {"h_compound": {"$nin": [20, 18, 1, 4]}},
+                        ],
+                    },
                 ],
                 "i_compound": {"$exists": True},
             },
@@ -12598,14 +13806,22 @@ export const pipelines = [
         {"$project": {"d_noidx": 1}},
     ],
     /* clusterSize: 14, queryRank: 10.03 */ [
-        {"$match": {"$nor": [{"a_compound": {"$all": [15, 17, 4]}}, {"c_idx": {"$in": [4, 2]}}], "h_idx": {"$gt": 10}}},
+        {
+            "$match": {
+                "$nor": [{"a_compound": {"$all": [15, 17, 4]}}, {"c_idx": {"$in": [4, 2]}}],
+                "h_idx": {"$gt": 10},
+            },
+        },
         {"$sort": {"h_idx": 1}},
         {"$limit": 137},
     ],
     /* clusterSize: 14, queryRank: 5.03 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$elemMatch": {"$nin": [4, 20, 9, 5, 5]}}}, {"i_compound": {"$gte": 8}}],
+                "$and": [
+                    {"a_compound": {"$elemMatch": {"$nin": [4, 20, 9, 5, 5]}}},
+                    {"i_compound": {"$gte": 8}},
+                ],
                 "a_noidx": {"$elemMatch": {"$lte": 16}},
             },
         },
@@ -12636,7 +13852,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_compound": 1, "i_idx": 1}},
     ],
     /* clusterSize: 14, queryRank: 4.03 */ [
-        {"$match": {"$nor": [{"i_idx": {"$in": [18, 18]}}, {"a_compound": {"$eq": 12}}], "d_noidx": {"$lte": 12}}},
+        {
+            "$match": {
+                "$nor": [{"i_idx": {"$in": [18, 18]}}, {"a_compound": {"$eq": 12}}],
+                "d_noidx": {"$lte": 12},
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$project": {"c_idx": 1, "d_idx": 1}},
     ],
@@ -12653,7 +13874,12 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$nor": [{"a_compound": {"$in": [10, 17]}}, {"a_idx": {"$all": [14, 17, 7, 11]}}]},
+                    {
+                        "$nor": [
+                            {"a_compound": {"$in": [10, 17]}},
+                            {"a_idx": {"$all": [14, 17, 7, 11]}},
+                        ],
+                    },
                     {"k_idx": {"$exists": True}},
                 ],
                 "d_idx": {"$gte": 9},
@@ -12664,7 +13890,13 @@ export const pipelines = [
         {"$skip": 6},
     ],
     /* clusterSize: 13, queryRank: 5.03 */ [
-        {"$match": {"i_compound": {"$gte": 2}, "i_idx": {"$nin": [6, 14]}, "z_idx": {"$exists": True}}},
+        {
+            "$match": {
+                "i_compound": {"$gte": 2},
+                "i_idx": {"$nin": [6, 14]},
+                "z_idx": {"$exists": True},
+            },
+        },
         {"$sort": {"a_idx": 1}},
     ],
     /* clusterSize: 13, queryRank: 8.02 */ [
@@ -12685,7 +13917,15 @@ export const pipelines = [
                 "$or": [
                     {
                         "$and": [
-                            {"a_idx": {"$elemMatch": {"$exists": True, "$in": [20, 13, 19, 17], "$ne": 14}}},
+                            {
+                                "a_idx": {
+                                    "$elemMatch": {
+                                        "$exists": True,
+                                        "$in": [20, 13, 19, 17],
+                                        "$ne": 14,
+                                    },
+                                },
+                            },
                             {"d_noidx": {"$lte": 1}},
                             {"h_idx": {"$gte": 7}},
                             {"z_compound": {"$exists": True}},
@@ -12740,7 +13980,13 @@ export const pipelines = [
         {"$project": {"_id": 0, "h_compound": 1}},
     ],
     /* clusterSize: 12, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$gte": 18}}, "c_compound": {"$lte": 5}, "d_idx": {"$lt": 17}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$gte": 18}},
+                "c_compound": {"$lte": 5},
+                "d_idx": {"$lt": 17},
+            },
+        },
         {"$sort": {"d_idx": -1, "z_idx": 1}},
         {"$limit": 127},
     ],
@@ -12756,7 +14002,12 @@ export const pipelines = [
         },
     ],
     /* clusterSize: 12, queryRank: 6.03 */ [
-        {"$match": {"$nor": [{"c_compound": {"$gt": 12}}, {"a_compound": {"$exists": False}}], "a_idx": {"$lte": 3}}},
+        {
+            "$match": {
+                "$nor": [{"c_compound": {"$gt": 12}}, {"a_compound": {"$exists": False}}],
+                "a_idx": {"$lte": 3},
+            },
+        },
         {"$sort": {"d_idx": 1}},
         {"$project": {"_id": 0, "a_idx": 1}},
     ],
@@ -12778,7 +14029,13 @@ export const pipelines = [
             "$match": {
                 "$or": [
                     {"a_compound": {"$exists": True}},
-                    {"$or": [{"i_compound": {"$ne": 1}}, {"k_compound": {"$gt": 3}}, {"d_idx": {"$exists": True}}]},
+                    {
+                        "$or": [
+                            {"i_compound": {"$ne": 1}},
+                            {"k_compound": {"$gt": 3}},
+                            {"d_idx": {"$exists": True}},
+                        ],
+                    },
                     {"a_idx": {"$in": [15, 10, 5, 17]}},
                 ],
                 "c_idx": {"$nin": [11, 3, 14]},
@@ -12806,7 +14063,10 @@ export const pipelines = [
         },
         {"$sort": {"h_idx": -1}},
     ],
-    /* clusterSize: 12, queryRank: 3.03 */ [{"$match": {"a_compound": {"$gt": 2}}}, {"$sort": {"a_idx": -1}}],
+    /* clusterSize: 12, queryRank: 3.03 */ [
+        {"$match": {"a_compound": {"$gt": 2}}},
+        {"$sort": {"a_idx": -1}},
+    ],
     /* clusterSize: 12, queryRank: 5.03 */ [
         {
             "$match": {
@@ -12884,14 +14144,20 @@ export const pipelines = [
     /* clusterSize: 11, queryRank: 8.03 */ [
         {
             "$match": {
-                "$or": [{"k_idx": {"$eq": 14}}, {"d_compound": {"$in": [13, 14]}}, {"c_compound": {"$ne": 19}}],
+                "$or": [
+                    {"k_idx": {"$eq": 14}},
+                    {"d_compound": {"$in": [13, 14]}},
+                    {"c_compound": {"$ne": 19}},
+                ],
                 "c_compound": {"$in": [16, 1, 5]},
                 "z_noidx": {"$exists": True},
             },
         },
         {"$project": {"a_compound": 1}},
     ],
-    /* clusterSize: 11, queryRank: 4.03 */ [{"$match": {"c_compound": {"$gte": 1}, "d_compound": {"$exists": True}}}],
+    /* clusterSize: 11, queryRank: 4.03 */ [
+        {"$match": {"c_compound": {"$gte": 1}, "d_compound": {"$exists": True}}},
+    ],
     /* clusterSize: 11, queryRank: 6.02 */ [
         {
             "$match": {
@@ -12910,7 +14176,15 @@ export const pipelines = [
                     {
                         "$or": [
                             {"d_idx": {"$nin": [5, 2]}},
-                            {"a_compound": {"$elemMatch": {"$exists": True, "$gte": 20, "$nin": [17, 16, 14]}}},
+                            {
+                                "a_compound": {
+                                    "$elemMatch": {
+                                        "$exists": True,
+                                        "$gte": 20,
+                                        "$nin": [17, 16, 14],
+                                    },
+                                },
+                            },
                         ],
                     },
                     {"c_compound": {"$in": [18, 6, 20]}},
@@ -12973,7 +14247,13 @@ export const pipelines = [
         {
             "$match": {
                 "$and": [
-                    {"$and": [{"a_compound": {"$lte": 7}}, {"a_compound": {"$gte": 8}}, {"k_noidx": {"$nin": [3, 7]}}]},
+                    {
+                        "$and": [
+                            {"a_compound": {"$lte": 7}},
+                            {"a_compound": {"$gte": 8}},
+                            {"k_noidx": {"$nin": [3, 7]}},
+                        ],
+                    },
                     {"c_idx": {"$in": [11, 9, 1, 11, 15]}},
                 ],
                 "z_noidx": {"$lte": 17},
@@ -12998,7 +14278,10 @@ export const pipelines = [
         {
             "$match": {
                 "$nor": [{"a_compound": {"$in": [13, 11, 19]}}, {"c_noidx": {"$gt": 15}}],
-                "$or": [{"i_compound": {"$nin": [5, 14, 12, 6]}}, {"i_compound": {"$exists": True}}],
+                "$or": [
+                    {"i_compound": {"$nin": [5, 14, 12, 6]}},
+                    {"i_compound": {"$exists": True}},
+                ],
             },
         },
         {"$sort": {"a_idx": 1}},
@@ -13038,7 +14321,12 @@ export const pipelines = [
         {
             "$match": {
                 "$or": [
-                    {"$or": [{"z_compound": {"$exists": True}}, {"a_idx": {"$all": [7, 20, 12, 1]}}]},
+                    {
+                        "$or": [
+                            {"z_compound": {"$exists": True}},
+                            {"a_idx": {"$all": [7, 20, 12, 1]}},
+                        ],
+                    },
                     {"a_idx": {"$all": [15, 18]}},
                 ],
                 "h_noidx": {"$nin": [17, 13, 9, 16]},
@@ -13048,7 +14336,13 @@ export const pipelines = [
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 10, queryRank: 7.03 */ [
-        {"$match": {"a_compound": {"$lte": 8}, "i_compound": {"$exists": True}, "k_compound": {"$in": [4, 12, 17, 4]}}},
+        {
+            "$match": {
+                "a_compound": {"$lte": 8},
+                "i_compound": {"$exists": True},
+                "k_compound": {"$in": [4, 12, 17, 4]},
+            },
+        },
         {"$sort": {"c_idx": -1}},
     ],
     /* clusterSize: 10, queryRank: 15.03 */ [
@@ -13066,7 +14360,12 @@ export const pipelines = [
             "$match": {
                 "$nor": [
                     {"d_idx": {"$exists": False}},
-                    {"$or": [{"a_compound": {"$nin": [17, 14, 16]}}, {"a_compound": {"$all": [11, 9, 10]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$nin": [17, 14, 16]}},
+                            {"a_compound": {"$all": [11, 9, 10]}},
+                        ],
+                    },
                 ],
                 "z_idx": {"$nin": [9, 2]},
                 "z_noidx": {"$nin": [11, 11, 8, 12, 19]},
@@ -13075,7 +14374,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_noidx": 1}},
     ],
     /* clusterSize: 10, queryRank: 4.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$exists": True, "$in": [6, 7, 1], "$ne": 8}}, "a_idx": {"$lt": 20}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$exists": True, "$in": [6, 7, 1], "$ne": 8}},
+                "a_idx": {"$lt": 20},
+            },
+        },
         {"$sort": {"c_idx": -1}},
     ],
     /* clusterSize: 10, queryRank: 7.03 */ [
@@ -13113,7 +14417,10 @@ export const pipelines = [
     /* clusterSize: 9, queryRank: 5.02 */ [
         {
             "$match": {
-                "$and": [{"a_noidx": {"$exists": True}}, {"a_compound": {"$elemMatch": {"$lt": 5, "$ne": 10}}}],
+                "$and": [
+                    {"a_noidx": {"$exists": True}},
+                    {"a_compound": {"$elemMatch": {"$lt": 5, "$ne": 10}}},
+                ],
                 "a_compound": {"$in": [9, 1, 2, 6]},
                 "a_noidx": {"$in": [6, 2]},
             },
@@ -13185,7 +14492,10 @@ export const pipelines = [
     /* clusterSize: 9, queryRank: 7.03 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$in": [1, 2, 10]}}, {"a_compound": {"$elemMatch": {"$nin": [17, 2, 11, 6]}}}],
+                "$and": [
+                    {"a_compound": {"$in": [1, 2, 10]}},
+                    {"a_compound": {"$elemMatch": {"$nin": [17, 2, 11, 6]}}},
+                ],
                 "$nor": [
                     {"h_noidx": {"$nin": [12, 4, 2, 15]}},
                     {"i_compound": {"$in": [4, 13]}},
@@ -13196,7 +14506,12 @@ export const pipelines = [
         {"$sort": {"d_idx": -1}},
     ],
     /* clusterSize: 9, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$lte": 20}, "a_noidx": {"$elemMatch": {"$in": [13, 16, 20, 5]}}}},
+        {
+            "$match": {
+                "a_compound": {"$lte": 20},
+                "a_noidx": {"$elemMatch": {"$in": [13, 16, 20, 5]}},
+            },
+        },
         {"$sort": {"k_idx": -1}},
     ],
     /* clusterSize: 9, queryRank: 5.03 */ [
@@ -13217,7 +14532,12 @@ export const pipelines = [
                 "$or": [
                     {"a_idx": {"$all": [19, 11]}},
                     {"a_compound": {"$elemMatch": {"$exists": False, "$nin": [11, 12, 4]}}},
-                    {"$or": [{"i_compound": {"$exists": True}}, {"a_compound": {"$exists": False}}]},
+                    {
+                        "$or": [
+                            {"i_compound": {"$exists": True}},
+                            {"a_compound": {"$exists": False}},
+                        ],
+                    },
                     {"a_compound": {"$all": [17, 10]}},
                 ],
                 "k_noidx": {"$nin": [5, 15]},
@@ -13235,7 +14555,13 @@ export const pipelines = [
         {"$project": {"a_compound": 1, "a_noidx": 1, "d_idx": 1}},
     ],
     /* clusterSize: 8, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$nin": [12, 1, 2, 9]}, "a_idx": {"$exists": True}, "k_noidx": {"$ne": 9}}},
+        {
+            "$match": {
+                "a_compound": {"$nin": [12, 1, 2, 9]},
+                "a_idx": {"$exists": True},
+                "k_noidx": {"$ne": 9},
+            },
+        },
     ],
     /* clusterSize: 8, queryRank: 13.03 */ [
         {
@@ -13333,7 +14659,13 @@ export const pipelines = [
         {"$project": {"_id": 0, "z_noidx": 1}},
     ],
     /* clusterSize: 7, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$nin": [1, 5]}}, "c_idx": {"$nin": [12, 19]}, "z_idx": {"$ne": 20}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$nin": [1, 5]}},
+                "c_idx": {"$nin": [12, 19]},
+                "z_idx": {"$ne": 20},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 7, queryRank: 3.03 */ [
@@ -13344,7 +14676,10 @@ export const pipelines = [
     /* clusterSize: 7, queryRank: 10.03 */ [
         {
             "$match": {
-                "$nor": [{"a_compound": {"$all": [6, 18, 11]}}, {"a_noidx": {"$nin": [6, 17, 8, 7]}}],
+                "$nor": [
+                    {"a_compound": {"$all": [6, 18, 11]}},
+                    {"a_noidx": {"$nin": [6, 17, 8, 7]}},
+                ],
                 "c_idx": {"$in": [3, 1, 19]},
             },
         },
@@ -13367,7 +14702,11 @@ export const pipelines = [
     /* clusterSize: 7, queryRank: 8.02 */ [
         {
             "$match": {
-                "$and": [{"d_noidx": {"$nin": [12, 14]}}, {"c_idx": {"$exists": True}}, {"c_idx": {"$exists": True}}],
+                "$and": [
+                    {"d_noidx": {"$nin": [12, 14]}},
+                    {"c_idx": {"$exists": True}},
+                    {"c_idx": {"$exists": True}},
+                ],
                 "d_compound": {"$ne": 10},
                 "i_compound": {"$nin": [11, 4, 7]},
                 "z_compound": {"$ne": 18},
@@ -13391,13 +14730,22 @@ export const pipelines = [
     /* clusterSize: 6, queryRank: 5.03 */ [
         {
             "$match": {
-                "$and": [{"a_noidx": {"$in": [6, 14]}}, {"d_compound": {"$exists": True}}, {"a_compound": {"$gte": 5}}],
+                "$and": [
+                    {"a_noidx": {"$in": [6, 14]}},
+                    {"d_compound": {"$exists": True}},
+                    {"a_compound": {"$gte": 5}},
+                ],
             },
         },
         {"$sort": {"k_idx": 1}},
     ],
     /* clusterSize: 6, queryRank: 5.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$exists": True, "$gte": 19}}, "z_compound": {"$exists": True}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$exists": True, "$gte": 19}},
+                "z_compound": {"$exists": True},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 6, queryRank: 3.02 */ [
@@ -13423,7 +14771,14 @@ export const pipelines = [
         {"$project": {"a_noidx": 1, "c_idx": 1}},
     ],
     /* clusterSize: 6, queryRank: 5.03 */ [
-        {"$match": {"$and": [{"a_compound": {"$nin": [19, 12, 9]}}, {"a_compound": {"$elemMatch": {"$lt": 11}}}]}},
+        {
+            "$match": {
+                "$and": [
+                    {"a_compound": {"$nin": [19, 12, 9]}},
+                    {"a_compound": {"$elemMatch": {"$lt": 11}}},
+                ],
+            },
+        },
         {"$sort": {"z_idx": 1}},
     ],
     // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
@@ -13475,7 +14830,12 @@ export const pipelines = [
         {"$project": {"_id": 0, "a_idx": 1, "a_noidx": 1}},
     ],
     /* clusterSize: 5, queryRank: 5.03 */ [
-        {"$match": {"$nor": [{"a_compound": {"$all": [14, 2]}}, {"a_noidx": {"$gt": 3}}], "a_noidx": {"$in": [12, 2]}}},
+        {
+            "$match": {
+                "$nor": [{"a_compound": {"$all": [14, 2]}}, {"a_noidx": {"$gt": 3}}],
+                "a_noidx": {"$in": [12, 2]},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 5, queryRank: 5.03 */ [
@@ -13485,14 +14845,26 @@ export const pipelines = [
     /* clusterSize: 5, queryRank: 5.03 */ [
         {
             "$match": {
-                "$and": [{"a_compound": {"$lte": 15}}, {"a_idx": {"$nin": [11, 7, 18, 3]}}, {"a_noidx": {"$lte": 19}}],
+                "$and": [
+                    {"a_compound": {"$lte": 15}},
+                    {"a_idx": {"$nin": [11, 7, 18, 3]}},
+                    {"a_noidx": {"$lte": 19}},
+                ],
                 "c_idx": {"$exists": True},
             },
         },
         {"$sort": {"h_idx": -1}},
     ],
     /* clusterSize: 4, queryRank: 6.03 */ [
-        {"$match": {"$and": [{"i_compound": {"$exists": True}}, {"c_compound": {"$ne": 10}}, {"k_idx": {"$gte": 2}}]}},
+        {
+            "$match": {
+                "$and": [
+                    {"i_compound": {"$exists": True}},
+                    {"c_compound": {"$ne": 10}},
+                    {"k_idx": {"$gte": 2}},
+                ],
+            },
+        },
         {"$sort": {"c_idx": -1}},
     ],
     /* clusterSize: 4, queryRank: 3.03 */ [
@@ -13530,7 +14902,13 @@ export const pipelines = [
         {"$project": {"_id": 0, "h_compound": 1}},
     ],
     /* clusterSize: 4, queryRank: 4.03 */ [
-        {"$match": {"a_compound": {"$nin": [10, 17]}, "h_noidx": {"$nin": [6, 1, 6, 1]}, "i_idx": {"$gt": 17}}},
+        {
+            "$match": {
+                "a_compound": {"$nin": [10, 17]},
+                "h_noidx": {"$nin": [6, 1, 6, 1]},
+                "i_idx": {"$gt": 17},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 4, queryRank: 3.03 */ [
@@ -13553,7 +14931,12 @@ export const pipelines = [
                 "$and": [
                     {
                         "$nor": [
-                            {"$and": [{"a_compound": {"$exists": True}}, {"a_idx": {"$in": [13, 3]}}]},
+                            {
+                                "$and": [
+                                    {"a_compound": {"$exists": True}},
+                                    {"a_idx": {"$in": [13, 3]}},
+                                ],
+                            },
                             {"c_idx": {"$gt": 9}},
                         ],
                     },
@@ -13567,7 +14950,10 @@ export const pipelines = [
     /* clusterSize: 4, queryRank: 4.03 */ [
         {
             "$match": {
-                "$and": [{"a_idx": {"$nin": [3, 15, 13]}}, {"a_compound": {"$elemMatch": {"$nin": [17, 10, 18]}}}],
+                "$and": [
+                    {"a_idx": {"$nin": [3, 15, 13]}},
+                    {"a_compound": {"$elemMatch": {"$nin": [17, 10, 18]}}},
+                ],
             },
         },
         {"$sort": {"i_idx": -1}},
@@ -13592,16 +14978,33 @@ export const pipelines = [
         },
     ],
     /* clusterSize: 3, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$elemMatch": {"$lt": 18}}, "a_noidx": {"$in": [17, 13, 16, 6, 8, 3, 3]}}},
+        {
+            "$match": {
+                "a_compound": {"$elemMatch": {"$lt": 18}},
+                "a_noidx": {"$in": [17, 13, 16, 6, 8, 3, 3]},
+            },
+        },
         {"$sort": {"k_idx": -1}},
         {"$project": {"z_idx": 1}},
     ],
     /* clusterSize: 3, queryRank: 6.03 */ [
-        {"$match": {"a_idx": {"$in": [4, 1, 13]}, "d_compound": {"$lt": 10}, "k_compound": {"$gt": 16}}},
+        {
+            "$match": {
+                "a_idx": {"$in": [4, 1, 13]},
+                "d_compound": {"$lt": 10},
+                "k_compound": {"$gt": 16},
+            },
+        },
         {"$sort": {"k_idx": 1}},
     ],
     /* clusterSize: 3, queryRank: 3.03 */ [
-        {"$match": {"a_compound": {"$gt": 4}, "h_noidx": {"$nin": [13, 11, 19]}, "z_idx": {"$in": [11, 1, 2, 3]}}},
+        {
+            "$match": {
+                "a_compound": {"$gt": 4},
+                "h_noidx": {"$nin": [13, 11, 19]},
+                "z_idx": {"$in": [11, 1, 2, 3]},
+            },
+        },
         {"$project": {"a_idx": 1}},
     ],
     /* clusterSize: 2, queryRank: 6.03 */ [
@@ -13635,7 +15038,12 @@ export const pipelines = [
         {"$sort": {"a_idx": -1}},
     ],
     /* clusterSize: 2, queryRank: 4.03 */ [
-        {"$match": {"$nor": [{"i_noidx": {"$exists": False}}, {"z_idx": {"$gt": 2}}], "d_compound": {"$gt": 2}}},
+        {
+            "$match": {
+                "$nor": [{"i_noidx": {"$exists": False}}, {"z_idx": {"$gt": 2}}],
+                "d_compound": {"$gt": 2},
+            },
+        },
         {"$sort": {"a_idx": -1}},
     ],
 
@@ -13866,7 +15274,12 @@ export const pipelines = [
                     {
                         "$nor": [
                             {"h_idx": {"$exists": True}},
-                            {"$or": [{"k_noidx": {"$nin": [19, 14, 9]}}, {"i_noidx": {"$exists": False}}]},
+                            {
+                                "$or": [
+                                    {"k_noidx": {"$nin": [19, 14, 9]}},
+                                    {"i_noidx": {"$exists": False}},
+                                ],
+                            },
                             {"k_idx": {"$exists": False}},
                             {"a_noidx": {"$lt": 13}},
                             {"i_noidx": {"$nin": [12, 10]}},
@@ -13892,9 +15305,20 @@ export const pipelines = [
         },
         {"$sort": {"a_idx": -1}},
     ],
-    /* clusterSize: 77, queryRank: 2.03 */ [{"$match": {"c_compound": {"$lt": 9}}}, {"$limit": 214}, {"$skip": 64}],
+    /* clusterSize: 77, queryRank: 2.03 */ [
+        {"$match": {"c_compound": {"$lt": 9}}},
+        {"$limit": 214},
+        {"$skip": 64},
+    ],
     /* clusterSize: 76, queryRank: 10.03 */ [
-        {"$match": {"$or": [{"a_compound": {"$all": [6, 3]}}, {"a_compound": {"$elemMatch": {"$in": [4, 1]}}}]}},
+        {
+            "$match": {
+                "$or": [
+                    {"a_compound": {"$all": [6, 3]}},
+                    {"a_compound": {"$elemMatch": {"$in": [4, 1]}}},
+                ],
+            },
+        },
         {"$sort": {"a_idx": -1}},
         {"$limit": 186},
         {"$project": {"c_noidx": 1, "h_noidx": 1, "z_idx": 1}},
@@ -14116,7 +15540,11 @@ export const pipelines = [
         {"$limit": 58},
         {"$project": {"_id": 0, "z_compound": 1}},
     ],
-    /* clusterSize: 23, queryRank: 2.03 */ [{"$match": {"a_compound": {"$gt": 19}}}, {"$limit": 165}, {"$skip": 6}],
+    /* clusterSize: 23, queryRank: 2.03 */ [
+        {"$match": {"a_compound": {"$gt": 19}}},
+        {"$limit": 165},
+        {"$skip": 6},
+    ],
     /* clusterSize: 21, queryRank: 2.03 */ [{"$match": {"d_compound": {"$lt": 6}}}, {"$skip": 4}],
     /* clusterSize: 19, queryRank: 7.03 */ [
         {
@@ -14148,12 +15576,21 @@ export const pipelines = [
         },
         {"$limit": 29},
     ],
-    /* clusterSize: 8, queryRank: 2.03 */ [{"$match": {"i_compound": {"$gt": 13}}}, {"$limit": 252}, {"$skip": 45}],
+    /* clusterSize: 8, queryRank: 2.03 */ [
+        {"$match": {"i_compound": {"$gt": 13}}},
+        {"$limit": 252},
+        {"$skip": 45},
+    ],
     /* clusterSize: 8, queryRank: 10.03 */ [
         {
             "$match": {
                 "$or": [
-                    {"$or": [{"a_compound": {"$all": [11, 8, 15]}}, {"a_compound": {"$all": [7, 20, 19]}}]},
+                    {
+                        "$or": [
+                            {"a_compound": {"$all": [11, 8, 15]}},
+                            {"a_compound": {"$all": [7, 20, 19]}},
+                        ],
+                    },
                     {"a_idx": {"$elemMatch": {"$gt": 10}}},
                     {"a_idx": {"$in": [7, 9, 12]}},
                 ],
@@ -14351,7 +15788,10 @@ export const pipelines = [
         {"$match": {"c_compound": {"$lte": 9}}},
         {"$project": {"_id": 0, "c_compound": 1}},
     ],
-    /* clusterSize: 9, queryRank: 2.03 */ [{"$match": {"a_compound": {"$in": [6, 13]}}}, {"$skip": 10}],
+    /* clusterSize: 9, queryRank: 2.03 */ [
+        {"$match": {"a_compound": {"$in": [6, 13]}}},
+        {"$skip": 10},
+    ],
     /* clusterSize: 7, queryRank: 2.03 */ [
         {"$match": {"a_compound": {"$eq": 9}}},
         {"$limit": 123},
@@ -14368,7 +15808,11 @@ export const pipelines = [
         {"$skip": 19},
         {"$project": {"_id": 0, "i_noidx": 1}},
     ],
-    /* clusterSize: 5, queryRank: 2.03 */ [{"$match": {"i_compound": {"$lte": 14}}}, {"$limit": 43}, {"$skip": 11}],
+    /* clusterSize: 5, queryRank: 2.03 */ [
+        {"$match": {"i_compound": {"$lte": 14}}},
+        {"$limit": 43},
+        {"$skip": 11},
+    ],
     /* clusterSize: 5, queryRank: 2.03 */ [{"$match": {"d_compound": {"$eq": 5}}}, {"$skip": 5}],
     /* clusterSize: 4, queryRank: 2.03 */ [
         {"$match": {"k_compound": {"$gte": 11}}},
@@ -14551,7 +15995,12 @@ export const pipelines = [
                                     {"a_idx": {"$elemMatch": {"$exists": False}}},
                                 ],
                             },
-                            {"$or": [{"i_noidx": {"$in": [9, 8]}}, {"d_idx": {"$nin": [10, 8, 17]}}]},
+                            {
+                                "$or": [
+                                    {"i_noidx": {"$in": [9, 8]}},
+                                    {"d_idx": {"$nin": [10, 8, 17]}},
+                                ],
+                            },
                         ],
                     },
                     {"h_compound": {"$exists": False}},

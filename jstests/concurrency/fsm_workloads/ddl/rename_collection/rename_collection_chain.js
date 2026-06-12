@@ -43,10 +43,14 @@ export const $config = (function () {
             if (!this.allCollectionsInitialized) {
                 if (collectionInfos.length === this.threadCount) {
                     this.allCollectionsInitialized = true;
-                    jsTestLog(`All collections visible to thread ${this.tid}: ${tojsononeline(collectionInfos)}`);
+                    jsTestLog(
+                        `All collections visible to thread ${this.tid}: ${tojsononeline(collectionInfos)}`,
+                    );
                 }
             } else {
-                const numColls = collectionInfos.filter((collInfo) => collInfo.name.startsWith(this.prefix)).length;
+                const numColls = collectionInfos.filter((collInfo) =>
+                    collInfo.name.startsWith(this.prefix),
+                ).length;
                 assert.eq(numColls, this.threadCount, () => tojson(collectionInfos));
             }
         }

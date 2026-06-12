@@ -22,7 +22,10 @@ function runAwaitableHelloBeforeFCVChange(
             hello: 1,
             topologyVersion: topologyVersionField,
             maxAwaitTimeMS: 99999999,
-            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(serverMaxWireVersion)},
+            internalClient: {
+                minWireVersion: NumberInt(0),
+                maxWireVersion: NumberInt(serverMaxWireVersion),
+            },
         }),
     );
 
@@ -138,26 +141,34 @@ function runTest(downgradeFCV) {
     secondaryFailPoint.wait();
 
     // Each node has one hello request waiting on a topology change.
-    let numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-    let numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(1, numAwaitingTopologyChangeOnPrimary);
     assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
     // Setting the FCV to the same version will not trigger an hello response.
-    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
 
     // Each node still has one hello request waiting on a topology change.
-    numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(1, numAwaitingTopologyChangeOnPrimary);
     assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
     jsTestLog("Downgrade the featureCompatibilityVersion.");
     // Downgrading the FCV will cause the hello requests to respond on both primary and
     // secondary.
-    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        primaryAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
     awaitHelloBeforeDowngradeFCVOnPrimary();
     awaitHelloBeforeDowngradeFCVOnSecondary();
     // Ensure the featureCompatibilityVersion document update has been replicated.
@@ -169,19 +180,29 @@ function runTest(downgradeFCV) {
     rst.waitForConfigReplication(primary);
 
     // All hello requests should have been responded to after the FCV change.
-    numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(0, numAwaitingTopologyChangeOnPrimary);
     assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
     // Get the new topologyVersion.
     let primaryResponseAfterDowngrade = helloAsInternalClient();
-    assert(primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"), tojson(primaryResponseAfterDowngrade));
+    assert(
+        primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
+        tojson(primaryResponseAfterDowngrade),
+    );
     let primaryTopologyVersionAfterDowngrade = primaryResponseAfterDowngrade.topologyVersion;
     let minWireVersionAfterDowngrade = primaryResponseAfterDowngrade.minWireVersion;
 
-    let secondaryResponseAfterDowngrade = assert.commandWorked(secondaryAdminDB.runCommand({hello: 1}));
-    assert(secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"), tojson(secondaryResponseAfterDowngrade));
+    let secondaryResponseAfterDowngrade = assert.commandWorked(
+        secondaryAdminDB.runCommand({hello: 1}),
+    );
+    assert(
+        secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
+        tojson(secondaryResponseAfterDowngrade),
+    );
     let secondaryTopologyVersionAfterDowngrade = secondaryResponseAfterDowngrade.topologyVersion;
 
     if (downgradeFCV === lastLTSFCV && lastLTSFCV !== lastContinuousFCV) {
@@ -217,8 +238,10 @@ function runTest(downgradeFCV) {
         secondaryFailPoint.wait();
 
         // Each node has one hello request waiting on a topology change.
-        numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-        numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+        numAwaitingTopologyChangeOnPrimary =
+            primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+        numAwaitingTopologyChangeOnSecondary =
+            secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
         assert.eq(1, numAwaitingTopologyChangeOnPrimary);
         assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
@@ -239,16 +262,22 @@ function runTest(downgradeFCV) {
         checkFCV(secondaryAdminDB, lastContinuousFCV);
 
         // All hello requests should have been responded to after the FCV change.
-        numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-        numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+        numAwaitingTopologyChangeOnPrimary =
+            primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+        numAwaitingTopologyChangeOnSecondary =
+            secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
         assert.eq(0, numAwaitingTopologyChangeOnPrimary);
         assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
         // Reset the FCV back to last-lts and the get the new hello parameters.
         // We must upgrade to latestFCV first since downgrading from last-continuous to last-stable
         // is forbidden.
-        assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-        assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        assert.commandWorked(
+            primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         rst.awaitReplication();
         checkFCV(primaryAdminDB, lastLTSFCV);
         checkFCV(secondaryAdminDB, lastLTSFCV);
@@ -257,11 +286,16 @@ function runTest(downgradeFCV) {
         rst.waitForConfigReplication(primary);
 
         primaryResponseAfterDowngrade = helloAsInternalClient();
-        assert(primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"), tojson(primaryResponseAfterDowngrade));
+        assert(
+            primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
+            tojson(primaryResponseAfterDowngrade),
+        );
         primaryTopologyVersionAfterDowngrade = primaryResponseAfterDowngrade.topologyVersion;
         minWireVersionAfterDowngrade = primaryResponseAfterDowngrade.minWireVersion;
 
-        secondaryResponseAfterDowngrade = assert.commandWorked(secondaryAdminDB.runCommand({hello: 1}));
+        secondaryResponseAfterDowngrade = assert.commandWorked(
+            secondaryAdminDB.runCommand({hello: 1}),
+        );
         assert(
             secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
             tojson(secondaryResponseAfterDowngrade),
@@ -298,25 +332,33 @@ function runTest(downgradeFCV) {
     secondaryFailPoint.wait();
 
     // Each node has one hello request waiting on a topology change.
-    numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(1, numAwaitingTopologyChangeOnPrimary);
     assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
     // Setting the FCV to the same version will not trigger an hello response.
-    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        primaryAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
     checkFCV(primaryAdminDB, downgradeFCV);
     checkFCV(secondaryAdminDB, downgradeFCV);
 
     // Each node still has one hello request waiting on a topology change.
-    numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(1, numAwaitingTopologyChangeOnPrimary);
     assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
     jsTestLog("Upgrade the featureCompatibilityVersion.");
     // Upgrading the FCV will cause the hello requests to respond on both primary and secondary.
-    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     awaitHelloBeforeUpgradeFCVOnPrimary();
     awaitHelloBeforeUpgradeFCVOnSecondary();
     // Ensure the featureCompatibilityVersion document update has been replicated.
@@ -325,8 +367,10 @@ function runTest(downgradeFCV) {
     checkFCV(secondaryAdminDB, latestFCV);
 
     // All hello requests should have been responded to after the FCV change.
-    numAwaitingTopologyChangeOnPrimary = primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary = secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(0, numAwaitingTopologyChangeOnPrimary);
     assert.eq(0, numAwaitingTopologyChangeOnSecondary);
     rst.stopSet();

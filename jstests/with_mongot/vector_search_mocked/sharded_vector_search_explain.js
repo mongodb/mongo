@@ -33,7 +33,9 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const coll = testDB.getCollection(collName);
 assert.commandWorked(coll.insert({_id: 1, name: "Sozin", element: "fire"}));
@@ -123,21 +125,35 @@ function testLimit(shard0Conn, shard1Conn, verbosity, userLimit) {
             ],
         });
     }
-    const result = coll.explain(verbosity).aggregate([{$vectorSearch: vectorSearchQuery}, {$limit: userLimit}]);
+    const result = coll
+        .explain(verbosity)
+        .aggregate([{$vectorSearch: vectorSearchQuery}, {$limit: userLimit}]);
     // We should have a $limit on each shard.
     const limitStages = getAggPlanStages(result, "$limit");
     assert.eq(limitStages.length, 2, tojson(result));
     // The $limits will take on the value of the $vectorSearch limit unless we have a smaller
     // user-specified $limit.
-    const expectedLimitVal = userLimit ? Math.min(userLimit, vectorSearchQuery.limit) : vectorSearchQuery.limit;
+    const expectedLimitVal = userLimit
+        ? Math.min(userLimit, vectorSearchQuery.limit)
+        : vectorSearchQuery.limit;
     for (const limitStage of limitStages) {
         assert.eq(expectedLimitVal, limitStage["$limit"], tojson(result));
     }
     // The merging pipeline should also have a $limit with the minimum of the $vectorSearch limit
     // and user-specified $limit.
-    assert(result.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"), tojson(result.splitPipeline));
-    assert(result.splitPipeline.mergerPart[1].hasOwnProperty("$limit"), tojson(result.splitPipeline));
-    assert.eq(result.splitPipeline.mergerPart[1].$limit, expectedLimitVal, tojson(result.splitPipeline));
+    assert(
+        result.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"),
+        tojson(result.splitPipeline),
+    );
+    assert(
+        result.splitPipeline.mergerPart[1].hasOwnProperty("$limit"),
+        tojson(result.splitPipeline),
+    );
+    assert.eq(
+        result.splitPipeline.mergerPart[1].$limit,
+        expectedLimitVal,
+        tojson(result.splitPipeline),
+    );
 }
 function runExplainTest(verbosity) {
     // Ensure there is never a staleShardVersionException to cause a retry on any shard.
@@ -292,12 +308,18 @@ function runExplainTest(verbosity) {
 
 // Test that $vectorSearch works with each explain verbosity.
 runExplainTest("queryPlanner");
-runTestOnPrimaries((shard0Conn, shard1Conn) => testLimit(shard0Conn, shard1Conn, "queryPlanner", lowerUserLimit));
-runTestOnPrimaries((shard0Conn, shard1Conn) => testLimit(shard0Conn, shard1Conn, "queryPlanner", higherUserLimit));
+runTestOnPrimaries((shard0Conn, shard1Conn) =>
+    testLimit(shard0Conn, shard1Conn, "queryPlanner", lowerUserLimit),
+);
+runTestOnPrimaries((shard0Conn, shard1Conn) =>
+    testLimit(shard0Conn, shard1Conn, "queryPlanner", higherUserLimit),
+);
 
 if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "SearchExplainExecutionStats")) {
     runExplainTest("executionStats");
-    runTestOnPrimaries((shard0Conn, shard1Conn) => testLimit(shard0Conn, shard1Conn, "executionStats", lowerUserLimit));
+    runTestOnPrimaries((shard0Conn, shard1Conn) =>
+        testLimit(shard0Conn, shard1Conn, "executionStats", lowerUserLimit),
+    );
     runTestOnPrimaries((shard0Conn, shard1Conn) =>
         testLimit(shard0Conn, shard1Conn, "executionStats", higherUserLimit),
     );

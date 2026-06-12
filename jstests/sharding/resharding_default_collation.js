@@ -19,11 +19,15 @@ const kCollName = "coll";
 const ns = kDbName + "." + kCollName;
 
 assert.commandWorked(
-    reshardingTest._st.s.getDB(kDbName).adminCommand({enableSharding: kDbName, primaryShard: donorShardNames[0]}),
+    reshardingTest._st.s
+        .getDB(kDbName)
+        .adminCommand({enableSharding: kDbName, primaryShard: donorShardNames[0]}),
 );
 
 assert.commandWorked(
-    reshardingTest._st.s.getCollection(ns).runCommand("create", {collation: {locale: "en_US", strength: 2}}),
+    reshardingTest._st.s
+        .getCollection(ns)
+        .runCommand("create", {collation: {locale: "en_US", strength: 2}}),
 );
 
 const collection = reshardingTest.createShardedCollection({
@@ -35,12 +39,17 @@ const collection = reshardingTest.createShardedCollection({
 const db = collection.getDB();
 
 const idxSimpleCollationName = "idxSimpleCollation";
-assert.commandWorked(collection.createIndex({x: 1}, {name: idxSimpleCollationName, collation: {locale: "simple"}}));
+assert.commandWorked(
+    collection.createIndex({x: 1}, {name: idxSimpleCollationName, collation: {locale: "simple"}}),
+);
 const idx2Name = "idx2";
 assert.commandWorked(collection.createIndex({x: 1}, {name: idx2Name}));
 
 // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-const preReshardingIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, collection.getIndexes());
+const preReshardingIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(
+    db,
+    collection.getIndexes(),
+);
 
 const preIdxDict = {};
 preReshardingIndexes.forEach(function (idx) {
@@ -57,7 +66,10 @@ const postReshardingIndexes = collection.getIndexes();
 assert.eq(postReshardingIndexes.length, 5);
 
 // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-const normalizedPostIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, postReshardingIndexes);
+const normalizedPostIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(
+    db,
+    postReshardingIndexes,
+);
 for (const postIdxSpec of normalizedPostIndexes) {
     if ("newKey" in postIdxSpec.key) {
         // the index collation for post resharding key should be {locale: "simple"}.

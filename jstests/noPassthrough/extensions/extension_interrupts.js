@@ -85,7 +85,10 @@ function runInterruptTests(conn) {
 
         // Run the aggregation with the failpoint active.
         // This should trigger an interrupt when checkForInterrupt is called in getNext(), and we should not uassert in $interruptTest. Instead, we should receive the interrupted kill code.
-        assert.throwsWithCode(() => coll.aggregate([{$sort: {_id: 1}}, {$interruptTest: {}}]), ErrorCodes.Interrupted);
+        assert.throwsWithCode(
+            () => coll.aggregate([{$sort: {_id: 1}}, {$interruptTest: {}}]),
+            ErrorCodes.Interrupted,
+        );
     })();
 
     // Sanity checks that without the interrupt, the query uasserts after a certain number of calls using getMore.
@@ -101,7 +104,9 @@ function runInterruptTests(conn) {
 
         // We have already run getNext() once, so advance up to the `uassertOn`th doc.
         for (var i = 1; i < uassertOn; i++) {
-            assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
+            assert.commandWorked(
+                db.runCommand({getMore: cursorId, collection: collName, batchSize: 1}),
+            );
         }
 
         // Calling getMore one more time should result in the custom error code.
@@ -124,7 +129,9 @@ function runInterruptTests(conn) {
 
         // We have already run getNext() once, so advance up to the `uassertOn`th doc.
         for (var i = 1; i < uassertOn; i++) {
-            assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
+            assert.commandWorked(
+                db.runCommand({getMore: cursorId, collection: collName, batchSize: 1}),
+            );
         }
 
         createOneTimeFailpoint(db, threadName);

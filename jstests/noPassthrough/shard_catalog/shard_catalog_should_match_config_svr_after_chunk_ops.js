@@ -39,9 +39,24 @@ function setOnCurrentShardSince(mongoS, coll, extraQuery, refTimestamp, offsetIn
 }
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
-    configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
-    configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
-    configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
+    configureFailPointForRS(
+        st.configRS.nodes,
+        "overrideHistoryWindowInSecs",
+        {seconds: valueInSeconds},
+        "alwaysOn",
+    );
+    configureFailPointForRS(
+        st.rs0.nodes,
+        "overrideHistoryWindowInSecs",
+        {seconds: valueInSeconds},
+        "alwaysOn",
+    );
+    configureFailPointForRS(
+        st.rs1.nodes,
+        "overrideHistoryWindowInSecs",
+        {seconds: valueInSeconds},
+        "alwaysOn",
+    );
 }
 
 function resetHistoryWindowInSecs(st) {
@@ -122,7 +137,9 @@ function assertCsrMatchesConfig(st, ns, shardConn, shardName) {
         .toArray()[0];
     assert(topChunk, `config.chunks has no chunk for ${ns} on ${shardName}`);
 
-    const shardVersionRes = assert.commandWorked(shardConn.adminCommand({getShardVersion: ns, fullMetadata: true}));
+    const shardVersionRes = assert.commandWorked(
+        shardConn.adminCommand({getShardVersion: ns, fullMetadata: true}),
+    );
     assert(
         shardVersionRes.metadata && shardVersionRes.metadata.shardVersion,
         `getShardVersion returned no shardVersion for ${ns} on ${shardName}: ${tojson(shardVersionRes)}`,
@@ -171,7 +188,9 @@ describe("CSR health after chunk ops", function () {
         this.collName = "coll";
         this.ns = `${this.dbName}.${this.collName}`;
 
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.shard0Name}));
+        assert.commandWorked(
+            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.shard0Name}),
+        );
         assert.commandWorked(this.st.s.adminCommand({shardCollection: this.ns, key: {x: 1}}));
 
         this.coll = this.st.s.getDB(this.dbName)[this.collName];
@@ -231,7 +250,13 @@ describe("CSR health after chunk ops", function () {
             // is eligible.
             setHistoryWindowInSecs(this.st, -10 * 60);
             try {
-                setOnCurrentShardSince(this.st.s, this.coll, {shard: this.shard0Name}, new Timestamp(100, 0), 0);
+                setOnCurrentShardSince(
+                    this.st.s,
+                    this.coll,
+                    {shard: this.shard0Name},
+                    new Timestamp(100, 0),
+                    0,
+                );
 
                 forceShardCsrStartingState(this.shard0Primary, this.ns);
 

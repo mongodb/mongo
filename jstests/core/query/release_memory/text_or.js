@@ -53,7 +53,11 @@ function insertData(coll, padding = "") {
     for (let word1 of words1) {
         for (let word2 of words2) {
             for (let word3 of words3) {
-                docs.push({desc: word1 + " " + word2 + " " + word3, price: price, padding: padding});
+                docs.push({
+                    desc: word1 + " " + word2 + " " + word3,
+                    price: price,
+                    padding: padding,
+                });
                 price = (price + 2) % 7;
             }
         }

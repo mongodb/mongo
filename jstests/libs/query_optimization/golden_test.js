@@ -3,7 +3,13 @@ export function tojsonOnelineSortKeys(x) {
 }
 
 export function tojsonMultiLineSortKeys(x) {
-    return tojson(x, undefined /*indent*/, false /*nolint*/, undefined /*depth*/, true /*sortKeys*/);
+    return tojson(
+        x,
+        undefined /*indent*/,
+        false /*nolint*/,
+        undefined /*depth*/,
+        true /*sortKeys*/,
+    );
 }
 
 // Takes an array of documents ('result').

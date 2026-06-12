@@ -58,7 +58,11 @@ export class QEStateCollectionStatsTracker {
     updateStatsPostCompactForFields(...keys) {
         keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
-                print("Skipping field " + key + " in updateStatsPostCompact because it is not tracked");
+                print(
+                    "Skipping field " +
+                        key +
+                        " in updateStatsPostCompact because it is not tracked",
+                );
                 return;
             }
             const field = this.fieldStats[key];
@@ -90,7 +94,11 @@ export class QEStateCollectionStatsTracker {
     updateStatsPostCleanupForFields(...keys) {
         keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
-                print("Skipping field " + key + " in updateStatsPostCleanup because it is not tracked");
+                print(
+                    "Skipping field " +
+                        key +
+                        " in updateStatsPostCleanup because it is not tracked",
+                );
                 return;
             }
             const field = this.fieldStats[key];

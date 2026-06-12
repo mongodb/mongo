@@ -22,7 +22,11 @@ const clusterCommandsCases = [
 ];
 
 function runTestCaseExpectFail(conn, testCase, code) {
-    assert.commandFailedWithCode(conn.getDB(kDbName).runCommand(testCase.cmd), code, tojson(testCase.cmd));
+    assert.commandFailedWithCode(
+        conn.getDB(kDbName).runCommand(testCase.cmd),
+        code,
+        tojson(testCase.cmd),
+    );
 }
 
 //

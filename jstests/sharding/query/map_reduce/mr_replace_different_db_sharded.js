@@ -8,8 +8,12 @@ const sourceDB = st.s.getDB("mr_source_db");
 const destDB = st.s.getDB("mr_out_db");
 const sourceColl = sourceDB.mr_source_coll;
 sourceColl.drop();
-assert.commandWorked(st.s.adminCommand({enableSharding: sourceDB.getName(), primaryShard: st.shard0.name}));
-assert.commandWorked(st.s.adminCommand({enableSharding: destDB.getName(), primaryShard: st.shard0.name}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: sourceDB.getName(), primaryShard: st.shard0.name}),
+);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: destDB.getName(), primaryShard: st.shard0.name}),
+);
 assert.commandWorked(sourceColl.insert({val: 1}));
 assert.commandWorked(sourceColl.insert({val: 2}));
 
@@ -40,7 +44,9 @@ assert.eq(2, destColl.find().count(), result);
 destColl.drop();
 destDB.dropDatabase();
 
-assert.commandWorked(st.s.adminCommand({enableSharding: destDB.getName(), primaryShard: st.shard1.name}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: destDB.getName(), primaryShard: st.shard1.name}),
+);
 
 result = assert.commandWorked(
     sourceDB.runCommand({

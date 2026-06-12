@@ -55,9 +55,13 @@ export function getPlanRankerMode(db) {
             internalQueryCBRCEMode: 1,
         });
 
-        return !getParam.featureFlagCostBasedRanker?.value ? "multiPlanning" : getParam.internalQueryCBRCEMode;
+        return !getParam.featureFlagCostBasedRanker?.value
+            ? "multiPlanning"
+            : getParam.internalQueryCBRCEMode;
     } else {
-        return TestData.setParameters.planRankerMode ? TestData.setParameters.planRankerMode : "multiPlanning";
+        return TestData.setParameters.planRankerMode
+            ? TestData.setParameters.planRankerMode
+            : "multiPlanning";
     }
 }
 

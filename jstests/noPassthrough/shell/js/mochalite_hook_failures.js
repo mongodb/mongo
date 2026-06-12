@@ -137,8 +137,14 @@ assert.eq(spylogerr.length, 4);
 assert.eq(spylogerr[0], "\u001b[31m✘ multiple test failures > test2\u001b[0m");
 assert.eq(spylogerr[1], "\u001b[31m✘ multiple test failures > test4\u001b[0m");
 // these are stack-dependent
-assert.startsWith(spylogerr[2], "\u001b[31m✘ multiple test failures > test2\nIntentional failure\nFAILURE@jstests");
-assert.startsWith(spylogerr[3], "\u001b[31m✘ multiple test failures > test4\nIntentional failure\nFAILURE@jstests");
+assert.startsWith(
+    spylogerr[2],
+    "\u001b[31m✘ multiple test failures > test2\nIntentional failure\nFAILURE@jstests",
+);
+assert.startsWith(
+    spylogerr[3],
+    "\u001b[31m✘ multiple test failures > test4\nIntentional failure\nFAILURE@jstests",
+);
 
 jsTest.log.info = previous_info;
 jsTest.log.error = previous_error;

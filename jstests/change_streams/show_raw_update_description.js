@@ -131,7 +131,10 @@ function assertCollectionsAreIdentical(coll1, coll2) {
         const values1 = coll1.find().toArray();
         const values2 = coll2.find().toArray();
 
-        return arrayEq(values1, values2), () => "actual: " + tojson(values1) + "  expected: " + tojson(values2);
+        return (
+            arrayEq(values1, values2),
+            () => "actual: " + tojson(values1) + "  expected: " + tojson(values2)
+        );
     });
 }
 
@@ -212,7 +215,10 @@ assertCanApplyRawUpdate(db.t1, db.t1Copy, expected);
 //
 // Test pipeline-style updates.
 //
-cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {showRawUpdateDescription: true}}], collection: db.t2});
+cursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {showRawUpdateDescription: true}}],
+    collection: db.t2,
+});
 
 // Also test a second change stream with the 'fullDocument' option enabled.
 const fullDocCursor = cst.startWatchingChanges({
@@ -282,7 +288,9 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 jsTestLog("Testing pipeline-style update with $replaceRoot");
-assert.commandWorked(db.t2.update({_id: 100}, [{$replaceRoot: {newRoot: {_id: 100, "giantStr": kGiantStr}}}]));
+assert.commandWorked(
+    db.t2.update({_id: 100}, [{$replaceRoot: {newRoot: {_id: 100, "giantStr": kGiantStr}}}]),
+);
 expected = {
     documentKey: {_id: 100},
     fullDocument: {_id: 100, giantStr: kGiantStr},

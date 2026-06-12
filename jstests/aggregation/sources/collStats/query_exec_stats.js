@@ -10,7 +10,9 @@ const nDocs = 32;
 const testDB = db.getSiblingDB("aggregation_query_exec_stats");
 const coll = testDB.aggregation_query_exec_stats;
 coll.drop();
-assert.commandWorked(testDB.createCollection("aggregation_query_exec_stats", {capped: true, size: nDocs * 100}));
+assert.commandWorked(
+    testDB.createCollection("aggregation_query_exec_stats", {capped: true, size: nDocs * 100}),
+);
 
 for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({a: i}));

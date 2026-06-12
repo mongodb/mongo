@@ -57,7 +57,10 @@ assert.commandWorked(coll.insert(docs));
         .aggregate([{$sort: {_id: 1}}, {$group: {_id: "$stateObj", sales: {$first: "$sales"}}}])
         .toArray();
 
-    const expectedResult = expectedFirstSales.map((doc) => ({"_id": {"st": doc["_id"]}, sales: doc["sales"]}));
+    const expectedResult = expectedFirstSales.map((doc) => ({
+        "_id": {"st": doc["_id"]},
+        sales: doc["sales"],
+    }));
     assert(
         arrayEq(expectedResult, actualResults),
         () => "expected " + tojson(expectedResult) + " actual " + tojson(actualResults),
@@ -81,7 +84,10 @@ assert.commandWorked(coll.insert(docs));
         .aggregate([{$sort: {_id: 1}}, {$group: {_id: "$stateObj", sales: {$last: "$sales"}}}])
         .toArray();
 
-    const expectedResult = expectedLastSales.map((doc) => ({"_id": {"st": doc["_id"]}, sales: doc["sales"]}));
+    const expectedResult = expectedLastSales.map((doc) => ({
+        "_id": {"st": doc["_id"]},
+        sales: doc["sales"],
+    }));
     assert(
         arrayEq(expectedResult, actualResults),
         () => "expected " + tojson(expectedResult) + " actual " + tojson(actualResults),
@@ -137,9 +143,16 @@ assert.commandWorked(coll.createIndex(idxSpec));
 {
     // Test $first with index.
     const actualResults = coll
-        .aggregate([{$sort: {_id: 1}}, {$group: {_id: "$state", sales: {$first: "$sales"}}}, {$sort: {_id: 1}}], {
-            hint: idxSpec,
-        })
+        .aggregate(
+            [
+                {$sort: {_id: 1}},
+                {$group: {_id: "$state", sales: {$first: "$sales"}}},
+                {$sort: {_id: 1}},
+            ],
+            {
+                hint: idxSpec,
+            },
+        )
         .toArray();
     assert.eq(expectedFirstSales, actualResults);
 }
@@ -147,9 +160,16 @@ assert.commandWorked(coll.createIndex(idxSpec));
 {
     // Test $last with index.
     const actualResults = coll
-        .aggregate([{$sort: {_id: 1}}, {$group: {_id: "$state", sales: {$last: "$sales"}}}, {$sort: {_id: 1}}], {
-            hint: idxSpec,
-        })
+        .aggregate(
+            [
+                {$sort: {_id: 1}},
+                {$group: {_id: "$state", sales: {$last: "$sales"}}},
+                {$sort: {_id: 1}},
+            ],
+            {
+                hint: idxSpec,
+            },
+        )
         .toArray();
     assert.eq(expectedLastSales, actualResults);
 }

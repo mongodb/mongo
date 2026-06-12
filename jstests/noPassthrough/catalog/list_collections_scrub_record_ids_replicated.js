@@ -25,20 +25,30 @@ assert.commandWorked(testDB.createCollection(collName));
 
 // Verify the field is present when querying the shard directly.
 const shardCollInfos = shard0.getDB(dbName).getCollectionInfos({name: collName});
-assert.eq(1, shardCollInfos.length, "expected to find collection on shard: " + tojson(shardCollInfos));
+assert.eq(
+    1,
+    shardCollInfos.length,
+    "expected to find collection on shard: " + tojson(shardCollInfos),
+);
 const shardCollInfo = shardCollInfos[0];
 assert(
     shardCollInfo.info.hasOwnProperty("recordIdsReplicated"),
-    "expected 'recordIdsReplicated' to be present in shard listCollections response: " + tojson(shardCollInfo),
+    "expected 'recordIdsReplicated' to be present in shard listCollections response: " +
+        tojson(shardCollInfo),
 );
 
 // Verify the field is scrubbed when querying via the router (mongos).
 const routerCollInfos = testDB.getCollectionInfos({name: collName});
-assert.eq(1, routerCollInfos.length, "expected to find collection via router: " + tojson(routerCollInfos));
+assert.eq(
+    1,
+    routerCollInfos.length,
+    "expected to find collection via router: " + tojson(routerCollInfos),
+);
 const routerCollInfo = routerCollInfos[0];
 assert(
     !routerCollInfo.info.hasOwnProperty("recordIdsReplicated"),
-    "expected 'recordIdsReplicated' to be absent in router listCollections response: " + tojson(routerCollInfo),
+    "expected 'recordIdsReplicated' to be absent in router listCollections response: " +
+        tojson(routerCollInfo),
 );
 
 st.stop();

@@ -54,7 +54,10 @@ commitFailPoint = configureFailPoint(
     shardPrimary,
     "failCommand",
     {
-        writeConcernError: {code: NumberInt(ErrorCodes.ReadConcernMajorityNotAvailableYet), errmsg: "foo"},
+        writeConcernError: {
+            code: NumberInt(ErrorCodes.ReadConcernMajorityNotAvailableYet),
+            errmsg: "foo",
+        },
         failCommands: ["commitTransaction"],
         failInternalCommands: true,
     },
@@ -78,7 +81,10 @@ commitFailPoint = configureFailPoint(
     },
     {times: 10},
 );
-res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 3})), ErrorCodes.InternalError);
+res = assert.commandFailedWithCode(
+    runTxn(st.s, makeSingleInsertTxn({_id: 3})),
+    ErrorCodes.InternalError,
+);
 commitFailPoint.off();
 
 // No commit error with a non-retryable write concern error.
@@ -93,7 +99,10 @@ commitFailPoint = configureFailPoint(
     {times: 10},
 );
 // The internal transaction test command will rethrow a write concern error as a top-level error.
-res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 4})), ErrorCodes.InternalError);
+res = assert.commandFailedWithCode(
+    runTxn(st.s, makeSingleInsertTxn({_id: 4})),
+    ErrorCodes.InternalError,
+);
 commitFailPoint.off();
 
 // Non-transient commit error that is normally transient. Note NoSuchTransaction is not transient
@@ -111,7 +120,10 @@ commitFailPoint = configureFailPoint(
     },
     {times: 10},
 );
-res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 5})), ErrorCodes.NoSuchTransaction);
+res = assert.commandFailedWithCode(
+    runTxn(st.s, makeSingleInsertTxn({_id: 5})),
+    ErrorCodes.NoSuchTransaction,
+);
 commitFailPoint.off();
 
 st.stop();

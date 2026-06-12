@@ -180,7 +180,10 @@ command.pipeline = [
     },
 ];
 res = assert.commandWorked(db.runCommand(command));
-assert(resultsEq(res.cursor.firstBatch, [{_id: 1, value: "initial_state_set_from_ABC_and_DEF"}]), res.cursor);
+assert(
+    resultsEq(res.cursor.firstBatch, [{_id: 1, value: "initial_state_set_from_ABC_and_DEF"}]),
+    res.cursor,
+);
 
 // Test that when initArgs errors, we fail gracefully, and don't call init.
 command.pipeline = [
@@ -374,7 +377,9 @@ command.pipeline = [
     },
 ];
 res = assert.commandWorked(db.runCommand(command));
-expectedResults = [{_id: 1, value: {len: 3, types: ["object", "object", "object"], values: [null, null, null]}}];
+expectedResults = [
+    {_id: 1, value: {len: 3, types: ["object", "object", "object"], values: [null, null, null]}},
+];
 assert(resultsEq(res.cursor.firstBatch, expectedResults), res.cursor);
 
 // Test that throwing inside accumulate causes the command to fail.

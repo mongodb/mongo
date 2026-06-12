@@ -41,14 +41,25 @@ function runInsertUpdateValidationTest(validator) {
     assert.commandWorked(coll.insert({_id: "valid1", a: 1}));
     assert.commandWorked(coll.update({_id: "valid2"}, {_id: "valid2", a: 2}, {upsert: true}));
     assert.commandWorked(
-        coll.runCommand("findAndModify", {query: {_id: "valid3"}, update: {$set: {a: 3}}, upsert: true}),
+        coll.runCommand("findAndModify", {
+            query: {_id: "valid3"},
+            update: {$set: {a: 3}},
+            upsert: true,
+        }),
     );
 
     // Insert and upsert documents that will not pass validation.
     assertDocumentValidationFailure(coll.insert({_id: "invalid3", b: 1}), coll);
-    assertDocumentValidationFailure(coll.update({_id: "invalid4"}, {_id: "invalid4", b: 2}, {upsert: true}), coll);
     assertDocumentValidationFailure(
-        coll.runCommand("findAndModify", {query: {_id: "invalid4"}, update: {$set: {b: 3}}, upsert: true}),
+        coll.update({_id: "invalid4"}, {_id: "invalid4", b: 2}, {upsert: true}),
+        coll,
+    );
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify", {
+            query: {_id: "invalid4"},
+            update: {$set: {b: 3}},
+            upsert: true,
+        }),
         coll,
     );
 
@@ -70,16 +81,24 @@ function runInsertUpdateValidationTest(validator) {
     // in validator.
     // Add a new field.
     assert.commandWorked(coll.update({_id: "valid1"}, {$set: {z: 1}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: 2}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: 2}}}),
+    );
     // In-place update.
     assert.commandWorked(coll.update({_id: "valid1"}, {$inc: {z: 1}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$inc: {y: 1}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$inc: {y: 1}}}),
+    );
     // Out-of-place update.
     assert.commandWorked(coll.update({_id: "valid1"}, {$set: {z: array}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: array}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: array}}}),
+    );
     // No-op update.
     assert.commandWorked(coll.update({_id: "valid1"}, {a: 1}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {a: 1}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {a: 1}}}),
+    );
 
     // Verify those same updates will fail on non-conforming document.
     assertDocumentValidationFailure(coll.update({_id: "invalid2"}, {$set: {z: 1}}), coll);
@@ -100,7 +119,9 @@ function runInsertUpdateValidationTest(validator) {
 
     // A no-op update of an invalid doc will succeed.
     assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {b: 1}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {b: 1}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {b: 1}}}),
+    );
 
     // Verify that we can't make a conforming document fail validation, but can update a
     // non-conforming document to pass validation.
@@ -116,7 +137,9 @@ function runInsertUpdateValidationTest(validator) {
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}),
         coll,
     );
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "invalid3"}, update: {$set: {a: 1}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "invalid3"}, update: {$set: {a: 1}}}),
+    );
 
     // Modify the collection to remove the document validator.
     assert.commandWorked(coll.runCommand("collMod", {validator: {}}));
@@ -126,10 +149,18 @@ function runInsertUpdateValidationTest(validator) {
     assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {z: 1}}));
     assert.commandWorked(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
     assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {z: 2}}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {z: 2}}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}));
-    assert.commandWorked(coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {a: 1}}}));
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {z: 2}}}),
+    );
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {z: 2}}}),
+    );
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}),
+    );
+    assert.commandWorked(
+        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {a: 1}}}),
+    );
 }
 
 // Run the test with a normal validator.
@@ -145,7 +176,10 @@ runInsertUpdateValidationTest({$jsonSchema: {required: ["a"]}});
 function runCollationValidationTest(validator) {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(collName, {validator: validator, collation: {locale: "en_US", strength: 2}}),
+        db.createCollection(collName, {
+            validator: validator,
+            collation: {locale: "en_US", strength: 2},
+        }),
     );
 
     // An insert that matches the validator should succeed.
@@ -162,8 +196,12 @@ function runCollationValidationTest(validator) {
     assertCorrectResult(coll.insert({a: "XyZ", b: "foo"}));
     assertCorrectResult(coll.update({_id: 0}, {a: "xyZ", b: "foo"}));
     assertCorrectResult(coll.update({_id: 0}, {$set: {a: "Xyz"}}));
-    assertCorrectResult(coll.runCommand("findAndModify", {query: {_id: 0}, update: {a: "xyZ", b: "foo"}}));
-    assertCorrectResult(coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "Xyz"}}}));
+    assertCorrectResult(
+        coll.runCommand("findAndModify", {query: {_id: 0}, update: {a: "xyZ", b: "foo"}}),
+    );
+    assertCorrectResult(
+        coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "Xyz"}}}),
+    );
 
     // Test an insert and an update that should always fail.
     assertDocumentValidationFailure(coll.insert({a: "not xyz"}), coll);
@@ -194,9 +232,13 @@ assert.commandWorked(coll.insert({a: 4}));
 assertDocumentValidationFailure(coll.insert({a: 5}), coll);
 
 // The validator will generate detailed errors when $expr throws.
-assert.commandWorked(db.runCommand({"collMod": collName, "validator": {$expr: {$divide: [10, 0]}}}));
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "validator": {$expr: {$divide: [10, 0]}}}),
+);
 assertDocumentValidationFailure(coll.insert({a: 4}), coll);
-assert.commandWorked(db.runCommand({"collMod": collName, "validator": {$nor: [{$expr: {$divide: [10, 0]}}]}}));
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "validator": {$nor: [{$expr: {$divide: [10, 0]}}]}}),
+);
 assertDocumentValidationFailure(coll.insert({a: 4}), coll);
 
 // The validator supports $expr with the date extraction expressions (with a timezone
@@ -267,7 +309,10 @@ assert.commandWorked(
     db.createCollection(collName, {
         validator: {
             $expr: {
-                $eq: [ISODate("2016-12-31T15:00:00Z"), {"$dateFromParts": {year: "$year", "timezone": "$timezone"}}],
+                $eq: [
+                    ISODate("2016-12-31T15:00:00Z"),
+                    {"$dateFromParts": {year: "$year", "timezone": "$timezone"}},
+                ],
             },
         },
     }),
@@ -297,7 +342,9 @@ assertDocumentValidationFailure(coll.insert({_id: 1, date: "2015-02-02T11:00:00"
 
 // The validator can contain an $expr that may throw at runtime.
 coll.drop();
-assert.commandWorked(db.createCollection(collName, {validator: {$expr: {$eq: ["$a", {$divide: [1, "$b"]}]}}}));
+assert.commandWorked(
+    db.createCollection(collName, {validator: {$expr: {$eq: ["$a", {$divide: [1, "$b"]}]}}}),
+);
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 let res = coll.insert({a: 1, b: 0});
 assert.writeError(res);
@@ -329,7 +376,12 @@ assertDocumentValidationFailure(res, coll);
 const errorInfo = res.getWriteError().errInfo;
 const expectedError = {
     failingDocumentId: 1,
-    details: {operatorName: "$eq", specifiedAs: {a: 1}, reason: "comparison failed", consideredValue: 2},
+    details: {
+        operatorName: "$eq",
+        specifiedAs: {a: 1},
+        reason: "comparison failed",
+        consideredValue: 2,
+    },
 };
 assert.docEq(expectedError, errorInfo, tojson(res));
 

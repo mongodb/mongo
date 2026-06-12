@@ -10,7 +10,8 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
-const timeseriesBucketingParametersChangedInputValueName = "timeseriesBucketingParametersChangedInputValue";
+const timeseriesBucketingParametersChangedInputValueName =
+    "timeseriesBucketingParametersChangedInputValue";
 let testCount = 0;
 const collNamePrefix = jsTestName();
 let collName = collNamePrefix + testCount;
@@ -44,7 +45,11 @@ function validateTimeseriesBucketingParametersChangeFail(
     coll = db.getCollection(collName);
     // You only need to insert one doc because this test checks the minimum value of each bucket
     // and compares them to the bucket's control.min.<time field>
-    coll.insert({"metadata": {"sensorId": 1, "type": "temperature"}, "timestamp": timestamp, "temp": 0});
+    coll.insert({
+        "metadata": {"sensorId": 1, "type": "temperature"},
+        "timestamp": timestamp,
+        "temp": 0,
+    });
 
     let bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
@@ -64,7 +69,9 @@ function validateTimeseriesBucketingParametersChangeFail(
         }),
     );
     // Disable strict bucket validation as it relies on timeseriesBucketingParametersChanged to be set accurately, which we are not doing with the above fail point.
-    assert.commandWorked(db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+    );
 
     // This collMod should lead to timeseriesBucketingParametersChanged to True because the original
     // bucketing parameters we set for our collections was different from the updated bucketing
@@ -84,9 +91,14 @@ function validateTimeseriesBucketingParametersChangeFail(
         res.errors,
     );
     assert.commandWorked(
-        db.adminCommand({"configureFailPoint": timeseriesBucketingParametersChangedInputValueName, "mode": "off"}),
+        db.adminCommand({
+            "configureFailPoint": timeseriesBucketingParametersChangedInputValueName,
+            "mode": "off",
+        }),
     );
-    assert.commandWorked(db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
+    );
 
     testCount += 1;
     collName = collNamePrefix + testCount;
@@ -95,7 +107,11 @@ function validateTimeseriesBucketingParametersChangeFail(
     jsTestLog("Create new timeseries collection.");
     assert.commandWorked(db.createCollection(collName, {timeseries: originalTimeSeriesParams}));
     coll = db.getCollection(collName);
-    coll.insert({"metadata": {"sensorId": 1, "type": "temperature"}, "timestamp": timestamp, "temp": 0});
+    coll.insert({
+        "metadata": {"sensorId": 1, "type": "temperature"},
+        "timestamp": timestamp,
+        "temp": 0,
+    });
 
     bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
@@ -132,7 +148,10 @@ function validateTimeseriesBucketingParametersChangeFail(
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
     assert.commandWorked(
-        db.adminCommand({"configureFailPoint": timeseriesBucketingParametersChangedInputValueName, "mode": "off"}),
+        db.adminCommand({
+            "configureFailPoint": timeseriesBucketingParametersChangedInputValueName,
+            "mode": "off",
+        }),
     );
 
     jsTestLog(
@@ -157,13 +176,18 @@ function validateTimeseriesBucketingParametersChangeFail(
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
     assert.commandWorked(
-        db.adminCommand({"configureFailPoint": timeseriesBucketingParametersChangedInputValueName, "mode": "off"}),
+        db.adminCommand({
+            "configureFailPoint": timeseriesBucketingParametersChangedInputValueName,
+            "mode": "off",
+        }),
     );
 }
 
 // The timestamp is rounded-down to: 2024-04-01T00:00:00.000+00:00
 // After the granularity change, the timestamp will be in bucket: 2024-04-01T13:25:00.000+00:00
-jsTestLog("Testing timeseriesBucketingParametersChange for changes to the granularity bucketing parameter.");
+jsTestLog(
+    "Testing timeseriesBucketingParametersChange for changes to the granularity bucketing parameter.",
+);
 validateTimeseriesBucketingParametersChangeFail(
     0,
     {granularity: "seconds"},

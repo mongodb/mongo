@@ -20,7 +20,9 @@ const configDB = st.s.getDB("config");
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic
 function setUpDatabaseAndEnableSharding(dbName) {
     assert.commandWorked(st.s.getDB(dbName).dropDatabase());
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     return dbName;
 }
@@ -41,9 +43,11 @@ function setUpDatabaseAndEnableSharding(dbName) {
 
     // Use _configsvrSetAllowMigrations to forbid migrations from happening
     assert.commandWorked(
-        st.configRS
-            .getPrimary()
-            .adminCommand({_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}),
+        st.configRS.getPrimary().adminCommand({
+            _configsvrSetAllowMigrations: ns,
+            allowMigrations: false,
+            writeConcern: {w: "majority"},
+        }),
     );
 
     // Check that allowMigrations has been set to 'false' on the configsvr config.collections.
@@ -54,9 +58,11 @@ function setUpDatabaseAndEnableSharding(dbName) {
 
     // Use _configsvrSetAllowMigrations to allow migrations to happen
     assert.commandWorked(
-        st.configRS
-            .getPrimary()
-            .adminCommand({_configsvrSetAllowMigrations: ns, allowMigrations: true, writeConcern: {w: "majority"}}),
+        st.configRS.getPrimary().adminCommand({
+            _configsvrSetAllowMigrations: ns,
+            allowMigrations: true,
+            writeConcern: {w: "majority"},
+        }),
     );
 
     // Check that allowMigrations has been unset (that implies migrations are allowed) on the
@@ -117,10 +123,10 @@ function setUpDatabaseAndEnableSharding(dbName) {
     const awaitResult = startParallelShell(
         funWithArgs(
             function (ns, toShardName) {
-                assert.commandFailedWithCode(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}), [
-                    ErrorCodes.ConflictingOperationInProgress,
-                    ErrorCodes.Interrupted,
-                ]);
+                assert.commandFailedWithCode(
+                    db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                    [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.Interrupted],
+                );
             },
             ns,
             st.shard1.shardName,
@@ -129,9 +135,11 @@ function setUpDatabaseAndEnableSharding(dbName) {
     );
     fp.wait();
     assert.commandWorked(
-        st.configRS
-            .getPrimary()
-            .adminCommand({_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}),
+        st.configRS.getPrimary().adminCommand({
+            _configsvrSetAllowMigrations: ns,
+            allowMigrations: false,
+            writeConcern: {w: "majority"},
+        }),
     );
     fp.off();
     awaitResult();
@@ -152,7 +160,9 @@ function setUpDatabaseAndEnableSharding(dbName) {
 //
 // collBSetParams specify the field(s) that will be set on the collB in config.collections.
 function testAllowMigrationsFalseDisablesBalancer(allowMigrations, collBSetNoBalanceParam) {
-    jsTestLog(`Running AllowMigrationsFalseDisablesBalancer(${allowMigrations}, ${tojson(collBSetNoBalanceParam)})`);
+    jsTestLog(
+        `Running AllowMigrationsFalseDisablesBalancer(${allowMigrations}, ${tojson(collBSetNoBalanceParam)})`,
+    );
 
     const dbName = setUpDatabaseAndEnableSharding("AllowMigrationsFalseDisablesBalancer");
 
@@ -179,13 +189,22 @@ function testAllowMigrationsFalseDisablesBalancer(allowMigrations, collBSetNoBal
 
         // Confirm the chunks are initially unbalanced. All chunks should start out on shard0
         // (primary shard for the database).
-        const balancerStatus = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: coll.getFullName()}));
+        const balancerStatus = assert.commandWorked(
+            st.s0.adminCommand({balancerCollectionStatus: coll.getFullName()}),
+        );
         assert.eq(balancerStatus.balancerCompliant, false);
         assert.eq(balancerStatus.firstComplianceViolation, "chunksImbalance");
-        assert.eq(4, findChunksUtil.findChunksByNs(configDB, coll.getFullName(), {shard: st.shard0.shardName}).count());
+        assert.eq(
+            4,
+            findChunksUtil
+                .findChunksByNs(configDB, coll.getFullName(), {shard: st.shard0.shardName})
+                .count(),
+        );
     }
 
-    assert.commandWorked(configDB.collections.update({_id: collB.getFullName()}, {$set: collBSetNoBalanceParam}));
+    assert.commandWorked(
+        configDB.collections.update({_id: collB.getFullName()}, {$set: collBSetNoBalanceParam}),
+    );
     assert.commandWorked(
         st.configRS.getPrimary().adminCommand({
             _configsvrSetAllowMigrations: collB.getFullName(),
@@ -199,14 +218,23 @@ function testAllowMigrationsFalseDisablesBalancer(allowMigrations, collBSetNoBal
     st.stopBalancer();
     st.verifyCollectionIsBalanced(collA);
 
-    const collABalanceStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: collA.getFullName()}));
+    const collABalanceStatus = assert.commandWorked(
+        st.s.adminCommand({balancerCollectionStatus: collA.getFullName()}),
+    );
     assert.eq(collABalanceStatus.balancerCompliant, true);
 
     // Test that collB remains unbalanced.
-    const collBBalanceStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: collB.getFullName()}));
+    const collBBalanceStatus = assert.commandWorked(
+        st.s.adminCommand({balancerCollectionStatus: collB.getFullName()}),
+    );
     assert.eq(collBBalanceStatus.balancerCompliant, false);
     assert.eq(collBBalanceStatus.firstComplianceViolation, "chunksImbalance");
-    assert.eq(4, findChunksUtil.findChunksByNs(configDB, collB.getFullName(), {shard: st.shard0.shardName}).count());
+    assert.eq(
+        4,
+        findChunksUtil
+            .findChunksByNs(configDB, collB.getFullName(), {shard: st.shard0.shardName})
+            .count(),
+    );
 }
 
 // Test cases that should disable the balancer.

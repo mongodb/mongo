@@ -103,12 +103,18 @@ describe("Basic tests for the $listCatalog aggregation stage", function () {
 
         const collViewOn = testDB.collViewOn;
         assert.commandWorked(collViewOn.insert({_id: 0, a: 0}));
-        assert.commandWorked(testDB.createView(viewSimpleName, collViewOn.getName(), [{$project: {a: 0}}]));
+        assert.commandWorked(
+            testDB.createView(viewSimpleName, collViewOn.getName(), [{$project: {a: 0}}]),
+        );
         const viewSimple = testDB.getCollection(viewSimpleName);
 
         // collection-ful aggregate
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: viewSimpleName, pipeline: [{$listCatalog: {}}], cursor: {}}),
+            testDB.runCommand({
+                aggregate: viewSimpleName,
+                pipeline: [{$listCatalog: {}}],
+                cursor: {},
+            }),
             40602,
         );
 
@@ -145,7 +151,9 @@ describe("Basic tests for the $listCatalog aggregation stage", function () {
     });
 
     it("clustered collection", () => {
-        assert.commandWorked(testDB.createCollection("clustered", {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            testDB.createCollection("clustered", {clusteredIndex: {key: {_id: 1}, unique: true}}),
+        );
         const collClustered = testDB.clustered;
         assert.commandWorked(collClustered.insert({_id: 2, y: "abc"}));
 

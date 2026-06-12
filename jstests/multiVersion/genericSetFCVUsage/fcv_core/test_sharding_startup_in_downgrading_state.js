@@ -43,10 +43,14 @@ function runSharding() {
     checkFCV(shard1PrimaryAdminDB, latestFCV);
 
     // Set the failDowngrading failpoint so that the downgrading will fail.
-    assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+    assert.commandWorked(
+        configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+    );
 
     // Start downgrading. It will fail.
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     st.rs0.awaitReplication();
     st.rs1.awaitReplication();
@@ -95,7 +99,9 @@ function runSharding() {
 
     // Upgrade the sharded cluster to upgraded (latestFCV).
     mongosAdminDB = st.s.getDB("admin");
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     st.rs0.awaitReplication();
     st.rs1.awaitReplication();

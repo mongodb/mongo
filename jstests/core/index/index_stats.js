@@ -84,7 +84,12 @@ assert.eq(countA, getUsageCount("a_1"));
 //
 // Confirm index stats tick on findAndModify() update.
 //
-let res = db.runCommand({findAndModify: colName, query: {a: 1}, update: {$set: {d: 1}}, "new": true});
+let res = db.runCommand({
+    findAndModify: colName,
+    query: {a: 1},
+    update: {$set: {d: 1}},
+    "new": true,
+});
 assert.commandWorked(res);
 countA++;
 assert.eq(countA, getUsageCount("a_1"));
@@ -323,7 +328,9 @@ assert.eq(
 //
 assert(col.drop());
 assert.commandWorked(col.createIndex({a: 1}, {hidden: true}));
-const hiddenIndexStats = col.aggregate([{$indexStats: {}}, {$match: {"name": "a_1", "spec.hidden": true}}]).toArray();
+const hiddenIndexStats = col
+    .aggregate([{$indexStats: {}}, {$match: {"name": "a_1", "spec.hidden": true}}])
+    .toArray();
 assert.eq(hiddenIndexStats.length, 1);
 
 //

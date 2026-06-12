@@ -126,7 +126,12 @@ describe("OTel query performance counters in sharded cluster", function () {
             "serverStatus.metrics.document.returned",
         ];
         for (const name of counterNames) {
-            assert.eq(undefined, mongosMetrics?.[name], "Expected counter to be absent from mongos metrics", {name});
+            assert.eq(
+                undefined,
+                mongosMetrics?.[name],
+                "Expected counter to be absent from mongos metrics",
+                {name},
+            );
         }
     });
 });

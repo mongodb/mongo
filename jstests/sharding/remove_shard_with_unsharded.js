@@ -19,8 +19,12 @@ const adminDB = st.s.getDB("admin");
 const db0 = st.s.getDB("db0");
 const db1 = st.s.getDB("db1");
 
-assert.commandWorked(st.s.adminCommand({enableSharding: db0.getName(), primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({enableSharding: db1.getName(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db0.getName(), primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db1.getName(), primaryShard: st.shard1.shardName}),
+);
 
 // Create the following collections:
 //
@@ -32,18 +36,28 @@ assert.commandWorked(st.s.adminCommand({enableSharding: db1.getName(), primarySh
 //   db1.collOutOfPrimary | db0.collOutOfPrimary
 //
 
-const expectedCollectionsOnTheDrainingShard = ["db1.collUnsharded", "db1.collTimeseries", "db0.collOutOfPrimary"];
+const expectedCollectionsOnTheDrainingShard = [
+    "db1.collUnsharded",
+    "db1.collTimeseries",
+    "db0.collOutOfPrimary",
+];
 
 [db0, db1].forEach((db) => {
     assert.commandWorked(db.createCollection("collUnsharded"));
     assert.commandWorked(db.createCollection("collOutOfPrimary"));
     assert.commandWorked(db.createCollection("collTimeseries", {timeseries: {timeField: "time"}}));
-    assert.commandWorked(db.adminCommand({shardCollection: db.getName() + ".collSharded", key: {x: 1}}));
+    assert.commandWorked(
+        db.adminCommand({shardCollection: db.getName() + ".collSharded", key: {x: 1}}),
+    );
 });
 
 // Move unsharded collections to non-primary shard
-assert.commandWorked(st.s.adminCommand({moveCollection: "db0.collOutOfPrimary", toShard: st.shard1.shardName}));
-assert.commandWorked(st.s.adminCommand({moveCollection: "db1.collOutOfPrimary", toShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveCollection: "db0.collOutOfPrimary", toShard: st.shard1.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveCollection: "db1.collOutOfPrimary", toShard: st.shard0.shardName}),
+);
 
 // Insert documents into collections on shard1 (the shard to be removed) so that
 // estimatedRemainingBytes will be non-zero during draining.
@@ -96,7 +110,11 @@ assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
 
 // Check the ongoing status and unsharded collection, that cannot be moved
 let removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
-assert.eq("ongoing", removeResult.state, "Shard should stay in ongoing state: " + tojson(removeResult));
+assert.eq(
+    "ongoing",
+    removeResult.state,
+    "Shard should stay in ongoing state: " + tojson(removeResult),
+);
 assert.eq(3, removeResult.remaining.collectionsToMove);
 assert.eq(1, removeResult.remaining.dbs);
 assert.eq(3, removeResult.collectionsToMove.length);
@@ -116,12 +134,17 @@ assert.gt(
 );
 
 jsTestLog(
-    "First removeShard progress check - estimatedRemainingBytes: " + removeResult.remaining.estimatedRemainingBytes,
+    "First removeShard progress check - estimatedRemainingBytes: " +
+        removeResult.remaining.estimatedRemainingBytes,
 );
 
 // Check the status once again
 removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
-assert.eq("ongoing", removeResult.state, "Shard should stay in ongoing state: " + tojson(removeResult));
+assert.eq(
+    "ongoing",
+    removeResult.state,
+    "Shard should stay in ongoing state: " + tojson(removeResult),
+);
 assert.eq(3, removeResult.remaining.collectionsToMove);
 assert.eq(1, removeResult.remaining.dbs);
 assert.eq(3, removeResult.collectionsToMove.length);
@@ -132,10 +155,12 @@ assert.sameMembers(expectedCollectionsOnTheDrainingShard, removeResult.collectio
 assert.gt(
     removeResult.remaining.estimatedRemainingBytes,
     0,
-    "estimatedRemainingBytes should still be > 0 since data hasn't moved: " + tojson(removeResult.remaining),
+    "estimatedRemainingBytes should still be > 0 since data hasn't moved: " +
+        tojson(removeResult.remaining),
 );
 jsTestLog(
-    "Second removeShard progress check - estimatedRemainingBytes: " + removeResult.remaining.estimatedRemainingBytes,
+    "Second removeShard progress check - estimatedRemainingBytes: " +
+        removeResult.remaining.estimatedRemainingBytes,
 );
 
 // Move unsharded collections out from the draining shard and track estimatedRemainingBytes
@@ -144,11 +169,16 @@ jsTestLog("Moving collections out from the draining shard...");
 let previousBytes = removeResult.remaining.estimatedRemainingBytes;
 expectedCollectionsOnTheDrainingShard.forEach((collName) => {
     jsTestLog("Moving collection: " + collName);
-    assert.commandWorked(adminDB.adminCommand({moveCollection: collName, toShard: st.shard0.shardName}));
+    assert.commandWorked(
+        adminDB.adminCommand({moveCollection: collName, toShard: st.shard0.shardName}),
+    );
 
     // Check progress after each collection move
     removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
-    if (removeResult.remaining && removeResult.remaining.hasOwnProperty("estimatedRemainingBytes")) {
+    if (
+        removeResult.remaining &&
+        removeResult.remaining.hasOwnProperty("estimatedRemainingBytes")
+    ) {
         jsTestLog(
             "After moving " +
                 collName +
@@ -205,7 +235,12 @@ jsTestLog("Waiting for removeShard to complete...");
 assert.soon(
     function () {
         removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
-        jsTestLog("removeShard state: " + removeResult.state + ", remaining: " + tojson(removeResult.remaining));
+        jsTestLog(
+            "removeShard state: " +
+                removeResult.state +
+                ", remaining: " +
+                tojson(removeResult.remaining),
+        );
         return removeResult.state === "completed";
     },
     "removeShard did not complete in time",
@@ -217,13 +252,20 @@ assert.eq("completed", removeResult.state, "Shard was not removed: " + tojson(re
 
 // Verify estimatedRemainingBytes is 0 when removeShard is completed
 // When completed, the 'remaining' field may not be present, or if present, estimatedRemainingBytes should be 0
-if (removeResult.hasOwnProperty("remaining") && removeResult.remaining.hasOwnProperty("estimatedRemainingBytes")) {
+if (
+    removeResult.hasOwnProperty("remaining") &&
+    removeResult.remaining.hasOwnProperty("estimatedRemainingBytes")
+) {
     assert.eq(
         removeResult.remaining.estimatedRemainingBytes,
         0,
-        "estimatedRemainingBytes should be 0 when removeShard is completed: " + tojson(removeResult),
+        "estimatedRemainingBytes should be 0 when removeShard is completed: " +
+            tojson(removeResult),
     );
-    jsTestLog("Completed removeShard - estimatedRemainingBytes: " + removeResult.remaining.estimatedRemainingBytes);
+    jsTestLog(
+        "Completed removeShard - estimatedRemainingBytes: " +
+            removeResult.remaining.estimatedRemainingBytes,
+    );
 } else {
     jsTestLog(
         "Completed removeShard - 'remaining' or 'estimatedRemainingBytes' not present " +
@@ -233,7 +275,11 @@ if (removeResult.hasOwnProperty("remaining") && removeResult.remaining.hasOwnPro
 }
 
 let existingShards = config.shards.find({}).toArray();
-assert.eq(1, existingShards.length, "Removed server still appears in count: " + tojson(existingShards));
+assert.eq(
+    1,
+    existingShards.length,
+    "Removed server still appears in count: " + tojson(existingShards),
+);
 
 // TODO (SERVER-97816): remove multiversion check
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);

@@ -42,7 +42,11 @@ runTest({
         {
             "Country._id": "US",
             "State": "California",
-            "$or": [{"City": "SanFrancisco"}, {"City": {$in: ["SanFrancisco"]}}, {"Country._id": "DNE"}],
+            "$or": [
+                {"City": "SanFrancisco"},
+                {"City": {$in: ["SanFrancisco"]}},
+                {"Country._id": "DNE"},
+            ],
         },
     ],
 });

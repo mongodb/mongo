@@ -22,7 +22,9 @@ const adminDB = db.getSiblingDB("admin");
 
 const getCurOpMetadata = function () {
     let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
-    return adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}]).toArray()[0];
+    return adminDB
+        .aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}])
+        .toArray()[0];
 };
 const getThreadName = function () {
     return getCurOpMetadata().desc;
@@ -131,7 +133,8 @@ assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 if (!isMultiversion) {
     // Test failpoint with errorMsg
@@ -169,9 +172,15 @@ assert.commandWorked(
         },
     }),
 );
-assert.commandFailedWithCode(testDB.runCommand({dropIndexes: "collection", index: "*"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.runCommand({dropIndexes: "collection", index: "*"}),
+    ErrorCodes.BadValue,
+);
 assert.commandWorked(testDB.runCommand({buildInfo: 1}));
-assert.commandFailedWithCode(testDB.runCommand({deleteIndexes: "collection", index: "*"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.runCommand({deleteIndexes: "collection", index: "*"}),
+    ErrorCodes.BadValue,
+);
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
@@ -523,11 +532,16 @@ assert.commandWorked(
 );
 
 // An insert to a different namespace should not trigger the failpoint.
-assert.commandWorked(testDB.runCommand({insert: "test", documents: [{x: "doc_for_namespace_no_wce"}]}));
+assert.commandWorked(
+    testDB.runCommand({insert: "test", documents: [{x: "doc_for_namespace_no_wce"}]}),
+);
 
 // An insert to the namespace given to the failpoint should trigger the failpoint.
 res = assert.commandWorkedIgnoringWriteConcernErrors(
-    testDB.runCommand({insert: "foo", documents: [{x: "doc_for_namespace_case_should_trigger_wce"}]}),
+    testDB.runCommand({
+        insert: "foo",
+        documents: [{x: "doc_for_namespace_case_should_trigger_wce"}],
+    }),
 );
 assert.eq(res.writeConcernError, {code: ErrorCodes.InternalError, errmsg: "foo"});
 
@@ -666,7 +680,11 @@ assert.commandWorked(
 );
 // This normally fails with RetryableWriteError label.
 res = assert.commandFailedWithCode(
-    testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
+    testDB.runCommand({
+        insert: "test",
+        documents: [{x: "retryable_write"}],
+        txnNumber: NumberLong(0),
+    }),
     ErrorCodes.NotWritablePrimary,
 );
 // Test that failCommand overrides the error label to "Foo".
@@ -686,7 +704,11 @@ assert.commandWorked(
     }),
 );
 // This normally fails with RetryableWriteError label.
-res = testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
+res = testDB.runCommand({
+    insert: "test",
+    documents: [{x: "retryable_write"}],
+    txnNumber: NumberLong(0),
+});
 assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"});
 // Test that failCommand overrides the error label to "Foo".
 assert.eq(res.errorLabels, ["Foo"], res);
@@ -706,7 +728,11 @@ assert.commandWorked(
 );
 // This normally fails with RetryableWriteError label.
 res = assert.commandFailedWithCode(
-    testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
+    testDB.runCommand({
+        insert: "test",
+        documents: [{x: "retryable_write"}],
+        txnNumber: NumberLong(0),
+    }),
     ErrorCodes.NotWritablePrimary,
 );
 // There should be no errorLabels field if no error labels provided in failCommand.
@@ -726,7 +752,11 @@ assert.commandWorked(
     }),
 );
 // This normally fails with RetryableWriteError label.
-res = testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
+res = testDB.runCommand({
+    insert: "test",
+    documents: [{x: "retryable_write"}],
+    txnNumber: NumberLong(0),
+});
 assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"});
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"), res);

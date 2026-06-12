@@ -28,7 +28,12 @@ const runTest = (config) => {
     const indexName = "test_index";
     let indexOptions = config.indexOptions || {};
     indexOptions.name = indexName;
-    const awaitIndex = IndexBuildTest.startIndexBuild(conn, testColl.getFullName(), config.indexSpec, indexOptions);
+    const awaitIndex = IndexBuildTest.startIndexBuild(
+        conn,
+        testColl.getFullName(),
+        config.indexSpec,
+        indexOptions,
+    );
     IndexBuildTest.waitForIndexBuildToStart(testDB, collName, indexName);
 
     // Perform writes while the index build is in progress.

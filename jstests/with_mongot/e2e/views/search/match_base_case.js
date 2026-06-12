@@ -29,7 +29,9 @@ bulk.insert({_id: "monitor", stock: 880, num_orders: 581});
 assert.commandWorked(bulk.execute());
 
 const viewName = "match";
-const viewPipeline = [{"$match": {"$expr": {"$gt": [{"$subtract": ["$stock", "$num_orders"]}, 300]}}}];
+const viewPipeline = [
+    {"$match": {"$expr": {"$gt": [{"$subtract": ["$stock", "$num_orders"]}, 300]}}},
+];
 assert.commandWorked(testDb.createView(viewName, "underlyingSourceCollection", viewPipeline));
 const matchView = testDb[viewName];
 

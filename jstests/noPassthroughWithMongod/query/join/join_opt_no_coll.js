@@ -8,8 +8,12 @@
 
 try {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
-    assert.commandWorked(db.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
-    assert.commandWorked(db.adminCommand({aggregate: 1, pipeline: [{$documents: [{myDoc: 1}]}], cursor: {}}));
+    assert.commandWorked(
+        db.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
+    );
+    assert.commandWorked(
+        db.adminCommand({aggregate: 1, pipeline: [{$documents: [{myDoc: 1}]}], cursor: {}}),
+    );
 
     // This pipeline's shape would normally be eligible for join-reordeing.
     // Ensure we process it correctly for non-existent collections.

@@ -6,7 +6,14 @@ const mock_res = {
     ok: 1,
 };
 
-function runCommandIgnoreDropOperations(conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+function runCommandIgnoreDropOperations(
+    conn,
+    _dbName,
+    _commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (kIgnoredDDLCommands.has(_commandName)) {
         return mock_res;
     }

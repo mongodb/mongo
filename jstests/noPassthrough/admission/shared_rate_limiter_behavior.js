@@ -33,7 +33,8 @@ const testBurstCapacityIncrease = () => {
                 ingressConnectionEstablishmentRatePerSec: initialRatePerSec,
                 ingressConnectionEstablishmentBurstCapacitySecs: initialBurstCapacitySecs,
             },
-            serverStatusSection: (conn) => conn.adminCommand({serverStatus: 1}).queues.ingressSessionEstablishment,
+            serverStatusSection: (conn) =>
+                conn.adminCommand({serverStatus: 1}).queues.ingressSessionEstablishment,
             tests: [
                 burstCapacityTest("ingressConnectionEstablishmentBurstCapacitySecs"),
                 ratePerSecTest("ingressConnectionEstablishmentRatePerSec"),
@@ -45,7 +46,8 @@ const testBurstCapacityIncrease = () => {
                 ingressRequestAdmissionBurstCapacitySecs: initialBurstCapacitySecs,
                 ingressRequestRateLimiterEnabled: true,
             },
-            serverStatusSection: (conn) => conn.adminCommand({serverStatus: 1}).network.ingressRequestRateLimiter,
+            serverStatusSection: (conn) =>
+                conn.adminCommand({serverStatus: 1}).network.ingressRequestRateLimiter,
             tests: [
                 burstCapacityTest("ingressRequestAdmissionBurstCapacitySecs"),
                 ratePerSecTest("ingressRequestAdmissionRatePerSec"),
@@ -59,13 +61,21 @@ const testBurstCapacityIncrease = () => {
         let mongo = MongoRunner.runMongod({setParameter: {featureFlagIngressRateLimiting: true}});
 
         for (const test of rateLimiter.tests) {
-            assert.commandWorked(mongo.adminCommand({setParameter: 1, ...rateLimiter.startupServerParameters}));
+            assert.commandWorked(
+                mongo.adminCommand({setParameter: 1, ...rateLimiter.startupServerParameters}),
+            );
 
             let initialTokens = rateLimiter.serverStatusSection(mongo).totalAvailableTokens;
-            assert.between(initialTargetTokens - marginOfError, initialTokens, initialTargetTokens + marginOfError);
+            assert.between(
+                initialTargetTokens - marginOfError,
+                initialTokens,
+                initialTargetTokens + marginOfError,
+            );
 
             jsTestLog("Setting " + test.parameterName + " to " + test.newValue);
-            assert.commandWorked(mongo.adminCommand({setParameter: 1, [test.parameterName]: test.newValue}));
+            assert.commandWorked(
+                mongo.adminCommand({setParameter: 1, [test.parameterName]: test.newValue}),
+            );
 
             assert.soon(() => {
                 const newTokens = rateLimiter.serverStatusSection(mongo).totalAvailableTokens;

@@ -56,7 +56,10 @@ export const TimeseriesMultiUpdateUtil = (function () {
         metaObjectTimeShardKey: {
             metaGenerator: (index) => ({a: index}),
             shardKey: {[metaField]: 1, [timeField]: 1},
-            splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
+            splitPoint: {
+                meta: {a: 2},
+                [`control.min.${timeField}`]: splitTimePointBetweenTwoShards,
+            },
         },
         metaSubFieldTimeShardKey: {
             metaGenerator: (index) => ({a: index}),
@@ -79,7 +82,14 @@ export const TimeseriesMultiUpdateUtil = (function () {
         return documents;
     }
 
-    function prepareShardedTimeseriesCollection(mongos, shardingTest, db, collName, collConfig, insertFn) {
+    function prepareShardedTimeseriesCollection(
+        mongos,
+        shardingTest,
+        db,
+        collName,
+        collConfig,
+        insertFn,
+    ) {
         // Ensures that the collection does not exist.
         const coll = db.getCollection(collName);
         coll.drop();

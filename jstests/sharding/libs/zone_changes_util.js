@@ -11,8 +11,14 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 export function assertChunksOnShards(configDB, ns, shardChunkBounds) {
     for (let [shardName, chunkBounds] of Object.entries(shardChunkBounds)) {
         for (let bounds of chunkBounds) {
-            const chunkEntry = findChunksUtil.findOneChunkByNs(configDB, ns, {min: bounds[0], max: bounds[1]});
-            assert(chunkEntry, "expected to find chunk " + tojson(bounds) + ' on shard "' + shardName + '"');
+            const chunkEntry = findChunksUtil.findOneChunkByNs(configDB, ns, {
+                min: bounds[0],
+                max: bounds[1],
+            });
+            assert(
+                chunkEntry,
+                "expected to find chunk " + tojson(bounds) + ' on shard "' + shardName + '"',
+            );
             assert.eq(
                 shardName,
                 chunkEntry.shard,
@@ -77,7 +83,9 @@ export function assertShardTags(configDB, shardTags) {
  */
 export function moveZoneToShard(st, zoneName, fromShard, toShard) {
     assert.commandWorked(st.s.adminCommand({addShardToZone: toShard.shardName, zone: zoneName}));
-    assert.commandWorked(st.s.adminCommand({removeShardFromZone: fromShard.shardName, zone: zoneName}));
+    assert.commandWorked(
+        st.s.adminCommand({removeShardFromZone: fromShard.shardName, zone: zoneName}),
+    );
 }
 
 /**
@@ -98,6 +106,20 @@ export function runBalancer(st, minNumRounds) {
  * Updates the zone key range for the given namespace.
  */
 export function updateZoneKeyRange(st, ns, zoneName, fromRange, toRange) {
-    assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: fromRange[0], max: fromRange[1], zone: null}));
-    assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: toRange[0], max: toRange[1], zone: zoneName}));
+    assert.commandWorked(
+        st.s.adminCommand({
+            updateZoneKeyRange: ns,
+            min: fromRange[0],
+            max: fromRange[1],
+            zone: null,
+        }),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({
+            updateZoneKeyRange: ns,
+            min: toRange[0],
+            max: toRange[1],
+            zone: zoneName,
+        }),
+    );
 }

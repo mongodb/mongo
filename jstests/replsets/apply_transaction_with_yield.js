@@ -23,7 +23,9 @@ const secondary = replTest.getSecondary();
 assert.commandWorked(primary.getDB(dbName).createCollection(collName));
 
 // Force the secondary to yield at ever opportunity.
-assert.commandWorked(secondary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+assert.commandWorked(
+    secondary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+);
 
 // Create a transaction that is substantially larger than 16MB, forcing the secondary to apply
 // it in multiple batches, so that it uses the TransactionHistoryIterator.

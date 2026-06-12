@@ -55,8 +55,12 @@ assert.commandFailedWithCode(
 );
 
 // Sanity check that command works with proper parameters.
-assert.commandWorked(testDb.runCommand({ping: 1, apiVersion: "1", apiStrict: true, apiDeprecationErrors: true}));
-assert.commandWorked(testDb.runCommand({ping: 1, apiVersion: "1", apiStrict: false, apiDeprecationErrors: false}));
+assert.commandWorked(
+    testDb.runCommand({ping: 1, apiVersion: "1", apiStrict: true, apiDeprecationErrors: true}),
+);
+assert.commandWorked(
+    testDb.runCommand({ping: 1, apiVersion: "1", apiStrict: false, apiDeprecationErrors: false}),
+);
 assert.commandWorked(testDb.runCommand({ping: 1, apiVersion: "1"}));
 
 // Test parsing logic on command not included in API V1.
@@ -71,7 +75,9 @@ assert.commandFailedWithCode(
     testDb.runCommand({isMaster: 1, apiVersion: "1", apiStrict: true}),
     ErrorCodes.APIStrictError,
 );
-assert.commandWorked(testDb.runCommand({listCommands: 1, apiVersion: "1", apiDeprecationErrors: true}));
+assert.commandWorked(
+    testDb.runCommand({listCommands: 1, apiVersion: "1", apiDeprecationErrors: true}),
+);
 
 // Test parsing logic of command deprecated in API V1.
 assert.commandWorked(testDb.runCommand({testDeprecation: 1, apiVersion: "1"}));
@@ -173,5 +179,10 @@ assert.commandFailedWithCode(
 );
 // Test reading from system.js succeeds.
 assert.commandWorked(
-    testDb.runCommand({find: "system.js", filter: {_id: "shouldExist"}, apiVersion: "1", apiStrict: true}),
+    testDb.runCommand({
+        find: "system.js",
+        filter: {_id: "shouldExist"},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
 );

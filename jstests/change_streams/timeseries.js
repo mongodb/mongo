@@ -13,10 +13,17 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {ChangeStreamTest, getClusterTime, getNextClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    getClusterTime,
+    getNextClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 import {describe, before, it} from "jstests/libs/mochalite.js";
 import {getRawOperationSpec, isRawOperationSupported} from "jstests/libs/raw_operation_utils.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 
 describe("$changeStream", function () {
     const dbName = "db";
@@ -134,7 +141,10 @@ describe("$changeStream", function () {
                     },
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                 },
-                "data": {"ts": BinData(7, "CQDoAwAAAAAAAAA="), "_id": BinData(7, "AQAAAAAAAADwPwA=")},
+                "data": {
+                    "ts": BinData(7, "CQDoAwAAAAAAAAA="),
+                    "_id": BinData(7, "AQAAAAAAAADwPwA="),
+                },
                 "meta": {"a": 1},
             },
             "ns": bucketsCollNs,
@@ -414,7 +424,10 @@ describe("$changeStream", function () {
                     },
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                 },
-                "data": {"ts": BinData(7, "CQDoAwAAAAAAAAA="), "_id": BinData(7, "AQAAAAAAAADwPwA=")},
+                "data": {
+                    "ts": BinData(7, "CQDoAwAAAAAAAAA="),
+                    "_id": BinData(7, "AQAAAAAAAADwPwA="),
+                },
                 "meta": {"a": 1},
             },
             "ns": timeseriesCollNs,
@@ -566,7 +579,9 @@ describe("$changeStream", function () {
     function generateEvents(db) {
         const clusterTimeBeforeGeneratingEvents = getNextClusterTime(getClusterTime(db));
 
-        const coll = assertCreateCollection(db, collName, {timeseries: {timeField: "ts", metaField: "meta"}});
+        const coll = assertCreateCollection(db, collName, {
+            timeseries: {timeField: "ts", metaField: "meta"},
+        });
         coll.createIndex({ts: 1, "meta.b": 1}, {name: "dropMe"});
 
         coll.insertOne({_id: 1, ts: new Date(1000), meta: {a: 1}});
@@ -584,7 +599,9 @@ describe("$changeStream", function () {
 
         coll.remove({"meta.a": 1});
 
-        assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: "hours"}}));
+        assert.commandWorked(
+            db.runCommand({collMod: collName, timeseries: {granularity: "hours"}}),
+        );
 
         assert.commandWorked(db.runCommand({collMod: collName, expireAfterSeconds: 1}));
         coll.dropIndex("dropMe");
@@ -664,17 +681,27 @@ describe("$changeStream", function () {
     describe("when not specifying rawData", function () {
         it("should not allow change streams on time-series collections", function () {
             const db = this.testDB.getSiblingDB("reservedDB");
-            const testColl = assertCreateCollection(db, collName, {timeseries: {timeField: "ts", metaField: "meta"}});
+            const testColl = assertCreateCollection(db, collName, {
+                timeseries: {timeField: "ts", metaField: "meta"},
+            });
             testColl.insertOne({_id: 1, ts: new Date(), meta: {a: 1}});
 
             // Ensure that change streams are not allowed on time-series collections.
             // In v1 it fails immediately, while in v2 it fails when the cursor to the shard is opened.
-            let response = db.runCommand({aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}});
+            let response = db.runCommand({
+                aggregate: collName,
+                pipeline: [{$changeStream: {}}],
+                cursor: {},
+            });
             if (response.ok) {
                 // In case we are running change streams version 2, the cursor may not be opened on the shard.
                 // To ensure the failure indeed occurs, we issue a getMore command to ensure that the cursor
                 // will be attempted to be opened on the shard and will fail.
-                assert.eq(response._changeStreamVersion, "v2", "Change stream of version v1 should fail immediately");
+                assert.eq(
+                    response._changeStreamVersion,
+                    "v2",
+                    "Change stream of version v1 should fail immediately",
+                );
 
                 // In a v2 change stream, the first getMore operation may return a future cluster time.
                 // Retry the getMore until the expected error is returned.
@@ -696,7 +723,9 @@ describe("$changeStream", function () {
         });
 
         for (const showSystemEvents of [true, false]) {
-            const message = showSystemEvents ? "DDL events (and DML if not running in viewless ts)" : "DDL events";
+            const message = showSystemEvents
+                ? "DDL events (and DML if not running in viewless ts)"
+                : "DDL events";
             it(`should allow change stream on the database and should emit timeseries return ${message} with: showSystemEvents=${showSystemEvents}`, function () {
                 const cst = new ChangeStreamTest(this.testDB);
                 const cursor = cst.startWatchingChanges({
@@ -719,7 +748,11 @@ describe("$changeStream", function () {
                     collection: 1,
                 });
 
-                const expectedChanges = getExpectedChangeEvents(db, showSystemEvents, false /* rawData */);
+                const expectedChanges = getExpectedChangeEvents(
+                    db,
+                    showSystemEvents,
+                    false /* rawData */,
+                );
                 cst.assertNextChangesEqual({cursor: cursor, expectedChanges});
                 cst.assertNoChange(cursor);
             });
@@ -750,7 +783,11 @@ describe("$changeStream", function () {
                     collection: 1,
                 });
 
-                const expectedChanges = getExpectedChangeEvents(db, showSystemEvents, false /* rawData */);
+                const expectedChanges = getExpectedChangeEvents(
+                    db,
+                    showSystemEvents,
+                    false /* rawData */,
+                );
                 cst.assertNextChangesEqual({cursor: cursor, expectedChanges});
                 cst.assertNoChange(cursor);
             });
@@ -768,12 +805,16 @@ describe("$changeStream", function () {
 
         // NOTE: if ffs are not set, then the change stream will not deliver any events for timeseries collections.
         if (!(isRawOperationSupported(db) && allTimeseriesFlagsEnabled)) {
-            jsTest.log.info("Can not run change stream timeseries tests as rawData flag is not supported");
+            jsTest.log.info(
+                "Can not run change stream timeseries tests as rawData flag is not supported",
+            );
             return;
         }
 
         for (const showSystemEvents of [true, false]) {
-            const message = showSystemEvents ? "DDL events (and DML if not running in viewless ts)" : "DDL events";
+            const message = showSystemEvents
+                ? "DDL events (and DML if not running in viewless ts)"
+                : "DDL events";
             it(`should allow change stream on the collection and should emit timeseries return ${message} with: showSystemEvents=${showSystemEvents}`, function () {
                 const cst = new ChangeStreamTest(this.testDB);
                 const cursor = cst.startWatchingChanges({
@@ -797,7 +838,11 @@ describe("$changeStream", function () {
                     aggregateOptions: getRawOperationSpec(this.testDB),
                 });
 
-                const expectedChanges = getExpectedChangeEvents(db, showSystemEvents, true /* rawData */);
+                const expectedChanges = getExpectedChangeEvents(
+                    db,
+                    showSystemEvents,
+                    true /* rawData */,
+                );
                 const invalidateEvent = {"operationType": "invalidate"};
                 expectedChanges.push(invalidateEvent);
                 cst.assertNextChangesEqual({cursor: cursor, expectedChanges});
@@ -827,7 +872,11 @@ describe("$changeStream", function () {
                     aggregateOptions: getRawOperationSpec(this.testDB),
                 });
 
-                const expectedChanges = getExpectedChangeEvents(db, showSystemEvents, true /* rawData */);
+                const expectedChanges = getExpectedChangeEvents(
+                    db,
+                    showSystemEvents,
+                    true /* rawData */,
+                );
                 cst.assertNextChangesEqual({cursor: cursor, expectedChanges});
                 cst.assertNoChange(cursor);
             });
@@ -859,7 +908,11 @@ describe("$changeStream", function () {
                     aggregateOptions: getRawOperationSpec(this.testDB),
                 });
 
-                const expectedChanges = getExpectedChangeEvents(db, showSystemEvents, true /* rawData */);
+                const expectedChanges = getExpectedChangeEvents(
+                    db,
+                    showSystemEvents,
+                    true /* rawData */,
+                );
                 cst.assertNextChangesEqual({cursor: cursor, expectedChanges});
                 cst.assertNoChange(cursor);
             });

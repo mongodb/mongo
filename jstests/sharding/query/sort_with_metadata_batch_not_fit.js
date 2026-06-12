@@ -53,7 +53,11 @@ let res = coll
 verifyDocOrder(res);
 
 res = coll
-    .aggregate([{$match: {$text: {$search: "s"}}}, {$sort: {textScore: {$meta: "textScore"}}}, {$project: {_id: 1}}])
+    .aggregate([
+        {$match: {$text: {$search: "s"}}},
+        {$sort: {textScore: {$meta: "textScore"}}},
+        {$project: {_id: 1}},
+    ])
     .toArray();
 verifyDocOrder(res);
 

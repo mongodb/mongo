@@ -4,7 +4,11 @@
  *
  * @tags: [requires_replication, requires_wiredtiger]
  */
-import {createWtTable, dumpWtTable, wtExtractRecordsFromDump} from "jstests/disk/libs/wt_file_helper.js";
+import {
+    createWtTable,
+    dumpWtTable,
+    wtExtractRecordsFromDump,
+} from "jstests/disk/libs/wt_file_helper.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

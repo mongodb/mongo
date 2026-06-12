@@ -13,7 +13,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // disableSplitHorizonIPCheck is required to prevent crashing when the bad config is initially set.
 function testStartupWarnings(horizonName, options = {}) {
     jsTestLog("Running startupWarning check.");
-    const includesStartupWarning = (line) => line.includes("Found split horizon configuration using IP");
+    const includesStartupWarning = (line) =>
+        line.includes("Found split horizon configuration using IP");
 
     // Start an initial Replica Set with no SplitHorizon configuration
     const replTest = new ReplSetTest({

@@ -32,7 +32,10 @@ for (let i = -25; i < 25; ++i) {
     assert.commandWorked(coll.insert({oldKey: i}));
 }
 
-assert.commandFailedWithCode(mongos.adminCommand({moveCollection: ns, toShard: shard1}), ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(
+    mongos.adminCommand({moveCollection: ns, toShard: shard1}),
+    ErrorCodes.NamespaceNotFound,
+);
 
 jsTest.log("Unshard the sharded collection to a non-primary shard.");
 assert.commandWorked(mongos.adminCommand({unshardCollection: ns, toShard: shard1}));

@@ -18,7 +18,9 @@ function runTest(mongod, web) {
     printjson(http_client);
     if (http_client.running.version_num < 0x73900) {
         // 39 hex == 57 dec, so 0x73900 == 7.57.0
-        print("*** Skipping test, curl < 7.57.0 does not support connection pooling via share interface");
+        print(
+            "*** Skipping test, curl < 7.57.0 does not support connection pooling via share interface",
+        );
         return;
     }
 
@@ -35,12 +37,18 @@ function runTest(mongod, web) {
     assert.eq(count, 1, "Connections were not kept alive.");
 
     // Force the open connection to close.
-    const closeCmd = admin.runCommand({httpClientRequest: 1, uri: web.getURL() + "/connection_close"});
+    const closeCmd = admin.runCommand({
+        httpClientRequest: 1,
+        uri: web.getURL() + "/connection_close",
+    });
     const close = assert.commandWorked(closeCmd).body;
     assert.eq(close, "closed");
 
     // Check count with new connection.
-    const connectsCmd = admin.runCommand({httpClientRequest: 1, uri: web.getURL() + "/connect_count"});
+    const connectsCmd = admin.runCommand({
+        httpClientRequest: 1,
+        uri: web.getURL() + "/connect_count",
+    });
     const connects = assert.commandWorked(connectsCmd).body;
     assert.eq(connects, 2, "Connection count incorrect.");
 

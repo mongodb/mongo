@@ -37,7 +37,12 @@ const scoreDetailsProjection = {
 
 function assertFailsScoreDetailsUnavailable(pipeline) {
     const kUnavailableMetadataErrCode = 40218;
-    assertErrCodeAndErrMsgContains(coll, pipeline, kUnavailableMetadataErrCode, "query requires scoreDetails metadata");
+    assertErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        kUnavailableMetadataErrCode,
+        "query requires scoreDetails metadata",
+    );
 }
 
 function assertCorrectScoreDetailsStructure(resultDoc, numInputPipelines) {
@@ -84,7 +89,10 @@ function runTest({
     forceProjectionOnMerger = false,
     numInputPipelines = 1,
 }) {
-    const searchQueryWithScoreDetails = Object.assign({scoreDetails: requestSearchScoreDetails}, searchQuery);
+    const searchQueryWithScoreDetails = Object.assign(
+        {scoreDetails: requestSearchScoreDetails},
+        searchQuery,
+    );
 
     let inputPipelines = {};
     for (let i = 0; i < numInputPipelines; ++i) {
@@ -425,7 +433,10 @@ runTest({
 {
     const pipeline = [
         {
-            $rankFusion: {input: {pipelines: {pipe: [{$sort: {textField: -1}}]}}, scoreDetails: false},
+            $rankFusion: {
+                input: {pipelines: {pipe: [{$sort: {textField: -1}}]}},
+                scoreDetails: false,
+            },
         },
         {
             $facet: {
@@ -469,7 +480,10 @@ runTest({
     const results = coll
         .aggregate([
             {
-                $rankFusion: {input: {pipelines: {pipe: [{$sort: {textField: -1}}]}}, scoreDetails: true},
+                $rankFusion: {
+                    input: {pipelines: {pipe: [{$sort: {textField: -1}}]}},
+                    scoreDetails: true,
+                },
             },
             {
                 $facet: {

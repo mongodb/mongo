@@ -19,12 +19,17 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
-    jsTest.log.info("Skipping test because we can not assume canonical timeseries buckets layout in the current suite");
+    jsTest.log.info(
+        "Skipping test because we can not assume canonical timeseries buckets layout in the current suite",
+    );
     quit();
 }
 
@@ -55,7 +60,9 @@ let lpa2 = undefined; // lastpoint value of a for m = 1
 
 (function setupCollection() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     coll.insert({t: timestamps.t2, m: 1, x: 2, a: 12}); // create bucket #3
     coll.insert({t: timestamps.t4, m: 1, x: 4, a: 14}); // add to bucket #3

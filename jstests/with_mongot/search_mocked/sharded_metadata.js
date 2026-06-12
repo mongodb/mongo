@@ -29,7 +29,9 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 function setupCollection(localName) {
     const testColl = testDB.getCollection(localName);
@@ -343,7 +345,14 @@ testMergeAtLocationSearchMeta(owningShardMerge, testColl, false);
 
 // Create a view that does not use $search. Verify that we can detect an invalid use of
 // $$SEARCH_META.
-assert.commandWorked(testDB.createView(collName + "viewColl", testColl.getName(), [{$match: {_id: {$gt: -1000}}}], {}));
+assert.commandWorked(
+    testDB.createView(
+        collName + "viewColl",
+        testColl.getName(),
+        [{$match: {_id: {$gt: -1000}}}],
+        {},
+    ),
+);
 let viewColl = testDB.getCollection(collName + "viewColl");
 testSearchMetaFailure(routerMergeType, viewColl, true);
 testSearchMetaFailure("anyShard", viewColl, true);
@@ -352,7 +361,9 @@ testSearchMetaFailure("localOnly", viewColl, true);
 
 assert(viewColl.drop());
 
-assert.commandWorked(testDB.createView(collName + "viewColl", testColl.getName(), [{$searchMeta: mongotQuery}], {}));
+assert.commandWorked(
+    testDB.createView(collName + "viewColl", testColl.getName(), [{$searchMeta: mongotQuery}], {}),
+);
 viewColl = testDB.getCollection(collName + "viewColl");
 testMergeAtLocationSearchMeta(routerMergeType, testColl, false);
 testMergeAtLocationSearchMeta("anyShard", viewColl, true);

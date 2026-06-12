@@ -16,25 +16,35 @@ for (let i = 0; i < 5; i++) {
 let res = assert.commandWorked(coll.validate({collHash: true}));
 assert(res.valid, res);
 assert(res.all, res);
-res = assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "0123456789abcdef".split("")}));
+res = assert.commandWorked(
+    coll.validate({collHash: true, revealHashedIds: "0123456789abcdef".split("")}),
+);
 assert(res.valid, res);
 assert(res.revealedIds, res);
 
 // When there is corruption, validate with collHash:true / revealHashedIds:[...] still reports it.
-assert.commandWorked(db.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "alwaysOn"}),
+);
 res = assert.commandWorked(coll.validate({collHash: true}));
 assert(!res.valid, res);
 assert(res.all, res);
 
-res = assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "0123456789abcdef".split("")}));
+res = assert.commandWorked(
+    coll.validate({collHash: true, revealHashedIds: "0123456789abcdef".split("")}),
+);
 assert(!res.valid, res);
 assert(res.revealedIds, res);
 
 // Drill down doesn't run full validate.
-res = assert.commandWorked(coll.validate({collHash: true, hashPrefixes: "0123456789abcdef".split("")}));
+res = assert.commandWorked(
+    coll.validate({collHash: true, hashPrefixes: "0123456789abcdef".split("")}),
+);
 assert(res.valid, res);
 assert(res.partial, res);
 
-assert.commandWorked(db.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "off"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "off"}),
+);
 
 MongoRunner.stopMongod(conn);

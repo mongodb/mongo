@@ -35,7 +35,9 @@ export const $config = (function () {
             // 'queryPlanner', 'executionStats', and 'allPlansExecution'
             ["queryPlanner", "executionStats", "allPlansExecution"].forEach(
                 function (verbosity) {
-                    assert.commandWorked(db[collName].find({j: this.nInserted / 2}).explain(verbosity));
+                    assert.commandWorked(
+                        db[collName].find({j: this.nInserted / 2}).explain(verbosity),
+                    );
                 }.bind(this),
             );
         }

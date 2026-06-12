@@ -230,7 +230,11 @@ jsTest.log.info("Testing $facet with subpipelines memory tracking");
             $facet: {
                 byCategory: [
                     {
-                        $group: {_id: "$category", values: {$push: "$value"}, total: {$sum: " $value"}},
+                        $group: {
+                            _id: "$category",
+                            values: {$push: "$value"},
+                            total: {$sum: " $value"},
+                        },
                     },
                 ],
                 highValues: [{$match: {value: {$gte: 15}}}, {$sort: {value: -1}}, {$limit: 3}],

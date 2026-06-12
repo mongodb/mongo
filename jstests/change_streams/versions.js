@@ -13,7 +13,10 @@ const dbName = jsTestName();
 const collName = jsTestName();
 
 const validVersions = ["v1", "v2", undefined];
-const isPreciseShardTargetingEnabled = FeatureFlagUtil.isEnabled(db, "ChangeStreamPreciseShardTargeting");
+const isPreciseShardTargetingEnabled = FeatureFlagUtil.isEnabled(
+    db,
+    "ChangeStreamPreciseShardTargeting",
+);
 
 function testChangeStreamWithVersionAttributeSet(version = undefined) {
     // Specifying the "version" field does nothing when opening a change stream on a replica set or
@@ -46,7 +49,9 @@ function testChangeStreamWithVersionAttributeSet(version = undefined) {
         const isWholeClusterChangeStream = !nss.hasOwnProperty("collection");
 
         const testDB = db.getSiblingDB(dbName);
-        const cst = new ChangeStreamTest(isWholeClusterChangeStream ? testDB.getSiblingDB("admin") : testDB);
+        const cst = new ChangeStreamTest(
+            isWholeClusterChangeStream ? testDB.getSiblingDB("admin") : testDB,
+        );
 
         let cursor;
         try {

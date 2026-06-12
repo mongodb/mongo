@@ -41,7 +41,10 @@ export function getNLatestProfilerEntries(profileDB, count, filter) {
         filter = {};
     }
     let cursor = profileDB.system.profile.find(filter).sort({$natural: -1}).limit(count);
-    assert(cursor.hasNext(), "could not find any entries in the profile collection matching filter: " + tojson(filter));
+    assert(
+        cursor.hasNext(),
+        "could not find any entries in the profile collection matching filter: " + tojson(filter),
+    );
     return cursor.toArray();
 }
 
@@ -123,7 +126,12 @@ export function profilerHasNumMatchingEntriesOrThrow({
  * Throws an assertion if the profiler does not contain any entries matching "filter". Optional
  * arguments "errorMsgFilter" and "errorMsgProj" limit profiler output if this asserts.
  */
-export function profilerHasAtLeastOneMatchingEntryOrThrow({profileDB, filter, errorMsgFilter, errorMsgProj}) {
+export function profilerHasAtLeastOneMatchingEntryOrThrow({
+    profileDB,
+    filter,
+    errorMsgFilter,
+    errorMsgProj,
+}) {
     assert.gte(
         profileDB.system.profile.find(filter).itcount(),
         1,
@@ -138,7 +146,12 @@ export function profilerHasAtLeastOneMatchingEntryOrThrow({profileDB, filter, er
  * Throws an assertion if the profiler does not contain exactly one entry matching "filter".
  * Optional arguments "errorMsgFilter" and "errorMsgProj" limit profiler output if this asserts.
  */
-export function profilerHasSingleMatchingEntryOrThrow({profileDB, filter, errorMsgFilter, errorMsgProj}) {
+export function profilerHasSingleMatchingEntryOrThrow({
+    profileDB,
+    filter,
+    errorMsgFilter,
+    errorMsgProj,
+}) {
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: profileDB,
         filter: filter,
@@ -152,7 +165,12 @@ export function profilerHasSingleMatchingEntryOrThrow({profileDB, filter, errorM
  * Throws an assertion if the profiler contains any entries matching "filter". Optional arguments
  * "errorMsgFilter" and "errorMsgProj" limit profiler output if this asserts.
  */
-export function profilerHasZeroMatchingEntriesOrThrow({profileDB, filter, errorMsgFilter, errorMsgProj}) {
+export function profilerHasZeroMatchingEntriesOrThrow({
+    profileDB,
+    filter,
+    errorMsgFilter,
+    errorMsgProj,
+}) {
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: profileDB,
         filter: filter,

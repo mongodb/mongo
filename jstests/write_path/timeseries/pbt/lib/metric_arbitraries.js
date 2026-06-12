@@ -152,11 +152,15 @@ export function makeMetricArb(types, ranges = {}) {
         bsonPrimitiveMetricTypes.push(fc.double({min: dblMin, max: dblMax, noNaN: true}));
     }
     if (typeList.includes("long")) {
-        bsonPrimitiveMetricTypes.push(fc.integer({min: longMin, max: longMax}).map((n) => NumberLong(n)));
+        bsonPrimitiveMetricTypes.push(
+            fc.integer({min: longMin, max: longMax}).map((n) => NumberLong(n)),
+        );
     }
     if (typeList.includes("decimal")) {
         bsonPrimitiveMetricTypes.push(
-            fc.double({min: decMin, max: decMax, noNaN: true}).map((n) => NumberDecimal(Number(n).toFixed(decScale))),
+            fc
+                .double({min: decMin, max: decMax, noNaN: true})
+                .map((n) => NumberDecimal(Number(n).toFixed(decScale))),
         );
     }
     if (typeList.includes("string")) {
@@ -195,7 +199,9 @@ export function makeMetricArb(types, ranges = {}) {
         bsonPrimitiveMetricTypes.push(fc.uuid());
     }
     if (typeList.includes("objectId")) {
-        bsonPrimitiveMetricTypes.push(fc.string({minLength: 24, maxLength: 24, unit: hexa()}).map(ObjectId));
+        bsonPrimitiveMetricTypes.push(
+            fc.string({minLength: 24, maxLength: 24, unit: hexa()}).map(ObjectId),
+        );
     }
     if (typeList.includes("binData")) {
         // Keep sizes small and hex-based.
@@ -214,7 +220,9 @@ export function makeMetricArb(types, ranges = {}) {
         // therefore fix byte 0 to one of the two valid algorithm types and fill the remaining 11 bytes
         // with random hex data.
         const _excludedSubtypes = new Set([2, 3, 6, 7, 12, 14, 15]);
-        const _genericSubtypes = Array.from({length: 256}, (_, i) => i).filter((n) => !_excludedSubtypes.has(n));
+        const _genericSubtypes = Array.from({length: 256}, (_, i) => i).filter(
+            (n) => !_excludedSubtypes.has(n),
+        );
         const subtypeArb = fc.constantFrom(..._genericSubtypes);
         const genericBinDataArb = fc
             .tuple(subtypeArb, fc.base64String({minLength: 24, maxLength: 2048}))
@@ -237,14 +245,20 @@ export function makeMetricArb(types, ranges = {}) {
     }
     if (typeList.includes("javascript")) {
         bsonPrimitiveMetricTypes.push(
-            fc.string({minLength: 0, maxLength: 64}).map((s) => Code(`function(){ return ${JSON.stringify(s)}; }`)),
+            fc
+                .string({minLength: 0, maxLength: 64})
+                .map((s) => Code(`function(){ return ${JSON.stringify(s)}; }`)),
         );
     }
     if (typeList.includes("javascriptWithScope")) {
         // Keep scope shallow and JSONy (no nested objects).
         const scopeArb = fc.dictionary(
             fc.string({minLength: 1, maxLength: 8}).filter((n) => n !== "_id"),
-            fc.oneof(fc.integer({min: intMin, max: intMax}), fc.string({minLength: 0, maxLength: 16}), fc.boolean()),
+            fc.oneof(
+                fc.integer({min: intMin, max: intMax}),
+                fc.string({minLength: 0, maxLength: 16}),
+                fc.boolean(),
+            ),
             {maxKeys: 4},
         );
         bsonPrimitiveMetricTypes.push(
@@ -307,9 +321,13 @@ export function makeDateMetricStreamArb(minLength = 0, maxLength = 20, ranges = 
 function generateStepArb(bucketing) {
     const unit = typeof bucketing === "string" ? bucketing : bucketing.unit;
     const gapFactorMin =
-        typeof bucketing === "object" && bucketing.gapFactorMin !== undefined ? bucketing.gapFactorMin : 1.0;
+        typeof bucketing === "object" && bucketing.gapFactorMin !== undefined
+            ? bucketing.gapFactorMin
+            : 1.0;
     const gapFactorMax =
-        typeof bucketing === "object" && bucketing.gapFactorMax !== undefined ? bucketing.gapFactorMax : 2.0;
+        typeof bucketing === "object" && bucketing.gapFactorMax !== undefined
+            ? bucketing.gapFactorMax
+            : 2.0;
 
     function unitToMs(u) {
         switch (u) {
@@ -359,7 +377,9 @@ function generateDateStream(stepArb, dateMin, dateMax, len) {
         }
 
         const startMaxMs = Math.max(dateMin.getTime(), dateMax.getTime() - total);
-        const startArb = fc.integer({min: dateMin.getTime(), max: startMaxMs}).map((ms) => new Date(ms));
+        const startArb = fc
+            .integer({min: dateMin.getTime(), max: startMaxMs})
+            .map((ms) => new Date(ms));
 
         return startArb.map((start) => {
             const out = [start];
@@ -379,7 +399,12 @@ function generateDateStream(stepArb, dateMin, dateMax, len) {
  * @param {('seconds'|'minutes'|'hours'|'days'|{unit:'seconds'|'minutes'|'hours'|'days', gapFactorMin?:number, gapFactorMax?:number})} [bucketing='hours']
  * @returns {fc.Arbitrary<Date[]>}
  */
-export function makeSensorDateMetricStreamArb(minLength = 0, maxLength = 20, ranges = {}, bucketing = "hours") {
+export function makeSensorDateMetricStreamArb(
+    minLength = 0,
+    maxLength = 20,
+    ranges = {},
+    bucketing = "hours",
+) {
     const {min: dateMin, max: dateMax} = _defaultDateRange(ranges.dateRange);
 
     const lenArb = fc.integer({min: minLength, max: maxLength});
@@ -406,7 +431,12 @@ export function makeSensorDateMetricStreamArb(minLength = 0, maxLength = 20, ran
 export function makeMetricTypeStreamArb(type, minLength = 0, maxLength = 20, ranges = {}) {
     // Special-case: date streams can use the sensor-like generator if the caller wants it.
     if (type === "date" && ranges?.useSensorDateStream) {
-        return makeSensorDateMetricStreamArb(minLength, maxLength, ranges, ranges?.timeBucketing ?? "hours");
+        return makeSensorDateMetricStreamArb(
+            minLength,
+            maxLength,
+            ranges,
+            ranges?.timeBucketing ?? "hours",
+        );
     }
     const metricArb = makeMetricArb([type], ranges);
     return fc.array(metricArb, {minLength, maxLength});
@@ -451,10 +481,17 @@ export function makeMetricStreamArb(minLength = 0, maxLength = 20, options = {},
         // delta (integer) is how much to extend by (if at all), and is added to the current min/max.
 
         return fc
-            .array(fc.tuple(fc.double({min: 0, max: 1, noNaN: true}), fc.boolean(), fc.integer({min: 1, max: 100})), {
-                minLength: stream.length,
-                maxLength: stream.length,
-            })
+            .array(
+                fc.tuple(
+                    fc.double({min: 0, max: 1, noNaN: true}),
+                    fc.boolean(),
+                    fc.integer({min: 1, max: 100}),
+                ),
+                {
+                    minLength: stream.length,
+                    maxLength: stream.length,
+                },
+            )
             .map((decisions) => {
                 // Convert a stream value to a number for min/max tracking.
                 function toNum(v) {
@@ -462,7 +499,8 @@ export function makeMetricStreamArb(minLength = 0, maxLength = 20, options = {},
                     if (v instanceof Date) return v.getTime();
                     if (typeof NumberLong === "function" && v instanceof NumberLong)
                         return typeof v.toNumber === "function" ? v.toNumber() : Number(v);
-                    if (typeof NumberDecimal === "function" && v instanceof NumberDecimal) return Number(v.toString());
+                    if (typeof NumberDecimal === "function" && v instanceof NumberDecimal)
+                        return Number(v.toString());
                     return null;
                 }
 
@@ -541,7 +579,14 @@ export function makeMetricStreamArb(minLength = 0, maxLength = 20, options = {},
  * @returns {fc.Arbitrary<any[]>}
  */
 export function makeRunnyMetricStreamArb(metricArb, opts = {}) {
-    const {minLength = 0, maxLength = 20, maxRuns = 6, maxRunLength = 8, stepMax = 10, maxMonoStringBytes = 16} = opts;
+    const {
+        minLength = 0,
+        maxLength = 20,
+        maxRuns = 6,
+        maxRunLength = 8,
+        stepMax = 10,
+        maxMonoStringBytes = 16,
+    } = opts;
 
     assert(minLength >= 0, "minLength must be non-negative");
 
@@ -615,7 +660,8 @@ export function makeRunnyMetricStreamArb(metricArb, opts = {}) {
         if (typeof v === "number") return "number";
         if (typeof NumberLong === "function" && v instanceof NumberLong) return "long";
         if (typeof NumberDecimal === "function" && v instanceof NumberDecimal) return "decimal";
-        if (typeof v === "string" && isAsciiString(v) && v.length <= maxMonoStringBytes) return "string16";
+        if (typeof v === "string" && isAsciiString(v) && v.length <= maxMonoStringBytes)
+            return "string16";
         return "other";
     }
 
@@ -747,15 +793,18 @@ export function makeMixedTypeMetricStreamArb(minLength = 0, maxLength = 20, opti
         const rhsStreamArb = makeMetricTypeStreamArb(rhsType, minLength, maxLength, options.ranges);
 
         return fc.tuple(lhsStreamArb, rhsStreamArb).chain(([lhsStream, rhsStream]) => {
-            const streamLength = lhsStream.length < rhsStream.length ? lhsStream.length : rhsStream.length;
+            const streamLength =
+                lhsStream.length < rhsStream.length ? lhsStream.length : rhsStream.length;
 
-            return fc.array(fc.boolean(), {minLength: streamLength, maxLength: streamLength}).map((chooseLhs) => {
-                const mixedStream = [];
-                for (let i = 0; i < streamLength; ++i) {
-                    mixedStream.push(chooseLhs[i] ? lhsStream[i] : rhsStream[i]);
-                }
-                return mixedStream;
-            });
+            return fc
+                .array(fc.boolean(), {minLength: streamLength, maxLength: streamLength})
+                .map((chooseLhs) => {
+                    const mixedStream = [];
+                    for (let i = 0; i < streamLength; ++i) {
+                        mixedStream.push(chooseLhs[i] ? lhsStream[i] : rhsStream[i]);
+                    }
+                    return mixedStream;
+                });
         });
     });
 }

@@ -98,7 +98,9 @@ assert.commandWorked(
 );
 
 // Sets the global defaultMaxTimeMS to a small value.
-assert.commandWorked(adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 1}}}));
+assert.commandWorked(
+    adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 1}}}),
+);
 
 // Without a tenant-specific default value, operations will use the global default value, which
 // causes a timeout.

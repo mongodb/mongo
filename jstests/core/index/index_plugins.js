@@ -36,7 +36,9 @@ assert.commandFailed(coll.createIndex({a: 1, b: "2d"})); // unsupported
 
 // Test compound index where multiple fields have same special index type.
 coll.dropIndexes();
-assert.commandWorked(coll.createIndex({a: "2dsphere", b: "2dsphere"}, add2dsphereVersionIfNeeded()));
+assert.commandWorked(
+    coll.createIndex({a: "2dsphere", b: "2dsphere"}, add2dsphereVersionIfNeeded()),
+);
 assert.commandWorked(coll.createIndex({a: "text", b: "text"}));
 // Unsupported.
 assert.commandFailed(coll.createIndex({a: "2d", b: "2d"}));
@@ -50,7 +52,10 @@ for (let indexType1 of incompatableIndexTypes) {
         if (indexType1 == indexType2) {
             continue;
         }
-        assert.commandFailedWithCode(coll.createIndex({a: indexType1, b: indexType2}), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(
+            coll.createIndex({a: indexType1, b: indexType2}),
+            ErrorCodes.CannotCreateIndex,
+        );
         assert.commandFailedWithCode(
             coll.createIndex({a: indexType1, b: indexType2, c: 1}),
             ErrorCodes.CannotCreateIndex,
@@ -64,5 +69,8 @@ for (let indexType1 of incompatableIndexTypes) {
             ErrorCodes.CannotCreateIndex,
         );
     }
-    assert.commandFailedWithCode(coll.createIndex({"$**": 1, b: indexType1}), ErrorCodes.CannotCreateIndex);
+    assert.commandFailedWithCode(
+        coll.createIndex({"$**": 1, b: indexType1}),
+        ErrorCodes.CannotCreateIndex,
+    );
 }

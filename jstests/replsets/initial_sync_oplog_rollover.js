@@ -52,7 +52,11 @@ failPoint.off();
 
 replSet.awaitSecondaryNodes(200 * 1000);
 
-assert.eq(i, secondary.getDB("test").foo.count({a: 2}), "collection successfully synced to secondary");
+assert.eq(
+    i,
+    secondary.getDB("test").foo.count({a: 2}),
+    "collection successfully synced to secondary",
+);
 
 assert.eq(
     0,

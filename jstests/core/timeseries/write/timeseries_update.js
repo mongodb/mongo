@@ -38,7 +38,12 @@ TimeseriesTest.run((insert) => {
         ordered = true,
     }) {
         const coll = testDB.getCollection("t");
-        const updateCommand = {update: coll.getName(), updates: updateList, ordered: ordered, let: letDoc};
+        const updateCommand = {
+            update: coll.getName(),
+            updates: updateList,
+            ordered: ordered,
+            let: letDoc,
+        };
 
         const prepareData = () => {
             assert(coll.drop());
@@ -312,7 +317,10 @@ TimeseriesTest.run((insert) => {
                 multi: true,
             },
         ],
-        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {z: "A", b: "B"}}, doc2],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {z: "A", b: "B"}},
+            doc2,
+        ],
         n: 1,
     });
 
@@ -656,7 +664,10 @@ TimeseriesTest.run((insert) => {
                 q: {
                     "$and": [
                         {
-                            "$or": [{[metaFieldName]: {"$ne": "B"}}, {[metaFieldName]: {"a": {"$eq": "B"}}}],
+                            "$or": [
+                                {[metaFieldName]: {"$ne": "B"}},
+                                {[metaFieldName]: {"a": {"$eq": "B"}}},
+                            ],
                         },
                         {[metaFieldName]: {a: "A", b: "B"}},
                     ],
@@ -736,7 +747,11 @@ TimeseriesTest.run((insert) => {
                 collation: {locale: "fr"},
             },
         ],
-        resultDocList: [collationDoc1, {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "Updated"}, collationDoc3],
+        resultDocList: [
+            collationDoc1,
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "Updated"},
+            collationDoc3,
+        ],
         n: 1,
     });
 });

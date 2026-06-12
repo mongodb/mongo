@@ -24,7 +24,11 @@ function checkOptions(coll, expectedOptions) {
 }
 
 function checkUUID(coll, expectedUUID) {
-    assert.eq(expectedUUID, coll.getUUID(), `Incorrect uuid for collection '${coll.getFullName()}'`);
+    assert.eq(
+        expectedUUID,
+        coll.getUUID(),
+        `Incorrect uuid for collection '${coll.getFullName()}'`,
+    );
 }
 
 function checkIndexes(coll, expectedIndexes) {
@@ -77,12 +81,24 @@ function testMovePrimary(sharded) {
     const c1_indexes = c1.getIndexes();
     const c2_indexes = c2.getIndexes();
 
-    assert.eq(3, c1.countDocuments({}), "Unexpected number of document after c1 collection creation");
-    assert.eq(3, c2.countDocuments({}), "Unexpected number of document after c2 collection creation");
+    assert.eq(
+        3,
+        c1.countDocuments({}),
+        "Unexpected number of document after c1 collection creation",
+    );
+    assert.eq(
+        3,
+        c2.countDocuments({}),
+        "Unexpected number of document after c2 collection creation",
+    );
 
     {
         const colls = db.getCollectionInfos(filterSystemColl);
-        assert.eq(2, colls.length, `Unexpected number of collections found before moving primary: ${tojson(colls)}`);
+        assert.eq(
+            2,
+            colls.length,
+            `Unexpected number of collections found before moving primary: ${tojson(colls)}`,
+        );
     }
 
     // ----------------------------
@@ -97,9 +113,12 @@ function testMovePrimary(sharded) {
         const shouldRetry =
             TestData.shardsAddedRemoved &&
             TestData.hasRandomShardsAddedRemoved &&
-            (res.code == ErrorCodes.ShardNotFound || res.code == ErrorCodes.ConflictingOperationInProgress);
+            (res.code == ErrorCodes.ShardNotFound ||
+                res.code == ErrorCodes.ConflictingOperationInProgress);
         if (shouldRetry) {
-            jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${toShard} failed, retrying...`);
+            jsTest.log(
+                `moving primary of ${db.getName()} from ${fromShard} to ${toShard} failed, retrying...`,
+            );
             return false;
         }
         assert.commandWorked(res);
@@ -111,7 +130,11 @@ function testMovePrimary(sharded) {
     // ----------------------------
     {
         const colls = db.getCollectionInfos(filterSystemColl);
-        assert.eq(2, colls.length, `Unexpected number of collections found after moving primary: ${tojson(colls)}`);
+        assert.eq(
+            2,
+            colls.length,
+            `Unexpected number of collections found after moving primary: ${tojson(colls)}`,
+        );
     }
 
     assert(c1.exists());

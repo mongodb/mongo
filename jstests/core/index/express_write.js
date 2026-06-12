@@ -46,7 +46,9 @@ function runExpressTest({command, expectedDocs, usesExpress}) {
     // Reset the collection docs then run explain.
     assert.commandWorked(coll.remove({}));
     assert.commandWorked(coll.insert(docs));
-    const explain = assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
+    const explain = assert.commandWorked(
+        db.runCommand({explain: command, verbosity: "executionStats"}),
+    );
 
     assert.eq(
         usesExpress,

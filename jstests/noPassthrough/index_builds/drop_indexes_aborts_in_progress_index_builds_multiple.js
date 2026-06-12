@@ -42,7 +42,9 @@ IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "a_1_b_1");
 
 const awaitDropIndex = startParallelShell(() => {
     const testDB = db.getSiblingDB(TestData.dbName);
-    assert.commandWorked(testDB.runCommand({dropIndexes: TestData.collName, index: ["b_1", "a_1_b_1", "a_1"]}));
+    assert.commandWorked(
+        testDB.runCommand({dropIndexes: TestData.collName, index: ["b_1", "a_1_b_1", "a_1"]}),
+    );
 }, conn.port);
 
 checkLog.contains(testDB.getMongo(), "About to abort index builder");

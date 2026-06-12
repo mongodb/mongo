@@ -39,7 +39,10 @@ function getShardVersionResponse(nss, failureExpected = false) {
 
     assert.commandWorked(response);
     responseFields.forEach((field) =>
-        assert(response[field], `Missing  or null field ${field} in shardVersion response ${tojson(response)}`),
+        assert(
+            response[field],
+            `Missing  or null field ${field} in shardVersion response ${tojson(response)}`,
+        ),
     );
     return response;
 }
@@ -97,7 +100,9 @@ assert.commandWorked(db.adminCommand({movechunk: kNss, find: {x: 1}, to: another
 const atChunkMigratedTime = getShardVersionResponse(kNss);
 assertMajorVersionIncrease(afterChunkMerge, atChunkMigratedTime);
 
-jsTest.log(" getShardVersion returns an updated version upon dropping and recreating a sharded collection");
+jsTest.log(
+    " getShardVersion returns an updated version upon dropping and recreating a sharded collection",
+);
 assert.commandWorked(db.runCommand({drop: kCollName}));
 getShardVersionResponse(kNss, true /*failureExpected*/);
 assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));

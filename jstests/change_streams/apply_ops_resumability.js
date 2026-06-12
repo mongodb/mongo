@@ -186,14 +186,20 @@ changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: nonTxnChange._id}}, {$project: {"lsid.uid": 0}}],
     collection: coll,
 });
-cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleCollChanges.slice(nonTxnIdx + 1)});
+cst.assertNextChangesEqual({
+    cursor: changeStream,
+    expectedChanges: expectedSingleCollChanges.slice(nonTxnIdx + 1),
+});
 
 // Resume after the first transaction change. Be sure we see the second change again.
 changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: firstTxnChange._id}}, {$project: {"lsid.uid": 0}}],
     collection: coll,
 });
-cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleCollChanges.slice(firstTxnIdx + 1)});
+cst.assertNextChangesEqual({
+    cursor: changeStream,
+    expectedChanges: expectedSingleCollChanges.slice(firstTxnIdx + 1),
+});
 
 // Try starting another change stream from the second change caused by the transaction. Verify
 // that we can see the insert performed after the transaction was committed.
@@ -203,7 +209,10 @@ let otherCursor = cst.startWatchingChanges({
     doNotModifyInPassthroughs: true, // A collection drop only invalidates single-collection
     // change streams.
 });
-cst.assertNextChangesEqual({cursor: otherCursor, expectedChanges: expectedSingleCollChanges.slice(secondTxnIdx + 1)});
+cst.assertNextChangesEqual({
+    cursor: otherCursor,
+    expectedChanges: expectedSingleCollChanges.slice(secondTxnIdx + 1),
+});
 
 // Verify that the next event observed by the stream is an invalidate following the collection drop.
 const invalidateEvent = cst.getOneChange(otherCursor, true);
@@ -232,7 +241,10 @@ changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
     collection: 1,
 });
-cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleDBChanges.slice(secondTxnIdx + 1)});
+cst.assertNextChangesEqual({
+    cursor: changeStream,
+    expectedChanges: expectedSingleDBChanges.slice(secondTxnIdx + 1),
+});
 
 //
 // Test behavior of whole-cluster change streams with apply ops.
@@ -253,6 +265,9 @@ changeStream = cst.startWatchingChanges({
     ],
     collection: 1,
 });
-cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges.slice(secondTxnIdx + 1)});
+cst.assertNextChangesEqual({
+    cursor: changeStream,
+    expectedChanges: expectedChanges.slice(secondTxnIdx + 1),
+});
 
 cst.cleanUp();

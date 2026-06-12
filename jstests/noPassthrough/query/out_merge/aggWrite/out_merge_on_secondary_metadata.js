@@ -31,7 +31,9 @@ const inputCollPrimary = primaryDB.getCollection("inputColl");
 assert.commandWorked(inputCollPrimary.insert({_id: 0, a: 1}, {writeConcern: {w: 2}}));
 assert.commandWorked(inputCollPrimary.insert({_id: 1, a: 2}, {writeConcern: {w: 2}}));
 
-assert.commandWorked(primaryDB.runCommand({createUser: "testUser", pwd: "pwd", roles: [], writeConcern: {w: 2}}));
+assert.commandWorked(
+    primaryDB.runCommand({createUser: "testUser", pwd: "pwd", roles: [], writeConcern: {w: 2}}),
+);
 primaryDB.grantRolesToUser("testUser", [{role: "readWrite", db: "test"}], {w: 2});
 const expectedUserAndRoleMetadata = {
     $impersonatedUser: {"user": "testUser", "db": "test"},
@@ -74,12 +76,17 @@ function testMetadata(pipeline, comment) {
         return true;
     });
 
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangDuringBatchInsert", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangDuringBatchInsert", mode: "off"}),
+    );
     awaitShell();
 
     // Assert that the impersonated user metadata, client metadata, and cluster time are propagated
     // to the primary.
-    const profile = primaryDB.system.profile.find({"command.comment": comment}).hint({$natural: 1}).toArray();
+    const profile = primaryDB.system.profile
+        .find({"command.comment": comment})
+        .hint({$natural: 1})
+        .toArray();
     let prevClusterTime = undefined;
     profile.forEach((op) => {
         assert.eq(op.command.$audit, expectedUserAndRoleMetadata);
@@ -104,7 +111,9 @@ function testMetadata(pipeline, comment) {
     outColl.drop({writeConcern: {w: 2}});
 }
 
-const mergePipeline = [{$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}}];
+const mergePipeline = [
+    {$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}},
+];
 testMetadata(mergePipeline, "merge_on_secondary_metadata");
 
 const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outCollName}];

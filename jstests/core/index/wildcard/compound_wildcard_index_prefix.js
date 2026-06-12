@@ -56,7 +56,9 @@ for (const query of supportedQueries) {
     WildcardIndexHelpers.assertExpectedIndexIsUsed(explainRes, indexSpec.indexName);
 
     for (const sortOrder of nonBlockingSorts) {
-        explainRes = assert.commandWorked(coll.find(query).sort(sortOrder).explain("executionStats"));
+        explainRes = assert.commandWorked(
+            coll.find(query).sort(sortOrder).explain("executionStats"),
+        );
 
         WildcardIndexHelpers.assertExpectedIndexIsUsed(explainRes, indexSpec.indexName);
         assertBlockingSort(explainRes, false);
@@ -68,7 +70,9 @@ for (const query of supportedQueries) {
     }
 
     for (const sortOrder of blockingSorts) {
-        explainRes = assert.commandWorked(coll.find(query).sort(sortOrder).explain("executionStats"));
+        explainRes = assert.commandWorked(
+            coll.find(query).sort(sortOrder).explain("executionStats"),
+        );
 
         WildcardIndexHelpers.assertExpectedIndexIsUsed(explainRes, indexSpec.indexName);
         assertBlockingSort(explainRes, true);

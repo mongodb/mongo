@@ -63,7 +63,9 @@ const testCollModConvertUniqueWithSideWrites = function (
     assert.commandWorked(coll.insert(initialDocs));
 
     // Disallows new duplicate keys on the index.
-    assert.commandWorked(testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}),
+    );
 
     let awaitCollMod = () => {};
     const failPoint = configureFailPoint(primary, "hangAfterCollModIndexUniqueFullIndexScan", {
@@ -135,7 +137,9 @@ const testCollModConvertUniqueWithSideWrites = function (
             "collMod is not holding collection lock in read mode: " + tojson(collModOp),
         );
 
-        jsTestLog("Performing CRUD ops on collection while collMod is paused: " + performCrudOpsFunc);
+        jsTestLog(
+            "Performing CRUD ops on collection while collMod is paused: " + performCrudOpsFunc,
+        );
         try {
             performCrudOpsFunc(coll);
         } catch (ex) {
@@ -148,15 +152,28 @@ const testCollModConvertUniqueWithSideWrites = function (
     }
 
     if (!expectedViolations) {
-        assert.eq(countUnique(coll, {a: 1}), 1, "index should be unique now: " + tojson(coll.getIndexes()));
+        assert.eq(
+            countUnique(coll, {a: 1}),
+            1,
+            "index should be unique now: " + tojson(coll.getIndexes()),
+        );
 
         // Tests uniqueness constraint.
         assert.commandFailedWithCode(coll.insert(duplicateDoc), ErrorCodes.DuplicateKey);
     } else {
-        assert.eq(countUnique(coll, {a: 1}), 0, "index should not unique: " + tojson(coll.getIndexes()));
+        assert.eq(
+            countUnique(coll, {a: 1}),
+            0,
+            "index should not unique: " + tojson(coll.getIndexes()),
+        );
 
         // Resets to allow duplicates on the regular index.
-        assert.commandWorked(testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
+        assert.commandWorked(
+            testDB.runCommand({
+                collMod: collName,
+                index: {keyPattern: {a: 1}, prepareUnique: false},
+            }),
+        );
 
         // Checks that uniqueness constraint is not enforced.
         assert.commandWorked(coll.insert(duplicateDoc));
@@ -186,7 +203,9 @@ testCollModConvertUniqueWithSideWrites(initialDocsUnique, (coll) => {
     ];
     jsTestLog("Inserting additional documents after collMod completed index scan: " + tojson(docs));
     assert.commandWorked(coll.insert(docs));
-    jsTestLog("Successfully inserted documents. Resuming collMod index conversion: " + tojson(docs));
+    jsTestLog(
+        "Successfully inserted documents. Resuming collMod index conversion: " + tojson(docs),
+    );
 });
 
 // Checks successful conversion with a conflicting document rejected during collMod.

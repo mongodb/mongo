@@ -61,7 +61,12 @@ const queries = [
                                 {
                                     "a": {
                                         "$elemMatch": {
-                                            "$and": [{"m.m2": {"$in": [null]}, "a": {"$eq": NumberInt(0)}}],
+                                            "$and": [
+                                                {
+                                                    "m.m2": {"$in": [null]},
+                                                    "a": {"$eq": NumberInt(0)},
+                                                },
+                                            ],
                                             "a": {"$eq": NumberInt(0)},
                                         },
                                     },

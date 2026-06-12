@@ -64,7 +64,9 @@ let n_docs = t.count(),
 // in meters.
 //
 
-let n_min1400_count = t.find({loc: {$near: {$geometry: geoJSONPoint, $minDistance: 1400 * km}}}).count();
+let n_min1400_count = t
+    .find({loc: {$near: {$geometry: geoJSONPoint, $minDistance: 1400 * km}}})
+    .count();
 
 assert.eq(
     n_docs - n_docs_within(1400),
@@ -95,7 +97,9 @@ assert.eq(
 // with legacy point. min/maxDistance are in radians.
 //
 
-n_min1400_count = t.find({loc: {$nearSphere: legacyPoint, $minDistance: metersToRadians(1400 * km)}}).count();
+n_min1400_count = t
+    .find({loc: {$nearSphere: legacyPoint, $minDistance: metersToRadians(1400 * km)}})
+    .count();
 
 assert.eq(
     n_docs - n_docs_within(1400),
@@ -256,7 +260,9 @@ assert.eq(3, t.find({loc: {$nearSphere: [0, 0]}}).itcount());
 assert.eq(1, t.find({loc: {$nearSphere: [0, 0], $minDistance: deg2rad(41.5)}}).itcount());
 
 // Test minDistance for 2d index with $geoNear stage and spherical=false.
-let cmdResult = t.aggregate({$geoNear: {near: [0, 0], spherical: false, distanceField: "dis"}}).toArray();
+let cmdResult = t
+    .aggregate({$geoNear: {near: [0, 0], spherical: false, distanceField: "dis"}})
+    .toArray();
 assert.eq(3, cmdResult.length);
 assert.eq(40, cmdResult[0].dis);
 assert.eq(41, cmdResult[1].dis);
@@ -277,7 +283,9 @@ assert.eq(42, cmdResult[0].dis);
 
 // Test minDistance for 2d index with $geoNear stage and spherical=true. Distances are in
 // radians.
-cmdResult = t.aggregate({$geoNear: {near: [0, 0], spherical: true, distanceField: "dis"}}).toArray();
+cmdResult = t
+    .aggregate({$geoNear: {near: [0, 0], spherical: true, distanceField: "dis"}})
+    .toArray();
 assert.eq(3, cmdResult.length);
 assertApproxEqual(deg2rad(40), cmdResult[0].dis, 1e-3);
 assertApproxEqual(deg2rad(41), cmdResult[1].dis, 1e-3);

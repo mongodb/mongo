@@ -43,14 +43,20 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue,
 );
 assert.commandWorked(mongosDB.runCommand(distinct));
-assert.commandWorked(st.shard0.getDB("admin").runCommand({configureFailPoint: "failCommand", mode: "off"}));
+assert.commandWorked(
+    st.shard0.getDB("admin").runCommand({configureFailPoint: "failCommand", mode: "off"}),
+);
 
 // Setting a failpoint for "distinct" on a shard with failInternalCommands DOES affect mongos.
 assert.commandWorked(
     st.shard0.getDB("admin").runCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.BadValue, failCommands: ["distinct"], failInternalCommands: true},
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["distinct"],
+            failInternalCommands: true,
+        },
     }),
 );
 assert.commandFailedWithCode(mongosDB.runCommand(distinct), ErrorCodes.BadValue);

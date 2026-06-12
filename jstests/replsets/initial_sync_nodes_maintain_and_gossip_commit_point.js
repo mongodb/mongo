@@ -54,7 +54,10 @@ jsTest.log("Adding a new node to the replica set");
 const initialSyncNode = rst.add({
     setParameter: {
         // Make sure our initial sync node does not sync from the node with votes 0.
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": primary.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {"hostAndPort": primary.host},
+        }),
     },
 });
 
@@ -143,7 +146,11 @@ assert.soon(() => {
 // Verify that the non-voting secondary has received the updated commit point via heartbeats from
 // the initial sync node.
 assert.soon(
-    () => rs.compareOpTimes(getLastCommittedOpTime(nonVotingSecondary), getLastCommittedOpTime(initialSyncNode)) >= 0,
+    () =>
+        rs.compareOpTimes(
+            getLastCommittedOpTime(nonVotingSecondary),
+            getLastCommittedOpTime(initialSyncNode),
+        ) >= 0,
     "The nonVotingSecondary was unable to update its commit point from the initial sync node",
 );
 

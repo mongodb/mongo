@@ -18,7 +18,8 @@ import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server
 
 // TODO(SERVER-103530) : Remove multiversion check when 9.0 becomes last-continuous.
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 // Use small strings and a low memory limit to avoid overwhelming test machines while still
 // triggering spilling and memory limit enforcement.
@@ -98,7 +99,11 @@ const originalMemoryLimit = assert.commandWorked(
 ).internalNearStageMaxMemoryBytes;
 
 try {
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalNearStageMaxMemoryBytes", kMemoryLimitBytes);
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalNearStageMaxMemoryBytes",
+        kMemoryLimitBytes,
+    );
 
     {
         // Check regular collection - spilling buffer will spill
@@ -126,7 +131,11 @@ try {
         assert.commandWorked(
             db.runCommand({
                 create: clusteredColl.getName(),
-                clusteredIndex: {"key": {_id: 1}, "unique": true, "name": "small string clustered key"},
+                clusteredIndex: {
+                    "key": {_id: 1},
+                    "unique": true,
+                    "name": "small string clustered key",
+                },
             }),
         );
         clusteredColl.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
@@ -152,7 +161,11 @@ try {
         assert.commandWorked(
             db.runCommand({
                 create: clusteredColl.getName(),
-                clusteredIndex: {"key": {_id: 1}, "unique": true, "name": "large string clustered key"},
+                clusteredIndex: {
+                    "key": {_id: 1},
+                    "unique": true,
+                    "name": "large string clustered key",
+                },
             }),
         );
         clusteredColl.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
@@ -168,5 +181,9 @@ try {
         assertNearStageThrowsMemoryLimit(clusteredColl);
     }
 } finally {
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalNearStageMaxMemoryBytes", originalMemoryLimit);
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalNearStageMaxMemoryBytes",
+        originalMemoryLimit,
+    );
 }

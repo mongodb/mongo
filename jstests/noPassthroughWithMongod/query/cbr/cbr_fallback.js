@@ -59,7 +59,9 @@ function testPartialIndex() {
     // 1. Fetch(a) -> Ixscan(b)
     // 2. Fetch(b) -> Ixscan(a)
     // 3. Fetch -> IxIntersect [IxScan(a), Ixscan(b)]
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}),
+    );
     assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$gt: 10}}}));
     assert.commandWorked(coll.createIndex({b: 1}));
     const explain = coll.find({a: 20, b: 20}).explain();
@@ -124,7 +126,9 @@ function testTextIndex() {
     }
     {
         // Test fallback on TEXT_OR
-        const explain = coll.find({$text: {$search: "a b c"}}, {score: {$meta: "textScore"}}).explain();
+        const explain = coll
+            .find({$text: {$search: "a b c"}}, {score: {$meta: "textScore"}})
+            .explain();
         const plans = getAllPlans(explain);
         plans.forEach(assertPlanNotCosted);
     }
@@ -146,7 +150,9 @@ function test2dSphereGeoIndex() {
     assert.commandWorked(coll.createIndex({"2dsphere_loc": "2dsphere", b: 1}));
     const explain = coll
         .find({
-            "2dsphere_loc": {$near: {$geometry: {type: "Point", coordinates: [-73, 40]}, $maxDistance: 2}},
+            "2dsphere_loc": {
+                $near: {$geometry: {type: "Point", coordinates: [-73, 40]}, $maxDistance: 2},
+            },
             b: 1,
         })
         .explain();
@@ -230,7 +236,9 @@ function testLargeInList() {
     assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
     // Use samplingCE so the test does not depend on histograms.
-    const prevCEMode = assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "samplingCE"}));
+    const prevCEMode = assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "samplingCE"}),
+    );
 
     // CBR uses a CE cache for $in-lists with <= 1000 intervals; larger lists bypass the cache.
     // In both cases, CBR should cost and rank the plans.
@@ -251,13 +259,17 @@ function testLargeInList() {
     testQuery({a: {$in: nonCacheableIn}, b: {$lt: 50}});
 
     // Restore CE mode for the remaining tests.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: prevCEMode.was}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryCBRCEMode: prevCEMode.was}),
+    );
     assert.commandWorked(coll.dropIndexes());
 }
 
 function testDistictScan() {
     assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-    const explain = coll.explain().aggregate([{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", f: {$first: "$b"}}}]);
+    const explain = coll
+        .explain()
+        .aggregate([{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", f: {$first: "$b"}}}]);
     const plans = getAllPlans(explain);
     assert.gt(plans.length, 0);
     plans.forEach((plan) => {
@@ -270,7 +282,11 @@ function testDistictScan() {
 
 try {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "heuristicCE",
+        }),
     );
 
     testHashedIndex();
@@ -291,5 +307,7 @@ try {
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}),
+    );
 }

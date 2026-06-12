@@ -46,7 +46,9 @@ const db = replSet.getPrimary().getDB(jsTestName());
 let coll = db.getCollection(collName + "1");
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 // Helper to log timeseries stats.
@@ -88,7 +90,10 @@ let compressedBuckets = timeseriesStats.numCompressedBuckets;
 // Ensure we have not closed any buckets due to size or cache pressure.
 assert.eq(bucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
 assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
-assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), belowCardinalityThreshold);
+assert.eq(
+    getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)),
+    belowCardinalityThreshold,
+);
 
 // We insert enough data to cause buckets to roll over due to their size exceeding the maximum
 // bucket size. Because the cardinality is below the threshold at which the maximum bucket size
@@ -127,7 +132,9 @@ assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
 coll = db.getCollection(collName + "2");
 coll.drop();
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 // If we pass the cardinality point to simulate cache pressure, we will begin to see buckets
@@ -177,6 +184,10 @@ assert.eq(timeseriesStats.numBucketsClosedDueToMemoryThreshold, 0, formatStatsLo
 // Previously, the bucket max size was 128KB, but under cache pressure using
 // 'aboveCardinalityThreshold', the max size drops to roughly ~55KB. Therfore, all of the buckets
 // should have been closed due to cache pressure.
-assert.eq(bucketsClosedDueToCachePressure, aboveCardinalityThreshold, formatStatsLog(timeseriesStats));
+assert.eq(
+    bucketsClosedDueToCachePressure,
+    aboveCardinalityThreshold,
+    formatStatsLog(timeseriesStats),
+);
 
 replSet.stopSet();

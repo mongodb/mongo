@@ -23,7 +23,16 @@ const test = () => {
     // Verify we can connect
     assert.eq(
         0,
-        runMongoProgram("mongo", "--tls", "--tlsCAFile", ECDSA_CA_CERT, "--port", mongod.port, "--eval", "db.hello()"),
+        runMongoProgram(
+            "mongo",
+            "--tls",
+            "--tlsCAFile",
+            ECDSA_CA_CERT,
+            "--port",
+            mongod.port,
+            "--eval",
+            "db.hello()",
+        ),
         "mongo did not initialize properly",
     );
 

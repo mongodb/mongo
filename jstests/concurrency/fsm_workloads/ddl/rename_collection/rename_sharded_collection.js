@@ -17,7 +17,11 @@
 
 const numDocs = 100;
 const dbNames = ["db0", "db1"];
-const collNames = ["rename_sharded_collectionA", "rename_sharded_collectionB", "rename_sharded_collectionC"];
+const collNames = [
+    "rename_sharded_collectionA",
+    "rename_sharded_collectionB",
+    "rename_sharded_collectionC",
+];
 
 /*
  * Initialize a collection with expected number of chunks/documents and randomly distribute chunks
@@ -50,7 +54,10 @@ function getRandomCollName(tid) {
 /*
  * Keep track of raised exceptions in a collection to be checked during teardown.
  */
-const expectedExceptions = [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress];
+const expectedExceptions = [
+    ErrorCodes.NamespaceNotFound,
+    ErrorCodes.ConflictingOperationInProgress,
+];
 const logExceptionsDBName = "exceptions";
 const logExceptionsCollName = "log";
 

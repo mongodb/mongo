@@ -21,7 +21,9 @@ void (function testOptimizedShardCollection() {
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: "hashed"}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: "hashed"}}),
+    );
 
     assert(
         shardKnowledgeIsShardedOrUnknown(st.shard0, `${dbName}.${collName}`),
@@ -44,7 +46,9 @@ void (function testmovePrimary() {
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}),
+    );
 
     assert.commandWorked(
         st.s.adminCommand({

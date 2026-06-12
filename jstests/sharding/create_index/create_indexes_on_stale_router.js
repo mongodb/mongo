@@ -29,7 +29,9 @@ const mongos1 = st.s1.getDB(dbName);
 
 // Insert some dummy data using 'mongos1' as the router, so that the cache is
 // initialized on the mongos while the collection is unsharded.
-assert.commandWorked(mongos1.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}));
+assert.commandWorked(
+    mongos1.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}),
+);
 assert.commandWorked(mongos1.getCollection(collName).insert({_id: "aaa"}));
 
 // Drop and shard the collection with 'mongos0' as the router.
@@ -46,7 +48,9 @@ createIndexOnStaleRouter(mongos1);
 
 // Drop the database and create a new one.
 assert.commandWorked(st.s0.getDB(dbName).dropDatabase());
-assert.commandWorked(mongos0.adminCommand({shardCollection: `${dbName}.${collName}`, key: shardKey}));
+assert.commandWorked(
+    mongos0.adminCommand({shardCollection: `${dbName}.${collName}`, key: shardKey}),
+);
 
 createIndexOnStaleRouter(mongos1);
 st.stop();

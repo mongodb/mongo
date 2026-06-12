@@ -25,7 +25,10 @@ function compareId(a, b) {
 
 // Helper for testing that pipeline returns correct set of results.
 function testPipeline(pipeline, expectedResult, collection) {
-    arrayEq(collection.aggregate(pipeline).toArray().sort(compareId), expectedResult.sort(compareId));
+    arrayEq(
+        collection.aggregate(pipeline).toArray().sort(compareId),
+        expectedResult.sort(compareId),
+    );
 }
 
 function runTest(coll, from, thirdColl, fourthColl) {
@@ -53,7 +56,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
         {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
     ];
-    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}], expectedResults, coll);
+    testPipeline(
+        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}],
+        expectedResults,
+        coll,
+    );
 
     // If localField is nonexistent, it is treated as if it is null.
     expectedResults = [
@@ -102,7 +109,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 1, "a": [{_id: 1, b: null}, {_id: 2}]},
         {_id: 2, "a": [{_id: 1, b: null}, {_id: 2}]},
     ];
-    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "a"}}], expectedResults, coll);
+    testPipeline(
+        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "a"}}],
+        expectedResults,
+        coll,
+    );
 
     // Running multiple $lookups in the same pipeline is allowed.
     expectedResults = [
@@ -133,7 +144,10 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 2, same: {_id: 2}},
     ];
     testPipeline(
-        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}, {$unwind: {path: "$same"}}],
+        [
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
+            {$unwind: {path: "$same"}},
+        ],
         expectedResults,
         coll,
     );
@@ -198,7 +212,13 @@ function runTest(coll, from, thirdColl, fourthColl) {
     testPipeline(
         [
             {$lookup: {localField: "_id", foreignField: "b", from: "from", as: "same"}},
-            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true, includeArrayIndex: "index"}},
+            {
+                $unwind: {
+                    path: "$same",
+                    preserveNullAndEmptyArrays: true,
+                    includeArrayIndex: "index",
+                },
+            },
         ],
         expectedResults,
         coll,
@@ -216,7 +236,10 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
     ];
     testPipeline(
-        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}, {$project: {"same": 1}}],
+        [
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
+            {$project: {"same": 1}},
+        ],
         expectedResults,
         coll,
     );
@@ -462,7 +485,9 @@ function runTest(coll, from, thirdColl, fourthColl) {
     //
     // Test $lookup when the foreign collection is a view.
     //
-    assert.commandWorked(coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
+    assert.commandWorked(
+        coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}),
+    );
     pipeline = [
         {
             $lookup: {
@@ -487,9 +512,21 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // 'from', 'as', 'localField' and 'foreignField' must all be specified when run with
     // localField/foreignField syntax.
-    assertErrorCode(coll, [{$lookup: {foreignField: "b", from: "from", as: "same"}}], ErrorCodes.FailedToParse);
-    assertErrorCode(coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], ErrorCodes.FailedToParse);
-    assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], ErrorCodes.FailedToParse);
+    assertErrorCode(
+        coll,
+        [{$lookup: {foreignField: "b", from: "from", as: "same"}}],
+        ErrorCodes.FailedToParse,
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: "a", from: "from", as: "same"}}],
+        ErrorCodes.FailedToParse,
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: "a", foreignField: "b", as: "same"}}],
+        ErrorCodes.FailedToParse,
+    );
     // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test case.
     assertErrorCode(
         coll,
@@ -571,9 +608,16 @@ runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl)
 // Verify that the command targets exactly one shard when both the local and foreign collections are
 // unsharded.
 const explain = assert.commandWorked(
-    mongosDB.lookup
-        .explain()
-        .aggregate([{$lookup: {from: mongosDB.from.getName(), localField: "a", foreignField: "b", as: "results"}}]),
+    mongosDB.lookup.explain().aggregate([
+        {
+            $lookup: {
+                from: mongosDB.from.getName(),
+                localField: "a",
+                foreignField: "b",
+                as: "results",
+            },
+        },
+    ]),
 );
 
 // Note that in a mixed version cluster, the presence of the 'shards' field will depend on the

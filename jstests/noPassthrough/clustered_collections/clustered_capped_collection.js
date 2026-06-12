@@ -26,7 +26,12 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     nonReplicatedColl.drop();
 
     ClusteredCappedUtils.testClusteredCappedCollectionWithTTL(replicatedDB, collName, "_id");
-    ClusteredCappedUtils.testClusteredTailableCursorCreation(replicatedDB, collName, "_id", true /* isReplicated */);
+    ClusteredCappedUtils.testClusteredTailableCursorCreation(
+        replicatedDB,
+        collName,
+        "_id",
+        true /* isReplicated */,
+    );
     for (let awaitData of [false, true]) {
         ClusteredCappedUtils.testClusteredTailableCursorWithTTL(
             replicatedDB,

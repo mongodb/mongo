@@ -28,7 +28,10 @@ const createViewAndSearchIndexDef = function (name, pipeline) {
 
 const testSearchIndexOnInvalidView = function ({name, pipeline, errorCode}) {
     const searchIndexDef = createViewAndSearchIndexDef(name, pipeline);
-    assert.commandFailedWithCode(testDb.runCommand({createSearchIndexes: name, indexes: [searchIndexDef]}), errorCode);
+    assert.commandFailedWithCode(
+        testDb.runCommand({createSearchIndexes: name, indexes: [searchIndexDef]}),
+        errorCode,
+    );
 };
 
 // ===============================================================================
@@ -36,7 +39,9 @@ const testSearchIndexOnInvalidView = function ({name, pipeline, errorCode}) {
 // ===============================================================================
 testSearchIndexOnInvalidView({
     name: "search_index_lookup_view",
-    pipeline: [{$lookup: {from: coll.getName(), localField: "_id", foreignField: "abc", as: "123"}}],
+    pipeline: [
+        {$lookup: {from: coll.getName(), localField: "_id", foreignField: "abc", as: "123"}},
+    ],
     errorCode: invalidStageErrorCode,
 });
 
@@ -52,7 +57,11 @@ testSearchIndexOnInvalidView({
     errorCode: invalidStageErrorCode,
 });
 
-testSearchIndexOnInvalidView({name: "search_index_search_view", pipeline: [{$search: {}}], errorCode: 10623000});
+testSearchIndexOnInvalidView({
+    name: "search_index_search_view",
+    pipeline: [{$search: {}}],
+    errorCode: 10623000,
+});
 
 testSearchIndexOnInvalidView({
     name: "search_index_project_view",
@@ -157,5 +166,7 @@ testSearchIndexOnInvalidView({
 (function testEmptyMatchIsValid() {
     const viewName = "search_index_empty_match_view";
     const searchIndexDef = createViewAndSearchIndexDef(viewName, [{$match: {}}]);
-    assert.commandWorked(testDb.runCommand({createSearchIndexes: viewName, indexes: [searchIndexDef]}));
+    assert.commandWorked(
+        testDb.runCommand({createSearchIndexes: viewName, indexes: [searchIndexDef]}),
+    );
 })();

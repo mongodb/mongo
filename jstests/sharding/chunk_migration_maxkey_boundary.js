@@ -29,14 +29,21 @@ function setupCollection(suffix, shardKey) {
     const dbName = testName + "_" + suffix;
     const ns = dbName + ".coll";
     const testDB = st.s.getDB(dbName);
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
     return {dbName, ns, coll: testDB.coll, shard0DB: st.shard0.getDB(dbName)};
 }
 
 function moveChunkAndWait(ns, findDoc) {
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: findDoc, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: findDoc,
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 }
 
@@ -108,7 +115,12 @@ function assertMigrationComplete(dbName, ns, coll, shard0DB, expectedCount) {
     );
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 10}}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: {x: 0},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     assert.eq(2, st.shard1.getDB(dbName).coll.find().itcount(), "shard1 has x=1 and x=5");
@@ -123,29 +135,44 @@ function assertMigrationComplete(dbName, ns, coll, shard0DB, expectedCount) {
 
     // 5a: Exact index
     const t5a = setupCollection("rd_exact", {x: 1});
-    assert.commandWorked(shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"}));
+    assert.commandWorked(
+        shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"}),
+    );
     assert.commandWorked(t5a.coll.insertMany([{x: MaxKey()}, {x: 5}]));
-    assert.commandWorked(st.s.adminCommand({moveChunk: t5a.ns, find: {x: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: t5a.ns, find: {x: 0}, to: st.shard1.shardName}),
+    );
     assert.eq(2, st.shard1.getDB(t5a.dbName).coll.find().itcount(), "Both docs on shard1");
     assert.eq(2, t5a.shard0DB.coll.find().itcount(), "Orphans still on shard0");
-    assert.commandWorked(shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"}));
-    assert.soon(() => t5a.shard0DB.coll.find().itcount() === 0, "Range deleter should clean up MaxKey orphans");
+    assert.commandWorked(
+        shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"}),
+    );
+    assert.soon(
+        () => t5a.shard0DB.coll.find().itcount() === 0,
+        "Range deleter should clean up MaxKey orphans",
+    );
     t5a.coll.drop();
 
     // 5b: Wider index {x:1,y:1}
     const t5b = setupCollection("rd_wider", {x: 1});
     assert.commandWorked(t5b.coll.createIndex({x: 1, y: 1}));
     assert.commandWorked(t5b.coll.dropIndex({x: 1}));
-    assert.commandWorked(shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"}));
+    assert.commandWorked(
+        shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"}),
+    );
     assert.commandWorked(
         t5b.coll.insertMany([
             {x: MaxKey(), y: 10},
             {x: 5, y: 20},
         ]),
     );
-    assert.commandWorked(st.s.adminCommand({moveChunk: t5b.ns, find: {x: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: t5b.ns, find: {x: 0}, to: st.shard1.shardName}),
+    );
     assert.eq(2, st.shard1.getDB(t5b.dbName).coll.find().itcount(), "Both docs on shard1");
-    assert.commandWorked(shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"}));
+    assert.commandWorked(
+        shard0Admin.runCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"}),
+    );
     assert.soon(
         () => t5b.shard0DB.coll.find().itcount() === 0,
         "Range deleter with wider index should clean up MaxKey orphans",
@@ -178,11 +205,20 @@ function assertMigrationComplete(dbName, ns, coll, shard0DB, expectedCount) {
     const dbName = testName + "_zones";
     const ns = dbName + ".coll";
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
-    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone_all"}));
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey()}, max: {x: MaxKey()}, zone: "zone_all"}),
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone_all"}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({
+            updateZoneKeyRange: ns,
+            min: {x: MinKey()},
+            max: {x: MaxKey()},
+            zone: "zone_all",
+        }),
     );
 
     const tags = st.s.getDB("config").tags.find({ns}).toArray();
@@ -198,7 +234,9 @@ function assertMigrationComplete(dbName, ns, coll, shard0DB, expectedCount) {
             zone: null,
         }),
     );
-    assert.commandWorked(st.s.adminCommand({removeShardFromZone: st.shard0.shardName, zone: "zone_all"}));
+    assert.commandWorked(
+        st.s.adminCommand({removeShardFromZone: st.shard0.shardName, zone: "zone_all"}),
+    );
     st.s.getDB(dbName).coll.drop();
 }
 
@@ -216,13 +254,20 @@ function assertMigrationComplete(dbName, ns, coll, shard0DB, expectedCount) {
     // Directly insert a MaxKey orphan on shard1 (bypassing mongos to simulate an orphan from
     // a prior buggy migration that left it behind). The wider index {x:1, y:1} means the scan
     // must use extendRangeBound to pad bounds to match the index width.
-    assert.commandWorked(st.shard1.getDB(dbName).coll.insert({_id: "orphan_maxkey", x: MaxKey(), y: 42}));
+    assert.commandWorked(
+        st.shard1.getDB(dbName).coll.insert({_id: "orphan_maxkey", x: MaxKey(), y: 42}),
+    );
 
     // Migrate the chunk [MinKey, MaxKey) from shard0 to shard1. The recipient's pre-cloning
     // check should detect the orphaned MaxKey document and abort the migration. Without the
     // extendRangeBound fix, the wider index scan would use {x: MaxKey, y: MinKey} as the
     // upper bound, missing the orphan at {x: MaxKey, y: 42}.
-    const result = st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true});
+    const result = st.s.adminCommand({
+        moveChunk: ns,
+        find: {x: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    });
 
     assert.commandFailed(result);
 

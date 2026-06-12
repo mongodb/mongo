@@ -9,7 +9,12 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {checkHealthLog, logQueries, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {
+    checkHealthLog,
+    logQueries,
+    resetAndInsert,
+    runDbCheck,
+} from "jstests/replsets/libs/dbcheck_utils.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // This test injects inconsistencies between replica set members; do not fail because of expected
@@ -37,14 +42,20 @@ const primaryColl = primaryDB.getCollection(collName);
 
 const nDocs = 200;
 resetAndInsert(replSet, primaryDB, collName, nDocs);
-assert.commandWorked(primaryDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(
+    primaryDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
+);
 replSet.awaitReplication();
 assert.eq(primaryColl.find({}).count(), nDocs);
 
 // Set up inconsistency.
-const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-    indexName: "a_1",
-});
+const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+    primaryDB,
+    "skipUnindexingDocumentWhenDeleted",
+    {
+        indexName: "a_1",
+    },
+);
 jsTestLog("Deleting docs");
 const stableTimestamp = assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -57,9 +68,13 @@ primary = rollbackTest.getPrimary();
 primaryDB = primary.getDB(dbName);
 
 // Hold stable timestamp.
-const stableTimestampFailPoint = configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {
-    timestamp: stableTimestamp,
-});
+const stableTimestampFailPoint = configureFailPoint(
+    primary,
+    "holdStableTimestampAtSpecificTimestamp",
+    {
+        timestamp: stableTimestamp,
+    },
+);
 
 runDbCheck(rollbackTest, primaryDB, collName, {
     validateMode: "extraIndexKeysCheck",

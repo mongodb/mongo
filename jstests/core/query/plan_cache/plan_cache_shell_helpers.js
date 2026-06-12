@@ -28,7 +28,11 @@ function assertCacheContent(expectedShapes) {
     const cacheContents = coll.getPlanCache().list();
     let cacheKeysSet = new Set();
     for (let i = 0; i < cacheContents.length; i++) {
-        cacheKeysSet.add(isSbeEnabled ? cacheContents[i].planCacheKey : tojson(cacheContents[i].createdFromQuery));
+        cacheKeysSet.add(
+            isSbeEnabled
+                ? cacheContents[i].planCacheKey
+                : tojson(cacheContents[i].createdFromQuery),
+        );
     }
     for (const [shape, shouldBeInCache] of expectedShapes) {
         let searchKey = isSbeEnabled
@@ -196,7 +200,12 @@ assertCacheContent([
 
 // Should not error on missing or extra fields in query shape object.
 planCache.clearPlansByQuery({query: queryB});
-planCache.clearPlansByQuery({query: queryB, sort: sortC, projection: projectionB, unknown_field: 1});
+planCache.clearPlansByQuery({
+    query: queryB,
+    sort: sortC,
+    projection: projectionB,
+    unknown_field: 1,
+});
 
 //
 // collection.getPlanCache().clear

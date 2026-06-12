@@ -50,7 +50,9 @@ export function withPinnedCursor({
         assert.neq(cursorId, NumberLong(0));
 
         // Enable the specified failpoint.
-        assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}),
+        );
 
         // In a different shell pin the cursor by calling 'getMore' on it that would be blocked by
         // the failpoint.

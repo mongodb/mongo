@@ -30,7 +30,8 @@ export var kDefaultWaitForFailPointTimeout;
         if (!names) {
             return failPointName;
         }
-        const isRouter = typeof conn.getMongo == "function" ? isMongos(conn) : isMongos(conn.getDB("admin"));
+        const isRouter =
+            typeof conn.getMongo == "function" ? isMongos(conn) : isMongos(conn.getDB("admin"));
         return isRouter ? names.router : names.shard;
     }
 
@@ -48,7 +49,11 @@ export var kDefaultWaitForFailPointTimeout;
         failPointName = getActualFailPointName(conn, failPointName);
 
         const res = sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-            return conn.adminCommand({configureFailPoint: failPointName, mode: failPointMode, data: data});
+            return conn.adminCommand({
+                configureFailPoint: failPointName,
+                mode: failPointMode,
+                data: data,
+            });
         }, "Timed out enabling fail point " + failPointName);
 
         return {
@@ -108,12 +113,21 @@ export var kDefaultWaitForFailPointTimeout;
         };
     };
 
-    configureFailPointForRS = function (conns, failPointName, data = {}, failPointMode = "alwaysOn") {
+    configureFailPointForRS = function (
+        conns,
+        failPointName,
+        data = {},
+        failPointMode = "alwaysOn",
+    ) {
         failPointName = getShardFailPointName(failPointName);
 
         conns.forEach((conn) => {
             sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-                return conn.adminCommand({configureFailPoint: failPointName, mode: failPointMode, data: data});
+                return conn.adminCommand({
+                    configureFailPoint: failPointName,
+                    mode: failPointMode,
+                    data: data,
+                });
             }, "Timed out setting failpoint " + failPointName);
         });
 
@@ -131,25 +145,39 @@ export var kDefaultWaitForFailPointTimeout;
     };
 })();
 
-export function configureFailPointForAllShardsAndMongos({conn, failPointName, data = {}, failPointMode}) {
+export function configureFailPointForAllShardsAndMongos({
+    conn,
+    failPointName,
+    data = {},
+    failPointMode,
+}) {
     const isMultiShardedClusterFixture = TestData.isMultiShardedClusterFixture || false;
 
     let rootConnections;
     if (isMultiShardedClusterFixture) {
-        const clusterDocs = db.getMongo().getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
+        const clusterDocs = db
+            .getMongo()
+            .getDB("config")
+            .multiShardedClusterFixture.find()
+            .sort({_id: 1})
+            .toArray();
         rootConnections = clusterDocs.map((doc) => new Mongo(doc.connectionString, undefined));
     } else {
         rootConnections = [db.getMongo()];
     }
 
-    const hosts = rootConnections.flatMap((rootConn) => DiscoverTopology.findNonConfigNodes(rootConn));
+    const hosts = rootConnections.flatMap((rootConn) =>
+        DiscoverTopology.findNonConfigNodes(rootConn),
+    );
 
     for (const host of hosts) {
         const hostConn = new Mongo(host, undefined);
         assert.commandWorked(
-            hostConn
-                .getDB("admin")
-                .runCommand({"configureFailPoint": failPointName, "mode": failPointMode, data: data}),
+            hostConn.getDB("admin").runCommand({
+                "configureFailPoint": failPointName,
+                "mode": failPointMode,
+                data: data,
+            }),
         );
     }
 }

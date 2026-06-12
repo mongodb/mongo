@@ -43,27 +43,32 @@ assert.commandWorked(getCollWithDirectShardConn().insert({x: 0}));
 const tests = [
     {
         desc: "upsert that results in an insert",
-        doWrite: (directColl) => directColl.update({x: 1}, {$inc: {y: 1}}, {upsert: true, multi: false}),
+        doWrite: (directColl) =>
+            directColl.update({x: 1}, {$inc: {y: 1}}, {upsert: true, multi: false}),
         expectedCollection: [{x: 0}, {x: 1, y: 1}],
     },
     {
         desc: "upsert that results in an insert, but with multi:true",
-        doWrite: (directColl) => directColl.update({x: 2}, {$inc: {y: 1}}, {upsert: true, multi: true}),
+        doWrite: (directColl) =>
+            directColl.update({x: 2}, {$inc: {y: 1}}, {upsert: true, multi: true}),
         expectedCollection: [{x: 0}, {x: 1, y: 1}, {x: 2, y: 1}],
     },
     {
         desc: "upsert that results in a regular update",
-        doWrite: (directColl) => directColl.update({x: 2}, {$inc: {y: 1}}, {upsert: true, multi: true}),
+        doWrite: (directColl) =>
+            directColl.update({x: 2}, {$inc: {y: 1}}, {upsert: true, multi: true}),
         expectedCollection: [{x: 0}, {x: 1, y: 1}, {x: 2, y: 2}],
     },
     {
         desc: "non-upsert multi:true update which affects multiple documents",
-        doWrite: (directColl) => directColl.update({x: {$gte: 1}}, {$inc: {y: 1}}, {upsert: false, multi: true}),
+        doWrite: (directColl) =>
+            directColl.update({x: {$gte: 1}}, {$inc: {y: 1}}, {upsert: false, multi: true}),
         expectedCollection: [{x: 0}, {x: 1, y: 2}, {x: 2, y: 3}],
     },
     {
         desc: "non-upsert multi:false update",
-        doWrite: (directColl) => directColl.update({x: 2}, {$inc: {y: 1}}, {upsert: false, multi: false}),
+        doWrite: (directColl) =>
+            directColl.update({x: 2}, {$inc: {y: 1}}, {upsert: false, multi: false}),
         expectedCollection: [{x: 0}, {x: 1, y: 2}, {x: 2, y: 4}],
     },
     {

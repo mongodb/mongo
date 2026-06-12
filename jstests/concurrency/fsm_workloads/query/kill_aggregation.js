@@ -35,7 +35,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // collection getting dropped on another thread.
             assert.contains(
                 aggResult.code,
-                [ErrorCodes.NamespaceNotFound, ErrorCodes.OperationFailed, ErrorCodes.QueryPlanKilled],
+                [
+                    ErrorCodes.NamespaceNotFound,
+                    ErrorCodes.OperationFailed,
+                    ErrorCodes.QueryPlanKilled,
+                ],
                 aggResult,
             );
             return;

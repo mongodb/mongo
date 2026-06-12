@@ -17,7 +17,9 @@ const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 
 function runTestSuccess(sessionOpts) {
     const commands = [
@@ -59,13 +61,24 @@ function runTestSuccess(sessionOpts) {
     assert.eq(res.responses[1], {n: 2, ok: 1}, tojson(res));
     assert.eq(res.responses[2], {nModified: 1, n: 1, ok: 1}, tojson(res));
     assert.eq(res.responses[3], {n: 1, ok: 1}, tojson(res));
-    assert.sameMembers(res.responses[4].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
+    assert.sameMembers(
+        res.responses[4].cursor.firstBatch,
+        [{_id: 1}, {_id: 2, updated: true}],
+        tojson(res),
+    );
     assert.eq(res.responses[4].cursor.id, 0, tojson(res));
-    assert.sameMembers(res.responses[5].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
+    assert.sameMembers(
+        res.responses[5].cursor.firstBatch,
+        [{_id: 1}, {_id: 2, updated: true}],
+        tojson(res),
+    );
     assert.eq(res.responses[5].cursor.id, 0, tojson(res));
 
     // The written documents should be visible outside the transaction.
-    assert.sameMembers(st.s.getCollection(kNs).find().toArray(), [{_id: 1}, {_id: 2, updated: true}]);
+    assert.sameMembers(st.s.getCollection(kNs).find().toArray(), [
+        {_id: 1},
+        {_id: 2, updated: true},
+    ]);
 
     // Clean up.
     assert.commandWorked(st.s.getCollection(kNs).remove({}, false /* justOne */));
@@ -93,7 +106,8 @@ function runTestFailure(sessionOpts) {
 
     // TODO (SERVER-88107): Simplify this path once 9.0 becomes last LTS.
     const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
     if (!isMultiversion) {
         const res = assert.commandFailedWithCode(shard0Primary.adminCommand(testCmd), 6349501);
         assert(!res.hasOwnProperty("responses"));
@@ -144,14 +158,18 @@ function runTestGetMore(sessionOpts) {
 
     // TODO (SERVER-88107): Simplify this path once 9.0 becomes last LTS.
     const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
     if (!isMultiversion) {
         assert.gt(commandMetricsAfter.clusterFind.total, commandMetricsBefore.clusterFind.total);
         if (!commandMetricsBefore.clusterGetMore) {
             // The unsharded case runs before any cluster getMores are run.
             assert.gt(commandMetricsAfter.clusterGetMore.total, 0);
         } else {
-            assert.gt(commandMetricsAfter.clusterGetMore.total, commandMetricsBefore.clusterGetMore.total);
+            assert.gt(
+                commandMetricsAfter.clusterGetMore.total,
+                commandMetricsBefore.clusterGetMore.total,
+            );
         }
     }
 

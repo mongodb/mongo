@@ -26,13 +26,23 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
         command: "insert",
         keysExamined: 0,
         docsExamined: 0,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0, nDeleteOps: 0},
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: 1,
+            nUpdateOps: 0,
+            nDeleteOps: 0,
+        },
     });
 
     if (shardConn) {
         // Verify the shard also recorded the insert in its own query stats store.
         const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
-        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {shardEntries});
+        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
+            shardEntries,
+        });
         assertAggregatedMetricsSingleExec(shardEntries[0], {
             keysExamined: 0,
             docsExamined: 0,
@@ -40,25 +50,45 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
             usedDisk: false,
             fromMultiPlanner: false,
             fromPlanCache: false,
-            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0, nDeleteOps: 0},
+            writes: {
+                nMatched: 0,
+                nUpserted: 0,
+                nModified: 0,
+                nDeleted: 0,
+                nInserted: 1,
+                nUpdateOps: 0,
+                nDeleteOps: 0,
+            },
         });
     }
 }
 
 function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(coll.deleteMany({}));
-    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{v: 1}, {v: 2}, {v: 3}]}));
+    assert.commandWorked(
+        testDB.runCommand({insert: collName, documents: [{v: 1}, {v: 2}, {v: 3}]}),
+    );
     assertWriteCmdQueryStatsSingleExec(testDB, coll, {
         command: "insert",
         keysExamined: 0,
         docsExamined: 0,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0, nDeleteOps: 0},
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: 3,
+            nUpdateOps: 0,
+            nDeleteOps: 0,
+        },
     });
 
     if (shardConn) {
         // Verify the shard also recorded the insert in its own query stats store.
         const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
-        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {shardEntries});
+        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {
+            shardEntries,
+        });
         assertAggregatedMetricsSingleExec(shardEntries[0], {
             keysExamined: 0,
             docsExamined: 0,
@@ -66,7 +96,15 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
             usedDisk: false,
             fromMultiPlanner: false,
             fromPlanCache: false,
-            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0, nDeleteOps: 0},
+            writes: {
+                nMatched: 0,
+                nUpserted: 0,
+                nModified: 0,
+                nDeleted: 0,
+                nInserted: 3,
+                nUpdateOps: 0,
+                nDeleteOps: 0,
+            },
         });
     }
 }
@@ -211,11 +249,16 @@ describe("query stats insert command metrics (replica set)", function () {
             assert.eq(
                 allRetryResult.retriedStmtIds,
                 [0, 1],
-                "Expected retriedStmtIds [0, 1] (every statement a retry): " + tojson(allRetryResult.retriedStmtIds),
+                "Expected retriedStmtIds [0, 1] (every statement a retry): " +
+                    tojson(allRetryResult.retriedStmtIds),
             );
 
             entries = getQueryStatsInsertCmd(conn, {collName: collName});
-            assert.eq(entries.length, 1, "Expected still 1 query stats entry after all-retry batch");
+            assert.eq(
+                entries.length,
+                1,
+                "Expected still 1 query stats entry after all-retry batch",
+            );
             assert.eq(
                 entries[0].metrics.execCount,
                 3,
@@ -291,12 +334,21 @@ describe("query stats insert command metrics (sharded)", function () {
         // Pin shard1 as primary so routing is deterministic: negative _ids stay on shard1
         // (primary), non-negative _ids move to shard0 (non-primary).
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: st.shard1.shardName,
+            }),
         );
-        assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}),
+        );
         assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
         assert.commandWorked(
-            st.s.adminCommand({movechunk: coll.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
+            st.s.adminCommand({
+                movechunk: coll.getFullName(),
+                find: {_id: 0},
+                to: st.shard0.shardName,
+            }),
         );
     });
 

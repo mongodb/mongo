@@ -39,7 +39,12 @@ function performUpsert() {
 assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 
 // Will hang upsert operations just prior to performing an insert.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "hangBeforeBulkWritePerformsUpdate",
+        mode: "alwaysOn",
+    }),
+);
 
 const awaitUpdate1 = startParallelShell(performUpsert, rst.ports[0]);
 const awaitUpdate2 = startParallelShell(performUpsert, rst.ports[0]);
@@ -50,7 +55,9 @@ assert.soon(() => {
     return curOps.length === 2;
 });
 
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "off"}),
+);
 
 awaitUpdate1();
 awaitUpdate2();
@@ -61,8 +68,14 @@ assert(!cursor.hasNext(), cursor.toArray());
 
 // Confirm that oplog entries exist for both insert and update operation.
 const oplogColl = testDB.getSiblingDB("local").getCollection("oplog.rs");
-assert.eq(1, oplogColl.find({"op": "i", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount());
-assert.eq(1, oplogColl.find({"op": "u", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount());
+assert.eq(
+    1,
+    oplogColl.find({"op": "i", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount(),
+);
+assert.eq(
+    1,
+    oplogColl.find({"op": "u", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount(),
+);
 
 //
 // Confirm DuplicateKey error for cases that should not be retried.

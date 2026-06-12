@@ -35,7 +35,9 @@ function testIntegrityCheck(turnFailpointOn) {
     jsTestLog("turnFailpointOn {" + turnFailpointOn + "}");
 
     coll.drop();
-    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     // Insert first measurement, creating our first bucket A.
     assert.commandWorked(coll.insert(measurements[0]));
@@ -52,7 +54,10 @@ function testIntegrityCheck(turnFailpointOn) {
     if (turnFailpointOn) {
         // Turn on the failpoint that causes the timeseries data integrity check to fail.
         assert.commandWorked(
-            testDB.adminCommand({configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate", mode: {times: 1}}),
+            testDB.adminCommand({
+                configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate",
+                mode: {times: 1},
+            }),
         );
 
         // Insert third measurement - this should cause the first bucket A that we closed to be
@@ -71,7 +76,11 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
-        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward,
+            1,
+            tojson(stats.timeseries),
+        );
 
         // Insert fourth measurement.
         assert.commandWorked(coll.insert(measurements[3]));
@@ -85,7 +94,11 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
-        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 2, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward,
+            2,
+            tojson(stats.timeseries),
+        );
     } else {
         // Insert third measurement.
         assert.commandWorked(coll.insert(measurements[2]));
@@ -100,7 +113,11 @@ function testIntegrityCheck(turnFailpointOn) {
         // We won't close bucket A due to reopening because it is marked with a rolloverReason
         // before we try to load it into the bucket catalog.
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 0, tojson(stats.timeseries));
-        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward,
+            1,
+            tojson(stats.timeseries),
+        );
 
         // Insert fourth measurement.
         assert.commandWorked(coll.insert(measurements[3]));
@@ -115,7 +132,11 @@ function testIntegrityCheck(turnFailpointOn) {
         // We will use bucket B which was marked with roll-over reason "TimeForward" for
         // measurement 4.
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
-        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward,
+            1,
+            tojson(stats.timeseries),
+        );
     }
 }
 

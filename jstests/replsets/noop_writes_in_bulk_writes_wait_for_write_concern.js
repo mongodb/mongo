@@ -311,7 +311,10 @@ function testCommandWithWriteConcern(cmd) {
     }
 
     // Run in a parallel shell as we expect this to hang.
-    const awaitBulkWrite = startParallelShell(funWithArgs(runBulkReq, primary.host, cmd), replTest.ports[0]);
+    const awaitBulkWrite = startParallelShell(
+        funWithArgs(runBulkReq, primary.host, cmd),
+        replTest.ports[0],
+    );
 
     // Wait to see that the bulkWrite has hit the failpoint.
     failpoint.wait();

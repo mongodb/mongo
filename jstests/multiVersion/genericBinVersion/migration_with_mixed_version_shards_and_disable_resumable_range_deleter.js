@@ -20,7 +20,9 @@ function getNewNs(dbName) {
 }
 
 function setDisableResumableRangeDeleter(value, rs) {
-    const getParameterRes = rs.getPrimary().adminCommand({getParameter: 1, disableResumableRangeDeleter: 1});
+    const getParameterRes = rs
+        .getPrimary()
+        .adminCommand({getParameter: 1, disableResumableRangeDeleter: 1});
     assert.commandWorked(getParameterRes);
     if (getParameterRes.disableResumableRangeDeleter == value) {
         return;
@@ -33,7 +35,9 @@ const st = new ShardingTest({
     shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-lts"}]}},
     other: {mongosOptions: {binVersion: "last-lts"}},
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 const vLatestShard = st.rs0;
 const v44shard = st.rs1;

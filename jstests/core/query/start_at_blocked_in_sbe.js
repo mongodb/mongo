@@ -45,7 +45,12 @@ const testStartAtNotSbe = function () {
     // Run the initial query and request to return a resume token. We're interested only in a single
     // document, so 'batchSize' is set to 1.
     let res = assert.commandWorked(
-        db.runCommand({find: collName, hint: {$natural: 1}, batchSize: 1, $_requestResumeToken: true}),
+        db.runCommand({
+            find: collName,
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+        }),
     );
     assert.eq(1, res.cursor.firstBatch.length);
     assert.contains(res.cursor.firstBatch[0], testData);

@@ -14,7 +14,9 @@ const kMonitoringIntervalMs = 200;
 const params = {
     setParameter: {
         healthMonitoringIntensities: tojson({values: [{type: "dns", intensity: "critical"}]}),
-        healthMonitoringIntervals: tojson({values: [{type: "dns", interval: kMonitoringIntervalMs}]}),
+        healthMonitoringIntervals: tojson({
+            values: [{type: "dns", interval: kMonitoringIntervalMs}],
+        }),
     },
 };
 
@@ -25,7 +27,9 @@ let st = new ShardingTest({
 
 const checkServerStats = function () {
     while (true) {
-        let result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+        let result = assert.commandWorked(
+            st.s0.adminCommand({serverStatus: 1, health: {details: true}}),
+        ).health;
         print(`Server status: ${tojson(result)}`);
         // Wait for: at least kWaitForPassedChecksCount checks completed.
         // At least some checks passed (more than 1).
@@ -58,7 +62,9 @@ assert.soon(() => {
 });
 
 // Failpoint off
-assert.commandWorked(st.s0.adminCommand({"configureFailPoint": "dnsHealthObserverFp", "mode": "off"}));
+assert.commandWorked(
+    st.s0.adminCommand({"configureFailPoint": "dnsHealthObserverFp", "mode": "off"}),
+);
 
 assert.soon(() => {
     result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;

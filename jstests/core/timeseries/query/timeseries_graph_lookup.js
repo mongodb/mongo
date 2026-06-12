@@ -42,7 +42,11 @@ TimeseriesTest.run((insert) => {
         for (let i = 0; i < numHosts; i++) {
             let host = hosts[i];
             assert.commandWorked(
-                insert(collA, {time: ISODate(), hostid: host.tags.hostid, info: host.tags.hostid * 11}),
+                insert(collA, {
+                    time: ISODate(),
+                    hostid: host.tags.hostid,
+                    info: host.tags.hostid * 11,
+                }),
             );
         }
 
@@ -63,7 +67,12 @@ TimeseriesTest.run((insert) => {
                 );
             } else {
                 assert.commandWorked(
-                    insert(collB, {time: ISODate(), hostid: host.tags.hostid, cpu: usage, info: host.tags.hostid - 11}),
+                    insert(collB, {
+                        time: ISODate(),
+                        hostid: host.tags.hostid,
+                        cpu: usage,
+                        info: host.tags.hostid - 11,
+                    }),
                 );
             }
 

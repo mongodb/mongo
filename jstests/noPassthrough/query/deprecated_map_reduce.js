@@ -39,19 +39,37 @@ let matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 assert.commandWorked(
-    db.runCommand({mapReduce: collName, map: mapFunc, reduce: reduceFunc, query: {b: 2}, out: "order_totals"}),
+    db.runCommand({
+        mapReduce: collName,
+        map: mapFunc,
+        reduce: reduceFunc,
+        query: {b: 2},
+        out: "order_totals",
+    }),
 );
 
 assert.commandWorked(coll.insert({cust_id: "B", amount: 50, status: "B"}));
 
 assert.commandWorked(
-    db.runCommand({mapReduce: collName, map: mapFunc, reduce: reduceFunc, query: {b: 2}, out: "order_totals"}),
+    db.runCommand({
+        mapReduce: collName,
+        map: mapFunc,
+        reduce: reduceFunc,
+        query: {b: 2},
+        out: "order_totals",
+    }),
 );
 
 assert.commandWorked(coll.insert({cust_id: "A", amount: 200, status: "B"}));
 
 assert.commandWorked(
-    db.runCommand({mapReduce: collName, map: mapFunc, reduce: reduceFunc, query: {"B": 2}, out: "order_totals"}),
+    db.runCommand({
+        mapReduce: collName,
+        map: mapFunc,
+        reduce: reduceFunc,
+        query: {"B": 2},
+        out: "order_totals",
+    }),
 );
 
 // Now that we have ran map reduce command, make sure the deprecation message is logged once.
@@ -67,7 +85,9 @@ const st = new ShardingTest({shards: 2, mongos: 1});
 const session = st.s.getDB("test").getMongo().startSession();
 const mongosDB = session.getDatabase("test");
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const mongosColl = mongosDB.testing;
 assert.commandWorked(mongosDB.createCollection(mongosColl.getName(), caseInsensitive));
@@ -79,7 +99,9 @@ assert.commandWorked(mongosColl.insert({cust_id: "A", amount: 10, status: "B"}))
 assert.commandWorked(mongosColl.insert({cust_id: "A", amount: 20, status: "B"}));
 assert.commandWorked(mongosColl.insert({cust_id: "B", amount: 5, status: "B"}));
 
-assert.commandWorked(st.s0.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    st.s0.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // Assert that deprecation msg is not logged before map reduce command is even run.
 globalLogs = mongosDB.adminCommand({getLog: "global"});

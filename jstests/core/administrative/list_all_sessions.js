@@ -26,7 +26,10 @@ function listSessions() {
     return config.system.sessions.aggregate(pipeline);
 }
 function listSessionsWithFilter(filter) {
-    return config.system.sessions.aggregate([{"$listSessions": {allUsers: true}}, {$match: filter}]);
+    return config.system.sessions.aggregate([
+        {"$listSessions": {allUsers: true}},
+        {$match: filter},
+    ]);
 }
 
 // Get current log level.

@@ -33,7 +33,9 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(testColl.insert({"a": 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    testColl.insert({"a": 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 jsTestLog("Shutting down the non-voting secondary");
 

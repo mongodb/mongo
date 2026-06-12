@@ -28,7 +28,8 @@ const cmdRes = assert.commandWorked(
         batchSize: 0,
     }),
 );
-const cmdStr = "db.runCommand({getMore: " + cmdRes.cursor.id.toString() + ', collection: "' + collName + '"})';
+const cmdStr =
+    "db.runCommand({getMore: " + cmdRes.cursor.id.toString() + ', collection: "' + collName + '"})';
 const awaitShell = startParallelShell(cmdStr);
 
 assert.soon(function () {

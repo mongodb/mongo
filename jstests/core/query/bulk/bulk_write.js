@@ -21,7 +21,11 @@ coll1.drop();
 
 // Make sure a properly formed request has successful result
 assert.commandWorked(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}], nsInfo: [{ns: collName}]}),
+    db.adminCommand({
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}],
+        nsInfo: [{ns: collName}],
+    }),
 );
 
 assert.eq(coll.find().itcount(), 1);

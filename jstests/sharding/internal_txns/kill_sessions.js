@@ -10,7 +10,10 @@ TestData.disableImplicitSessions = true;
 const st = new ShardingTest({
     shards: 1,
     mongosOptions: {
-        setParameter: {maxSessions: 1, "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        setParameter: {
+            maxSessions: 1,
+            "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
+        },
     },
 });
 const shard0Primary = st.rs0.getPrimary();
@@ -51,13 +54,21 @@ assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 
     // killSessions does not end/reap the session it targets. It only kills the operation running on
     // the session
     assert.commandFailedWithCode(
-        testDB.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+        testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumber,
+            autocommit: false,
+        }),
         ErrorCodes.NoSuchTransaction,
     );
 })();
 
 (() => {
-    jsTest.log("Test running killSessions on mongos using an internal transaction with lsid containing " + "txnUUID");
+    jsTest.log(
+        "Test running killSessions on mongos using an internal transaction with lsid containing " +
+            "txnUUID",
+    );
     const lsid = {id: sessionUUID, txnUUID: UUID()};
     const txnNumber = NumberLong(1);
     assert.commandWorked(
@@ -80,7 +91,12 @@ assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 
     // killSessions does not end/reap the session it targets. It only kills the operation running on
     // the session
     assert.commandFailedWithCode(
-        testDB.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+        testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumber,
+            autocommit: false,
+        }),
         ErrorCodes.NoSuchTransaction,
     );
 })();
@@ -135,13 +151,21 @@ assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 
     // killSessions does not end/reap the session it targets. It only kills the operation running on
     // the session
     assert.commandFailedWithCode(
-        testDB.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+        testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumber,
+            autocommit: false,
+        }),
         ErrorCodes.NoSuchTransaction,
     );
 })();
 
 (() => {
-    jsTest.log("Test running killSessions on mongod using an internal transaction with lsid containing " + "txnUUID");
+    jsTest.log(
+        "Test running killSessions on mongod using an internal transaction with lsid containing " +
+            "txnUUID",
+    );
     const lsid = {id: sessionUUID, txnUUID: UUID()};
     const txnNumber = NumberLong(3);
     assert.commandWorked(
@@ -164,7 +188,12 @@ assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 
     // killSessions does not end/reap the session it targets. It only kills the operation running on
     // the session
     assert.commandFailedWithCode(
-        testDB.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+        testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumber,
+            autocommit: false,
+        }),
         ErrorCodes.NoSuchTransaction,
     );
 })();

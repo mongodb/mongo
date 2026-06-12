@@ -31,7 +31,10 @@ function dropView(viewName) {
 
 function verifyViewName(results, expectedViewName) {
     results.forEach((doc, index) => {
-        assert(doc.hasOwnProperty("viewName"), `Document ${index} should have viewName field: ${tojson(doc)}`);
+        assert(
+            doc.hasOwnProperty("viewName"),
+            `Document ${index} should have viewName field: ${tojson(doc)}`,
+        );
         assert.eq(
             doc.viewName,
             expectedViewName,
@@ -103,7 +106,13 @@ function testNestedViewsWithViewNameStage(suffix, userPipeStage) {
 
     const outerView = {view: db[outerViewName], viewName: outerViewName, viewNss: outerViewNss};
     // Verify outer view name is present when running on outerView
-    testViewNameOnView(outerView, userPipe, outerViewName, innerViewPipe.concat(outerViewPipe), shouldPrepend);
+    testViewNameOnView(
+        outerView,
+        userPipe,
+        outerViewName,
+        innerViewPipe.concat(outerViewPipe),
+        shouldPrepend,
+    );
 
     const innerView = {view: db[innerViewName], viewName: innerViewName, viewNss: innerViewNss};
     // Verify inner view name is present when running on innerView
@@ -192,11 +201,19 @@ function assertViewHandledCorrectly(view, userPipeline, viewPipeline, shouldPrep
         // View pipeline should be prepended before user pipeline
         const expandedViewPipeline = expandDesugarStages(viewPipeline);
         expectedStages = expandedViewPipeline.concat(expandedUserPipeline);
-        assertStagesInExpectedOrder(actualStages, expectedStages, "View pipeline should be prepended: ");
+        assertStagesInExpectedOrder(
+            actualStages,
+            expectedStages,
+            "View pipeline should be prepended: ",
+        );
     } else {
         // Only user pipeline should appear (view pipeline not prepended)
         expectedStages = expandedUserPipeline;
-        assertStagesInExpectedOrder(actualStages, expectedStages, "Only user pipeline should appear: ");
+        assertStagesInExpectedOrder(
+            actualStages,
+            expectedStages,
+            "Only user pipeline should appear: ",
+        );
     }
 }
 
@@ -268,7 +285,11 @@ describe("View policy extension stages", function () {
 
         it("should handle multiple $addViewName stages in user pipeline", function () {
             const viewPipe = [{$addFields: {a: 1}}];
-            const userPipe = [{$addViewName: {}}, {$project: {_id: 1, viewName: 1}}, {$addViewName: {}}];
+            const userPipe = [
+                {$addViewName: {}},
+                {$project: {_id: 1, viewName: 1}},
+                {$addViewName: {}},
+            ];
             const viewName = "multi_add_viewname_view";
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, false /* shouldPrepend */);
         });
@@ -286,7 +307,12 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$desugarAddViewName: {}}];
             const userPipe = [{$addFields: {a: 1}}];
             const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
-            testViewNameAbsentInView("desugar_add_viewname_in_view", viewPipe, userPipe, shouldPrepend);
+            testViewNameAbsentInView(
+                "desugar_add_viewname_in_view",
+                viewPipe,
+                userPipe,
+                shouldPrepend,
+            );
         });
 
         describe("Extension stages at different positions in view definition", function () {
@@ -331,7 +357,11 @@ describe("View policy extension stages", function () {
             const results = coll.aggregate(pipeline).toArray();
 
             const viewDocs = results.filter((doc) => doc.hasOwnProperty("viewName"));
-            assert.gt(viewDocs.length, 0, "Expected some documents with viewName field from $unionWith");
+            assert.gt(
+                viewDocs.length,
+                0,
+                "Expected some documents with viewName field from $unionWith",
+            );
 
             // Verify the view docs have the correct viewName.
             verifyViewName(viewDocs, view.viewName);
@@ -346,11 +376,17 @@ describe("View policy extension stages", function () {
 
             // $desugarAddViewName desugars to $addViewName + $doNothingViewPolicy.
             // Since it starts the pipeline, view pipeline is NOT prepended (kDoNothing policy).
-            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$desugarAddViewName: {}}]}}];
+            const pipeline = [
+                {$unionWith: {coll: viewName, pipeline: [{$desugarAddViewName: {}}]}},
+            ];
             const results = coll.aggregate(pipeline).toArray();
 
             const viewDocs = results.filter((doc) => doc.hasOwnProperty("viewName"));
-            assert.gt(viewDocs.length, 0, "Expected some documents with viewName field from $unionWith");
+            assert.gt(
+                viewDocs.length,
+                0,
+                "Expected some documents with viewName field from $unionWith",
+            );
 
             // Verify the view docs have the correct viewName.
             verifyViewName(viewDocs, view.viewName);
@@ -376,7 +412,14 @@ describe("View policy extension stages", function () {
             const view = createView(viewName, viewPipe);
 
             // Even though $addViewName has kDoNothing policy, subsequent $disallowViews should fail.
-            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$addViewName: {}}, {$disallowViews: {}}]}}];
+            const pipeline = [
+                {
+                    $unionWith: {
+                        coll: viewName,
+                        pipeline: [{$addViewName: {}}, {$disallowViews: {}}],
+                    },
+                },
+            ];
             testDisallowViewsFails(collName, pipeline);
 
             dropView(view.viewName);
@@ -411,7 +454,12 @@ describe("View policy extension stages", function () {
             // $match has kDefaultPrepend policy, so view pipeline SHOULD be prepended.
             // The subsequent $addViewName doesn't affect the prepend decision.
             const pipeline = [
-                {$unionWith: {coll: viewName, pipeline: [{$match: {_id: {$exists: true}}}, {$addViewName: {}}]}},
+                {
+                    $unionWith: {
+                        coll: viewName,
+                        pipeline: [{$match: {_id: {$exists: true}}}, {$addViewName: {}}],
+                    },
+                },
             ];
             const results = coll.aggregate(pipeline).toArray();
 

@@ -33,14 +33,23 @@ let opTime = res1.operationTime;
 rst.awaitLastOpCommitted();
 
 jsTest.log.info("Validate with background: true and atClusterTime should fail");
-assert.commandFailed(db.runCommand({validate: "coll", background: true, collHash: true, atClusterTime: opTime}));
+assert.commandFailed(
+    db.runCommand({validate: "coll", background: true, collHash: true, atClusterTime: opTime}),
+);
 
 jsTest.log.info("Validate with atClusterTime of 0,0 should fail");
-assert.commandFailed(db.runCommand({validate: "coll", collHash: true, atClusterTime: Timestamp(0, 0)}));
+assert.commandFailed(
+    db.runCommand({validate: "coll", collHash: true, atClusterTime: Timestamp(0, 0)}),
+);
 
 jsTest.log.info("Validate with atClusterTime on an unreplicated collection should fail");
 assert.commandFailed(
-    primary.getDB("local").runCommand({validate: "oplog.rs", background: true, collHash: true, atClusterTime: opTime}),
+    primary.getDB("local").runCommand({
+        validate: "oplog.rs",
+        background: true,
+        collHash: true,
+        atClusterTime: opTime,
+    }),
 );
 
 const fp = configureFailPoint(secondary, "stopReplProducer");
@@ -49,7 +58,9 @@ const fp = configureFailPoint(secondary, "stopReplProducer");
 res1 = assert.commandWorked(db.runCommand({insert: "coll", "documents": [{_id: 3}]}));
 
 // Validate with no readConcern should not be equal since extra document on the secondary
-jsTest.log.info("Validate with no readConcern should not be equal since extra document on the secondary");
+jsTest.log.info(
+    "Validate with no readConcern should not be equal since extra document on the secondary",
+);
 res1 = assert.commandWorked(db.runCommand({validate: "coll", background: false, collHash: true}));
 let res2 = assert.commandWorked(
     secondary.getDB("test").runCommand({validate: "coll", background: false, collHash: true}),
@@ -63,7 +74,9 @@ res1 = assert.commandWorked(
     db.runCommand({validate: "coll", background: false, collHash: true, atClusterTime: opTime}),
 );
 res2 = assert.commandWorked(
-    secondary.getDB("test").runCommand({validate: "coll", background: false, collHash: true, atClusterTime: opTime}),
+    secondary
+        .getDB("test")
+        .runCommand({validate: "coll", background: false, collHash: true, atClusterTime: opTime}),
 );
 
 assert.eq(true, res1.all == res2.all, `res1: ${tojson(res1)}, res2: ${tojson(res2)}`);
@@ -94,7 +107,9 @@ function runValidate(path, opts) {
 jsTest.log.info("Modal Validate Tests");
 
 // Validate with no readConcern should not be equal due to extra document on the secondary
-jsTest.log.info("Validate with no readConcern should not be equal due to extra document on the secondary");
+jsTest.log.info(
+    "Validate with no readConcern should not be equal due to extra document on the secondary",
+);
 res1 = runValidate(primaryPath, {collHash: true});
 res2 = runValidate(secondaryPath, {collHash: true});
 
@@ -112,7 +127,8 @@ let keys2 = Object.keys(res2.partial);
 
 let inconsistency = keys1.length === keys2.length;
 for (const key of keys1) {
-    inconsistency = inconsistency || !keys2.includes(key) || res2.partial[key].hash !== res1.partial[key].hash;
+    inconsistency =
+        inconsistency || !keys2.includes(key) || res2.partial[key].hash !== res1.partial[key].hash;
 }
 assert(inconsistency, `res1: ${tojson(res1)}, res2: ${tojson(res2)}`);
 

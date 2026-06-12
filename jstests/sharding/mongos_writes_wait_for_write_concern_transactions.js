@@ -17,7 +17,9 @@ import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
 let st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
 
-assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}),
+);
 
 jsTest.log("Testing commit and abort in cross shard transactions.");
 // Test that commit and abort transaction return write concern errors as expected in cross shard
@@ -72,9 +74,12 @@ assert.commandWorked(
     }),
 );
 assert.commandWorked(
-    st.shard0
-        .getDB(dbName)
-        .adminCommand({prepareTransaction: 1, lsid: {id: lsid}, txnNumber: NumberLong(1), autocommit: false}),
+    st.shard0.getDB(dbName).adminCommand({
+        prepareTransaction: 1,
+        lsid: {id: lsid},
+        txnNumber: NumberLong(1),
+        autocommit: false,
+    }),
 );
 
 let abortRes = st.s.adminCommand({

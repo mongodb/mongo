@@ -44,7 +44,11 @@ Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
             return originalRunCommand.apply(this, arguments);
         }
 
-        if (stageSpec.hasOwnProperty("$match") && typeof stageSpec.$match === "object" && stageSpec.$match !== null) {
+        if (
+            stageSpec.hasOwnProperty("$match") &&
+            typeof stageSpec.$match === "object" &&
+            stageSpec.$match !== null
+        ) {
             if (stageSpec.$match.hasOwnProperty("$text")) {
                 // A $text search is disallowed within a $facet stage.
                 jsTest.log.info("Not wrapping $text in a $facet stage");

@@ -27,7 +27,14 @@ let standalone;
 
 // Builds a collection with 'keyPattern', makes it multikey inside a transaction, then recovers a
 // standalone node past that transaction. Returns the read-only recovered database.
-function recoverWithMultikeyTxn({collName, keyPattern, indexName, indexOptions = {}, initialDoc, multikeyUpdate}) {
+function recoverWithMultikeyTxn({
+    collName,
+    keyPattern,
+    indexName,
+    indexOptions = {},
+    initialDoc,
+    multikeyUpdate,
+}) {
     rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
@@ -57,11 +64,17 @@ function recoverWithMultikeyTxn({collName, keyPattern, indexName, indexOptions =
     const sessionColl = session.getDatabase(dbName).getCollection(collName);
     session.startTransaction();
     assert.commandWorked(sessionColl.update(multikeyUpdate.q, multikeyUpdate.u));
-    const operationTime = assert.commandWorked(session.commitTransaction_forTesting()).operationTime;
+    const operationTime = assert.commandWorked(
+        session.commitTransaction_forTesting(),
+    ).operationTime;
 
     // One setMultikeyMetadata entry is emitted per affected index, regardless of path count.
     const cmdNs = primaryDB.getCollection("$cmd").getFullName();
-    const entries = rst.dumpOplog(primary, {op: "c", ns: cmdNs, "o.setMultikeyMetadata": coll.getFullName()});
+    const entries = rst.dumpOplog(primary, {
+        op: "c",
+        ns: cmdNs,
+        "o.setMultikeyMetadata": coll.getFullName(),
+    });
     assert.eq(1, entries.length, "expected one setMultikeyMetadata oplog entry", {entries});
 
     const dbpath = primary.dbpath;
@@ -83,7 +96,10 @@ function recoverWithMultikeyTxn({collName, keyPattern, indexName, indexOptions =
 function assertMultikey(db, collName, indexName, pathQuery) {
     const explain = db.getCollection(collName).find(pathQuery).hint(indexName).explain();
     const ixscan = getPlanStage(getWinningPlanFromExplain(explain), "IXSCAN");
-    assert.eq(ixscan.isMultiKey, true, "expected index to be multikey after recovery", {indexName, ixscan});
+    assert.eq(ixscan.isMultiKey, true, "expected index to be multikey after recovery", {
+        indexName,
+        ixscan,
+    });
 }
 
 describe("setMultikeyMetadata during standalone recoverToOplogTimestamp", function () {

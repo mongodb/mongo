@@ -21,7 +21,13 @@ function testShardZoneAssociationValidation(proposedShardKey, numberLongMin, num
     let zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
     let zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
     assert.commandWorked(
-        configDB.tags.insert({_id: {ns: ns, min: zoneMin}, ns: ns, min: zoneMin, max: zoneMax, tag: zoneName}),
+        configDB.tags.insert({
+            _id: {ns: ns, min: zoneMin},
+            ns: ns,
+            min: zoneMin,
+            max: zoneMax,
+            tag: zoneName,
+        }),
     );
 
     let tagDoc = configDB.tags.findOne();
@@ -47,7 +53,9 @@ function testShardKeyValidation(proposedShardKey, numberLongMin, numberLongMax, 
 
     let zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
     let zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
-    assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: zoneMin, max: zoneMax, zone: zoneName}));
+    assert.commandWorked(
+        st.s.adminCommand({updateZoneKeyRange: ns, min: zoneMin, max: zoneMax, zone: zoneName}),
+    );
 
     let tagDoc = configDB.tags.findOne();
     jsTestLog("xxx tag doc " + tojson(tagDoc));
@@ -86,12 +94,23 @@ function testChunkSplits(collectionExists) {
     // shard1 - zonename1 - [10, 20)
     // shard2 - zonename2 - [30, 40)
     for (let i = 0; i < shards.length; i++) {
-        assert.commandWorked(st.s.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
         assert.commandWorked(
-            st.s.adminCommand({updateZoneKeyRange: ns, min: ranges[i].min, max: ranges[i].max, zone: zoneName + i}),
+            st.s.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: ranges[i].min,
+                max: ranges[i].max,
+                zone: zoneName + i,
+            }),
         );
     }
-    assert.eq(configDB.tags.find().count(), shards.length, "failed to create tag documents correctly");
+    assert.eq(
+        configDB.tags.find().count(),
+        shards.length,
+        "failed to create tag documents correctly",
+    );
     assert.eq(
         configDB.chunks.find({ns: ns}).count(),
         0,
@@ -112,9 +131,17 @@ function testChunkSplits(collectionExists) {
         {range: [{x: 40}, {x: {"$maxKey": 1}}], shardId: null}, // any shard
     ];
     let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
-    assert.eq(chunkDocs.length, expectedChunks.length, "shardCollection failed to create chunk documents correctly");
+    assert.eq(
+        chunkDocs.length,
+        expectedChunks.length,
+        "shardCollection failed to create chunk documents correctly",
+    );
     for (let i = 0; i < chunkDocs.length; i++) {
-        let errMsg = "expect to see chunk " + tojson(expectedChunks[i]) + " but found chunk " + tojson(chunkDocs[i]);
+        let errMsg =
+            "expect to see chunk " +
+            tojson(expectedChunks[i]) +
+            " but found chunk " +
+            tojson(chunkDocs[i]);
         assert.eq(expectedChunks[i].range[0], chunkDocs[i].min, errMsg);
         assert.eq(expectedChunks[i].range[1], chunkDocs[i].max, errMsg);
         if (expectedChunks[i].shardId !== null) {
@@ -148,9 +175,16 @@ function testNonemptyZonedCollection() {
     assert.commandWorked(testColl.createIndex(shardKey));
 
     for (let i = 0; i < shards.length; i++) {
-        assert.commandWorked(mongos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
         assert.commandWorked(
-            mongos.adminCommand({updateZoneKeyRange: ns, min: ranges[i].min, max: ranges[i].max, zone: zoneName + i}),
+            mongos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}),
+        );
+        assert.commandWorked(
+            mongos.adminCommand({
+                updateZoneKeyRange: ns,
+                min: ranges[i].min,
+                max: ranges[i].max,
+                zone: zoneName + i,
+            }),
         );
     }
 

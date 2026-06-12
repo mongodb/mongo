@@ -32,14 +32,20 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 // Set up a sharded collection with 2 chunks, [min, 0) and [0, max), one on each shard, with one
 // document in each.
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
 
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}),
+);
 
 // Verifies transactions using causal consistency read all causally prior operations.
 function runTest(st, readConcern) {
@@ -55,7 +61,9 @@ function runTest(st, readConcern) {
     // Through a separate router move the chunk that was inserted to, so the original router is
     // stale when it starts its transaction.
     const otherRouter = st.s1;
-    assert.commandWorked(otherRouter.adminCommand({moveChunk: ns, find: docToInsert, to: st.shard0.shardName}));
+    assert.commandWorked(
+        otherRouter.adminCommand({moveChunk: ns, find: docToInsert, to: st.shard0.shardName}),
+    );
 
     withTxnAndAutoRetry(
         session,
@@ -71,14 +79,18 @@ function runTest(st, readConcern) {
             assert.docEq(
                 docToInsert,
                 sessionDB[collName].findOne(docToInsert),
-                "sharded transaction with read concern " + tojson(readConcern) + " did not see expected document",
+                "sharded transaction with read concern " +
+                    tojson(readConcern) +
+                    " did not see expected document",
             );
         },
         {readConcern: readConcern},
     );
 
     // Clean up for the next iteration.
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: docToInsert, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: docToInsert, to: st.shard1.shardName}),
+    );
     assert.commandWorked(sessionDB[collName].remove(docToInsert));
 }
 

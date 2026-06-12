@@ -58,7 +58,9 @@ assert.commandWorked(
             {
                 update: 0,
                 filter: {_id: 106},
-                updateMods: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
+                updateMods: [
+                    {$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}},
+                ],
             },
 
             // Do an update-operator-style update to add a new document with _id=107.
@@ -71,7 +73,9 @@ assert.commandWorked(
             {
                 update: 0,
                 filter: {_id: 109},
-                updateMods: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
+                updateMods: [
+                    {$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}},
+                ],
                 upsert: true,
             },
         ],

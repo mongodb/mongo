@@ -22,7 +22,9 @@ import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewles
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}),
+);
 
 const tsOptions = {
     timeField: "timestamp",
@@ -53,7 +55,10 @@ function createFailed(collName, tsOptions, errorCode) {
     if (Object.keys(tsOptions).length === 0) {
         assert.commandFailedWithCode(db.createCollection(collName), errorCode);
     } else {
-        assert.commandFailedWithCode(db.createCollection(collName, {timeseries: tsOptions}), errorCode);
+        assert.commandFailedWithCode(
+            db.createCollection(collName, {timeseries: tsOptions}),
+            errorCode,
+        );
     }
 }
 
@@ -62,7 +67,9 @@ function shardCollectionWorked(collName, tsOptions = {}) {
     if (Object.keys(tsOptions).length === 0) {
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {x: 1}}));
     } else {
-        assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {timestamp: 1}, timeseries: tsOptions}));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: nss, key: {timestamp: 1}, timeseries: tsOptions}),
+        );
     }
     return db.getCollection(collName);
 }
@@ -70,7 +77,10 @@ function shardCollectionWorked(collName, tsOptions = {}) {
 function shardCollectionFailed(collName, tsOptions, errorCode) {
     let nss = kDbName + "." + collName;
     if (Object.keys(tsOptions).length === 0) {
-        assert.commandFailedWithCode(st.s.adminCommand({shardCollection: nss, key: {x: 1}}), errorCode);
+        assert.commandFailedWithCode(
+            st.s.adminCommand({shardCollection: nss, key: {x: 1}}),
+            errorCode,
+        );
     } else {
         assert.commandFailedWithCode(
             st.s.adminCommand({shardCollection: nss, key: {timestamp: 1}, timeseries: tsOptions}),
@@ -81,7 +91,10 @@ function shardCollectionFailed(collName, tsOptions, errorCode) {
 
 function runTest(testCase, minRequiredVersion = null) {
     if (minRequiredVersion) {
-        const res = st.s.getDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
+        const res = st.s
+            .getDB("admin")
+            .system.version.find({_id: "featureCompatibilityVersion"})
+            .toArray();
         if (MongoRunner.compareBinVersions(res[0].version, minRequiredVersion) < 0) {
             return;
         }
@@ -140,7 +153,9 @@ if (!areViewlessTimeseriesEnabled(db)) {
         shardCollectionFailed(kColl, {}, 5914001);
     });
 
-    jsTest.log("Case collection: bucket timeseries / collection: sharded timeseries different options.");
+    jsTest.log(
+        "Case collection: bucket timeseries / collection: sharded timeseries different options.",
+    );
     runTest(() => {
         createWorked(kBucket, tsOptions);
         shardCollectionFailed(kColl, tsOptions2, [ErrorCodes.InvalidOptions]);
@@ -255,7 +270,9 @@ if (!areViewlessTimeseriesEnabled(db)) {
     });
 
     if (!areViewlessTimeseriesEnabled(db)) {
-        jsTest.log("Creation of unsharded bucket collections without timeseries options is not permitted.");
+        jsTest.log(
+            "Creation of unsharded bucket collections without timeseries options is not permitted.",
+        );
         runTest(
             () => {
                 createFailed(kBucket, {}, ErrorCodes.IllegalOperation);
@@ -264,7 +281,9 @@ if (!areViewlessTimeseriesEnabled(db)) {
             "8.1", // minRequiredVersion
         );
 
-        jsTest.log("Creation of sharded bucket collections without timeseries options is not permitted.");
+        jsTest.log(
+            "Creation of sharded bucket collections without timeseries options is not permitted.",
+        );
         runTest(() => {
             shardCollectionFailed(kBucket, {}, 5731501);
         });

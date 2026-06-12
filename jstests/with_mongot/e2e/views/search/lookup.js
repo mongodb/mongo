@@ -78,20 +78,31 @@ assert.commandWorked(
 
 // Create views on the review and product collections.
 const verifiedReviewViewName = "verifiedReview";
-const verifiedReviewViewPipeline = [{"$addFields": {verified_review: {$ifNull: ["$verified_review", "unverified"]}}}];
-assert.commandWorked(testDb.createView(verifiedReviewViewName, reviewColl.getName(), verifiedReviewViewPipeline));
+const verifiedReviewViewPipeline = [
+    {"$addFields": {verified_review: {$ifNull: ["$verified_review", "unverified"]}}},
+];
+assert.commandWorked(
+    testDb.createView(verifiedReviewViewName, reviewColl.getName(), verifiedReviewViewPipeline),
+);
 const verifiedReviewView = testDb[verifiedReviewViewName];
 
 const batteryTypeViewName = "batteryTypeView";
-const batteryTypeViewPipeline = [{"$addFields": {battery_type: {$ifNull: ["$battery_type", "unknown"]}}}];
-assert.commandWorked(testDb.createView(batteryTypeViewName, productColl.getName(), batteryTypeViewPipeline));
+const batteryTypeViewPipeline = [
+    {"$addFields": {battery_type: {$ifNull: ["$battery_type", "unknown"]}}},
+];
+assert.commandWorked(
+    testDb.createView(batteryTypeViewName, productColl.getName(), batteryTypeViewPipeline),
+);
 const batteryTypeViewOnProductColl = testDb[batteryTypeViewName];
 
 // Configure search indexes for all collections/views.
 const indexConfigs = [
     {
         coll: verifiedReviewView,
-        definition: {name: "verifiedReviewSearchIndex", definition: {"mappings": {"dynamic": true}}},
+        definition: {
+            name: "verifiedReviewSearchIndex",
+            definition: {"mappings": {"dynamic": true}},
+        },
     },
     {coll: reviewColl, definition: {name: "default", definition: {"mappings": {"dynamic": true}}}},
     {
@@ -361,10 +372,21 @@ const lookupTestCases = (isStoredSource) => {
         },
     ];
 
-    validateSearchExplain(verifiedReviewView, lookupPipeline, isStoredSource, verifiedReviewViewPipeline, (explain) => {
-        assertLookupInExplain(explain, lookupPipeline[0]);
-        assertLookupSearchSubPipelineAppliedViews(explain, lookupPipeline[0], batteryTypeViewPipeline, isStoredSource);
-    });
+    validateSearchExplain(
+        verifiedReviewView,
+        lookupPipeline,
+        isStoredSource,
+        verifiedReviewViewPipeline,
+        (explain) => {
+            assertLookupInExplain(explain, lookupPipeline[0]);
+            assertLookupSearchSubPipelineAppliedViews(
+                explain,
+                lookupPipeline[0],
+                batteryTypeViewPipeline,
+                isStoredSource,
+            );
+        },
+    );
 
     results = verifiedReviewView.aggregate(lookupPipeline).toArray();
     assertArrayEq({actual: results, expected: expectedResults});

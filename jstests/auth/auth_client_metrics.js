@@ -32,7 +32,10 @@ jsTest.log.info("Check secondary config servers for authentication logs");
 st.configRS.getSecondaries().forEach((conn) => {
     // Get per-mech auth counter stats from serverStatus
     const admin = conn.getDB("admin");
-    assert.soon(() => admin.auth("root", "pass"), "Authentication for root user failed on " + conn.host);
+    assert.soon(
+        () => admin.auth("root", "pass"),
+        "Authentication for root user failed on " + conn.host,
+    );
     const stats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication;
     jsTest.log.info("Authn stats: " + tojson(stats));
     assert.gt(stats.totalEgressAuthenticationTimeMicros, 0);
@@ -52,44 +55,62 @@ st.configRS.getSecondaries().forEach((conn) => {
             assert.gte(
                 egressSpecAuthSuccesses,
                 1,
-                "Expected at least one egress SCRAM-SHA-256 speculativeAuthenticate success on " + conn.host,
+                "Expected at least one egress SCRAM-SHA-256 speculativeAuthenticate success on " +
+                    conn.host,
             );
             assert.eq(
                 egressAuthSuccesses,
                 stats.egress.authenticate.total,
-                "SCRAM-SHA-256 egress authenticate successful count should equal total on " + conn.host,
+                "SCRAM-SHA-256 egress authenticate successful count should equal total on " +
+                    conn.host,
             );
             assert.eq(
                 egressSpecAuthSuccesses,
                 stats.egress.speculativeAuthenticate.total,
-                "SCRAM-SHA-256 egress speculativeAuthenticate successful count should equal total on " + conn.host,
+                "SCRAM-SHA-256 egress speculativeAuthenticate successful count should equal total on " +
+                    conn.host,
             );
         } else {
             assert.eq(
                 stats.egress.authenticate.total,
                 0,
-                "Mechanism " + mech + " should have no egress authenticate attempts on " + conn.host,
+                "Mechanism " +
+                    mech +
+                    " should have no egress authenticate attempts on " +
+                    conn.host,
             );
             assert.eq(
                 stats.egress.speculativeAuthenticate.total,
                 0,
-                "Mechanism " + mech + " should have no egress speculativeAuthenticate attempts on " + conn.host,
+                "Mechanism " +
+                    mech +
+                    " should have no egress speculativeAuthenticate attempts on " +
+                    conn.host,
             );
             if (stats.hasOwnProperty("ingress")) {
                 assert.eq(
                     stats.ingress.authenticate.total,
                     0,
-                    "Mechanism " + mech + " should have no ingress authenticate attempts on " + conn.host,
+                    "Mechanism " +
+                        mech +
+                        " should have no ingress authenticate attempts on " +
+                        conn.host,
                 );
                 assert.eq(
                     stats.ingress.speculativeAuthenticate.total,
                     0,
-                    "Mechanism " + mech + " should have no ingress speculativeAuthenticate attempts on " + conn.host,
+                    "Mechanism " +
+                        mech +
+                        " should have no ingress speculativeAuthenticate attempts on " +
+                        conn.host,
                 );
                 assert.eq(
                     stats.ingress.clusterAuthenticate.total,
                     0,
-                    "Mechanism " + mech + " should have no ingress clusterAuthenticate attempts on " + conn.host,
+                    "Mechanism " +
+                        mech +
+                        " should have no ingress clusterAuthenticate attempts on " +
+                        conn.host,
                 );
             }
         }
@@ -161,12 +182,14 @@ st.configRS.getSecondaries().forEach((conn) => {
     assert.lte(
         Math.abs(egressAuthSuccesses - (specSuccessMessages.length + successMessages.length)),
         2,
-        "Egress auth success count should be roughly sum of speculative and normal auth log messages on " + conn.host,
+        "Egress auth success count should be roughly sum of speculative and normal auth log messages on " +
+            conn.host,
     );
     assert.lte(
         Math.abs(egressSpecAuthSuccesses - specSuccessMessages.length),
         2,
-        "Egress speculative auth success count should be roughly speculative success log message count on " + conn.host,
+        "Egress speculative auth success count should be roughly speculative success log message count on " +
+            conn.host,
     );
 });
 

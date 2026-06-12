@@ -57,37 +57,49 @@ assert.eq(coll.find({name: "Jane", ranking: 11}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 5}).count(), 2); // new value
 
 // Sort on ranking in ascending order.
-res = assert.commandWorked(coll.updateOne({name: "Jane"}, {$set: {ranking: 6}}, {sort: {ranking: 1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Jane"}, {$set: {ranking: 6}}, {sort: {ranking: 1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 1}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 6}).count(), 2); // new value
 
 // Sort on ranking in descending order.
-res = assert.commandWorked(coll.updateOne({name: "Jane"}, {$set: {ranking: 100}}, {sort: {ranking: -1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Jane"}, {$set: {ranking: 100}}, {sort: {ranking: -1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 10}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 100}).count(), 1); // new value
 
 // Sort while calling $set on multiple fields
-res = assert.commandWorked(coll.updateOne({name: "Jane"}, {$set: {name: "Jean", ranking: 101}}, {sort: {ranking: -1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Jane"}, {$set: {name: "Jean", ranking: 101}}, {sort: {ranking: -1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 100}).count(), 0); // old value
 assert.eq(coll.find({name: "Jean", ranking: 101}).count(), 1); // new value
 
 // Sort with inequality filter
-res = assert.commandWorked(coll.updateOne({ranking: {$lt: 10}}, {$set: {ranking: 10}}, {sort: {ranking: -1}}));
+res = assert.commandWorked(
+    coll.updateOne({ranking: {$lt: 10}}, {$set: {ranking: 10}}, {sort: {ranking: -1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 9}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 10}).count(), 1); // new value
 
 // updateOne with sort and upsert: true will insert documents when there is no match.
-res = assert.commandWorked(coll.updateOne({name: "Lucy"}, {$set: {ranking: 11}}, {sort: {ranking: 1}, upsert: true}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Lucy"}, {$set: {ranking: 11}}, {sort: {ranking: 1}, upsert: true}),
+);
 assert.neq(res.upsertedId, null);
 assert.eq(coll.find({name: "Lucy"}).count(), 1);
 
 // updateOne with sort and upsert: true will modify document and respect sort when there is a match.
 assert.commandWorked(coll.insert({name: "Lucy", ranking: 13}));
-res = assert.commandWorked(coll.updateOne({name: "Lucy"}, {$set: {ranking: 12}}, {sort: {ranking: -1}, upsert: true}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Lucy"}, {$set: {ranking: 12}}, {sort: {ranking: -1}, upsert: true}),
+);
 assert.eq(res.upsertedId, null);
 assert.eq(coll.find({name: "Lucy", ranking: 13}).count(), 0);
 assert.eq(coll.find({name: "Lucy", ranking: 12}).count(), 1);
@@ -100,7 +112,10 @@ assert.throwsWithCode(
     () => coll.updateOne({name: "Jane"}, {$set: {ranking: 100}}, {sort: true}),
     ErrorCodes.TypeMismatch,
 );
-assert.throwsWithCode(() => coll.updateOne({name: "Jane"}, {$set: {ranking: 100}}, {sort: {ranking: 50}}), 15975); // $sort key ordering must be 1 (for ascending) or -1 (for descending)
+assert.throwsWithCode(
+    () => coll.updateOne({name: "Jane"}, {$set: {ranking: 100}}, {sort: {ranking: 50}}),
+    15975,
+); // $sort key ordering must be 1 (for ascending) or -1 (for descending)
 
 //
 // updateOne with multiple documents matching the query and sort only updates one document.
@@ -112,12 +127,16 @@ for (let i = 0; i <= 10; i++) {
     assert.commandWorked(coll.insert({name: "Lucy", ranking: i}));
 }
 
-res = assert.commandWorked(coll.updateOne({name: "Lucy"}, {$set: {ranking: -1}}, {sort: {ranking: 1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Lucy"}, {$set: {ranking: -1}}, {sort: {ranking: 1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Lucy", ranking: 0}).count(), 1); // old value
 assert.eq(coll.find({name: "Lucy", ranking: -1}).count(), 1); // new value
 
-res = assert.commandWorked(coll.updateOne({name: "Lucy"}, {$set: {ranking: 11}}, {sort: {ranking: -1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Lucy"}, {$set: {ranking: 11}}, {sort: {ranking: -1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Lucy", ranking: 10}).count(), 1); // old value
 assert.eq(coll.find({name: "Lucy", ranking: 11}).count(), 1); // new value
@@ -133,7 +152,9 @@ for (let i = 0; i <= 1000; i++) {
     assert.commandWorked(coll.insert({name: "Lucy", ranking: i}));
 }
 
-res = assert.commandWorked(coll.updateOne({name: "Lucy"}, {$set: {ranking: -1}}, {sort: {ranking: -1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Lucy"}, {$set: {ranking: -1}}, {sort: {ranking: -1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Lucy", ranking: 1000}).count(), 0); // old value
 assert.eq(coll.find({name: "Lucy", ranking: -1}).count(), 1); // new value
@@ -150,13 +171,17 @@ for (let i = 0; i <= 10; i++) {
 }
 
 // Index is in the same order as the sort specification.
-res = assert.commandWorked(coll.updateOne({name: "Jane"}, {$set: {ranking: -1}}, {sort: {ranking: 1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Jane"}, {$set: {ranking: -1}}, {sort: {ranking: 1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 0}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: -1}).count(), 1); // new value
 
 // Index is in the opposite order as the sort specification.
-res = assert.commandWorked(coll.updateOne({name: "Jane"}, {$set: {ranking: -1}}, {sort: {ranking: -1}}));
+res = assert.commandWorked(
+    coll.updateOne({name: "Jane"}, {$set: {ranking: -1}}, {sort: {ranking: -1}}),
+);
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 10}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: -1}).count(), 2); // new value
@@ -186,7 +211,11 @@ assert.commandWorked(
 // Sort + collation provided through command, case sensitive
 // Ascending sort
 res = assert.commandWorked(
-    coll.updateOne({age: 12}, {$set: {age: 13}}, {sort: {name: 1}, collation: caseSensitive.collation}),
+    coll.updateOne(
+        {age: 12},
+        {$set: {age: 13}},
+        {sort: {name: 1}, collation: caseSensitive.collation},
+    ),
 );
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "bella", age: 12}).count(), 0); // old value
@@ -195,7 +224,11 @@ assert.eq(coll.find({name: "Bella", age: 12}).count(), 1); // "Bella" doc unmodi
 
 // Descending sort
 res = assert.commandWorked(
-    coll.updateOne({age: 12}, {$set: {age: 13}}, {sort: {name: -1}, collation: caseSensitive.collation}),
+    coll.updateOne(
+        {age: 12},
+        {$set: {age: 13}},
+        {sort: {name: -1}, collation: caseSensitive.collation},
+    ),
 );
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Candice", age: 12}).count(), 0); // old value
@@ -203,7 +236,11 @@ assert.eq(coll.find({name: "Candice", age: 13}).count(), 1); // new value
 
 // Sort + collation provided through command, case insensitive
 res = assert.commandWorked(
-    coll.updateOne({name: "bella"}, {$set: {age: 14}}, {sort: {name: 1}, collation: caseInsensitive.collation}),
+    coll.updateOne(
+        {name: "bella"},
+        {$set: {age: 14}},
+        {sort: {name: 1}, collation: caseInsensitive.collation},
+    ),
 );
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Bella", age: 12}).count(), 0); // old value
@@ -238,7 +275,11 @@ assert.eq(coll.find({name: "Candice", age: 13}).count(), 1); // new value
 // Implicit collation in collection and a collation specified on the query operator. The collation
 // in the query operator takes precedence.
 res = assert.commandWorked(
-    coll.updateOne({name: "candice"}, {$set: {age: 14}}, {sort: {name: 1}, collation: caseInsensitive.collation}),
+    coll.updateOne(
+        {name: "candice"},
+        {$set: {age: 14}},
+        {sort: {name: 1}, collation: caseInsensitive.collation},
+    ),
 );
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Candice", age: 13}).count(), 0); // old value
@@ -255,14 +296,24 @@ for (let i = 0; i <= 10; i++) {
 }
 
 assert.commandWorked(
-    coll.bulkWrite([{updateOne: {filter: {name: "Jane"}, update: [{$set: {ranking: 100}}], sort: {ranking: -1}}}]),
+    coll.bulkWrite([
+        {
+            updateOne: {
+                filter: {name: "Jane"},
+                update: [{$set: {ranking: 100}}],
+                sort: {ranking: -1},
+            },
+        },
+    ]),
 );
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 10}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 100}).count(), 1); // new value
 
 assert.commandWorked(
-    coll.bulkWrite([{updateOne: {filter: {name: "Jane"}, update: [{$set: {ranking: 100}}], sort: {ranking: 1}}}]),
+    coll.bulkWrite([
+        {updateOne: {filter: {name: "Jane"}, update: [{$set: {ranking: 100}}], sort: {ranking: 1}}},
+    ]),
 );
 assert.eq(1, res.modifiedCount);
 assert.eq(coll.find({name: "Jane", ranking: 0}).count(), 0); // old value
@@ -302,7 +353,11 @@ assert.eq(coll.find({name: "Jane", ranking: 1}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 6}).count(), 2); // new value
 
 // Sort on ranking in descending order.
-res = coll.findAndModify({query: {name: "Jane"}, update: {$set: {ranking: 100}}, sort: {ranking: -1}});
+res = coll.findAndModify({
+    query: {name: "Jane"},
+    update: {$set: {ranking: 100}},
+    sort: {ranking: -1},
+});
 assert.neq(res, null);
 assert.eq(coll.find({name: "Jane", ranking: 10}).count(), 0); // old value
 assert.eq(coll.find({name: "Jane", ranking: 100}).count(), 1); // new value
@@ -341,7 +396,9 @@ assert.throws(() => coll.updateMany({ranking: 1}, {$set: {ranking: 100}}, {sort:
 // Calling updateMany with sort through bulk api will error. The error is thrown from the shell
 // helper for bulkWrite.updateMany in crud_api.js.
 assert.throws(() =>
-    coll.bulkWrite([{updateMany: {filter: {ranking: 1}, update: {$set: {ranking: 100}}, sort: {name: 1}}}]),
+    coll.bulkWrite([
+        {updateMany: {filter: {ranking: 1}, update: {$set: {ranking: 100}}, sort: {name: 1}}},
+    ]),
 );
 
 // Calling a pipeline-style update with sort and multi=true will error.

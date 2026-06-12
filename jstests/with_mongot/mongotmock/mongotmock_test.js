@@ -25,7 +25,9 @@ function ensureNoResponses() {
         {expectedCommand: {getMore: cursorId, collection: "abc"}, response: {ok: 1, foo: 3}},
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 
     // Now run a search command.
     let resp = assert.commandWorked(testDB.runCommand(searchCmd));
@@ -46,7 +48,10 @@ function ensureNoResponses() {
 
     // Run another getMore. This should fail because there are no more queued responses for the
     // cursor id.
-    assert.commandFailedWithCode(testDB.runCommand({getMore: NumberLong(123), collection: "abc"}), 31087);
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: NumberLong(123), collection: "abc"}),
+        31087,
+    );
 
     // Check the remaining history on the mock. There should be 0 remaining queued commands.
     ensureNoResponses();
@@ -58,10 +63,14 @@ function ensureNoResponses() {
     const searchCmd = {search: "a UUID"};
     const history = [{expectedCommand: searchCmd, response: {ok: 1}}];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 
     // We should be able to set the mock responses again to the same thing without issue.
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 
     // Run setMockResponses on cursor id of 0.
     assert.commandFailedWithCode(
@@ -70,22 +79,32 @@ function ensureNoResponses() {
     );
 
     // Run getMore on cursor id before it's ready.
-    assert.commandFailedWithCode(testDB.runCommand({getMore: NumberLong(123), collection: "abc"}), 31088);
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: NumberLong(123), collection: "abc"}),
+        31088,
+    );
 
     // Run getMore on invalid cursor id.
-    assert.commandFailedWithCode(testDB.runCommand({getMore: NumberLong(777), collection: "abc"}), 31089);
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: NumberLong(777), collection: "abc"}),
+        31089,
+    );
 
     // Run a search which doesn't match its 'expectedCommand'.
     assert.commandFailedWithCode(testDB.runCommand({search: "a different UUID"}), 31086);
 
     // Reset state associated with cursor id and run a search command which doesn't match its
     // 'expectedCommand' by having extra fields compared to the expected.
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
     assert.commandFailedWithCode(testDB.runCommand({search: "a UUID", random: "yes"}), 31086);
 
     // Reset state associated with cursor id and run a search command which should fail since it has
     // a field that should not be ignored in a subobject.
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
     assert.commandFailedWithCode(
         testDB.runCommand({search: "a UUID", cursorOptions: {notInIgnoredFieldSet: 1}}),
         31086,
@@ -93,12 +112,18 @@ function ensureNoResponses() {
 
     // Reset state associated with cursor id and run a search command which should succeed since it
     // has fields that should be ignored.
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
-    assert.commandWorked(testDB.runCommand({search: "a UUID", cursorOptions: {docsRequested: 1, batchSize: 1}}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
+    assert.commandWorked(
+        testDB.runCommand({search: "a UUID", cursorOptions: {docsRequested: 1, batchSize: 1}}),
+    );
 
     // Reset the state associated with the cursor id and run a search command which
     // succeeds.
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
     assert.commandWorked(testDB.runCommand({search: "a UUID"}));
     // Run another search command. We did not set up any state on the mock for another
     // client, though, so this should fail.
@@ -117,7 +142,10 @@ function ensureNoResponses() {
     const cursorHistory = [
         {
             expectedCommand: searchCmd,
-            response: {ok: 1, cursor: {firstBatch: [{_id: 0}, {_id: 1}], id: cursorId, ns: "testColl"}},
+            response: {
+                ok: 1,
+                cursor: {firstBatch: [{_id: 0}, {_id: 1}], id: cursorId, ns: "testColl"},
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: "testColl"},
@@ -143,7 +171,9 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}),
+    );
     let resp = assert.commandWorked(testDB.runCommand(searchCmd));
 
     const cursor = new DBCommandCursor(testDB, resp);
@@ -161,7 +191,10 @@ function ensureNoResponses() {
     const cursorHistory = [
         {
             expectedCommand: searchCmd,
-            response: {ok: 1, cursor: {firstBatch: [{_id: 0}, {_id: 1}], id: cursorId, ns: "testColl"}},
+            response: {
+                ok: 1,
+                cursor: {firstBatch: [{_id: 0}, {_id: 1}], id: cursorId, ns: "testColl"},
+            },
         },
         {
             expectedCommand: {killCursors: "testColl", cursors: [cursorId]},
@@ -175,7 +208,9 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}),
+    );
 
     let resp = assert.commandWorked(testDB.runCommand(searchCmd));
 
@@ -212,7 +247,9 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}),
+    );
 
     let resp = assert.commandWorked(testDB.runCommand(searchCmd));
 
@@ -275,15 +312,22 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorIdA, history: cursorAHistory}));
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorIdB, history: cursorBHistory}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorIdA, history: cursorAHistory}),
+    );
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorIdB, history: cursorBHistory}),
+    );
 
     let responses = [
         assert.commandWorked(testDB.runCommand(searchCmd)),
         assert.commandWorked(testDB.runCommand(searchCmd)),
     ];
 
-    const cursors = [new DBCommandCursor(testDB, responses[0]), new DBCommandCursor(testDB, responses[1])];
+    const cursors = [
+        new DBCommandCursor(testDB, responses[0]),
+        new DBCommandCursor(testDB, responses[1]),
+    ];
 
     // The mock responses should respect a FIFO order. The first cursor should get the
     // responses for cursor A, and the second cursor should get the responses for cursor B.
@@ -333,7 +377,9 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}),
+    );
     let resp = assert.commandWorked(testDB.runCommand(pipelineCmd));
     assert.eq(resp, cursorHistory[0].response);
 
@@ -382,7 +428,9 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}),
+    );
     let resp = assert.commandWorked(testDB.runCommand(vectorSearchCmd));
     assert.eq(resp, cursorHistory[0].response);
 
@@ -420,10 +468,18 @@ function ensureNoResponses() {
             },
         ];
         assert.commandWorked(
-            testDB.runCommand({setMockResponses: 1, cursorId: NumberLong(1), history: planShardedSearchHistory}),
+            testDB.runCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(1),
+                history: planShardedSearchHistory,
+            }),
         );
         assert.commandWorked(
-            testDB.runCommand({setMockResponses: 1, cursorId: NumberLong(2), history: resultDocHistory}),
+            testDB.runCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(2),
+                history: resultDocHistory,
+            }),
         );
     }
     function assertResults(actualDocResults, actualPssResults) {
@@ -515,7 +571,10 @@ function ensureNoResponses() {
             // GetMore for results cursor
             {
                 expectedCommand: {getMore: NumberLong(1), collection: "collName"},
-                response: {cursor: {id: NumberLong(0), ns: "collName", nextBatch: resultsABatch2}, ok: 1},
+                response: {
+                    cursor: {id: NumberLong(0), ns: "collName", nextBatch: resultsABatch2},
+                    ok: 1,
+                },
             },
         ];
         const historyB = [
@@ -558,10 +617,18 @@ function ensureNoResponses() {
                 },
             },
         ];
-        assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: NumberLong(1), history: historyA}));
-        assert.commandWorked(testDB.runCommand({allowMultiCursorResponse: 1, cursorId: NumberLong(10)}));
-        assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: NumberLong(2), history: historyB}));
-        assert.commandWorked(testDB.runCommand({allowMultiCursorResponse: 1, cursorId: NumberLong(20)}));
+        assert.commandWorked(
+            testDB.runCommand({setMockResponses: 1, cursorId: NumberLong(1), history: historyA}),
+        );
+        assert.commandWorked(
+            testDB.runCommand({allowMultiCursorResponse: 1, cursorId: NumberLong(10)}),
+        );
+        assert.commandWorked(
+            testDB.runCommand({setMockResponses: 1, cursorId: NumberLong(2), history: historyB}),
+        );
+        assert.commandWorked(
+            testDB.runCommand({allowMultiCursorResponse: 1, cursorId: NumberLong(20)}),
+        );
     }
 
     // Return the batches from both cursors in the response. Assumes the format of the response from
@@ -599,16 +666,26 @@ function ensureNoResponses() {
     // Call the commands out of order.
     let resultsB = assert.commandWorked(testDB.runCommand(multiCursorCommandB));
     let resultsA = assert.commandWorked(testDB.runCommand(multiCursorCommandA));
-    let getMoreA = assert.commandWorked(testDB.runCommand({getMore: NumberLong(1), collection: "collName"}));
-    let getMoreB = assert.commandWorked(testDB.runCommand({getMore: NumberLong(2), collection: "collName"}));
+    let getMoreA = assert.commandWorked(
+        testDB.runCommand({getMore: NumberLong(1), collection: "collName"}),
+    );
+    let getMoreB = assert.commandWorked(
+        testDB.runCommand({getMore: NumberLong(2), collection: "collName"}),
+    );
     assertResultsFromAllCursors(resultsA, getMoreA, resultsB, getMoreB);
     ensureNoResponses();
 
     // Demonstrate that getMore cannot be run before the originating command even with order
     // checking disabled.
     setHistoryForOrderTest();
-    assert.commandFailedWithCode(testDB.runCommand({getMore: NumberLong(1), collection: "collName"}), 31088);
-    assert.commandFailedWithCode(testDB.runCommand({getMore: NumberLong(2), collection: "collName"}), 31088);
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: NumberLong(1), collection: "collName"}),
+        31088,
+    );
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: NumberLong(2), collection: "collName"}),
+        31088,
+    );
     assert.commandWorked(testDB.runCommand(multiCursorCommandB));
     assert.commandWorked(testDB.runCommand(multiCursorCommandA));
     assert.commandWorked(testDB.runCommand({getMore: NumberLong(2), collection: "collName"}));
@@ -621,8 +698,12 @@ function ensureNoResponses() {
     // Call the commands in order.
     resultsB = assert.commandWorked(testDB.runCommand(multiCursorCommandB));
     resultsA = assert.commandWorked(testDB.runCommand(multiCursorCommandA));
-    getMoreB = assert.commandWorked(testDB.runCommand({getMore: NumberLong(2), collection: "collName"}));
-    getMoreA = assert.commandWorked(testDB.runCommand({getMore: NumberLong(1), collection: "collName"}));
+    getMoreB = assert.commandWorked(
+        testDB.runCommand({getMore: NumberLong(2), collection: "collName"}),
+    );
+    getMoreA = assert.commandWorked(
+        testDB.runCommand({getMore: NumberLong(1), collection: "collName"}),
+    );
     assertResultsFromAllCursors(resultsA, getMoreA, resultsB, getMoreB);
 
     // Enable order checking for future tests.
@@ -647,7 +728,9 @@ function ensureNoResponses() {
         },
     ];
 
-    assert.commandWorked(testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 
     // Now run a search command.
     let resp = assert.commandWorked(testDB.runCommand(searchCmd));

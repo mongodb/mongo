@@ -27,7 +27,10 @@ function verifyLoggingCountIncrease(conn) {
     let subsequent_logging_count = getLoggingCount(db);
     assert(
         subsequent_logging_count > initial_logging_count,
-        "logging count did not increase: was " + initial_logging_count + ", now " + subsequent_logging_count,
+        "logging count did not increase: was " +
+            initial_logging_count +
+            ", now " +
+            subsequent_logging_count,
     );
 }
 
@@ -44,12 +47,18 @@ assert(
 );
 assert(
     ftdcData["serverStatus"]["metrics"]["logging"].hasOwnProperty("count"),
-    "'serverStatus.metrics.logging.count' should be included in FTDC data: '" + tojson(ftdcData) + "'",
+    "'serverStatus.metrics.logging.count' should be included in FTDC data: '" +
+        tojson(ftdcData) +
+        "'",
 );
 verifyLoggingCountIncrease(mongod);
 MongoRunner.stopMongod(mongod);
 
 // Verify logging.count is present in mongos as well.
-let shardingTest = new ShardingTest({shards: 0, mongos: 1, config: {configsvr: "", storageEngine: "wiredTiger"}});
+let shardingTest = new ShardingTest({
+    shards: 0,
+    mongos: 1,
+    config: {configsvr: "", storageEngine: "wiredTiger"},
+});
 verifyLoggingCountIncrease(shardingTest.s);
 shardingTest.stop();

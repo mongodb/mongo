@@ -27,7 +27,9 @@ function retryableUpdateTestUUIDMismatch(isSharded) {
     if (isSharded) {
         cluster = new ShardingTest({shards: 2});
         sDB = cluster.s.getDB(dbName);
-        assert.commandWorked(sDB.adminCommand({enableSharding: dbName, primaryShard: cluster.shard0.shardName}));
+        assert.commandWorked(
+            sDB.adminCommand({enableSharding: dbName, primaryShard: cluster.shard0.shardName}),
+        );
         primary = cluster.rs0.getPrimary();
     } else {
         cluster = new ReplSetTest({nodes: 2});
@@ -39,7 +41,11 @@ function retryableUpdateTestUUIDMismatch(isSharded) {
     session = primary.startSession({retryWrites: true});
     testDB = session.getDatabase(dbName);
 
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        testDB.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
+    );
 
     if (isSharded) {
         assert.commandWorked(

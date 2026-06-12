@@ -73,10 +73,14 @@ assert(samplingIsIncomplete(secondary));
 // Check sampling does not block TTL
 {
     assert.commandWorked(primaryDb.createCollection("cows"));
-    assert.commandWorked(primaryDb.cows.createIndex({"lastModifiedDate": 1}, {expireAfterSeconds: 0}));
+    assert.commandWorked(
+        primaryDb.cows.createIndex({"lastModifiedDate": 1}, {expireAfterSeconds: 0}),
+    );
 
     for (let i = 0; i < 5; i++) {
-        assert.commandWorked(primaryDb.getCollection("cows").insert({"lastModifiedDate": new Date()}));
+        assert.commandWorked(
+            primaryDb.getCollection("cows").insert({"lastModifiedDate": new Date()}),
+        );
     }
 
     // TTL Monitor should now perform passes every second. A timeout here would mean we fail the

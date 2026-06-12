@@ -37,7 +37,12 @@ const testQuery = [
                                 index: getRentalSearchIndexSpec().name,
                                 text: {
                                     query: "brooklyn",
-                                    path: ["name", "summary", "description", "neighborhood_overview"],
+                                    path: [
+                                        "name",
+                                        "summary",
+                                        "description",
+                                        "neighborhood_overview",
+                                    ],
                                 },
                             },
                         },

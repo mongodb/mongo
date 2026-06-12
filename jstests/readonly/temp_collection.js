@@ -18,7 +18,13 @@ runReadOnlyTest(
 
                 assert.commandWorked(
                     db.runCommand({
-                        applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: collName, temp: true}}],
+                        applyOps: [
+                            {
+                                op: "c",
+                                ns: db.getName() + ".$cmd",
+                                o: {create: collName, temp: true},
+                            },
+                        ],
                     }),
                 );
 
@@ -28,7 +34,8 @@ runReadOnlyTest(
                     if (info.name === collName) {
                         assert(
                             info.options.temp,
-                            "The collection is not marked as a temporary one\n" + tojson(collectionInfos),
+                            "The collection is not marked as a temporary one\n" +
+                                tojson(collectionInfos),
                         );
                         collectionExists = true;
                     }

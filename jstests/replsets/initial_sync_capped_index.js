@@ -47,10 +47,14 @@ const cappedMaxCount = 5;
 const additionalDocumentCount = 2;
 
 jsTestLog(`Creating capped collection with max ${cappedMaxCount} documents`);
-assert.commandWorked(primaryDB.createCollection(cappedCollName, {capped: true, size: 4096, max: cappedMaxCount}));
+assert.commandWorked(
+    primaryDB.createCollection(cappedCollName, {capped: true, size: 4096, max: cappedMaxCount}),
+);
 assert.commandWorked(primaryCappedColl.createIndex({a: 1}));
 
-jsTestLog(`Inserting ${cappedMaxCount} documents so that the next insertion will delete a document`);
+jsTestLog(
+    `Inserting ${cappedMaxCount} documents so that the next insertion will delete a document`,
+);
 for (let i = 0; i < cappedMaxCount; ++i) {
     assert.commandWorked(primaryCappedColl.insert({_id: i, a: i}));
 }
@@ -96,7 +100,8 @@ waitForState(secondary, ReplSetTest.State.SECONDARY);
 // Make sure the indexes created during initial sync are valid.
 let secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
 let validate_result = secondaryCappedColl.validate({full: true});
-let failMsg = "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
+let failMsg =
+    "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
 assert(validate_result.valid, failMsg);
 
 // Verify that the replicated collection has the expected documents and querying on the indexes

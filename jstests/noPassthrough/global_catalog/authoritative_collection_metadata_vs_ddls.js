@@ -54,7 +54,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
     }
 
     function getShardCatalogChunks(node, uuid) {
-        return node.getDB("config").getCollection(kShardCatalogChunksNs).find({uuid: uuid}).sort({min: 1}).toArray();
+        return node
+            .getDB("config")
+            .getCollection(kShardCatalogChunksNs)
+            .find({uuid: uuid})
+            .sort({min: 1})
+            .toArray();
     }
 
     function getInMemoryCollectionMetadata(node, ns) {
@@ -80,7 +85,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
         assert.eq(expectedUuid.toString(), meta.uuid.toString(), `${label}: uuid mismatch`);
         assert.eq(tojson(expectedKey), tojson(meta.key), `${label}: shard key mismatch`);
         if (expectedTimestamp) {
-            assert.eq(tojson(expectedTimestamp), tojson(meta.timestamp), `${label}: timestamp mismatch`);
+            assert.eq(
+                tojson(expectedTimestamp),
+                tojson(meta.timestamp),
+                `${label}: timestamp mismatch`,
+            );
         }
         if (expectedTimeseriesFields) {
             assert.eq(
@@ -110,7 +119,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
     function assertShardCatalogAbsentOnNode(node, ns, uuid) {
         const label = node.host;
         assertShardCatalogCollMetadataAbsentAtNsOnNode(node, ns);
-        assert.eq(0, getShardCatalogChunks(node, uuid).length, `${label}: unexpected chunks in shard catalog`);
+        assert.eq(
+            0,
+            getShardCatalogChunks(node, uuid).length,
+            `${label}: unexpected chunks in shard catalog`,
+        );
     }
 
     function assertShardCatalogCollMetadataAbsentAtNsOnNode(node, ns) {
@@ -133,7 +146,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
         assert.eq(expectedUuid.toString(), meta.uuid.toString(), `${label}: uuid mismatch`);
         assert.eq(tojson(expectedKey), tojson(meta.key), `${label}: shard key mismatch`);
         if (expectedTimestamp) {
-            assert.eq(tojson(expectedTimestamp), tojson(meta.timestamp), `${label}: timestamp mismatch`);
+            assert.eq(
+                tojson(expectedTimestamp),
+                tojson(meta.timestamp),
+                `${label}: timestamp mismatch`,
+            );
         }
         if (expectedTimeseriesFields) {
             assert.eq(
@@ -144,7 +161,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
         }
 
         const shardChunks = getShardCatalogChunks(node, expectedUuid);
-        assert.eq(0, shardChunks.length, `${label}: chunkless primary must not carry shard catalog chunks`);
+        assert.eq(
+            0,
+            shardChunks.length,
+            `${label}: chunkless primary must not carry shard catalog chunks`,
+        );
     }
 
     // We assert the in-memory metadata is not sharded rather than completely absent because a
@@ -169,10 +190,18 @@ describe("Authoritative collection metadata vs DDLs", function () {
         assert(res.global !== "UNKNOWN");
         assert(res.metadata, `${label}: expected in-memory metadata to be present`);
         if (isUnsplittable) {
-            assert.eq(res.metadata, {}, `${label}: expected in-memory metadata to be of an unsplittable collection`);
+            assert.eq(
+                res.metadata,
+                {},
+                `${label}: expected in-memory metadata to be of an unsplittable collection`,
+            );
         } else {
             assert.neq(res.metadata, {}, `${label}: expected in-memory metadata to be present`);
-            assert.eq(tojson(expectedKey), tojson(res.metadata.keyPattern), `${label}: in-memory shard key mismatch`);
+            assert.eq(
+                tojson(expectedKey),
+                tojson(res.metadata.keyPattern),
+                `${label}: in-memory shard key mismatch`,
+            );
         }
     }
 
@@ -185,8 +214,16 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
         assert.commandWorked(db.runCommand({drop: collName}));
 
-        assert.eq(null, getGlobalCatalogCollMetadata(ns), `${ns}: still in global catalog after drop`);
-        assert.eq(0, getAllGlobalCatalogChunks(uuid).length, `${ns}: chunks still in global catalog after drop`);
+        assert.eq(
+            null,
+            getGlobalCatalogCollMetadata(ns),
+            `${ns}: still in global catalog after drop`,
+        );
+        assert.eq(
+            0,
+            getAllGlobalCatalogChunks(uuid).length,
+            `${ns}: chunks still in global catalog after drop`,
+        );
 
         st.awaitReplicationOnShards();
         forEachNodeOnAllShards((node) => {
@@ -198,7 +235,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
     function setupDb(suffix) {
         const dbName = uniqueDbName(suffix);
         const db = st.s.getDB(dbName);
-        assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
         return db;
     }
 
@@ -259,8 +298,16 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
         const globalMeta = getGlobalCatalogCollMetadata(ns);
         assert.neq(null, globalMeta, `${ns}: missing in global catalog after resharding`);
-        assert.neq(originalUuid.toString(), globalMeta.uuid.toString(), "resharding must reissue the collection UUID");
-        assert.eq(tojson(expectedKey), tojson(globalMeta.key), `${ns}: unexpected shard key after resharding`);
+        assert.neq(
+            originalUuid.toString(),
+            globalMeta.uuid.toString(),
+            "resharding must reissue the collection UUID",
+        );
+        assert.eq(
+            tojson(expectedKey),
+            tojson(globalMeta.key),
+            `${ns}: unexpected shard key after resharding`,
+        );
         const newUuid = globalMeta.uuid;
 
         forEachNodeOnAllShards((node) => {
@@ -280,7 +327,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
         });
 
         // Sanity: the resharded collection owns at least one chunk somewhere.
-        assert.gt(getAllGlobalCatalogChunks(newUuid).length, 0, `${ns}: expected chunks after resharding`);
+        assert.gt(
+            getAllGlobalCatalogChunks(newUuid).length,
+            0,
+            `${ns}: expected chunks after resharding`,
+        );
 
         const primaryShard = getPrimaryShardId(ns);
         // Every shard that owns chunks for the new UUID must carry a matching shard catalog entry.
@@ -314,7 +365,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
     afterEach(function () {
         const inconsistencies = st.s.getDB("admin").checkMetadataConsistency().toArray();
-        assert.eq(0, inconsistencies.length, `Metadata inconsistencies found: ${tojson(inconsistencies)}`);
+        assert.eq(
+            0,
+            inconsistencies.length,
+            `Metadata inconsistencies found: ${tojson(inconsistencies)}`,
+        );
     });
 
     describe("refineCollectionShardKey", function () {
@@ -325,7 +380,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(
                 db.coll.insert([
@@ -336,7 +396,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             );
 
             assert.commandWorked(db.coll.createIndex({x: 1, y: 1}));
-            assert.commandWorked(db.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1}}));
+            assert.commandWorked(
+                db.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1}}),
+            );
 
             const refinedKey = {x: 1, y: 1};
             const globalMeta = getGlobalCatalogCollMetadata(ns);
@@ -351,7 +413,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 {rs: st.rs1, shardName: st.shard1.shardName},
             ].forEach(({rs, shardName}) => {
                 const shardGlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, shardName);
-                assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
+                assert.gt(
+                    shardGlobalChunks.length,
+                    0,
+                    `Expected at least one chunk on ${shardName}`,
+                );
 
                 // Validate in-memory metadata on each shard's primary.
                 assertInMemoryMetadataSharded(rs.getPrimary(), ns, refinedKey);
@@ -373,7 +439,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const db2 = st.s.getDB(dbName2);
 
             // Setup: sharded collection {x: 1} with 2 chunks split at x: 0, all on shard0.
-            assert.commandWorked(db2.adminCommand({enableSharding: dbName2, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                db2.adminCommand({enableSharding: dbName2, primaryShard: st.shard0.shardName}),
+            );
             assert.commandWorked(db2.adminCommand({shardCollection: ns2, key: {x: 1}}));
             assert.commandWorked(db2.adminCommand({split: ns2, middle: {x: 0}}));
             assert.commandWorked(
@@ -385,7 +453,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             // First refine: {x: 1} -> {x: 1, y: 1}.
             assert.commandWorked(db2.coll.createIndex({x: 1, y: 1}));
-            assert.commandWorked(db2.adminCommand({refineCollectionShardKey: ns2, key: {x: 1, y: 1}}));
+            assert.commandWorked(
+                db2.adminCommand({refineCollectionShardKey: ns2, key: {x: 1, y: 1}}),
+            );
 
             st.awaitReplicationOnShards();
 
@@ -434,7 +504,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             // Second refine: {x: 1, y: 1} -> {x: 1, y: 1, z: 1}.
             assert.commandWorked(db2.coll.createIndex({x: 1, y: 1, z: 1}));
-            assert.commandWorked(db2.adminCommand({refineCollectionShardKey: ns2, key: {x: 1, y: 1, z: 1}}));
+            assert.commandWorked(
+                db2.adminCommand({refineCollectionShardKey: ns2, key: {x: 1, y: 1, z: 1}}),
+            );
 
             st.awaitReplicationOnShards();
 
@@ -477,12 +549,16 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const globalMeta = getGlobalCatalogCollMetadata(ns);
 
             st.awaitReplicationOnShards();
-            st.rs1.nodes.forEach((node) => assertShardCatalogAbsentOnNode(node, ns, globalMeta.uuid));
+            st.rs1.nodes.forEach((node) =>
+                assertShardCatalogAbsentOnNode(node, ns, globalMeta.uuid),
+            );
 
             assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
             st.awaitReplicationOnShards();
 
-            st.rs1.nodes.forEach((node) => assertCollectionExistsWithoutChunksOnNode(node, ns, globalMeta.uuid));
+            st.rs1.nodes.forEach((node) =>
+                assertCollectionExistsWithoutChunksOnNode(node, ns, globalMeta.uuid),
+            );
         });
 
         it("does not commit collection metadata when new primary already owns chunks", function () {
@@ -493,7 +569,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
 
@@ -524,7 +605,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const ddlNs = getTimeseriesCollForDDLOps(db, coll).getFullName();
             assert.commandWorked(db.adminCommand({split: ddlNs, middle: {meta: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ddlNs, find: {meta: 1}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ddlNs,
+                    find: {meta: 1},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(
                 coll.insert([
@@ -535,9 +621,15 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             const originalGlobalMeta = getGlobalCatalogCollMetadata(ddlNs);
             const originalGlobalChunks = getAllGlobalCatalogChunks(originalGlobalMeta.uuid);
-            assert.eq(2, originalGlobalChunks.length, `${ddlNs}: expected two chunks before collMod`);
+            assert.eq(
+                2,
+                originalGlobalChunks.length,
+                `${ddlNs}: expected two chunks before collMod`,
+            );
 
-            assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}));
+            assert.commandWorked(
+                db.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}),
+            );
 
             const globalMeta = getGlobalCatalogCollMetadata(ddlNs);
             assert.neq(null, globalMeta, `${ddlNs}: missing global catalog metadata after collMod`);
@@ -560,7 +652,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 {rs: st.rs1, shardName: st.shard1.shardName},
             ].forEach(({rs, shardName}) => {
                 const shardGlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, shardName);
-                assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
+                assert.gt(
+                    shardGlobalChunks.length,
+                    0,
+                    `Expected at least one chunk on ${shardName}`,
+                );
 
                 assertInMemoryMetadataSharded(rs.getPrimary(), ddlNs, globalMeta.key);
 
@@ -584,7 +680,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
 
@@ -606,7 +707,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const ns = `${db.getName()}.coll`;
 
             assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}),
+            );
 
             dropCollectionAndAssertCleanup(db, "coll");
         });
@@ -618,8 +721,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const ns = `${db.getName()}.coll`;
 
             assert.commandWorked(db.createCollection("coll"));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}),
+            );
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}),
+            );
             assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
 
             const globalMeta = getGlobalCatalogCollMetadata(ns);
@@ -628,9 +735,21 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             assert.commandWorked(db.adminCommand({untrackUnshardedCollection: ns}));
 
-            assert.eq(null, getGlobalCatalogCollMetadata(ns), `${ns}: still in global catalog after untrack`);
-            assert.eq(0, getAllGlobalCatalogChunks(uuid).length, `${ns}: chunks still in global catalog after untrack`);
-            assert.eq(2, db.coll.countDocuments({}), `${ns}: user data should remain after untrack`);
+            assert.eq(
+                null,
+                getGlobalCatalogCollMetadata(ns),
+                `${ns}: still in global catalog after untrack`,
+            );
+            assert.eq(
+                0,
+                getAllGlobalCatalogChunks(uuid).length,
+                `${ns}: chunks still in global catalog after untrack`,
+            );
+            assert.eq(
+                2,
+                db.coll.countDocuments({}),
+                `${ns}: user data should remain after untrack`,
+            );
 
             st.awaitReplicationOnShards();
             forEachNodeOnAllShards((node) => {
@@ -703,7 +822,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 // Primary is not the data shard: it owns no real chunks but must carry the collection entry so disk recovery recognize the collection as tracked.
                 primaryRs.nodes.forEach((node) => {
                     const meta = getShardCatalogCollMetadata(node, ns);
-                    assert.neq(null, meta, `${node.host}: chunkless primary is missing collection metadata`);
+                    assert.neq(
+                        null,
+                        meta,
+                        `${node.host}: chunkless primary is missing collection metadata`,
+                    );
                     assert.eq(
                         newUuid.toString(),
                         meta.uuid.toString(),
@@ -711,7 +834,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     );
 
                     const shardChunks = getShardCatalogChunks(node, newUuid);
-                    assert.eq(0, shardChunks.length, `${node.host}: chunkless primary must not have any chunks`);
+                    assert.eq(
+                        0,
+                        shardChunks.length,
+                        `${node.host}: chunkless primary must not have any chunks`,
+                    );
                 });
             }
 
@@ -733,7 +860,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             // Tracked, unsplittable collection living on the DB primary.
             assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}),
+            );
 
             const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
 
@@ -764,7 +893,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             // Tracked, unsplittable collection moved to a shard that is not the DB primary.
             assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}),
+            );
 
             const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
 
@@ -792,7 +923,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const ns = `${db.getName()}.coll`;
 
             assert.commandWorked(db.coll.insert([{x: 1}]));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}),
+            );
             assert.commandWorked(db.runCommand({convertToCapped: "coll", size: 1024}));
 
             dropCollectionAndAssertCleanup(db, "coll");
@@ -848,12 +981,16 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     timeseries: {timeField: "time", metaField: "tag"},
                 }),
             );
-            assert.commandWorked(trackedColl.insert([{time: ISODate("2026-01-01T00:00:00.000Z"), tag: "tracked"}]));
+            assert.commandWorked(
+                trackedColl.insert([{time: ISODate("2026-01-01T00:00:00.000Z"), tag: "tracked"}]),
+            );
 
             assert.neq(null, getGlobalCatalogCollMetadata(shardedUserNs));
             assert.neq(null, getGlobalCatalogCollMetadata(trackedUserNs));
 
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            );
             st.awaitReplicationOnShards();
 
             assert.eq(null, getGlobalCatalogCollMetadata(shardedUserNs));
@@ -868,7 +1005,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 assertShardCatalogCollMetadataAbsentAtNsOnNode(node, trackedBucketsNs);
             });
 
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+            );
             st.awaitReplicationOnShards();
 
             assert.eq(null, getGlobalCatalogCollMetadata(shardedBucketsNs));
@@ -894,14 +1033,21 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: dstNs, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: dstNs, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: dstNs, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: dstNs,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.dst.insert([{x: -1}, {x: 1}]));
             assert.commandWorked(db.src.insert([{x: 10}, {x: 20}]));
 
             const originalDstUuid = getGlobalCatalogCollMetadata(dstNs).uuid;
 
-            assert.commandWorked(db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}));
+            assert.commandWorked(
+                db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}),
+            );
 
             st.awaitReplicationOnShards();
 
@@ -947,7 +1093,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.src.insert([{x: 1}]));
             assert.commandWorked(db.dst.insert([{y: 2}]));
 
-            assert.commandWorked(db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}));
+            assert.commandWorked(
+                db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}),
+            );
 
             st.awaitReplicationOnShards();
 
@@ -975,7 +1123,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: srcNs, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: srcNs, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: srcNs, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: srcNs,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.src.insert([{x: -1}, {x: 1}]));
             assert.commandWorked(db.dst.insert([{y: 1}]));
@@ -984,7 +1137,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const srcUuid = srcMeta.uuid;
             const srcKey = srcMeta.key;
 
-            assert.commandWorked(db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}));
+            assert.commandWorked(
+                db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}),
+            );
 
             st.awaitReplicationOnShards();
 
@@ -993,7 +1148,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 {rs: st.rs1, shardName: st.shard1.shardName},
             ].forEach(({rs, shardName}) => {
                 const shardGlobalChunks = getGlobalCatalogChunks(srcUuid, shardName);
-                assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
+                assert.gt(
+                    shardGlobalChunks.length,
+                    0,
+                    `Expected at least one chunk on ${shardName}`,
+                );
 
                 rs.nodes.forEach((node) => {
                     // Shard catalog has entries for the final namespace.
@@ -1023,7 +1182,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: srcNs, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: srcNs, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: srcNs, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: srcNs,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.src.insert([{x: -1}, {x: 1}]));
 
@@ -1040,7 +1204,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 {rs: st.rs1, shardName: st.shard1.shardName},
             ].forEach(({rs, shardName}) => {
                 const shardGlobalChunks = getGlobalCatalogChunks(srcUuid, shardName);
-                assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
+                assert.gt(
+                    shardGlobalChunks.length,
+                    0,
+                    `Expected at least one chunk on ${shardName}`,
+                );
 
                 rs.nodes.forEach((node) => {
                     // Shard catalog has entries for the final namespace.
@@ -1068,14 +1236,21 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const dstDbName = uniqueDbName("rename_unsplittable_cross_dst");
             const dstDb = st.s.getDB(dstDbName);
             const dstNs = `${dstDbName}.coll`;
-            assert.commandWorked(dstDb.adminCommand({enableSharding: dstDbName, primaryShard: st.shard0.shardName}));
             assert.commandWorked(
-                dstDb.adminCommand({enableSharding: srcDb.getName(), primaryShard: st.shard0.shardName}),
+                dstDb.adminCommand({enableSharding: dstDbName, primaryShard: st.shard0.shardName}),
+            );
+            assert.commandWorked(
+                dstDb.adminCommand({
+                    enableSharding: srcDb.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
             );
 
             // Make the collection tracked-but-unsplittable
             assert.commandWorked(srcDb.coll.insert([{x: 1}, {x: 2}]));
-            assert.commandWorked(srcDb.adminCommand({moveCollection: srcNs, toShard: st.shard0.shardName}));
+            assert.commandWorked(
+                srcDb.adminCommand({moveCollection: srcNs, toShard: st.shard0.shardName}),
+            );
 
             const originalUuid = getGlobalCatalogCollMetadata(srcNs).uuid;
 
@@ -1089,7 +1264,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 newMeta.uuid.toString(),
                 "cross-DB rename must reissue the collection UUID",
             );
-            assert.eq(null, getGlobalCatalogCollMetadata(srcNs), `${srcNs}: still in global catalog after rename`);
+            assert.eq(
+                null,
+                getGlobalCatalogCollMetadata(srcNs),
+                `${srcNs}: still in global catalog after rename`,
+            );
 
             st.awaitReplicationOnShards();
 
@@ -1130,7 +1309,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: srcNs, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: srcNs, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: srcNs, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: srcNs,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.src.insert([{x: -1}, {x: 1}]));
 
@@ -1142,7 +1326,9 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const srcKey = srcMeta.key;
             const originalDstUuid = getGlobalCatalogCollMetadata(dstNs).uuid;
 
-            assert.commandWorked(db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}));
+            assert.commandWorked(
+                db.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}),
+            );
 
             st.awaitReplicationOnShards();
 
@@ -1151,7 +1337,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 {rs: st.rs1, shardName: st.shard1.shardName},
             ].forEach(({rs, shardName}) => {
                 const shardGlobalChunks = getGlobalCatalogChunks(srcUuid, shardName);
-                assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
+                assert.gt(
+                    shardGlobalChunks.length,
+                    0,
+                    `Expected at least one chunk on ${shardName}`,
+                );
 
                 rs.nodes.forEach((node) => {
                     // Shard catalog has entries for the final namespace with the source's metadata.
@@ -1189,7 +1379,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(
                 db.coll.insert([
@@ -1201,9 +1396,15 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
 
             const newKey = {y: 1};
-            assert.commandWorked(db.adminCommand({reshardCollection: ns, key: newKey, numInitialChunks: 2}));
+            assert.commandWorked(
+                db.adminCommand({reshardCollection: ns, key: newKey, numInitialChunks: 2}),
+            );
 
-            assertReshardingFinalState(ns, {originalUuid, expectedKey: newKey, isUnsplittable: false});
+            assertReshardingFinalState(ns, {
+                originalUuid,
+                expectedKey: newKey,
+                isUnsplittable: false,
+            });
         });
 
         it("updates the shard catalog with the new shard key and drops the previous state even in non-owning primary shard", function () {
@@ -1214,10 +1415,20 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: -1}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: -1},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard2.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 1},
+                    to: st.shard2.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(
                 db.coll.insert([
@@ -1245,7 +1456,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 }),
             );
 
-            assertReshardingFinalState(ns, {originalUuid, expectedKey: newKey, isUnsplittable: false});
+            assertReshardingFinalState(ns, {
+                originalUuid,
+                expectedKey: newKey,
+                isUnsplittable: false,
+            });
         });
 
         it("abort cleans up the temporary resharding collection and leaves the source intact", function () {
@@ -1274,13 +1489,20 @@ describe("Authoritative collection metadata vs DDLs", function () {
             // created the temporary resharding collection and committed its metadata to the shard
             // catalog, so we can observe it before aborting. The failpoint releases automatically
             // once the operation is canceled by the abort.
-            const fp = configureFailPoint(st.configRS.getPrimary(), "reshardingPauseCoordinatorBeforeBlockingWrites");
+            const fp = configureFailPoint(
+                st.configRS.getPrimary(),
+                "reshardingPauseCoordinatorBeforeBlockingWrites",
+            );
 
             const awaitReshard = startParallelShell(
                 funWithArgs(
                     function (ns, newKey) {
                         assert.commandFailedWithCode(
-                            db.adminCommand({reshardCollection: ns, key: newKey, numInitialChunks: 2}),
+                            db.adminCommand({
+                                reshardCollection: ns,
+                                key: newKey,
+                                numInitialChunks: 2,
+                            }),
                             ErrorCodes.ReshardCollectionAborted,
                         );
                     },
@@ -1295,7 +1517,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
             // The temporary resharding collection is tracked in the global catalog and its metadata
             // is durably committed to the shard catalog on at least one recipient.
             const tempGlobalMeta = getGlobalCatalogCollMetadata(tempNs);
-            assert.neq(null, tempGlobalMeta, `${tempNs}: temporary resharding collection missing from global catalog`);
+            assert.neq(
+                null,
+                tempGlobalMeta,
+                `${tempNs}: temporary resharding collection missing from global catalog`,
+            );
             const tempUuid = tempGlobalMeta.uuid;
 
             assert.soon(() => {
@@ -1323,9 +1549,21 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             // The source collection metadata is intact: same UUID, same key, original chunk layout.
             const finalMeta = getGlobalCatalogCollMetadata(ns);
-            assert.neq(null, finalMeta, `${ns}: source collection missing from global catalog after abort`);
-            assert.eq(sourceUuid.toString(), finalMeta.uuid.toString(), "source UUID changed despite the abort");
-            assert.eq(tojson(sourceKey), tojson(finalMeta.key), "source shard key changed despite the abort");
+            assert.neq(
+                null,
+                finalMeta,
+                `${ns}: source collection missing from global catalog after abort`,
+            );
+            assert.eq(
+                sourceUuid.toString(),
+                finalMeta.uuid.toString(),
+                "source UUID changed despite the abort",
+            );
+            assert.eq(
+                tojson(sourceKey),
+                tojson(finalMeta.key),
+                "source shard key changed despite the abort",
+            );
 
             [
                 {rs: st.rs0, shardName: st.shard0.shardName},
@@ -1359,14 +1597,22 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             // Track the unsharded collection on shard1 first so there is a previous tracked state.
             assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}),
+            );
 
             const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
 
             // Move it back to shard0.
-            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}),
+            );
 
-            assertReshardingFinalState(ns, {originalUuid, expectedKey: kUnsplittableShardKey, isUnsplittable: true});
+            assertReshardingFinalState(ns, {
+                originalUuid,
+                expectedKey: kUnsplittableShardKey,
+                isUnsplittable: true,
+            });
 
             // The destination shard (shard0) is the only data shard and must own the single chunk.
             const newUuid = getGlobalCatalogCollMetadata(ns).uuid;
@@ -1384,19 +1630,34 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
 
             const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
 
-            assert.commandWorked(db.adminCommand({unshardCollection: ns, toShard: st.shard0.shardName}));
+            assert.commandWorked(
+                db.adminCommand({unshardCollection: ns, toShard: st.shard0.shardName}),
+            );
 
             // The collection is now unsplittable ({_id: 1}) living on shard0 alone.
-            assertReshardingFinalState(ns, {originalUuid, expectedKey: kUnsplittableShardKey, isUnsplittable: true});
+            assertReshardingFinalState(ns, {
+                originalUuid,
+                expectedKey: kUnsplittableShardKey,
+                isUnsplittable: true,
+            });
 
             const newUuid = getGlobalCatalogCollMetadata(ns).uuid;
-            assert.eq(1, getAllGlobalCatalogChunks(newUuid).length, `${ns}: expected a single chunk after unshard`);
+            assert.eq(
+                1,
+                getAllGlobalCatalogChunks(newUuid).length,
+                `${ns}: expected a single chunk after unshard`,
+            );
             assert.eq(1, getGlobalCatalogChunks(newUuid, st.shard0.shardName).length);
         });
     });
@@ -1410,7 +1671,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
             );
             assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
 

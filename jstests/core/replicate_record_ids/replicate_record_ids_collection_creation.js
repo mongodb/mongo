@@ -18,7 +18,9 @@ coll.drop();
 // Validate that a clustered collection will never have the 'recordIdsReplicated' option set
 // implicitly.
 const clusteredCollName = collName + "_clustered";
-assert.commandWorked(db.createCollection(clusteredCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    db.createCollection(clusteredCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 assert(
     !hasRecordIdsReplicated(db, clusteredCollName),
     "clustered collection created with recordIdsReplicated collection option",

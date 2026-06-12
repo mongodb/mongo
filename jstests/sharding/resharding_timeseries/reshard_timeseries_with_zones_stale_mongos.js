@@ -101,7 +101,13 @@ function runReshardCollectionTest(failpoint) {
     assert.commandWorked(st.s2.getDB(dbName).runCommand({find: collName, filter: {}}));
 
     // Perform the first reshardCollection.
-    let reshardThread1 = new Thread(runReshardCollection, st.s0.host, ns, {"sensorId.y": 1}, zones1);
+    let reshardThread1 = new Thread(
+        runReshardCollection,
+        st.s0.host,
+        ns,
+        {"sensorId.y": 1},
+        zones1,
+    );
     reshardThread1.start();
     reshardThread1.join();
     assert.commandWorked(reshardThread1.returnData());
@@ -112,7 +118,13 @@ function runReshardCollectionTest(failpoint) {
 
     // Perform the second reshardCollection.
     let fp = configureFailPoint(configPrimary, failpoint);
-    let reshardThread2 = new Thread(runReshardCollection, st.s0.host, ns, {"sensorId.z": 1}, zones2);
+    let reshardThread2 = new Thread(
+        runReshardCollection,
+        st.s0.host,
+        ns,
+        {"sensorId.z": 1},
+        zones2,
+    );
     reshardThread2.start();
     fp.wait({maxTimeMS: waitForFailPointTimeout});
 
@@ -123,20 +135,26 @@ function runReshardCollectionTest(failpoint) {
     assert.commandWorked(st.s0.getDB(dbName).runCommand({find: collName, filter: {}}));
     // Use insert rather than update: sharded timeseries collections disallow {multi:false} updates.
     assert.commandWorked(
-        st.s0
-            .getDB(dbName)
-            .runCommand({insert: collName, documents: [{ts: new Date(), sensorId: {x: 0, y: 0, z: 0}, v: 0}]}),
+        st.s0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{ts: new Date(), sensorId: {x: 0, y: 0, z: 0}, v: 0}],
+        }),
     );
 
-    jsTest.log("Perform a read via mongos1 which has stale routing info. The read should not be blocked");
+    jsTest.log(
+        "Perform a read via mongos1 which has stale routing info. The read should not be blocked",
+    );
     assert.commandWorked(st.s1.getDB(dbName).runCommand({find: collName, filter: {}}));
 
-    jsTest.log("Perform an insert via mongos2 which has stale routing info. The insert should not be blocked");
+    jsTest.log(
+        "Perform an insert via mongos2 which has stale routing info. The insert should not be blocked",
+    );
     // Please note that mongos1 is no longer stale after the read above.
     assert.commandWorked(
-        st.s2
-            .getDB(dbName)
-            .runCommand({insert: collName, documents: [{ts: new Date(), sensorId: {x: 0, y: 0, z: 0}, v: 0}]}),
+        st.s2.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{ts: new Date(), sensorId: {x: 0, y: 0, z: 0}, v: 0}],
+        }),
     );
 
     fp.off();

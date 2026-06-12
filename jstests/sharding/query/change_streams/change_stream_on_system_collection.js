@@ -51,7 +51,9 @@ const wholeClusterCursor = db.getMongo().watch();
 
 // Create a new sharded collection that we will start watching later.
 assert.commandWorked(db.createCollection("system.resharding.someUUID"));
-assert.commandWorked(db.adminCommand({shardCollection: db.getName() + ".system.resharding.someUUID", key: {_id: 1}}));
+assert.commandWorked(
+    db.adminCommand({shardCollection: db.getName() + ".system.resharding.someUUID", key: {_id: 1}}),
+);
 
 // Insert a document to capture the cluster time at which our tests begin.
 assert.commandWorked(db.t1.insert({_id: 0, a: 1}));
@@ -59,8 +61,16 @@ assert.soon(() => wholeDBCursor.hasNext());
 const documentInsertedEvent = wholeDBCursor.next();
 
 // Verify that the event is a document insertion event.
-assert.eq("insert", documentInsertedEvent.operationType, "Unexpected change event: " + tojson(documentInsertedEvent));
-assert.eq("t1", documentInsertedEvent.ns.coll, "Unexpected change event: " + tojson(documentInsertedEvent));
+assert.eq(
+    "insert",
+    documentInsertedEvent.operationType,
+    "Unexpected change event: " + tojson(documentInsertedEvent),
+);
+assert.eq(
+    "t1",
+    documentInsertedEvent.ns.coll,
+    "Unexpected change event: " + tojson(documentInsertedEvent),
+);
 const clusterTimeAtInsert = documentInsertedEvent.clusterTime;
 
 const systemCollection = db["system.resharding.someUUID"];

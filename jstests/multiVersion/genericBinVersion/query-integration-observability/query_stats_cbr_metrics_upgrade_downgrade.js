@@ -8,7 +8,11 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {describe, it} from "jstests/libs/mochalite.js";
-import {getQueryPlannerMetrics, getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryPlannerMetrics,
+    getQueryStats,
+    resetQueryStatsStore,
+} from "jstests/libs/query/query_stats_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 

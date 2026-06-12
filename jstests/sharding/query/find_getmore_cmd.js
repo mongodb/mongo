@@ -17,7 +17,9 @@ st.stopBalancer();
 
 // Set up a collection sharded by "_id" with one chunk on each of the two shards.
 var db = st.s.getDB("test");
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 let coll = db.getCollection("find_getmore_cmd");
 
 assert.commandWorked(coll.insert({_id: -9, a: 4, b: "foo foo"}));
@@ -31,7 +33,9 @@ assert.commandWorked(coll.createIndex({b: "text"}));
 
 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}),
+);
 
 // Find with no options.
 cmdRes = db.runCommand({find: coll.getName()});
@@ -137,7 +141,11 @@ assert.eq(cmdRes.cursor.firstBatch[2]["_id"], -1);
 // User projection on $sortKey is illegal.
 cmdRes = db.runCommand({find: coll.getName(), projection: {$sortKey: 1}, sort: {_id: 1}});
 assert.commandFailed(cmdRes);
-cmdRes = db.runCommand({find: coll.getName(), projection: {$sortKey: {$meta: "sortKey"}}, sort: {_id: 1}});
+cmdRes = db.runCommand({
+    find: coll.getName(),
+    projection: {$sortKey: {$meta: "sortKey"}},
+    sort: {_id: 1},
+});
 assert.commandFailed(cmdRes);
 
 // User should be able to issue a sortKey meta-projection, as long as it's not on the reserved

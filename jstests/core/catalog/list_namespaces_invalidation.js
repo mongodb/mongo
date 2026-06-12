@@ -29,7 +29,9 @@ function testNamespaceInvalidation(namespaceAction, batchSize) {
         // memory for the record.
         assert.commandWorked(
             dbInvalid["coll1"].renameCollection(
-                "coll1" + "lkdsahflaksjdhfsdkljhfskladhfkahfsakfla" + "skfjhaslfaslfkhasklfjhsakljhdsjksahkldjslh",
+                "coll1" +
+                    "lkdsahflaksjdhfsdkljhfskladhfkahfsakfla" +
+                    "skfjhaslfaslfkhasklfjhsakljhdsjksahkldjslh",
             ),
         );
     } else if (namespaceAction == DROP) {

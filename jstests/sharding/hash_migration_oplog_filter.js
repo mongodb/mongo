@@ -39,7 +39,9 @@ let ns2 = dbName + "." + collName2;
 let configDB = st.s.getDB("config");
 let testDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: "hashed"}}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: "hashed"}}));
@@ -59,8 +61,16 @@ docs.forEach(function (doc) {
     let hashDoc = {x: convertShardKeyToHashed(doc.x)};
 
     // Check that chunks for the doc and its hash are different.
-    let originalShardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, doc);
-    let hashShardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, hashDoc);
+    let originalShardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(
+        st,
+        shardChunkBounds,
+        doc,
+    );
+    let hashShardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(
+        st,
+        shardChunkBounds,
+        hashDoc,
+    );
     assert.neq(originalShardBoundsPair.bounds, hashShardBoundsPair.bounds);
 
     shards.push(hashShardBoundsPair.shard);
@@ -88,7 +98,12 @@ function testChunkMove(dbName, collName, findSourceOperation) {
     let fromShard = shards[0];
     let toShard = st.getOther(fromShard);
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, bounds: docChunkBounds[0], to: toShard.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            bounds: docChunkBounds[0],
+            to: toShard.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     // Check that only the oplog entries for docs[0] are copied onto the recipient shard.

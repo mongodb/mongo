@@ -63,7 +63,11 @@ TimeseriesTest.run((insert) => {
             );
             // Here we extract the hostId from "host.tags.hostname". It is expected that the
             // "host.tags.hostname" is in the form of 'host_<hostNum>'.
-            entryCountPerHost[parseInt(host[tagFieldName].hostname.substring(5, host[tagFieldName].hostname.length))]++;
+            entryCountPerHost[
+                parseInt(
+                    host[tagFieldName].hostname.substring(5, host[tagFieldName].hostname.length),
+                )
+            ]++;
         }
 
         // Equality Match
@@ -105,7 +109,13 @@ TimeseriesTest.run((insert) => {
                         let: {"outer_hostname": `$${tagFieldName}.hostname`},
                         pipeline: [
                             // $match will be pushed before unpack bucket stage
-                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname]}}},
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname],
+                                    },
+                                },
+                            },
                         ],
                         as: "matchedB",
                     },
@@ -138,7 +148,13 @@ TimeseriesTest.run((insert) => {
                         from: collB.getName(),
                         let: {"outer_hostname": `$${tagFieldName}.hostname`},
                         pipeline: [
-                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname]}}},
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname],
+                                    },
+                                },
+                            },
                             {$set: {foo: {$const: 123}}}, // uncorrelated
                         ],
                         as: "matchedB",
@@ -172,7 +188,13 @@ TimeseriesTest.run((insert) => {
                         from: collB.getName(),
                         let: {"outer_hostname": `$${tagFieldName}.hostname`},
                         pipeline: [
-                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname]}}},
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname],
+                                    },
+                                },
+                            },
                             {$set: {foo: "$$outer_hostname"}}, // correlated
                         ],
                         as: "matchedB",
@@ -209,7 +231,14 @@ TimeseriesTest.run((insert) => {
                             {
                                 $match: {
                                     $expr: {
-                                        $lte: [{$toInt: {$substr: [`$${tagFieldName}.hostname`, 5, -1]}}, "$$hostId"],
+                                        $lte: [
+                                            {
+                                                $toInt: {
+                                                    $substr: [`$${tagFieldName}.hostname`, 5, -1],
+                                                },
+                                            },
+                                            "$$hostId",
+                                        ],
                                     },
                                 },
                             },
@@ -284,7 +313,9 @@ TimeseriesTest.run((insert) => {
         {_id: 0, key: 1},
         {_id: 1, key: 2},
     ]);
-    testDB.createCollection("foreign", {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
+    testDB.createCollection("foreign", {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    });
     testDB.foreign.insertMany([
         {[timeFieldName]: new Date(), _id: 0, [metaFieldName]: 1, val1: 42, val2: 100},
         {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 17, val2: 100},
@@ -438,7 +469,9 @@ TimeseriesTest.run((insert) => {
         {_id: 0, key: 1, a: 10},
         {_id: 1, key: 2, a: 20},
     ]);
-    testDB.createCollection(foreignColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
+    testDB.createCollection(foreignColl.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    });
     foreignColl.insertMany([
         {[timeFieldName]: new Date(), _id: 0, [metaFieldName]: 1, val1: 42, val2: 100},
         {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 17, val2: 100},
@@ -468,7 +501,8 @@ TimeseriesTest.run((insert) => {
                 {_id: 1, key: 2, joined: {val1: 17, m: 2}},
                 {_id: 1, key: 2, joined: {val1: 20, m: 2}},
             ],
-            extraErrorMsg: "Unexpected result for $lookup with an equality match followed by $unwind",
+            extraErrorMsg:
+                "Unexpected result for $lookup with an equality match followed by $unwind",
         });
     })();
 
@@ -674,7 +708,16 @@ TimeseriesTest.run((insert) => {
                     _id: 1,
                     key: 2,
                     a: 20,
-                    reviews: [{_id: 2, m: 2, val1: 2, val2: 25, foo: 123, updates: {_id: 1, key: 2, b: 25}}],
+                    reviews: [
+                        {
+                            _id: 2,
+                            m: 2,
+                            val1: 2,
+                            val2: 25,
+                            foo: 123,
+                            updates: {_id: 1, key: 2, b: 25},
+                        },
+                    ],
                 },
             ],
             extraErrorMsg: "Unexpected result for nested $lookup",
@@ -689,7 +732,10 @@ TimeseriesTest.run((insert) => {
                 $lookup: {
                     from: otherColl.getName(),
                     let: {val2_field: "$val2"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$val2_field", "$b"]}}}, {$project: {[timeFieldName]: 0}}],
+                    pipeline: [
+                        {$match: {$expr: {$eq: ["$$val2_field", "$b"]}}},
+                        {$project: {[timeFieldName]: 0}},
+                    ],
                     as: "updates",
                 },
             },

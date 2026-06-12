@@ -62,7 +62,10 @@ function runNullSemanticsTest(pipeline, extraParams = {}) {
     code(normalizeArray(noJoinOptResults, true /* shouldSortArray */));
 
     const noJoinExplain = coll.explain().aggregate(pipeline);
-    assert(!joinOptUsed(noJoinExplain), "Join optimizer was not used as expected: " + tojson(noJoinExplain));
+    assert(
+        !joinOptUsed(noJoinExplain),
+        "Join optimizer was not used as expected: " + tojson(noJoinExplain),
+    );
 
     // Enable join opt & increase the max number of nodes for join edges.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));

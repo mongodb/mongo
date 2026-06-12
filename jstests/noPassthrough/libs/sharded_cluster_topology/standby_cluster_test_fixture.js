@@ -172,7 +172,10 @@ export class StandbyClusterTestFixture {
                 noCleanData: true,
                 ...(this._keyFile ? {noauth: ""} : {}),
             });
-            assert(standalone, `Failed to start standalone mongod for config node ${i} on port ${oldPorts[i]}`);
+            assert(
+                standalone,
+                `Failed to start standalone mongod for config node ${i} on port ${oldPorts[i]}`,
+            );
 
             const replSetColl = standalone.getDB("local").getCollection("system.replset");
 
@@ -232,7 +235,10 @@ export class StandbyClusterTestFixture {
         });
         // Wait for each sentry process to be alive before continuing.
         for (const {pid, port} of this._sentries) {
-            assert.soon(() => checkProgram(pid).alive, `mongosentry failed to start on retired port ${port}`);
+            assert.soon(
+                () => checkProgram(pid).alive,
+                `mongosentry failed to start on retired port ${port}`,
+            );
         }
     }
 
@@ -247,7 +253,9 @@ export class StandbyClusterTestFixture {
         for (const {pid, port} of this._sentries || []) {
             const {alive} = checkProgram(pid);
             if (!alive) {
-                jsTest.log.info(`mongosentry on retired port ${port} received a command and hit an invariant`);
+                jsTest.log.info(
+                    `mongosentry on retired port ${port} received a command and hit an invariant`,
+                );
                 failedPorts.push(port);
             } else {
                 stopMongoProgramByPid(pid);
@@ -271,7 +279,10 @@ export class StandbyClusterTestFixture {
         }
 
         if (failedPorts.length > 0) {
-            throw new Error(`Commands were sent to retired ports after standby transition: ` + failedPorts.join(", "));
+            throw new Error(
+                `Commands were sent to retired ports after standby transition: ` +
+                    failedPorts.join(", "),
+            );
         }
     }
 }

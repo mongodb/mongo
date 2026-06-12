@@ -68,7 +68,9 @@ pipeline = [
 ];
 // Pipeline will fail because $merge is not allowed to exist within a $lookup.
 // Validation for $merge in a view occurs at a later point.
-const cmdRes = coll.getDB().runCommand({create: "view1", viewOn: coll.getName(), pipeline: pipeline});
+const cmdRes = coll
+    .getDB()
+    .runCommand({create: "view1", viewOn: coll.getName(), pipeline: pipeline});
 assert.commandFailedWithCode(cmdRes, kErrorCodeMergeBannedInLookup);
 
 // Test that a $merge without an explicit "on" field still fails within a $lookup.

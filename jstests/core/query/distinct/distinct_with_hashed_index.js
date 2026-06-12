@@ -24,7 +24,9 @@ coll.drop();
 
 for (let i = 0; i < 100; i++) {
     assert.commandWorked(
-        assert.commandWorked(coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)})),
+        assert.commandWorked(
+            coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}),
+        ),
     );
     assert.commandWorked(coll.insert({a: i, b: i % 13, c: NumberInt(i % 10)}));
 }
@@ -87,7 +89,18 @@ assert.neq(null, getAggPlanStage(explainPlan, "DISTINCT_SCAN"), explainPlan);
 // Verify that simple $group with $match on non-hashed fields can use DISTINCT_SCAN.
 pipeline = [{$match: {a: {$lt: 10}}}, {$group: {_id: "$a"}}];
 assert.sameMembers(
-    [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}],
+    [
+        {_id: 0},
+        {_id: 1},
+        {_id: 2},
+        {_id: 3},
+        {_id: 4},
+        {_id: 5},
+        {_id: 6},
+        {_id: 7},
+        {_id: 8},
+        {_id: 9},
+    ],
     coll.aggregate(pipeline).toArray(),
 );
 explainPlan = coll.explain().aggregate(pipeline);

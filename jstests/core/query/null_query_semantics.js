@@ -174,7 +174,10 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         const projectResults = coll.find({"a.b": {$eq: null}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults, [{a: {}}, {}, {}, {a: {b: null}}, {}, {}]), tojson(projectResults));
+        assert(
+            resultsEq(projectResults, [{a: {}}, {}, {}, {a: {b: null}}, {}, {}]),
+            tojson(projectResults),
+        );
     })();
 
     // Test the semantics of the query {"a.b": {$ne: null}}.
@@ -190,7 +193,10 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         const projectResults = coll.find({"a.b": {$ne: null}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults, [{a: {b: "hi"}}, {a: {b: undefined}}]), tojson(projectResults));
+        assert(
+            resultsEq(projectResults, [{a: {b: "hi"}}, {a: {b: undefined}}]),
+            tojson(projectResults),
+        );
     })();
 
     (function testDottedExistsFalse() {
@@ -225,7 +231,8 @@ function testNullSemantics(coll) {
             const noProjectResults = coll.find(elemMatchQuery).toArray();
             assert(
                 resultsEq(noProjectResults, []),
-                `Expected no results for query ${tojson(elemMatchQuery)}, got ` + tojson(noProjectResults),
+                `Expected no results for query ${tojson(elemMatchQuery)}, got ` +
+                    tojson(noProjectResults),
             );
 
             const count = coll.count(elemMatchQuery);
@@ -234,13 +241,15 @@ function testNullSemantics(coll) {
             let projectResults = coll.find(elemMatchQuery, projectToOnlyA).toArray();
             assert(
                 resultsEq(projectResults, []),
-                `Expected no results for query ${tojson(elemMatchQuery)}, got ` + tojson(projectResults),
+                `Expected no results for query ${tojson(elemMatchQuery)}, got ` +
+                    tojson(projectResults),
             );
 
             projectResults = coll.find(elemMatchQuery, projectToOnlyADotB).toArray();
             assert(
                 resultsEq(projectResults, []),
-                `Expected no results for query ${tojson(elemMatchQuery)}, got ` + tojson(projectResults),
+                `Expected no results for query ${tojson(elemMatchQuery)}, got ` +
+                    tojson(projectResults),
             );
         }
     })();
@@ -511,7 +520,10 @@ function testNullSemantics(coll) {
         assert.eq(count, expectedEqualToNull.length);
 
         let projectResults = coll.find({a: {$elemMatch: {$eq: null}}}, projectToOnlyA).toArray();
-        assert(resultsEq(projectResults, extractAValues(expectedEqualToNull)), tojson(projectResults));
+        assert(
+            resultsEq(projectResults, extractAValues(expectedEqualToNull)),
+            tojson(projectResults),
+        );
 
         // Test $elemMatch with not equal to null.
         noProjectResults = coll.find({a: {$elemMatch: {$ne: null}}}).toArray();
@@ -532,7 +544,10 @@ function testNullSemantics(coll) {
         assert(resultsEq(noProjectResults, expectedNotEqualToNull), tojson(noProjectResults));
 
         projectResults = coll.find({a: {$elemMatch: {$ne: null}}}, projectToOnlyA).toArray();
-        assert(resultsEq(projectResults, extractAValues(expectedNotEqualToNull)), tojson(projectResults));
+        assert(
+            resultsEq(projectResults, extractAValues(expectedNotEqualToNull)),
+            tojson(projectResults),
+        );
     })();
 
     // Test the semantics of the query {"a.b": {$eq: null}}. The semantics here are to return
@@ -749,7 +764,9 @@ function testNullSemantics(coll) {
         const count = coll.count({a: {$elemMatch: {b: {$eq: null}}}});
         assert.eq(count, expectedEqualToNull.length);
 
-        let projectResults = coll.find({a: {$elemMatch: {b: {$eq: null}}}}, projectToOnlyADotB).toArray();
+        let projectResults = coll
+            .find({a: {$elemMatch: {b: {$eq: null}}}}, projectToOnlyADotB)
+            .toArray();
         assert(
             resultsEq(projectResults, [
                 {a: [[]]},
@@ -774,7 +791,9 @@ function testNullSemantics(coll) {
         ];
         assert(resultsEq(noProjectResults, expectedNotEqualToNull), tojson(noProjectResults));
 
-        projectResults = coll.find({a: {$elemMatch: {b: {$ne: null}}}}, projectToOnlyADotB).toArray();
+        projectResults = coll
+            .find({a: {$elemMatch: {b: {$ne: null}}}}, projectToOnlyADotB)
+            .toArray();
         assert(
             resultsEq(projectResults, [
                 {a: [{b: 1}, {b: 3}, {b: "string"}]},

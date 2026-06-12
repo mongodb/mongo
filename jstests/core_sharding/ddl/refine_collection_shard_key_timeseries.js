@@ -51,7 +51,9 @@ function testAcceptsLogicalFields() {
     let configEntry = findTimeseriesConfigCollectionsDocument(coll);
     assert.docEq(expectedBucketKey, configEntry.key, "Initial shard key mismatch");
 
-    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: coll.getFullName(), key: refinedKey}));
+    assert.commandWorked(
+        mongos.adminCommand({refineCollectionShardKey: coll.getFullName(), key: refinedKey}),
+    );
 
     // Verify refined shard key.
     expectedBucketKey = {[bucketMetaField]: 1, [controlTimeField]: 1};

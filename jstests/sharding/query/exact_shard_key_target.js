@@ -12,7 +12,9 @@ let mongos = st.s0;
 let coll = mongos.getCollection("foo.bar");
 let admin = mongos.getDB("admin");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {"a.b": 1}}));
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {"a.b": 0}}));
 assert.commandWorked(
@@ -47,14 +49,22 @@ assert.eq(1, explainOutput.queryPlanner.winningPlan.shards.length);
 coll.remove({});
 assert.commandWorked(coll.update({a: {b: 1}}, {a: {b: 1}}, {upsert: true}));
 assert.commandWorked(coll.update({a: {b: 1}}, {a: {b: 1}}, {upsert: true}));
-assert.eq(1, st.shard0.getCollection(coll.toString()).count() + st.shard1.getCollection(coll.toString()).count());
+assert.eq(
+    1,
+    st.shard0.getCollection(coll.toString()).count() +
+        st.shard1.getCollection(coll.toString()).count(),
+);
 
 //
 // Successive upserts ($op-style)
 coll.remove({});
 assert.commandWorked(coll.update({a: {b: 1}}, {$set: {upserted: true}}, {upsert: true}));
 assert.commandWorked(coll.update({a: {b: 1}}, {$set: {upserted: true}}, {upsert: true}));
-assert.eq(1, st.shard0.getCollection(coll.toString()).count() + st.shard1.getCollection(coll.toString()).count());
+assert.eq(
+    1,
+    st.shard0.getCollection(coll.toString()).count() +
+        st.shard1.getCollection(coll.toString()).count(),
+);
 
 jsTest.log("DONE!");
 st.stop();

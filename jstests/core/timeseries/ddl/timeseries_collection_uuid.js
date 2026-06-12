@@ -21,7 +21,9 @@ const testDB = db.getSiblingDB(dbName);
 testDB.dropDatabase();
 const coll = testDB.getCollection(collName);
 
-assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 
 assert.commandWorked(
     testDB.runCommand({
@@ -34,7 +36,9 @@ assert.commandWorked(
 );
 testDB.dropDatabase();
 
-assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 
 const nonexistentUUID = UUID();
 
@@ -65,7 +69,10 @@ const checkResult = function (res, uuid) {
     assert.eq(res.db, dbName);
     assert.eq(res.collectionUUID, uuid);
     assert.eq(res.expectedCollection, collName);
-    assert.eq(res.actualCollection, bsonBinaryEqual(uuid, bucketsCollUUID) ? bucketsColl.getName() : null);
+    assert.eq(
+        res.actualCollection,
+        bsonBinaryEqual(uuid, bucketsCollUUID) ? bucketsColl.getName() : null,
+    );
 };
 
 const testInsert = function (uuid, ordered) {

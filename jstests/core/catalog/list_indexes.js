@@ -37,7 +37,11 @@ assert.eq("_id_", res.cursor.firstBatch[0].name);
 //
 
 let getListIndexesCursor = function (coll, options, subsequentBatchSize) {
-    return new DBCommandCursor(coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+    return new DBCommandCursor(
+        coll.getDB(),
+        coll.runCommand("listIndexes", options),
+        subsequentBatchSize,
+    );
 };
 
 let cursorGetIndexSpecs = function (cursor) {

@@ -27,7 +27,11 @@ TestData.pinToSingleMongos = true;
 const collName = "collectionless_agg_ns_test";
 db[collName].insert({a: 1}); // to avoid empty db
 const cursor = assert.commandWorked(
-    db.runCommand({aggregate: 1, pipeline: [{$documents: [{a: 1}, {a: 2}]}], cursor: {batchSize: 1}}),
+    db.runCommand({
+        aggregate: 1,
+        pipeline: [{$documents: [{a: 1}, {a: 2}]}],
+        cursor: {batchSize: 1},
+    }),
 );
 
 describe("Commands that are permitted on the $cmd.aggregate namespace", function () {

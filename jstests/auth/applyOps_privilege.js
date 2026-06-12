@@ -28,14 +28,20 @@ const command = {
 function createUsers(conn) {
     let adminDb = conn.getDB(adminDbName);
     // Create the admin user.
-    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "password", roles: ["__system"]}));
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "admin", pwd: "password", roles: ["__system"]}),
+    );
 
     assert(adminDb.auth("admin", "password"));
     assert.commandWorked(adminDb.runCommand({createRole: testRole, privileges: [], roles: []}));
 
     let testDb = adminDb.getSiblingDB(testDBName);
     assert.commandWorked(
-        testDb.runCommand({createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}),
+        testDb.runCommand({
+            createUser: testUser,
+            pwd: "password",
+            roles: [{role: testRole, db: adminDbName}],
+        }),
     );
 
     assert.commandWorked(

@@ -51,7 +51,13 @@ export function prettyTreeString(
     const children = getChildrenForNode(node);
     for (let i = children.length - 1; i >= 0; i--) {
         // Increase distance from left & number of edges to print by index of child.
-        out += prettyTreeString(children[i], nodeLambda, getChildrenForNode, depth + 1, numEdges + i);
+        out += prettyTreeString(
+            children[i],
+            nodeLambda,
+            getChildrenForNode,
+            depth + 1,
+            numEdges + i,
+        );
     }
     return out;
 }

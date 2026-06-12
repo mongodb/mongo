@@ -20,7 +20,9 @@ let coll = testDB.compound;
 let ns = coll.getFullName();
 let shardKey = {x: 1, y: 1};
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
 
 jsTest.log("Insert docs and check that they end up on the primary shard.");
@@ -40,10 +42,20 @@ jsTest.log("Add shards to zones and assign zone key ranges.");
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneA"}));
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "zoneB"}));
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey, y: MinKey}, max: {x: 0, y: 0}, zone: "zoneA"}),
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {x: MinKey, y: MinKey},
+        max: {x: 0, y: 0},
+        zone: "zoneA",
+    }),
 );
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 0, y: 0}, max: {x: MaxKey, y: MaxKey}, zone: "zoneB"}),
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {x: 0, y: 0},
+        max: {x: MaxKey, y: MaxKey},
+        zone: "zoneB",
+    }),
 );
 
 jsTest.log("Check that the shards have the assigned zones.");
@@ -107,13 +119,28 @@ jsTest.log("Test chunk's zone changes...");
 jsTest.log("Make one of the chunks not aligned with zone ranges.");
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "zoneC"}));
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey, y: MinKey}, max: {x: 0, y: 0}, zone: null}),
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {x: MinKey, y: MinKey},
+        max: {x: 0, y: 0},
+        zone: null,
+    }),
 );
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey, y: MinKey}, max: {x: -5, y: -10}, zone: "zoneA"}),
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {x: MinKey, y: MinKey},
+        max: {x: -5, y: -10},
+        zone: "zoneA",
+    }),
 );
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: -5, y: -10}, max: {x: 0, y: 0}, zone: "zoneC"}),
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {x: -5, y: -10},
+        max: {x: 0, y: 0},
+        zone: "zoneC",
+    }),
 );
 shardTags = {
     [st.shard0.shardName]: ["zoneA", "zoneB"],
@@ -121,7 +148,9 @@ shardTags = {
 };
 assertShardTags(configDB, shardTags);
 
-jsTest.log("Check that the balancer splits the chunk and that all chunks and docs are on the right shards.");
+jsTest.log(
+    "Check that the balancer splits the chunk and that all chunks and docs are on the right shards.",
+);
 runBalancer(st, 1);
 shardChunkBounds = {
     [st.shard0.shardName]: [

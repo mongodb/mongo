@@ -18,7 +18,9 @@ let secConn = replTest.getSecondary();
 
 // Stopping replication on secondaries can take up to 5 seconds normally. Set a small oplog
 // getMore timeout so the test runs faster.
-assert.commandWorked(secConn.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
+assert.commandWorked(
+    secConn.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}),
+);
 
 runWriteConcernRetryabilityTest(
     priConn,
@@ -31,7 +33,9 @@ runWriteConcernRetryabilityTest(
     kNodes,
     "admin",
 );
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 checkFCV(priConn.getDB("admin"), lastLTSFCV);
 
 runWriteConcernRetryabilityTest(
@@ -45,7 +49,9 @@ runWriteConcernRetryabilityTest(
     kNodes,
     "admin",
 );
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    priConn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 checkFCV(priConn.getDB("admin"), latestFCV);
 
 replTest.stopSet();

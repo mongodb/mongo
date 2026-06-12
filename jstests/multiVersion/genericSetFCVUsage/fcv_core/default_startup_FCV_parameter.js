@@ -12,7 +12,10 @@ resetDbpath(dbpath);
 
 function runStandaloneTest() {
     jsTestLog("Test starting with defaultStartupFCV = lastLTS");
-    let conn = MongoRunner.runMongod({binVersion: latest, setParameter: "defaultStartupFCV=" + lastLTSFCV});
+    let conn = MongoRunner.runMongod({
+        binVersion: latest,
+        setParameter: "defaultStartupFCV=" + lastLTSFCV,
+    });
     assert.neq(null, conn);
     let adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastLTSFCV);
@@ -49,7 +52,10 @@ function runStandaloneTest() {
     MongoRunner.stopMongod(conn);
 
     jsTestLog("Test starting with defaultStartupFCV = latest");
-    conn = MongoRunner.runMongod({binVersion: latest, setParameter: "defaultStartupFCV=" + latestFCV});
+    conn = MongoRunner.runMongod({
+        binVersion: latest,
+        setParameter: "defaultStartupFCV=" + latestFCV,
+    });
     assert.neq(null, conn);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
@@ -61,7 +67,9 @@ function runStandaloneTest() {
     assert.neq(null, conn);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
-    assert(rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(
+        rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"),
+    );
     MongoRunner.stopMongod(conn);
 
     clearRawMongoProgramOutput();
@@ -70,16 +78,23 @@ function runStandaloneTest() {
     assert.neq(null, conn);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
-    assert(rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(
+        rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"),
+    );
     MongoRunner.stopMongod(conn);
 
     jsTestLog("Test starting with defaultStartupFCV = latest, changing it at runtime");
-    conn = MongoRunner.runMongod({binVersion: latest, setParameter: "defaultStartupFCV=" + latestFCV});
+    conn = MongoRunner.runMongod({
+        binVersion: latest,
+        setParameter: "defaultStartupFCV=" + latestFCV,
+    });
     assert.neq(null, conn);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
     assert.commandWorked(adminDB.runCommand({setParameter: 1, defaultStartupFCV: lastLTSFCV}));
-    const result = assert.commandWorked(adminDB.runCommand({getParameter: 1, defaultStartupFCV: 1}));
+    const result = assert.commandWorked(
+        adminDB.runCommand({getParameter: 1, defaultStartupFCV: 1}),
+    );
     assert.eq(lastLTSFCV, result.defaultStartupFCV);
     MongoRunner.stopMongod(conn);
 }
@@ -163,7 +178,10 @@ function runReplicaSetTest() {
 
     clearRawMongoProgramOutput();
     jsTestLog("Test starting with invalid defaultStartupFCV, FCV should default to latest");
-    rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: "hello"}}});
+    rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: "hello"}},
+    });
     rst.startSet();
     rst.initiate();
     assert.neq(null, rst);
@@ -171,12 +189,17 @@ function runReplicaSetTest() {
     secondaryAdminDB = rst.getSecondary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
-    assert(rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(
+        rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"),
+    );
     rst.stopSet();
 
     clearRawMongoProgramOutput();
     jsTestLog("Test starting with invalid defaultStartupFCV, FCV should default to latest");
-    rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: "5.0"}}});
+    rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: "5.0"}},
+    });
     rst.startSet();
     rst.initiate();
     assert.neq(null, rst);
@@ -184,7 +207,9 @@ function runReplicaSetTest() {
     secondaryAdminDB = rst.getSecondary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
-    assert(rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(
+        rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"),
+    );
     rst.stopSet();
 
     clearRawMongoProgramOutput();
@@ -200,8 +225,12 @@ function runReplicaSetTest() {
     secondaryAdminDB = rst.getSecondary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
-    assert.commandWorked(primaryAdminDB.runCommand({setParameter: 1, defaultStartupFCV: lastLTSFCV}));
-    const result = assert.commandWorked(primaryAdminDB.runCommand({getParameter: 1, defaultStartupFCV: 1}));
+    assert.commandWorked(
+        primaryAdminDB.runCommand({setParameter: 1, defaultStartupFCV: lastLTSFCV}),
+    );
+    const result = assert.commandWorked(
+        primaryAdminDB.runCommand({getParameter: 1, defaultStartupFCV: 1}),
+    );
     assert.eq(lastLTSFCV, result.defaultStartupFCV);
     rst.stopSet();
 }
@@ -252,7 +281,10 @@ function runShardingTest() {
             shards: 1,
             mongos: 1,
             config: 1,
-            configOptions: {binVersion: latest, setParameter: {defaultStartupFCV: lastContinuousFCV}},
+            configOptions: {
+                binVersion: latest,
+                setParameter: {defaultStartupFCV: lastContinuousFCV},
+            },
         });
         const configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
         const shard0PrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
@@ -260,7 +292,9 @@ function runShardingTest() {
         checkFCV(configPrimaryAdminDB, lastContinuousFCV);
         checkFCV(shard0PrimaryAdminDB, lastContinuousFCV);
 
-        jsTestLog("Test starting replica set with shardsvr without defaultStartupFCV uses lastLTSFCV");
+        jsTestLog(
+            "Test starting replica set with shardsvr without defaultStartupFCV uses lastLTSFCV",
+        );
         const newShard = new ReplSetTest({
             nodes: 2,
             nodeOptions: {binVersion: latest},

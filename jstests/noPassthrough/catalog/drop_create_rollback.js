@@ -17,7 +17,9 @@ let primary = rollbackTest.getPrimary();
 // Do a majority write to guarantee the stable timestamp contains this create. Otherwise startup
 // replication recovery will recreate the collection, initializing the _mdb_catalog RecordId
 // generator.
-assert.commandWorked(primary.getDB("foo").runCommand({create: "timestamped", writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.getDB("foo").runCommand({create: "timestamped", writeConcern: {w: "majority"}}),
+);
 
 // This restart forces the _mdb_catalog to refresh, uninitializing the auto-incrementing RecordId
 // generator.

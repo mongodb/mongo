@@ -30,17 +30,39 @@ function setup() {
     assert.commandWorked(testDB.createCollection(localColl.getName()));
     assert.commandWorked(testDB.createCollection(foreignColl.getName()));
     assert.commandWorked(
-        testDB.createCollection(localCaseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}),
+        testDB.createCollection(localCaseInsensitiveColl.getName(), {
+            collation: caseInsensitiveCollation,
+        }),
     );
     assert.commandWorked(
-        testDB.createCollection(foreignCaseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}),
+        testDB.createCollection(foreignCaseInsensitiveColl.getName(), {
+            collation: caseInsensitiveCollation,
+        }),
     );
 
-    assert.commandWorked(localColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
-    assert.commandWorked(localCaseInsensitiveColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
-    assert.commandWorked(foreignColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]));
     assert.commandWorked(
-        foreignCaseInsensitiveColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]),
+        localColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]),
+    );
+    assert.commandWorked(
+        localCaseInsensitiveColl.insert([
+            {_id: "a"},
+            {_id: "b"},
+            {_id: "c"},
+            {_id: "d"},
+            {_id: "e"},
+        ]),
+    );
+    assert.commandWorked(
+        foreignColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]),
+    );
+    assert.commandWorked(
+        foreignCaseInsensitiveColl.insert([
+            {_id: "a"},
+            {_id: "B"},
+            {_id: "c"},
+            {_id: "D"},
+            {_id: "e"},
+        ]),
     );
 }
 
@@ -82,7 +104,12 @@ function setup() {
         };
 
         const lookupWithLocalForeignField = {
-            $lookup: {from: foreignColl.getName(), localField: "_id", foreignField: "_id", as: "foreignMatch"},
+            $lookup: {
+                from: foreignColl.getName(),
+                localField: "_id",
+                foreignField: "_id",
+                as: "foreignMatch",
+            },
         };
 
         const aggOptions = {};
@@ -106,7 +133,12 @@ function setup() {
     for (const local of [localColl, localCaseInsensitiveColl]) {
         for (const foreign of [foreignColl, foreignCaseInsensitiveColl]) {
             // Case insensitive collation results in a case insensitive join.
-            assertExpectedResultSet(local, foreign, caseInsensitiveCollation, resultSetCaseInsensitive);
+            assertExpectedResultSet(
+                local,
+                foreign,
+                caseInsensitiveCollation,
+                resultSetCaseInsensitive,
+            );
 
             // Simple collation results in a case sensitive join.
             assertExpectedResultSet(local, foreign, simpleCollation, resultSetCaseSensitive);

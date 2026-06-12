@@ -12,7 +12,9 @@ const coll = db.or_use_clustered_collection;
 assertDropCollection(db, coll.getName());
 
 // Create a clustered collection and create indexes.
-assert.commandWorked(db.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 assert.commandWorked(coll.createIndex({a: 1}));
 
 // Insert documents, and store them to be used later in the test.
@@ -37,14 +39,25 @@ function validatePlanCacheEntries({increment, query, expectedDocIds}) {
     assert.eq(
         oldSize + increment,
         newSize,
-        "Expected " + tojson(increment) + " new entries in the cache, but got: " + tojson(coll.getPlanCache().list()),
+        "Expected " +
+            tojson(increment) +
+            " new entries in the cache, but got: " +
+            tojson(coll.getPlanCache().list()),
     );
 }
 
 coll.getPlanCache().clear();
 // Validate queries with a single equality clustered collection scan.
-validatePlanCacheEntries({increment: 0, query: coll.find({$or: [{_id: 123}, {a: 12}]}), expectedDocIds: []});
-validatePlanCacheEntries({increment: 0, query: coll.find({$or: [{_id: 6}, {a: 5}]}), expectedDocIds: [5, 6]});
+validatePlanCacheEntries({
+    increment: 0,
+    query: coll.find({$or: [{_id: 123}, {a: 12}]}),
+    expectedDocIds: [],
+});
+validatePlanCacheEntries({
+    increment: 0,
+    query: coll.find({$or: [{_id: 6}, {a: 5}]}),
+    expectedDocIds: [5, 6],
+});
 
 // Validate queries with multiple equality clustered collection scans.
 validatePlanCacheEntries({

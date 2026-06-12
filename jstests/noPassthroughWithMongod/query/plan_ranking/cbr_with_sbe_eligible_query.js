@@ -1,5 +1,9 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
-import {checkSbeStatus, kSbeDisabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeStatus,
+    kSbeDisabled,
+    isDeferredGetExecutorEnabled,
+} from "jstests/libs/query/sbe_util.js";
 import {getCBRConfig, setCBRConfig, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
 
@@ -50,11 +54,23 @@ function assertSbeWithCbrFallbackBehavior() {
 
     const pipelines = [
         // Queries that return results during the multiplanning trial period (no CBR fallback).
-        {queryReturnsNoResults: false, pipeline: [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: "$a"}}]}, // distinct
-        {queryReturnsNoResults: false, pipeline: [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: null}}]}, // non-distinct
+        {
+            queryReturnsNoResults: false,
+            pipeline: [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: "$a"}}],
+        }, // distinct
+        {
+            queryReturnsNoResults: false,
+            pipeline: [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: null}}],
+        }, // non-distinct
         // Queries that return no results during the multiplanning trial period (may trigger CBR fallback).
-        {queryReturnsNoResults: true, pipeline: [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: "$a"}}]}, // distinct
-        {queryReturnsNoResults: true, pipeline: [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: null}}]}, // non-distinct
+        {
+            queryReturnsNoResults: true,
+            pipeline: [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: "$a"}}],
+        }, // distinct
+        {
+            queryReturnsNoResults: true,
+            pipeline: [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: null}}],
+        }, // non-distinct
     ];
 
     for (const {queryReturnsNoResults, pipeline} of pipelines) {
@@ -83,7 +99,8 @@ function assertSbeWithCbrFallbackBehavior() {
             assert.eq(
                 cbrQueryColl.aggregate(pipeline).toArray().length,
                 1,
-                "Expected 1 result, results are: " + tojson(cbrQueryColl.aggregate(pipeline).toArray()),
+                "Expected 1 result, results are: " +
+                    tojson(cbrQueryColl.aggregate(pipeline).toArray()),
             );
         }
     }
@@ -103,7 +120,11 @@ try {
     runTests();
 
     // 2: Run with CBR fallback strategies.
-    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"});
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "automaticCE",
+    });
 
     const cbrFallbackStrategies = [
         "CBRForNoMultiplanningResults",
@@ -113,7 +134,9 @@ try {
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running tests with automaticCE.", {cbrFallbackStrategy});
-        assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}),
+        );
         runTests();
     }
 

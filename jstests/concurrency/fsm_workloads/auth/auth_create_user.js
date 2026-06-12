@@ -36,7 +36,11 @@ export const $config = (function () {
             assert.retry(
                 function () {
                     try {
-                        db.createUser({user: username, pwd: "password", roles: ["readWrite", "dbAdmin"]});
+                        db.createUser({
+                            user: username,
+                            pwd: "password",
+                            roles: ["readWrite", "dbAdmin"],
+                        });
                         return true;
                     } catch (e) {
                         jsTest.log("Caught createUser exception: " + tojson(e));

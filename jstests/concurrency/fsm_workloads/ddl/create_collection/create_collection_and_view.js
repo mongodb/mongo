@@ -66,11 +66,16 @@ export const $config = (function () {
             );
         },
         createCollection: (db, collName) => {
-            assert.commandWorkedOrFailedWithCode(db.createCollection(getCollectionName(collName)), allowedErrorCodes);
+            assert.commandWorkedOrFailedWithCode(
+                db.createCollection(getCollectionName(collName)),
+                allowedErrorCodes,
+            );
         },
         verifyNoDuplicates: (db, collName) => {
             // Check how many collections/views match our namespace.
-            const res = db.runCommand("listCollections", {filter: {name: getCollectionName(collName)}});
+            const res = db.runCommand("listCollections", {
+                filter: {name: getCollectionName(collName)},
+            });
             assert.commandWorked(res);
             // We expect that we only ever find 0 or 1. If we find 2 or more, then we managed to
             // create a view and collection on the same namespace simultaneously, which is a bug.

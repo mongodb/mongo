@@ -18,7 +18,9 @@ reshardingTest.setup();
 
 const testCases = [
     {
-        desc: "Test ordinary insert when donor does not have temporary resharding collection " + "routing info cached",
+        desc:
+            "Test ordinary insert when donor does not have temporary resharding collection " +
+            "routing info cached",
         ns: "reshardingDb.coll_no_txn",
         opFn: (sourceCollection) => {
             const docToInsert = {_id: 0};
@@ -57,7 +59,9 @@ const testCases = [
                 .getDatabase(sourceCollection.getDB().getName())
                 .getCollection(sourceCollection.getName());
 
-            const sessionCollectionB = session.getDatabase(sourceCollection.getDB().getName()).getCollection("foo");
+            const sessionCollectionB = session
+                .getDatabase(sourceCollection.getDB().getName())
+                .getCollection("foo");
             assert.commandWorked(sessionCollectionB.insert({a: 1}));
 
             const docToInsert = {_id: 0};
@@ -74,7 +78,10 @@ for (const {desc, ns, opFn} of testCases) {
     jsTest.log(desc);
 
     const donorShardNames = reshardingTest.donorShardNames;
-    const sourceCollection = reshardingTest.createUnshardedCollection({ns: ns, primaryShardName: donorShardNames[0]});
+    const sourceCollection = reshardingTest.createUnshardedCollection({
+        ns: ns,
+        primaryShardName: donorShardNames[0],
+    });
 
     const mongos = sourceCollection.getMongo();
     const topology = DiscoverTopology.findConnectedNodes(mongos);

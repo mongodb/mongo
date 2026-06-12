@@ -43,7 +43,9 @@ function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel})
     );
 
     // Now open a valid $changeStream cursor...
-    const aggCmdRes = assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
+    const aggCmdRes = assert.commandWorked(
+        coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}),
+    );
 
     // ... run a getMore using the cursorID from the original command response, and confirm that the
     // expected error was thrown...
@@ -58,14 +60,22 @@ function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel})
     assert.eq(errorLabels.includes("ResumableChangeStreamError"), expectedLabel, getMoreRes);
 
     // Finally, disable the failpoint.
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}),
+    );
 }
 // Test the expected output for both resumable and non-resumable error codes.
-testFailGetMoreAfterCursorCheckoutFailpoint({errorCode: ErrorCodes.ShutdownInProgress, expectedLabel: true});
+testFailGetMoreAfterCursorCheckoutFailpoint({
+    errorCode: ErrorCodes.ShutdownInProgress,
+    expectedLabel: true,
+});
 testFailGetMoreAfterCursorCheckoutFailpoint({
     errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet,
     expectedLabel: true,
 });
-testFailGetMoreAfterCursorCheckoutFailpoint({errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
+testFailGetMoreAfterCursorCheckoutFailpoint({
+    errorCode: ErrorCodes.FailedToParse,
+    expectedLabel: false,
+});
 
 rst.stopSet();

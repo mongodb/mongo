@@ -63,8 +63,19 @@ const kBtreeCases = [
             {_id: 4, a: 1},
         ],
         ops: [
-            {type: "insert", doc: {_id: 10, a: 1}, arrayPath: null, description: "scalar insert _id=10"},
-            {type: "update", id: 1, setSpec: {a: 1}, arrayPath: null, description: "scalar update _id=1"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 1},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
+            {
+                type: "update",
+                id: 1,
+                setSpec: {a: 1},
+                arrayPath: null,
+                description: "scalar update _id=1",
+            },
             // First array write to "a": a single insert makes the index multikey.
             {
                 type: "insert",
@@ -73,7 +84,13 @@ const kBtreeCases = [
                 isFirstMultikey: true,
                 description: "insert _id=11 arrayPath=a",
             },
-            {type: "update", id: 2, setSpec: {a: [3, 4]}, arrayPath: "a", description: "update _id=2 arrayPath=a"},
+            {
+                type: "update",
+                id: 2,
+                setSpec: {a: [3, 4]},
+                arrayPath: "a",
+                description: "update _id=2 arrayPath=a",
+            },
             // Repeated update with the same value is a no-op (no oplog entry produced).
             {
                 type: "update",
@@ -125,7 +142,12 @@ const kBtreeCases = [
             {_id: 4, a: 1, b: 3},
         ],
         ops: [
-            {type: "insert", doc: {_id: 10, a: 1, b: 3}, arrayPath: null, description: "scalar insert _id=10"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 1, b: 3},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
             // First array write to "a": the middle document of an insertMany batch makes "a" multikey.
             {
                 type: "insertMany",
@@ -138,7 +160,13 @@ const kBtreeCases = [
                 isFirstMultikey: true,
                 description: "insertMany _ids=[11,13] arrayPath=a",
             },
-            {type: "update", id: 1, setSpec: {a: 1, b: 3}, arrayPath: null, description: "scalar update _id=1"},
+            {
+                type: "update",
+                id: 1,
+                setSpec: {a: 1, b: 3},
+                arrayPath: null,
+                description: "scalar update _id=1",
+            },
             // First array write to "b": a single update makes "b" multikey.
             {
                 type: "update",
@@ -253,7 +281,12 @@ const kBtreeCases = [
             {_id: 3, a: 1},
         ],
         ops: [
-            {type: "insert", doc: {_id: 10, a: 2}, arrayPath: null, description: "scalar insert _id=10"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 2},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
             {
                 type: "update",
                 id: 1,
@@ -262,8 +295,20 @@ const kBtreeCases = [
                 isFirstMultikey: true,
                 description: "update _id=1 arrayPath=a (first multikey)",
             },
-            {type: "update", id: 1, setSpec: {a: [1, 2]}, arrayPath: "a", description: "duplicate no-op update _id=1"},
-            {type: "update", id: 2, setSpec: {a: 3}, arrayPath: null, description: "scalar update _id=2"},
+            {
+                type: "update",
+                id: 1,
+                setSpec: {a: [1, 2]},
+                arrayPath: "a",
+                description: "duplicate no-op update _id=1",
+            },
+            {
+                type: "update",
+                id: 2,
+                setSpec: {a: 3},
+                arrayPath: null,
+                description: "scalar update _id=2",
+            },
         ],
     },
     {
@@ -286,8 +331,19 @@ const kBtreeCases = [
             {_id: 3, a: 1},
         ],
         ops: [
-            {type: "insert", doc: {_id: 10, a: 2}, arrayPath: null, description: "scalar insert _id=10"},
-            {type: "update", id: 1, setSpec: {a: 3}, arrayPath: null, description: "scalar update _id=1"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 2},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
+            {
+                type: "update",
+                id: 1,
+                setSpec: {a: 3},
+                arrayPath: null,
+                description: "scalar update _id=1",
+            },
             {
                 type: "insertMany",
                 docs: [
@@ -297,7 +353,13 @@ const kBtreeCases = [
                 arrayPath: null,
                 description: "scalar insertMany",
             },
-            {type: "updateMany", ids: [2, 3], setSpec: {a: 6}, arrayPath: null, description: "scalar updateMany"},
+            {
+                type: "updateMany",
+                ids: [2, 3],
+                setSpec: {a: 6},
+                arrayPath: null,
+                description: "scalar updateMany",
+            },
             {
                 type: "update",
                 id: 1,
@@ -336,8 +398,19 @@ const kBtreeCases = [
                 isFirstMultikey: true,
                 description: "update _id=1 arrayPath=a (first op, first multikey)",
             },
-            {type: "insert", doc: {_id: 10, a: 2}, arrayPath: null, description: "scalar insert _id=10"},
-            {type: "update", id: 1, setSpec: {a: [1, 2]}, arrayPath: "a", description: "duplicate no-op update _id=1"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 2},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
+            {
+                type: "update",
+                id: 1,
+                setSpec: {a: [1, 2]},
+                arrayPath: "a",
+                description: "duplicate no-op update _id=1",
+            },
         ],
     },
     {
@@ -360,7 +433,12 @@ const kBtreeCases = [
             {_id: 3, a: 1},
         ],
         ops: [
-            {type: "insert", doc: {_id: 10, a: 2}, arrayPath: null, description: "scalar insert _id=10"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 2},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
             {
                 type: "update",
                 id: 1,
@@ -409,7 +487,12 @@ const kBtreeCases = [
             {_id: 3, a: 1, b: 3},
         ],
         ops: [
-            {type: "insert", doc: {_id: 10, a: 2, b: 5}, arrayPath: null, description: "scalar insert _id=10"},
+            {
+                type: "insert",
+                doc: {_id: 10, a: 2, b: 5},
+                arrayPath: null,
+                description: "scalar insert _id=10",
+            },
             {
                 type: "update",
                 id: 1,
@@ -461,7 +544,9 @@ const kWildcardCases = [
                 type: "wildcardUpdate",
                 id: 1,
                 setSpec: {"nested.alpha": [1000, 1001]},
-                queryHintsForTimestampRetrieval: [{path: "nested.alpha", beforeValue: 100, afterValue: 1000}],
+                queryHintsForTimestampRetrieval: [
+                    {path: "nested.alpha", beforeValue: 100, afterValue: 1000},
+                ],
                 isFirstMultikey: true,
                 description: "wildcard update _id=1 path=nested.alpha",
             },
@@ -469,7 +554,9 @@ const kWildcardCases = [
                 type: "wildcardUpdate",
                 id: 2,
                 setSpec: {"nested.beta": [2010, 2011]},
-                queryHintsForTimestampRetrieval: [{path: "nested.beta", beforeValue: 201, afterValue: 2010}],
+                queryHintsForTimestampRetrieval: [
+                    {path: "nested.beta", beforeValue: 201, afterValue: 2010},
+                ],
                 isFirstMultikey: true,
                 description: "wildcard update _id=2 path=nested.beta",
             },
@@ -478,7 +565,9 @@ const kWildcardCases = [
                 type: "wildcardUpdate",
                 id: 2,
                 setSpec: {"nested.beta": [2010, 2011]},
-                queryHintsForTimestampRetrieval: [{path: "nested.beta", beforeValue: 201, afterValue: 2010}],
+                queryHintsForTimestampRetrieval: [
+                    {path: "nested.beta", beforeValue: 201, afterValue: 2010},
+                ],
                 description: "duplicate wildcard update _id=2 path=nested.beta",
             },
             {
@@ -501,7 +590,9 @@ const kWildcardCases = [
                 type: "wildcardUpdate",
                 id: 1,
                 setSpec: {"payload.nested.alpha": [1000, 1001]},
-                queryHintsForTimestampRetrieval: [{path: "payload.nested.alpha", beforeValue: 100, afterValue: 1000}],
+                queryHintsForTimestampRetrieval: [
+                    {path: "payload.nested.alpha", beforeValue: 100, afterValue: 1000},
+                ],
                 isFirstMultikey: true,
                 description: "wildcard update _id=1 path=payload.nested.alpha",
             },
@@ -525,7 +616,9 @@ const kWildcardCases = [
                 type: "wildcardUpdate",
                 id: 1,
                 setSpec: {"nested.alpha": [1000, 1001]},
-                queryHintsForTimestampRetrieval: [{path: "nested.alpha", beforeValue: 100, afterValue: 1000}],
+                queryHintsForTimestampRetrieval: [
+                    {path: "nested.alpha", beforeValue: 100, afterValue: 1000},
+                ],
                 isFirstMultikey: true,
                 description: "wildcard update _id=1 path=nested.alpha",
             },
@@ -545,7 +638,12 @@ const kWildcardCases = [
 ////////////////////////////////////////////////////////////////////////////////
 
 function getLatestOplogTimestamp(node) {
-    const latestOplogEntry = node.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    const latestOplogEntry = node
+        .getDB("local")
+        .oplog.rs.find()
+        .sort({$natural: -1})
+        .limit(1)
+        .next();
     return latestOplogEntry.ts;
 }
 
@@ -567,7 +665,9 @@ function getIndexMultikeyPaths(node, dbName, collName, indexName, ts) {
         .toArray();
     assert.eq(1, catalogEntries.length, catalogEntries);
 
-    const indexMetadata = catalogEntries[0].md.indexes.find((index) => index.spec.name === indexName);
+    const indexMetadata = catalogEntries[0].md.indexes.find(
+        (index) => index.spec.name === indexName,
+    );
     assert.neq(undefined, indexMetadata, catalogEntries[0].md.indexes);
     return indexMetadata.multikeyPaths;
 }
@@ -598,7 +698,12 @@ function getInsertManyApplyOpsTimestamp(node, collName, tsBefore, docs, descript
     const ids = docs.map((doc) => doc._id);
     const entries = node
         .getDB("local")
-        .oplog.rs.find({ts: {$gt: tsBefore}, op: "c", ns: "admin.$cmd", "o.applyOps.o._id": {$in: ids}})
+        .oplog.rs.find({
+            ts: {$gt: tsBefore},
+            op: "c",
+            ns: "admin.$cmd",
+            "o.applyOps.o._id": {$in: ids},
+        })
         .sort({$natural: 1})
         .toArray();
     assert.eq(1, entries.length, {description, expectedDocs: docs, entries});
@@ -619,7 +724,12 @@ function getInsertManyApplyOpsTimestamp(node, collName, tsBefore, docs, descript
 function getUpdateManyOplogEntries(node, collName, tsBefore, ids, description) {
     const entries = node
         .getDB("local")
-        .oplog.rs.find({ts: {$gt: tsBefore}, op: "u", ns: `${dbName}.${collName}`, "o2._id": {$in: ids}})
+        .oplog.rs.find({
+            ts: {$gt: tsBefore},
+            op: "u",
+            ns: `${dbName}.${collName}`,
+            "o2._id": {$in: ids},
+        })
         .sort({$natural: 1})
         .toArray();
 
@@ -639,7 +749,9 @@ function getUpdateManyOplogEntries(node, collName, tsBefore, ids, description) {
 function findWriteOplogEntries(node, collName, tsBefore, opType, idFilter) {
     return node
         .getDB("local")
-        .oplog.rs.find(Object.assign({ts: {$gt: tsBefore}, op: opType, ns: `${dbName}.${collName}`}, idFilter))
+        .oplog.rs.find(
+            Object.assign({ts: {$gt: tsBefore}, op: opType, ns: `${dbName}.${collName}`}, idFilter),
+        )
         .sort({$natural: 1})
         .toArray();
 }
@@ -678,16 +790,36 @@ function getPrecedingOplogTimestamp(node, ts, description) {
  */
 function firstMultikeyEntryTimestamp(primary, collName, op, tsBefore) {
     if (op.type === "insert") {
-        return getSingleWriteTimestamp(primary, collName, tsBefore, "i", {"o._id": op.doc._id}, op.description);
+        return getSingleWriteTimestamp(
+            primary,
+            collName,
+            tsBefore,
+            "i",
+            {"o._id": op.doc._id},
+            op.description,
+        );
     }
     if (op.type === "update") {
-        return getSingleWriteTimestamp(primary, collName, tsBefore, "u", {"o2._id": op.id}, op.description);
+        return getSingleWriteTimestamp(
+            primary,
+            collName,
+            tsBefore,
+            "u",
+            {"o2._id": op.id},
+            op.description,
+        );
     }
     if (op.type === "insertMany") {
         return getInsertManyApplyOpsTimestamp(primary, collName, tsBefore, op.docs, op.description);
     }
     if (op.type === "updateMany") {
-        const entries = getUpdateManyOplogEntries(primary, collName, tsBefore, op.ids, op.description);
+        const entries = getUpdateManyOplogEntries(
+            primary,
+            collName,
+            tsBefore,
+            op.ids,
+            op.description,
+        );
         assert.gt(entries.length, 0, {description: op.description, entries});
         return entries[0].ts;
     }
@@ -741,7 +873,9 @@ function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
     // Force a write to ensure the oplog fetcher is not idle and will observe stopReplProducer immediately.
     // In case there is nothing to replicate, the fetcher would wait 30s before discovering the failpoint.
     // Intentionally use {w:1} or we would block on the secondary hitting the failpoint.
-    assert.commandWorked(primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}));
+    assert.commandWorked(
+        primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}),
+    );
     stopReplProducerFailPoint.wait();
 }
 
@@ -766,7 +900,15 @@ function formatMultikeyTimestampMismatch(field, snapshotTs, transition, expected
     );
 }
 
-function assertPathAtTimestampForNode(node, btreeCase, field, ts, expectedPath, transition, failureContext) {
+function assertPathAtTimestampForNode(
+    node,
+    btreeCase,
+    field,
+    ts,
+    expectedPath,
+    transition,
+    failureContext,
+) {
     const actual = getIndexMultikeyPaths(node, dbName, btreeCase.collName, btreeCase.indexName, ts);
     const actualPath = actual[field.indexPath];
     assert(
@@ -819,7 +961,13 @@ function executeWildcardOp(primary, primaryColl, wildcardCase, op) {
         assert(false, `unknown wildcard op type: ${tojson(op)}`);
     }
 
-    const entries = findWriteOplogEntries(primary, wildcardCase.collName, tsLowerBound, opType, idFilter);
+    const entries = findWriteOplogEntries(
+        primary,
+        wildcardCase.collName,
+        tsLowerBound,
+        opType,
+        idFilter,
+    );
     assert.lte(entries.length, 1, {description: op.description, entries});
     if (entries.length === 0) {
         return null;
@@ -844,11 +992,23 @@ function assertWildcardOpAtTimestamps(node, collName, op, beforeTs, ts) {
         assert.eq(1, atTsNew.length, {host: node.host, path, afterValue, ts});
         assert.eq(id, atTsNew[0]._id, {host: node.host, path, afterValue, ts});
 
-        const beforeNew = findWithWildcardHintAtTimestamp(node, collName, path, afterValue, beforeTs);
+        const beforeNew = findWithWildcardHintAtTimestamp(
+            node,
+            collName,
+            path,
+            afterValue,
+            beforeTs,
+        );
         assert.eq(0, beforeNew.length, {host: node.host, path, afterValue, beforeTs});
 
         if (beforeValue !== undefined) {
-            const beforeOld = findWithWildcardHintAtTimestamp(node, collName, path, beforeValue, beforeTs);
+            const beforeOld = findWithWildcardHintAtTimestamp(
+                node,
+                collName,
+                path,
+                beforeValue,
+                beforeTs,
+            );
             assert.eq(1, beforeOld.length, {host: node.host, path, beforeValue, beforeTs});
             assert.eq(id, beforeOld[0]._id, {host: node.host, path, beforeValue, beforeTs});
 
@@ -907,7 +1067,9 @@ function runBtreeCase(btreeCase, rst, primary, secondary) {
     const primaryColl = primaryDB.getCollection(btreeCase.collName);
 
     assert.commandWorked(primaryDB.dropDatabase());
-    assert.commandWorked(primaryColl.createIndex(btreeCase.keyPattern, {name: btreeCase.indexName}));
+    assert.commandWorked(
+        primaryColl.createIndex(btreeCase.keyPattern, {name: btreeCase.indexName}),
+    );
     assert.commandWorked(primaryColl.insert(btreeCase.seedDocs, {writeConcern: {w: 2}}));
     rst.awaitReplication();
 
@@ -976,7 +1138,10 @@ function runWildcardCase(wildcardCase, rst, primary, secondary) {
 
     assert.commandWorked(primaryDB.dropDatabase());
     assert.commandWorked(
-        primaryColl.createIndex(wildcardCase.indexSpec, {name: "wildcard_all", ...wildcardCase.indexOptions}),
+        primaryColl.createIndex(wildcardCase.indexSpec, {
+            name: "wildcard_all",
+            ...wildcardCase.indexOptions,
+        }),
     );
     assert.commandWorked(primaryColl.insert(wildcardCase.seedDocs, {writeConcern: {w: 2}}));
     rst.awaitReplication();

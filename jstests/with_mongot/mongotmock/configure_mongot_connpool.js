@@ -37,7 +37,11 @@ function launchSearchQuery(mongod, threads, {times}) {
                 let client = new Mongo(connStr);
                 let db = client.getDB(dbName);
                 assert.commandWorked(
-                    db.runCommand({aggregate: collName, pipeline: [{$search: searchQuery}], cursor: {}}),
+                    db.runCommand({
+                        aggregate: collName,
+                        pipeline: [{$search: searchQuery}],
+                        cursor: {},
+                    }),
                 );
             },
             mongod.host,
@@ -84,12 +88,24 @@ function prepSearchResponses(mongotConn, howMany, coll, collUUID, stWithMock = u
             );
         }
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(++cursorIdCounter), history: history}),
+            mongotConn.adminCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(++cursorIdCounter),
+                history: history,
+            }),
         );
     }
 }
 
-function assertConnectionStats(mongos, allHosts, mongoRPCArgs, gRPCArgs, checkNum, gRPC, connPoolStatsCmd = undefined) {
+function assertConnectionStats(
+    mongos,
+    allHosts,
+    mongoRPCArgs,
+    gRPCArgs,
+    checkNum,
+    gRPC,
+    connPoolStatsCmd = undefined,
+) {
     if (!gRPC) {
         assertHasConnPoolStats(mongos, allHosts, mongoRPCArgs, checkNum, connPoolStatsCmd);
         return;
@@ -123,8 +139,12 @@ function testMinAndMax(conn, mongotConn, useGRPC, stWithMock = undefined) {
     // If we're testing mongos <--> mongot conn pool, we need to block the mongotmock that responds
     // to mongos rather than the mongotmock that responds to mongot's queries for actual data.
     let threads = [];
-    let mongotMockToBlock = stWithMock ? stWithMock.getMockConnectedToHost(mongos).getConnection() : mongotConn;
-    assert.commandWorked(conn.adminCommand({_dropConnectionsToMongot: 1, hostAndPort: [mongotMockToBlock.host]}));
+    let mongotMockToBlock = stWithMock
+        ? stWithMock.getMockConnectedToHost(mongos).getConnection()
+        : mongotConn;
+    assert.commandWorked(
+        conn.adminCommand({_dropConnectionsToMongot: 1, hostAndPort: [mongotMockToBlock.host]}),
+    );
 
     let db = conn.getDB("test");
     let coll = db.search;
@@ -183,7 +203,9 @@ function testMinAndMax(conn, mongotConn, useGRPC, stWithMock = undefined) {
 
     // Reset the pool to mongot before testing max.
     updateSetParameters(conn, {mongotConnectionPoolMinSize: 0});
-    assert.commandWorked(conn.adminCommand({_dropConnectionsToMongot: 1, hostAndPort: [mongotMockToBlock.host]}));
+    assert.commandWorked(
+        conn.adminCommand({_dropConnectionsToMongot: 1, hostAndPort: [mongotMockToBlock.host]}),
+    );
     currentCheckNum = assertConnectionStats(
         conn,
         [mongotMockToBlock.host],
@@ -197,7 +219,10 @@ function testMinAndMax(conn, mongotConn, useGRPC, stWithMock = undefined) {
     // Launch kPoolMaxSize - 1 blocked finds.
     threads = [];
     assert.commandWorked(
-        mongotMockToBlock.adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "alwaysOn"}),
+        mongotMockToBlock.adminCommand({
+            configureFailPoint: "mongotWaitBeforeRespondingToQuery",
+            mode: "alwaysOn",
+        }),
     );
     prepSearchResponses(mongotConn, kPoolMaxSize - 1, coll, collUUID, stWithMock);
     launchSearchQuery(conn, threads, {times: kPoolMaxSize - 1});
@@ -246,7 +271,10 @@ function testMinAndMax(conn, mongotConn, useGRPC, stWithMock = undefined) {
 
     // Release the search queries and assert we have the max number of connections ready.
     assert.commandWorked(
-        mongotMockToBlock.adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}),
+        mongotMockToBlock.adminCommand({
+            configureFailPoint: "mongotWaitBeforeRespondingToQuery",
+            mode: "off",
+        }),
     );
     currentCheckNum = assertConnectionStats(
         conn,

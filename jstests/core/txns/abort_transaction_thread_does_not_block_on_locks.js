@@ -29,13 +29,17 @@ for (let i = 0; i < 4; ++i) {
 }
 assert.commandWorked(bulk.execute({w: "majority"}));
 
-const res = assert.commandWorked(db.adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1}));
+const res = assert.commandWorked(
+    db.adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1}),
+);
 const originalTransactionLifetimeLimitSeconds = res.transactionLifetimeLimitSeconds;
 
 try {
     let transactionLifeTime = 10;
     jsTest.log("Decrease transactionLifetimeLimitSeconds to " + transactionLifeTime + " seconds.");
-    assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}),
+    );
 
     // Set up two transactions with IX locks and cursors.
 

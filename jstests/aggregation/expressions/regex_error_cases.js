@@ -37,7 +37,10 @@ function assertFails(parameters, errorCode, allowNullResponse = false) {
     );
     executeAggregationTestCase(
         coll,
-        Object.assign({pipeline: [{$project: {"_id": 0, result: {"$regexFind": constantParameters}}}]}, regexFindTest),
+        Object.assign(
+            {pipeline: [{$project: {"_id": 0, result: {"$regexFind": constantParameters}}}]},
+            regexFindTest,
+        ),
     );
     executeAggregationTestCase(
         coll,
@@ -96,11 +99,17 @@ function assertFails(parameters, errorCode, allowNullResponse = false) {
     }
     executeAggregationTestCase(
         coll,
-        Object.assign({pipeline: [{$project: {"_id": 0, result: {"$regexMatch": dynamicParameters}}}]}, regexMatchTest),
+        Object.assign(
+            {pipeline: [{$project: {"_id": 0, result: {"$regexMatch": dynamicParameters}}}]},
+            regexMatchTest,
+        ),
     );
     executeAggregationTestCase(
         coll,
-        Object.assign({pipeline: [{$project: {"_id": 0, result: {"$regexFind": dynamicParameters}}}]}, regexFindTest),
+        Object.assign(
+            {pipeline: [{$project: {"_id": 0, result: {"$regexFind": dynamicParameters}}}]},
+            regexFindTest,
+        ),
     );
     executeAggregationTestCase(
         coll,

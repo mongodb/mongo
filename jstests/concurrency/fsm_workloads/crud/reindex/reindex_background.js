@@ -23,10 +23,22 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const coll = db[this.threadCollName];
 
         // The number of indexes created here is also stored in data.nIndexes.
-        assertWorkedHandleTxnErrors(coll.createIndex({text: "text"}), ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({geo: "2dsphere"}), ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}), ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}), ErrorCodes.IndexBuildAlreadyInProgress);
+        assertWorkedHandleTxnErrors(
+            coll.createIndex({text: "text"}),
+            ErrorCodes.IndexBuildAlreadyInProgress,
+        );
+        assertWorkedHandleTxnErrors(
+            coll.createIndex({geo: "2dsphere"}),
+            ErrorCodes.IndexBuildAlreadyInProgress,
+        );
+        assertWorkedHandleTxnErrors(
+            coll.createIndex({integer: 1}),
+            ErrorCodes.IndexBuildAlreadyInProgress,
+        );
+        assertWorkedHandleTxnErrors(
+            coll.createIndex({"$**": 1}),
+            ErrorCodes.IndexBuildAlreadyInProgress,
+        );
     };
 
     return $config;

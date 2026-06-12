@@ -45,7 +45,10 @@ function seedCollection(collection, numDocs, fieldName) {
 function assertClassicLookupUnwind(explain) {
     // Assert that the $lookup stage is present in the classic aggregation plan.
     const lookup = getAggPlanStage(explain, "$lookup");
-    assert(lookup, "Expected to find $lookup stage in the aggregation plan, explain: " + tojson(explain));
+    assert(
+        lookup,
+        "Expected to find $lookup stage in the aggregation plan, explain: " + tojson(explain),
+    );
 
     // Assert that the $unwind stage was absorbed into the $lookup stage.
     assert(
@@ -64,8 +67,14 @@ function assertClassicLookupUnwind(explain) {
  */
 function assertSbeLookupUnwind(explain) {
     // Assert that neither the $lookup nor the $unwind stages are present in the aggregation plan.
-    assert(!aggPlanHasStage(explain, "$lookup"), `Expected $lookup to be pushed down, explain: ${tojson(explain)}`);
-    assert(!aggPlanHasStage(explain, "$unwind"), `Expected $unwind to be pushed down, explain: ${tojson(explain)}`);
+    assert(
+        !aggPlanHasStage(explain, "$lookup"),
+        `Expected $lookup to be pushed down, explain: ${tojson(explain)}`,
+    );
+    assert(
+        !aggPlanHasStage(explain, "$unwind"),
+        `Expected $unwind to be pushed down, explain: ${tojson(explain)}`,
+    );
 
     // Assert that there is a single EQ_LOOKUP_UNWIND stage in the winning SBE plan.
     const queryPlan = getWinningPlanFromExplain(explain);
@@ -85,7 +94,10 @@ function assertSbeLookupUnwind(explain) {
  */
 function assertSbeLookupClassicUnwind(explain) {
     // Assert that the lookup stage is present in the SBE aggregation plan.
-    assert(!aggPlanHasStage(explain, "$lookup"), `Expected $lookup to be in SBE, explain: ${tojson(explain)}`);
+    assert(
+        !aggPlanHasStage(explain, "$lookup"),
+        `Expected $lookup to be in SBE, explain: ${tojson(explain)}`,
+    );
     const queryPlan = getWinningPlanFromExplain(explain);
     assert(
         planHasStage(db, queryPlan, "EQ_LOOKUP"),
@@ -93,7 +105,10 @@ function assertSbeLookupClassicUnwind(explain) {
     );
 
     // Assert that the unwind stage is present in the classic aggregation plan.
-    assert(aggPlanHasStage(explain, "$unwind"), `Expected $unwind to be in classic, explain: ${tojson(explain)}`);
+    assert(
+        aggPlanHasStage(explain, "$unwind"),
+        `Expected $unwind to be in classic, explain: ${tojson(explain)}`,
+    );
 }
 
 describe("$LU pushdown", function () {
@@ -112,7 +127,10 @@ describe("$LU pushdown", function () {
     it("Should pushdown lookup-unwind", function () {
         const explain = this.collection
             .explain()
-            .aggregate([{$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "c"}}, {$unwind: "$c"}]);
+            .aggregate([
+                {$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "c"}},
+                {$unwind: "$c"},
+            ]);
         assertSbeLookupUnwind(explain);
     });
 
@@ -175,7 +193,10 @@ describe("$LU pushdown", function () {
     it("Should not push down lookup-unwind when internalQuerySlotBasedExecutionDisableLookupUnwindPushdown is set", function () {
         const setDisablePushdown = (value) =>
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableLookupUnwindPushdown: value}),
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQuerySlotBasedExecutionDisableLookupUnwindPushdown: value,
+                }),
             );
         const explain = (() => {
             try {

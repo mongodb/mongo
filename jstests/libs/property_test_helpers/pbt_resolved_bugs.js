@@ -24,7 +24,10 @@ const partialIndexExample102825 = {
         ],
     },
     queries: [
-        {"pipeline": [{$match: {$or: [{a: 1}, {a: {$lte: "a string"}}], _id: {$lte: 5}}}], "options": {}},
+        {
+            "pipeline": [{$match: {$or: [{a: 1}, {a: {$lte: "a string"}}], _id: {$lte: 5}}}],
+            "options": {},
+        },
         {"pipeline": [{$match: {$or: [{a: 1}, {a: {$lte: 10}}], _id: {$lte: 5}}}], "options": {}},
     ],
 };
@@ -50,10 +53,19 @@ const partialIndexExample2 = {
     },
     queries: [
         {
-            "pipeline": [{$match: {$or: [{a: {$lt: ""}}, {_id: {$eq: 0}, a: {$eq: -1}}]}}, {$sort: {b: 1}}],
+            "pipeline": [
+                {$match: {$or: [{a: {$lt: ""}}, {_id: {$eq: 0}, a: {$eq: -1}}]}},
+                {$sort: {b: 1}},
+            ],
             "options": {},
         },
-        {"pipeline": [{$match: {$or: [{a: {$lt: 1}}, {_id: {$eq: 0}, a: {$eq: 0}}]}}, {$sort: {b: 1}}], "options": {}},
+        {
+            "pipeline": [
+                {$match: {$or: [{a: {$lt: 1}}, {_id: {$eq: 0}, a: {$eq: 0}}]}},
+                {$sort: {b: 1}},
+            ],
+            "options": {},
+        },
     ],
 };
 

@@ -31,7 +31,9 @@ outColl.drop();
         return Array.sum(vals);
     };
 
-    let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {merge: outColl.getName()}, query: {}}));
+    let res = assert.commandWorked(
+        coll.mapReduce(mapFn, reduceFn, {out: {merge: outColl.getName()}, query: {}}),
+    );
     assert(outColl.drop());
 
     res = assert.commandWorked(

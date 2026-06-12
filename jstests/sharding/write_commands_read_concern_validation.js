@@ -17,7 +17,12 @@ const shard0Primary = st.rs0.getPrimary();
 const kDbName = "testDb";
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
 
-function testWriteCommandOutsideSessionAndTransaction(conn, cmdObj, readConcern, shouldBypassCheck) {
+function testWriteCommandOutsideSessionAndTransaction(
+    conn,
+    cmdObj,
+    readConcern,
+    shouldBypassCheck,
+) {
     const cmdObjWithReadConcern = Object.assign({}, cmdObj, {
         readConcern: readConcern,
     });
@@ -103,7 +108,12 @@ function testWriteCommandInsideTransactionNotFirstCommand(conn, cmdObj, readConc
 }
 
 function runTest(conn, cmdObj, mongosConn, kCollName) {
-    const defaultReadConcerns = [{}, {"level": "local"}, {"level": "majority"}, {"level": "available"}];
+    const defaultReadConcerns = [
+        {},
+        {"level": "local"},
+        {"level": "majority"},
+        {"level": "available"},
+    ];
 
     defaultReadConcerns.forEach((defaultReadConcern) => {
         if ("level" in defaultReadConcern) {
@@ -134,10 +144,20 @@ function runTest(conn, cmdObj, mongosConn, kCollName) {
                 testCase.readConcern,
                 testCase.shouldBypassCheck,
             );
-            testWriteCommandOutsideTransaction(conn, cmdObj, testCase.readConcern, testCase.shouldBypassCheck);
+            testWriteCommandOutsideTransaction(
+                conn,
+                cmdObj,
+                testCase.readConcern,
+                testCase.shouldBypassCheck,
+            );
             if (testCase.supportedInTransaction) {
                 testWriteCommandInsideTransactionFirstCommand(conn, cmdObj, testCase.readConcern);
-                testWriteCommandInsideTransactionNotFirstCommand(conn, cmdObj, testCase.readConcern, kCollName);
+                testWriteCommandInsideTransactionNotFirstCommand(
+                    conn,
+                    cmdObj,
+                    testCase.readConcern,
+                    kCollName,
+                );
             }
         });
     });

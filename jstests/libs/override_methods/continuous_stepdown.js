@@ -56,10 +56,8 @@ export class ContinuousStepdown {
                 stepdownOptions,
                 verbositySetting,
             ),
-            ShardingTestWithContinuousPrimaryStepdown: makeShardingTestWithContinuousPrimaryStepdown(
-                stepdownOptions,
-                verbositySetting,
-            ),
+            ShardingTestWithContinuousPrimaryStepdown:
+                makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbositySetting),
         };
     }
 }
@@ -110,7 +108,10 @@ const StepdownThread = function () {
                 // The command may fail if the node is no longer primary or is in the process of
                 // stepping down.
                 assert.commandWorkedOrFailedWithCode(
-                    primary.adminCommand({replSetStepDown: options.stepdownDurationSecs, force: true}),
+                    primary.adminCommand({
+                        replSetStepDown: options.stepdownDurationSecs,
+                        force: true,
+                    }),
                     [
                         ErrorCodes.NotWritablePrimary,
                         ErrorCodes.ConflictingOperationInProgress,
@@ -274,7 +275,9 @@ function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbosity
                 assert.eq(
                     newSettings.catchUpTimeoutMillis,
                     stepdownOptions.catchUpTimeoutMS,
-                    "Failed to set the catchUpTimeoutMillis to " + stepdownOptions.catchUpTimeoutMS + " milliseconds.",
+                    "Failed to set the catchUpTimeoutMillis to " +
+                        stepdownOptions.catchUpTimeoutMS +
+                        " milliseconds.",
                 );
             }
 
@@ -313,7 +316,8 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
 
             if (stepdownOptions.configStepdown) {
                 params.other.configOptions = params.other.configOptions || {};
-                params.other.configOptions.setParameter = params.other.configOptions.setParameter || {};
+                params.other.configOptions.setParameter =
+                    params.other.configOptions.setParameter || {};
                 params.other.configOptions.setParameter.logComponentVerbosity = verbositySetting;
             }
 
@@ -328,11 +332,15 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
 
             // Validate the stepdown options.
             if (stepdownOptions.configStepdown && !this.configRS) {
-                throw new Error("Continuous config server primary step down only available with CSRS");
+                throw new Error(
+                    "Continuous config server primary step down only available with CSRS",
+                );
             }
 
             if (stepdownOptions.shardStepdown && this._rs.some((rst) => !rst)) {
-                throw new Error("Continuous shard primary step down only available with replica set shards");
+                throw new Error(
+                    "Continuous shard primary step down only available with replica set shards",
+                );
             }
         }
 
@@ -347,7 +355,10 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
                     try {
                         const conn = new Mongo(mongos.host);
                         assert.commandWorked(
-                            conn.adminCommand({setParameter: 1, defaultFindReplicaSetHostTimeoutMS: 2 * 60 * 1000}),
+                            conn.adminCommand({
+                                setParameter: 1,
+                                defaultFindReplicaSetHostTimeoutMS: 2 * 60 * 1000,
+                            }),
                         );
                     } catch (e) {
                         if (isNetworkError(e)) {
@@ -368,7 +379,10 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
                 // fasserts due to slow stepdowns.
                 this.configRS.nodes.forEach((node) => {
                     assert.commandWorked(
-                        node.adminCommand({setParameter: 1, fassertOnLockTimeoutForStepUpDown: 3 * 60}),
+                        node.adminCommand({
+                            setParameter: 1,
+                            fassertOnLockTimeoutForStepUpDown: 3 * 60,
+                        }),
                     );
                 });
             }

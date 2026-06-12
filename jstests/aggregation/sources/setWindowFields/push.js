@@ -1,7 +1,10 @@
 /**
  * Test that $push works as a window function.
  */
-import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -19,7 +22,10 @@ assert.commandWorked(coll.insert([{_id: 0}, {_id: 1, a: "a"}, {_id: 2}]));
 const result = coll
     .aggregate([
         {
-            $setWindowFields: {sortBy: {_id: 1}, output: {b: {$push: "$a", window: {documents: [-1, 0]}}}},
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {b: {$push: "$a", window: {documents: [-1, 0]}}},
+            },
         },
     ])
     .toArray();

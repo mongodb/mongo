@@ -14,7 +14,11 @@
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getQueryPlanner, getSingleNodeExplain, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getQueryPlanner,
+    getSingleNodeExplain,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.orToIn;
 coll.drop();
@@ -53,7 +57,10 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
         .sort({f1: 1})
         .collation({locale: "en_US"})
         .explain("queryPlanner");
-    assert.docEq(expectedExplainCollation.queryPlanner.parsedQuery, actualExplainCollation.queryPlanner.parsedQuery);
+    assert.docEq(
+        expectedExplainCollation.queryPlanner.parsedQuery,
+        actualExplainCollation.queryPlanner.parsedQuery,
+    );
 
     // Make sure both queries have the same access plan.
     const expectedPlan = getWinningPlanFromExplain(expectedExplain);
@@ -67,11 +74,22 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     // The queries must produce the same result.
     const expectedRes = coll.find(expectedQuery).toArray();
     const actualRes = coll.find(actualQuery).toArray();
-    assert(arrayEq(expectedRes, actualRes, false, compareValues), `expected=${expectedRes}, actual=${actualRes}`);
+    assert(
+        arrayEq(expectedRes, actualRes, false, compareValues),
+        `expected=${expectedRes}, actual=${actualRes}`,
+    );
 
     // also with collation
-    const expectedResCollation = coll.find(expectedQuery).sort({f1: 1}).collation({locale: "en_US"}).toArray();
-    const actualResCollation = coll.find(actualQuery).sort({f1: 1}).collation({locale: "en_US"}).toArray();
+    const expectedResCollation = coll
+        .find(expectedQuery)
+        .sort({f1: 1})
+        .collation({locale: "en_US"})
+        .toArray();
+    const actualResCollation = coll
+        .find(actualQuery)
+        .sort({f1: 1})
+        .collation({locale: "en_US"})
+        .toArray();
     assert(
         arrayEq(expectedResCollation, actualResCollation, false, compareValues),
         `expected=${expectedRes}, actual=${actualRes}`,
@@ -155,15 +173,27 @@ const positiveTestQueries = [
     [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {$or: [{f1: /c/}, {f1: "a"}, {f1: "b"}]}],
     [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {$or: [{f1: "a"}, {f1: /c/}, {f1: "b"}]}],
     [{$or: [{f2: 9}, {f1: 1}, {f1: 99}]}, {$or: [{f2: 9}, {f1: {$in: [1, 99]}}]}],
-    [{$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}]}, {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}],
+    [
+        {$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}]},
+        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]},
+    ],
     // Same as above, but different order of predicates.
-    [{$or: [{f1: 1}, {f2: 3}, {f1: 2}, {f2: 4}]}, {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}],
-    [{$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}, {f3: 5}]}, {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}, {f3: 5}]}],
+    [
+        {$or: [{f1: 1}, {f2: 3}, {f1: 2}, {f2: 4}]},
+        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]},
+    ],
+    [
+        {$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}, {f3: 5}]},
+        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}, {f3: 5}]},
+    ],
     [{$or: [{f1: 1}, {f1: 1}]}, {f1: 1}],
 ];
 
 // These $or queries should not be rewritten into $in because of different semantics.
-const negativeTestQueries = [{$or: [{f1: {$eq: /^x/}}, {f1: {$eq: /ab/}}]}, {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]}];
+const negativeTestQueries = [
+    {$or: [{f1: {$eq: /^x/}}, {f1: {$eq: /ab/}}]},
+    {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]},
+];
 
 for (const query of negativeTestQueries) {
     assertOrNotRewrittenToIn(query);

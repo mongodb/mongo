@@ -49,9 +49,14 @@ export const $config = (function () {
      * operation.
      */
     function mutexLock(db, tid, collName) {
-        jsTestLog("Trying to acquire mutexLock for resource tid:" + tid + " collection:" + collName);
+        jsTestLog(
+            "Trying to acquire mutexLock for resource tid:" + tid + " collection:" + collName,
+        );
         assert.soon(() => {
-            let doc = db[data.BulkWriteMutex].findAndModify({query: {tid: tid}, update: {$set: {mutex: 1}}});
+            let doc = db[data.BulkWriteMutex].findAndModify({
+                query: {tid: tid},
+                update: {$set: {mutex: 1}},
+            });
             return doc.mutex === 0;
         });
         jsTestLog("Acquired mutexLock for tid:" + tid + " collection:" + collName);
@@ -75,7 +80,14 @@ export const $config = (function () {
             const targetThreadColl = threadCollectionName(collName, tid)[0];
             const coll = db[targetThreadColl];
             const fullNs = coll.getFullName();
-            jsTestLog("create state tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl);
+            jsTestLog(
+                "create state tid:" +
+                    tid +
+                    " currentTid:" +
+                    this.tid +
+                    " collection:" +
+                    targetThreadColl,
+            );
             // Add necessary indexes for resharding.
             assert.commandWorked(
                 db.adminCommand({
@@ -89,12 +101,19 @@ export const $config = (function () {
             );
             try {
                 assert.commandWorked(
-                    db.adminCommand({shardCollection: fullNs, key: {[`tid_${tid}_0`]: 1}, unique: false}),
+                    db.adminCommand({
+                        shardCollection: fullNs,
+                        key: {[`tid_${tid}_0`]: 1},
+                        unique: false,
+                    }),
                 );
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode) {
-                    if (exceptionCode == ErrorCodes.AlreadyInitialized || exceptionCode == ErrorCodes.InvalidOptions) {
+                    if (
+                        exceptionCode == ErrorCodes.AlreadyInitialized ||
+                        exceptionCode == ErrorCodes.InvalidOptions
+                    ) {
                         // It is fine for a shardCollection to throw AlreadyInitialized, a
                         // resharding state might have changed the shard key for the namespace. It
                         // is also fine to fail with InvalidOptions, a drop state could've removed
@@ -115,7 +134,14 @@ export const $config = (function () {
 
             const targetThreadColl = threadCollectionName(collName, tid)[0];
 
-            jsTestLog("drop state tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl);
+            jsTestLog(
+                "drop state tid:" +
+                    tid +
+                    " currentTid:" +
+                    this.tid +
+                    " collection:" +
+                    targetThreadColl,
+            );
             mutexLock(db, tid, targetThreadColl);
             try {
                 assert.eq(db[targetThreadColl].drop(), true);
@@ -203,7 +229,11 @@ export const $config = (function () {
                         newKey,
                 );
                 assert.commandWorked(
-                    db.adminCommand({reshardCollection: fullNs, key: {[`${newKey}`]: 1}, numInitialChunks: 1}),
+                    db.adminCommand({
+                        reshardCollection: fullNs,
+                        key: {[`${newKey}`]: 1},
+                        numInitialChunks: 1,
+                    }),
                 );
             } catch (e) {
                 const exceptionCode = e.code;
@@ -249,14 +279,17 @@ export const $config = (function () {
             // Note this command will behave as no-op in case the collection is not tracked.
             const namespace = `${db}.${collName}`;
             jsTestLog(`Started to untrack collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
-                // Handles the case where the collection is not located on its primary
-                ErrorCodes.OperationFailed,
-                // Handles the case where the collection is sharded
-                ErrorCodes.InvalidNamespace,
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}),
+                [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                ],
+            );
             jsTestLog(`Untrack collection completed`);
         },
         BulkWrite: function (db, collName, connCache) {
@@ -269,7 +302,14 @@ export const $config = (function () {
             const fullNs1 = db[collNames[0]].getFullName();
             const fullNs2 = db[collNames[1]].getFullName();
 
-            jsTestLog("BulkWrite state tid:" + tid + " currentTid:" + this.tid + " collections:" + collNames);
+            jsTestLog(
+                "BulkWrite state tid:" +
+                    tid +
+                    " currentTid:" +
+                    this.tid +
+                    " collections:" +
+                    collNames,
+            );
             const coll = db[collNames[0]];
 
             const generation = new Date().getTime();
@@ -280,11 +320,21 @@ export const $config = (function () {
             for (let i = 0; i < numDocs; ++i) {
                 bulkWriteOps.push({
                     insert: 0,
-                    document: {generation: generation, count: i, [`tid_${tid}_0`]: i, [`tid_${tid}_1`]: i},
+                    document: {
+                        generation: generation,
+                        count: i,
+                        [`tid_${tid}_0`]: i,
+                        [`tid_${tid}_1`]: i,
+                    },
                 });
                 bulkWriteOps.push({
                     insert: 1,
-                    document: {generation: generation, count: i, [`tid_${tid}_0`]: i, [`tid_${tid}_1`]: i},
+                    document: {
+                        generation: generation,
+                        count: i,
+                        [`tid_${tid}_0`]: i,
+                        [`tid_${tid}_1`]: i,
+                    },
                 });
             }
 
@@ -296,7 +346,14 @@ export const $config = (function () {
 
             mutexLock(db, tid, collNames[0]);
             try {
-                jsTestLog("BulkWrite - Insert tid:" + tid + " currentTid:" + this.tid + " collection:" + collNames);
+                jsTestLog(
+                    "BulkWrite - Insert tid:" +
+                        tid +
+                        " currentTid:" +
+                        this.tid +
+                        " collection:" +
+                        collNames,
+                );
 
                 // Assign txnNumber to enable retryable writes. This is necessary to avoid
                 // an error caused by ShardCannotRefreshDueToLocksHeld in an interaction with
@@ -308,9 +365,20 @@ export const $config = (function () {
                 // Check if insert succeeded
                 let res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
-                assert.eq(res.nErrors, 0, "BulkWrite - Insert errored when not expected to: " + tojson(res));
+                assert.eq(
+                    res.nErrors,
+                    0,
+                    "BulkWrite - Insert errored when not expected to: " + tojson(res),
+                );
 
-                jsTestLog("BulkWrite - Update tid:" + tid + " currentTid:" + this.tid + " collection:" + collNames);
+                jsTestLog(
+                    "BulkWrite - Update tid:" +
+                        tid +
+                        " currentTid:" +
+                        this.tid +
+                        " collection:" +
+                        collNames,
+                );
                 bulkWriteOps = [];
                 bulkWriteOps.push({
                     update: 0,
@@ -336,15 +404,28 @@ export const $config = (function () {
                     if (err == ErrorCodes.QueryPlanKilled) {
                         // Update is expected to throw ErrorCodes::QueryPlanKilled if performed
                         // concurrently with a rename (SERVER-31695).
-                        jsTestLog("BulkWrite state finished earlier because query plan was killed.");
+                        jsTestLog(
+                            "BulkWrite state finished earlier because query plan was killed.",
+                        );
                         return;
                     }
                 }
                 assert.commandWorked(res);
-                assert.eq(res.nErrors, 0, "BulkWrite - Update errored when not expected to: " + tojson(res));
+                assert.eq(
+                    res.nErrors,
+                    0,
+                    "BulkWrite - Update errored when not expected to: " + tojson(res),
+                );
 
                 // Delete Data
-                jsTestLog("BulkWrite - Remove tid:" + tid + " currentTid:" + this.tid + " collection:" + collNames);
+                jsTestLog(
+                    "BulkWrite - Remove tid:" +
+                        tid +
+                        " currentTid:" +
+                        this.tid +
+                        " collection:" +
+                        collNames,
+                );
                 // Check if delete succeeded
                 bulkWriteOps = [];
                 bulkWriteOps.push({delete: 0, filter: {generation: generation}, multi: true});
@@ -356,7 +437,11 @@ export const $config = (function () {
                 };
                 res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
-                assert.eq(res.nErrors, 0, "BulkWrite - Delete errored when not expected to: " + tojson(res));
+                assert.eq(
+                    res.nErrors,
+                    0,
+                    "BulkWrite - Delete errored when not expected to: " + tojson(res),
+                );
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 assert.eq(countDocuments(coll, {generation: generation}), 0);
             } finally {
@@ -388,7 +473,8 @@ export const $config = (function () {
             const res = assert.commandWorked(
                 db.adminCommand({
                     setParameter: 1,
-                    reshardingMinimumOperationDurationMillis: initialReshardingMinimumOperationDurationMillis,
+                    reshardingMinimumOperationDurationMillis:
+                        initialReshardingMinimumOperationDurationMillis,
                 }),
             );
         });

@@ -22,8 +22,12 @@ import {runPipelineAndGetDiagnostics} from "jstests/libs/query/memory_tracking_u
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}),
+);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -45,7 +49,11 @@ const explainExecStats = assert.commandWorked(
 );
 const updateStage = getPlanStage(explainExecStats.executionStats.executionStages, "UPDATE");
 
-assert.neq(null, updateStage, "Expected query to use the classic UPDATE stage with forceClassicEngine ");
+assert.neq(
+    null,
+    updateStage,
+    "Expected query to use the classic UPDATE stage with forceClassicEngine ",
+);
 
 // peakTrackedMemBytes is not reported in explain output for the UPDATE stage. In explain mode the
 // update is not actually written, so indexesAffected is never set, no record IDs are inserted into
@@ -89,11 +97,19 @@ const profilerEntries = runPipelineAndGetDiagnostics({
 assert.eq(1, logLines.length, "Expected exactly one slow query log entry: " + tojson(logLines));
 const match = logLines[0].match(peakTrackedMemBytesRegex);
 assert(match, "Expected peakTrackedMemBytes in slow query log: " + logLines[0]);
-assert.gt(parseInt(match[1]), 0, "Expected positive peakTrackedMemBytes in slow query log: " + logLines[0]);
+assert.gt(
+    parseInt(match[1]),
+    0,
+    "Expected positive peakTrackedMemBytes in slow query log: " + logLines[0],
+);
 
 // --- Profiler check ---
 // Test that memory usage metrics appear in the profiler.
-assert.eq(1, profilerEntries.length, "Expected exactly one profiler entry: " + tojson(profilerEntries));
+assert.eq(
+    1,
+    profilerEntries.length,
+    "Expected exactly one profiler entry: " + tojson(profilerEntries),
+);
 const profilerEntry = profilerEntries[0];
 assert(
     profilerEntry.hasOwnProperty("peakTrackedMemBytes"),

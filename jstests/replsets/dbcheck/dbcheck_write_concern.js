@@ -42,7 +42,11 @@ const healthlog = db.getSiblingDB("local").system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
+    checkHealthLog(
+        healthlog,
+        {operation: "dbCheckBatch", severity: "info"},
+        nDocs / maxDocsPerBatch,
+    );
 
     // Confirm there are no warnings or errors.
     checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
@@ -62,7 +66,11 @@ const healthlog = db.getSiblingDB("local").system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
+    checkHealthLog(
+        healthlog,
+        {operation: "dbCheckBatch", severity: "info"},
+        nDocs / maxDocsPerBatch,
+    );
 
     // Confirm there are no warnings or errors.
     checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);

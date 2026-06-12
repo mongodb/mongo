@@ -37,7 +37,11 @@ export const $config = (function () {
                 let indexToUpdate = Math.floor(Math.random() * this.numIds);
                 let res;
                 try {
-                    res = db[collName].update({_id: indexToUpdate}, {$inc: {num: 1}}, {upsert: true});
+                    res = db[collName].update(
+                        {_id: indexToUpdate},
+                        {$inc: {num: 1}},
+                        {upsert: true},
+                    );
                     assert.commandWorked(res);
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
@@ -50,7 +54,10 @@ export const $config = (function () {
                             e["errorLabels"] = ["TransientTransactionError"];
                             throw e;
                         }
-                    } else if (e.code == ErrorCodes.QueryPlanKilled || e.code == ErrorCodes.OperationFailed) {
+                    } else if (
+                        e.code == ErrorCodes.QueryPlanKilled ||
+                        e.code == ErrorCodes.OperationFailed
+                    ) {
                         // dropIndex can cause queries to throw if these queries
                         // yield.
                     } else {
@@ -134,7 +141,11 @@ export const $config = (function () {
                         // yield.
                         assert.contains(
                             e.code,
-                            [ErrorCodes.NamespaceNotFound, ErrorCodes.OperationFailed, ErrorCodes.QueryPlanKilled],
+                            [
+                                ErrorCodes.NamespaceNotFound,
+                                ErrorCodes.OperationFailed,
+                                ErrorCodes.QueryPlanKilled,
+                            ],
                             "unexpected error code: " + e.code + ": " + e.message,
                         );
                     }
@@ -156,7 +167,10 @@ export const $config = (function () {
                         e["errorLabels"] = ["TransientTransactionError"];
                         throw e;
                     }
-                } else if (TestData.runInsideTransaction && includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+                } else if (
+                    TestData.runInsideTransaction &&
+                    includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)
+                ) {
                     // Rethrow so the auto transaction retry logic will retry.
                     //
                     // With background config shard transitions, movePrimary may be called while

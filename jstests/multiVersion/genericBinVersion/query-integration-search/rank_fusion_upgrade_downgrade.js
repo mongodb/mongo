@@ -30,14 +30,18 @@ function assertRankFusionCompletelyRejected(primaryConn) {
     assertRefactoredMQLKeepsWorking(db);
 
     // $rankFusion is rejected in a plain aggregation command.
-    assert.commandFailedWithCode(db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.QueryFeatureNotAllowed,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}),
+        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.QueryFeatureNotAllowed],
+    );
 
     // $rankFusion with scoreDetails is still rejected.
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+        db.runCommand({
+            aggregate: collName,
+            pipeline: rankFusionPipelineWithScoreDetails,
+            cursor: {},
+        }),
         [kUnrecognizedPipelineStageErrorCode, ErrorCodes.QueryFeatureNotAllowed],
     );
 
@@ -47,19 +51,25 @@ function assertRankFusionCompletelyRejected(primaryConn) {
         ErrorCodes.QueryFeatureNotAllowed,
         ErrorCodes.OptionNotSupportedOnView,
     ]);
-    assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipelineWithScoreDetails), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView,
-    ]);
+    assert.commandFailedWithCode(
+        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.OptionNotSupportedOnView,
+        ],
+    );
 
     // Running $rankFusion against a view is rejected.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
-    assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.OptionNotSupportedOnView,
+        ],
+    );
 }
 
 function assertRankFusionCompletelyAccepted(primaryConn) {
@@ -76,17 +86,26 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
         ErrorCodes.QueryFeatureNotAllowed,
         ErrorCodes.OptionNotSupportedOnView,
     ]);
-    assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipelineWithScoreDetails), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView,
-    ]);
+    assert.commandFailedWithCode(
+        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.OptionNotSupportedOnView,
+        ],
+    );
 
     // Running $rankFusion against a view succeeds.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
-    assert.commandWorked(db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}));
     assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}),
+    );
+    assert.commandWorked(
+        db.runCommand({
+            aggregate: viewName,
+            pipeline: rankFusionPipelineWithScoreDetails,
+            cursor: {},
+        }),
     );
 }
 

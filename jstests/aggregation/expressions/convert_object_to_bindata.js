@@ -121,7 +121,11 @@ const illegalConversionTestDocs = [
     {_id: 4, input: Timestamp(0, 1), target: "binData"},
 ];
 
-const nullTestDocs = [{_id: 0, input: null}, {_id: 1, input: undefined}, {_id: 2 /* input is missing */}];
+const nullTestDocs = [
+    {_id: 0, input: null},
+    {_id: 1, input: undefined},
+    {_id: 2 /* input is missing */},
+];
 
 runConvertTests({
     coll,

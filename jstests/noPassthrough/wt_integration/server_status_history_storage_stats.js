@@ -49,10 +49,14 @@ assert.soon(() => {
     // block-manager
     assert(
         serverStatus["wiredTiger"]["historyStorageStats"].hasOwnProperty("block-manager"),
-        "does not have 'wiredTiger.historyStorageStats.block-manager' in '" + tojson(serverStatus) + "'",
+        "does not have 'wiredTiger.historyStorageStats.block-manager' in '" +
+            tojson(serverStatus) +
+            "'",
     );
     assert(
-        serverStatus["wiredTiger"]["historyStorageStats"]["block-manager"].hasOwnProperty("file size in bytes"),
+        serverStatus["wiredTiger"]["historyStorageStats"]["block-manager"].hasOwnProperty(
+            "file size in bytes",
+        ),
         "does not have 'file size in bytes' in wiredTiger.historyStorageStats.block-manager in '" +
             tojson(serverStatus) +
             "'",
@@ -72,8 +76,12 @@ assert.soon(() => {
         "does not have 'wiredTiger.historyStorageStats.btree' in '" + tojson(serverStatus) + "'",
     );
     assert(
-        serverStatus["wiredTiger"]["historyStorageStats"]["btree"].hasOwnProperty("maximum tree depth"),
-        "does not have 'maximum tree depth' in wiredTiger.historyStorageStats.btree in '" + tojson(serverStatus) + "'",
+        serverStatus["wiredTiger"]["historyStorageStats"]["btree"].hasOwnProperty(
+            "maximum tree depth",
+        ),
+        "does not have 'maximum tree depth' in wiredTiger.historyStorageStats.btree in '" +
+            tojson(serverStatus) +
+            "'",
     );
 
     return true;

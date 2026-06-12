@@ -78,4 +78,7 @@ export var kCommandsSupportingWriteConcern = new Set([
     "updateUser",
 ]);
 
-export var kCommandsSupportingWriteConcernInTransaction = new Set(["abortTransaction", "commitTransaction"]);
+export var kCommandsSupportingWriteConcernInTransaction = new Set([
+    "abortTransaction",
+    "commitTransaction",
+]);

@@ -64,7 +64,8 @@ export const $config = (function () {
                 assert.neq(
                     res.nModified,
                     0,
-                    "updateOne should have found and updated a matching document, returned " + tojson(res),
+                    "updateOne should have found and updated a matching document, returned " +
+                        tojson(res),
                 );
             }
         }
@@ -87,7 +88,8 @@ export const $config = (function () {
             assert.neq(
                 typeof doc._id,
                 "object",
-                "default comparator of" + " Array.prototype.sort() is not well-ordered for JS objects",
+                "default comparator of" +
+                    " Array.prototype.sort() is not well-ordered for JS objects",
             );
             bulk.insert(doc);
         }

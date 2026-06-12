@@ -16,7 +16,9 @@ assert.commandWorked(
     ]),
 );
 
-const result = coll.aggregate([{$sort: {_id: 1}}, {$project: {f: {$first: "$a"}, l: {$last: "$a"}}}]).toArray();
+const result = coll
+    .aggregate([{$sort: {_id: 1}}, {$project: {f: {$first: "$a"}, l: {$last: "$a"}}}])
+    .toArray();
 assert.eq(result, [
     // When an array doesn't contain a given index, the result is 'missing', similar to looking up a
     // nonexistent key in a document.

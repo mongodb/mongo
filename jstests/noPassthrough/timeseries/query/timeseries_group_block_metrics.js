@@ -9,7 +9,9 @@
  */
 import {getAggPlanStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 
-const conn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true},
+});
 const db = conn.getDB("test");
 // Debug mode changes how often we spill. This test assumes SBE is being used.
 if (

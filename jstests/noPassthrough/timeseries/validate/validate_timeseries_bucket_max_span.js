@@ -15,7 +15,9 @@ const outOfRangeDate = ISODate("2025-01-23T03:00:00.000Z"); // currentDate + 360
 // Inserts one measurement and verifies the collection is valid.
 const coll = db.getCollection(collName);
 assert.commandWorked(
-    db.createCollection(collName, {timeseries: {timeField: "time", metaField: "tag", granularity: "seconds"}}),
+    db.createCollection(collName, {
+        timeseries: {timeField: "time", metaField: "tag", granularity: "seconds"},
+    }),
 );
 assert.commandWorked(coll.insert({time: currentDate, tag: 1, a: 1}));
 let res = coll.validate();
@@ -24,7 +26,9 @@ assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.errors.length, 0);
 
 // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
-assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+assert.commandWorked(
+    conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+);
 
 // Sets the max timestamp to outside the bucket max span.
 getTimeseriesCollForRawOps(db, coll).updateOne(

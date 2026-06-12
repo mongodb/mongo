@@ -8,7 +8,10 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -41,7 +44,11 @@ withExtensions(
                 "command.comment": comment,
             })
             .toArray();
-        assert.eq(profileEntries.length, 1, `Expected 1 profiler entry, got: ${tojson(profileEntries)}`);
+        assert.eq(
+            profileEntries.length,
+            1,
+            `Expected 1 profiler entry, got: ${tojson(profileEntries)}`,
+        );
 
         const entry = profileEntries[0];
         assert(entry.extensionMetrics !== undefined, entry);

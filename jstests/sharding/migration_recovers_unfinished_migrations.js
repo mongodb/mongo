@@ -39,7 +39,9 @@ const collNameB = "bar";
 const nsA = dbName + "." + collNameA;
 const nsB = dbName + "." + collNameB;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: nsA, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: nsB, key: {_id: 1}}));
 
@@ -57,7 +59,10 @@ let joinMoveChunk1 = moveChunkParallel(
 
 moveChunkHangAtStep5Failpoint.wait();
 
-let migrationCommitNetworkErrorFailpoint = configureFailPoint(st.rs0.getPrimary(), "migrationCommitNetworkError");
+let migrationCommitNetworkErrorFailpoint = configureFailPoint(
+    st.rs0.getPrimary(),
+    "migrationCommitNetworkError",
+);
 let skipShardFilteringMetadataRefreshFailpoint = configureFailPoint(
     st.rs0.getPrimary(),
     "skipShardFilteringMetadataRefresh",
@@ -81,7 +86,11 @@ skipShardFilteringMetadataRefreshFailpoint.off();
 
 // The migration is left pending recovery.
 {
-    let migrationCoordinatorDocuments = st.rs0.getPrimary().getDB("config")["migrationCoordinators"].find().toArray();
+    let migrationCoordinatorDocuments = st.rs0
+        .getPrimary()
+        .getDB("config")
+        ["migrationCoordinators"].find()
+        .toArray();
     assert.eq(1, migrationCoordinatorDocuments.length);
     assert.eq(nsA, migrationCoordinatorDocuments[0].nss);
 }
@@ -97,7 +106,9 @@ let moveChunkHangAtStep3Failpoint = configureFailPoint(st.rs0.getPrimary(), "mov
 function runMoveChunkWithRetryOnConflict(mongosURL, ns, toShardId) {
     const admin = new Mongo(mongosURL).getDB("admin");
     assert.soonRetryOnAcceptableErrors(() => {
-        assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 0}, to: toShardId, _waitForDelete: true}));
+        assert.commandWorked(
+            admin.runCommand({moveChunk: ns, find: {_id: 0}, to: toShardId, _waitForDelete: true}),
+        );
         return true;
     }, ErrorCodes.ConflictingOperationInProgress);
 }
@@ -113,7 +124,11 @@ let joinMoveChunk2 = startParallelOps(staticMongod, runMoveChunkWithRetryOnConfl
 sleep(5 * 1000);
 {
     // There's still only one migration recovery document, corresponding to the first migration
-    let migrationCoordinatorDocuments = st.rs0.getPrimary().getDB("config")["migrationCoordinators"].find().toArray();
+    let migrationCoordinatorDocuments = st.rs0
+        .getPrimary()
+        .getDB("config")
+        ["migrationCoordinators"].find()
+        .toArray();
     assert.eq(1, migrationCoordinatorDocuments.length);
     assert.eq(nsA, migrationCoordinatorDocuments[0].nss);
 }
@@ -125,7 +140,11 @@ moveChunkHangAtStep3Failpoint.wait();
 // Check that the first migration has been recovered. There must be only one
 // config.migrationCoordinators document, which corresponds to the second migration.
 {
-    let migrationCoordinatorDocuments = st.rs0.getPrimary().getDB("config")["migrationCoordinators"].find().toArray();
+    let migrationCoordinatorDocuments = st.rs0
+        .getPrimary()
+        .getDB("config")
+        ["migrationCoordinators"].find()
+        .toArray();
     assert.eq(1, migrationCoordinatorDocuments.length);
     assert.eq(nsB, migrationCoordinatorDocuments[0].nss);
 }

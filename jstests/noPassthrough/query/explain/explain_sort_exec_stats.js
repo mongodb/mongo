@@ -33,7 +33,11 @@ const pipelines = [
     }, // top k sorter
     {
         sortUsesDocumentSources: true,
-        pipeline: [{$_internalInhibitOptimization: {}}, {$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}],
+        pipeline: [
+            {$_internalInhibitOptimization: {}},
+            {$sort: {_id: 1, b: -1}},
+            {$limit: nDocs / 10},
+        ],
     }, // top k sorter document sources
 ];
 
@@ -72,7 +76,10 @@ let explainOutput = {};
 pipelines.forEach(function (pipeline) {
     // Set MaxMemory low to force spill to disk.
     const originalMemoryLimit = assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit,
+        }),
     );
 
     explainOutput = coll.explain("executionStats").aggregate(pipeline.pipeline);
@@ -80,7 +87,10 @@ pipelines.forEach(function (pipeline) {
 
     // Set MaxMemory to back to the original value.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was,
+        }),
     );
 
     explainOutput = coll.explain("executionStats").aggregate(pipeline.pipeline);

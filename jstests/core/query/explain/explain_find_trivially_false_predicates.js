@@ -22,7 +22,9 @@ const collName = "jstests_explain_find_trivially_false_predicates";
     {description: "Regular collections", collOptions: {}},
     {
         description: "Clustered collections",
-        collOptions: {clusteredIndex: {key: {_id: 1}, unique: true, name: "Clustered index definition"}},
+        collOptions: {
+            clusteredIndex: {key: {_id: 1}, unique: true, name: "Clustered index definition"},
+        },
     },
 ].forEach((testConfig) => {
     jsTestLog(`Testing trivially false optimization with ${testConfig.description}`);

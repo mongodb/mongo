@@ -53,7 +53,9 @@ let encryptedClient = new EncryptedClient(initialConn, dbName);
 assert.commandWorked(
     encryptedClient.createEncryptionCollection(collName, {
         encryptedFields: {
-            "fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}],
+            "fields": [
+                {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
+            ],
         },
     }),
 );
@@ -111,7 +113,10 @@ function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
     // Do updates on encrypted fields
     for (let it = 0; it < iterations; it++) {
         let res = assert.commandWorked(
-            ecoll.updateOne({$and: [{last: "baggins"}, {first: "frodo"}]}, {$set: {first: "bilbo"}}),
+            ecoll.updateOne(
+                {$and: [{last: "baggins"}, {first: "frodo"}]},
+                {$set: {first: "bilbo"}},
+            ),
         );
         assert.eq(res.matchedCount, 1);
         assert.eq(res.modifiedCount, 1);
@@ -119,7 +124,9 @@ function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
         ecocCount++;
         client.assertEncryptedCollectionCounts(collName, count, escCount, ecocCount);
 
-        res = assert.commandWorked(ecoll.replaceOne({last: "took"}, {first: "paladin", last: "took"}));
+        res = assert.commandWorked(
+            ecoll.replaceOne({last: "took"}, {first: "paladin", last: "took"}),
+        );
         assert.eq(res.matchedCount, 1);
         assert.eq(res.modifiedCount, 1);
         escCount++;
@@ -146,7 +153,9 @@ function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
 
     // Do deletes
     for (let it = 0; it < iterations; it++) {
-        let res = assert.commandWorked(ecoll.deleteOne({last: "brandybuck"}, {writeConcern: {w: "majority"}}));
+        let res = assert.commandWorked(
+            ecoll.deleteOne({last: "brandybuck"}, {writeConcern: {w: "majority"}}),
+        );
         assert.eq(res.deletedCount, 1);
         count--;
         client.assertEncryptedCollectionCounts(collName, count, escCount, ecocCount);

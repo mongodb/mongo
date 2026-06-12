@@ -21,8 +21,19 @@ const collation = {
  * command, validates that all the 'expectedStages' are present in the plan returned and all the
  * 'stagesNotExpected' are not present in the plan.
  */
-function validateFindCmdOutputAndPlan({filter, projection = {}, expectedOutput, expectedStages, stagesNotExpected}) {
-    const cmdObj = {find: coll.getName(), filter: filter, projection: projection, collation: collation};
+function validateFindCmdOutputAndPlan({
+    filter,
+    projection = {},
+    expectedOutput,
+    expectedStages,
+    stagesNotExpected,
+}) {
+    const cmdObj = {
+        find: coll.getName(),
+        filter: filter,
+        projection: projection,
+        collation: collation,
+    };
     const res = assert.commandWorked(coll.runCommand(cmdObj));
     const ouputArray = new DBCommandCursor(coll.getDB(), res).toArray();
 
@@ -39,7 +50,9 @@ function validateFindCmdOutputAndPlan({filter, projection = {}, expectedOutput, 
 
 // Verify that index creation works for compound hashed index with collation, when hashed field is a
 // prefix.
-assert.commandWorked(coll.createIndex({"a.b": "hashed", "a.c": 1, "a.e": -1}, {collation: collation}));
+assert.commandWorked(
+    coll.createIndex({"a.b": "hashed", "a.c": 1, "a.e": -1}, {collation: collation}),
+);
 
 // Insert a series of documents whose fieldnames and values differ only by case.
 assert.commandWorked(coll.insert({_id: 0, a: {b: "string", c: "STRING", e: 5}}));
@@ -84,7 +97,9 @@ validateFindCmdOutputAndPlan({
  * When hashed field is not a prefix.
  */
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.createIndex({"a.b": 1, "a.c": "hashed", "a.e": -1}, {collation: collation}));
+assert.commandWorked(
+    coll.createIndex({"a.b": 1, "a.c": "hashed", "a.e": -1}, {collation: collation}),
+);
 
 // Hashed indexes with collation can be covered, if the query predicate restrict strings from being
 // returned.

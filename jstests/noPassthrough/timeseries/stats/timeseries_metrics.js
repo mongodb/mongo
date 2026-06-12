@@ -19,7 +19,9 @@ const metaFieldName = "tag";
 const resetColl = function () {
     coll.drop();
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     assert.commandWorked(coll.insert({a: 0, [timeFieldName]: new Date(), [metaFieldName]: 1}));
     assert.commandWorked(coll.insert({a: 1, [timeFieldName]: new Date(), [metaFieldName]: 2}));
@@ -72,7 +74,11 @@ if (!FeatureFlagUtil.isEnabled(testDB, "TimeseriesUpdatesSupport")) {
 // Direct bucket update.
 ++expectedMetrics.directUpdated;
 assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, coll).updateOne({meta: 1}, {$set: {meta: 3}}, getRawOperationSpec(testDB)),
+    getTimeseriesCollForRawOps(testDB, coll).updateOne(
+        {meta: 1},
+        {$set: {meta: 3}},
+        getRawOperationSpec(testDB),
+    ),
 );
 checkServerStatus();
 
@@ -96,7 +102,9 @@ checkServerStatus();
 
 // Direct bucket delete.
 ++expectedMetrics.directDeleted;
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll).deleteOne({meta: 1}, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).deleteOne({meta: 1}, getRawOperationSpec(testDB)),
+);
 checkServerStatus();
 
 MongoRunner.stopMongod(conn);

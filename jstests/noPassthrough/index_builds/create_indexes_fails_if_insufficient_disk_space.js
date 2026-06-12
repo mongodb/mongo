@@ -18,7 +18,9 @@ const primary = rst.getPrimary();
 const primaryDB = primary.getDB("test");
 const primaryColl = primaryDB.getCollection("test");
 
-const simulateDiskSpaceFp = configureFailPoint(primaryDB, "simulateAvailableDiskSpace", {bytes: 450 * 1024 * 1024});
+const simulateDiskSpaceFp = configureFailPoint(primaryDB, "simulateAvailableDiskSpace", {
+    bytes: 450 * 1024 * 1024,
+});
 
 // Empty collections do not start index builds, and should succeed.
 assert.commandWorked(primaryColl.createIndex({b: 1}));

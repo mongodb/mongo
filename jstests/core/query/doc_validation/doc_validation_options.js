@@ -57,7 +57,9 @@ assert.commandWorked(t.remove({foo: "1"}));
 assert.commandWorked(t.runCommand("collMod", {validator: validatorExpression}));
 
 // check we can go back to enforce strict
-assert.commandWorked(t.runCommand("collMod", {validationAction: "error", validationLevel: "strict"}));
+assert.commandWorked(
+    t.runCommand("collMod", {validationAction: "error", validationLevel: "strict"}),
+);
 assertFailsValidation(t.update({}, {$set: {a: 3}}));
 assert.eq(1, t.find({a: 2}).itcount());
 
@@ -68,7 +70,9 @@ assert.eq(1, t.find({a: 3}).itcount());
 
 // test create
 t.drop();
-assert.commandWorked(db.createCollection(t.getName(), {validator: {a: 1}, validationAction: "warn"}));
+assert.commandWorked(
+    db.createCollection(t.getName(), {validator: {a: 1}, validationAction: "warn"}),
+);
 
 assert.commandWorked(t.insert({a: 2}));
 assert.commandWorked(t.insert({a: 1}));

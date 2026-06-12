@@ -37,7 +37,10 @@ function checkDrainingCorrectAndIllegalOperations() {
     );
 
     // Can't drain non-existent shard
-    assert.commandFailedWithCode(st.s.adminCommand({startShardDraining: "shard1"}), ErrorCodes.ShardNotFound);
+    assert.commandFailedWithCode(
+        st.s.adminCommand({startShardDraining: "shard1"}),
+        ErrorCodes.ShardNotFound,
+    );
 
     // Remove st.shard1.shardName
     assert.commandWorked(st.s.adminCommand({commitShardRemoval: st.shard1.shardName}));

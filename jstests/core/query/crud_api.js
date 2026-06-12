@@ -55,7 +55,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
     let deleteOneExecutor = createTestExecutor(coll, "deleteOne", checkResultObject);
     let bulkWriteExecutor = createTestExecutor(coll, "bulkWrite", checkResultObject);
     let findOneAndDeleteExecutor = createTestExecutor(coll, "findOneAndDelete", checkResultObject);
-    let findOneAndReplaceExecutor = createTestExecutor(coll, "findOneAndReplace", checkResultObject);
+    let findOneAndReplaceExecutor = createTestExecutor(
+        coll,
+        "findOneAndReplace",
+        checkResultObject,
+    );
     let findOneAndUpdateExecutor = createTestExecutor(coll, "findOneAndUpdate", checkResultObject);
     let insertManyExecutor = createTestExecutor(coll, "insertMany", checkResultObject);
     let insertOneExecutor = createTestExecutor(coll, "insertOne", checkResultObject);
@@ -314,7 +318,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: {$gt: 1}}, {x: 32}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true}],
+        params: [
+            {_id: {$gt: 1}},
+            {x: 32},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true},
+        ],
         result: {x: 32},
         expected: [
             {_id: 1, x: 11},
@@ -344,7 +352,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: 2}, {x: 32}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true}],
+        params: [
+            {_id: 2},
+            {x: 32},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true},
+        ],
         result: {x: 32},
         expected: [
             {_id: 1, x: 11},
@@ -391,7 +403,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: 4}, {x: 44}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true}],
+        params: [
+            {_id: 4},
+            {x: 44},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true},
+        ],
         result: null,
         expected: [
             {_id: 1, x: 11},
@@ -407,7 +423,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: 4}, {x: 44}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true, upsert: true}],
+        params: [
+            {_id: 4},
+            {x: 44},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true, upsert: true},
+        ],
         result: {x: 44},
         expected: [
             {_id: 1, x: 11},
@@ -447,7 +467,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: {$gt: 1}}, {$inc: {x: 1}}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true}],
+        params: [
+            {_id: {$gt: 1}},
+            {$inc: {x: 1}},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true},
+        ],
         result: {x: 23},
         expected: [
             {_id: 1, x: 11},
@@ -477,7 +501,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: 2}, {$inc: {x: 1}}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true}],
+        params: [
+            {_id: 2},
+            {$inc: {x: 1}},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true},
+        ],
         result: {x: 23},
         expected: [
             {_id: 1, x: 11},
@@ -508,7 +536,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: 4}, {$inc: {x: 1}}, {projection: {x: 1, _id: 0}, sort: {x: 1}, upsert: true}],
+        params: [
+            {_id: 4},
+            {$inc: {x: 1}},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, upsert: true},
+        ],
         result: null,
         expected: [
             {_id: 1, x: 11},
@@ -524,7 +556,11 @@ let crudAPISpecTests = function crudAPISpecTests() {
             {_id: 2, x: 22},
             {_id: 3, x: 33},
         ],
-        params: [{_id: 4}, {$inc: {x: 1}}, {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true}],
+        params: [
+            {_id: 4},
+            {$inc: {x: 1}},
+            {projection: {x: 1, _id: 0}, sort: {x: 1}, returnNewDocument: true},
+        ],
         result: null,
         expected: [
             {_id: 1, x: 11},

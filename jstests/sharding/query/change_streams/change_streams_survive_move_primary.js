@@ -20,10 +20,14 @@ const dbName = "test";
 const untrackedCollName = "untrackedCollection";
 const db = st.s.getDB(dbName);
 
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 let untrackedColl = assertCreateCollection(db, untrackedCollName);
 
-const cst = new ChangeStreamTest(ChangeStreamTest.getDBForChangeStream(ChangeStreamWatchMode.kCollection, db));
+const cst = new ChangeStreamTest(
+    ChangeStreamTest.getDBForChangeStream(ChangeStreamWatchMode.kCollection, db),
+);
 
 // 1. Verify that an open change stream can collect all the relevant events occurring before and
 // after the execution of movePrimary().

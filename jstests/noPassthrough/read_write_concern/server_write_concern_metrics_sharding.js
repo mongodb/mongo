@@ -56,7 +56,11 @@ function resetCollection(setupCommand) {
     // the test cases (due to writes onto config.cache.collections/chunks).By performing a secomdary
     // read here, we'll ensure that subsequent requests will see stable filtering metadata.
     assert.commandWorked(
-        testDB.runCommand({count: collName, $readPreference: {mode: "secondary"}, readConcern: {"level": "local"}}),
+        testDB.runCommand({
+            count: collName,
+            $readPreference: {mode: "secondary"},
+            readConcern: {"level": "local"},
+        }),
     );
 
     if (setupCommand) {
@@ -109,7 +113,11 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
 
     // Run command with no writeConcern with CWWC set to w:1.
     assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     cmdsWithNoWCProvided.forEach((cmd) => {
         resetCollection(setupCommand);
@@ -151,7 +159,9 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "majority"}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "majority"}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -164,7 +174,9 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 0}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 0}})),
+    );
     // Because 'w:0' doesn't wait for an ack, the command might return before it got
     // executed, hence retrying.
     assert.soon(() => {
@@ -187,7 +199,9 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 1}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 1}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -200,7 +214,9 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 2}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 2}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -213,7 +229,9 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "myTag"}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "myTag"}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,

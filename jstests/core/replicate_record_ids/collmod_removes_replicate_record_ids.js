@@ -45,7 +45,10 @@ jsTestLog("Inserting document into " + coll.getFullName());
 assert.commandWorked(coll.insert({_id: 1}));
 jsTestLog("Inserted document into " + coll.getFullName());
 
-jsTestLog("Running collMod command to remove recordIdsReplication collection option from " + coll.getFullName());
+jsTestLog(
+    "Running collMod command to remove recordIdsReplication collection option from " +
+        coll.getFullName(),
+);
 let result = assert.commandWorked(db.runCommand({collMod: collName, recordIdsReplicated: false}));
 jsTestLog("Result from successful collMod command: " + tojson(result));
 
@@ -68,4 +71,7 @@ assert(
 assert.commandWorked(db.runCommand({collMod: collName, recordIdsReplicated: false}));
 
 // Modifying with a true 'recordIdsReplicated' value is not allowed
-assert.commandFailedWithCode(db.runCommand({collMod: collName, recordIdsReplicated: true}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({collMod: collName, recordIdsReplicated: true}),
+    ErrorCodes.InvalidOptions,
+);

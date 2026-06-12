@@ -55,11 +55,17 @@ function runTest(conn, {rst, st}) {
 
     if (st) {
         // Shard collection1 and move one chunk to shard1.
-        assert.commandWorked(conn.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
-        assert.commandWorked(testDb.runCommand({createIndexes: collName1, indexes: [{key: {x: 1}, name: "xIndex"}]}));
+        assert.commandWorked(
+            conn.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+        );
+        assert.commandWorked(
+            testDb.runCommand({createIndexes: collName1, indexes: [{key: {x: 1}, name: "xIndex"}]}),
+        );
         assert.commandWorked(conn.adminCommand({shardCollection: ns1, key: {x: 1}}));
         assert.commandWorked(conn.adminCommand({split: ns1, middle: {x: 0}}));
-        assert.commandWorked(conn.adminCommand({moveChunk: ns1, find: {x: 0}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            conn.adminCommand({moveChunk: ns1, find: {x: 0}, to: st.shard1.shardName}),
+        );
     }
 
     insertDocuments(collection0, numDocs);
@@ -67,7 +73,9 @@ function runTest(conn, {rst, st}) {
     const collUuid0 = QuerySamplingUtil.getCollectionUuid(testDb, collName0);
     const collUuid1 = QuerySamplingUtil.getCollectionUuid(testDb, collName1);
 
-    jsTest.log("Test running a $listSampledQueries aggregate command while there are no sampled queries");
+    jsTest.log(
+        "Test running a $listSampledQueries aggregate command while there are no sampled queries",
+    );
     let actualSamples = adminDb.aggregate([{$listSampledQueries: {}}]).toArray();
     assert.eq(actualSamples.length, 0);
 
@@ -101,7 +109,13 @@ function runTest(conn, {rst, st}) {
 
     // Create read samples on collection0.
     const aggregateFilter = {x: 1, sampleNum: ++sampleNum};
-    assert.commandWorked(testDb.runCommand({aggregate: collName0, pipeline: [{$match: aggregateFilter}], cursor: {}}));
+    assert.commandWorked(
+        testDb.runCommand({
+            aggregate: collName0,
+            pipeline: [{$match: aggregateFilter}],
+            cursor: {},
+        }),
+    );
     expectedSamples[sampleNum] = {
         ns: ns0,
         collectionUuid: collUuid0,
@@ -112,7 +126,12 @@ function runTest(conn, {rst, st}) {
 
     const countFilter = {x: -1, sampleNum: ++sampleNum};
     assert.commandWorked(testDb.runCommand({count: collName0, query: countFilter}));
-    expectedSamples[sampleNum] = {ns: ns0, collectionUuid: collUuid0, cmdName: "count", cmd: {filter: countFilter}};
+    expectedSamples[sampleNum] = {
+        ns: ns0,
+        collectionUuid: collUuid0,
+        cmdName: "count",
+        cmd: {filter: countFilter},
+    };
     numSamplesColl0++;
 
     const distinctFilter = {x: 2, sampleNum: ++sampleNum};
@@ -188,12 +207,21 @@ function runTest(conn, {rst, st}) {
         // or above (with binary version 7.3 or above implied).
         const getFCVDoc = () => {
             if (st) {
-                return assert.commandWorked(st.shard0.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+                return assert.commandWorked(
+                    st.shard0.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+                );
             } else {
-                return assert.commandWorked(testDb.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+                return assert.commandWorked(
+                    testDb.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+                );
             }
         };
-        if (MongoRunner.compareBinVersions(getFCVDoc().featureCompatibilityVersion.version, "7.3") >= 0) {
+        if (
+            MongoRunner.compareBinVersions(
+                getFCVDoc().featureCompatibilityVersion.version,
+                "7.3",
+            ) >= 0
+        ) {
             jsTestLog("Test bulkWrite command for sampling");
             const bulkWriteCmdObj = {
                 bulkWrite: 1,
@@ -212,7 +240,10 @@ function runTest(conn, {rst, st}) {
         }
     }
 
-    jsTest.log("Test running a $listSampledQueries aggregate command that doesn't involve " + "getMore commands");
+    jsTest.log(
+        "Test running a $listSampledQueries aggregate command that doesn't involve " +
+            "getMore commands",
+    );
     // Verify samples on both collections.
     assert.soon(() => {
         actualSamples = adminDb.aggregate([{$listSampledQueries: {}}, {$sort: {ns: 1}}]).toArray();
@@ -246,14 +277,18 @@ function runTest(conn, {rst, st}) {
         QuerySamplingUtil.assertSubObject(sample, expectedSamples[getSampleNum(sample)]);
     });
 
-    jsTest.log("Test running a $listSampledQueries aggregate command that involves getMore " + "commands");
+    jsTest.log(
+        "Test running a $listSampledQueries aggregate command that involves getMore " + "commands",
+    );
     // Make the number of sampled queries larger than the batch size so that getMore commands are
     // required when $listSampledQueries is run.
     const batchSize = 101;
     for (let i = 0; i < 250; i++) {
         const sign = i % 2 == 0 ? 1 : -1;
         const findFilter = {x: sign * 7, sampleNum: ++sampleNum};
-        assert.commandWorked(testDb.runCommand({find: collName1, filter: findFilter, collation: {}}));
+        assert.commandWorked(
+            testDb.runCommand({find: collName1, filter: findFilter, collation: {}}),
+        );
         expectedSamples[sampleNum] = {
             ns: ns1,
             collectionUuid: collUuid1,
@@ -331,7 +366,9 @@ if (!TestData.auth) {
     const primary = rst.getPrimary();
     const adminDb = primary.getDB("admin");
 
-    assert.commandWorked(adminDb.runCommand({createUser: "user_monitor", pwd: "pwd", roles: ["clusterMonitor"]}));
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "user_monitor", pwd: "pwd", roles: ["clusterMonitor"]}),
+    );
     assert(adminDb.auth("user_monitor", "pwd"));
     assert.commandFailedWithCode(
         adminDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}),

@@ -40,7 +40,10 @@ describe("SERVER-119744 race condition: step-down during setProfilingLevel", fun
     it("should expose the race condition: unreplicated database created after step-down", function () {
         // Pause _applyProfilingLevel after canAcceptNonLocalWrites() returns true but
         // before openDb() runs, artificially widening the race window.
-        const fp = configureFailPoint(originalPrimary, "hangAfterCanAcceptNonLocalWritesCheckInProfile");
+        const fp = configureFailPoint(
+            originalPrimary,
+            "hangAfterCanAcceptNonLocalWritesCheckInProfile",
+        );
 
         // Run setProfilingLevel in a parallel shell — it will block at the failpoint.
         const runProfileCmd = function (port, targetDbName) {

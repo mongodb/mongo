@@ -29,11 +29,17 @@ const mapReduceCmd = {
 };
 
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: memoryLimitMb * 1024 * 1024}),
+    db.adminCommand({
+        setParameter: 1,
+        internalDocumentSourceGroupMaxMemoryBytes: memoryLimitMb * 1024 * 1024,
+    }),
 );
 
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: false}));
-assert.commandFailedWithCode(db.runCommand(mapReduceCmd), ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+assert.commandFailedWithCode(
+    db.runCommand(mapReduceCmd),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
 
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
 const res = assert.commandWorked(db.runCommand(mapReduceCmd));

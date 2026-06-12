@@ -14,7 +14,10 @@ let conn = MongoRunner.runMongod({
 let cmdOut = conn.getDB("admin").runCommand({getParameter: 1, authenticationMechanisms: 1});
 if (cmdOut.ok) {
     MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, setParameter: "authenticationMechanisms=MONGODB-X509"});
+    conn = MongoRunner.runMongod({
+        restart: conn,
+        setParameter: "authenticationMechanisms=MONGODB-X509",
+    });
     let external = conn.getDB("$external");
 
     // Add user using localhost exception
@@ -36,10 +39,16 @@ if (cmdOut.ok) {
         "read without login",
     );
 
-    assert(external.auth({user: CLIENT_USER, mechanism: "MONGODB-X509"}), "authentication with valid user failed");
+    assert(
+        external.auth({user: CLIENT_USER, mechanism: "MONGODB-X509"}),
+        "authentication with valid user failed",
+    );
     MongoRunner.stopMongod(conn);
 
-    conn = MongoRunner.runMongod({restart: conn, setParameter: "authenticationMechanisms=SCRAM-SHA-1"});
+    conn = MongoRunner.runMongod({
+        restart: conn,
+        setParameter: "authenticationMechanisms=SCRAM-SHA-1",
+    });
     external = conn.getDB("$external");
 
     assert(

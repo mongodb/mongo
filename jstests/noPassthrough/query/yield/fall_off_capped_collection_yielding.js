@@ -9,7 +9,9 @@ const testDB = conn.getDB("test");
 const coll = testDB.fall_off_capped_collection_yielding;
 const kCollectionMaxSize = 20;
 coll.drop();
-assert.commandWorked(testDB.createCollection(coll.getName(), {capped: true, size: 4096, max: kCollectionMaxSize}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {capped: true, size: 4096, max: kCollectionMaxSize}),
+);
 
 // Insert 10 documents.
 const numDocs = 10;
@@ -24,14 +26,18 @@ assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryExecYiel
 // Set the yield MS counter to a very high value so that we never yield due to time.
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 50000}));
 
-const failPoint = configureFailPoint(testDB, "setYieldAllLocksHang", {namespace: coll.getFullName()});
+const failPoint = configureFailPoint(testDB, "setYieldAllLocksHang", {
+    namespace: coll.getFullName(),
+});
 let joinParallelShell = null;
 // We use this try/finally pattern to ensure that the fail point gets disabled even if the test
 // fails.
 try {
     // In a separate shell, run the query.
     joinParallelShell = startParallelShell(function () {
-        const err = assert.throws(() => printjson(db.fall_off_capped_collection_yielding.find().toArray()));
+        const err = assert.throws(() =>
+            printjson(db.fall_off_capped_collection_yielding.find().toArray()),
+        );
         assert.eq(err.code, ErrorCodes.CappedPositionLost);
     }, conn.port);
 

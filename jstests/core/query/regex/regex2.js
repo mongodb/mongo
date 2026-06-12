@@ -30,7 +30,11 @@ assert.eq(1, t.find({a: a}).count(), "C B");
 assert.eq(1, t.find({a: b}).count(), "C C");
 assert.eq(1, t.find({a: new RegExp(a)}).count(), "C D");
 assert.eq(1, t.find({a: new RegExp(b)}).count(), "C E");
-assert.eq(2, t.find({a: new RegExp(a, "i")}).count(), "C F is spidermonkey built with UTF-8 support?");
+assert.eq(
+    2,
+    t.find({a: new RegExp(a, "i")}).count(),
+    "C F is spidermonkey built with UTF-8 support?",
+);
 
 // same tests as above but using {$regex: "a|b", $options: "imx"} syntax.
 t.drop();
@@ -54,7 +58,11 @@ assert.commandWorked(t.save({a: b}));
 
 assert.eq(1, t.find({a: {$regex: a}}).count(), "obj C D");
 assert.eq(1, t.find({a: {$regex: b}}).count(), "obj C E");
-assert.eq(2, t.find({a: {$regex: a, $options: "i"}}).count(), "obj C F is spidermonkey built with UTF-8 support?");
+assert.eq(
+    2,
+    t.find({a: {$regex: a, $options: "i"}}).count(),
+    "obj C F is spidermonkey built with UTF-8 support?",
+);
 
 // Test s (DOT_ALL) option. Not supported with /regex/opts syntax
 t.drop();

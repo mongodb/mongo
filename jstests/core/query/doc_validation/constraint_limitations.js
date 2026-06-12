@@ -43,7 +43,9 @@ describe("constraint validationLevel", () => {
 
             createConstraintCollection();
             assert.commandFailed(myDb.runCommand({"collMod": collName, validationAction: "warn"}));
-            assert.commandWorked(myDb.runCommand({"collMod": collName, validationAction: "errorAndLog"}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, validationAction: "errorAndLog"}),
+            );
         });
 
         it("can be 'warn' for other validationLevels", () => {
@@ -97,7 +99,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
@@ -120,7 +124,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
@@ -143,7 +149,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -166,7 +174,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -186,7 +196,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -204,7 +216,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -223,7 +237,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -242,7 +258,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
@@ -261,7 +279,9 @@ describe("constraint validationLevel", () => {
                     writeConcern: {w: "majority"},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
@@ -280,7 +300,9 @@ describe("constraint validationLevel", () => {
                 }),
             );
             // Modifying the validationOptions here Implicitly sets the validationLevel to strict.
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -339,7 +361,9 @@ describe("constraint validationLevel", () => {
                     validator: {b: {$exists: true}},
                 }),
             );
-            assert.commandWorked(myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}));
+            assert.commandWorked(
+                myDb.runCommand({"collMod": collName, prepareConstraintValidationLevel: true}),
+            );
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,

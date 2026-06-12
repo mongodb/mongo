@@ -18,6 +18,9 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 assert.commandFailed(coll.runCommand("distinct", {help: helpFn, foo: 1}));
 assert.commandFailed(
-    coll.runCommand({explain: {distinct: coll.getName(), help: helpFn, foo: 1}, verbosity: "queryPlanner"}),
+    coll.runCommand({
+        explain: {distinct: coll.getName(), help: helpFn, foo: 1},
+        verbosity: "queryPlanner",
+    }),
 );
 st.stop();

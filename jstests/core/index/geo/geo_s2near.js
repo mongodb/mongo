@@ -13,7 +13,10 @@ let goldenPoint = {type: "Point", coordinates: [31.0, 41.0]};
 t.insert({geo: goldenPoint});
 t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 let resNear = t
-    .aggregate([{$geoNear: {near: [30, 40], distanceField: "d", spherical: true, includeLocs: "loc"}}, {$limit: 1}])
+    .aggregate([
+        {$geoNear: {near: [30, 40], distanceField: "d", spherical: true, includeLocs: "loc"}},
+        {$limit: 1},
+    ])
     .toArray();
 assert.eq(resNear.length, 1, tojson(resNear));
 assert.eq(resNear[0].loc, goldenPoint);
@@ -86,12 +89,18 @@ resNear = t.aggregate([
 assert.eq(res.itcount(), resNear.itcount(), "10");
 
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10);
-resNear = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10}]);
+resNear = t.aggregate([
+    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
+    {$limit: 10},
+]);
 assert.eq(res.itcount(), resNear.itcount(), "10");
 
 // Find all the points!
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
-resNear = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10000}]);
+resNear = t.aggregate([
+    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
+    {$limit: 10000},
+]);
 assert.eq(res.itcount(), resNear.itcount(), (2 * points * (2 * points)).toString());
 
 // longitude goes -180 to 180
@@ -103,7 +112,10 @@ t.insert({geo: {"type": "Point", "coordinates": [180, -90]}});
 t.insert({geo: {"type": "Point", "coordinates": [180, 90]}});
 t.insert({geo: {"type": "Point", "coordinates": [-180, 90]}});
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
-resNear = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10000}]);
+resNear = t.aggregate([
+    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
+    {$limit: 10000},
+]);
 assert.eq(res.itcount(), resNear.itcount(), (2 * points * (2 * points) + 4).toString());
 
 function testRadAndDegreesOK(distance) {

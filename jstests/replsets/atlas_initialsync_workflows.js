@@ -45,7 +45,11 @@ function testAddWithInitialSync(secondariesDown) {
     config.version += 1;
     jsTestLog("Reconfiguring set to add node.");
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: majorityDown,
+        }),
     );
 
     jsTestLog("Waiting for node to sync.");
@@ -56,12 +60,18 @@ function testAddWithInitialSync(secondariesDown) {
     config.version += 1;
     config.members[3].votes = 1;
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: majorityDown,
+        }),
     );
     if (!majorityDown) {
         // Make sure we can replicate to it.  This only works if the set was healthy, otherwise we
         // can't.
-        assert.commandWorked(testDb[testName].insert({addWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}));
+        assert.commandWorked(
+            testDb[testName].insert({addWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}),
+        );
         rst.awaitReplication(undefined, undefined, [newNode]);
     }
 
@@ -97,7 +107,10 @@ function testReplaceWithInitialSync(secondariesDown) {
         // majority, and thus the primary, if we have one node disconnected and another node
         // stopped.
         assert.commandWorked(
-            testDb[testName].insert({replaceWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}),
+            testDb[testName].insert(
+                {replaceWithInitialSync: secondariesDown},
+                {writeConcern: {w: 1}},
+            ),
         );
     }
 

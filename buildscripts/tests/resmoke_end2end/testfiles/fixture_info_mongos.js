@@ -4,5 +4,8 @@
     print("DEBUG BUILDINFO");
     printjson(db.adminCommand("buildInfo"));
 
-    writeFile(TestData.outputLocation, tojson(db.adminCommand("getCmdLineOpts")["parsed"]["setParameter"]));
+    writeFile(
+        TestData.outputLocation,
+        tojson(db.adminCommand("getCmdLineOpts")["parsed"]["setParameter"]),
+    );
 })();

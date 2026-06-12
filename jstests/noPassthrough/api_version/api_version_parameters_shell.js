@@ -48,15 +48,23 @@ function runShellWithScript(port, requireApiVersion, expectSuccess, script, api)
             ` requireApiVersion = ${requireApiVersion}, expectSuccess = ${expectSuccess}`,
     );
 
-    const result = runMongoProgram.apply(null, ["mongo", "--port", port, "--eval", script].concat(shellArgs || []));
+    const result = runMongoProgram.apply(
+        null,
+        ["mongo", "--port", port, "--eval", script].concat(shellArgs || []),
+    );
 
     if (expectSuccess) {
-        assert.eq(result, 0, `Error running shell with script ${tojson(script)} and args ${tojson(shellArgs)}`);
+        assert.eq(
+            result,
+            0,
+            `Error running shell with script ${tojson(script)} and args ${tojson(shellArgs)}`,
+        );
     } else {
         assert.neq(
             result,
             0,
-            `Unexpected success running shell with` + ` script ${tojson(script)} and args ${tojson(shellArgs)}`,
+            `Unexpected success running shell with` +
+                ` script ${tojson(script)} and args ${tojson(shellArgs)}`,
         );
     }
 }
@@ -79,13 +87,21 @@ function newMongo(port, requireApiVersion, expectSuccess, command, api) {
             ` requireApiVersion = ${requireApiVersion}, expectSuccess = ${expectSuccess}`,
     );
     if (expectSuccess) {
-        const m = new Mongo(`mongodb://localhost:${port}`, undefined /* encryptedDBClientCallback */, {api: api});
+        const m = new Mongo(
+            `mongodb://localhost:${port}`,
+            undefined /* encryptedDBClientCallback */,
+            {api: api},
+        );
         const reply = m.adminCommand(command);
         assert.commandWorked(reply, command);
     } else {
         let m;
         try {
-            m = new Mongo(`mongodb://localhost:${port}`, undefined /* encryptedDBClientCallback */, {api: api});
+            m = new Mongo(
+                `mongodb://localhost:${port}`,
+                undefined /* encryptedDBClientCallback */,
+                {api: api},
+            );
         } catch (e) {
             // The constructor threw, but we expected failure.
             print(e);
@@ -100,7 +116,9 @@ const mongod = MongoRunner.runMongod({verbose: 2});
 
 for (let [requireApiVersion, successExpected, command, api] of testCases) {
     const m = new Mongo(`localhost:${mongod.port}`, undefined, {api: {version: "1"}});
-    assert.commandWorked(m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}));
+    assert.commandWorked(
+        m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}),
+    );
 
     runShellWithCommand(mongod.port, requireApiVersion, successExpected, command, api);
     newMongo(mongod.port, requireApiVersion, successExpected, command, api);
@@ -108,7 +126,9 @@ for (let [requireApiVersion, successExpected, command, api] of testCases) {
 
 let m = new Mongo(`localhost:${mongod.port}`, undefined, {api: {version: "1"}});
 assert.commandWorked(
-    m.getDB("admin").runCommand({insert: "collection", documents: [{}, {}, {}, {}, {}, {}], apiVersion: "1"}),
+    m
+        .getDB("admin")
+        .runCommand({insert: "collection", documents: [{}, {}, {}, {}, {}, {}], apiVersion: "1"}),
 );
 
 for (let requireApiVersion of [false, true]) {
@@ -119,7 +139,9 @@ for (let requireApiVersion of [false, true]) {
         {version: "1", deprecationErrors: true},
         {version: "1", strict: true, deprecationErrors: true},
     ]) {
-        assert.commandWorked(m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}));
+        assert.commandWorked(
+            m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}),
+        );
 
         /*
          * Test getMore. Create a cursor with the right API version parameters. Use an explicit lsid
@@ -128,7 +150,9 @@ for (let requireApiVersion of [false, true]) {
         const lsid = UUID();
         const versionedConn = new Mongo(`localhost:${mongod.port}`, undefined, {api: api});
         const findReply = assert.commandWorked(
-            versionedConn.getDB("admin").runCommand({find: "collection", batchSize: 1, lsid: {id: lsid}}),
+            versionedConn
+                .getDB("admin")
+                .runCommand({find: "collection", batchSize: 1, lsid: {id: lsid}}),
         );
         const getMoreCmd = {
             getMore: findReply.cursor.id,
@@ -137,7 +161,13 @@ for (let requireApiVersion of [false, true]) {
             batchSize: 1,
         };
 
-        runShellWithCommand(mongod.port, requireApiVersion, true /* expectSuccess */, getMoreCmd, api);
+        runShellWithCommand(
+            mongod.port,
+            requireApiVersion,
+            true /* expectSuccess */,
+            getMoreCmd,
+            api,
+        );
         newMongo(mongod.port, requireApiVersion, true /* expectSuccess */, getMoreCmd, api);
 
         /*
@@ -145,7 +175,13 @@ for (let requireApiVersion of [false, true]) {
          */
         versionedConn.getDB("admin")["collection2"].insertMany([{}, {}]);
         const deleteScript = "db.getSiblingDB('admin').collection2.deleteOne({}, {w: 0});";
-        runShellWithScript(mongod.port, requireApiVersion, true /* expectSuccess */, deleteScript, api);
+        runShellWithScript(
+            mongod.port,
+            requireApiVersion,
+            true /* expectSuccess */,
+            deleteScript,
+            api,
+        );
         // The delete succeeds, collection2 had 2 records, it soon has 1. Use assert.soon since the
         // write is unacknowledged. Use countDocuments which is apiStrict-compatible.
         assert.soon(() => {
@@ -332,7 +368,9 @@ for (let requireApiVersion of [false, true]) {
         {version: "1", deprecationErrors: true},
         {version: "1", strict: true, deprecationErrors: true},
     ]) {
-        assert.commandWorked(m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}));
+        assert.commandWorked(
+            m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}),
+        );
 
         // Start a transaction with the right API version parameters. Use an explicit lsid to
         // override implicit session creation.
@@ -348,9 +386,20 @@ for (let requireApiVersion of [false, true]) {
             }),
         );
 
-        const continueCmd = {find: "collection", lsid: {id: lsid}, txnNumber: NumberLong(1), autocommit: false};
+        const continueCmd = {
+            find: "collection",
+            lsid: {id: lsid},
+            txnNumber: NumberLong(1),
+            autocommit: false,
+        };
 
-        runShellWithCommand(primaryPort, requireApiVersion, true /* expectSuccess */, continueCmd, api);
+        runShellWithCommand(
+            primaryPort,
+            requireApiVersion,
+            true /* expectSuccess */,
+            continueCmd,
+            api,
+        );
         newMongo(primaryPort, requireApiVersion, true /* expectSuccess */, continueCmd, api);
     }
 }

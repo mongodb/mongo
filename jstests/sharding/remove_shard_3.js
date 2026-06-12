@@ -9,7 +9,9 @@ TestData.skipCheckOrphans = true;
 
 let st = new ShardingTest({name: "remove_shard3", shards: 2, mongos: 2});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: "TestDB.Coll", middle: {_id: 0}}));
 
@@ -18,7 +20,12 @@ st.s0.getDB("TestDB").Coll.insert({_id: -1, value: "Negative value"});
 st.s0.getDB("TestDB").Coll.insert({_id: 1, value: "Positive value"});
 
 assert.commandWorked(
-    st.s0.adminCommand({moveChunk: "TestDB.Coll", find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}),
+    st.s0.adminCommand({
+        moveChunk: "TestDB.Coll",
+        find: {_id: 1},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 // Make sure both mongos instances know of the latest metadata
@@ -34,7 +41,12 @@ assert.eq("ongoing", removeRes.state);
 
 // Move the one chunk off st.shard1.shardName
 assert.commandWorked(
-    st.s0.adminCommand({moveChunk: "TestDB.Coll", find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}),
+    st.s0.adminCommand({
+        moveChunk: "TestDB.Coll",
+        find: {_id: 1},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 moveOutSessionChunks(st, st.shard1.shardName, st.shard0.shardName);

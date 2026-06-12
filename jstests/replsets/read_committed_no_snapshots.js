@@ -59,14 +59,17 @@ let lastOp = res["$replData"].lastOpVisible;
 
 // Timeout is based on heartbeat timeout.
 assert.commandWorked(
-    healthySecondary
-        .getDB(name)
-        .foo.runCommand("find", {"readConcern": {"level": "majority", "afterOpTime": lastOp}, "maxTimeMS": 10 * 1000}),
+    healthySecondary.getDB(name).foo.runCommand("find", {
+        "readConcern": {"level": "majority", "afterOpTime": lastOp},
+        "maxTimeMS": 10 * 1000,
+    }),
 );
 
 // Ensure maxTimeMS times out while waiting for this snapshot
 assert.commandFailedWithCode(
-    noSnapshotSecondary.getDB(name).foo.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
+    noSnapshotSecondary
+        .getDB(name)
+        .foo.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -79,7 +82,9 @@ primary = reconfig(replTest, config, true);
 
 // Ensure maxTimeMS times out while waiting for this snapshot
 assert.commandFailedWithCode(
-    primary.getSiblingDB(name).foo.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
+    primary
+        .getSiblingDB(name)
+        .foo.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
     ErrorCodes.MaxTimeMSExpired,
 );
 replTest.stopSet();

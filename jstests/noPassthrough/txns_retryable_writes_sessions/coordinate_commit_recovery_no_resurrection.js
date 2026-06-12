@@ -22,9 +22,15 @@ const collName = "coordinate_commit_recovery_no_resurrection";
 const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));

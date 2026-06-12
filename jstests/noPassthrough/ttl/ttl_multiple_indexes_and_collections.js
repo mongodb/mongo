@@ -56,7 +56,9 @@ function runTests(batchingEnabled) {
     // If batching is disabled, the TTL Monitor runs with legacy behavior, meaning the concept of a
     // sub-pass, 'ttlMonitorSubPassTargetSecs', and 'ttlIndexDeleteTargetDocs' hold no meaning.
     jsTest.log(`Running TTL tests with batching enabled? ${batchingEnabled}`);
-    assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, ttlMonitorBatchDeletes: batchingEnabled}));
+    assert.commandWorked(
+        conn.getDB("admin").runCommand({setParameter: 1, ttlMonitorBatchDeletes: batchingEnabled}),
+    );
 
     // Test two TTL indexes on the same collection.
     {
@@ -85,7 +87,9 @@ function runTests(batchingEnabled) {
         });
 
         // The server status logged may be stale by the next operation.
-        jsTest.log(`TTL indexes on same collection -- TTL server status 0: ${tojson(db.serverStatus().metrics.ttl)}`);
+        jsTest.log(
+            `TTL indexes on same collection -- TTL server status 0: ${tojson(db.serverStatus().metrics.ttl)}`,
+        );
 
         // At a minimum, a sub-pass has removed expired documents on indexKeyY. Insert more expired
         // documents to show the TTL Monitor eventually deletes more on indexKeyY. Note - it is
@@ -95,11 +99,14 @@ function runTests(batchingEnabled) {
 
         assert.soon(() => {
             return (
-                collA.find({"info": xExpiredInfo}).itcount() == 0 && collA.find({"info": yExpiredInfo}).itcount() == 0
+                collA.find({"info": xExpiredInfo}).itcount() == 0 &&
+                collA.find({"info": yExpiredInfo}).itcount() == 0
             );
         });
 
-        jsTest.log(`TTL indexes on same collection -- TTL server status 1: ${tojson(db.serverStatus().metrics.ttl)}`);
+        jsTest.log(
+            `TTL indexes on same collection -- TTL server status 1: ${tojson(db.serverStatus().metrics.ttl)}`,
+        );
     }
 
     // Test TTL indexes on different collections.

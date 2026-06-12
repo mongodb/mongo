@@ -43,7 +43,9 @@ describe("QueryShapeHash in slow logs", function () {
 
     after(function () {
         // Restore the default slow query logging threshold.
-        assert.commandWorked(db.runCommand({profile: profilingStatus.was, slowms: profilingStatus.slowms}));
+        assert.commandWorked(
+            db.runCommand({profile: profilingStatus.was, slowms: profilingStatus.slowms}),
+        );
     });
 
     /**
@@ -99,7 +101,10 @@ describe("QueryShapeHash in slow logs", function () {
 
         // Get query shape hash from slow query log.
         let slowLogsCount = 1;
-        const slowLogQueryShapeHash = assertQueryShapeHashFromSlowLogs(query.comment, slowLogsCount);
+        const slowLogQueryShapeHash = assertQueryShapeHashFromSlowLogs(
+            query.comment,
+            slowLogsCount,
+        );
 
         // If cursor is still present, issue a getMore and check for query shape hash being
         // reported.
@@ -135,7 +140,9 @@ describe("QueryShapeHash in slow logs", function () {
     });
 
     it("should be reported for distinct commands", function () {
-        const comment = makeUniqueComment("Query shape hash in slow query logs test. Distinct query.");
+        const comment = makeUniqueComment(
+            "Query shape hash in slow query logs test. Distinct query.",
+        );
         const query = qsutils.makeDistinctQueryInstance({
             key: "x",
             query: {x: 4},
@@ -145,7 +152,9 @@ describe("QueryShapeHash in slow logs", function () {
     });
 
     it("should be reported for aggregate and getMore commands", function () {
-        const comment = makeUniqueComment("Query shape hash in slow query logs test. Aggregate query.");
+        const comment = makeUniqueComment(
+            "Query shape hash in slow query logs test. Aggregate query.",
+        );
         const query = qsutils.makeAggregateQueryInstance({
             pipeline: [{$match: {x: 4}}],
             cursor: {

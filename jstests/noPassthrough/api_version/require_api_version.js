@@ -26,23 +26,43 @@ function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) 
     // Create a collection and do some writes with writeConcern majority.
     const collName = "testColl";
     assert.commandWorked(db.runCommand({create: collName, apiVersion: "1", writeConcern}));
-    assert.commandWorked(db.runCommand({insert: collName, documents: [{a: 1, b: 2}], apiVersion: "1", writeConcern}));
+    assert.commandWorked(
+        db.runCommand({insert: collName, documents: [{a: 1, b: 2}], apiVersion: "1", writeConcern}),
+    );
 
     // User management commands loop back into the system so make sure they set apiVersion
     // internally
     assert.commandWorked(
-        db.adminCommand({createRole: "testRole", apiVersion: "1", writeConcern, privileges: [], roles: []}),
+        db.adminCommand({
+            createRole: "testRole",
+            apiVersion: "1",
+            writeConcern,
+            privileges: [],
+            roles: [],
+        }),
     );
     assert.commandWorked(db.adminCommand({dropRole: "testRole", apiVersion: "1", writeConcern}));
 
     /*
      * "getMore" accepts apiVersion.
      */
-    assert.commandWorked(db.runCommand({insert: "collection", documents: [{}, {}, {}], apiVersion: "1", writeConcern}));
+    assert.commandWorked(
+        db.runCommand({
+            insert: "collection",
+            documents: [{}, {}, {}],
+            apiVersion: "1",
+            writeConcern,
+        }),
+    );
     let reply = db.runCommand({find: "collection", batchSize: 1, apiVersion: "1"});
     assert.commandWorked(reply);
-    assert.commandFailedWithCode(db.runCommand({getMore: reply.cursor.id, collection: "collection"}), 498870);
-    assert.commandWorked(db.runCommand({getMore: reply.cursor.id, collection: "collection", apiVersion: "1"}));
+    assert.commandFailedWithCode(
+        db.runCommand({getMore: reply.cursor.id, collection: "collection"}),
+        498870,
+    );
+    assert.commandWorked(
+        db.runCommand({getMore: reply.cursor.id, collection: "collection", apiVersion: "1"}),
+    );
 
     if (supportsTransactions) {
         /*
@@ -93,12 +113,21 @@ function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) 
         );
 
         assert.commandFailedWithCode(
-            sessionDb.runCommand({commitTransaction: 1, txnNumber: NumberLong(1), autocommit: false}),
+            sessionDb.runCommand({
+                commitTransaction: 1,
+                txnNumber: NumberLong(1),
+                autocommit: false,
+            }),
             498870,
         );
 
         assert.commandWorked(
-            sessionDb.runCommand({commitTransaction: 1, apiVersion: "1", txnNumber: NumberLong(1), autocommit: false}),
+            sessionDb.runCommand({
+                commitTransaction: 1,
+                apiVersion: "1",
+                txnNumber: NumberLong(1),
+                autocommit: false,
+            }),
         );
 
         // Start a new txn so we can test abortTransaction.
@@ -112,30 +141,53 @@ function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) 
         });
         assert.commandWorked(reply);
         assert.commandFailedWithCode(
-            sessionDb.runCommand({abortTransaction: 1, txnNumber: NumberLong(2), autocommit: false}),
+            sessionDb.runCommand({
+                abortTransaction: 1,
+                txnNumber: NumberLong(2),
+                autocommit: false,
+            }),
             498870,
         );
         assert.commandWorked(
-            sessionDb.runCommand({abortTransaction: 1, apiVersion: "1", txnNumber: NumberLong(2), autocommit: false}),
+            sessionDb.runCommand({
+                abortTransaction: 1,
+                apiVersion: "1",
+                txnNumber: NumberLong(2),
+                autocommit: false,
+            }),
         );
     }
 
-    assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+    assert.commandWorked(
+        db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}),
+    );
     for (const secondary of secondaries) {
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}),
+        );
     }
     assert.commandWorked(db.runCommand({ping: 1}));
 }
 
 function requireApiVersionOnShardOrConfigServerTest() {
     assert.throws(
-        () => MongoRunner.runMongod({shardsvr: "", replSet: "dummy", setParameter: {"requireApiVersion": true}}),
+        () =>
+            MongoRunner.runMongod({
+                shardsvr: "",
+                replSet: "dummy",
+                setParameter: {"requireApiVersion": true},
+            }),
         [],
         "mongod should not be able to start up with --shardsvr and requireApiVersion=true",
     );
 
     assert.throws(
-        () => MongoRunner.runMongod({configsvr: "", replSet: "dummy", setParameter: {"requireApiVersion": 1}}),
+        () =>
+            MongoRunner.runMongod({
+                configsvr: "",
+                replSet: "dummy",
+                setParameter: {"requireApiVersion": 1},
+            }),
         [],
         "mongod should not be able to start up with --configsvr and requireApiVersion=true",
     );
@@ -192,7 +244,10 @@ function checkLogsForHelloFromReplCoordExternNetwork(logs) {
 // with "majority" write concern in order to trigger internal commands to be sent from the secondary
 // to the primary.
 function requireApiVersionDropConnectionTest() {
-    const rst = new ReplSetTest({nodes: 3, nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 2})}}});
+    const rst = new ReplSetTest({
+        nodes: 3,
+        nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 2})}},
+    });
     rst.startSet();
     rst.initiate();
     const db = rst.getPrimary().getDB("admin");
@@ -231,13 +286,20 @@ function requireApiVersionDropConnectionTest() {
     let logs = assert.commandWorked(db.adminCommand({getLog: "global", apiVersion: "1"})).log;
     assert(checkLogsForHelloFromReplCoordExternNetwork(logs));
 
-    assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+    assert.commandWorked(
+        db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}),
+    );
     for (const secondary of rst.getSecondaries()) {
-        assert.commandWorked(secondary.adminCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+        assert.commandWorked(
+            secondary.adminCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}),
+        );
     }
 
     assert.commandWorked(
-        db.runCommand({configureFailPoint: "connectionPoolDropConnectionsBeforeGetConnection", mode: "off"}),
+        db.runCommand({
+            configureFailPoint: "connectionPoolDropConnectionsBeforeGetConnection",
+            mode: "off",
+        }),
     );
     rst.stopSet();
 }

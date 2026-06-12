@@ -10,7 +10,10 @@
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mockPlanShardedSearchResponse, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mockPlanShardedSearchResponse,
+    MongotMock,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {prepCollection, prepMongotResponse} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
@@ -30,7 +33,12 @@ function runStandaloneTest(stageRegex, pipeline, expectedCommand) {
 
     const collectionUUID = getUUIDFromListCollections(conn.getDB(dbName), collName);
     expectedCommand["collectionUUID"] = collectionUUID;
-    const expected = prepMongotResponse(expectedCommand, coll, mongotConn, NumberLong(123) /* cursorId */);
+    const expected = prepMongotResponse(
+        expectedCommand,
+        coll,
+        mongotConn,
+        NumberLong(123) /* cursorId */,
+    );
 
     // Simulate a case where mongot closes the connection after getting a command.
     // Mongod should retry the command and succeed.
@@ -61,7 +69,11 @@ const searchQuery = {
     query: "cakes",
     path: "title",
 };
-runStandaloneTest(/\$search/, [{$search: searchQuery}], {search: collName, query: searchQuery, $db: dbName});
+runStandaloneTest(/\$search/, [{$search: searchQuery}], {
+    search: collName,
+    query: searchQuery,
+    $db: dbName,
+});
 
 const vectorSearchQuery = {
     queryVector: [1.0, 2.0, 3.0],
@@ -133,9 +145,14 @@ const shard_mongot_conn = stWithMock.getMockConnectedToHost(shardPrimary).getCon
 
     // Error on retry should be propogated out to client.
     let coll = mongos.getDB(dbName).getCollection(collName);
-    const result = assert.throws(() => coll.aggregate([{$search: searchQuery}], {cursor: {batchSize: 2}}));
+    const result = assert.throws(() =>
+        coll.aggregate([{$search: searchQuery}], {cursor: {batchSize: 2}}),
+    );
     assert(isNetworkError(result));
-    assert(/planShardedSearch/.test(result), `Error wasn't due to planShardedSearch failing: ${result}`);
+    assert(
+        /planShardedSearch/.test(result),
+        `Error wasn't due to planShardedSearch failing: ${result}`,
+    );
 }
 
 stWithMock.stop();

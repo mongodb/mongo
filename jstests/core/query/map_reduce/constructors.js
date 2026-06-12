@@ -72,7 +72,9 @@ function mapReduceConstructorTest(constructorList) {
             const r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
 
             out.drop();
-            assert.commandWorked(t.mapReduce(m, r, {out: {merge: "map_reduce_constructors_out"}, scope: {xx: 1}}));
+            assert.commandWorked(
+                t.mapReduce(m, r, {out: {merge: "map_reduce_constructors_out"}, scope: {xx: 1}}),
+            );
         } catch (e) {
             throw "valid constructor: " + constructor + " failed in mapReduce context: " + e;
         }
@@ -140,7 +142,10 @@ let dbrefConstructors = {
 };
 
 let dbpointerConstructors = {
-    "valid": ['DBPointer("namespace", ObjectId())', 'DBPointer("namespace", ObjectId("000000000000000000000000"))'],
+    "valid": [
+        'DBPointer("namespace", ObjectId())',
+        'DBPointer("namespace", ObjectId("000000000000000000000000"))',
+    ],
     "invalid": [
         "DBPointer()",
         "DBPointer(true, ObjectId())",

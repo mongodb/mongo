@@ -13,7 +13,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: 1,
-    nodeOptions: {setParameter: {featureFlagPathArrayness: true, internalEnableJoinOptimization: true}},
+    nodeOptions: {
+        setParameter: {featureFlagPathArrayness: true, internalEnableJoinOptimization: true},
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -36,7 +38,10 @@ assert.commandWorked(regular.createIndex({dummy: 1, a: 1, b: 1}));
 
 function assertJoinOptNotUsed(coll, pipeline, msg) {
     const explain = coll.explain().aggregate(pipeline);
-    assert(!joinOptUsed(explain), `${msg}: expected join optimizer was used unexpectedly: ` + tojson(explain));
+    assert(
+        !joinOptUsed(explain),
+        `${msg}: expected join optimizer was used unexpectedly: ` + tojson(explain),
+    );
 }
 
 function assertJoinOptUsed(coll, pipeline, msg) {
@@ -45,7 +50,10 @@ function assertJoinOptUsed(coll, pipeline, msg) {
 }
 
 function lookupPipeline(foreignName) {
-    return [{$lookup: {from: foreignName, localField: "a", foreignField: "a", as: "joined"}}, {$unwind: "$joined"}];
+    return [
+        {$lookup: {from: foreignName, localField: "a", foreignField: "a", as: "joined"}},
+        {$unwind: "$joined"},
+    ];
 }
 
 // Test a given "ineligible" collection both as the local side and the foreign side of a join.
@@ -62,7 +70,9 @@ function testIneligibleCollection({coll, label}) {
     const tsName = "ts_coll";
     testDB[tsName].drop();
     // Note: fields "t" and "a" should both be indexed due to the nature of timeseries queries.
-    assert.commandWorked(testDB.createCollection(tsName, {timeseries: {timeField: "t", metaField: "a"}}));
+    assert.commandWorked(
+        testDB.createCollection(tsName, {timeseries: {timeField: "t", metaField: "a"}}),
+    );
     const ts = testDB[tsName];
     assert.commandWorked(
         ts.insert([
@@ -113,7 +123,9 @@ function testIneligibleCollection({coll, label}) {
 {
     const collationName = "collation_coll";
     testDB[collationName].drop();
-    assert.commandWorked(testDB.createCollection(collationName, {collation: {locale: "en_US", strength: 2}}));
+    assert.commandWorked(
+        testDB.createCollection(collationName, {collation: {locale: "en_US", strength: 2}}),
+    );
     const collated = testDB[collationName];
     assert.commandWorked(
         collated.insertMany([
@@ -131,7 +143,9 @@ function testIneligibleCollection({coll, label}) {
     const viewName = "view_coll";
     const view = testDB[viewName];
     view.drop();
-    assert.commandWorked(testDB.createView(viewName, regular.getName(), [{$match: {a: {$gte: 0}}}]));
+    assert.commandWorked(
+        testDB.createView(viewName, regular.getName(), [{$match: {a: {$gte: 0}}}]),
+    );
 
     // Can't use a view as a foreign collection.
     assertJoinOptNotUsed(regular, lookupPipeline(viewName), "foreign coll is a view");
@@ -210,7 +224,9 @@ function testIneligibleCollection({coll, label}) {
     });
 
     // But not if it is an ineligible pipeline prefix.
-    assert.commandWorked(testDB.createView("ineligibleView", regular.getName(), [{$group: {_id: "$a"}}]));
+    assert.commandWorked(
+        testDB.createView("ineligibleView", regular.getName(), [{$group: {_id: "$a"}}]),
+    );
     testIneligibleCollection({coll: testDB["ineligibleView"], label: "ineligible view"});
 }
 

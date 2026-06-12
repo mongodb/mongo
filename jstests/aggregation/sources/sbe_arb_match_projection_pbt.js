@@ -47,28 +47,32 @@ const correctnessProperty = createCorrectnessProperty(controlColl, experimentCol
 });
 
 // Lower the hash join threshold to increase the likelihood of hash joins being used.
-runWithParamsAllNonConfigNodes(db, {internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 100}, () => {
-    testProperty(
-        correctnessProperty,
-        {controlColl, experimentColl},
-        // Control collection is foreign side.
-        makeWorkloadModel({
-            collModel: getCollectionModel(),
-            aggModel: trySbeRestrictedPushdownEligibleAggModel(controlName),
-            numQueriesPerRun,
-        }),
-        numRuns,
-    );
+runWithParamsAllNonConfigNodes(
+    db,
+    {internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 100},
+    () => {
+        testProperty(
+            correctnessProperty,
+            {controlColl, experimentColl},
+            // Control collection is foreign side.
+            makeWorkloadModel({
+                collModel: getCollectionModel(),
+                aggModel: trySbeRestrictedPushdownEligibleAggModel(controlName),
+                numQueriesPerRun,
+            }),
+            numRuns,
+        );
 
-    testProperty(
-        correctnessProperty,
-        {controlColl, experimentColl},
-        // Experiment collection is foreign side.
-        makeWorkloadModel({
-            collModel: getCollectionModel(),
-            aggModel: trySbeRestrictedPushdownEligibleAggModel(experimentName),
-            numQueriesPerRun,
-        }),
-        numRuns,
-    );
-});
+        testProperty(
+            correctnessProperty,
+            {controlColl, experimentColl},
+            // Experiment collection is foreign side.
+            makeWorkloadModel({
+                collModel: getCollectionModel(),
+                aggModel: trySbeRestrictedPushdownEligibleAggModel(experimentName),
+                numQueriesPerRun,
+            }),
+            numRuns,
+        );
+    },
+);

@@ -76,7 +76,10 @@ function assertPipelineOptimization(pipeline, expectedStageSequence) {
 
     if (explain.hasOwnProperty("shards")) {
         for (const shardName in explain.shards) {
-            let stageSequenceTuple = getStageSequenceToCompare(explain.shards[shardName], queryEngine);
+            let stageSequenceTuple = getStageSequenceToCompare(
+                explain.shards[shardName],
+                queryEngine,
+            );
             assert.eq(stageSequenceTuple[0], expectedStageSequence[stageSequenceTuple[1]], explain);
         }
     } else {
@@ -103,7 +106,11 @@ assert.commandWorked(coll.insert({_id: 20, d: 2}));
 // Asserts that a sequence of stages group, project, match over a rename on a dotted path (depth
 // 3) will push the predicate before the group stage.
 assertPipelineOptimizationAndResult({
-    pipeline: [{$group: {_id: {c: "$d"}, c: {$sum: {$const: 1}}}}, {$project: {m: "$_id.c"}}, {$match: {m: {$eq: 2}}}],
+    pipeline: [
+        {$group: {_id: {c: "$d"}, c: {$sum: {$const: 1}}}},
+        {$project: {m: "$_id.c"}},
+        {$match: {m: {$eq: 2}}},
+    ],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$project"],
         [MultiStageClassic]: ["$cursor", "$group", "$project"],
@@ -148,7 +155,11 @@ assertPipelineOptimizationAndResult({
 // Asserts that the optimization over group, addFields, match over a renamed dotted path will not
 // lose other dependencies between stages.
 assertPipelineOptimizationAndResult({
-    pipeline: [{$group: {_id: "$d", c: {$sum: {$const: 1}}}}, {$addFields: {c: "$_id"}}, {$match: {c: {$eq: 2}}}],
+    pipeline: [
+        {$group: {_id: "$d", c: {$sum: {$const: 1}}}},
+        {$addFields: {c: "$_id"}},
+        {$match: {c: {$eq: 2}}},
+    ],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$addFields"],
         [MultiStageClassic]: ["$cursor", "$group", "$addFields"],
@@ -158,9 +169,15 @@ assertPipelineOptimizationAndResult({
 });
 
 assertPipelineOptimizationAndResult({
-    pipeline: [{$group: {_id: "$d", c: {$sum: {$const: 1}}}}, {$addFields: {d: "$c"}}, {$match: {d: {$eq: 1}}}],
+    pipeline: [
+        {$group: {_id: "$d", c: {$sum: {$const: 1}}}},
+        {$addFields: {d: "$c"}},
+        {$match: {d: {$eq: 1}}},
+    ],
     expectedStageSequence: {
-        [MultiStageSBE]: sbeNonLeadingMatchEnabled ? ["$cursor", "$addFields"] : ["$cursor", "$match", "$addFields"],
+        [MultiStageSBE]: sbeNonLeadingMatchEnabled
+            ? ["$cursor", "$addFields"]
+            : ["$cursor", "$match", "$addFields"],
         [MultiStageClassic]: ["$cursor", "$group", "$match", "$addFields"],
         [SingleStage]: ["PROJECTION_DEFAULT", "MATCH", "GROUP", "COLLSCAN"],
     },
@@ -197,7 +214,10 @@ assertQueryResult([{$match: {"a.b": {$exists: false}}}, {$group: {_id: "$a.b"}}]
 coll.drop();
 assert.commandWorked(coll.insert([{_id: 1, a: [{b: [{c: null}]}]}]));
 assertQueryResult([{$group: {_id: "$a.b"}}, {$match: {"_id.c": {$exists: true}}}], []);
-assertQueryResult([{$match: {"a.b.c": {$exists: true}}}, {$group: {_id: "$a.b"}}], [{_id: [[{c: null}]]}]);
+assertQueryResult(
+    [{$match: {"a.b.c": {$exists: true}}}, {$group: {_id: "$a.b"}}],
+    [{_id: [[{c: null}]]}],
+);
 
 coll.drop();
 assert.commandWorked(
@@ -207,7 +227,10 @@ assert.commandWorked(
     ]),
 );
 assertQueryResult([{$group: {_id: "$a"}}, {$match: {"_id.b": {$type: "long"}}}], []);
-assertQueryResult([{$match: {"a.b": {$type: "long"}}}, {$group: {_id: "$a"}}], [{_id: {b: NumberLong(1)}}]);
+assertQueryResult(
+    [{$match: {"a.b": {$type: "long"}}}, {$group: {_id: "$a"}}],
+    [{_id: {b: NumberLong(1)}}],
+);
 
 coll.drop();
 assert.commandWorked(
@@ -216,7 +239,10 @@ assert.commandWorked(
         {_id: 2, a: [{b: 5, c: NumberLong(1)}]},
     ]),
 );
-assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {b: 5, c: {$type: "long"}}}}}], []);
+assertQueryResult(
+    [{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {b: 5, c: {$type: "long"}}}}}],
+    [],
+);
 assertQueryResult(
     [{$match: {a: {$elemMatch: {b: 5, c: {$type: "long"}}}}}, {$group: {_id: "$a"}}],
     [{_id: [{b: 5, c: NumberLong(1)}]}],
@@ -230,7 +256,10 @@ assert.commandWorked(
     ]),
 );
 assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {$type: "long"}}}}], []);
-assertQueryResult([{$match: {a: {$elemMatch: {$type: "long"}}}}, {$group: {_id: "$a"}}], [{_id: [NumberLong(1)]}]);
+assertQueryResult(
+    [{$match: {a: {$elemMatch: {$type: "long"}}}}, {$group: {_id: "$a"}}],
+    [{_id: [NumberLong(1)]}],
+);
 
 coll.drop();
 assert.commandWorked(
@@ -240,6 +269,9 @@ assert.commandWorked(
     ]),
 );
 assertQueryResult([{$group: {_id: "$a"}}, {$match: {"_id.": {$type: "long"}}}], []);
-assertQueryResult([{$match: {"a.": {$type: "long"}}}, {$group: {_id: "$a"}}], [{_id: {"": NumberLong(1)}}]);
+assertQueryResult(
+    [{$match: {"a.": {$type: "long"}}}, {$group: {_id: "$a"}}],
+    [{_id: {"": NumberLong(1)}}],
+);
 
 MongoRunner.stopMongod(conn);

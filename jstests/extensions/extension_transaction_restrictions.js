@@ -130,7 +130,11 @@ describe("Extension stage transaction restrictions", function () {
         );
 
         // Verify the insert from the transaction was NOT committed (rolled back).
-        assert.eq(testColl.find({_id: 100}).itcount(), 0, "Transaction insert should have been rolled back");
+        assert.eq(
+            testColl.find({_id: 100}).itcount(),
+            0,
+            "Transaction insert should have been rolled back",
+        );
     });
 
     it("should abort transaction when extension stage fails with OperationNotSupportedInTransaction", function () {

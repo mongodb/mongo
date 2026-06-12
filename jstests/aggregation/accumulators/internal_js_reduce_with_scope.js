@@ -28,7 +28,11 @@ function reduce(key, values) {
 const command = {
     aggregate: coll.getName(),
     cursor: {},
-    runtimeConstants: {localNow: new Date(), clusterTime: new Timestamp(0, 0), jsScope: {modulus: modulus}},
+    runtimeConstants: {
+        localNow: new Date(),
+        clusterTime: new Timestamp(0, 0),
+        jsScope: {modulus: modulus},
+    },
     pipeline: [
         {
             $group: {

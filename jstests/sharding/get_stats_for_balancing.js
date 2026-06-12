@@ -23,7 +23,11 @@ function getCollSizeBytes(ns, node, optUUID) {
     }
     assert.soon(() => {
         res = assert.commandWorkedOrFailedWithCode(
-            node.adminCommand({_shardsvrGetStatsForBalancing: 1, collections: collections, scaleFactor: 1}),
+            node.adminCommand({
+                _shardsvrGetStatsForBalancing: 1,
+                collections: collections,
+                scaleFactor: 1,
+            }),
             [ErrorCodes.NotYetInitialized],
         );
         return res.ok;
@@ -39,7 +43,9 @@ st.forEachConnection((shard) => {
 
 const dbName = "db";
 const db = st.getDB(dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 {
     // work on unsharded collections
@@ -67,7 +73,10 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: numDocs / 2}}));
 
 // Check the data size is correct before the chunk is moved
-assert.eq(kSizeSingleDocBytes * numDocs, getCollSizeBytes(coll.getFullName(), st.shard0.rs.getPrimary()));
+assert.eq(
+    kSizeSingleDocBytes * numDocs,
+    getCollSizeBytes(coll.getFullName(), st.shard0.rs.getPrimary()),
+);
 assert.eq(0, getCollSizeBytes(coll.getFullName(), st.shard1.rs.getPrimary()));
 
 {
@@ -87,7 +96,11 @@ assert.eq(0, getCollSizeBytes(coll.getFullName(), st.shard1.rs.getPrimary()));
 let beforeDeletionFailpoint = configureFailPoint(st.shard0, "hangBeforeDoingDeletion");
 let afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");
 assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: numDocs / 2}, to: st.shard1.shardName}),
+    db.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {_id: numDocs / 2},
+        to: st.shard1.shardName,
+    }),
 );
 
 const expectedShardSizeBytes = kSizeSingleDocBytes * (numDocs / 2);
@@ -101,7 +114,10 @@ for (let i = 0; i < numBatches; i++) {
     // Wait for failpoint and check num orphans
     beforeDeletionFailpoint.wait();
     st.forEachConnection((shard) => {
-        assert.eq(expectedShardSizeBytes, getCollSizeBytes(coll.getFullName(), shard.rs.getPrimary()));
+        assert.eq(
+            expectedShardSizeBytes,
+            getCollSizeBytes(coll.getFullName(), shard.rs.getPrimary()),
+        );
     });
     // Unset and reset failpoint without allowing any batches deleted in the meantime
     afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");

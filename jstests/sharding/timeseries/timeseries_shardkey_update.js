@@ -30,14 +30,26 @@ import {
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
-const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
+const docs = [
+    doc1_a_nofields,
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc5_b_f104,
+    doc6_c_f105,
+    doc7_c_f106,
+];
 
 setUpShardedCluster();
 
 (function testUpdateMultiModifyingShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
     // MaxKey).
-    const coll = prepareShardedCollection({collName: getCallerName(1), initialDocList: docs, includeMeta: true});
+    const coll = prepareShardedCollection({
+        collName: getCallerName(1),
+        initialDocList: docs,
+        includeMeta: true,
+    });
 
     // This update command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The owning
     // shard would be the shard that owns [MinKey, meta: "A"].
@@ -65,7 +77,11 @@ setUpShardedCluster();
 (function testUpdateOneModifyingShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
     // MaxKey).
-    const coll = prepareShardedCollection({collName: getCallerName(1), initialDocList: docs, includeMeta: true});
+    const coll = prepareShardedCollection({
+        collName: getCallerName(1),
+        initialDocList: docs,
+        includeMeta: true,
+    });
 
     // Update one command as retryable write can modify the shard key.
     const session = testDB.getMongo().startSession({retryWrites: true});
@@ -98,7 +114,11 @@ setUpShardedCluster();
 (function testFindOneAndUpdateModifyingMetaShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
     // MaxKey).
-    const coll = prepareShardedCollection({collName: getCallerName(1), initialDocList: docs, includeMeta: true});
+    const coll = prepareShardedCollection({
+        collName: getCallerName(1),
+        initialDocList: docs,
+        includeMeta: true,
+    });
 
     // TODO SERVER-114994 findAndModify support in UWE.
     // This findAndModify command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The
@@ -122,7 +142,11 @@ setUpShardedCluster();
     withTxnAndAutoRetryOnMongos(session, () => {
         const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
         assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
-        assert.eq(true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
+        assert.eq(
+            true,
+            res.lastErrorObject.updatedExisting,
+            "Expected existing document to be updated",
+        );
         const updatedDoc = Object.assign(doc5_b_f104, {[metaFieldName]: "A"});
         assert.docEq(updatedDoc, res.value, "Wrong new document");
         expectedDocs = docs.filter((doc) => doc._id !== 5);
@@ -135,7 +159,11 @@ setUpShardedCluster();
 (function testFindOneAndUpdateModifyingTimeShardKey() {
     // This will create a sharded collection with 2 chunks: [MinKey,
     // 'splitTimePointBetweenTwoShards') and ['splitTimePointBetweenTwoShards', MaxKey).
-    const coll = prepareShardedCollection({collName: getCallerName(1), initialDocList: docs, includeMeta: false});
+    const coll = prepareShardedCollection({
+        collName: getCallerName(1),
+        initialDocList: docs,
+        includeMeta: false,
+    });
 
     // This findAndModify command tries to update doc1_a_nofields into {_id: 1, tag: "A",
     // time: generateTimeValue(8)}. The owning shard would be the shard that owns [MinKey,
@@ -157,7 +185,11 @@ setUpShardedCluster();
     withTxnAndAutoRetryOnMongos(session, () => {
         const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
         assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
-        assert.eq(true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
+        assert.eq(
+            true,
+            res.lastErrorObject.updatedExisting,
+            "Expected existing document to be updated",
+        );
         assert.docEq(doc1_a_nofields, res.value, "Wrong old document");
     });
 

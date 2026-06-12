@@ -45,7 +45,9 @@ export var ApplyOpsInsertWriteConflictTest = function (options) {
         let probability = 5.0 / numOps;
 
         // Set up failpoint to trigger WriteConflictException during write operations.
-        assert.commandWorked(primaryDB.adminCommand({setParameter: 1, traceWriteConflictExceptions: true}));
+        assert.commandWorked(
+            primaryDB.adminCommand({setParameter: 1, traceWriteConflictExceptions: true}),
+        );
         assert.commandWorked(
             primaryDB.adminCommand({
                 configureFailPoint: "WTWriteConflictException",
@@ -54,7 +56,8 @@ export var ApplyOpsInsertWriteConflictTest = function (options) {
         );
 
         // This logs each operation being applied.
-        let previousLogLevel = assert.commandWorked(primaryDB.setLogLevel(3, "replication")).was.replication.verbosity;
+        let previousLogLevel = assert.commandWorked(primaryDB.setLogLevel(3, "replication")).was
+            .replication.verbosity;
 
         let applyOpsResult = primaryDB.adminCommand({applyOps: ops});
 

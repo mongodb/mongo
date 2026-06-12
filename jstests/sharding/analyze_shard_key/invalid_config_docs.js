@@ -22,7 +22,9 @@ function runAnalyzerDocTest(conn) {
     );
 
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
-    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}));
+    assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}),
+    );
     assert.commandFailedWithCode(
         configColl.update({}, {unknownField: 0}),
         ErrorCodes.IDLFailedToParse /* IDL required field error */,

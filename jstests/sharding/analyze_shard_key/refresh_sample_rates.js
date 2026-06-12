@@ -42,10 +42,18 @@ function testBasic(createConnFn, rst, samplerNames) {
 
     jsTest.log("Verifying that refreshing returns the correct configurations");
     assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", samplesPerSecond: samplesPerSecond0}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns0,
+            mode: "full",
+            samplesPerSecond: samplesPerSecond0,
+        }),
     );
     assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", samplesPerSecond: samplesPerSecond1}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns1,
+            mode: "full",
+            samplesPerSecond: samplesPerSecond1,
+        }),
     );
     const configColl = conn.getCollection("config.queryAnalyzers");
     const startTime0 = configColl.findOne({_id: ns0}).startTime;
@@ -216,12 +224,18 @@ function testFailover(createConnFn, rst, samplerNames) {
 
     jsTest.log("Verify that configurations are persisted and available after failover");
     assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: "full",
+            samplesPerSecond: samplesPerSecond,
+        }),
     );
     const configColl = conn.getCollection("config.queryAnalyzers");
     const startTime = configColl.findOne({_id: ns}).startTime;
 
-    assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
     primary = rst.getPrimary();
     conn = createConnFn();
@@ -265,7 +279,11 @@ function testRestart(createConnFn, rst, samplerNames) {
 
     jsTest.log("Verify that configurations are persisted and available after restart");
     assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}),
+        conn.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: "full",
+            samplesPerSecond: samplesPerSecond,
+        }),
     );
     const configColl = conn.getCollection("config.queryAnalyzers");
     const startTime = configColl.findOne({_id: ns}).startTime;
@@ -301,7 +319,9 @@ function testRestart(createConnFn, rst, samplerNames) {
 function runTest(createConnFn, rst, samplerNames) {
     testBasic(createConnFn, rst, samplerNames);
     // Verify that query distribution info is reset upon stepup.
-    assert.commandWorked(rst.getPrimary().adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        rst.getPrimary().adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     testBasic(createConnFn, rst, samplerNames);
 
     testFailover(createConnFn, rst, samplerNames);
@@ -356,7 +376,8 @@ function runTest(createConnFn, rst, samplerNames) {
     });
 
     jsTest.log(
-        "Test that the _refreshQueryAnalyzerConfiguration command is supported on " + "configsvr primary mongod",
+        "Test that the _refreshQueryAnalyzerConfiguration command is supported on " +
+            "configsvr primary mongod",
     );
     runTest(() => st.s, st.configRS, samplerNames);
 
@@ -370,7 +391,10 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
     const samplerNames = rst.nodes.map((node) => node.host);
 
-    jsTest.log("Test that the _refreshQueryAnalyzerConfiguration command is not supported on " + "secondary mongod");
+    jsTest.log(
+        "Test that the _refreshQueryAnalyzerConfiguration command is not supported on " +
+            "secondary mongod",
+    );
     const cmdObj = {
         _refreshQueryAnalyzerConfiguration: 1,
         name: samplerNames[0].host,
@@ -380,7 +404,10 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
         assert.commandFailedWithCode(node.adminCommand(cmdObj), ErrorCodes.NotWritablePrimary);
     });
 
-    jsTest.log("Test that the _refreshQueryAnalyzerConfiguration command is supported on " + "primary mongod");
+    jsTest.log(
+        "Test that the _refreshQueryAnalyzerConfiguration command is supported on " +
+            "primary mongod",
+    );
     runTest(() => rst.getPrimary(), rst, samplerNames);
 
     rst.stopSet();

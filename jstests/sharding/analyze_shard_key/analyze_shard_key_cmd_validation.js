@@ -32,9 +32,14 @@ function testValidationBeforeMetricsCalculation(conn, mongodConn, validationTest
         );
     }
     for (let shardKey of validationTest.invalidShardKeyTestCases) {
-        jsTest.log(`Testing that the analyzeShardKey command fails if the shard key is invalid ${tojson({shardKey})}`);
+        jsTest.log(
+            `Testing that the analyzeShardKey command fails if the shard key is invalid ${tojson({shardKey})}`,
+        );
         const ns = validationTest.validDbName + "." + validationTest.validCollName;
-        assert.commandFailedWithCode(conn.adminCommand({analyzeShardKey: ns, key: shardKey}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(
+            conn.adminCommand({analyzeShardKey: ns, key: shardKey}),
+            ErrorCodes.BadValue,
+        );
     }
 
     fp.off();
@@ -90,7 +95,11 @@ function testValidationDuringKeyCharacteristicsMetricsCalculation(conn, validati
     assert.commandWorked(testColl.remove({}));
 }
 
-function testValidationDuringReadWriteDistributionMetricsCalculation(cmdConn, validationTest, aggConn) {
+function testValidationDuringReadWriteDistributionMetricsCalculation(
+    cmdConn,
+    validationTest,
+    aggConn,
+) {
     const dbName = validationTest.dbName;
     const collName = validationTest.collName;
     const ns = dbName + "." + collName;
@@ -105,7 +114,10 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(cmdConn, va
     // collection must have for the command to not fail to generate split points.
     const {docs, arrayFieldName} = validationTest.makeDocuments(10 * analyzeShardKeyNumRanges);
 
-    let fp = configureFailPoint(aggConn, "analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics");
+    let fp = configureFailPoint(
+        aggConn,
+        "analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics",
+    );
     let analyzeShardKeyFunc = (cmdHost, ns, arrayFieldName) => {
         const cmdConn = new Mongo(cmdHost);
         return cmdConn.adminCommand({
@@ -147,14 +159,18 @@ function testValidationOnShardedTimeseriesCollections(cmdConn, validationTest, p
     const testColl = testDB.getCollection(collName);
 
     const shards = cmdConn.getDB("config").shards.find().toArray();
-    assert.commandWorked(cmdConn.adminCommand({enableSharding: dbName, primaryShard: shards[0]._id}));
+    assert.commandWorked(
+        cmdConn.adminCommand({enableSharding: dbName, primaryShard: shards[0]._id}),
+    );
 
     // Create a normal collection, in order to bypass initial timeseries check for analyzeShardKey command.
     testColl.insert(docs);
     const failPoint = configureFailPoint(primaryShard, "analyzeShardKeyHangInClusterAggregate");
 
     // TODO SERVER-111315: for viewless timeseries we should get CollectionUUIDMismatch
-    const expectedError = areViewlessTimeseriesEnabled(cmdConn) ? 7826501 : ErrorCodes.CommandNotSupportedOnView;
+    const expectedError = areViewlessTimeseriesEnabled(cmdConn)
+        ? 7826501
+        : ErrorCodes.CommandNotSupportedOnView;
     // Start the analyzeShardKey command in parallel.
     const awaitResult = startParallelShell(
         funWithArgs(
@@ -170,7 +186,9 @@ function testValidationOnShardedTimeseriesCollections(cmdConn, validationTest, p
 
     // Recreate the original collection as timeseries collection in the middle of the request.
     testColl.drop();
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}),
+    );
     assert.commandWorked(testDB.adminCommand({shardCollection: ns, key: {time: 1}}));
 
     // Resume request with the collection changed to timeseries and expect the request to fail.
@@ -208,7 +226,11 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
     // Disable the calculation of all metrics to test validation at the start of the command.
     testValidationBeforeMetricsCalculation(st.s, shard0Primary, validationTest);
     testValidationDuringKeyCharacteristicsMetricsCalculation(st.s, validationTest);
-    testValidationDuringReadWriteDistributionMetricsCalculation(st.s, validationTest, shard0Primary);
+    testValidationDuringReadWriteDistributionMetricsCalculation(
+        st.s,
+        validationTest,
+        shard0Primary,
+    );
     testSettingInvalidNumRanges(shard0Primary);
     testValidationOnShardedTimeseriesCollections(st.s, validationTest, shard0Primary);
 

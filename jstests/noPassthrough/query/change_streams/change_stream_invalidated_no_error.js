@@ -13,7 +13,10 @@
  * ]
  */
 import {after, describe, it} from "jstests/libs/mochalite.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {ServerStatusMetrics} from "jstests/change_streams/change_stream_metrics_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

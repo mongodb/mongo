@@ -40,7 +40,10 @@ function checkServerStatus(
     // make it likely enough to catch bugs in most test runs.
     sleep(intervalMS * 2);
 
-    checkServerStatusNumCollsWithInconsistentIndexes(configPrimaryConn, expectedNumCollsWithInconsistentIndexes);
+    checkServerStatusNumCollsWithInconsistentIndexes(
+        configPrimaryConn,
+        expectedNumCollsWithInconsistentIndexes,
+    );
 
     // A config secondary should always report zero because only primaries run the aggregation to
     // find inconsistent indexes.
@@ -67,7 +70,9 @@ const filterExpr = {
     x: {$gt: 50},
 };
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns3, key: {_id: "hashed"}}));
@@ -76,7 +81,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns4, key: {_id: "hashed
 // Disable the check on one config secondary to verify this means metrics won't be shown in
 // serverStatus.
 assert.commandWorked(
-    st.config2.getDB("admin").runCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}),
+    st.config2
+        .getDB("admin")
+        .runCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}),
 );
 
 let configPrimaryConn = st.config0;
@@ -138,7 +145,9 @@ assert.commandWorked(
         .getCollection(ns3)
         .createIndex({y: 1}, {name: "indexWithDifferentOptions", expireAfterSeconds: expiration}),
 );
-assert.commandWorked(st.shard1.getCollection(ns3).createIndex({y: 1}, {name: "indexWithDifferentOptions"}));
+assert.commandWorked(
+    st.shard1.getCollection(ns3).createIndex({y: 1}, {name: "indexWithDifferentOptions"}),
+);
 checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsistencyMetrics, 3);
 
 // Create indexes where one is missing a property and verify this is considered inconsistent.
@@ -153,10 +162,14 @@ checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsi
 
 // Verify fields other than expireAfterSeconds and key are not ignored.
 assert.commandWorked(
-    st.shard0.getCollection(ns4).createIndex({z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$gt: 50}}}),
+    st.shard0
+        .getCollection(ns4)
+        .createIndex({z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$gt: 50}}}),
 );
 assert.commandWorked(
-    st.shard1.getCollection(ns4).createIndex({z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$lt: 100}}}),
+    st.shard1
+        .getCollection(ns4)
+        .createIndex({z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$lt: 100}}}),
 );
 checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsistencyMetrics, 4);
 

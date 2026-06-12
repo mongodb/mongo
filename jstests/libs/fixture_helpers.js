@@ -78,7 +78,10 @@ export var FixtureHelpers = (function () {
      * sharded.
      */
     function isSharded(coll) {
-        const collEntry = coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        const collEntry = coll
+            .getDB()
+            .getSiblingDB("config")
+            .collections.findOne({_id: coll.getFullName()});
         if (collEntry === null) {
             return false;
         }
@@ -90,7 +93,10 @@ export var FixtureHelpers = (function () {
      * unsplittable.
      */
     function isUnsplittable(coll) {
-        const collEntry = coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        const collEntry = coll
+            .getDB()
+            .getSiblingDB("config")
+            .collections.findOne({_id: coll.getFullName()});
         if (collEntry === null) {
             return false;
         }
@@ -121,7 +127,10 @@ export var FixtureHelpers = (function () {
     }
 
     function maySkipImplicitSharding() {
-        return typeof TestData.shardCollectionProbability !== "undefined" && TestData.shardCollectionProbability < 1;
+        return (
+            typeof TestData.shardCollectionProbability !== "undefined" &&
+            TestData.shardCollectionProbability < 1
+        );
     }
 
     /**
@@ -134,14 +143,21 @@ export var FixtureHelpers = (function () {
                 .collections.aggregate([
                     {$match: {_id: coll.getFullName()}},
                     {
-                        $lookup: {from: "chunks", localField: "uuid", foreignField: "uuid", as: "chunks"},
+                        $lookup: {
+                            from: "chunks",
+                            localField: "uuid",
+                            foreignField: "uuid",
+                            as: "chunks",
+                        },
                     },
                     {$group: {_id: "$chunks.shard"}},
                 ])
                 .toArray();
             return res.map((x) => x._id).flat();
         } else {
-            const dbMetadata = db.getSiblingDB("config").databases.findOne({_id: coll.getDB().getName()});
+            const dbMetadata = db
+                .getSiblingDB("config")
+                .databases.findOne({_id: coll.getDB().getName()});
             return dbMetadata ? [dbMetadata.primary] : [];
         }
     }
@@ -173,7 +189,12 @@ export var FixtureHelpers = (function () {
     }
 
     function getTopologyTime(db) {
-        const shards = db.getSiblingDB("config").shards.find({}).sort({"topologyTime": -1}).limit(1).toArray();
+        const shards = db
+            .getSiblingDB("config")
+            .shards.find({})
+            .sort({"topologyTime": -1})
+            .limit(1)
+            .toArray();
         if (!shards.length) {
             // In case we are on a replicaset config.shards is empty
             return Timestamp();
@@ -192,7 +213,9 @@ export var FixtureHelpers = (function () {
             // shard.
             return 1;
         }
-        const collMetadata = db.getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        const collMetadata = db
+            .getSiblingDB("config")
+            .collections.findOne({_id: coll.getFullName()});
         return db.getSiblingDB("config").chunks.distinct("shard", {uuid: collMetadata.uuid}).length;
     }
 
@@ -221,10 +244,14 @@ export var FixtureHelpers = (function () {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
 
             for (let shardObj of shardObjs) {
-                connList = connList.concat(getRequestedConns(new Mongo(shardObj.host, undefined, {gRPC: false})));
+                connList = connList.concat(
+                    getRequestedConns(new Mongo(shardObj.host, undefined, {gRPC: false})),
+                );
             }
         } else {
-            connList = getRequestedConns(new Mongo(db.getMongo().host, undefined, {gRPC: db.getMongo().isGRPC()}));
+            connList = getRequestedConns(
+                new Mongo(db.getMongo().host, undefined, {gRPC: db.getMongo().isGRPC()}),
+            );
         }
 
         return connList.map((conn) => func(conn.getDB(db.getName())));

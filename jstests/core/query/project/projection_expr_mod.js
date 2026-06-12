@@ -58,12 +58,16 @@ assert.commandFailedWithCode(error, 16610);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: NumberInt(10)}));
-error = assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberInt(0)]}, _id: 0, n: 1}).toArray());
+error = assert.throws(() =>
+    coll.find({}, {f: {$mod: ["$a", NumberInt(0)]}, _id: 0, n: 1}).toArray(),
+);
 assert.commandFailedWithCode(error, 16610);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: NumberLong(10)}));
-error = assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberLong(0)]}, _id: 0, n: 1}).toArray());
+error = assert.throws(() =>
+    coll.find({}, {f: {$mod: ["$a", NumberLong(0)]}, _id: 0, n: 1}).toArray(),
+);
 assert.commandFailedWithCode(error, 16610);
 
 // Clear collection again and reset.

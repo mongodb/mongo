@@ -49,7 +49,10 @@ function runTestOnFixtures(runQueriesAndCompareResults) {
         const st = new ShardingTest(Object.assign({shards: 2}));
         const testDB = st.s.getDB("test");
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: st.shard0.shardName,
+            }),
         );
         runQueriesAndCompareResults(st.s, false);
         st.stop();
@@ -79,7 +82,8 @@ function tests(conn, isStandalone) {
         const shards = explainResult.queryPlanner.winningPlan.shards; // May be undefined.
         jsTestLog(explainResult.queryPlanner.winningPlan);
         assert(
-            stage === "BATCHED_DELETE" || (stage === "SHARD_WRITE" && shards[0].winningPlan.stage === "BATCHED_DELETE"),
+            stage === "BATCHED_DELETE" ||
+                (stage === "SHARD_WRITE" && shards[0].winningPlan.stage === "BATCHED_DELETE"),
         );
         assert.commandWorked(testDb.c.remove({}));
         assert.eq(testDb.c.find().toArray(), []);

@@ -2,7 +2,10 @@
  * Utility functions for Markdown golden testing.
  */
 
-import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/query_optimization/golden_test.js";
+import {
+    normalizeArray,
+    tojsonMultiLineSortKeys,
+} from "jstests/libs/query_optimization/golden_test.js";
 import {code, codeOneLine, line, linebreak, subSection} from "jstests/libs/query/pretty_md.js";
 import {
     formatExplainRoot,
@@ -94,7 +97,12 @@ export function outputCountPlanAndResults(coll, cmdObj, explain, expected, actua
 
     assert.eq(actualCount, executionStages.nCounted);
 
-    outputCommonPlanAndResults(coll, {querySection: tojson(cmdObj), resultsSection: actualCount, explain, expected});
+    outputCommonPlanAndResults(coll, {
+        querySection: tojson(cmdObj),
+        resultsSection: actualCount,
+        explain,
+        expected,
+    });
 }
 
 /**
@@ -221,7 +229,9 @@ export function outputShardedFindSummaryAndResults(queryObj) {
     const explain = queryObj.explain();
     const winningPlan = explain.queryPlanner.winningPlan;
 
-    subSection(`Find : "${tojson(queryObj._filter)}", additional params: ${tojson(queryObj._additionalCmdParams)}`);
+    subSection(
+        `Find : "${tojson(queryObj._filter)}", additional params: ${tojson(queryObj._additionalCmdParams)}`,
+    );
 
     subSection("Stage");
     codeOneLine(winningPlan.stage);

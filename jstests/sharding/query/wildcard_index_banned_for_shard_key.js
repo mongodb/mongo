@@ -16,7 +16,12 @@ function assertCannotShardCollectionOnWildcardIndex(keyDoc) {
         ErrorCodes.InvalidOptions,
     );
 
-    assert.eq(mongos.getDB("config").collections.countDocuments({_id: `${kDbName}.foo`, unsplittable: {$ne: true}}), 0);
+    assert.eq(
+        mongos
+            .getDB("config")
+            .collections.countDocuments({_id: `${kDbName}.foo`, unsplittable: {$ne: true}}),
+        0,
+    );
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 }
 
@@ -31,7 +36,9 @@ assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1}));
 assertCannotShardCollectionOnWildcardIndex({a: 1});
 
 // Can't shard on a path supported by wildcard index with projection option.
-assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({"$**": 1}, {wildcardProjection: {a: 1}}));
+assert.commandWorked(
+    mongos.getDB(kDbName).foo.createIndex({"$**": 1}, {wildcardProjection: {a: 1}}),
+);
 assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1}));
 assertCannotShardCollectionOnWildcardIndex({a: 1});
 

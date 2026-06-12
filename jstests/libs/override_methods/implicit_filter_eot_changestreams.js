@@ -12,7 +12,14 @@ const endOfTransactionFilter = {
     $match: {operationType: {$ne: "endOfTransaction"}},
 };
 
-const runCommandWithPassthroughEotFilter = function (conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+const runCommandWithPassthroughEotFilter = function (
+    conn,
+    _dbName,
+    _commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (OverrideHelpers.isAggregationWithChangeStreamStage(_commandName, commandObj)) {
         const newPipeline = Object.assign([], commandObj.pipeline);
         newPipeline.splice(1, 0, endOfTransactionFilter);

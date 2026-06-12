@@ -33,7 +33,9 @@ function verifyClusterParameterReportedOnAllNodeTypes(expected) {
 
 verifyClusterParameterReportedOnAllNodeTypes(false);
 
-assert.commandWorked(st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
+assert.commandWorked(
+    st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}),
+);
 assert.commandWorked(st.s.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
 
 verifyClusterParameterReportedOnAllNodeTypes(true);

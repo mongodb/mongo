@@ -12,7 +12,9 @@ try {
     const dstNs = dbName + ".dst";
     const caseInsensitive = {locale: "en_US", strength: 2};
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     // Both directions of collation mismatch should fail.
     for (const [srcOpts, dstOpts] of [
@@ -23,7 +25,13 @@ try {
         dst.drop();
         assert.commandWorked(db.createCollection(src.getName(), srcOpts || {}));
         assert.commandWorked(db.createCollection(dst.getName(), dstOpts || {}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: dstNs, key: {sk: 1}, collation: {locale: "simple"}}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                shardCollection: dstNs,
+                key: {sk: 1},
+                collation: {locale: "simple"},
+            }),
+        );
         const err = assert.throws(() => src.aggregate({$merge: {into: dst.getName()}}));
         assert.commandFailedWithCode(err, [51183, 11749300]);
     }
@@ -33,7 +41,13 @@ try {
         dst.drop();
         assert.commandWorked(db.createCollection(src.getName(), {collation: caseInsensitive}));
         assert.commandWorked(db.createCollection(dst.getName(), {collation: caseInsensitive}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: dstNs, key: {sk: 1}, collation: {locale: "simple"}}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                shardCollection: dstNs,
+                key: {sk: 1},
+                collation: {locale: "simple"},
+            }),
+        );
         // TODO this should fail but it succeeds
         assert.doesNotThrow(() => src.aggregate({$merge: {into: dst.getName()}}));
     }
@@ -43,8 +57,16 @@ try {
         src.drop();
         dst.drop();
         assert.commandWorked(db.createCollection(dst.getName(), {collation: caseInsensitive}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: dstNs, key: {sk: 1}, collation: {locale: "simple"}}));
-        assert.commandWorked(dst.createIndex({sk: 1, k: 1}, {unique: true, collation: {locale: "simple"}}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                shardCollection: dstNs,
+                key: {sk: 1},
+                collation: {locale: "simple"},
+            }),
+        );
+        assert.commandWorked(
+            dst.createIndex({sk: 1, k: 1}, {unique: true, collation: {locale: "simple"}}),
+        );
         assert.commandWorked(db.createCollection(src.getName()));
         assert.commandWorked(src.insert({_id: "s1", sk: "a", k: "x"}));
         assert.commandWorked(dst.insert({_id: "d1", sk: "a", k: "y"}));
@@ -57,7 +79,11 @@ try {
         assert.commandWorked(db.createCollection(src.getName()));
         assert.commandWorked(db.createCollection(dst.getName(), {collation: caseInsensitive}));
         assert.commandWorked(
-            st.s.adminCommand({shardCollection: dstNs, key: {sk: 1, _id: 1}, collation: {locale: "simple"}}),
+            st.s.adminCommand({
+                shardCollection: dstNs,
+                key: {sk: 1, _id: 1},
+                collation: {locale: "simple"},
+            }),
         );
         const err = assert.throws(() => src.aggregate({$merge: {into: dst.getName()}}));
         assert.commandFailedWithCode(err, [51183, 11749300]);
@@ -70,9 +96,17 @@ try {
         assert.commandWorked(src.insert({_id: "a"}));
         assert.commandWorked(src.insert({_id: "A"}));
         assert.commandWorked(db.createCollection(dst.getName(), {collation: caseInsensitive}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: dstNs, key: {sk: 1}, collation: {locale: "simple"}}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                shardCollection: dstNs,
+                key: {sk: 1},
+                collation: {locale: "simple"},
+            }),
+        );
         assert.commandWorked(dst.insert({_id: "A"}));
-        const err = assert.throws(() => src.aggregate([{$merge: {into: dst.getName()}}], {collation: caseInsensitive}));
+        const err = assert.throws(() =>
+            src.aggregate([{$merge: {into: dst.getName()}}], {collation: caseInsensitive}),
+        );
         assert.commandFailedWithCode(err, ErrorCodes.ImmutableField);
     }
 

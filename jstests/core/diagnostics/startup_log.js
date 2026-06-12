@@ -31,13 +31,26 @@ function arrayIsSubset(smallArray, largeArray) {
 let stats = db.getSiblingDB("local").startup_log.stats();
 assert(stats.capped);
 
-let latestStartUpLog = db.getSiblingDB("local").startup_log.find().sort({$natural: -1}).limit(1).next();
+let latestStartUpLog = db
+    .getSiblingDB("local")
+    .startup_log.find()
+    .sort({$natural: -1})
+    .limit(1)
+    .next();
 let serverStatus = db._adminCommand("serverStatus");
 let cmdLine = db._adminCommand("getCmdLineOpts").parsed;
 
 // Test that the startup log has the expected keys
 let verbose = false;
-var expectedKeys = ["_id", "hostname", "startTime", "startTimeLocal", "cmdLine", "pid", "buildinfo"];
+var expectedKeys = [
+    "_id",
+    "hostname",
+    "startTime",
+    "startTimeLocal",
+    "cmdLine",
+    "pid",
+    "buildinfo",
+];
 var keys = Object.keySet(latestStartUpLog);
 assert(arrayEq(expectedKeys, keys, verbose), "startup_log keys failed");
 
@@ -50,8 +63,17 @@ let uptimeSinceEpochRounded = Math.floor(_idUptime / 1000) * 1000;
 let startTime = new Date(uptimeSinceEpochRounded); // Expected startTime
 
 assert.eq(_idHost, latestStartUpLog.hostname, "Hostname doesn't match one from _id");
-assert.eq(serverStatus.host.split(":")[0], latestStartUpLog.hostname, "Hostname doesn't match one in server status");
-assert.closeWithinMS(startTime, latestStartUpLog.startTime, "StartTime doesn't match one from _id", 2000); // Expect less than 2 sec delta
+assert.eq(
+    serverStatus.host.split(":")[0],
+    latestStartUpLog.hostname,
+    "Hostname doesn't match one in server status",
+);
+assert.closeWithinMS(
+    startTime,
+    latestStartUpLog.startTime,
+    "StartTime doesn't match one from _id",
+    2000,
+); // Expect less than 2 sec delta
 assert.eq(cmdLine, latestStartUpLog.cmdLine, "cmdLine doesn't match that from getCmdLineOpts");
 assert.eq(serverStatus.pid, latestStartUpLog.pid, "pid doesn't match that from serverStatus");
 
@@ -85,7 +107,11 @@ assert(
     arrayIsSubset(expectedKeys, keys),
     "buildinfo keys failed! \n expected:\t" + expectedKeys + "\n actual:\t" + keys,
 );
-assert.eq(buildinfo, latestStartUpLog.buildinfo, "buildinfo doesn't match that from buildinfo command");
+assert.eq(
+    buildinfo,
+    latestStartUpLog.buildinfo,
+    "buildinfo doesn't match that from buildinfo command",
+);
 
 // Test version and version Array
 let version = latestStartUpLog.buildinfo.version.split("-")[0];
@@ -100,7 +126,11 @@ assert.eq(
     latestStartUpLog.buildinfo.version,
     "Mongo version doesn't match that from ServerStatus",
 );
-assert.eq(version, versionArrayCleaned.join("."), "version doesn't match that from the versionArray");
+assert.eq(
+    version,
+    versionArrayCleaned.join("."),
+    "version doesn't match that from the versionArray",
+);
 let jsEngine = latestStartUpLog.buildinfo.javascriptEngine;
 assert(jsEngine == "none" || jsEngine.startsWith("mozjs"));
 assert.eq(

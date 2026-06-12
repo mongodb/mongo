@@ -26,12 +26,16 @@ for (let i = 0; i < numIndexes; ++i) {
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDB
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 const listIndexesCommand = {
@@ -54,7 +58,9 @@ assert.eq(
 );
 
 const getMoreCollName = cmdRes.cursor.ns.substr(cmdRes.cursor.ns.indexOf(".") + 1);
-cmdRes = assert.commandWorked(testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
+cmdRes = assert.commandWorked(
+    testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}),
+);
 
 const getMoreProfileEntry = getLatestProfilerEntry(testDB, {op: "getmore"});
 for (var field in listIndexesCommand) {

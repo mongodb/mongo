@@ -28,7 +28,9 @@ export const $config = (function () {
                 [metaFieldName]: tid * numDocs + i,
             });
         }
-        TimeseriesTest.assertInsertWorked(db.runCommand({insert: collName, documents: docs, ordered: ordered}));
+        TimeseriesTest.assertInsertWorked(
+            db.runCommand({insert: collName, documents: docs, ordered: ordered}),
+        );
     };
 
     const states = {
@@ -49,12 +51,17 @@ export const $config = (function () {
         let collName = getCollectionName(collNameSuffix);
         cluster.executeOnMongodNodes((db) => {
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, timeseriesIdleBucketExpiryMemoryUsageThreshold: 1024}),
+                db.adminCommand({
+                    setParameter: 1,
+                    timeseriesIdleBucketExpiryMemoryUsageThreshold: 1024,
+                }),
             );
         });
 
         assert.commandWorked(
-            db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
     };
 

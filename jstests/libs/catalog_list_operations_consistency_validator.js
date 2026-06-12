@@ -31,7 +31,8 @@ import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 function assertNoUnrecognizedFields(restParameters, sourceName, targetName, sourceObject) {
     assert(
         !Object.keys(restParameters).length,
@@ -134,7 +135,12 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
             collation: viewCollation,
             ...viewUnrecognized
         } = nsRest;
-        assertNoUnrecognizedFields(viewUnrecognized, "`$listCatalog` view entry", "listCollections", listCatalogEntry);
+        assertNoUnrecognizedFields(
+            viewUnrecognized,
+            "`$listCatalog` view entry",
+            "listCollections",
+            listCatalogEntry,
+        );
 
         return {
             name: nsName,
@@ -310,7 +316,9 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
             ...(mdIndexSpec.originalSpec !== undefined && {
                 originalSpec: {
                     ...mdIndexSpec.originalSpec,
-                    ...(mdIndexSpec.originalSpec.collation === undefined && {collation: {locale: "simple"}}),
+                    ...(mdIndexSpec.originalSpec.collation === undefined && {
+                        collation: {locale: "simple"},
+                    }),
                 },
             }),
         };
@@ -320,7 +328,10 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
 
     // Clustered indexes are not stored in the `indexes` field of the catalog, but rather as
     // part of the collection options. However, they are returned by `listIndexes`.
-    if ((typeof mdOptions.clusteredIndex === "object" || mdOptions.clusteredIndex === true) && !mdOptions.timeseries) {
+    if (
+        (typeof mdOptions.clusteredIndex === "object" || mdOptions.clusteredIndex === true) &&
+        !mdOptions.timeseries
+    ) {
         indexes.push({
             ...(typeof mdOptions.clusteredIndex === "object"
                 ? mdOptions.clusteredIndex
@@ -337,7 +348,9 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
             // Adding the simple collation to the $listCatalog entry to be able to compare the index specs.
             // TODO (SERVER-119573) Remove this once listCatalog returns the simple collation explicitly.
             ...(mdOptions.collation === undefined && {collation: {locale: "simple"}}),
-            ...(mdOptions.expireAfterSeconds !== undefined && {expireAfterSeconds: mdOptions.expireAfterSeconds}),
+            ...(mdOptions.expireAfterSeconds !== undefined && {
+                expireAfterSeconds: mdOptions.expireAfterSeconds,
+            }),
             clustered: true,
         });
     }
@@ -353,14 +366,19 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
  * while `listCollections` only returns one per collection (and similarly for `listIndexes`).
  */
 function removeDuplicateDocuments(docList) {
-    return docList.filter((item, index) => index === 0 || bsonWoCompare(docList[index - 1], item) !== 0);
+    return docList.filter(
+        (item, index) => index === 0 || bsonWoCompare(docList[index - 1], item) !== 0,
+    );
 }
 
 // Some tests create a large amount and/or very bloated collection/index definitions,
 // so that comparing it all at once fails due to it exceeding the BSON document size limit.
 // This works around the issue by running the comparison element by element.
 function bsonUnorderedFieldArrayEquals(a, b) {
-    return a.length === b.length && a.every((item, index) => bsonUnorderedFieldsCompare(item, b[index]) === 0);
+    return (
+        a.length === b.length &&
+        a.every((item, index) => bsonUnorderedFieldsCompare(item, b[index]) === 0)
+    );
 }
 
 function validateListCatalogToListCollectionsConsistency(
@@ -375,7 +393,11 @@ function validateListCatalogToListCollectionsConsistency(
     // legacy time series collections, which inherit their options from their buckets collection in
     // listCollections. This becomes redundant once only viewless timeseries collections exist.
     const listCatalogMap = listCatalog.map((ci) =>
-        mapListCatalogToListCollectionsEntry(ci, new Map(listCatalog.map((c) => [c.name, c])), isDbReadOnly),
+        mapListCatalogToListCollectionsEntry(
+            ci,
+            new Map(listCatalog.map((c) => [c.name, c])),
+            isDbReadOnly,
+        ),
     );
 
     // TODO (SERVER-95599): Remove this workaround under the "if" for the configDebugDump once 9.0 becomes last LTS.
@@ -407,10 +429,15 @@ function validateListCatalogToListCollectionsConsistency(
         return collectionList.sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    const listCollectionsFromListCatalog = removeDuplicateDocuments(sortCollectionsInPlace(listCatalogMap));
+    const listCollectionsFromListCatalog = removeDuplicateDocuments(
+        sortCollectionsInPlace(listCatalogMap),
+    );
     const sortedListCollections = sortCollectionsInPlace([...listCollections]);
 
-    const equals = bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
+    const equals = bsonUnorderedFieldArrayEquals(
+        listCollectionsFromListCatalog,
+        sortedListCollections,
+    );
     if (!equals) {
         const message =
             "$listCatalog to listCollections consistency check failed.\n" +
@@ -458,7 +485,9 @@ function validateListCatalogToListIndexesConsistency(db, listCatalog, listIndexe
 
     const listIndexesFromListCatalog = removeDuplicateDocuments(
         sortCollectionIndexesInPlace(
-            listCatalog.filter((e) => !isViewListCatalogEntry(e)).map(mapListCatalogToListIndexesEntry),
+            listCatalog
+                .filter((e) => !isViewListCatalogEntry(e))
+                .map(mapListCatalogToListIndexesEntry),
         ),
     );
     const sortedListIndexes = sortCollectionIndexesInPlace(
@@ -560,9 +589,14 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
     // TODO (SERVER-91702): Remove this exclusion once the race with downgrade is fixed.
     const ignoreRecordIdsReplicatedOption =
         !TestData.enableTestCommands ||
-        PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            db,
+            "shouldUseReplicatedRecordIds",
+            true,
+        );
 
-    const originalHideImplicitlyCreatedIndexesFromListIndexes = TestData.hideImplicitlyCreatedIndexesFromListIndexes;
+    const originalHideImplicitlyCreatedIndexesFromListIndexes =
+        TestData.hideImplicitlyCreatedIndexesFromListIndexes;
     try {
         TestData.hideImplicitlyCreatedIndexesFromListIndexes = false;
 
@@ -576,7 +610,10 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
 
         let listCatalog = db
             .getSiblingDB("admin")
-            .aggregate([{$listCatalog: {}}, {$match: {db: db.getName(), name: {$in: collectionNames}}}])
+            .aggregate([
+                {$listCatalog: {}},
+                {$match: {db: db.getName(), name: {$in: collectionNames}}},
+            ])
             .toArray();
 
         listCatalog = filterListCatalogEntriesFromShardsWithoutChunks(db, listCatalog);
@@ -591,7 +628,8 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
             true,
         );
     } finally {
-        TestData.hideImplicitlyCreatedIndexesFromListIndexes = originalHideImplicitlyCreatedIndexesFromListIndexes;
+        TestData.hideImplicitlyCreatedIndexesFromListIndexes =
+            originalHideImplicitlyCreatedIndexesFromListIndexes;
     }
 }
 
@@ -669,7 +707,11 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
     // TODO (SERVER-91702): Remove this exclusion once the race with downgrade is fixed.
     const ignoreRecordIdsReplicatedOption =
         !TestData.enableTestCommands ||
-        PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            db,
+            "shouldUseReplicatedRecordIds",
+            true,
+        );
 
     // Don't check these DBs on mongos since it will mirror them from the config server for
     // listCollections & listIndexes, but will return the data from the shards on $listCatalog.
@@ -720,7 +762,9 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
                 TestData.hideImplicitlyCreatedIndexesFromListIndexes = false;
                 let collInfoForIndexes = collInfo.filter((e) => !isViewListCollectionsEntry(e));
                 if (skipLegacyBucketsForListIndexes) {
-                    collInfoForIndexes = collInfoForIndexes.filter((e) => !e.name.startsWith("system.buckets."));
+                    collInfoForIndexes = collInfoForIndexes.filter(
+                        (e) => !e.name.startsWith("system.buckets."),
+                    );
                 }
                 collIndexes = !isMongos
                     ? collInfoForIndexes.map((coll) => ({
@@ -765,8 +809,14 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         // Replica set with profiling enabled on an empty database do not show the
         // system.profile collection in listCollections, but they do in $listCatalog.
         // TODO(SERVER-97721): Remove this workaround.
-        if (collInfo.length === 0 && catalogInfo.length === 1 && catalogInfo[0].name === "system.profile") {
-            jsTest.log.info("Skipped consistency check: Stray system.profile on replica set (SERVER-97721)");
+        if (
+            collInfo.length === 0 &&
+            catalogInfo.length === 1 &&
+            catalogInfo[0].name === "system.profile"
+        ) {
+            jsTest.log.info(
+                "Skipped consistency check: Stray system.profile on replica set (SERVER-97721)",
+            );
             return true;
         }
 
@@ -777,11 +827,15 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         const namespaceSet = new Set(catalogInfo.map((c) => c.name));
         const nsWithUnexpectedBucketsSet = new Set(
             catalogInfo
-                .filter((c) => c.type !== "timeseries" && namespaceSet.has("system.buckets." + c.name))
+                .filter(
+                    (c) => c.type !== "timeseries" && namespaceSet.has("system.buckets." + c.name),
+                )
                 .map((c) => c.name),
         );
         if (nsWithUnexpectedBucketsSet.size > 0) {
-            jsTest.log.info("Ignored namespaces with unexpected buckets", {nsWithUnexpectedBucketsSet});
+            jsTest.log.info("Ignored namespaces with unexpected buckets", {
+                nsWithUnexpectedBucketsSet,
+            });
             collInfo = collInfo.filter((c) => !nsWithUnexpectedBucketsSet.has(c.name));
             catalogInfo = catalogInfo.filter((c) => !nsWithUnexpectedBucketsSet.has(c.name));
             if (collIndexes !== null) {
@@ -820,11 +874,18 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         }
         let catalogInfoForIndexes = catalogInfo;
         if (skipLegacyBucketsForListIndexes) {
-            catalogInfoForIndexes = catalogInfo.filter((c) => !c.name.startsWith("system.buckets."));
+            catalogInfoForIndexes = catalogInfo.filter(
+                (c) => !c.name.startsWith("system.buckets."),
+            );
         }
         if (
             collIndexes !== null &&
-            !validateListCatalogToListIndexesConsistency(db, catalogInfoForIndexes, collIndexes, shouldAssert)
+            !validateListCatalogToListIndexesConsistency(
+                db,
+                catalogInfoForIndexes,
+                collIndexes,
+                shouldAssert,
+            )
         ) {
             jsTest.log.info("$listCatalog/listIndexes consistency check failed, retrying...");
             return false;

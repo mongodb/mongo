@@ -26,7 +26,9 @@ function assertRankFusionFeaturesAccepted(primaryConn) {
 }
 
 testPerformUpgradeReplSet({
-    startingNodeOptions: {setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true}},
+    startingNodeOptions: {
+        setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true},
+    },
     upgradeNodeOptions: {setParameter: {bypassRankFusionFCVGate: true}},
     setupFn: setupCollection,
     whenFullyDowngraded: assertRankFusionFeaturesAccepted,
@@ -37,7 +39,9 @@ testPerformUpgradeReplSet({
 
 // Sharded collection in a sharded cluster.
 testPerformUpgradeSharded({
-    startingNodeOptions: {setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true}},
+    startingNodeOptions: {
+        setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true},
+    },
     upgradeNodeOptions: {setParameter: {bypassRankFusionFCVGate: true}},
     setupFn: setupCollection,
     whenFullyDowngraded: assertRankFusionFeaturesAccepted,
@@ -50,7 +54,9 @@ testPerformUpgradeSharded({
 
 // Unsharded collection in a sharded cluster.
 testPerformUpgradeSharded({
-    startingNodeOptions: {setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true}},
+    startingNodeOptions: {
+        setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true},
+    },
     upgradeNodeOptions: {setParameter: {bypassRankFusionFCVGate: true}},
     setupFn: setupUnshardedCollection,
     whenFullyDowngraded: assertRankFusionFeaturesAccepted,

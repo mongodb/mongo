@@ -10,7 +10,9 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBuildAbort} = {}) {
     // Force a two-phase index build to hang on the non DB primary shard.
@@ -23,7 +25,11 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
         {} /* options */,
         permitIndexBuildAbort ? [ErrorCodes.IndexBuildAborted] : [],
     );
-    IndexBuildTest.waitForIndexBuildToScanCollection(shardConn.getDB(db.getName()), coll.getName(), "a_1");
+    IndexBuildTest.waitForIndexBuildToScanCollection(
+        shardConn.getDB(db.getName()),
+        coll.getName(),
+        "a_1",
+    );
 
     // Use collMod to change the granularity on the collection.
     const collModThread = new Thread(
@@ -55,7 +61,9 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
     // Regular unsharded collection outside DB primary.
     const coll = db.getCollection("unsharded");
     coll.insertOne({x: 123});
-    assert.commandWorked(st.s.adminCommand({moveCollection: coll.getFullName(), toShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: coll.getFullName(), toShard: st.shard1.shardName}),
+    );
     runCollModWithConcurrentIndexBuild(coll, {validator: {x: 123}});
 }
 
@@ -81,7 +89,11 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
     );
     coll.insertOne({t: ISODate(), m: 123, temp: 42});
     // Since timeseries granularity changes block CRUD operations, the index build may be aborted to unblock them.
-    runCollModWithConcurrentIndexBuild(coll, {timeseries: {granularity: "minutes"}}, {permitIndexBuildAbort: true});
+    runCollModWithConcurrentIndexBuild(
+        coll,
+        {timeseries: {granularity: "minutes"}},
+        {permitIndexBuildAbort: true},
+    );
 }
 
 {
@@ -103,7 +115,11 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
     );
     coll.insertOne({t: ISODate(), temp: 42});
     // Since timeseries granularity changes block CRUD operations, the index build may be aborted to unblock them.
-    runCollModWithConcurrentIndexBuild(coll, {timeseries: {granularity: "minutes"}}, {permitIndexBuildAbort: true});
+    runCollModWithConcurrentIndexBuild(
+        coll,
+        {timeseries: {granularity: "minutes"}},
+        {permitIndexBuildAbort: true},
+    );
 }
 
 st.stop();

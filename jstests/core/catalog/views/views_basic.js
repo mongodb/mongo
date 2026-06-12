@@ -13,7 +13,10 @@ let assertCmdResultEq = function (cmd, expected) {
 
     let cursor = new DBCommandCursor(viewsDB, res, 5);
     let actual = cursor.toArray();
-    assert(arrayEq(actual, expected), "actual: " + tojson(cursor.toArray()) + ", expected:" + tojson(expected));
+    assert(
+        arrayEq(actual, expected),
+        "actual: " + tojson(cursor.toArray()) + ", expected:" + tojson(expected),
+    );
 };
 
 // Insert some control documents.
@@ -29,10 +32,17 @@ assert.commandWorked(bulk.execute());
 // Test creating views on both collections and other views, using the database command and the
 // shell helper.
 assert.commandWorked(
-    viewsDB.runCommand({create: "californiaCities", viewOn: "collection", pipeline: [{$match: {state: "CA"}}]}),
+    viewsDB.runCommand({
+        create: "californiaCities",
+        viewOn: "collection",
+        pipeline: [{$match: {state: "CA"}}],
+    }),
 );
 assert.commandWorked(
-    viewsDB.createView("largeCaliforniaCities", "californiaCities", [{$match: {pop: {$gte: 10}}}, {$sort: {pop: 1}}]),
+    viewsDB.createView("largeCaliforniaCities", "californiaCities", [
+        {$match: {pop: {$gte: 10}}},
+        {$sort: {pop: 1}},
+    ]),
 );
 
 // Use the find command on a view with various options.

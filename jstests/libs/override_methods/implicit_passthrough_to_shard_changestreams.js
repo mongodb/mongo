@@ -32,7 +32,14 @@ const discoverShardId = function (conn) {
     return {shard: shardName};
 };
 
-function runCommandWithPassthroughToShard(conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithPassthroughToShard(
+    conn,
+    _dbName,
+    _commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }

@@ -38,7 +38,9 @@ const max = {
     y: MaxKey,
 };
 
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: primaryShard.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
 
 // Check shard version.
@@ -112,7 +114,9 @@ st.configRS.awaitLastOpCommitted();
 assert.neq(null, st.s.getDB("config").databases.findOne());
 
 // Trigger a refresh on the mongos through a moveChunk command.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0, y: bigString}, to: otherShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: 0, y: bigString}, to: otherShard.shardName}),
+);
 
 // Chunks should not be included in the response because the chunk size exceeds the limit.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});

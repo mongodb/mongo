@@ -51,10 +51,16 @@ const st = new ShardingTest({
 function disableDurableRecovery(conn) {
     const nodes = FixtureHelpers.getAllNodes(conn.getDB("admin"));
     for (const node of nodes) {
-        const res = node.adminCommand({getParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 1});
+        const res = node.adminCommand({
+            getParameter: 1,
+            durableRecoveryForCollectionCatalogEntryChance: 1,
+        });
         if (res.ok) {
             assert.commandWorked(
-                node.adminCommand({setParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 0}),
+                node.adminCommand({
+                    setParameter: 1,
+                    durableRecoveryForCollectionCatalogEntryChance: 0,
+                }),
             );
         }
     }
@@ -66,12 +72,30 @@ disableDurableRecovery(st.s);
 
 // Config sharded collections.
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[singleShardedColl1] + "", key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[singleShardedColl2] + "", key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[someShardedColl1] + "", key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[someShardedColl2] + "", key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[allShardedColl1] + "", key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[allShardedColl2] + "", key: {_id: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({
+        shardCollection: st.s.getDB(dbName)[singleShardedColl1] + "",
+        key: {_id: 1},
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        shardCollection: st.s.getDB(dbName)[singleShardedColl2] + "",
+        key: {_id: 1},
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: st.s.getDB(dbName)[someShardedColl1] + "", key: {_id: 1}}),
+);
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: st.s.getDB(dbName)[someShardedColl2] + "", key: {_id: 1}}),
+);
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: st.s.getDB(dbName)[allShardedColl1] + "", key: {_id: 1}}),
+);
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: st.s.getDB(dbName)[allShardedColl2] + "", key: {_id: 1}}),
+);
 
 const mongos = st.s0;
 
@@ -80,12 +104,25 @@ const setupSomeShardedColl = (collName) => {
     let ns = dbName + "." + collName;
     // snapshotReadsTest() inserts ids 0-9 and tries snapshot reads on the collection.
     assert.commandWorked(st.splitAt(ns, {_id: 5}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}),
+    );
 
-    assert.eq(0, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
-    assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
-    assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
+    assert.eq(
+        0,
+        findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}),
+    );
+    assert.eq(
+        1,
+        findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}),
+    );
+    assert.eq(
+        1,
+        findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}),
+    );
     flushRoutersAndRefreshShardMetadata(st, {ns});
 };
 setupSomeShardedColl(someShardedColl1);
@@ -98,13 +135,28 @@ const setupAllShardedColl = (collName) => {
     assert.commandWorked(st.splitAt(ns, {_id: 4}));
     assert.commandWorked(st.splitAt(ns, {_id: 7}));
 
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}),
+    );
 
-    assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
-    assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
-    assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
+    assert.eq(
+        1,
+        findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}),
+    );
+    assert.eq(
+        1,
+        findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}),
+    );
+    assert.eq(
+        1,
+        findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}),
+    );
     flushRoutersAndRefreshShardMetadata(st, {ns});
 };
 setupAllShardedColl(allShardedColl1);
@@ -119,7 +171,11 @@ function awaitCommittedFn() {
 // Pass the same DB handle as "primaryDB" and "secondaryDB" params; the test functions will
 // send readPreference to mongos to target primary/secondary shard servers.
 let db = st.s.getDB(dbName);
-let snapshotReadsTest = new SnapshotReadsTest({primaryDB: db, secondaryDB: db, awaitCommittedFn: awaitCommittedFn});
+let snapshotReadsTest = new SnapshotReadsTest({
+    primaryDB: db,
+    secondaryDB: db,
+    awaitCommittedFn: awaitCommittedFn,
+});
 
 for (let coll1 of [unshardedColl1, singleShardedColl1, someShardedColl1, allShardedColl1]) {
     for (let coll2 of [unshardedColl2, singleShardedColl2, someShardedColl2, allShardedColl2]) {

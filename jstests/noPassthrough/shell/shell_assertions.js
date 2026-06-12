@@ -19,7 +19,11 @@ describe("doassert tests", function () {
             doassert(expectedError);
         });
 
-        assert.eq("Error: " + expectedError, actualError, "doAssert should throw passed msg as exception");
+        assert.eq(
+            "Error: " + expectedError,
+            actualError,
+            "doAssert should throw passed msg as exception",
+        );
     });
 
     it("callingDoAssertWithObjectThrowsException", function () {
@@ -28,7 +32,11 @@ describe("doassert tests", function () {
             doassert(expectedError);
         });
 
-        assert.eq("Error: " + tojson(expectedError), actualError, "doAssert should throw passed object as exception");
+        assert.eq(
+            "Error: " + tojson(expectedError),
+            actualError,
+            "doAssert should throw passed object as exception",
+        );
     });
 
     it("callingDoAssertWithStringPassedAsFunctionThrowsException", function () {
@@ -39,7 +47,11 @@ describe("doassert tests", function () {
             });
         });
 
-        assert.eq("Error: " + expectedError, actualError, "doAssert should throw passed msg as exception");
+        assert.eq(
+            "Error: " + expectedError,
+            actualError,
+            "doAssert should throw passed msg as exception",
+        );
     });
 
     it("callingDoAssertWithObjectAsFunctionThrowsException", function () {
@@ -50,7 +62,11 @@ describe("doassert tests", function () {
             });
         });
 
-        assert.eq("Error: " + tojson(expectedError), actualError, "doAssert should throw passed object as exception");
+        assert.eq(
+            "Error: " + tojson(expectedError),
+            actualError,
+            "doAssert should throw passed object as exception",
+        );
     });
 
     it("callingDoAssertCorrectlyAttachesWriteErrors", function () {
@@ -81,7 +97,9 @@ describe("doassert tests", function () {
         const bulkResult = {
             nModified: 0,
             n: 0,
-            writeConcernErrors: [{code: 6, codeName: "HostUnreachable", errmsg: errorMessage, errInfo: {}}],
+            writeConcernErrors: [
+                {code: 6, codeName: "HostUnreachable", errmsg: errorMessage, errInfo: {}},
+            ],
             upserted: [],
             ok: 1,
         };
@@ -105,7 +123,11 @@ describe("assert tests", function () {
         const err = assert.throws(() => {
             assert(1, 2, 3, 4);
         });
-        assert.neq(-1, err.message.indexOf("Too many parameters"), "Too many params message should be displayed");
+        assert.neq(
+            -1,
+            err.message.indexOf("Too many parameters"),
+            "Too many params message should be displayed",
+        );
     });
 
     it("assertShouldNotThrowExceptionForTrue", function () {
@@ -120,7 +142,11 @@ describe("assert tests", function () {
             assert(false, expectedMessage);
         });
 
-        assert.neq(-1, err.message.indexOf(expectedMessage), "assert message should be thrown on error");
+        assert.neq(
+            -1,
+            err.message.indexOf(expectedMessage),
+            "assert message should be thrown on error",
+        );
     });
 
     it("assertShouldThrowExceptionForFalseWithDefaultMessage", function () {
@@ -140,7 +166,11 @@ describe("assert tests", function () {
         });
 
         assert.neq(-1, err.message.indexOf(prefix), "assert message should should contain prefix");
-        assert.neq(-1, err.message.indexOf(message), "assert message should should contain original message");
+        assert.neq(
+            -1,
+            err.message.indexOf(message),
+            "assert message should should contain original message",
+        );
     });
 
     it("assertShouldNotCallMsgFunctionsOnSuccess", function () {
@@ -172,7 +202,11 @@ describe("assert tests", function () {
             assert(false, objMsg);
         });
 
-        assert.neq(-1, err.message.indexOf(tojson(objMsg)), "Error message should have included " + tojson(objMsg));
+        assert.neq(
+            -1,
+            err.message.indexOf(tojson(objMsg)),
+            "Error message should have included " + tojson(objMsg),
+        );
     });
 
     it("assertShouldNotAcceptNonObjStringFunctionAsMsg", function () {
@@ -721,7 +755,10 @@ describe("assert.sameMembers tests", function () {
     it("sameMembersDoesNotSortNestedArrays", function () {
         assert.throws(() => assert.sameMembers([[1, 2]], [[2, 1]]));
         assert.throws(() => {
-            assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}, {b: 0}]}]);
+            assert.sameMembers(
+                [{a: [{b: 0}, {b: 1, c: 0}], _id: 0}],
+                [{_id: 0, a: [{c: 0, b: 1}, {b: 0}]}],
+            );
         });
     });
 
@@ -751,7 +788,10 @@ describe("assert.sameMembers tests", function () {
 
     it("sameMembersPassesWithSortedNestedArrays", function () {
         assert.sameMembers([[1, 2]], [[1, 2]]);
-        assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{b: 0}, {c: 0, b: 1}]}]);
+        assert.sameMembers(
+            [{a: [{b: 0}, {b: 1, c: 0}], _id: 0}],
+            [{_id: 0, a: [{b: 0}, {c: 0, b: 1}]}],
+        );
     });
 
     it("sameMembersPassesWithObjects", function () {
@@ -812,9 +852,15 @@ it("assertCallsHangAnalyzer", function () {
             MongoRunner = oldMongoRunner;
         }
     }
-    runAssertTest(() => assert.soon(() => false, "assert message", kSmallTimeoutMS, kSmallRetryIntervalMS));
-    runAssertTest(() => assert.retry(() => false, "assert message", kDefaultRetryAttempts, kSmallRetryIntervalMS));
-    runAssertTest(() => assert.time(() => sleep(5), "assert message", 1 /* we certainly take less than this */));
+    runAssertTest(() =>
+        assert.soon(() => false, "assert message", kSmallTimeoutMS, kSmallRetryIntervalMS),
+    );
+    runAssertTest(() =>
+        assert.retry(() => false, "assert message", kDefaultRetryAttempts, kSmallRetryIntervalMS),
+    );
+    runAssertTest(() =>
+        assert.time(() => sleep(5), "assert message", 1 /* we certainly take less than this */),
+    );
 });
 
 function assertThrowsError(assertFailureTriggerFn, msg) {
@@ -863,7 +909,11 @@ function assertThrowsErrorWithAttr(assertFailureTriggerFn, {msg, attr}) {
         assertFailureTriggerFn();
     } catch (e) {
         assert.eq(msg, e.message, "unexpected error message");
-        assert.eq(toJsonForLog(attr), toJsonForLog(e.extraAttr), "unexpected extra attributes in plain mode");
+        assert.eq(
+            toJsonForLog(attr),
+            toJsonForLog(e.extraAttr),
+            "unexpected extra attributes in plain mode",
+        );
         return;
     }
     // Call the 'assertFailureTriggerFn' second time to make sure it actually throws.
@@ -1051,7 +1101,12 @@ it("assertFuzzySameMembersJsonFormat", function () {
         },
         {
             msg: "{aArr} != {bArr} : Oops!",
-            attr: {aArr: [{soccer: 42}], bArr: [{score: 42000}], compareFn: "fuzzyCompare", ...kAttr},
+            attr: {
+                aArr: [{soccer: 42}],
+                bArr: [{score: 42000}],
+                compareFn: "fuzzyCompare",
+                ...kAttr,
+            },
         },
     );
 });
@@ -1370,7 +1425,9 @@ it("assertWriteOKJsonFormat", function () {
 it("assertWriteErrorJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
-            const res = new WriteResult({nRemoved: 0, writeErrors: [], upserted: []}, 3, {w: "majority"});
+            const res = new WriteResult({nRemoved: 0, writeErrors: [], upserted: []}, 3, {
+                w: "majority",
+            });
             assert.writeError(res, "Oops!");
         },
         {
@@ -1392,7 +1449,9 @@ it("assertWriteErrorJsonFormat", function () {
 it("assertWriteErrorToJsonHasCorrectFields", function () {
     // Verify that the json obj has the correct name for the writeErrors field ('writeErrors' instead of 'writeError').
     const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
-    const res = new WriteResult({nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {w: "majority"});
+    const res = new WriteResult({nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {
+        w: "majority",
+    });
     const jsonRes = JSON.parse(tojson(res));
 
     assert(jsonRes.hasOwnProperty("writeErrors"));
@@ -1404,7 +1463,9 @@ it("assertWriteErrorWithCodeJsonFormat", function () {
     const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
     assertThrowsErrorWithJson(
         () => {
-            const res = new WriteResult({nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {w: "majority"});
+            const res = new WriteResult({nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {
+                w: "majority",
+            });
             assert.writeErrorWithCode(res, ErrorCodes.BadValue, "Oops!");
         },
         {

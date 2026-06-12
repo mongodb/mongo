@@ -33,7 +33,9 @@ let coll;
 //
 coll = db.getCollection(collNamePrefix + "insert_at_size_limit");
 coll.drop();
-assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: maxStr}]}));
+assert.commandWorked(
+    db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: maxStr}]}),
+);
 assert.eq(coll.find({}).itcount(), 1);
 
 coll = db.getCollection(collNamePrefix + "upsert_at_size_limit");
@@ -69,7 +71,10 @@ const largerThanMaxString = maxStr + "a";
 coll = db.getCollection(collNamePrefix + "insert_over_size_limit");
 coll.drop();
 assert.commandFailedWithCode(
-    db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: largerThanMaxString}]}),
+    db.runCommand({
+        insert: coll.getName(),
+        documents: [{_id: new ObjectId(), x: largerThanMaxString}],
+    }),
     ErrorCodes.BSONObjectTooLarge,
 );
 

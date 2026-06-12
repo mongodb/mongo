@@ -25,7 +25,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 db[collName].dropIndex({value: 1});
             },
             listCollections: function listCollections(db, collName) {
-                const listColls = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+                const listColls = assert.commandWorked(
+                    db.runCommand({listCollections: 1, filter: {name: collName}}),
+                );
                 const listCollsOptions = listColls.cursor.firstBatch[0].options;
                 assert(listCollsOptions.clusteredIndex);
             },
@@ -37,7 +39,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // As the default collection created by runner.js won't be clustered we need to recreate it.
         db[coll].drop();
 
-        assert.commandWorked(db.runCommand({create: coll, clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            db.runCommand({create: coll, clusteredIndex: {key: {_id: 1}, unique: true}}),
+        );
         for (let i = 0; i < this.numIds; i++) {
             const res = db[coll].insert({_id: i, value: this.docValue, num: 1});
             assert.commandWorked(res);

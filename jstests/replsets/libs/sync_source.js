@@ -44,7 +44,9 @@ export const forceSyncSource = (rst, node, syncSource) => {
 
     // Stop replication on the node, so that we can advance the optime on the sync source.
     const stopReplProducer = configureFailPoint(node, "stopReplProducer");
-    const forceSyncSource = configureFailPoint(node, "forceSyncSourceCandidate", {"hostAndPort": syncSource.host});
+    const forceSyncSource = configureFailPoint(node, "forceSyncSourceCandidate", {
+        "hostAndPort": syncSource.host,
+    });
 
     const primaryDB = primary.getDB("forceSyncSourceDB");
     const primaryColl = primaryDB["forceSyncSourceColl"];
@@ -117,7 +119,9 @@ export function assertSyncSourceChangesTo(rst, secondary, expectedSyncSource) {
         return timestampCmp(sourceMember.optime.ts, appliedTimestamp) > 0;
     });
     restartServerReplication(secondary);
-    let host = TestData.usePriorityPorts ? expectedSyncSource.priorityHost : expectedSyncSource.host;
+    let host = TestData.usePriorityPorts
+        ? expectedSyncSource.priorityHost
+        : expectedSyncSource.host;
     assertSyncSourceMatchesSoon(secondary, host);
 }
 

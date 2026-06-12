@@ -34,14 +34,30 @@ assert.commandWorked(localColl.insert({"t": new Date(), join: "shard1"}));
 assert.commandWorked(localColl.createIndex({join: 1}));
 assert(st.s.adminCommand({shardCollection: localColl.getFullName(), key: {join: 1}}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: localColl.getFullName(), find: {join: "shard1"}, to: st.shard1.shardName}),
+    st.s.adminCommand({
+        moveChunk: localColl.getFullName(),
+        find: {join: "shard1"},
+        to: st.shard1.shardName,
+    }),
 );
 
 // If rawData is attached multiple times to the network request, the following query will fail.
 const results = localColl
-    .aggregate([{$lookup: {from: foreignCollName, localField: "join", foreignField: "shard", as: "things"}}], {
-        rawData: true,
-    })
+    .aggregate(
+        [
+            {
+                $lookup: {
+                    from: foreignCollName,
+                    localField: "join",
+                    foreignField: "shard",
+                    as: "things",
+                },
+            },
+        ],
+        {
+            rawData: true,
+        },
+    )
     .toArray();
 
 assert.eq(1, results.length);

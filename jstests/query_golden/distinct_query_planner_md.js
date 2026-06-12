@@ -24,7 +24,9 @@ coll.insertMany([
     {a: 1, b: 2},
     {a: 2, b: 3},
 ]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}},
+]);
 
 subSection("Suitable Index for Sort (Inverse Order) => Distinct Scan");
 coll.drop();
@@ -34,7 +36,9 @@ coll.insertMany([
     {a: 2, b: 3},
 ]);
 coll.createIndex({a: -1, b: -1});
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}},
+]);
 
 subSection("No Suitable Index for Sort => No Distinct Scan and No Blocking Sort");
 coll.drop();
@@ -44,7 +48,9 @@ coll.insertMany([
     {a: 1, b: 2},
     {a: 2, b: 3},
 ]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}},
+]);
 
 subSection("Suitable Index for Filter but Not for Sort => No Distinct Scan and No Blocking Sort");
 coll.drop();

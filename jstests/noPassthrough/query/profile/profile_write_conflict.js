@@ -35,11 +35,17 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     assert.commandWorked(testDB.createCollection(coll.getName()));
     const fp = configureFailPoint(db, "WTWriteConflictException", {}, {times: writeConflicts});
     assert.commandWorked(
-        testDB.runCommand({insert: coll.getName(), documents: [doc], comment: jsTestName() + "-insert"}),
+        testDB.runCommand({
+            insert: coll.getName(),
+            documents: [doc],
+            comment: jsTestName() + "-insert",
+        }),
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-insert"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-insert",
+    });
 
     assert.eq(profileObj.ninserted, 1, profileObj);
     assert.eq(profileObj.keysInserted, numIdIndexKeys, profileObj);
@@ -60,7 +66,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-delete"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-delete",
+    });
 
     assert.eq(profileObj.ndeleted, 1, profileObj);
     assert.eq(profileObj.keysDeleted, numIdIndexKeys, profileObj);
@@ -82,7 +90,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-update"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-update",
+    });
 
     assert.eq(profileObj.keysInserted, 1, profileObj);
     assert.eq(profileObj.keysDeleted, 1, profileObj);
@@ -106,7 +116,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-upsertu"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-upsertu",
+    });
 
     assert.eq(profileObj.keysInserted, 1, profileObj);
     assert.eq(profileObj.keysDeleted, 1, profileObj);
@@ -131,7 +143,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-upserti"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-upserti",
+    });
 
     assert.eq(profileObj.keysInserted, numIdIndexKeys + 1, profileObj);
     assert.eq(profileObj.nMatched, 0, profileObj);
@@ -155,7 +169,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-fnmdel"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-fnmdel",
+    });
 
     assert.eq(profileObj.ndeleted, 1, profileObj);
     assert.eq(profileObj.keysDeleted, numIdIndexKeys, profileObj);
@@ -178,7 +194,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-fnmupd"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-fnmupd",
+    });
 
     assert.eq(profileObj.keysInserted, 1, profileObj);
     assert.eq(profileObj.keysDeleted, 1, profileObj);
@@ -204,7 +222,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-fnmupsu"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-fnmupsu",
+    });
 
     assert.eq(profileObj.keysInserted, 1, profileObj);
     assert.eq(profileObj.keysDeleted, 1, profileObj);
@@ -231,7 +251,9 @@ assert.commandWorked(testDB.setProfilingLevel(2));
     );
     fp.off();
 
-    const profileObj = getLatestProfilerEntry(testDB, {"command.comment": jsTestName() + "-fnmupsi"});
+    const profileObj = getLatestProfilerEntry(testDB, {
+        "command.comment": jsTestName() + "-fnmupsi",
+    });
 
     assert.eq(profileObj.keysInserted, numIdIndexKeys + 1, profileObj);
     assert.eq(profileObj.nMatched, 0, profileObj);

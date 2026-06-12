@@ -32,7 +32,9 @@ const db = st.s.getDB(dbName);
 const adminDB = st.s.getDB("admin");
 const coll = db.getCollection(collName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Create sharded timeseries collection (in viewless format)
 assert.commandWorked(
@@ -105,6 +107,8 @@ assert.eq(undefined, collDoc.allowMigrations);
 
 failCommandFP.off();
 
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 st.stop();

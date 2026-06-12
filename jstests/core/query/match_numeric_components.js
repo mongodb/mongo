@@ -549,7 +549,9 @@ assert.commandWorked(
     assert.commandWorked(coll.insert({_id: 1, "a": {"9223372036854776000": 42}}));
     assert.commandWorked(coll.insert({_id: 2, "a": {"9223372036854776000": [42]}}));
     assert.commandWorked(coll.insert({_id: 3, "a": {"9223372036854776000": [0, 42]}}));
-    assert.commandWorked(coll.insert({_id: 4, "a": {"9223372036854776000": [{"9223372036854776000": 42}]}}));
+    assert.commandWorked(
+        coll.insert({_id: 4, "a": {"9223372036854776000": [{"9223372036854776000": 42}]}}),
+    );
     const res1 = coll.find({"a.9223372036854776000": 42}).toArray();
     const expected1 = [
         {_id: 1, "a": {"9223372036854776000": 42}},

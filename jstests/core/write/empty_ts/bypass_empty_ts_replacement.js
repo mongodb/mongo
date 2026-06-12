@@ -19,7 +19,11 @@ const emptyTs = Timestamp(0, 0);
 coll.drop();
 
 function doInsert(docs, bypassEmptyTsReplacement) {
-    let cmdRes = db.runCommand({insert: collName, documents: docs, bypassEmptyTsReplacement: bypassEmptyTsReplacement});
+    let cmdRes = db.runCommand({
+        insert: collName,
+        documents: docs,
+        bypassEmptyTsReplacement: bypassEmptyTsReplacement,
+    });
     assert.commandWorked(cmdRes);
 }
 
@@ -142,7 +146,11 @@ function runTests(bypassEmptyTsReplacement) {
     doUpdateWithUpsert({_id: getId(14)}, [{$addFields: {a: emptyTs}}], bypassEmptyTsReplacement);
 
     // Do a pipeline-style findAndModify to add a new document with _id=getId(15).
-    doFindAndModifyWithUpsert({_id: getId(15)}, [{$addFields: {a: emptyTs}}], bypassEmptyTsReplacement);
+    doFindAndModifyWithUpsert(
+        {_id: getId(15)},
+        [{$addFields: {a: emptyTs}}],
+        bypassEmptyTsReplacement,
+    );
 
     // Do a pipline-style update with $internalApplyOplogUpdate to add a new document with
     // _id=getId(16).

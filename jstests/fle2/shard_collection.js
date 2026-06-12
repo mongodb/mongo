@@ -25,7 +25,11 @@ let client = new EncryptedClient(db.getMongo(), dbName);
 
 assert.commandWorked(
     client.createEncryptionCollection("basic", {
-        encryptedFields: {"fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}]},
+        encryptedFields: {
+            "fields": [
+                {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
+            ],
+        },
     }),
 );
 

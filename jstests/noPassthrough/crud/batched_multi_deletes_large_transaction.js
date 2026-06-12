@@ -95,7 +95,10 @@ assert.eq(
     docIds.length,
     "last oplog entry should contain total count of operations in chain: " + tojson(ops[0]),
 );
-assert(ops[1].o.partialTxn, "non-terminal oplog entry should have partialTxn field set to true: " + tojson(ops[1]));
+assert(
+    ops[1].o.partialTxn,
+    "non-terminal oplog entry should have partialTxn field set to true: " + tojson(ops[1]),
+);
 assert(ops[0].hasOwnProperty("prevOpTime"));
 assert(ops[1].hasOwnProperty("prevOpTime"));
 assert.eq(ops[0].prevOpTime.ts, ops[1].ts);

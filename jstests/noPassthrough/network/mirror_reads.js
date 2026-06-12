@@ -44,16 +44,29 @@ const kLargeMaxTimeMS = 100000000;
     rst.initiate();
 
     jsTestLog(`Attempting invalid mirrorReads parameters`);
-    assert.commandFailed(MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: 0.5}));
-    assert.commandFailed(MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: "half"}));
     assert.commandFailed(
-        MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {samplingRate: -1.0}}),
+        MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: 0.5}),
     );
     assert.commandFailed(
-        MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {samplingRate: 1.01}}),
+        MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: "half"}),
     );
     assert.commandFailed(
-        MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {somplingRate: 1.0}}),
+        MirrorReadsHelpers.setParameter({
+            nodeToReadFrom: rst.getPrimary(),
+            value: {samplingRate: -1.0},
+        }),
+    );
+    assert.commandFailed(
+        MirrorReadsHelpers.setParameter({
+            nodeToReadFrom: rst.getPrimary(),
+            value: {samplingRate: 1.01},
+        }),
+    );
+    assert.commandFailed(
+        MirrorReadsHelpers.setParameter({
+            nodeToReadFrom: rst.getPrimary(),
+            value: {somplingRate: 1.0},
+        }),
     );
 
     // Put in a datum
@@ -103,10 +116,20 @@ const kLargeMaxTimeMS = 100000000;
     });
 
     jsTestLog("Verifying processedAsSecondary field for 'find' commands timing out on secondaries");
-    MirrorReadsHelpers.verifyProcessedAsSecondaryOnEarlyError(rst, MirrorReadsHelpers.kGeneralMode, kDbName, kCollName);
+    MirrorReadsHelpers.verifyProcessedAsSecondaryOnEarlyError(
+        rst,
+        MirrorReadsHelpers.kGeneralMode,
+        kDbName,
+        kCollName,
+    );
 
     jsTestLog("Verifying erroredDuringSend field for 'find' commands failing to send");
-    MirrorReadsHelpers.verifyErroredDuringSend(rst, MirrorReadsHelpers.kGeneralMode, kDbName, kCollName);
+    MirrorReadsHelpers.verifyErroredDuringSend(
+        rst,
+        MirrorReadsHelpers.kGeneralMode,
+        kDbName,
+        kCollName,
+    );
 
     if (FeatureFlagUtil.isEnabled(rst.getPrimary(), "BulkWriteCommand")) {
         jsTestLog("Verifying mirrored reads for 'bulkWrite' commands");
@@ -126,7 +149,9 @@ const kLargeMaxTimeMS = 100000000;
     // Test that the pending metric works with just the `failpoint.mirrorMaestroTracksPending` fail
     // point.
     assert.commandWorked(
-        rst.getPrimary().adminCommand({configureFailPoint: "mirrorMaestroExpectsResponse", mode: "off"}),
+        rst
+            .getPrimary()
+            .adminCommand({configureFailPoint: "mirrorMaestroExpectsResponse", mode: "off"}),
     );
     let initialStatsOnPrimary = MirrorReadsHelpers.getMirroredReadsStats(rst.getPrimary(), kDbName);
     MirrorReadsHelpers.sendReads({
@@ -138,7 +163,10 @@ const kLargeMaxTimeMS = 100000000;
     });
     assert.soon(
         () => {
-            let currentStatsOnPrimary = MirrorReadsHelpers.getMirroredReadsStats(rst.getPrimary(), kDbName);
+            let currentStatsOnPrimary = MirrorReadsHelpers.getMirroredReadsStats(
+                rst.getPrimary(),
+                kDbName,
+            );
             const statDifferenceOnPrimary = MirrorReadsHelpers.getStatDifferences(
                 initialStatsOnPrimary,
                 currentStatsOnPrimary,
@@ -191,7 +219,12 @@ const kLargeMaxTimeMS = 100000000;
         rst.initiate();
 
         jsTestLog(`Verifying mirroring distribution for ${secondaries} secondaries`);
-        MirrorReadsHelpers.verifyMirroringDistribution(rst, MirrorReadsHelpers.kGeneralMode, kDbName, kCollName);
+        MirrorReadsHelpers.verifyMirroringDistribution(
+            rst,
+            MirrorReadsHelpers.kGeneralMode,
+            kDbName,
+            kCollName,
+        );
         rst.stopSet();
     }
 }

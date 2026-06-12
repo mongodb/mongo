@@ -25,7 +25,9 @@ function verifyStats({expectedCurrentCount, expectedRejectedCount}) {
         }, expectedRejectedCount: ${expectedRejectedCount}`,
     );
     let serverStatus = getStats();
-    let connectionStats = jsTestOptions().shellGRPC ? serverStatus.gRPC.ingress.streams : serverStatus.connections;
+    let connectionStats = jsTestOptions().shellGRPC
+        ? serverStatus.gRPC.ingress.streams
+        : serverStatus.connections;
 
     assert.soon(
         () => {
@@ -37,7 +39,10 @@ function verifyStats({expectedCurrentCount, expectedRejectedCount}) {
                     expectedRejectedCount
                 }, actualCurrentCount: ${actualCurrentCount}, actualRejectedCount: ${actualRejectedCount}`,
             );
-            return expectedCurrentCount == actualCurrentCount && expectedRejectedCount == actualRejectedCount;
+            return (
+                expectedCurrentCount == actualCurrentCount &&
+                expectedRejectedCount == actualRejectedCount
+            );
         },
         "Failed to verify initial conditions. serverStatus.connections: " + tojson(connectionStats),
         10000,
@@ -59,7 +64,10 @@ for (let i = 0; i < configuredMaxConns * 2; i++) {
         assert(i + 1 >= configuredMaxConns);
         ++expectedRejectedCount;
     }
-    verifyStats({expectedCurrentCount: expectedCurrentCount, expectedRejectedCount: expectedRejectedCount});
+    verifyStats({
+        expectedCurrentCount: expectedCurrentCount,
+        expectedRejectedCount: expectedRejectedCount,
+    });
 }
 
 MongoRunner.stopMongod(conn);

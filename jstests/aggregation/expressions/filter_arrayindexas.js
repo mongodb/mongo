@@ -129,9 +129,18 @@ test(
 testError({$filter: {input: "$b", arrayIndexAs: "i", cond: {$eq: ["$$this", "$$IDX"]}}}, 17276);
 
 // Can't use non-user definable names on 'arrayIndexAs'.
-testError({$filter: {input: "$b", arrayIndexAs: "IDX", cond: {$eq: ["$$this", "$$IDX"]}}}, ErrorCodes.FailedToParse);
-testError({$filter: {input: "$b", arrayIndexAs: "^", cond: {$eq: ["$$this", "$$^"]}}}, ErrorCodes.FailedToParse);
-testError({$filter: {input: "$b", arrayIndexAs: "", cond: {$eq: ["$$this", "$$IDX"]}}}, ErrorCodes.FailedToParse);
+testError(
+    {$filter: {input: "$b", arrayIndexAs: "IDX", cond: {$eq: ["$$this", "$$IDX"]}}},
+    ErrorCodes.FailedToParse,
+);
+testError(
+    {$filter: {input: "$b", arrayIndexAs: "^", cond: {$eq: ["$$this", "$$^"]}}},
+    ErrorCodes.FailedToParse,
+);
+testError(
+    {$filter: {input: "$b", arrayIndexAs: "", cond: {$eq: ["$$this", "$$IDX"]}}},
+    ErrorCodes.FailedToParse,
+);
 
 // Can't use variable defined by 'arrayIndexAs' or $$IDX in the non-'cond' arguments.
 testError({$filter: {input: "$$i", as: "c", cond: true, limit: 1, arrayIndexAs: "i"}}, 17276);

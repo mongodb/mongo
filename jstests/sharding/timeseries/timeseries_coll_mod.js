@@ -23,7 +23,9 @@ function runBasicTest() {
     const mongos = st.s0;
     const db = mongos.getDB(dbName);
 
-    assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
 
     // Updates for timeField and metaField are disabled.
     assert.commandFailedWithCode(
@@ -37,8 +39,12 @@ function runBasicTest() {
 
     // Normal collMod commands works for the unsharded time-series collection.
     assert.commandWorked(db[collName].createIndex({[metaField]: 1}, {name: indexName}));
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: indexName, hidden: true}}));
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: indexName, hidden: false}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: indexName, hidden: true}}),
+    );
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: indexName, hidden: false}}),
+    );
 
     // Granularity update works for unsharded time-series collection.
     assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}));
@@ -60,7 +66,9 @@ function runBasicTest() {
     // Granularity update works for sharded time-series collection, when we're using DDL
     // coordinator logic.
     const getGranularity = () =>
-        db.getSiblingDB("config").collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+        db
+            .getSiblingDB("config")
+            .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
             .timeseriesFields.granularity;
     assert.eq(getGranularity(), "minutes");
     assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: "hours"}}));
@@ -86,7 +94,9 @@ function runReadAfterWriteTest() {
         return;
     }
 
-    assert.commandWorked(mongos0.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
+    assert.commandWorked(
+        mongos0.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}),
+    );
     assert.commandWorked(
         db.createCollection(collName, {
             timeseries: {timeField: timeField, metaField: metaField, granularity: "seconds"},
@@ -103,7 +113,10 @@ function runReadAfterWriteTest() {
     //       shard0                  shard1
     const splitChunk = {[controlTimeField]: ISODate("2022-01-01 09:00:00")};
     assert.commandWorked(
-        mongos0.adminCommand({split: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`, middle: splitChunk}),
+        mongos0.adminCommand({
+            split: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`,
+            middle: splitChunk,
+        }),
     );
     assert.commandWorked(
         mongos0.adminCommand({
@@ -116,7 +129,10 @@ function runReadAfterWriteTest() {
 
     function assertDocumentOnShard(shard, _id) {
         const shardDb = shard.getDB(dbName);
-        const buckets = getTimeseriesCollForRawOps(shardDb, shardDb.getCollection(collName)).find().rawData().toArray();
+        const buckets = getTimeseriesCollForRawOps(shardDb, shardDb.getCollection(collName))
+            .find()
+            .rawData()
+            .toArray();
 
         // If we are writing to time-series collections using the compressed format, the data
         // fields will be compressed. We need to decompress the buckets on the shard in order to
@@ -149,7 +165,9 @@ function runReadAfterWriteTest() {
         funWithArgs(
             function (dbName, collName) {
                 assert.commandWorked(
-                    db.getSiblingDB(dbName).runCommand({collMod: collName, timeseries: {granularity: "hours"}}),
+                    db
+                        .getSiblingDB(dbName)
+                        .runCommand({collMod: collName, timeseries: {granularity: "hours"}}),
                 );
             },
             dbName,
@@ -163,7 +181,9 @@ function runReadAfterWriteTest() {
     // While the collMod command on the config server is still being processed, inserts on the
     // collection should be blocked.
     assert.commandFailedWithCode(
-        mongos0.getDB(dbName).runCommand({insert: collName, documents: [{[timeField]: ISODate()}], maxTimeMS: 2000}),
+        mongos0
+            .getDB(dbName)
+            .runCommand({insert: collName, documents: [{[timeField]: ISODate()}], maxTimeMS: 2000}),
         ErrorCodes.MaxTimeMSExpired,
     );
     assert.commandFailedWithCode(

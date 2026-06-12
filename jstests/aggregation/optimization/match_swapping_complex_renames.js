@@ -32,7 +32,11 @@ function runTest({name, pipeline, positive, negative}) {
                 createIndexes(positive.index);
                 assert.eq(positive.expectedCount, coll.aggregate(pipeline).itcount());
                 const explain = coll.explain().aggregate(pipeline);
-                assert.neq(null, getAggPlanStage(explain, "IXSCAN"), "Expected IXSCAN (pushdown): " + tojson(explain));
+                assert.neq(
+                    null,
+                    getAggPlanStage(explain, "IXSCAN"),
+                    "Expected IXSCAN (pushdown): " + tojson(explain),
+                );
             });
         }
 
@@ -43,7 +47,11 @@ function runTest({name, pipeline, positive, negative}) {
                 createIndexes(negative.index);
                 assert.eq(negative.expectedCount, coll.aggregate(pipeline).itcount());
                 const explain = coll.explain().aggregate(pipeline);
-                assert.eq(null, getAggPlanStage(explain, "IXSCAN"), "Expected NO IXSCAN: " + tojson(explain));
+                assert.eq(
+                    null,
+                    getAggPlanStage(explain, "IXSCAN"),
+                    "Expected NO IXSCAN: " + tojson(explain),
+                );
             });
         }
     });

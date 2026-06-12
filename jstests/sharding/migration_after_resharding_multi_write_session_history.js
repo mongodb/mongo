@@ -12,7 +12,9 @@ const dbName = "test";
 const collName = "foo";
 const coll = st.s.getDB(dbName)[collName];
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 
 // Create separate session pairs for each operation type to avoid txnNumber conflicts.
@@ -155,7 +157,10 @@ Object.values(writeConfigurations).forEach((writeConfig) => {
 });
 
 jsTest.log("Starting resharding operation...");
-let fpHangResharding = configureFailPoint(st.configRS.getPrimary(), "reshardingPauseCoordinatorBeforeBlockingWrites");
+let fpHangResharding = configureFailPoint(
+    st.configRS.getPrimary(),
+    "reshardingPauseCoordinatorBeforeBlockingWrites",
+);
 
 let awaitResharding = startParallelShell(
     funWithArgs(
@@ -189,19 +194,30 @@ assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
 
 Object.values(writeConfigurations).forEach((writeConfig) => {
     jsTest.log(`Verifying ${writeConfig.name} retries after resharding...`);
-    assert.commandFailedWithCode(writeConfig.beforeReshardingOp(), ErrorCodes.IncompleteTransactionHistory);
+    assert.commandFailedWithCode(
+        writeConfig.beforeReshardingOp(),
+        ErrorCodes.IncompleteTransactionHistory,
+    );
     assert.commandWorked(writeConfig.duringReshardingOp());
 });
 
 // Verify retrying after a subsequent moveChunk also does not double apply.
 assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {a: 0}}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}),
+    st.s.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {a: 10},
+        to: st.shard2.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 Object.values(writeConfigurations).forEach((writeConfig) => {
     jsTest.log(`Verifying ${writeConfig.name} retries after moveChunk...`);
-    assert.commandFailedWithCode(writeConfig.beforeReshardingOp(), ErrorCodes.IncompleteTransactionHistory);
+    assert.commandFailedWithCode(
+        writeConfig.beforeReshardingOp(),
+        ErrorCodes.IncompleteTransactionHistory,
+    );
     assert.commandWorked(writeConfig.duringReshardingOp());
 });
 

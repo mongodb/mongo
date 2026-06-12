@@ -271,10 +271,14 @@ export class Filter {
                 const d = pickDoc();
                 if (!d) return matchNothing;
 
-                const exclude = new Set(this.params.exclude ?? ["_id", timeFieldname, metaFieldname].filter(Boolean));
+                const exclude = new Set(
+                    this.params.exclude ?? ["_id", timeFieldname, metaFieldname].filter(Boolean),
+                );
                 const allow = Array.isArray(this.params.allow) ? new Set(this.params.allow) : null;
 
-                const keys = Object.keys(d).filter((k) => !exclude.has(k) && (allow ? allow.has(k) : true));
+                const keys = Object.keys(d).filter(
+                    (k) => !exclude.has(k) && (allow ? allow.has(k) : true),
+                );
                 if (keys.length === 0) return matchNothing;
 
                 // Pick a key by seed; use another mix so key choice isn't perfectly correlated with doc choice.
@@ -599,7 +603,8 @@ function inferMetricType(v) {
     if (typeof Code === "function" && v instanceof Code) {
         return v.scope !== undefined ? "javascriptWithScope" : "javascript";
     }
-    if (typeof globalThis.BSONSymbol === "function" && v instanceof globalThis.BSONSymbol) return "symbol";
+    if (typeof globalThis.BSONSymbol === "function" && v instanceof globalThis.BSONSymbol)
+        return "symbol";
 
     // MinKey/MaxKey: support both constructor and structural forms.
     if (typeof MinKey === "function" && v instanceof MinKey) return "minKey";

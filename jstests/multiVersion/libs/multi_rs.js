@@ -97,7 +97,9 @@ ReplSetTest.prototype.upgradePrimary = function (primary, options, user, pwd) {
 
     // we need to re-authenticate on all connections before calling awaitNodesAgreeOnPrimary().
     for (const node of this.nodes) {
-        const connStatus = assert.commandWorked(node.adminCommand({connectionStatus: 1, showPrivileges: true}));
+        const connStatus = assert.commandWorked(
+            node.adminCommand({connectionStatus: 1, showPrivileges: true}),
+        );
 
         const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
         if (connIsAuthenticated) {
@@ -115,7 +117,11 @@ ReplSetTest.prototype.upgradePrimary = function (primary, options, user, pwd) {
     let newPrimary = this.getPrimary();
 
     if (this._stablePrimaryOnRestarts()) {
-        assert.eq(newPrimary, primary, "Primary changed unexpectedly after upgrading old primary node");
+        assert.eq(
+            newPrimary,
+            primary,
+            "Primary changed unexpectedly after upgrading old primary node",
+        );
     }
     return newPrimary;
 };
@@ -144,7 +150,11 @@ ReplSetTest.prototype.upgradeNode = function (node, opts = {}, user, pwd) {
         newNode.getDB("admin").auth(user, pwd);
     }
 
-    let waitForStates = [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY, ReplSetTest.State.ARBITER];
+    let waitForStates = [
+        ReplSetTest.State.PRIMARY,
+        ReplSetTest.State.SECONDARY,
+        ReplSetTest.State.ARBITER,
+    ];
     this.waitForState(newNode, waitForStates);
 
     if (user !== undefined) {
@@ -170,7 +180,10 @@ ReplSetTest.prototype.stepdown = function (nodeId) {
         // resume syncing from the primary in this case, which in turn will let the primary
         // finish stepping down successfully.
         node.getDB("admin").garbageWriteToAdvanceOpTime.insert({a: 1});
-        assert.adminCommandWorkedAllowingNetworkError(node, {replSetStepDown: 5 * 60, secondaryCatchUpPeriodSecs: 60});
+        assert.adminCommandWorkedAllowingNetworkError(node, {
+            replSetStepDown: 5 * 60,
+            secondaryCatchUpPeriodSecs: 60,
+        });
         return true;
     });
 

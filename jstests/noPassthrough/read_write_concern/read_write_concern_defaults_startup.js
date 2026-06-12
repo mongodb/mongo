@@ -13,7 +13,9 @@ import {reconnect} from "jstests/replsets/rslib.js";
 
 function runTest(conn, failPointConn, restartFn) {
     // Set a default rwc.
-    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}));
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
+    );
     let res = assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1}));
     assert.eq(res.defaultReadConcern, {level: "local"});
 
@@ -24,10 +26,15 @@ function runTest(conn, failPointConn, restartFn) {
 
     // Verify the server attempted to load the defaults at startup.
     checkLog.contains(conn, "Error loading read and write concern defaults at startup");
-    checkLog.contains(conn, "Failing read/write concern persisted defaults lookup because of fail point");
+    checkLog.contains(
+        conn,
+        "Failing read/write concern persisted defaults lookup because of fail point",
+    );
 
     // Disable the fail point and verify the defaults can be returned.
-    assert.commandWorked(failPointConn.adminCommand({configureFailPoint: "failRWCDefaultsLookup", mode: "off"}));
+    assert.commandWorked(
+        failPointConn.adminCommand({configureFailPoint: "failRWCDefaultsLookup", mode: "off"}),
+    );
     res = assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1}));
     assert.eq(res.defaultReadConcern, {level: "local"});
 
@@ -42,7 +49,9 @@ jsTestLog("Testing mongos...");
 
     runTest(st.s, st.configRS.getPrimary(), () => {
         assert.commandWorked(
-            st.configRS.getPrimary().adminCommand({configureFailPoint: "failRWCDefaultsLookup", mode: "alwaysOn"}),
+            st.configRS
+                .getPrimary()
+                .adminCommand({configureFailPoint: "failRWCDefaultsLookup", mode: "alwaysOn"}),
         );
         st.restartMongos(0);
     });
@@ -58,7 +67,9 @@ jsTestLog("Testing plain replica set node...");
 
     const primary = rst.getPrimary();
     runTest(primary, primary, () => {
-        rst.restart(primary, {setParameter: "failpoint.failRWCDefaultsLookup=" + tojson({mode: "alwaysOn"})});
+        rst.restart(primary, {
+            setParameter: "failpoint.failRWCDefaultsLookup=" + tojson({mode: "alwaysOn"}),
+        });
         rst.getPrimary();
     });
 

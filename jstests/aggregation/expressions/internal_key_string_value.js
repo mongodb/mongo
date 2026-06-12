@@ -45,7 +45,9 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}]).toArray();
+results = coll
+    .aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}])
+    .toArray();
 assert.eq(docs.length, results.length, results);
 assert(
     results.every((result) => bsonWoCompare(result.b, results[0].b) === 0),
@@ -62,7 +64,9 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {c: {$_internalKeyStringValue: {input: "$a"}}}}]).toArray();
+results = coll
+    .aggregate([{$sort: {_id: 1}}, {$addFields: {c: {$_internalKeyStringValue: {input: "$a"}}}}])
+    .toArray();
 assert.eq(docs.length, results.length, results);
 assert(
     results.every((result) => bsonWoCompare(result.c, results[0].c) === 0),
@@ -77,7 +81,9 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}]).toArray();
+results = coll
+    .aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}])
+    .toArray();
 assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
@@ -93,7 +99,10 @@ results = coll
     .aggregate([
         {$sort: {_id: 1}},
         {
-            $addFields: {b: {$_internalKeyStringValue: {input: "$a"}}, c: {$toHashedIndexKey: "$a"}},
+            $addFields: {
+                b: {$_internalKeyStringValue: {input: "$a"}},
+                c: {$toHashedIndexKey: "$a"},
+            },
         },
     ])
     .toArray();

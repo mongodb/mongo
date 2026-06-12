@@ -24,10 +24,20 @@ import {
     SingleChangeStreamMatcher,
     MultipleChangeStreamMatcher,
 } from "jstests/libs/util/change_stream/change_stream_matcher.js";
-import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
+import {
+    ChangeStreamReader,
+    ChangeStreamReadingMode,
+} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {ChangeStreamWatchMode, getClusterTime} from "jstests/libs/query/change_stream_util.js";
-import {InsertDocCommand, DropCollectionCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
-import {TEST_DB, TEST_SEED, createShardingTest} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
+import {
+    InsertDocCommand,
+    DropCollectionCommand,
+} from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {
+    TEST_DB,
+    TEST_SEED,
+    createShardingTest,
+} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
 jsTest.log.info(
@@ -74,10 +84,18 @@ describe("ShardingCommandGenerator", function () {
         const commands1 = gen1.generateCommands(model1, params1);
         const commands2 = gen2.generateCommands(model2, params2);
 
-        assert.eq(commands1.length, commands2.length, "Same seed should produce same number of commands");
+        assert.eq(
+            commands1.length,
+            commands2.length,
+            "Same seed should produce same number of commands",
+        );
 
         for (let i = 0; i < commands1.length; i++) {
-            assert.eq(commands1[i].toString(), commands2[i].toString(), `Command ${i}: type mismatch`);
+            assert.eq(
+                commands1[i].toString(),
+                commands2[i].toString(),
+                `Command ${i}: type mismatch`,
+            );
         }
     });
 
@@ -345,7 +363,10 @@ describe("ChangeStreamReader integration", function () {
      * @param {string} readingMode - Reading mode constant
      */
     function testCaptureInsertEvents(ctx, readingMode) {
-        const modeName = readingMode === ChangeStreamReadingMode.kContinuous ? "Continuous" : "FetchOneAndResume";
+        const modeName =
+            readingMode === ChangeStreamReadingMode.kContinuous
+                ? "Continuous"
+                : "FetchOneAndResume";
         const dbName = TEST_DB;
         const collName = `test_coll_${modeName.toLowerCase()}`;
         const writerInstanceName = "writer_test";
@@ -528,7 +549,9 @@ describe("ChangeStreamReader integration", function () {
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
-        jsTest.log.debug(`\n========== ChangeStreamReader FetchOneAndResume + Invalidate ==========`);
+        jsTest.log.debug(
+            `\n========== ChangeStreamReader FetchOneAndResume + Invalidate ==========`,
+        );
 
         // Expected events: 2 InsertDocCommands (1 insert each) + drop + invalidate.
         const expectedEventTypes = ["insert", "insert", "drop", "invalidate"];

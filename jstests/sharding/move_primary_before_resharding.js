@@ -26,8 +26,12 @@ assert.neq(originalCollInfo, null, "failed to find sharded collection before res
 
 const st = reshardingTest._st;
 // Move chunk to and from donorShard to warm up config server CatalogCache
-assert.commandWorked(st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: donorShardName}));
-assert.commandWorked(st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: recipientShardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: donorShardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: recipientShardName}),
+);
 
 assert.commandWorked(st.s.adminCommand({movePrimary: "reshardingDb", to: donorShardName}));
 

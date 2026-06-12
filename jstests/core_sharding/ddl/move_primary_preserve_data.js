@@ -43,7 +43,11 @@ const viewDataColl = db["view_data_coll"];
 assert.commandWorked(viewDataColl.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 const view = db["view"];
 assert.commandWorked(
-    db.runCommand({create: view.getName(), viewOn: viewDataColl.getName(), pipeline: [{$match: {a: 3}}]}),
+    db.runCommand({
+        create: view.getName(),
+        viewOn: viewDataColl.getName(),
+        pipeline: [{$match: {a: 3}}],
+    }),
 );
 assert.eq(1, view.countDocuments({}));
 

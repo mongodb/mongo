@@ -22,10 +22,17 @@ export function verifyShardsPartExplainOutput({
     sortSpec = null,
 }) {
     // Checks index 0 of 'shardsPart' since $search, $searchMeta need to come first in the pipeline
-    assert(result.splitPipeline.shardsPart[0][searchType].hasOwnProperty("metadataMergeProtocolVersion"));
+    assert(
+        result.splitPipeline.shardsPart[0][searchType].hasOwnProperty(
+            "metadataMergeProtocolVersion",
+        ),
+    );
     assert(result.splitPipeline.shardsPart[0][searchType].hasOwnProperty("mergingPipeline"));
 
-    assert.eq(NumberInt(result.splitPipeline.shardsPart[0][searchType].metadataMergeProtocolVersion), protocolVersion);
+    assert.eq(
+        NumberInt(result.splitPipeline.shardsPart[0][searchType].metadataMergeProtocolVersion),
+        protocolVersion,
+    );
 
     if (metaPipeline) {
         assert.eq(result.splitPipeline.shardsPart[0][searchType].mergingPipeline, metaPipeline);
@@ -73,7 +80,12 @@ export function prepareUnionWithExplain(unionSubExplain) {
     return {stages: unionSubExplain};
 }
 
-const mongotStages = ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup", "$vectorSearch"];
+const mongotStages = [
+    "$_internalSearchMongotRemote",
+    "$searchMeta",
+    "$_internalSearchIdLookup",
+    "$vectorSearch",
+];
 
 /**
  * Validates that the mongot stage from the explain output includes the required execution metrics.
@@ -101,8 +113,14 @@ export function validateMongotStageExplainExecutionStats({
     isE2E = false,
     numFiltered = null,
 }) {
-    assert(mongotStages.includes(stageType), "stageType must be a mongot stage found in mongotStages.");
-    assert(stage[stageType], "Given stage isn't the expected stage. " + stageType + " is not found.");
+    assert(
+        mongotStages.includes(stageType),
+        "stageType must be a mongot stage found in mongotStages.",
+    );
+    assert(
+        stage[stageType],
+        "Given stage isn't the expected stage. " + stageType + " is not found.",
+    );
 
     const isIdLookup = stageType === "$_internalSearchIdLookup";
 

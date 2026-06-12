@@ -42,10 +42,14 @@ try {
     const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), "a_1", filter);
 
     // Index build should be present in the config.system.indexBuilds collection if not primary driven.
-    const indexMap = IndexBuildTest.assertIndexesSoon(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+    const indexMap = IndexBuildTest.assertIndexesSoon(coll, 2, ["_id_"], ["a_1"], {
+        includeBuildUUIDs: true,
+    });
     const indexBuildUUID = indexMap["a_1"].buildUUID;
     if (FeatureFlagUtil.isPresentAndEnabled(primary.getDB("config"), "PrimaryDrivenIndexBuilds")) {
-        assert.isnull(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
+        assert.isnull(
+            primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}),
+        );
     } else {
         assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
     }
@@ -54,7 +58,9 @@ try {
     assert.commandWorked(testDB.killOp(opId));
     checkLog.containsJson(primary, 4656003);
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}),
+    );
 }
 
 // Wait for the index build to stop.

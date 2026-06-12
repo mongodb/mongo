@@ -10,7 +10,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     shards: 1,
     other: {
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+        configOptions: {
+            setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000},
+        },
     },
 });
 const mongos = st.s0;
@@ -30,7 +32,9 @@ const resetColl = function (shardedColl) {
     assert.commandWorked(shardedColl.insert({a: 1, b: 2}));
     assert.commandWorked(mongos.getCollection(shardedColl.getFullName()).createIndex(oldKeyDoc));
     assert.commandWorked(mongos.getCollection(shardedColl.getFullName()).createIndex(newKeyDoc));
-    assert.commandWorked(mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: oldKeyDoc}));
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: oldKeyDoc}),
+    );
 };
 
 const uuid = function () {

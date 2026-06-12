@@ -3,7 +3,11 @@
  * communication with mongot.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {CA_CERT, SERVER_CERT, CLIENT_PASSWORD_PROTECTED_CERT} from "jstests/ssl/libs/ssl_helpers.js";
+import {
+    CA_CERT,
+    SERVER_CERT,
+    CLIENT_PASSWORD_PROTECTED_CERT,
+} from "jstests/ssl/libs/ssl_helpers.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 function runOneTest(mongodTlsOpts, badPassword) {
@@ -44,7 +48,12 @@ function runOneTest(mongodTlsOpts, badPassword) {
     // Give mongotmock some stuff to return.
     {
         const cursorId = NumberLong(123);
-        const searchCmd = {search: collName, collectionUUID: collUUID, query: searchQuery, $db: "test"};
+        const searchCmd = {
+            search: collName,
+            collectionUUID: collUUID,
+            query: searchQuery,
+            $db: "test",
+        };
         const history = [
             {
                 expectedCommand: searchCmd,
@@ -59,7 +68,9 @@ function runOneTest(mongodTlsOpts, badPassword) {
             },
         ];
 
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+        );
     }
 
     // Perform a $search query.

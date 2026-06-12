@@ -27,7 +27,9 @@ const ns = dbName + "." + collName;
 const numDocs = 100;
 let coll = st.s.getCollection(ns);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 function setupTest() {
     coll.drop();
@@ -41,7 +43,12 @@ function setupTest() {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: numDocs}}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {x: numDocs}, to: st.shard1.shardName, waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: {x: numDocs},
+            to: st.shard1.shardName,
+            waitForDelete: true,
+        }),
     );
 
     jsTest.log("Inserting initial data.");
@@ -100,7 +107,9 @@ async function deleteOperationFn(shardColl, numInitialDocsOnShard0) {
 function runTest(writeOpFn) {
     setupTest();
 
-    let fp1 = configureFailPoint(st.rs0.getPrimary(), "setYieldAllLocksHang", {namespace: coll.getFullName()});
+    let fp1 = configureFailPoint(st.rs0.getPrimary(), "setYieldAllLocksHang", {
+        namespace: coll.getFullName(),
+    });
 
     const writeThread = new Thread(
         (shard0PrimaryHost, writeOpFn, dbName, collName, numDocs) => {
@@ -121,7 +130,10 @@ function runTest(writeOpFn) {
     jsTest.log("Multi-write yielded");
 
     // Start chunk migration and wait for it to enter the critical section.
-    let failpointHangMigrationWhileInCriticalSection = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep5");
+    let failpointHangMigrationWhileInCriticalSection = configureFailPoint(
+        st.rs0.getPrimary(),
+        "moveChunkHangAtStep5",
+    );
     const migrationThread = new Thread(
         (mongosHost, ns, toShard) => {
             const mongos = new Mongo(mongosHost);

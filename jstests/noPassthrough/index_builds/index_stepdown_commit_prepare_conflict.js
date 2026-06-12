@@ -45,7 +45,9 @@ assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
 // Enable fail point which makes hybrid index build to hang.
 const failPoint = "hangIndexBuildAfterSignalPrimaryForCommitReadiness";
-let res = assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+let res = assert.commandWorked(
+    primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}),
+);
 let timesEntered = res.count;
 
 const indexThread = IndexBuildTest.startIndexBuild(

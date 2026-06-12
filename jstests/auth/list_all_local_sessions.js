@@ -58,7 +58,9 @@ const st = new ShardingTest({
     config: 1,
     other: {
         keyFile: "jstests/libs/key1",
-        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+        mongosOptions: {
+            setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        },
     },
 });
 runListAllLocalSessionsTest(st.s0);

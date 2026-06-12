@@ -155,17 +155,34 @@ export var TagsTest = function (options) {
         // primary.
         // expectedWritableNodesCount is the number of nodes we can expect to write to. Defaults to
         //     expectedNodesAgreeOnPrimary.length.
-        let ensurePrimary = function (nodeId, expectedNodesAgreeOnPrimary, expectedWritableNodesCount) {
-            expectedWritableNodesCount = expectedWritableNodesCount || expectedNodesAgreeOnPrimary.length;
-            jsTestLog("ensurePrimary - Node " + nodeId + " (" + replTest.nodes[nodeId].host + ") should be primary.");
+        let ensurePrimary = function (
+            nodeId,
+            expectedNodesAgreeOnPrimary,
+            expectedWritableNodesCount,
+        ) {
+            expectedWritableNodesCount =
+                expectedWritableNodesCount || expectedNodesAgreeOnPrimary.length;
+            jsTestLog(
+                "ensurePrimary - Node " +
+                    nodeId +
+                    " (" +
+                    replTest.nodes[nodeId].host +
+                    ") should be primary.",
+            );
 
             // Wait until the desired node steps up as primary and can accept writes.
-            assert.soonNoExcept(() => assert.commandWorked(replTest.nodes[nodeId].adminCommand({replSetStepUp: 1})));
+            assert.soonNoExcept(() =>
+                assert.commandWorked(replTest.nodes[nodeId].adminCommand({replSetStepUp: 1})),
+            );
             assert.soon(() => replTest.getPrimary() === replTest.nodes[nodeId]);
             let primary = replTest.nodes[nodeId];
 
             // Wait until nodes know about the new primary.
-            replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, expectedNodesAgreeOnPrimary, nodeId);
+            replTest.awaitNodesAgreeOnPrimary(
+                replTest.timeoutMS,
+                expectedNodesAgreeOnPrimary,
+                nodeId,
+            );
             jsTestLog(
                 "ensurePrimary - Nodes " +
                     tojson(expectedNodesAgreeOnPrimary) +
@@ -206,8 +223,12 @@ export var TagsTest = function (options) {
         conns[3].disconnect(conns[4]);
         jsTestLog("Done setting up partitions");
 
-        jsTestLog("partitions: nodes with each set of brackets [N1, N2, N3] form a complete network.");
-        jsTestLog("partitions: [0-1-2] [3] [4] (only nodes 0 and 1 can replicate from primary node 2");
+        jsTestLog(
+            "partitions: nodes with each set of brackets [N1, N2, N3] form a complete network.",
+        );
+        jsTestLog(
+            "partitions: [0-1-2] [3] [4] (only nodes 0 and 1 can replicate from primary node 2",
+        );
 
         let doc = {x: 1};
 
@@ -241,7 +262,10 @@ export var TagsTest = function (options) {
         assert(result.getWriteConcernError().errInfo.wtimeout);
 
         conns[1].reconnect(conns[4]);
-        jsTestLog("partitions: [0-1-2] [1-4] [3] " + "(all nodes besides node 3 can replicate from primary node 2)");
+        jsTestLog(
+            "partitions: [0-1-2] [1-4] [3] " +
+                "(all nodes besides node 3 can replicate from primary node 2)",
+        );
         primary = ensurePrimary(2, replTest.nodes.slice(0, 3), 4);
 
         jsTestLog(
@@ -259,13 +283,22 @@ export var TagsTest = function (options) {
         assert.commandWorked(primary.getDB("foo").bar.insert(doc));
         result = assert.writeError(primary.getDB("foo").bar.insert(doc, options));
         assert.neq(null, result.getWriteConcernError());
-        assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result.getWriteConcernError()));
+        assert(
+            result.getWriteConcernError().errInfo.wtimeout,
+            tojson(result.getWriteConcernError()),
+        );
 
         conns[3].reconnect(conns[4]);
-        jsTestLog("partitions: [0-1-2] [1-4] [3-4] " + "(all secondaries can replicate from primary node 2)");
+        jsTestLog(
+            "partitions: [0-1-2] [1-4] [3-4] " +
+                "(all secondaries can replicate from primary node 2)",
+        );
         primary = ensurePrimary(2, replTest.nodes.slice(0, 3), replTest.nodes.length);
 
-        jsTestLog('Write concern "3 and 4" should work - ' + "nodes 3 and 4 are connected to primary via node 1.");
+        jsTestLog(
+            'Write concern "3 and 4" should work - ' +
+                "nodes 3 and 4 are connected to primary via node 1.",
+        );
         options = {writeConcern: {w: "3 and 4", wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.commandWorked(primary.getDB("foo").bar.insert(doc));
         assert.commandWorked(primary.getDB("foo").bar.insert(doc, options));
@@ -309,12 +342,16 @@ export var TagsTest = function (options) {
         );
         primary = ensurePrimary(1, replTest.nodes.slice(0, 2), 4);
 
-        jsTestLog('Write concern "3 and 4" should still work with new primary node 1 ' + primary.host);
+        jsTestLog(
+            'Write concern "3 and 4" should still work with new primary node 1 ' + primary.host,
+        );
         options = {writeConcern: {w: "3 and 4", wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.commandWorked(primary.getDB("foo").bar.insert(doc));
         assert.commandWorked(primary.getDB("foo").bar.insert(doc, options));
 
-        jsTestLog('Write concern "2" should fail because node 2 ' + replTest.nodes[2].host + " is down.");
+        jsTestLog(
+            'Write concern "2" should fail because node 2 ' + replTest.nodes[2].host + " is down.",
+        );
         options = {writeConcern: {w: "2", wtimeout: failTimeout}};
         assert.commandWorked(primary.getDB("foo").bar.insert(doc));
         result = assert.writeError(primary.getDB("foo").bar.insert(doc, options));

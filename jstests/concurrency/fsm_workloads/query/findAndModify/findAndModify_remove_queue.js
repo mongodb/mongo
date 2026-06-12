@@ -55,14 +55,23 @@ export const $config = (function () {
 
     let states = (function () {
         function remove(db, collName) {
-            let res = db.runCommand({findAndModify: db[collName].getName(), query: {}, sort: {rand: -1}, remove: true});
+            let res = db.runCommand({
+                findAndModify: db[collName].getName(),
+                query: {},
+                sort: {rand: -1},
+                remove: true,
+            });
             assert.commandWorked(res);
 
             let doc = res.value;
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
                 // return null.
-                assert.neq(doc, null, "findAndModify should have found and removed a matching document");
+                assert.neq(
+                    doc,
+                    null,
+                    "findAndModify should have found and removed a matching document",
+                );
             }
             if (doc !== null) {
                 this.saveDocId(db, collName, doc._id);
@@ -86,7 +95,8 @@ export const $config = (function () {
             assert.neq(
                 typeof doc._id,
                 "object",
-                "default comparator of" + " Array.prototype.sort() is not well-ordered for JS objects",
+                "default comparator of" +
+                    " Array.prototype.sort() is not well-ordered for JS objects",
             );
             bulk.insert(doc);
         }
@@ -106,12 +116,20 @@ export const $config = (function () {
             // Each findAndModify should be internally retried until it removes exactly one
             // document. Since this.numDocs == this.iterations * this.threadCount, there should not
             // be any documents remaining.
-            assert.eq(db[collName].find().itcount(), 0, "Expected all documents to have been removed");
+            assert.eq(
+                db[collName].find().itcount(),
+                0,
+                "Expected all documents to have been removed",
+            );
         } else if (this.opName === "updated") {
             // Each findAndModify should be internally retried until it updates exactly one
             // document. Since this.numDocs == this.iterations * this.threadCount, there should not
             // be any documents remaining with '{counter: 0}'.
-            assert.eq(db[collName].find({counter: 0}).itcount(), 0, "Expected all documents to have been updated");
+            assert.eq(
+                db[collName].find({counter: 0}).itcount(),
+                0,
+                "Expected all documents to have been updated",
+            );
         }
 
         let docs = ownedDB[collName].find().toArray();

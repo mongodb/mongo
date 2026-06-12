@@ -70,11 +70,22 @@ function runTests(bypassEmptyTsReplacement) {
                 {
                     update: 0,
                     filter: {_id: getId(6)},
-                    updateMods: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
+                    updateMods: [
+                        {
+                            $_internalApplyOplogUpdate: {
+                                oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}},
+                            },
+                        },
+                    ],
                 },
 
                 // Do an update-operator-style update to add a new document with _id=getId(7).
-                {update: 0, filter: {_id: getId(7)}, updateMods: {$set: {a: emptyTs}}, upsert: true},
+                {
+                    update: 0,
+                    filter: {_id: getId(7)},
+                    updateMods: {$set: {a: emptyTs}},
+                    upsert: true,
+                },
 
                 // Do a pipline-style update to add a new document with _id=getId(8).
                 {
@@ -89,7 +100,13 @@ function runTests(bypassEmptyTsReplacement) {
                 {
                     update: 0,
                     filter: {_id: getId(9)},
-                    updateMods: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
+                    updateMods: [
+                        {
+                            $_internalApplyOplogUpdate: {
+                                oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}},
+                            },
+                        },
+                    ],
                     upsert: true,
                 },
             ],

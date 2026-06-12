@@ -96,7 +96,9 @@ export function prepareShardedCollectionWithOrphans(st) {
     // Shard the collection and move all docs where 'a' >= 2 to the non-primary shard.
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
     assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {a: 2}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 2}, to: otherShard}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 2}, to: otherShard}),
+    );
 
     // Insert orphans to both shards. Both shards must include multikey values in order to not break
     // sharded passthrough tests which rely on the assumption that multikey indexes are indeed
@@ -127,7 +129,9 @@ export function prepareShardedCollectionWithOrphans(st) {
         {a: 1.2, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
         {a: 1.3, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
     ];
-    assert.commandWorked(st.shard0.getCollection(coll.getFullName()).insert(primaryShardOrphanDocs));
+    assert.commandWorked(
+        st.shard0.getCollection(coll.getFullName()).insert(primaryShardOrphanDocs),
+    );
     assert.commandWorked(st.shard1.getCollection(coll.getFullName()).insert(otherShardOrphanDocs));
     return db;
 }

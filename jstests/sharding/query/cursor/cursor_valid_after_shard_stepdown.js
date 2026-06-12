@@ -28,7 +28,9 @@ const primary = st.rs0.getPrimary();
 // Stepdown the primary of the shard and ensure that that cursor can still be read
 st.rs0.freeze(primary);
 
-let getMoreCursor = assert.commandWorked(db.runCommand({getMore: findCursor.id, collection: "TestColl"})).cursor;
+let getMoreCursor = assert.commandWorked(
+    db.runCommand({getMore: findCursor.id, collection: "TestColl"}),
+).cursor;
 assert.eq(0, getMoreCursor.id);
 assert.eq(2, getMoreCursor.nextBatch[0].x);
 

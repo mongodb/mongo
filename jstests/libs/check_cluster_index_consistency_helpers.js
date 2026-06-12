@@ -36,8 +36,13 @@ export var ClusterIndexConsistencyChecker = (function () {
                         // NotPrimary shard errors as HostUnreachable so that the client retries
                         // without triggering an SDAM state change. Once the mongos refreshes its
                         // topology the retry will succeed.
-                        if (e.code === ErrorCodes.ShardNotFound || e.code === ErrorCodes.HostUnreachable) {
-                            jsTest.log.info("Retrying $indexStats aggregation on transient error", {error: e});
+                        if (
+                            e.code === ErrorCodes.ShardNotFound ||
+                            e.code === ErrorCodes.HostUnreachable
+                        ) {
+                            jsTest.log.info("Retrying $indexStats aggregation on transient error", {
+                                error: e,
+                            });
                             continue;
                         }
                         throw e;
@@ -48,7 +53,9 @@ export var ClusterIndexConsistencyChecker = (function () {
 
         mongos.fullOptions = mongos.fullOptions || {};
         const requiresAuth = keyFile || mongos.fullOptions.clusterAuthMode === "x509";
-        const collDocs = requiresAuth ? authutil.asCluster(mongos, keyFile, getCollDocs) : getCollDocs();
+        const collDocs = requiresAuth
+            ? authutil.asCluster(mongos, keyFile, getCollDocs)
+            : getCollDocs();
         for (const collDoc of collDocs) {
             const ns = collDoc._id;
             const getIndexDocsForNs = makeGetIndexDocsFunc(ns);
@@ -63,7 +70,8 @@ export var ClusterIndexConsistencyChecker = (function () {
                 continue;
             }
 
-            const inconsistentIndexes = ShardedIndexUtil.findInconsistentIndexesAcrossShards(indexDocs);
+            const inconsistentIndexes =
+                ShardedIndexUtil.findInconsistentIndexesAcrossShards(indexDocs);
 
             for (const shard in inconsistentIndexes) {
                 const shardInconsistentIndexes = inconsistentIndexes[shard];

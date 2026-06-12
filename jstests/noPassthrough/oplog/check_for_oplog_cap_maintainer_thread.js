@@ -14,7 +14,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verify that the oplog cap maintainer thread is running under normal circumstances.
 jsTestLog("Testing single node replica set mode");
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: 1})}}});
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: 1})}},
+});
 rst.startSet();
 rst.initiate();
 

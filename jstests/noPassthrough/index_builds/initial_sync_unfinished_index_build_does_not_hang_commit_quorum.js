@@ -99,7 +99,10 @@ function fpDataToStartupParams(failpoints) {
 }
 
 let fpData = {};
-fpData[initialSyncFpName] = {mode: "alwaysOn", data: {namespace: `${dbName}.${collName}`, numDocsToClone: 0}};
+fpData[initialSyncFpName] = {
+    mode: "alwaysOn",
+    data: {namespace: `${dbName}.${collName}`, numDocsToClone: 0},
+};
 
 // Restart the secondary with a clean data directory to start the initial sync process.
 secondary = rst.restart(1, {
@@ -186,5 +189,13 @@ rst.awaitSecondaryNodes();
 
 const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 IndexBuildTest.assertIndexesIdHelper(coll, 7, ["a_1", "b_1", "c_1", "d_1", "e_1", "f_1", "g_1"]);
-IndexBuildTest.assertIndexesIdHelper(secondaryColl, 7, ["a_1", "b_1", "c_1", "d_1", "e_1", "f_1", "g_1"]);
+IndexBuildTest.assertIndexesIdHelper(secondaryColl, 7, [
+    "a_1",
+    "b_1",
+    "c_1",
+    "d_1",
+    "e_1",
+    "f_1",
+    "g_1",
+]);
 rst.stopSet();

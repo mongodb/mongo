@@ -55,7 +55,10 @@ replTest.awaitSecondaryNodes(null, [initialSyncNode]);
 replTest.awaitReplication();
 
 validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
-assert.sameMembers(primary.getDB(dbName).getCollectionInfos(), initialSyncNode.getDB(dbName).getCollectionInfos());
+assert.sameMembers(
+    primary.getDB(dbName).getCollectionInfos(),
+    initialSyncNode.getDB(dbName).getCollectionInfos(),
+);
 
 // Now make the initial sync node step up.
 replTest.stepUp(initialSyncNode);

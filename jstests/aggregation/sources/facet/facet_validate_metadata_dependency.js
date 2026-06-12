@@ -41,7 +41,10 @@ const validatedMetaFields = [
 validatedMetaFields.forEach((metaField) => {
     jsTestLog("Testing meta field " + metaField.fieldName);
     // First test $project.
-    let pipeline = [{$match: {_id: {$gte: 0}}}, {$facet: {pipe1: [{$project: {score: {$meta: metaField.fieldName}}}]}}];
+    let pipeline = [
+        {$match: {_id: {$gte: 0}}},
+        {$facet: {pipe1: [{$project: {score: {$meta: metaField.fieldName}}}]}},
+    ];
     let errMsg = "requires " + metaField.debugName + " metadata";
     assertErrCodeAndErrMsgContains(coll, pipeline, kUnavailableMetadataErrCode, errMsg);
 
@@ -50,7 +53,10 @@ validatedMetaFields.forEach((metaField) => {
         return;
     }
 
-    pipeline = [{$match: {_id: {$gte: 0}}}, {$facet: {pipe1: [{$sort: {a: {$meta: metaField.fieldName}}}]}}];
+    pipeline = [
+        {$match: {_id: {$gte: 0}}},
+        {$facet: {pipe1: [{$sort: {a: {$meta: metaField.fieldName}}}]}},
+    ];
     errMsg = "requires " + metaField.debugName + " metadata";
     assertErrCodeAndErrMsgContains(coll, pipeline, kUnavailableMetadataErrCode, errMsg);
 });
@@ -160,7 +166,10 @@ validatedMetaFields.forEach((metaField) => {
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [{pipe1: [{_id: 2}, {_id: 0}, {_id: 1}]}]);
 
-    pipeline = [{$geoNear: {near: [20, 40]}}, {$facet: {pipe1: [{$project: {pt: {$meta: "geoNearPoint"}}}]}}];
+    pipeline = [
+        {$geoNear: {near: [20, 40]}},
+        {$facet: {pipe1: [{$project: {pt: {$meta: "geoNearPoint"}}}]}},
+    ];
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [
         {

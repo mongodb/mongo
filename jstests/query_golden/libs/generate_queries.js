@@ -63,7 +63,8 @@ export function nextChar(thisChar, distance) {
     const number_of_chars = max_char_code - min_char_code + 1;
     const char_code = thisChar.codePointAt(0);
     assert(min_char_code <= char_code <= max_char_code, "char is out of range");
-    const new_char_code = ((char_code - min_char_code + distance) % number_of_chars) + min_char_code;
+    const new_char_code =
+        ((char_code - min_char_code + distance) % number_of_chars) + min_char_code;
     assert(min_char_code <= new_char_code <= max_char_code, "new char is out of range");
     return String.fromCodePoint(new_char_code);
 }
@@ -100,7 +101,10 @@ export function nextStr(str, distance) {
         );
         res = newStr;
     }
-    assert(res !== undefined, `Found undefined with inputs: str=${str}, res=${res}, distance=${distance}`);
+    assert(
+        res !== undefined,
+        `Found undefined with inputs: str=${str}, res=${res}, distance=${distance}`,
+    );
     return res;
 }
 
@@ -238,7 +242,9 @@ export function generateRangePredicates(field, queryValues, fieldType) {
         } else if (elemType == "date") {
             const minDate = new Date(queryValues["min"]);
             const maxDate = new Date(queryValues["max"]);
-            const rangeSize = Math.round((maxDate.getTime() - minDate.getTime()) * querySpecs[qSize]);
+            const rangeSize = Math.round(
+                (maxDate.getTime() - minDate.getTime()) * querySpecs[qSize],
+            );
             ranges = generateRanges(queryValues["values"], elemType, rangeSize);
         } else {
             const step = qSize == "small" ? 1 : qSize == "medium" ? 2 : 3;
@@ -283,7 +289,10 @@ export function selectSamplePos(collSize, n) {
     let step = Math.round(collSize / n);
     let offset = n * step - collSize;
 
-    let pos = offset >= 0 ? Math.min(Math.trunc(step / 2), step - offset) : Math.trunc(step / 2 + Math.abs(offset) / 2);
+    let pos =
+        offset >= 0
+            ? Math.min(Math.trunc(step / 2), step - offset)
+            : Math.trunc(step / 2 + Math.abs(offset) / 2);
     while (pos < collSize) {
         samplePos.push(pos);
         pos += step;
@@ -493,7 +502,9 @@ export function generateQueries(fields, fieldTypes, queryValues) {
     while (i < fields.length) {
         const field = fields[i];
         const fieldType = fieldTypes[i];
-        testCases = testCases.concat(generateComparisons(field, queryValues[field].values, fieldType));
+        testCases = testCases.concat(
+            generateComparisons(field, queryValues[field].values, fieldType),
+        );
 
         testCases = testCases.concat(generateRangePredicates(field, queryValues[field], fieldType));
         i++;
@@ -556,7 +567,14 @@ export function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, st
  * op: $and or $or
  * comp: array of comparisons for predicate terms
  */
-export function makeSingleFieldComplexPredicate(field, values, op, comp, predicates, isArray = false) {
+export function makeSingleFieldComplexPredicate(
+    field,
+    values,
+    op,
+    comp,
+    predicates,
+    isArray = false,
+) {
     let terms = [];
     for (let i = 0; i < comp.length; i++) {
         terms.push({[field]: {[comp[i]]: values[i]}});
@@ -607,11 +625,31 @@ export function generateSingleFieldPredicates(fields, fieldTypes, queryValues, p
 
         while (values.length > 4) {
             makeSingleFieldComplexPredicate(field, values, "$and", ["$gte", "$lte"], predicates);
-            makeSingleFieldComplexPredicate(field, values, "$and", ["$gt", "$gte", "$lt", "$lte"], predicates);
+            makeSingleFieldComplexPredicate(
+                field,
+                values,
+                "$and",
+                ["$gt", "$gte", "$lt", "$lte"],
+                predicates,
+            );
             if (fieldType == "array") {
                 // Make non-overlapping conjunctions for multi-key fields.
-                makeSingleFieldComplexPredicate(field, values, "$and", ["$lte", "$gte"], predicates, true);
-                makeSingleFieldComplexPredicate(field, values, "$and", ["$lte", "$eq"], predicates, true);
+                makeSingleFieldComplexPredicate(
+                    field,
+                    values,
+                    "$and",
+                    ["$lte", "$gte"],
+                    predicates,
+                    true,
+                );
+                makeSingleFieldComplexPredicate(
+                    field,
+                    values,
+                    "$and",
+                    ["$lte", "$eq"],
+                    predicates,
+                    true,
+                );
                 makeSingleFieldComplexPredicate(
                     field,
                     values,
@@ -623,7 +661,13 @@ export function generateSingleFieldPredicates(fields, fieldTypes, queryValues, p
             }
             makeSingleFieldComplexPredicate(field, values, "$or", ["$lte", "$gte"], predicates);
             makeSingleFieldComplexPredicate(field, values, "$or", ["$eq", "$gte"], predicates);
-            makeSingleFieldComplexPredicate(field, values, "$or", ["$lt", "$eq", "$eq", "$gte"], predicates);
+            makeSingleFieldComplexPredicate(
+                field,
+                values,
+                "$or",
+                ["$lt", "$eq", "$eq", "$gte"],
+                predicates,
+            );
             makeSingleFieldDNF(field, values, predicates);
             values = values.slice(4, values.length);
         }

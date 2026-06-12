@@ -5,7 +5,9 @@
 const pathsep = _isWindows() ? "\\" : "/";
 const recordingDirGlobal = MongoRunner.toRealDir("$dataDir" + pathsep + "traffic_recording");
 const recordingDirCustom = "recordings";
-const recordingDir = MongoRunner.toRealDir(recordingDirGlobal + pathsep + recordingDirCustom + pathsep);
+const recordingDir = MongoRunner.toRealDir(
+    recordingDirGlobal + pathsep + recordingDirCustom + pathsep,
+);
 
 assert.throws(function () {
     convertTrafficRecordingToBSON("notarealfileatall");
@@ -32,7 +34,9 @@ adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 adminDB.auth("admin", "pass");
 
 // Start recording traffic
-assert.commandWorked(adminDB.runCommand({"startTrafficRecording": 1, "destination": recordingDirCustom}));
+assert.commandWorked(
+    adminDB.runCommand({"startTrafficRecording": 1, "destination": recordingDirCustom}),
+);
 
 // Run a few commands
 assert.commandWorked(testDB.runCommand({"serverStatus": 1}));

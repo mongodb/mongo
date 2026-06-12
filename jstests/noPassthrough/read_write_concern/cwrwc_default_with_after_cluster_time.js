@@ -12,7 +12,10 @@
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const dbName = "cwrwc_aftercluster_db";
 const collName = "cwrwc_aftercluster_coll";
@@ -120,17 +123,30 @@ function runTests({label, makeFixture, teardown, getRouter, getShardRs, getMetri
             const ts = insertRes.operationTime;
 
             const beforeCounters = getCounters();
-            assert.commandWorked(testDB.runCommand({find: collName, readConcern: {afterClusterTime: ts}}));
+            assert.commandWorked(
+                testDB.runCommand({find: collName, readConcern: {afterClusterTime: ts}}),
+            );
             const afterCounters = getCounters();
 
             const beforeMaj =
-                (beforeCounters.noneInfo && beforeCounters.noneInfo.CWRC && beforeCounters.noneInfo.CWRC.majority) || 0;
+                (beforeCounters.noneInfo &&
+                    beforeCounters.noneInfo.CWRC &&
+                    beforeCounters.noneInfo.CWRC.majority) ||
+                0;
             const afterMaj =
-                (afterCounters.noneInfo && afterCounters.noneInfo.CWRC && afterCounters.noneInfo.CWRC.majority) || 0;
-            assert.eq(1, afterMaj - beforeMaj, "expected noneInfo.CWRC.majority to increment by 1", {
-                beforeCounters,
-                afterCounters,
-            });
+                (afterCounters.noneInfo &&
+                    afterCounters.noneInfo.CWRC &&
+                    afterCounters.noneInfo.CWRC.majority) ||
+                0;
+            assert.eq(
+                1,
+                afterMaj - beforeMaj,
+                "expected noneInfo.CWRC.majority to increment by 1",
+                {
+                    beforeCounters,
+                    afterCounters,
+                },
+            );
         });
 
         it("blocks a causal-consistency session read when CWRWC level is majority", () => {

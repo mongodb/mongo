@@ -13,7 +13,10 @@ const coll = db.field_name_validation;
 coll.drop();
 
 // Insert command field name validation
-assert.writeErrorWithCode(coll.insert({_id: {a: {$b: 1}}, x: 1}), ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(
+    coll.insert({_id: {a: {$b: 1}}, x: 1}),
+    ErrorCodes.DollarPrefixedFieldName,
+);
 
 // Update commands with $set
 coll.drop();
@@ -34,7 +37,10 @@ assert.writeErrorWithCode(coll.update({a: 1}, {$set: {_id: {a: {$b: 1}}}}, {upse
 // Replacement-style updates
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 1}));
-assert.writeErrorWithCode(coll.update({_id: 0}, {_id: {a: {$b: 1}}}), ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(
+    coll.update({_id: 0}, {_id: {a: {$b: 1}}}),
+    ErrorCodes.DollarPrefixedFieldName,
+);
 assert.writeErrorWithCode(
     coll.update({"_id.a.$b": 1}, {_id: {a: {$b: 1}}}, {upsert: true}),
     ErrorCodes.NotExactValueField,

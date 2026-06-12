@@ -84,7 +84,8 @@ function runTest(testOptions) {
         assert.lte(
             0,
             res.errmsg.indexOf("object to insert too large"),
-            "map-reduce command failed for a reason other than inserting a large document: " + tojson(res),
+            "map-reduce command failed for a reason other than inserting a large document: " +
+                tojson(res),
         );
     }
 }

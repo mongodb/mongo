@@ -57,7 +57,10 @@ assertResultsMatch([{$project: {_id: 0, a: 1}}], ignoreSortOrder);
 assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}], ignoreSortOrder);
 assertResultsMatch([{$project: {_id: 0, a: 1, b: 1, c: {$literal: 1}}}], ignoreSortOrder);
 assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}, {$project: {a: 1}}], ignoreSortOrder);
-assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}], ignoreSortOrder);
+assertResultsMatch(
+    [{$project: {_id: 0, a: 1, b: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}],
+    ignoreSortOrder,
+);
 
 // Non-blocking $sort, uncovered $project.
 assertResultsMatch([{$sort: {a: -1, b: -1}}, {$project: {_id: 1, a: 1, b: 1}}]);
@@ -70,7 +73,10 @@ assertResultsMatch(
 // Non-blocking $sort, covered $project.
 assertResultsMatch([{$sort: {a: -1, b: -1}}, {$project: {_id: 0, a: 1, b: 1}}]);
 assertResultsMatch([{$sort: {a: 1, b: 1}}, {$project: {_id: 0, a: 1, b: 1}}]);
-assertResultsMatch([{$sort: {a: 1, b: 1}}, {$group: {_id: "$b", arr: {$push: "$a"}}}], ignoreSortOrder);
+assertResultsMatch(
+    [{$sort: {a: 1, b: 1}}, {$group: {_id: "$b", arr: {$push: "$a"}}}],
+    ignoreSortOrder,
+);
 
 // Blocking $sort, uncovered $project.
 assertResultsMatch([{$sort: {b: 1, a: -1}}, {$project: {_id: 1, a: 1, b: 1}}]);
@@ -81,4 +87,7 @@ assertResultsMatch(
 
 // Blocking $sort, covered $project.
 assertResultsMatch([{$sort: {b: 1, a: -1}}, {$project: {_id: 0, a: 1, b: 1}}]);
-assertResultsMatch([{$sort: {b: 1, a: -1}}, {$group: {_id: "$b", arr: {$push: "$a"}}}], ignoreSortOrder);
+assertResultsMatch(
+    [{$sort: {b: 1, a: -1}}, {$group: {_id: "$b", arr: {$push: "$a"}}}],
+    ignoreSortOrder,
+);

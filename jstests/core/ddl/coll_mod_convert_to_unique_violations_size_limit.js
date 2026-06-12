@@ -118,7 +118,9 @@ for (let i = 0; i < nDocs; ++i) {
 }
 
 // Sets 'prepareUnique' before converting the index to unique.
-assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}),
+);
 
 // Expects dryRun: true and unique: true conversion to fail with size exceeding violation.
 assertFailedWithViolations(

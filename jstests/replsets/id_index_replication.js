@@ -21,7 +21,11 @@ function testOplogEntryIdIndexSpec(collectionName, idIndexSpec) {
     if (idIndexSpec === null) {
         assert(!oplogEntry.o.hasOwnProperty("idIndex"), tojson(oplogEntry));
     } else {
-        assert.eq(0, bsonUnorderedFieldsCompare(idIndexSpec, oplogEntry.o.idIndex), tojson(oplogEntry));
+        assert.eq(
+            0,
+            bsonUnorderedFieldsCompare(idIndexSpec, oplogEntry.o.idIndex),
+            tojson(oplogEntry),
+        );
     }
 }
 
@@ -33,7 +37,9 @@ assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(2, spec.v, "Expected primary to build a v=2 _id index: " + tojson(spec));
 testOplogEntryIdIndexSpec("without_version", spec);
 
-assert.commandWorked(primaryDB.createCollection("version_v2", {idIndex: {key: {_id: 1}, name: "_id_", v: 2}}));
+assert.commandWorked(
+    primaryDB.createCollection("version_v2", {idIndex: {key: {_id: 1}, name: "_id_", v: 2}}),
+);
 allIndexes = primaryDB.version_v2.getIndexes();
 allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
@@ -41,7 +47,9 @@ assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(2, spec.v, "Expected primary to build a v=2 _id index: " + tojson(spec));
 testOplogEntryIdIndexSpec("version_v2", spec);
 
-assert.commandWorked(primaryDB.createCollection("version_v1", {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
+assert.commandWorked(
+    primaryDB.createCollection("version_v1", {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}),
+);
 allIndexes = primaryDB.version_v1.getIndexes();
 allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
@@ -57,13 +65,21 @@ allIndexes = secondaryDB.without_version.getIndexes();
 allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
-assert.eq(2, spec.v, "Expected secondary to build a v=2 _id index when explicitly requested: " + tojson(spec));
+assert.eq(
+    2,
+    spec.v,
+    "Expected secondary to build a v=2 _id index when explicitly requested: " + tojson(spec),
+);
 
 allIndexes = secondaryDB.version_v2.getIndexes();
 allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
-assert.eq(2, spec.v, "Expected secondary to build a v=2 _id index when explicitly requested: " + tojson(spec));
+assert.eq(
+    2,
+    spec.v,
+    "Expected secondary to build a v=2 _id index when explicitly requested: " + tojson(spec),
+);
 
 allIndexes = secondaryDB.version_v1.getIndexes();
 allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);

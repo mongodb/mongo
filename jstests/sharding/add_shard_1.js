@@ -58,7 +58,10 @@ assert.commandWorked(db2.foo.save({a: 1}));
 s.config.databases.find().forEach(printjson);
 
 let rejectedShard = "rejectedShard";
-assert(!s.admin.runCommand({addShard: rs2.getURL(), name: rejectedShard}).ok, "accepted mongod with duplicate db");
+assert(
+    !s.admin.runCommand({addShard: rs2.getURL(), name: rejectedShard}).ok,
+    "accepted mongod with duplicate db",
+);
 
 // Check that all collection that were local to the mongod's are writable through the mongos
 assert.commandWorked(db1.foo.insertOne({a: 4}));
@@ -69,13 +72,21 @@ numObjsTestTsColl++;
 // Check that all collection that were local to the mongod's are accessible through the mongos
 let sdb1 = s.getDB("testDB");
 assert.eq(numObjsFoo, sdb1.foo.count(), "wrong count collection foo that existed before addshard");
-assert.eq(numObjsTestTsColl, sdb1.testTsColl.count(), "wrong count collection testTsColl that existed before addshard");
+assert.eq(
+    numObjsTestTsColl,
+    sdb1.testTsColl.count(),
+    "wrong count collection testTsColl that existed before addshard",
+);
 
 let sdb2 = s.getDB("otherDB");
 assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through mongos");
 
 // make sure we can move a DB from the original mongod to a previoulsy existing shard
-assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary), newShard, "DB primary is wrong");
+assert.eq(
+    s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
+    newShard,
+    "DB primary is wrong",
+);
 
 let rs3 = new ReplSetTest({name: "addshard1-3", host: "localhost", nodes: 1});
 rs3.startSet({shardsvr: ""});
@@ -85,7 +96,11 @@ assert.commandWorked(s.admin.runCommand({addShard: rs3.getURL()}));
 let origShard = s.getNonPrimaries("testDB")[0];
 moveDatabaseAndUnshardedColls(s.s.getDB("testDB"), origShard);
 
-assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary), origShard, "DB primary didn't move");
+assert.eq(
+    s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
+    origShard,
+    "DB primary didn't move",
+);
 assert.eq(
     numObjsFoo,
     sdb1.foo.count(),
@@ -107,7 +122,11 @@ assert.eq(
     findChunksUtil.countChunksForNs(s.config, "testDB.foo"),
     "wrong chunk number after splitting collection that existed before",
 );
-assert.eq(numObjsFoo, sdb1.foo.count(), "wrong count after splitting collection that existed before");
+assert.eq(
+    numObjsFoo,
+    sdb1.foo.count(),
+    "wrong count after splitting collection that existed before",
+);
 
 s.stop();
 rs1.stopSet();

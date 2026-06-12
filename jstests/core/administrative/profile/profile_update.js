@@ -24,12 +24,16 @@ let coll = testDB.getCollection(collName);
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDB
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 //
@@ -69,7 +73,13 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [0]}));
 
-assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
+assert.commandWorked(
+    coll.update(
+        {_id: 0},
+        {$set: {"a.$[i]": 1}},
+        {collation: {locale: "fr"}, arrayFilters: [{i: 0}]},
+    ),
+);
 
 profileObj = getLatestProfilerEntry(testDB);
 
@@ -126,7 +136,12 @@ assert.eq(
 );
 assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
 // Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
-assert.between(expectedDocsExamined, profileObj.docsExamined, 2 * expectedDocsExamined, tojson(profileObj));
+assert.between(
+    expectedDocsExamined,
+    profileObj.docsExamined,
+    2 * expectedDocsExamined,
+    tojson(profileObj),
+);
 assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
 assert.eq(profileObj.nMatched, 0, tojson(profileObj));
 assert.eq(profileObj.nModified, 0, tojson(profileObj));

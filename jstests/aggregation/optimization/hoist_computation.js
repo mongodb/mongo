@@ -29,7 +29,9 @@ assert.commandWorked(db.hoist_computation_secondary.insert({}));
 
 /// Extracts the user-visible aggregation stages.
 function extractUserStages(explain) {
-    return (explain.stages || []).filter((stage) => !stage.$cursor && !stage.$_internalInhibitOptimization);
+    return (explain.stages || []).filter(
+        (stage) => !stage.$cursor && !stage.$_internalInhibitOptimization,
+    );
 }
 
 /// Returns true if `actual` matches `expected`, allowing any leading
@@ -80,7 +82,10 @@ function runTest({name, docs, pipeline, optimized, expected, policy}) {
         const stripId = ({_id, ...rest}) => rest;
 
         // Verify the unoptimized pipeline produces the expected results (golden baseline).
-        const unoptimizedResults = coll.aggregate(inhibitOptimizationPerStage(pipeline)).toArray().map(stripId);
+        const unoptimizedResults = coll
+            .aggregate(inhibitOptimizationPerStage(pipeline))
+            .toArray()
+            .map(stripId);
         assert.docEq(unoptimizedResults, expected, "unoptimized results");
 
         // Verify the original pipeline's explain matches the expected optimized pipeline.
@@ -605,8 +610,14 @@ it("maximum paths knob: blocks hoisting above the limit", () => {
                 });
             };
 
-            assertPlan([lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}], [lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}]);
-            assertPlan([lookupStage("x"), {$set: {a: 1, b: 2}}], [{$set: {a: 1, b: 2}}, lookupStage("x")]);
+            assertPlan(
+                [lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}],
+                [lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}],
+            );
+            assertPlan(
+                [lookupStage("x"), {$set: {a: 1, b: 2}}],
+                [{$set: {a: 1, b: 2}}, lookupStage("x")],
+            );
         },
     );
 });
@@ -650,7 +661,11 @@ runTest({
 runTest({
     name: "$project+$match pushdown: before $lookup",
     docs: [{a: 5, c: 1}],
-    pipeline: [lookupStage("x"), {$project: {sum: {$add: ["$a", 1]}, a: 1, c: 1}}, {$match: {sum: {$gt: 3}}}],
+    pipeline: [
+        lookupStage("x"),
+        {$project: {sum: {$add: ["$a", 1]}, a: 1, c: 1}},
+        {$match: {sum: {$gt: 3}}},
+    ],
     optimized: [
         {$addFields: {sum: {$add: ["$a", 1]}}},
         {$match: {sum: {$gt: 3}}},
@@ -717,46 +732,50 @@ it("match pushdown in $lookup inner pipeline does not crash in $sequentialCache 
     // the uncorrelated prefix; postTransform() then tries to resize the dependency graph from the
     // (now-erased) last stage. The test makes sure this doesn't cause a tassert (error 12299003).
     // Two outer documents are required so the cache reaches serving mode.
-    runWithParamsAllNonConfigNodes(db, {internalQueryTransformHoistPolicy: "forMatchPushdown"}, () => {
-        const coll = db.hoist_computation;
-        coll.drop();
-        assert.commandWorked(
-            coll.insertMany([
-                {_id: 0, bar: 53},
-                {_id: 1, bar: 100},
-            ]),
-        );
+    runWithParamsAllNonConfigNodes(
+        db,
+        {internalQueryTransformHoistPolicy: "forMatchPushdown"},
+        () => {
+            const coll = db.hoist_computation;
+            coll.drop();
+            assert.commandWorked(
+                coll.insertMany([
+                    {_id: 0, bar: 53},
+                    {_id: 1, bar: 100},
+                ]),
+            );
 
-        const pipeline = [
-            {
-                $lookup: {
-                    from: coll.getName(),
-                    let: {outerId: "$_id"},
-                    pipeline: [
-                        // Uncorrelated leading $match: cached as the uncorrelated prefix and erased
-                        // in serving mode once the correlated $match is pushed in front of the
-                        // $project stages.
-                        {$match: {$expr: {$gt: ["$_id", {$literal: null}]}}},
-                        // A chain of single-document transformations for the correlated $match to be
-                        // pushed in front of.
-                        {$project: {wrapped: "$$ROOT", _id: 0}},
-                        {$project: {inner: {id: "$wrapped._id", bar: "$wrapped.bar"}, _id: 0}},
-                        {$project: {u: "$inner", _id: 0}},
-                        // Correlated $match referencing the let variable.
-                        {$match: {$expr: {$eq: ["$$outerId", "$u.id"]}}},
-                    ],
-                    as: "joined",
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: coll.getName(),
+                        let: {outerId: "$_id"},
+                        pipeline: [
+                            // Uncorrelated leading $match: cached as the uncorrelated prefix and erased
+                            // in serving mode once the correlated $match is pushed in front of the
+                            // $project stages.
+                            {$match: {$expr: {$gt: ["$_id", {$literal: null}]}}},
+                            // A chain of single-document transformations for the correlated $match to be
+                            // pushed in front of.
+                            {$project: {wrapped: "$$ROOT", _id: 0}},
+                            {$project: {inner: {id: "$wrapped._id", bar: "$wrapped.bar"}, _id: 0}},
+                            {$project: {u: "$inner", _id: 0}},
+                            // Correlated $match referencing the let variable.
+                            {$match: {$expr: {$eq: ["$$outerId", "$u.id"]}}},
+                        ],
+                        as: "joined",
+                    },
                 },
-            },
-        ];
+            ];
 
-        // Each outer document self-joins with the inner document having the same _id.
-        assertArrayEq({
-            actual: coll.aggregate(pipeline).toArray(),
-            expected: [
-                {_id: 0, bar: 53, joined: [{u: {id: 0, bar: 53}}]},
-                {_id: 1, bar: 100, joined: [{u: {id: 1, bar: 100}}]},
-            ],
-        });
-    });
+            // Each outer document self-joins with the inner document having the same _id.
+            assertArrayEq({
+                actual: coll.aggregate(pipeline).toArray(),
+                expected: [
+                    {_id: 0, bar: 53, joined: [{u: {id: 0, bar: 53}}]},
+                    {_id: 1, bar: 100, joined: [{u: {id: 1, bar: 100}}]},
+                ],
+            });
+        },
+    );
 });

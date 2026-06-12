@@ -30,7 +30,10 @@ function snapshotChunks(st, ns) {
 function anyShardHoldsCriticalSection(st, ns) {
     for (let i = 0; i < st._rs.length; i++) {
         const primary = st["rs" + i].getPrimary();
-        const found = primary.getDB("config").getCollection("collection_critical_sections").findOne({_id: ns});
+        const found = primary
+            .getDB("config")
+            .getCollection("collection_critical_sections")
+            .findOne({_id: ns});
         if (found !== null) {
             return true;
         }
@@ -60,7 +63,11 @@ function anyCoordinatorStateDocPresent(st, ns, coordinatorType) {
  * held, and no leftover coordinator document.
  */
 function assertNoSideEffects(st, ns, baselineChunks, coordinatorType) {
-    assert.eq(baselineChunks, snapshotChunks(st, ns), "config.chunks changed -- rejection left side effects");
+    assert.eq(
+        baselineChunks,
+        snapshotChunks(st, ns),
+        "config.chunks changed -- rejection left side effects",
+    );
     assert(!anyShardHoldsCriticalSection(st, ns), "a critical section was left behind");
     if (coordinatorType !== undefined) {
         assert(
@@ -75,13 +82,36 @@ describe("authoritative chunk operations reject malformed inputs without side ef
         this.st = new ShardingTest({shards: 3});
         this.dbName = "ckprecond_db";
 
-        configureFailPointForRS(this.st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPointForRS(this.st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPointForRS(this.st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPointForRS(this.st.rs2.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(
+            this.st.configRS.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPointForRS(
+            this.st.rs0.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPointForRS(
+            this.st.rs1.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPointForRS(
+            this.st.rs2.nodes,
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
 
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
     });
 
@@ -136,7 +166,9 @@ describe("authoritative chunk operations reject malformed inputs without side ef
 
         // Merging a range that is already a single chunk is a no-op: the command succeeds and the
         // chunks are unchanged.
-        assert.commandWorked(this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 0}]}));
+        assert.commandWorked(
+            this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 0}]}),
+        );
         assertNoSideEffects(this.st, this.ns, baseline, "mergeChunks");
     });
 
@@ -146,7 +178,9 @@ describe("authoritative chunk operations reject malformed inputs without side ef
         const baseline = snapshotChunks(this.st, this.ns);
 
         // 5 is not a chunk boundary.
-        assert.commandFailed(this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 5}]}));
+        assert.commandFailed(
+            this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 5}]}),
+        );
         assertNoSideEffects(this.st, this.ns, baseline, "mergeChunks");
     });
 
@@ -154,11 +188,19 @@ describe("authoritative chunk operations reject malformed inputs without side ef
         // Pre-split into three chunks and move the middle one to shard1.
         assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 0}}));
         assert.commandWorked(this.st.s.adminCommand({split: this.ns, middle: {x: 10}}));
-        assert.commandWorked(this.st.s.adminCommand({moveChunk: this.ns, find: {x: 5}, to: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveChunk: this.ns,
+                find: {x: 5},
+                to: this.st.shard1.shardName,
+            }),
+        );
         const baseline = snapshotChunks(this.st, this.ns);
 
         // [MinKey, 10) spans chunks on shard0 and shard1, so it cannot be merged.
-        assert.commandFailed(this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}));
+        assert.commandFailed(
+            this.st.s.adminCommand({mergeChunks: this.ns, bounds: [{x: MinKey}, {x: 10}]}),
+        );
         assertNoSideEffects(this.st, this.ns, baseline, "mergeChunks");
     });
 
@@ -168,7 +210,12 @@ describe("authoritative chunk operations reject malformed inputs without side ef
         // All chunks live on shard0, so asking shard1 to merge its chunks of this collection has
         // nothing to do: the command succeeds and the chunks are unchanged.
         const baseline = snapshotChunks(this.st, this.ns);
-        assert.commandWorked(this.st.s.adminCommand({mergeAllChunksOnShard: this.ns, shard: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                mergeAllChunksOnShard: this.ns,
+                shard: this.st.shard1.shardName,
+            }),
+        );
         assert.eq(baseline, snapshotChunks(this.st, this.ns));
         assert.eq(false, anyShardHoldsCriticalSection(this.st, this.ns));
         assert.eq(false, anyCoordinatorStateDocPresent(this.st, this.ns, "mergeAllChunks"));
@@ -186,9 +233,14 @@ describe("authoritative chunk operations reject malformed inputs without side ef
     it("mergeAllChunksOnShard: unsharded namespace is rejected", () => {
         const unshardedNs = this.dbName + ".unsharded_" + new ObjectId().str;
         // Create a regular, unsharded collection.
-        assert.commandWorked(this.st.s.getDB(this.dbName).createCollection(unshardedNs.split(".")[1]));
+        assert.commandWorked(
+            this.st.s.getDB(this.dbName).createCollection(unshardedNs.split(".")[1]),
+        );
         assert.commandFailedWithCode(
-            this.st.s.adminCommand({mergeAllChunksOnShard: unshardedNs, shard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                mergeAllChunksOnShard: unshardedNs,
+                shard: this.st.shard0.shardName,
+            }),
             ErrorCodes.NamespaceNotSharded,
         );
         assert.eq(false, anyCoordinatorStateDocPresent(this.st, unshardedNs, "mergeAllChunks"));

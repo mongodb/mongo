@@ -24,7 +24,10 @@ assert(!coll.isCapped());
 
 // Command must fail if size is not specified.
 {
-    assert.commandFailedWithCode(testDb.runCommand({convertToCapped: coll.getName()}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        testDb.runCommand({convertToCapped: coll.getName()}),
+        ErrorCodes.InvalidOptions,
+    );
     assert(!coll.isCapped());
 }
 
@@ -42,16 +45,19 @@ assert(!coll.isCapped());
     const timeseriesCollName = "timeseriesColl";
 
     assert.commandWorked(
-        testDb.runCommand({create: timeseriesCollName, timeseries: {timeField: "time", metaField: "m"}}),
+        testDb.runCommand({
+            create: timeseriesCollName,
+            timeseries: {timeField: "time", metaField: "m"},
+        }),
     );
 
     const timeseriesColl = testDb.getCollection(timeseriesCollName);
     assert(!timeseriesColl.isCapped());
 
-    assert.commandFailedWithCode(testDb.runCommand({convertToCapped: timeseriesColl.getName(), size: 1000}), [
-        ErrorCodes.CommandNotSupportedOnView,
-        ErrorCodes.IllegalOperation,
-    ]);
+    assert.commandFailedWithCode(
+        testDb.runCommand({convertToCapped: timeseriesColl.getName(), size: 1000}),
+        [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.IllegalOperation],
+    );
     assert(!timeseriesColl.isCapped());
 }
 

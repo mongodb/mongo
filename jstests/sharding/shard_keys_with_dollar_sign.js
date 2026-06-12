@@ -10,7 +10,9 @@ const st = new ShardingTest({
     shards: 1,
     other: {
         // Avoid spurious failures with small 'ReshardingCriticalSectionTimeout' values being set.
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}},
+        configOptions: {
+            setParameter: {reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS},
+        },
     },
 });
 
@@ -39,7 +41,11 @@ function testValidation(key, {isValidIndexKey, isValidShardKey}) {
     }
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: 1}}));
-    const reshardCollectionRes = st.s.adminCommand({reshardCollection: ns2, key, numInitialChunks: 1});
+    const reshardCollectionRes = st.s.adminCommand({
+        reshardCollection: ns2,
+        key,
+        numInitialChunks: 1,
+    });
     if (isValidShardKey) {
         assert.commandWorked(reshardCollectionRes);
     } else {

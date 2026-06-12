@@ -7,7 +7,9 @@ function logLinesExceededBufferSize(node) {
 }
 
 export function enableLocalReadLogs(node) {
-    assert.commandWorked(node.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(
+        node.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}),
+    );
 }
 
 export function getLocalReadCount(node, namespace, comment) {

@@ -10,7 +10,12 @@ const mongod = MongoRunner.runMongod({
 const admin = mongod.getDB("admin");
 const external = mongod.getDB("$external");
 
-admin.createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"]});
+admin.createUser({
+    user: "admin",
+    pwd: "pwd",
+    roles: ["root"],
+    mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"],
+});
 admin.auth("admin", "pwd");
 
 const X509USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
@@ -47,7 +52,8 @@ function testInternal(uri) {
 }
 
 function assertStats(cb) {
-    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+        .authentication.mechanisms;
     cb(mechStats);
 }
 

@@ -13,7 +13,9 @@ const st = new ShardingTest({shards: 3});
 const mongos = st.s;
 const testDb = mongos.getDB("test");
 
-assert.commandWorked(mongos.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}),
+);
 
 // Set up "test.coll0"
 assert.commandWorked(mongos.adminCommand({shardcollection: "test.coll0", key: {x: 1}}));
@@ -22,10 +24,20 @@ assert.commandWorked(testDb.adminCommand({split: "test.coll0", middle: {x: 200}}
 
 // // Move chunks so each shard has one chunk.
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: "test.coll0", find: {x: 2}, to: st.shard0.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: "test.coll0",
+        find: {x: 2},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: "test.coll0", find: {x: 200}, to: st.shard2.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: "test.coll0",
+        find: {x: 200},
+        to: st.shard2.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 // Set up "test.coll1"
@@ -34,7 +46,12 @@ assert.commandWorked(testDb.adminCommand({split: "test.coll1", middle: {x: 5}}))
 
 // // Move chunk so only shards 0 and 1 have chunks.
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: "test.coll1", find: {x: 2}, to: st.shard0.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: "test.coll1",
+        find: {x: 2},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 function assertShardingStats(initialStats, updatedStats, expectedChanges) {
@@ -68,9 +85,13 @@ for (let x = 0; x < 10; x++) {
     bulk.insert({x: x});
 }
 assert.commandWorked(bulk.execute());
-assertShardingStats({"insert": {"manyShards": 0}}, testDb.serverStatus().shardingStatistics.numHostsTargeted, {
-    "insert": {"manyShards": 1},
-});
+assertShardingStats(
+    {"insert": {"manyShards": 0}},
+    testDb.serverStatus().shardingStatistics.numHostsTargeted,
+    {
+        "insert": {"manyShards": 1},
+    },
+);
 
 serverStatusInitial = testDb.serverStatus();
 bulk = testDb.unshardedCollection.initializeOrderedBulkOp();
@@ -202,7 +223,9 @@ assertShardingStats(
 // ----- Check aggregate targeting stats -----
 
 serverStatusInitial = testDb.serverStatus();
-let aggRes = testDb.coll0.aggregate([{$match: {x: {$gte: 15, $lte: 100}}}].concat([{$sort: {x: 1}}])).itcount();
+let aggRes = testDb.coll0
+    .aggregate([{$match: {x: {$gte: 15, $lte: 100}}}].concat([{$sort: {x: 1}}]))
+    .itcount();
 assert.gte(aggRes, 1);
 assertShardingStats(
     serverStatusInitial.shardingStatistics.numHostsTargeted,
@@ -211,7 +234,9 @@ assertShardingStats(
 );
 
 serverStatusInitial = testDb.serverStatus();
-aggRes = testDb.coll0.aggregate([{$match: {x: {$gte: -150, $lte: 50}}}].concat([{$sort: {x: 1}}])).itcount();
+aggRes = testDb.coll0
+    .aggregate([{$match: {x: {$gte: -150, $lte: 50}}}].concat([{$sort: {x: 1}}]))
+    .itcount();
 assert.gte(aggRes, 1);
 assertShardingStats(
     serverStatusInitial.shardingStatistics.numHostsTargeted,
@@ -220,7 +245,9 @@ assertShardingStats(
 );
 
 serverStatusInitial = testDb.serverStatus();
-aggRes = testDb.coll0.aggregate([{$match: {x: {$gte: -150, $lte: 500}}}].concat([{$sort: {x: 1}}])).itcount();
+aggRes = testDb.coll0
+    .aggregate([{$match: {x: {$gte: -150, $lte: 500}}}].concat([{$sort: {x: 1}}]))
+    .itcount();
 assert.gte(aggRes, 1);
 assertShardingStats(
     serverStatusInitial.shardingStatistics.numHostsTargeted,
@@ -243,7 +270,12 @@ serverStatusInitial = testDb.serverStatus();
 aggRes = testDb.coll1
     .aggregate([
         {
-            $lookup: {from: "unshardedCollection", localField: "x", foreignField: "j", as: "lookup"},
+            $lookup: {
+                from: "unshardedCollection",
+                localField: "x",
+                foreignField: "j",
+                as: "lookup",
+            },
         },
     ])
     .itcount();

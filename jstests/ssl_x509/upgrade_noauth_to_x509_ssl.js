@@ -17,10 +17,16 @@ TestData.disableImplicitSessions = true;
 
 let dbName = "upgradeToX509";
 
-let transitionToX509allowTLS = Object.merge(allowTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
+let transitionToX509allowTLS = Object.merge(allowTLS, {
+    transitionToAuth: "",
+    clusterAuthMode: "x509",
+});
 
 // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-let x509requireTLS = Object.merge(requireTLS, {transitionToAuth: undefined, clusterAuthMode: "x509"});
+let x509requireTLS = Object.merge(requireTLS, {
+    transitionToAuth: undefined,
+    clusterAuthMode: "x509",
+});
 
 let rst = new ReplSetTest({name: "noauthSet", nodes: 3, nodeOptions: transitionToX509allowTLS});
 rst.startSet();
@@ -30,7 +36,9 @@ let rstConn1 = rst.getPrimary();
 let testDB = rstConn1.getDB(dbName);
 
 // Create a user to login when auth is enabled later
-assert.commandWorked(rstConn1.adminCommand({createUser: "root", pwd: "root", roles: ["root"], writeConcern: {w: 3}}));
+assert.commandWorked(
+    rstConn1.adminCommand({createUser: "root", pwd: "root", roles: ["root"], writeConcern: {w: 3}}),
+);
 
 assert.commandWorked(testDB.a.insert({a: 1, str: "TESTTESTTEST"}));
 assert.eq(1, testDB.a.count(), "Error interacting with replSet");

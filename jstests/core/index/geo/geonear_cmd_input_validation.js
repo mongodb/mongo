@@ -47,7 +47,10 @@ indexTypes.forEach(function (indexType) {
                 }
 
                 // Unsupported combinations should return errors.
-                if ((indexType == "2d" && !isLegacy) || (indexType == "2dsphere" && isLegacy && !spherical)) {
+                if (
+                    (indexType == "2d" && !isLegacy) ||
+                    (indexType == "2dsphere" && isLegacy && !spherical)
+                ) {
                     assert.commandFailed(
                         db.runCommand(makeCommand(1)),
                         "geoNear with spherical=" +
@@ -68,7 +71,15 @@ indexTypes.forEach(function (indexType) {
                     db.runCommand({
                         aggregate: t.getName(),
                         cursor: {},
-                        pipeline: [{$geoNear: {near: pointType, distanceField: "dist", spherical: spherical}}],
+                        pipeline: [
+                            {
+                                $geoNear: {
+                                    near: pointType,
+                                    distanceField: "dist",
+                                    spherical: spherical,
+                                },
+                            },
+                        ],
                     }),
                 );
 

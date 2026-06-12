@@ -46,7 +46,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     // Assert cluster is running the latest FCV.
     assert.eq(getCurrentFCV(st.s), latestFCV, "Cluster is not running the latest FCV");
 
-    assert.commandWorked(adminDB.runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}));
+    assert.commandWorked(
+        adminDB.runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}),
+    );
 
     st.stop();
 }

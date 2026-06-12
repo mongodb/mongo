@@ -13,7 +13,9 @@ let testDB = st.s.getDB("test");
 let shardKey = {a: 1};
 
 // Use "st.shard0.shardName" as the primary shard.
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Create a collection with an index on the intended shard key.
 let shardedColl = testDB.getCollection(collName);
@@ -21,7 +23,9 @@ shardedColl.drop();
 assert.commandWorked(testDB.createCollection(collName));
 assert.commandWorked(shardedColl.createIndex(shardKey));
 
-assert.commandWorked(testDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}));
+assert.commandWorked(
+    testDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}),
+);
 
 // Split and move the chunks so that
 //   chunk { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }                is on
@@ -30,7 +34,11 @@ assert.commandWorked(testDB.adminCommand({shardCollection: shardedColl.getFullNa
 //   st.shard1.shardName
 assert.commandWorked(testDB.adminCommand({split: shardedColl.getFullName(), middle: {a: 10}}));
 assert.commandWorked(
-    testDB.adminCommand({moveChunk: shardedColl.getFullName(), find: {a: 10}, to: st.shard1.shardName}),
+    testDB.adminCommand({
+        moveChunk: shardedColl.getFullName(),
+        find: {a: 10},
+        to: st.shard1.shardName,
+    }),
 );
 
 let res;
@@ -38,7 +46,10 @@ let res;
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 res = assert.commandWorked(
-    testDB.runCommand({explain: {findAndModify: collName, query: {b: 1}, remove: true}, verbosity: "queryPlanner"}),
+    testDB.runCommand({
+        explain: {findAndModify: collName, query: {b: 1}, remove: true},
+        verbosity: "queryPlanner",
+    }),
 );
 
 assert(res.queryPlanner);

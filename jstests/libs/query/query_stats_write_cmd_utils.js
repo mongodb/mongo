@@ -19,7 +19,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
  * command. Callers supply only the fields that vary per test; the boolean planner flags all
  * default to false and the docs-returned metrics default to 0.
  */
-export function assertWriteCmdQueryStatsSingleExec(testDB, coll, {command, keysExamined, docsExamined, writes}) {
+export function assertWriteCmdQueryStatsSingleExec(
+    testDB,
+    coll,
+    {command, keysExamined, docsExamined, writes},
+) {
     const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
     assert.eq(entry.key.queryShape.command, command);
     assertAggregatedMetricsSingleExec(entry, {
@@ -48,7 +52,9 @@ export function assertWriteCmdQueryStatsSingleExec(testDB, coll, {command, keysE
  */
 export function resetQueryStatsCollection(coll) {
     coll.drop();
-    assert.commandWorked(coll.insert([{v: 1}, {v: 2}, {v: 3}, {v: 4}, {v: 5}, {v: 6}, {v: 7}, {v: 8}]));
+    assert.commandWorked(
+        coll.insert([{v: 1}, {v: 2}, {v: 3}, {v: 4}, {v: 5}, {v: 6}, {v: 7}, {v: 8}]),
+    );
 }
 
 /**
@@ -198,7 +204,11 @@ export function describeRetryableWriteQueryStatsTests(
             );
 
             assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.OperationFailed);
-            assert.eq(coll.findOne({_id: 2}).a, 2, "Document should not be affected after failed attempt");
+            assert.eq(
+                coll.findOne({_id: 2}).a,
+                2,
+                "Document should not be affected after failed attempt",
+            );
 
             let entries = getQueryStatsCmd(conn, {collName});
             assert.eq(entries.length, 0, "Expected no query stats after failed attempt");
@@ -228,7 +238,13 @@ export function describeRetryableWriteQueryStatsTests(
  * @param {Function} testBodyFn - function(ctxFn) that registers it() blocks;
  *   ctxFn() => {testDB, coll}, valid only at test execution time (after before())
  */
-export function runTokenizationTestsForTopology(label, setupFn, teardownFn, {collName, initialDocs}, testBodyFn) {
+export function runTokenizationTestsForTopology(
+    label,
+    setupFn,
+    teardownFn,
+    {collName, initialDocs},
+    testBodyFn,
+) {
     describe(label, function () {
         let fixture, testDB, coll;
 
@@ -309,7 +325,10 @@ export function runMongosWriteMetricsTests({
             mongos = st.s;
             testDB = mongos.getDB("test");
             assert.commandWorked(
-                testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+                testDB.adminCommand({
+                    enableSharding: testDB.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
             );
         });
 
@@ -344,7 +363,8 @@ export function runMongosWriteMetricsTests({
                 assert.commandWorked(coll.deleteMany({}));
                 const docs = [];
                 for (let i = 0; i < docsPerShard; i++) docs.push({_id: -(i + 1), v: i + 1});
-                for (let i = 0; i < docsPerShard; i++) docs.push({_id: i + 1, v: docsPerShard + i + 1});
+                for (let i = 0; i < docsPerShard; i++)
+                    docs.push({_id: i + 1, v: docsPerShard + i + 1});
                 assert.commandWorked(coll.insertMany(docs));
                 resetQueryStatsStore(mongos, "1MB");
             });
@@ -511,7 +531,11 @@ export function runMongosWriteMetricsTests({
             });
 
             it(`by _id: single execution recorded`, function () {
-                const cmd = {...commands.byId(collName), lsid: {id: UUID()}, txnNumber: NumberLong(1)};
+                const cmd = {
+                    ...commands.byId(collName),
+                    lsid: {id: UUID()},
+                    txnNumber: NumberLong(1),
+                };
                 const result = assert.commandWorked(testDB.runCommand(cmd));
                 validateCmdFn(result);
 
@@ -524,14 +548,22 @@ export function runMongosWriteMetricsTests({
             // TODO SERVER-121325 We double count for this case. Unskip this test case when that
             // is fixed.
             it.skip(`One by _id: double execution should not double count`, function () {
-                const cmd = {...commands.byId(collName), lsid: {id: UUID()}, txnNumber: NumberLong(1)};
+                const cmd = {
+                    ...commands.byId(collName),
+                    lsid: {id: UUID()},
+                    txnNumber: NumberLong(1),
+                };
 
                 // Initial execution.
                 const result = assert.commandWorked(testDB.runCommand(cmd));
                 validateCmdFn(result);
 
                 let entries = getQueryStatsFn(mongos, {collName});
-                assert.eq(entries.length, 1, "Expected 1 entry after initial exec: " + tojson(entries));
+                assert.eq(
+                    entries.length,
+                    1,
+                    "Expected 1 entry after initial exec: " + tojson(entries),
+                );
                 assert.eq(entries[0].metrics.execCount, 1);
 
                 // Retry with the same lsid/txnNumber — the server recognises this as
@@ -541,8 +573,16 @@ export function runMongosWriteMetricsTests({
                 assert.eq(retryResult.nModified, 1);
 
                 entries = getQueryStatsFn(mongos, {collName: collName});
-                assert.eq(entries.length, 1, "Expected still 1 entry after retry: " + tojson(entries));
-                assert.eq(entries[0].metrics.execCount, 1, "execCount should stay at 1 after retry");
+                assert.eq(
+                    entries.length,
+                    1,
+                    "Expected still 1 entry after retry: " + tojson(entries),
+                );
+                assert.eq(
+                    entries[0].metrics.execCount,
+                    1,
+                    "execCount should stay at 1 after retry",
+                );
             });
         });
 
@@ -559,7 +599,9 @@ export function runMongosWriteMetricsTests({
 
             before(function () {
                 coll = testDB[collName];
-                assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+                assert.commandWorked(
+                    testDB.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+                );
                 assert.commandWorked(
                     coll.insert([
                         {_id: 1, v: 1},
@@ -598,10 +640,18 @@ export function runMongosWriteMetricsTests({
                 // Force shard0 to return StaleConfig on the next metadata check, which triggers a
                 // mongos-level retry. The failpoint expires after one activation, so the retry
                 // succeeds.
-                const fp = configureFailPoint(shard0Primary, "alwaysThrowStaleConfigInfo", {}, {times: 1});
+                const fp = configureFailPoint(
+                    shard0Primary,
+                    "alwaysThrowStaleConfigInfo",
+                    {},
+                    {times: 1},
+                );
                 const result = assert.commandWorked(testDB.runCommand(commands.byId(collName)));
                 validateCmdFn(result);
-                assert(fp.waitWithTimeout(1000), "alwaysThrowStaleConfigInfo failpoint was never triggered");
+                assert(
+                    fp.waitWithTimeout(1000),
+                    "alwaysThrowStaleConfigInfo failpoint was never triggered",
+                );
 
                 // Mongos should show exactly 1 execution despite the internal retry.
                 const mongosEntries = getQueryStatsFn(mongos, {collName});

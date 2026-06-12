@@ -42,9 +42,13 @@ const hangFpOnSetup = configureFailPoint(primary, "hangIndexBuildOnSetupBeforeTa
 const hangFpOnConflict = configureFailPoint(primary, "hangAfterIndexBuildConflict");
 
 jsTestLog("Starting index build");
-let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+let awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    primaryColl.getFullName(),
+    {a: 1},
+    null,
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 
 jsTestLog("Waiting for primary to register the index build");
 hangFpOnSetup.wait();

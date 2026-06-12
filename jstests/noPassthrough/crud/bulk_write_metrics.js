@@ -37,18 +37,28 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     if (timeseries) {
         assert.commandWorked(
             testDB.createCollection(collName1, {
-                timeseries: {timeField: "timestamp", bucketMaxSpanSeconds: 1, bucketRoundingSeconds: 1},
+                timeseries: {
+                    timeField: "timestamp",
+                    bucketMaxSpanSeconds: 1,
+                    bucketRoundingSeconds: 1,
+                },
             }),
         );
     }
 
     if (isMongos) {
         assert.commandWorked(testDB.adminCommand({"enableSharding": dbName}));
-        assert.commandWorked(testDB.adminCommand({shardCollection: namespace1, key: {timestamp: 1}}));
-        assert.commandWorked(testDB.adminCommand({shardCollection: namespace2, key: {timestamp: 1}}));
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: namespace1, key: {timestamp: 1}}),
+        );
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: namespace2, key: {timestamp: 1}}),
+        );
 
         // TODO(SERVER-101609): Remove `splitNs` and replace with `namespace1`
-        const splitNs = (timeseries ? getTimeseriesCollForDDLOps(testDB, coll) : coll).getFullName();
+        const splitNs = (
+            timeseries ? getTimeseriesCollForDDLOps(testDB, coll) : coll
+        ).getFullName();
         const splitKey = timeseries ? "control.min.timestamp" : "timestamp";
 
         assert.commandWorked(testDB.adminCommand({split: splitNs, middle: {[splitKey]: key1}}));
@@ -114,7 +124,10 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         {updated: 1, updatePipeline: 1},
     );
 
-    metricChecker.executeCommand({insert: collName1, documents: [{_id: 1, a: [{b: 5}, {b: 1}, {b: 2}]}]});
+    metricChecker.executeCommand({
+        insert: collName1,
+        documents: [{_id: 1, a: [{b: 5}, {b: 1}, {b: 2}]}],
+    });
 
     metricChecker.checkMetrics(
         "Update with arrayFilters",
@@ -287,7 +300,13 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                 updateShardField: "oneShard",
                 deleteShardField: "oneShard",
                 perNamespaceMetrics: {
-                    [namespace1]: {inserted: 1, deleted: 1, deleteCount: 1, updated: 2, updateCount: 1},
+                    [namespace1]: {
+                        inserted: 1,
+                        deleted: 1,
+                        deleteCount: 1,
+                        updated: 2,
+                        updateCount: 1,
+                    },
                     [namespace2]: {inserted: 1, updateCount: 1, updated: 1},
                 },
             },

@@ -35,10 +35,16 @@ function assertFailsWithCode(pipeline, errCode) {
 // Change streams are only supported against a replica set.
 if (FixtureHelpers.isReplSet(db) || FixtureHelpers.isSharded(baseColl)) {
     // Disallowed alongside a $changeStream.
-    assertFailsWithCode([{$changeStream: {}}, {$unionWith: unionColl.getName()}], ErrorCodes.IllegalOperation);
+    assertFailsWithCode(
+        [{$changeStream: {}}, {$unionWith: unionColl.getName()}],
+        ErrorCodes.IllegalOperation,
+    );
 
     // Likewise, $changeStream is disallowed within a $unionWith sub-pipeline.
-    assertFailsWithCode([{$unionWith: {coll: unionColl.getName(), pipeline: [{$changeStream: {}}]}}], 31441);
+    assertFailsWithCode(
+        [{$unionWith: {coll: unionColl.getName(), pipeline: [{$changeStream: {}}]}}],
+        31441,
+    );
 
     assert.commandFailedWithCode(
         db.runCommand({
@@ -67,12 +73,21 @@ assertFailsWithCode([{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}
 
 // Test that collection-less stages are not allowed within the $unionWith sub-pipeline.
 subPipe = [{$listCachedAndActiveUsers: {}}];
-assertFailsWithCode([{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}], ErrorCodes.InvalidNamespace);
+assertFailsWithCode(
+    [{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}],
+    ErrorCodes.InvalidNamespace,
+);
 
 subPipe = [{$listLocalSessions: {}}];
-assertFailsWithCode([{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}], ErrorCodes.InvalidNamespace);
+assertFailsWithCode(
+    [{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}],
+    ErrorCodes.InvalidNamespace,
+);
 
 if (FixtureHelpers.isSharded(baseColl)) {
     subPipe = [{$currentOp: {localOps: true}}];
-    assertFailsWithCode([{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}], ErrorCodes.InvalidNamespace);
+    assertFailsWithCode(
+        [{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}],
+        ErrorCodes.InvalidNamespace,
+    );
 }

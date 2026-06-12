@@ -289,7 +289,10 @@ let result = assert.commandWorked(
             {
                 $unionWith: {
                     coll: testColl.getName(),
-                    pipeline: [{$search: mongotQuery}, {$project: {_id: 1, pipe: "inner", meta: "$$SEARCH_META"}}],
+                    pipeline: [
+                        {$search: mongotQuery},
+                        {$project: {_id: 1, pipe: "inner", meta: "$$SEARCH_META"}},
+                    ],
                 },
             },
         ],

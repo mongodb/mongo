@@ -35,7 +35,10 @@ const session = db.getMongo().startSession();
 const sessionDB = session.getDatabase(dbName);
 const sessionCappedColl = sessionDB.getCollection(cappedCollName);
 
-jsTest.log("Starting individual transactions for writes against capped collections that should " + " fail.");
+jsTest.log(
+    "Starting individual transactions for writes against capped collections that should " +
+        " fail.",
+);
 
 /*
  * Write ops (should fail):
@@ -43,7 +46,10 @@ jsTest.log("Starting individual transactions for writes against capped collectio
 
 jsTest.log("About to try: insert");
 session.startTransaction();
-assert.commandFailedWithCode(sessionCappedColl.insert({"x": 55}), ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    sessionCappedColl.insert({"x": 55}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 jsTest.log("About to try: update");
@@ -57,7 +63,11 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 jsTest.log("About to try: findAndModify (update version)");
 session.startTransaction();
 assert.commandFailedWithCode(
-    sessionDB.runCommand({findAndModify: cappedCollName, query: testDocument, update: {"$set": {"a": 1000}}}),
+    sessionDB.runCommand({
+        findAndModify: cappedCollName,
+        query: testDocument,
+        update: {"$set": {"a": 1000}},
+    }),
     ErrorCodes.OperationNotSupportedInTransaction,
 );
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
@@ -72,7 +82,10 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 // Deletes do not work against capped collections so we will not test them in transactions.
 
-jsTest.log("Starting individual transactions for reads against capped collections that should " + " succeed.");
+jsTest.log(
+    "Starting individual transactions for reads against capped collections that should " +
+        " succeed.",
+);
 
 /*
  * Read ops (should succeed):
@@ -86,7 +99,9 @@ assert.commandWorked(session.abortTransaction_forTesting());
 
 jsTest.log("About to try: distinct");
 session.startTransaction();
-let distinctRes = assert.commandWorked(sessionDB.runCommand({"distinct": cappedCollName, "key": "a"}));
+let distinctRes = assert.commandWorked(
+    sessionDB.runCommand({"distinct": cappedCollName, "key": "a"}),
+);
 assert.eq(1, distinctRes.values);
 assert.commandWorked(session.abortTransaction_forTesting());
 

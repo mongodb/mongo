@@ -14,9 +14,17 @@ assert.commandWorked(coll.insert({inf: Infinity, nan: NaN}));
     (function testCommutativityWithConstArguments() {
         specials.forEach((special) => {
             numbers.forEach((num) => {
-                const expected = [{a: num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val}];
-                assert.eq(expected, coll.aggregate([{$project: {a: {[op]: [special.val, num]}, _id: 0}}]).toArray());
-                assert.eq(expected, coll.aggregate([{$project: {a: {[op]: [num, special.val]}, _id: 0}}]).toArray());
+                const expected = [
+                    {a: num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val},
+                ];
+                assert.eq(
+                    expected,
+                    coll.aggregate([{$project: {a: {[op]: [special.val, num]}, _id: 0}}]).toArray(),
+                );
+                assert.eq(
+                    expected,
+                    coll.aggregate([{$project: {a: {[op]: [num, special.val]}, _id: 0}}]).toArray(),
+                );
             });
         });
     })();
@@ -24,9 +32,21 @@ assert.commandWorked(coll.insert({inf: Infinity, nan: NaN}));
     (function testCommutativityWithNonConstArgument() {
         specials.forEach((special) => {
             numbers.forEach((num) => {
-                const expected = [{a: num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val}];
-                assert.eq(expected, coll.aggregate([{$project: {a: {[op]: [special.path, num]}, _id: 0}}]).toArray());
-                assert.eq(expected, coll.aggregate([{$project: {a: {[op]: [num, special.path]}, _id: 0}}]).toArray());
+                const expected = [
+                    {a: num instanceof NumberDecimal ? NumberDecimal(special.val) : special.val},
+                ];
+                assert.eq(
+                    expected,
+                    coll
+                        .aggregate([{$project: {a: {[op]: [special.path, num]}, _id: 0}}])
+                        .toArray(),
+                );
+                assert.eq(
+                    expected,
+                    coll
+                        .aggregate([{$project: {a: {[op]: [num, special.path]}, _id: 0}}])
+                        .toArray(),
+                );
             });
         });
     })();

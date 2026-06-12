@@ -25,7 +25,10 @@ function runTest(validateMode) {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     rst.startSet();
@@ -37,7 +40,9 @@ function runTest(validateMode) {
     const primaryDB = primary.getDB(dbName);
     const secondaryDB = secondary.getDB(dbName);
 
-    assert.commandWorked(secondary.adminCommand({"setParameter": 1, "skipApplyingDbCheckBatchOnSecondary": true}));
+    assert.commandWorked(
+        secondary.adminCommand({"setParameter": 1, "skipApplyingDbCheckBatchOnSecondary": true}),
+    );
     const writeConcern = {w: "majority"};
 
     resetAndInsert(rst, primaryDB, collName, nDocs);
@@ -85,7 +90,11 @@ function runTest(validateMode) {
     checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, nDocs / batchSize);
 
     checkHealthLog(secondaryHealthLog, logQueries.startStopQuery, 2);
-    checkHealthLog(secondaryHealthLog, logQueries.skipApplyingBatchOnSecondaryQuery, nDocs / batchSize);
+    checkHealthLog(
+        secondaryHealthLog,
+        logQueries.skipApplyingBatchOnSecondaryQuery,
+        nDocs / batchSize,
+    );
     checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, nDocs / batchSize);
     checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 0);
     rst.stopSet();

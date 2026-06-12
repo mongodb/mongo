@@ -63,7 +63,11 @@ if (s.getDB("admin").runCommand("buildInfo").bits < 64) {
 }
 
 print("Configuration: Add user " + tojson(adminUser));
-s.getDB(adminUser.db).createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
+s.getDB(adminUser.db).createUser({
+    user: adminUser.username,
+    pwd: adminUser.password,
+    roles: jsTest.adminUserRoles,
+});
 login(adminUser);
 
 // Set the chunk size, disable the secondary throttle (so the test doesn't run so slow)
@@ -136,7 +140,11 @@ s.getDB("admin").runCommand({shardCollection: "test.foo", key: {x: 1}});
 
 d1.awaitSecondaryNodes(5 * 60 * 1000);
 
-s.getDB(testUser.db).createUser({user: testUser.username, pwd: testUser.password, roles: jsTest.basicUserRoles});
+s.getDB(testUser.db).createUser({
+    user: testUser.username,
+    pwd: testUser.password,
+    roles: jsTest.basicUserRoles,
+});
 s.getDB(testUserReadOnly.db).createUser({
     user: testUserReadOnly.username,
     pwd: testUserReadOnly.password,
@@ -226,7 +234,11 @@ if (numDocs != num) {
         traceMissingDoc(s.getDB("test").foo, {_id: missingDocNumbers[i], x: missingDocNumbers[i]});
     }
 
-    assert(false, "Number of docs found does not equal the number inserted. Missing docs: " + missingDocNumbers);
+    assert(
+        false,
+        "Number of docs found does not equal the number inserted. Missing docs: " +
+            missingDocNumbers,
+    );
 }
 
 // We're only sure we aren't duplicating documents iff there's no balancing going on here

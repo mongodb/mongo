@@ -31,7 +31,9 @@ assert.commandWorked(
         ]),
 );
 
-assert.commandWorked(st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
+assert.commandWorked(
+    st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}),
+);
 
 // The setClusterParameter command only sets the cluster parameter on all shards and the config
 // server. getClusterParamter will refresh the cluster parameter cache so mongos is able to
@@ -71,7 +73,9 @@ const joinBulkMultiUpdateShell = startParallelShell(
             const res = db
                 .getSiblingDB(dbName)
                 .getCollection(collName)
-                .bulkWrite([{updateMany: {filter: {member: "abc123"}, update: {$set: {points: 100}}}}]);
+                .bulkWrite([
+                    {updateMany: {filter: {member: "abc123"}, update: {$set: {points: 100}}}},
+                ]);
             assert.commandWorked(res);
             assert.eq(res["matchedCount"], 2, tojson(res));
         },
@@ -89,7 +93,10 @@ jsTest.log("Running multiDelete");
 const joinMultiDeleteShell = startParallelShell(
     funWithArgs(
         function (dbName, collName) {
-            const res = db.getSiblingDB(dbName).getCollection(collName).deleteMany({member: "abc123"});
+            const res = db
+                .getSiblingDB(dbName)
+                .getCollection(collName)
+                .deleteMany({member: "abc123"});
             assert.commandWorked(res);
             assert.eq(res["deletedCount"], 2, tojson(res));
         },

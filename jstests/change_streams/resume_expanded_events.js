@@ -112,7 +112,11 @@ function runTest(collNameForChangeStream) {
         function testResumeForEvent(event, nextEventDesc) {
             pipeline = [
                 {
-                    $changeStream: {showExpandedEvents: true, showSystemEvents: true, [resumeOption]: event._id},
+                    $changeStream: {
+                        showExpandedEvents: true,
+                        showSystemEvents: true,
+                        [resumeOption]: event._id,
+                    },
                 },
             ];
             cursor = test.startWatchingChanges({pipeline, collection: collNameForChangeStream});

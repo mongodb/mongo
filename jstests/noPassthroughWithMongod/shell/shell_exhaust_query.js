@@ -10,7 +10,9 @@ assert.throws(() => coll.find().addOption(DBQuery.Option.exhaust).itcount());
 db.getMongo().setReadConcern(null);
 
 // Ensure that collation is not allowed
-assert.throws(() => coll.find().collation({locale: "simple"}).addOption(DBQuery.Option.exhaust).itcount());
+assert.throws(() =>
+    coll.find().collation({locale: "simple"}).addOption(DBQuery.Option.exhaust).itcount(),
+);
 
 // Ensure that "allowDiskUse" is not allowed
 assert.throws(() => coll.find().allowDiskUse(true).addOption(DBQuery.Option.exhaust).itcount());

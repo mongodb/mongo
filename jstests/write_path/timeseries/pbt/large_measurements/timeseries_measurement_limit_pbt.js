@@ -48,4 +48,7 @@ const programArb = makeTimeseriesCommandSequenceArb(
     /* replayPath    */ fcParams.replayPath, // replace this value with the replay path to replicate a failure
 );
 
-fixture.run(programArb, "keeps tsColl and ctrlColl in sync under inserts that approach the Measurement 4MB limit");
+fixture.run(
+    programArb,
+    "keeps tsColl and ctrlColl in sync under inserts that approach the Measurement 4MB limit",
+);

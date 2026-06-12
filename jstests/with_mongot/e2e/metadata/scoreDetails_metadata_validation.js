@@ -25,7 +25,11 @@ createSearchIndex(coll, {name: "search-index", definition: {"mappings": {"dynami
 const kUnavailableMetadataErrCode = 40218;
 
 const searchStageWithDetails = {
-    $search: {index: "search-index", text: {query: "hungry hippo", path: ["mood"]}, scoreDetails: true},
+    $search: {
+        index: "search-index",
+        text: {query: "hungry hippo", path: ["mood"]},
+        scoreDetails: true,
+    },
 };
 const searchStageNoDetails = {
     $search: {
@@ -62,7 +66,13 @@ assert.commandWorked(
 assert.commandWorked(
     db.runCommand({
         aggregate: collName,
-        pipeline: [searchStageWithDetails, matchStage, skipStage, limitStage, metaProjectScoreDetailsStage],
+        pipeline: [
+            searchStageWithDetails,
+            matchStage,
+            skipStage,
+            limitStage,
+            metaProjectScoreDetailsStage,
+        ],
         cursor: {},
     }),
 );

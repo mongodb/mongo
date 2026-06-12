@@ -31,11 +31,15 @@ function dropAndRecreateColl({numDocs}) {
 // Test that running a find with the 'tailable' option will return results immediately, even if
 // there are fewer than the specified batch size.
 dropAndRecreateColl({numDocs: batchSize - 1});
-let findRes = assert.commandWorked(db.runCommand({find: collName, tailable: true, batchSize: batchSize}));
+let findRes = assert.commandWorked(
+    db.runCommand({find: collName, tailable: true, batchSize: batchSize}),
+);
 assert.eq(findRes.cursor.firstBatch.length, batchSize - 1);
 assert.neq(findRes.cursor.id, 0);
 // Test that the same is true for a find with the 'tailable' and 'awaitData' options set.
-findRes = assert.commandWorked(db.runCommand({find: collName, tailable: true, awaitData: true, batchSize: batchSize}));
+findRes = assert.commandWorked(
+    db.runCommand({find: collName, tailable: true, awaitData: true, batchSize: batchSize}),
+);
 assert.eq(findRes.cursor.firstBatch.length, batchSize - 1);
 assert.neq(findRes.cursor.id, 0);
 
@@ -45,7 +49,12 @@ assert.neq(findRes.cursor.id, 0);
  */
 function openCursor({batchSize, tailable, awaitData}) {
     const findRes = assert.commandWorked(
-        db.runCommand({find: collName, tailable: tailable, awaitData: awaitData, batchSize: batchSize}),
+        db.runCommand({
+            find: collName,
+            tailable: tailable,
+            awaitData: awaitData,
+            batchSize: batchSize,
+        }),
     );
     assert.eq(findRes.cursor.firstBatch.length, batchSize);
     assert.neq(findRes.cursor.id, 0);
@@ -59,7 +68,9 @@ function openCursor({batchSize, tailable, awaitData}) {
 // One batch's worth for the find and one more than one batch's worth for the getMore.
 dropAndRecreateColl({numDocs: batchSize + (batchSize + 1)});
 let cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: false});
-let getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+let getMoreRes = assert.commandWorked(
+    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+);
 assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
 
 // Test that the same is true for a tailable, *awaitData* cursor when not running against
@@ -67,7 +78,9 @@ assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
 // timeout expires before it has received results from the shards.
 if (!FixtureHelpers.isMongos(db)) {
     cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: true});
-    getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+    );
     assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
 }
 
@@ -76,7 +89,9 @@ if (!FixtureHelpers.isMongos(db)) {
 // One batch's worth for the find and one less than one batch's worth for the getMore.
 dropAndRecreateColl({numDocs: batchSize + (batchSize - 1)});
 cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: false});
-getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+getMoreRes = assert.commandWorked(
+    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+);
 assert.eq(getMoreRes.cursor.nextBatch.length, batchSize - 1);
 
 // Test that the same is true for a tailable, *awaitData* cursor when run directly against
@@ -84,7 +99,9 @@ assert.eq(getMoreRes.cursor.nextBatch.length, batchSize - 1);
 // timeout expires before it has received results from the shards.
 if (!FixtureHelpers.isMongos(db)) {
     cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: true});
-    getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+    );
     assert.eq(getMoreRes.cursor.nextBatch.length, batchSize - 1);
 }
 
@@ -93,11 +110,17 @@ if (!FixtureHelpers.isMongos(db)) {
 function checkNoIntermediateEmptyBatchesWhenBatchSizeSmall(awaitData) {
     dropAndRecreateColl({numDocs: batchSize * 3});
     cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: awaitData});
-    getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+    );
     assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
-    getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+    );
     assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
-    getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}),
+    );
     assert.eq(getMoreRes.cursor.nextBatch.length, 0);
 
     // Avoid leaving the cursor open. Cursors above are killed by drops, but we'll avoid dropping

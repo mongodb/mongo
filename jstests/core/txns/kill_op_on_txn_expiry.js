@@ -26,17 +26,24 @@ const sessionColl = sessionDb[collName];
 
 // Need the original 'transactionLifetimeLimitSeconds' value so that we can reset it back at the
 // end of the test.
-let res = assert.commandWorked(db.adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1}));
+let res = assert.commandWorked(
+    db.adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1}),
+);
 const originalTransactionLifetimeLimitSeconds = res.transactionLifetimeLimitSeconds;
 
 // Decrease transactionLifetimeLimitSeconds so it expires faster
 jsTest.log(
-    "Decrease transactionLifetimeLimitSeconds from " + originalTransactionLifetimeLimitSeconds + " to 30 seconds.",
+    "Decrease transactionLifetimeLimitSeconds from " +
+        originalTransactionLifetimeLimitSeconds +
+        " to 30 seconds.",
 );
 assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 30}));
 
-res = assert.commandWorked(db.adminCommand({getParameter: 1, AbortExpiredTransactionsSessionCheckoutTimeout: 1}));
-const originalAbortExpiredTransactionsSessionCheckoutTimeout = res.AbortExpiredTransactionsSessionCheckoutTimeout;
+res = assert.commandWorked(
+    db.adminCommand({getParameter: 1, AbortExpiredTransactionsSessionCheckoutTimeout: 1}),
+);
+const originalAbortExpiredTransactionsSessionCheckoutTimeout =
+    res.AbortExpiredTransactionsSessionCheckoutTimeout;
 
 // Increase the AbortExpiredTransactionsSessionCheckoutTimeout to prevent it from conflicting with
 // the abortExpiredTransactions job on slower machines. This ensures that the
@@ -47,7 +54,12 @@ jsTest.log(
         originalAbortExpiredTransactionsSessionCheckoutTimeout +
         " ms to 5 minutes.",
 );
-assert.commandWorked(db.adminCommand({setParameter: 1, AbortExpiredTransactionsSessionCheckoutTimeout: 5 * 60 * 1000}));
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        AbortExpiredTransactionsSessionCheckoutTimeout: 5 * 60 * 1000,
+    }),
+);
 
 try {
     jsTestLog("Starting transaction");
@@ -65,7 +77,9 @@ try {
     );
 
     jsTestLog("Enabling fail point to block batch inserts");
-    let failPoint = configureFailPoint(testDB, "hangDuringBatchInsert", {shouldCheckForInterrupt: true});
+    let failPoint = configureFailPoint(testDB, "hangDuringBatchInsert", {
+        shouldCheckForInterrupt: true,
+    });
     // Clear ramlog so checkLog can't find log messages from the previous times this test was run.
     assert.commandWorked(testDB.adminCommand({clearLog: "global"}));
 
@@ -106,7 +120,10 @@ try {
         ),
     );
 
-    jsTestLog("Disabling fail point to enable insert to proceed and detect that the session " + "has been killed");
+    jsTestLog(
+        "Disabling fail point to enable insert to proceed and detect that the session " +
+            "has been killed",
+    );
     failPoint.off();
 
     workerThread.join();
@@ -124,7 +141,8 @@ try {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
-            AbortExpiredTransactionsSessionCheckoutTimeout: originalAbortExpiredTransactionsSessionCheckoutTimeout,
+            AbortExpiredTransactionsSessionCheckoutTimeout:
+                originalAbortExpiredTransactionsSessionCheckoutTimeout,
         }),
     );
 }

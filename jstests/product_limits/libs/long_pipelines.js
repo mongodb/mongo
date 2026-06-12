@@ -50,7 +50,12 @@ export class WorkloadManyCollectionsLookupBushy extends LongPipelineWorkload {
         let unsetList = ["_id"];
         for (let i = 1; i < this.scale(); i++) {
             pipeline.push({
-                $lookup: {from: `coll${i}`, localField: "f0", foreignField: "f0", as: `asField_${i}`},
+                $lookup: {
+                    from: `coll${i}`,
+                    localField: "f0",
+                    foreignField: "f0",
+                    as: `asField_${i}`,
+                },
             });
             // Remove all _id fields
             unsetList.push(`asField_${i}._id`);
@@ -82,7 +87,12 @@ export class WorkloadManyCollectionsLookupUnwind extends LongPipelineWorkload {
         let unsetList = ["_id"];
         for (let i = 1; i < this.scale(); i++) {
             pipeline.push({
-                $lookup: {from: `coll${i}`, localField: "f0", foreignField: "f0", as: `asField_${i}`},
+                $lookup: {
+                    from: `coll${i}`,
+                    localField: "f0",
+                    foreignField: "f0",
+                    as: `asField_${i}`,
+                },
             });
             pipeline.push({$unwind: `$asField_${i}`});
             // Remove all _id fields
@@ -116,7 +126,12 @@ export class WorkloadManyCollectionsLookupUnwindChained extends LongPipelineWork
         for (let i = 1; i < this.scale(); i++) {
             const localField = i > 1 ? `asField_${i - 1}.f0` : "f0";
             pipeline.push({
-                $lookup: {from: `coll${i}`, localField: localField, foreignField: "f0", as: `asField_${i}`},
+                $lookup: {
+                    from: `coll${i}`,
+                    localField: localField,
+                    foreignField: "f0",
+                    as: `asField_${i}`,
+                },
             });
             pipeline.push({$unwind: `$asField_${i}`});
             unsetList.push(`asField_${i}._id`);

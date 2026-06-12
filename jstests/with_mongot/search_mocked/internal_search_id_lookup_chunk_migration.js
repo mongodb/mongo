@@ -34,7 +34,11 @@ function createLookupSourceDocument(lookupId, shardKey, targetId) {
 function validateResults(resultIds, expectedIds) {
     // Verify no duplicates.
     const uniqueIds = [...new Set(resultIds)];
-    assert.eq(resultIds.length, uniqueIds.length, `Found duplicate documents in results. IDs: ${tojson(resultIds)}`);
+    assert.eq(
+        resultIds.length,
+        uniqueIds.length,
+        `Found duplicate documents in results. IDs: ${tojson(resultIds)}`,
+    );
 
     // Verify all expected documents are returned.
     assert.eq(
@@ -44,7 +48,10 @@ function validateResults(resultIds, expectedIds) {
             `Missing: ${tojson(expectedIds.filter((id) => !resultIds.includes(id)))}`,
     );
     for (const expectedId of expectedIds) {
-        assert(resultIds.includes(expectedId), `Results should include document with _id=${expectedId}`);
+        assert(
+            resultIds.includes(expectedId),
+            `Results should include document with _id=${expectedId}`,
+        );
     }
 }
 
@@ -62,7 +69,9 @@ describe("$_internalSearchIdLookup with chunk migrations", function () {
         this.testDB = mongos.getDB(dbName);
         this.testColl = this.testDB.getCollection(collName);
 
-        assert.commandWorked(this.testDB.adminCommand({enableSharding: dbName, primaryShard: this.st.shard0.name}));
+        assert.commandWorked(
+            this.testDB.adminCommand({enableSharding: dbName, primaryShard: this.st.shard0.name}),
+        );
 
         // Insert documents - 50 on shard0 (shardKey 0-49), 50 on shard1 (shardKey 200-249).
         this.docs = [];
@@ -92,7 +101,9 @@ describe("$_internalSearchIdLookup with chunk migrations", function () {
         );
 
         // Split at 15 to prepare for migration during test.
-        assert.commandWorked(this.testDB.adminCommand({split: this.testColl.getFullName(), middle: {shardKey: 15}}));
+        assert.commandWorked(
+            this.testDB.adminCommand({split: this.testColl.getFullName(), middle: {shardKey: 15}}),
+        );
 
         // Stop the balancer to prevent automatic chunk migrations.
         assert.commandWorked(this.testDB.adminCommand({balancerStop: 1}));
@@ -218,7 +229,11 @@ describe("$_internalSearchIdLookup with chunk migrations", function () {
         // on shard1.
         for (let targetDocId = 15; targetDocId < 50; targetDocId++) {
             const docOnShard1 = this.shard1Coll.findOne({_id: targetDocId});
-            assert.neq(docOnShard1, null, `Target doc with _id=${targetDocId} should be on shard1 after migration`);
+            assert.neq(
+                docOnShard1,
+                null,
+                `Target doc with _id=${targetDocId} should be on shard1 after migration`,
+            );
         }
 
         // Read results from temp collection and validate.

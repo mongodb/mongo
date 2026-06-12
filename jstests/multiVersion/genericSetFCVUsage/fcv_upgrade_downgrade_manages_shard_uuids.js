@@ -27,13 +27,17 @@ describe("FCV upgrade/downgrade uuid fields", function () {
 
     function setupForFCVUpgradeTest(clearExistingUuids) {
         // Ensure that the upgrade request won't result into a no-op.
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         checkIndexOnShardUuid(false /* expectedToBePresent */);
         // Clear pre-existing metadata if requested.
         if (clearExistingUuids) {
             const shardsInFixture = getShards();
             // Clear uuid values from config.shards docs.
-            const updateRes = assert.commandWorked(st.s.getDB("config").shards.updateMany({}, {$unset: {uuid: 1}}));
+            const updateRes = assert.commandWorked(
+                st.s.getDB("config").shards.updateMany({}, {$unset: {uuid: 1}}),
+            );
             assert.eq(shardsInFixture.length, updateRes.modifiedCount);
             // Clear uuid values from all shardIdentity docs.
             assert.commandWorked(
@@ -44,7 +48,9 @@ describe("FCV upgrade/downgrade uuid fields", function () {
             );
             for (const shard of shardsInFixture) {
                 assert.commandWorked(
-                    shard.getDB("admin").system.version.updateOne({_id: "shardIdentity"}, {$unset: {uuid: 1}}),
+                    shard
+                        .getDB("admin")
+                        .system.version.updateOne({_id: "shardIdentity"}, {$unset: {uuid: 1}}),
                 );
             }
         }
@@ -139,7 +145,11 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         for (const shard of getShards()) {
             const identityDoc = shard.getDB("admin").system.version.findOne({_id: "shardIdentity"});
             const configShardsDoc = st.s.getDB("config").shards.findOne({_id: shard.shardName});
-            assert.neq(null, identityDoc, `shardIdentity document must exist on node ${shard.host}`);
+            assert.neq(
+                null,
+                identityDoc,
+                `shardIdentity document must exist on node ${shard.host}`,
+            );
             assert.eq(
                 identityDoc.uuid,
                 configShardsDoc.uuid,
@@ -149,14 +159,18 @@ describe("FCV upgrade/downgrade uuid fields", function () {
 
         // The shardIdentity doc on the config server should also have a uuid field.
         const configServer = st.configRS.getPrimary();
-        const configServerIdentityDoc = configServer.getDB("admin").system.version.findOne({_id: "shardIdentity"});
+        const configServerIdentityDoc = configServer
+            .getDB("admin")
+            .system.version.findOne({_id: "shardIdentity"});
         assertIsUUID(configServerIdentityDoc.uuid);
     }
 
     it("[Dedicated CSRS] Should set consistent metadata on FCV upgrade", function () {
         setupForFCVUpgradeTest(true /* clearExistingUuids */);
         const topologyTimeBeforeUpgrade = getMaxTopologyTimeInConfigShards();
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
         const topologyTimeAfterFirstUpgrade = getMaxTopologyTimeInConfigShards();
         assert(
             timestampCmp(topologyTimeAfterFirstUpgrade, topologyTimeBeforeUpgrade) > 0,
@@ -169,7 +183,9 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         checkIndexOnShardUuid(true /* expectedToBePresent */);
 
         // Repeat the upgrade to verify idempotency.
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
 
         const topologyTimeAfterNoopUpgrade = getMaxTopologyTimeInConfigShards();
         assert(
@@ -190,7 +206,9 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         getShards().forEach((shard) => {
             const uuid = UUID();
             expectedValuesByShardName[shard.shardName] = uuid;
-            assert.commandWorked(st.s.getDB("config").shards.updateOne({_id: shard.shardName}, {$set: {uuid: uuid}}));
+            assert.commandWorked(
+                st.s.getDB("config").shards.updateOne({_id: shard.shardName}, {$set: {uuid: uuid}}),
+            );
         });
 
         // Inject bogus uuid values into all shardIdentity docs.
@@ -199,11 +217,15 @@ describe("FCV upgrade/downgrade uuid fields", function () {
 
         for (const shard of getShards()) {
             assert.commandWorked(
-                shard.getDB("admin").system.version.updateOne({_id: "shardIdentity"}, {$set: {uuid: bogusUUID}}),
+                shard
+                    .getDB("admin")
+                    .system.version.updateOne({_id: "shardIdentity"}, {$set: {uuid: bogusUUID}}),
             );
         }
 
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
 
         // Verify bogus values have been replaced with the correct shard identifiers.
         assertConfigShardsHaveUuids(expectedValuesByShardName);
@@ -212,9 +234,13 @@ describe("FCV upgrade/downgrade uuid fields", function () {
     });
 
     it("[Dedicated CSRS] Should drop the uuid_1 index of config.shards on FCV downgrade", function () {
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
         checkIndexOnShardUuid(true /* expectedToBePresent */);
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         checkIndexOnShardUuid(false /* expectedToBePresent */);
     });
 });

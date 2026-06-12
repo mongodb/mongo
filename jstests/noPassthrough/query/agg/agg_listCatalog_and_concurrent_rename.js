@@ -42,7 +42,10 @@ const uuid = testDB.getCollectionInfos({name: coll.getName()})[0].info.uuid;
 // executor. Execution of the aggregation should now either succed with data, or fail.
 const fp = configureFailPoint(primary, "hangAfterCreatingAggregationPlan", {uuid: uuid});
 
-const aggregateShell = startParallelShell(funWithArgs(concurrentAggregation, uuid, coll.getName()), primary.port);
+const aggregateShell = startParallelShell(
+    funWithArgs(concurrentAggregation, uuid, coll.getName()),
+    primary.port,
+);
 
 fp.wait();
 

@@ -43,13 +43,17 @@ const clusterTime = testDB.getSession().getOperationTime();
 // Snapshot read while the drop is pending: the collection is dropped in durable at clusterTime,
 // so the read must return no results even though the in-memory catalog still has the collection.
 const resDuringPending = assert.commandWorked(
-    testDB.runCommand({find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTime}}),
+    testDB.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: clusterTime},
+    }),
 );
 const docsDuringPending = new DBCommandCursor(testDB, resDuringPending).toArray();
 assert.eq(
     docsDuringPending.length,
     0,
-    "Expected no documents from a dropped collection during pending commit, got: " + tojson(docsDuringPending),
+    "Expected no documents from a dropped collection during pending commit, got: " +
+        tojson(docsDuringPending),
 );
 
 // Let the drop publish to the in-memory catalog.
@@ -58,13 +62,17 @@ awaitDrop();
 
 // Same snapshot read after publish: must also return no results.
 const resAfterPublish = assert.commandWorked(
-    testDB.runCommand({find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTime}}),
+    testDB.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: clusterTime},
+    }),
 );
 const docsAfterPublish = new DBCommandCursor(testDB, resAfterPublish).toArray();
 assert.eq(
     docsAfterPublish.length,
     0,
-    "Expected no documents from a dropped collection after publish, got: " + tojson(docsAfterPublish),
+    "Expected no documents from a dropped collection after publish, got: " +
+        tojson(docsAfterPublish),
 );
 
 rst.stopSet();

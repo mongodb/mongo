@@ -25,7 +25,12 @@ describe("write conflict preserves plan stats", function () {
     });
 
     function runAndCheckStats(comment, fn) {
-        const fp = configureFailPoint(conn, "WTWriteConflictException", {}, {times: kWriteConflictCount});
+        const fp = configureFailPoint(
+            conn,
+            "WTWriteConflictException",
+            {},
+            {times: kWriteConflictCount},
+        );
         fn(comment);
         fp.off();
 
@@ -42,7 +47,11 @@ describe("write conflict preserves plan stats", function () {
             kWriteConflictCount,
             `${label}: expected at least ${kWriteConflictCount} writeConflicts, got ${wc}`,
         );
-        assert.eq(wc + 1, parsed.attr.docsExamined, `${label}: docsExamined should equal writeConflicts+1`);
+        assert.eq(
+            wc + 1,
+            parsed.attr.docsExamined,
+            `${label}: docsExamined should equal writeConflicts+1`,
+        );
     }
 
     it("findAndModify update accumulates keysExamined and docsExamined", function () {
@@ -112,7 +121,12 @@ describe("write conflict preserves plan stats", function () {
         );
 
         const comment = "sorted_update_no_match";
-        const fp = configureFailPoint(conn, "hangBeforeUpdaterEnsureDocStillMatchesAndYield", {}, "alwaysOn");
+        const fp = configureFailPoint(
+            conn,
+            "hangBeforeUpdaterEnsureDocStillMatchesAndYield",
+            {},
+            "alwaysOn",
+        );
 
         const awaitUpdate = startParallelShell(
             `assert.commandWorked(db.runCommand({

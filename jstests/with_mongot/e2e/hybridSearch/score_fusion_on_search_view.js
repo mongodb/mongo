@@ -22,9 +22,17 @@ import {
  */
 const createScoreFusionPipeline = (inputPipelines, viewPipeline = null) => {
     const scoreFusionStage = {
-        $scoreFusion: {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}},
+        $scoreFusion: {
+            input: {pipelines: {}, normalization: "sigmoid"},
+            combination: {method: "avg"},
+        },
     };
-    return createHybridSearchPipeline(inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
+    return createHybridSearchPipeline(
+        inputPipelines,
+        viewPipeline,
+        scoreFusionStage,
+        /**isRankFusion*/ false,
+    );
 };
 
 /**
@@ -48,7 +56,10 @@ const runScoreFusionSearchViewsTest = (inputPipelines, checkCorrectness = true) 
  *     needed.
  */
 const runScoreFusionWithAllMongotInputPipelinesOnSearchViewsTest = (inputPipelines) => {
-    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines, createScoreFusionPipeline);
+    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(
+        inputPipelines,
+        createScoreFusionPipeline,
+    );
 };
 
 /* --------------------------------------------------------------------------------------- */
@@ -73,7 +84,11 @@ runScoreFusionSearchViewsTest({
         {$score: {score: "$x", normalization: "minMaxScaler"}},
         {$sort: {x: -1}},
     ],
-    b: [{$match: {$expr: {$eq: ["$a", "foo"]}}}, {$score: {score: "$y", normalization: "sigmoid"}}, {$sort: {x: 1}}],
+    b: [
+        {$match: {$expr: {$eq: ["$a", "foo"]}}},
+        {$score: {score: "$y", normalization: "sigmoid"}},
+        {$sort: {x: 1}},
+    ],
 });
 // score two pipelines with matches (reference collection fields)
 runScoreFusionSearchViewsTest({
@@ -129,7 +144,11 @@ runScoreFusionSearchViewsTest(
             {$score: {score: {$add: [10, 2]}, normalization: "minMaxScaler", weight: 0.5}},
             {$sort: {x: 1}},
         ],
-        b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$sample: {size: 5}}, {$sort: {x: 1}}],
+        b: [
+            {$score: {score: "$x", normalization: "sigmoid"}},
+            {$sample: {size: 5}},
+            {$sort: {x: 1}},
+        ],
     },
     /*checkCorrectness=**/ false,
 );
@@ -166,7 +185,10 @@ runScoreFusionSearchViewsTest({
 runScoreFusionSearchViewsTest({
     a: [{$match: {"$expr": {$gt: ["$x", 4]}}}, {$score: {score: "$x", normalization: "sigmoid"}}],
     b: [vectorSearchPipelineV],
-    c: [{$match: {"$expr": {$lte: ["$x", 45]}}}, {$score: {score: "$y", normalization: "minMaxScaler"}}],
+    c: [
+        {$match: {"$expr": {$lte: ["$x", 45]}}},
+        {$score: {score: "$y", normalization: "minMaxScaler"}},
+    ],
     d: [searchPipelineBar],
 });
 

@@ -71,15 +71,31 @@ function runTests(db, coll) {
     // $skip
     checkCounters(() => coll.aggregate([{$skip: 5}]).toArray(), ["$skip"]);
     // $project is an alias for $unset.
-    checkCounters(() => coll.aggregate([{$project: {title: 1, author: 1}}]).toArray(), ["$project"], ["$unset"]);
+    checkCounters(
+        () => coll.aggregate([{$project: {title: 1, author: 1}}]).toArray(),
+        ["$project"],
+        ["$unset"],
+    );
     // $count is an alias for $project and $group.
-    checkCounters(() => coll.aggregate([{$count: "test"}]).toArray(), ["$count"], ["$project", "$group"]);
+    checkCounters(
+        () => coll.aggregate([{$count: "test"}]).toArray(),
+        ["$count"],
+        ["$project", "$group"],
+    );
 
     // $lookup
     checkCounters(
         () =>
             coll
-                .aggregate([{$lookup: {from: "inventory", pipeline: [{$match: {inStock: 70}}], as: "inventory_docs"}}])
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: "inventory",
+                            pipeline: [{$match: {inStock: 70}}],
+                            as: "inventory_docs",
+                        },
+                    },
+                ])
                 .toArray(),
         ["$lookup", "$match"],
     );
@@ -90,7 +106,10 @@ function runTests(db, coll) {
             coll
                 .aggregate([
                     {
-                        $merge: {into: coll.getName(), whenMatched: [{$set: {a: {$multiply: ["$a", 2]}}}]},
+                        $merge: {
+                            into: coll.getName(),
+                            whenMatched: [{$set: {a: {$multiply: ["$a", 2]}}}],
+                        },
                     },
                 ])
                 .toArray(),
@@ -103,7 +122,10 @@ function runTests(db, coll) {
             coll
                 .aggregate([
                     {
-                        $facet: {"a": [{$match: {price: {$exists: 1}}}], "b": [{$project: {title: 1}}]},
+                        $facet: {
+                            "a": [{$match: {price: {$exists: 1}}}],
+                            "b": [{$project: {title: 1}}],
+                        },
                     },
                 ])
                 .toArray(),
@@ -115,7 +137,8 @@ function runTests(db, coll) {
 
     // Verify that a pipeline in an update ticks counters.
     checkCounters(
-        () => coll.update({price: {$gte: 0}}, [{$addFields: {a: {$add: ["$a", 1]}}}], {multi: true}),
+        () =>
+            coll.update({price: {$gte: 0}}, [{$addFields: {a: {$add: ["$a", 1]}}}], {multi: true}),
         ["$addFields"],
         ["$set"],
     );
@@ -126,7 +149,10 @@ function runTests(db, coll) {
             coll
                 .aggregate([
                     {
-                        $facet: {"a": [{$match: {price: {$exists: 1}}}], "b": [{$project: {title: 1}}]},
+                        $facet: {
+                            "a": [{$match: {price: {$exists: 1}}}],
+                            "b": [{$project: {title: 1}}],
+                        },
                     },
                     {
                         $facet: {
@@ -144,7 +170,10 @@ function runTests(db, coll) {
     assert.commandWorked(db.createView(viewName, coll.getName(), [{"$project": {_id: 0}}]));
     // Note that $project's counter will also be ticked since the $project used to generate the view
     // will be stitched together with the pipeline specified to the aggregate command.
-    checkCounters(() => db[viewName].aggregate([{$match: {a: 5}}]).toArray(), ["$match", "$project"]);
+    checkCounters(
+        () => db[viewName].aggregate([{$match: {a: 5}}]).toArray(),
+        ["$match", "$project"],
+    );
 
     // Failed aggregations should still increment the counters.
     checkCounters(() => {

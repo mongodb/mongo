@@ -19,7 +19,12 @@ const aggregationPipelineWithDateDiff = [
         $project: {
             _id: false,
             date_diff: {
-                $dateDiff: {startDate: "$startDate", endDate: "$endDate", unit: "$unit", timezone: "$timeZone"},
+                $dateDiff: {
+                    startDate: "$startDate",
+                    endDate: "$endDate",
+                    unit: "$unit",
+                    timezone: "$timeZone",
+                },
             },
         },
     },
@@ -80,7 +85,9 @@ const testCases = [
             {
                 $project: {
                     _id: false,
-                    date_diff: {$dateDiff: {startDate: "$startDate", endDate: "$endDate", unit: "$unit"}},
+                    date_diff: {
+                        $dateDiff: {startDate: "$startDate", endDate: "$endDate", unit: "$unit"},
+                    },
                 },
             },
         ],
@@ -203,7 +210,9 @@ const testCases = [
     {
         // Invalid 'timezone' value.
         pipeline: aggregationPipelineWithDateDiff,
-        inputDocuments: [{startDate: someDate, endDate: someDate, unit: "hour", timeZone: "America/Invalid"}],
+        inputDocuments: [
+            {startDate: someDate, endDate: someDate, unit: "hour", timeZone: "America/Invalid"},
+        ],
         expectedErrorCode: 40485,
     },
     {
@@ -240,7 +249,9 @@ const testCases = [
             {
                 $project: {
                     _id: false,
-                    date_diff: {$dateDiff: {startDate: "$startDate", endDate: "$endDate", unit: "week"}},
+                    date_diff: {
+                        $dateDiff: {startDate: "$startDate", endDate: "$endDate", unit: "week"},
+                    },
                 },
             },
         ],
@@ -267,13 +278,17 @@ const testCases = [
     {
         // Invalid 'startOfWeek' type.
         pipeline: aggregationPipelineWithDateDiffAndStartOfWeek,
-        inputDocuments: [{startDate: someDate, endDate: someDate, unit: "week", timeZone: "GMT", startOfWeek: 1}],
+        inputDocuments: [
+            {startDate: someDate, endDate: someDate, unit: "week", timeZone: "GMT", startOfWeek: 1},
+        ],
         expectedErrorCode: 5439015,
     },
     {
         // Invalid 'startOfWeek' type, unit is not the week.
         pipeline: aggregationPipelineWithDateDiffAndStartOfWeek,
-        inputDocuments: [{startDate: someDate, endDate: someDate, unit: "hour", timeZone: "GMT", startOfWeek: 1}],
+        inputDocuments: [
+            {startDate: someDate, endDate: someDate, unit: "hour", timeZone: "GMT", startOfWeek: 1},
+        ],
         expectedResults: [{date_diff: NumberLong("0")}],
     },
     {

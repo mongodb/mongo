@@ -21,7 +21,9 @@ const collName = "ts";
 
 // Create a time-series collection containing a mixed-schema bucket
 assert.commandWorked(testDB.runCommand({drop: collName}));
-assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 const coll = testDB[collName];
 
 const bucket = {
@@ -56,14 +58,23 @@ const bucket = {
     },
 };
 
-assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)),
+);
 
 // Set the mixed-schema flag only set on the top-level catalog metadata field
 // (md.timeseriesBucketsMayHaveMixedSchemaData), but not on the collection options
 // (inside md.options.storageEngine.wiredTiger.configString).
-const fpsimulateLegacyTimeseriesMixedSchemaFlag = configureFailPoint(conn, "simulateLegacyTimeseriesMixedSchemaFlag");
-assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+const fpsimulateLegacyTimeseriesMixedSchemaFlag = configureFailPoint(
+    conn,
+    "simulateLegacyTimeseriesMixedSchemaFlag",
+);
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}),
+);
 fpsimulateLegacyTimeseriesMixedSchemaFlag.off();
 
 const bucketsCatalogEntry = getTimeseriesCollForDDLOps(testDB, coll)
@@ -95,7 +106,10 @@ assert.commandFailedWithCode(
 );
 
 assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, coll).deleteOne({_id: bucket._id}, getRawOperationSpec(testDB)),
+    getTimeseriesCollForRawOps(testDB, coll).deleteOne(
+        {_id: bucket._id},
+        getRawOperationSpec(testDB),
+    ),
 );
 assert.throwsWithCode(
     () => getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)),

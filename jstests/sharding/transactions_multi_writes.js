@@ -28,14 +28,20 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 // Set up a sharded collection with 3 chunks, [min, 0), [0, 10), [10, max), one on each shard,
 // with one document in each.
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 function setupCollection() {
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 10}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard1.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 15}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {skey: 15}, to: st.shard2.shardName}),
+    );
 
     assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1, counter: 0, skey: -5}));
     assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 2, counter: 0, skey: 5}));
@@ -59,7 +65,12 @@ function runTest(st, session, writeCmd, staleRouter) {
         // previously owned the chunk to verify the multi-write obeys the shard versioning
         // protocol.
         assert.commandWorked(
-            st.s1.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard2.shardName, _waitForDelete: true}),
+            st.s1.adminCommand({
+                moveChunk: ns,
+                find: {skey: 5},
+                to: st.shard2.shardName,
+                _waitForDelete: true,
+            }),
         );
         orphanShardName = "rs1";
     } else {
@@ -69,7 +80,9 @@ function runTest(st, session, writeCmd, staleRouter) {
     }
 
     const orphanShardDB = st[orphanShardName].getPrimary().getDB(dbName);
-    assert.commandWorked(orphanShardDB[collName].insert(orphanDoc, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        orphanShardDB[collName].insert(orphanDoc, {writeConcern: {w: "majority"}}),
+    );
 
     // Start a transaction with majority read concern to ensure the orphan will be visible if
     // its shard is targeted and send the multi-write.

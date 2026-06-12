@@ -62,7 +62,11 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         assert.eq(2, docs.length, {docs});
 
         for (const doc of docs) {
-            assert.eq(1, doc.counter, {message: `retryable write executed more than once ${phase}`, id: doc._id, docs});
+            assert.eq(1, doc.counter, {
+                message: `retryable write executed more than once ${phase}`,
+                id: doc._id,
+                docs,
+            });
         }
     }
 

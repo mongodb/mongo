@@ -19,7 +19,9 @@ let s = new ShardingTest({
     },
 });
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "TestDB", primaryShard: s.shard0.shardName}));
+assert.commandWorked(
+    s.s0.adminCommand({enablesharding: "TestDB", primaryShard: s.shard0.shardName}),
+);
 
 let bulk = s.s0.getDB("TestDB").TestColl.initializeUnorderedBulkOp();
 for (var i = 0; i < 2100; i++) {
@@ -54,7 +56,8 @@ assert.commandWorked(
 assert.eq(
     2100,
     collSecondaryOk.find().itcount(),
-    "Incorrect count when reading from secondary. Count from primary is " + collPrimary.find().itcount(),
+    "Incorrect count when reading from secondary. Count from primary is " +
+        collPrimary.find().itcount(),
 );
 
 s.stop();

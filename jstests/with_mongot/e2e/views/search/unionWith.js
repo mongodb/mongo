@@ -34,8 +34,12 @@ assert.commandWorked(
     ]),
 );
 let viewName = "bestActressAwardsAfter1979";
-let bestActressViewPipeline = [{"$match": {"$expr": {"$and": [{"$gt": ["$year", 1979]}, {"$lt": ["$year", 1997]}]}}}];
-assert.commandWorked(testDb.createView(viewName, bestActressColl.getName(), bestActressViewPipeline));
+let bestActressViewPipeline = [
+    {"$match": {"$expr": {"$and": [{"$gt": ["$year", 1979]}, {"$lt": ["$year", 1997]}]}}},
+];
+assert.commandWorked(
+    testDb.createView(viewName, bestActressColl.getName(), bestActressViewPipeline),
+);
 let bestActressView = testDb[viewName];
 
 assert.commandWorked(
@@ -51,8 +55,12 @@ assert.commandWorked(
     ]),
 );
 viewName = "bestPictureAwardsWithRottenTomatoScore";
-let bestPicturesViewPipeline = [{"$addFields": {rotten_tomatoes_score: {$ifNull: ["$rotten_tomatoes_score", "62%"]}}}];
-assert.commandWorked(testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline));
+let bestPicturesViewPipeline = [
+    {"$addFields": {rotten_tomatoes_score: {$ifNull: ["$rotten_tomatoes_score", "62%"]}}},
+];
+assert.commandWorked(
+    testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline),
+);
 let bestPictureView = testDb[viewName];
 
 // Create search indexes for all collections and views.
@@ -120,15 +128,21 @@ const unionWithTestCases = (isStoredSource) => {
         },
     ];
 
-    validateSearchExplain(bestActressView, pipeline, isStoredSource, bestActressViewPipeline, (explain) => {
-        assertUnionWithSearchSubPipelineAppliedViews(
-            explain,
-            bestPictureColl,
-            bestPictureView.getName(),
-            bestPicturesViewPipeline,
-            isStoredSource,
-        );
-    });
+    validateSearchExplain(
+        bestActressView,
+        pipeline,
+        isStoredSource,
+        bestActressViewPipeline,
+        (explain) => {
+            assertUnionWithSearchSubPipelineAppliedViews(
+                explain,
+                bestPictureColl,
+                bestPictureView.getName(),
+                bestPicturesViewPipeline,
+                isStoredSource,
+            );
+        },
+    );
 
     let results = bestActressView.aggregate(pipeline).toArray();
     assertArrayEq({actual: results, expected: expectedResults});

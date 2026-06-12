@@ -84,7 +84,9 @@ function runTest(boolSimplificationEnabled) {
 
 // Get the default parameter value so it can be correctly reset if the test fails. Then run the test
 // with boolean simplification enabled and with it disabled.
-const origParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[paramName];
+const origParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[
+    paramName
+];
 try {
     runTest(true);
     runTest(false);

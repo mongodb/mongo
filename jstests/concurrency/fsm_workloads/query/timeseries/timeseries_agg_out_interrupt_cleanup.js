@@ -110,7 +110,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         db[collName].drop();
         assert.commandWorked(
-            db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
         const docs = [];
         for (let i = 0; i < numDocs; ++i) {

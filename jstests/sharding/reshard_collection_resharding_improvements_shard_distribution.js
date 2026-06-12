@@ -18,15 +18,21 @@ const collName = "foo";
 const ns = kDbName + "." + collName;
 const mongos = st.s0;
 const kNumInitialDocs = 500;
-const reshardCmdTest = new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
+const reshardCmdTest = new ReshardCollectionCmdTest({
+    st,
+    dbName: kDbName,
+    collName,
+    numInitialDocs: kNumInitialDocs,
+});
 
 const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; /* 1 day */
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const coordinator = new Mongo(topology.configsvr.nodes[0]);
 assert.commandWorked(
-    coordinator
-        .getDB("admin")
-        .adminCommand({setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}),
+    coordinator.getDB("admin").adminCommand({
+        setParameter: 1,
+        reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS,
+    }),
 );
 
 const testCompoundShardKey = (mongos) => {
@@ -134,14 +140,30 @@ const testMoreShardsAndZones = (mongos) => {
         const zoneName1 = "z1";
         const zoneName2 = "z2";
         const zoneName3 = "z3";
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName3}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName2}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName3}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard3.shardName, zone: zoneName3}));
-        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard4.shardName, zone: zoneName3}));
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName3}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName2}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName3}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard3.shardName, zone: zoneName3}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard4.shardName, zone: zoneName3}),
+        );
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
         assert.commandWorked(
             st.s.adminCommand({
@@ -152,13 +174,28 @@ const testMoreShardsAndZones = (mongos) => {
             }),
         );
         assert.commandWorked(
-            st.s.adminCommand({updateZoneKeyRange: ns, min: {oldKey: 1000}, max: {oldKey: MaxKey}, zone: zoneName1}),
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: {oldKey: 1000},
+                max: {oldKey: MaxKey},
+                zone: zoneName1,
+            }),
         );
         assert.commandWorked(
-            st.s.adminCommand({updateZoneKeyRange: ns, min: {oldKey: -1000}, max: {oldKey: -1}, zone: zoneName2}),
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: {oldKey: -1000},
+                max: {oldKey: -1},
+                zone: zoneName2,
+            }),
         );
         assert.commandWorked(
-            st.s.adminCommand({updateZoneKeyRange: ns, min: {oldKey: -1}, max: {oldKey: 1000}, zone: zoneName3}),
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: {oldKey: -1},
+                max: {oldKey: 1000},
+                zone: zoneName3,
+            }),
         );
     };
 

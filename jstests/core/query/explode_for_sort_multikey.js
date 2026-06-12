@@ -19,7 +19,11 @@ function runTest({index, query, sort, assertSortMergeUsed}) {
     assert.commandWorked(coll.createIndex(index));
     const results = coll.find(query).sort(sort).toArray();
     const collScanResults = coll.find(query).sort(sort).hint({$natural: 1}).toArray();
-    assert.eq(results, collScanResults, `Index: ${tojson(index)} Query: ${tojson(query)} Sort: ${tojson(sort)}`);
+    assert.eq(
+        results,
+        collScanResults,
+        `Index: ${tojson(index)} Query: ${tojson(query)} Sort: ${tojson(sort)}`,
+    );
 
     const explain = coll.find(query).sort(sort).explain();
     assert.eq(0, hasRejectedPlans(explain), explain);

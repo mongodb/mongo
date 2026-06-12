@@ -52,7 +52,11 @@ function runTest(useProxy, useMongos, useAdminThreads) {
         };
 
         Object.keys(servers).forEach(function (mode) {
-            const svr = new ProxyProtocolServer(allocatePort(), opts.proxyPort, kProxyProtocolVersion);
+            const svr = new ProxyProtocolServer(
+                allocatePort(),
+                opts.proxyPort,
+                kProxyProtocolVersion,
+            );
             svr.ingress_address = servers[mode];
             svr.egress_address = servers[mode];
             svr.start();
@@ -63,7 +67,9 @@ function runTest(useProxy, useMongos, useAdminThreads) {
         jsTest.log(`ProxyPort: ${opts.proxyPort}`);
         Object.keys(proxyServer).forEach(function (mode) {
             const svr = proxyServer[mode];
-            jsTest.log(`ProxyServer ${mode}: ${svr.getIngressString()} -> ${svr.getEgressString()}`);
+            jsTest.log(
+                `ProxyServer ${mode}: ${svr.getIngressString()} -> ${svr.getEgressString()}`,
+            );
         });
     }
     jsTest.log(`Listening: ${opts.port}`);
@@ -92,7 +98,10 @@ function runTest(useProxy, useMongos, useAdminThreads) {
     if (featureFlagMongodProxyProtocolSupportEnabled === undefined) {
         // Test for featureFlag while in normal mode,
         // so that we know if we can run with proxy mode later.
-        featureFlagMongodProxyProtocolSupportEnabled = FeatureFlagUtil.isEnabled(conn, "MongodProxyProtocolSupport");
+        featureFlagMongodProxyProtocolSupportEnabled = FeatureFlagUtil.isEnabled(
+            conn,
+            "MongodProxyProtocolSupport",
+        );
     }
 
     MaxConnsOverrideHelpers.runTest(

@@ -57,7 +57,9 @@ assert.eq(0, c.count({c: 1}));
 
 c.createIndex({loc: "2d"});
 c.save({a: 2, b: 2, loc: [0, 0]});
-let near = c.aggregate({$geoNear: {near: [0, 0], query: unsatisfiable, distanceField: "dist"}}).toArray();
+let near = c
+    .aggregate({$geoNear: {near: [0, 0], query: unsatisfiable, distanceField: "dist"}})
+    .toArray();
 assert.eq(0, near.length, tojson(near));
 
 s.stop();

@@ -20,7 +20,11 @@ const userTestDB = userConn.getDB(dbName);
 jsTest.log("Setup users for test");
 shardAdminDB.createUser({user: "admin", pwd: "x", roles: ["root"]});
 assert(shardAdminDB.auth("admin", "x"), "Authentication failed");
-shardAdminDB.createUser({user: "user", pwd: "y", roles: ["readWriteAnyDatabase", "directShardOperations"]});
+shardAdminDB.createUser({
+    user: "user",
+    pwd: "y",
+    roles: ["readWriteAnyDatabase", "directShardOperations"],
+});
 assert(userConn.getDB("admin").auth("user", "y"), "Authentication failed");
 
 assert.commandWorked(
@@ -40,20 +44,30 @@ assert.commandWorked(bulk.execute());
 
 jsTest.log("Run cursor tests");
 {
-    let findCursor = assert.commandWorked(userTestDB.runCommand({find: collName, batchSize: 1})).cursor;
+    let findCursor = assert.commandWorked(
+        userTestDB.runCommand({find: collName, batchSize: 1}),
+    ).cursor;
 
     assert.commandWorked(
-        shardAdminDB.runCommand({revokeRolesFromUser: "user", roles: [{role: "directShardOperations", db: "admin"}]}),
+        shardAdminDB.runCommand({
+            revokeRolesFromUser: "user",
+            roles: [{role: "directShardOperations", db: "admin"}],
+        }),
     );
 
     assert.commandFailedWithCode(
         userTestDB.runCommand({getMore: findCursor.id, collection: collName}),
         ErrorCodes.Unauthorized,
     );
-    assert.commandWorked(userTestDB.runCommand({killCursors: collName, cursors: [NumberLong(findCursor.id)]}));
+    assert.commandWorked(
+        userTestDB.runCommand({killCursors: collName, cursors: [NumberLong(findCursor.id)]}),
+    );
 
     assert.commandWorked(
-        shardAdminDB.runCommand({grantRolesToUser: "user", roles: [{role: "directShardOperations", db: "admin"}]}),
+        shardAdminDB.runCommand({
+            grantRolesToUser: "user",
+            roles: [{role: "directShardOperations", db: "admin"}],
+        }),
     );
 }
 
@@ -74,7 +88,10 @@ function testTransactionCommand(userConn, cmdToTest, shouldFail, isAdmin) {
     cmdToTest.lsid = session.id;
 
     assert.commandWorked(
-        shardAdminDB.runCommand({revokeRolesFromUser: "user", roles: [{role: "directShardOperations", db: "admin"}]}),
+        shardAdminDB.runCommand({
+            revokeRolesFromUser: "user",
+            roles: [{role: "directShardOperations", db: "admin"}],
+        }),
     );
 
     let testDB = isAdmin ? userConn.getSiblingDB("admin") : userConn;
@@ -86,7 +103,10 @@ function testTransactionCommand(userConn, cmdToTest, shouldFail, isAdmin) {
     assert.commandWorked(testDB.runCommand({killSessions: [session.lsid]}));
 
     assert.commandWorked(
-        shardAdminDB.runCommand({grantRolesToUser: "user", roles: [{role: "directShardOperations", db: "admin"}]}),
+        shardAdminDB.runCommand({
+            grantRolesToUser: "user",
+            roles: [{role: "directShardOperations", db: "admin"}],
+        }),
     );
 }
 // Transaction cannot be continued

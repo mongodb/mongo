@@ -8,7 +8,10 @@
  * ]
  */
 
-import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 import {
     assertResultCloseToVal,
     assertResultEqToVal,
@@ -57,7 +60,11 @@ for (let paramValue of paramValues) {
 
     // Run the suite of partition and bounds tests against the $percentile function. Will run
     // tests with removable and non-removable windows.
-    testAccumAgainstGroup(coll, "$percentile", [null, null], {p: [0.1, 0.6], input: "$price", method: "continuous"});
+    testAccumAgainstGroup(coll, "$percentile", [null, null], {
+        p: [0.1, 0.6],
+        input: "$price",
+        method: "continuous",
+    });
     testAccumAgainstGroup(coll, "$median", null, {input: "$price", method: "continuous"});
 
     // Test that $median and $percentile return null for windows which do not contain numeric

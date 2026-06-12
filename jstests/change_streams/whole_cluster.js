@@ -59,7 +59,17 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 // Test that the change stream returns an inserted doc on a user-created database whose name
 // includes 'admin', 'local', or 'config'.
-const validUserDBs = ["admin1", "1admin", "_admin_", "local_", "_local", "_local_", "config_", "_config", "_config_"];
+const validUserDBs = [
+    "admin1",
+    "1admin",
+    "_admin_",
+    "local_",
+    "_local",
+    "_local_",
+    "config_",
+    "_config",
+    "_config_",
+];
 validUserDBs.forEach((dbName) => {
     assert.commandWorked(testDb.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     expected = [
@@ -75,7 +85,13 @@ validUserDBs.forEach((dbName) => {
 
 // Test that the change stream returns an inserted doc on a user-created collection whose name
 // includes "system" but is not considered an internal collection.
-const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system", "system_views"];
+const validSystemColls = [
+    "system",
+    "systems.views",
+    "ssystem.views",
+    "test.system",
+    "system_views",
+];
 validSystemColls.forEach((collName) => {
     assert.commandWorked(testDb.getCollection(collName).insert({_id: 0, a: 1}));
     expected = [
@@ -97,7 +113,11 @@ filteredDBs.forEach((dbName) => {
     if (
         dbName == "local" &&
         (FixtureHelpers.isMongos(testDb) ||
-            PersistenceProviderUtil.allNodesHavePropertyWithValue(testDb, "supportsLocalCollections", false))
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                testDb,
+                "supportsLocalCollections",
+                false,
+            ))
     ) {
         return;
     }
@@ -136,7 +156,10 @@ if (!FixtureHelpers.isMongos(adminDB)) {
     cst.getNextBatch(cursor);
     const profileEntry = getLatestProfilerEntry(adminDB, {op: "getmore"});
     const firstStage = Object.keys(profileEntry.originatingCommand.pipeline[0])[0];
-    assert(["$changeStream", "$_internalChangeStreamOplogMatch"].includes(firstStage), profileEntry);
+    assert(
+        ["$changeStream", "$_internalChangeStreamOplogMatch"].includes(firstStage),
+        profileEntry,
+    );
 }
 
 cst.cleanUp();

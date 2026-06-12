@@ -10,7 +10,9 @@ let st = new ShardingTest({
         rs1: {nodes: [{rsConfig: {}}, {rsConfig: {}}]},
     },
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 
 let coll = "insert";
 let cmd = {

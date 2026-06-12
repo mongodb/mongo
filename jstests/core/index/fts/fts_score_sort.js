@@ -68,7 +68,10 @@ results = coll
     .toArray();
 assert.eq(results, expectedResults);
 results = coll
-    .aggregate([{$match: {$text: {$search: "textual content -irrelevant"}}}, {$sort: {score: {$meta: "textScore"}}}])
+    .aggregate([
+        {$match: {$text: {$search: "textual content -irrelevant"}}},
+        {$sort: {score: {$meta: "textScore"}}},
+    ])
     .toArray();
 assert.eq(results, expectedResults);
 

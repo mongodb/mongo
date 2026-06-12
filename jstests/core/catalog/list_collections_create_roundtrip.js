@@ -22,7 +22,8 @@ import {beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 
-const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+const isImplicitlyShardedCollection =
+    typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
 const TEST_CASES = [
     {
@@ -85,8 +86,15 @@ const TEST_CASES = [
 ];
 
 function listCollectionEntry(db, name) {
-    const entries = new DBCommandCursor(db, db.runCommand({listCollections: 1, filter: {name}})).toArray();
-    assert.eq(1, entries.length, `Expected exactly one listCollections entry for '${name}', got: ${tojson(entries)}`);
+    const entries = new DBCommandCursor(
+        db,
+        db.runCommand({listCollections: 1, filter: {name}}),
+    ).toArray();
+    assert.eq(
+        1,
+        entries.length,
+        `Expected exactly one listCollections entry for '${name}', got: ${tojson(entries)}`,
+    );
     return entries[0];
 }
 
@@ -128,7 +136,11 @@ describe("ListCollectionsCreateRoundtrip", function () {
             recreateFromOptions(testDb, collName, reportedOptions, "first recreate");
 
             const secondEntry = listCollectionEntry(testDb, collName);
-            assert.eq(initialEntry.type, secondEntry.type, `Type diverged after first recreate for '${collName}'`);
+            assert.eq(
+                initialEntry.type,
+                secondEntry.type,
+                `Type diverged after first recreate for '${collName}'`,
+            );
             assert.docEq(
                 initialEntry.options,
                 secondEntry.options,
@@ -139,7 +151,11 @@ describe("ListCollectionsCreateRoundtrip", function () {
             recreateFromOptions(testDb, collName, reportedOptions, "second recreate");
 
             const thirdEntry = listCollectionEntry(testDb, collName);
-            assert.eq(initialEntry.type, thirdEntry.type, `Type diverged after second recreate for '${collName}'`);
+            assert.eq(
+                initialEntry.type,
+                thirdEntry.type,
+                `Type diverged after second recreate for '${collName}'`,
+            );
             assert.docEq(
                 initialEntry.options,
                 thirdEntry.options,

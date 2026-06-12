@@ -54,7 +54,9 @@ function runTestForCmd(db, makeCmdObjFunc, testDbName, testCollName, requiresCol
     assert.commandFailedWithCode(res2, ErrorCodes.InvalidNamespace);
 
     const res3 = db.runCommand(makeCmdObjFunc(testCollName));
-    jsTest.log("*** Response for command: " + tojsononeline({db, ns: testCollName, response: res3}));
+    jsTest.log(
+        "*** Response for command: " + tojsononeline({db, ns: testCollName, response: res3}),
+    );
     assert.commandFailedWithCode(res3, ErrorCodes.InvalidNamespace);
 }
 

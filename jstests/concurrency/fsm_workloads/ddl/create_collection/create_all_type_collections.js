@@ -33,7 +33,11 @@ export const $config = (function () {
                 // Concurrent creation on the same namespace.
                 ErrorCodes.NamespaceExists,
             ];
-            assert.commandWorkedOrFailedWithCode(res, errorCodes, "Failed to create unsharded collection");
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                errorCodes,
+                "Failed to create unsharded collection",
+            );
         },
 
         createView: function createView(db, collName) {
@@ -51,9 +55,10 @@ export const $config = (function () {
                     baseColl.getFullName(),
             );
 
-            const res = baseColl
-                .getDB()
-                .createCollection(viewColl.getName(), {viewOn: baseColl.getName(), pipeline: [{"$match": {}}]});
+            const res = baseColl.getDB().createCollection(viewColl.getName(), {
+                viewOn: baseColl.getName(),
+                pipeline: [{"$match": {}}],
+            });
             const errorCodes = [
                 // Concurrent creation on the same namespace.
                 ErrorCodes.NamespaceExists,
@@ -94,13 +99,19 @@ export const $config = (function () {
             // assumptions made by the 'EncryptedClient.createEncryptionCollection()' helper.
             // Therefore, create the Encrypted Data Collection (EDC) directly using the
             // 'createCollection()' command, without the ESC/ECOC state collections.
-            const res = coll.getDB().createCollection(coll.getName(), {encryptedFields: sampleEncryptedFields});
+            const res = coll
+                .getDB()
+                .createCollection(coll.getName(), {encryptedFields: sampleEncryptedFields});
 
             const errorCodes = [
                 // Concurrent creation on the same namespace.
                 ErrorCodes.NamespaceExists,
             ];
-            assert.commandWorkedOrFailedWithCode(res, errorCodes, "Failed to create unsharded FLE collection");
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                errorCodes,
+                "Failed to create unsharded FLE collection",
+            );
         },
 
         createTimeseriesUnsharded: function createTimeseriesUnsharded(db, collName) {
@@ -120,12 +131,18 @@ export const $config = (function () {
             const coll = getRandomCollection(db);
             jsTestLog("Executing state createTimeseriesUnsharded: " + coll.getFullName());
 
-            const res = coll.getDB().createCollection(coll.getName(), {timeseries: {timeField: "time"}});
+            const res = coll
+                .getDB()
+                .createCollection(coll.getName(), {timeseries: {timeField: "time"}});
             const errorCodes = [
                 // Concurrent creation on the same namespace.
                 ErrorCodes.NamespaceExists,
             ];
-            assert.commandWorkedOrFailedWithCode(res, errorCodes, "Failed to create unsharded timeseries");
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                errorCodes,
+                "Failed to create unsharded timeseries",
+            );
         },
 
         createTimeseriesSharded: function createTimeseriesSharded(db, collName) {
@@ -154,14 +171,22 @@ export const $config = (function () {
                 // Trying to shard directly a view.
                 ErrorCodes.CommandNotSupportedOnView,
             ];
-            assert.commandWorkedOrFailedWithCode(res, errorCodes, "Failed to create sharded timeseries");
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                errorCodes,
+                "Failed to create sharded timeseries",
+            );
         },
 
         createSharded: function createSharded(db, collName) {
             const coll = getRandomCollection(db);
             jsTestLog("Executing state createSharded: " + coll.getFullName());
 
-            const res = db.adminCommand({shardCollection: coll.getFullName(), key: {time: 1}, unique: false});
+            const res = db.adminCommand({
+                shardCollection: coll.getFullName(),
+                key: {time: 1},
+                unique: false,
+            });
             const errorCodes = [
                 // Concurrent creation on the same namespace.
                 ErrorCodes.NamespaceExists,
@@ -172,7 +197,11 @@ export const $config = (function () {
                 // Trying to shard directly a view.
                 ErrorCodes.CommandNotSupportedOnView,
             ];
-            assert.commandWorkedOrFailedWithCode(res, errorCodes, "Failed to create sharded collection");
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                errorCodes,
+                "Failed to create sharded collection",
+            );
         },
 
         createImplicitCollectionOrInsert: function insert(db, collName) {
@@ -184,7 +213,11 @@ export const $config = (function () {
                 // It is not possible to insert into a view.
                 ErrorCodes.CommandNotSupportedOnView,
             ];
-            assert.commandWorkedOrFailedWithCode(res, errorCodes, "Failed to createImplicitCollection or insert");
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                errorCodes,
+                "Failed to createImplicitCollection or insert",
+            );
         },
 
         drop: function drop(db, collName) {

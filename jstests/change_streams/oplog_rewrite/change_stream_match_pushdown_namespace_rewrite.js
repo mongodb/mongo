@@ -33,13 +33,24 @@ const db = mongosConn.getDB(dbName);
 const coll = createShardedCollection(st, "_id" /* shardKey */, dbName, collName, 2 /* splitAt */);
 
 // Create a sharded collection in the "other" database.
-const otherColl = createShardedCollection(st, "_id" /* shardKey */, otherDbName, otherCollName, 2 /* splitAt */);
+const otherColl = createShardedCollection(
+    st,
+    "_id" /* shardKey */,
+    otherDbName,
+    otherCollName,
+    2 /* splitAt */,
+);
 
 // A helper that opens a change stream on the whole cluster with the user supplied match expression
 // 'userMatchExpr' and validates that:
 // 1. for each shard, the events are seen in that order as specified in 'expectedResult'
 // 2. the filtering is been done at oplog level
-function verifyOnWholeCluster(resumeAfterToken, userMatchExpr, expectedResult, expectedOplogRetDocsForEachShard) {
+function verifyOnWholeCluster(
+    resumeAfterToken,
+    userMatchExpr,
+    expectedResult,
+    expectedOplogRetDocsForEachShard,
+) {
     verifyChangeStreamOnWholeCluster({
         st: st,
         changeStreamSpec: {resumeAfter: resumeAfterToken},
@@ -54,7 +65,9 @@ function verifyOnWholeCluster(resumeAfterToken, userMatchExpr, expectedResult, e
 // Enable a failpoint that will prevent $expr match expressions from generating $_internalExprEq
 // or similar expressions. This ensures that the following test-cases only exercise the $expr
 // rewrites.
-assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}),
+);
 FixtureHelpers.runCommandOnEachPrimary({
     db: db.getSiblingDB("admin"),
     cmdObj: {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"},
@@ -63,12 +76,21 @@ FixtureHelpers.runCommandOnEachPrimary({
 // Create some new collections to ensure that test cases has sufficient namespaces to verify
 // that the namespace filtering is working correctly.
 const coll2 = createShardedCollection(st, "_id" /* shardKey */, dbName, "coll2", 4 /* splitAt */);
-const coll3 = createShardedCollection(st, "_id" /* shardKey */, dbName, "coll.coll3", 6 /* splitAt */);
+const coll3 = createShardedCollection(
+    st,
+    "_id" /* shardKey */,
+    dbName,
+    "coll.coll3",
+    6 /* splitAt */,
+);
 const coll4 = createShardedCollection(st, "_id" /* shardKey */, dbName, "coll4", 10 /* splitAt */);
 
 // Open a change stream and store the resume token. This resume token will be used to replay the
 // stream after this point.
-const resumeAfterToken = db.getSiblingDB("admin").watch([], {allChangesForCluster: true}).getResumeToken();
+const resumeAfterToken = db
+    .getSiblingDB("admin")
+    .watch([], {allChangesForCluster: true})
+    .getResumeToken();
 
 // For each collection, insert 2 documents, one on each shard. These will create oplog events and
 // change stream will apply various namespace filtering on these collections to verify that the
@@ -94,18 +116,38 @@ assert(coll3.drop());
 // fact that these documents could potentially match with the partial 'ns' filter we rewrite into
 // the oplog, the {op: "c"} predicate we add into the filter should ensure that they are correctly
 // discarded.
-assert.commandWorked(coll4.insert({_id: 7, renameCollection: coll2.getName(), drop: coll3.getName(), dropDatabase: 1}));
-assert.commandWorked(coll4.insert({_id: 8, renameCollection: true, drop: {}, dropDatabase: null}));
-assert.commandWorked(coll4.insert({_id: 9, renameCollection: "no_dot_ns", drop: "", dropDatabase: ""}));
 assert.commandWorked(
-    coll4.insert({_id: 10, renameCollection: coll2.getName(), drop: coll3.getName(), dropDatabase: 1}),
+    coll4.insert({
+        _id: 7,
+        renameCollection: coll2.getName(),
+        drop: coll3.getName(),
+        dropDatabase: 1,
+    }),
+);
+assert.commandWorked(coll4.insert({_id: 8, renameCollection: true, drop: {}, dropDatabase: null}));
+assert.commandWorked(
+    coll4.insert({_id: 9, renameCollection: "no_dot_ns", drop: "", dropDatabase: ""}),
+);
+assert.commandWorked(
+    coll4.insert({
+        _id: 10,
+        renameCollection: coll2.getName(),
+        drop: coll3.getName(),
+        dropDatabase: 1,
+    }),
 );
 assert.commandWorked(coll4.insert({_id: 11, renameCollection: true, drop: {}, dropDatabase: null}));
-assert.commandWorked(coll4.insert({_id: 12, renameCollection: "no_dot_ns", drop: "", dropDatabase: ""}));
+assert.commandWorked(
+    coll4.insert({_id: 12, renameCollection: "no_dot_ns", drop: "", dropDatabase: ""}),
+);
 
 // These events from unmonitored collection should not been seen unexpectedly.
-assert.commandWorked(otherColl.insert({_id: 1, renameCollection: true, drop: {}, dropDatabase: null}));
-assert.commandWorked(otherColl.insert({_id: 2, renameCollection: true, drop: {}, dropDatabase: null}));
+assert.commandWorked(
+    otherColl.insert({_id: 1, renameCollection: true, drop: {}, dropDatabase: null}),
+);
+assert.commandWorked(
+    otherColl.insert({_id: 2, renameCollection: true, drop: {}, dropDatabase: null}),
+);
 
 // This group of tests ensures that the '$match' on a particular namespace object only sees its
 // documents and only required document(s) are returned at the oplog for each shard.
@@ -148,7 +190,12 @@ verifyOnWholeCluster(
 
 // Ensure that the '$match' on the namespace with only db component should not emit any document and
 // the oplog should not return any documents.
-verifyOnWholeCluster(resumeAfterToken, {$match: {ns: {db: dbName}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {ns: {db: dbName}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$eq: ["$ns", {db: dbName}]}}},
@@ -274,7 +321,9 @@ verifyOnWholeCluster(
 verifyOnWholeCluster(
     resumeAfterToken,
     {
-        $match: {$expr: {$regexMatch: {input: "$ns.db", regex: "(^change_stream_match_pushdown.*$)"}}},
+        $match: {
+            $expr: {$regexMatch: {input: "$ns.db", regex: "(^change_stream_match_pushdown.*$)"}},
+        },
     },
     {
         coll1: {insert: [1, 2]},
@@ -300,7 +349,11 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $regexMatch: {input: "$ns.db", regex: "^(Change_Stream_MATCH_PUSHDOWN.*$)", options: "i"},
+                $regexMatch: {
+                    input: "$ns.db",
+                    regex: "^(Change_Stream_MATCH_PUSHDOWN.*$)",
+                    options: "i",
+                },
             },
         },
     },
@@ -328,7 +381,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $regexMatch: {input: "$ns.db", regex: "(^unknown$|^change_stream_match_pushdown.*$)"},
+                $regexMatch: {
+                    input: "$ns.db",
+                    regex: "(^unknown$|^change_stream_match_pushdown.*$)",
+                },
             },
         },
     },
@@ -371,7 +427,12 @@ verifyOnWholeCluster(
 
 // Ensure that the '$match' on non-existing db should not return any document and oplog should not
 // return any document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.db": "unknown"}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.db": "unknown"}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$eq: ["$ns.db", "unknown"]}}},
@@ -381,7 +442,12 @@ verifyOnWholeCluster(
 
 // Ensure that the '$match' on empty db should not return any document and oplog should not return
 // any document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.db": ""}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.db": ""}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$eq: ["$ns.db", ""]}}},
@@ -391,7 +457,12 @@ verifyOnWholeCluster(
 
 // Ensure that the '$match' on sub field of db should not return any document and oplog should not
 // return any document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.db.extra": dbName}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.db.extra": dbName}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$eq: ["$ns.db.extra", "unknown"]}}},
@@ -565,7 +636,12 @@ verifyOnWholeCluster(
 
 // Ensure that the '$match' on non-existing collection should not return any document and oplog
 // should not return any document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.coll": "unknown"}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.coll": "unknown"}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$eq: ["$ns.coll", "unknown"]}}},
@@ -575,7 +651,12 @@ verifyOnWholeCluster(
 
 // Ensure that the '$match' on empty collection should not return any document and oplog should not
 // return any document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.coll": ""}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.coll": ""}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$eq: ["$ns.coll", ""]}}},
@@ -663,7 +744,15 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$regexMatch: {input: "$ns.db", regex: "^change_stream_MATCH.*$", options: "i"}}],
+                $or: [
+                    {
+                        $regexMatch: {
+                            input: "$ns.db",
+                            regex: "^change_stream_MATCH.*$",
+                            options: "i",
+                        },
+                    },
+                ],
             },
         },
     },
@@ -678,7 +767,12 @@ verifyOnWholeCluster(
 
 // Ensure that an empty '$in' on db path should not match any collection and oplog should not return
 // any document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.db": {$in: []}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.db": {$in: []}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 verifyOnWholeCluster(
     resumeAfterToken,
     {$match: {$expr: {$in: ["$ns.db", []]}}},
@@ -727,7 +821,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$eq: ["$ns.db", "unknown1"]}, {$regexMatch: {input: "$ns.db", regex: "^unknown2$"}}],
+                $or: [
+                    {$eq: ["$ns.db", "unknown1"]},
+                    {$regexMatch: {input: "$ns.db", regex: "^unknown2$"}},
+                ],
             },
         },
     },
@@ -868,7 +965,12 @@ verifyOnWholeCluster(
 
 // Ensure that an empty '$in' should not match any collection and oplog should not return any
 // document for each shard.
-verifyOnWholeCluster(resumeAfterToken, {$match: {"ns.coll": {$in: []}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {"ns.coll": {$in: []}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 
 // Ensure that '$in' with invalid collection cannot be rewritten and oplog should return all
 // documents for each shard.
@@ -904,7 +1006,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$eq: ["$ns.coll", "coll1"]}, {$regexMatch: {input: "$ns.coll", regex: "^coll.*3$"}}],
+                $or: [
+                    {$eq: ["$ns.coll", "coll1"]},
+                    {$regexMatch: {input: "$ns.coll", regex: "^coll.*3$"}},
+                ],
             },
         },
     },
@@ -928,7 +1033,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$eq: ["$ns.coll", "unknown1"]}, {$regexMatch: {input: "$ns.coll", regex: "^unknown2$"}}],
+                $or: [
+                    {$eq: ["$ns.coll", "unknown1"]},
+                    {$regexMatch: {input: "$ns.coll", regex: "^unknown2$"}},
+                ],
             },
         },
     },
@@ -1028,7 +1136,10 @@ verifyOnWholeCluster(
                 $not: {
                     $or: [
                         {
-                            $regexMatch: {input: "$ns.db", regex: "change_stream_match_pushdown_and_rewr.*"},
+                            $regexMatch: {
+                                input: "$ns.db",
+                                regex: "change_stream_match_pushdown_and_rewr.*",
+                            },
                         },
                     ],
                 },
@@ -1185,7 +1296,10 @@ verifyOnWholeCluster(
 
 // Open a new change streams and verify that from here onwards the events related to 'dropDatabase'
 // are seen.
-const secondResumeAfterToken = db.getSiblingDB("admin").watch([], {allChangesForCluster: true}).getResumeToken();
+const secondResumeAfterToken = db
+    .getSiblingDB("admin")
+    .watch([], {allChangesForCluster: true})
+    .getResumeToken();
 
 assert.commandWorked(db.dropDatabase());
 
@@ -1244,9 +1358,24 @@ verifyOnWholeCluster(
 
 // Create two sharded collections in the main test database, then start a new change stream to get a
 // fresh resume token.
-const collWithDot = createShardedCollection(st, "_id" /* shardKey */, dbName, "foo.bar", 2 /*splitAt */);
-const collWithUnderscore = createShardedCollection(st, "_id" /* shardKey */, dbName, "foo_bar", 2 /*splitAt */);
-const thirdResumeAfterToken = db.getSiblingDB("admin").watch([], {allChangesForCluster: true}).getResumeToken();
+const collWithDot = createShardedCollection(
+    st,
+    "_id" /* shardKey */,
+    dbName,
+    "foo.bar",
+    2 /*splitAt */,
+);
+const collWithUnderscore = createShardedCollection(
+    st,
+    "_id" /* shardKey */,
+    dbName,
+    "foo_bar",
+    2 /*splitAt */,
+);
+const thirdResumeAfterToken = db
+    .getSiblingDB("admin")
+    .watch([], {allChangesForCluster: true})
+    .getResumeToken();
 
 // Insert one document per collection, per shard. The test cases below verify the behavior of regex
 // matches with escaped characters on collections with special names (e.g. containing dots). This

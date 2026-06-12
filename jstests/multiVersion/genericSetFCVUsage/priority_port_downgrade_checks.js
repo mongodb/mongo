@@ -26,24 +26,34 @@ assert.commandFailedWithCode(
     ErrorCodes.CannotDowngrade,
 );
 
-jsTest.log.info("Remove the priority ports one by one and ensure downgrade is only possible once they are all removed");
+jsTest.log.info(
+    "Remove the priority ports one by one and ensure downgrade is only possible once they are all removed",
+);
 for (let i = 0; i < numNodes; i++) {
     let config = rs.getReplSetConfigFromNode();
     delete config.members[i].priorityPort;
     config.version += 1;
     assert.commandWorked(rs.getPrimary().adminCommand({replSetReconfig: config}));
     if (i == numNodes - 1) {
-        assert.commandWorked(rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            rs
+                .getPrimary()
+                .adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
     } else {
         assert.commandFailedWithCode(
-            rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            rs
+                .getPrimary()
+                .adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
             ErrorCodes.CannotDowngrade,
         );
     }
 }
 
 jsTest.log.info("Reset FCV to fully upgraded");
-assert.commandWorked(rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 jsTest.log.info("Test concurrent downgrade and reconfig");
 let timeoutOFCVDrainFP = configureFailPoint(rs.getPrimary(), "immediatelyTimeOutWaitForStaleOFCV");
@@ -81,7 +91,9 @@ assert.commandFailedWithCode(
 );
 
 jsTest.log.info("Reset FCV to fully upgraded");
-assert.commandWorked(rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 jsTest.log.info("Check that we cannot reconfig adding priority ports with force reconfig");
 assert.commandFailedWithCode(

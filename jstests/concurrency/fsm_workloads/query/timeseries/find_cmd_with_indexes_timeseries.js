@@ -235,7 +235,11 @@ export const $config = (function () {
         const coll = db.getCollection(getCollectionName(collName));
         for (let i = 0; i < numDocs; ++i) {
             // Insert a document with the current time.
-            const res = coll.insert({_id: i, [timeFieldName]: docTimes[i], [metaFieldName]: {a: i}});
+            const res = coll.insert({
+                _id: i,
+                [timeFieldName]: docTimes[i],
+                [metaFieldName]: {a: i},
+            });
             assert.commandWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
         }

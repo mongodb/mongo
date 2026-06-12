@@ -35,6 +35,9 @@ const sessionColl = sessionDB.getCollection(collName);
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: 42}));
 
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}), ErrorCodes.ReadConcernMajorityNotEnabled);
+assert.commandFailedWithCode(
+    sessionDB.adminCommand({prepareTransaction: 1}),
+    ErrorCodes.ReadConcernMajorityNotEnabled,
+);
 
 rst.stopSet();

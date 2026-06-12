@@ -62,7 +62,12 @@ function rollOverCurrentOplog() {
     // Keep populating the oplog as long as the first oplog entry is newer (more recent) than
     // 'lastOplogEntry'. The majority concern guarantees that both nodes of the 2-node replica set
     // have identical oplogs.
-    while (timestampCmp(lastOplogEntry.ts, getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) >= 0) {
+    while (
+        timestampCmp(
+            lastOplogEntry.ts,
+            getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts,
+        ) >= 0
+    ) {
         assert.commandWorked(testDB.tmp.insert({largeStr}, {writeConcern: {w: "majority"}}));
     }
 }
@@ -99,8 +104,12 @@ function retryOnCappedPositionLostError(func, message) {
     assert.soon(() => getPreImages(primaryNode).length === 0);
 
     // Drop and recreate the collections with pre-images recording.
-    const collA = assertDropAndRecreateCollection(testDB, "collA", {changeStreamPreAndPostImages: {enabled: true}});
-    const collB = assertDropAndRecreateCollection(testDB, "collB", {changeStreamPreAndPostImages: {enabled: true}});
+    const collA = assertDropAndRecreateCollection(testDB, "collA", {
+        changeStreamPreAndPostImages: {enabled: true},
+    });
+    const collB = assertDropAndRecreateCollection(testDB, "collB", {
+        changeStreamPreAndPostImages: {enabled: true},
+    });
 
     // Perform insert and update operations.
     for (const coll of [collA, collB]) {

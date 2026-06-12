@@ -55,7 +55,11 @@ export const $config = (function () {
                     ErrorCodes.NotWritablePrimary,
                     ErrorCodes.FailedToSatisfyReadPreference,
                 ],
-                [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument, ErrorCodes.NotWritablePrimary],
+                [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                    ErrorCodes.NotWritablePrimary,
+                ],
             );
         }
 
@@ -68,7 +72,12 @@ export const $config = (function () {
                 return;
             }
 
-            assert.commandWorked(db.runCommand({dropIndexes: this.getCollectionNameForThread(this.tid), index: "x_1"}));
+            assert.commandWorked(
+                db.runCommand({
+                    dropIndexes: this.getCollectionNameForThread(this.tid),
+                    index: "x_1",
+                }),
+            );
         }
 
         return {

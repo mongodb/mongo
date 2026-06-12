@@ -3,7 +3,12 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getWinningPlanFromExplain, isExpress, isIdhack, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    isExpress,
+    isIdhack,
+    isIdhackOrExpress,
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const conn = MongoRunner.runMongod({});
@@ -61,7 +66,9 @@ assertIdHackCounterIncreased(() => {
 // Tests that an update query using express path, increments the express counter.
 assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express update query");
-    const explain = db.runCommand({explain: {update: collName, updates: [{q: {_id: {a: 1}}, u: {$set: {a: 2}}}]}});
+    const explain = db.runCommand({
+        explain: {update: collName, updates: [{q: {_id: {a: 1}}, u: {$set: {a: 2}}}]},
+    });
     const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });
@@ -69,7 +76,9 @@ assertExpressCounterIncreased(() => {
 // Tests that a delete query using express increments the express counter.
 assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express delete query");
-    const explain = db.runCommand({explain: {delete: collName, deletes: [{q: {_id: {a: 1}}, limit: 0}]}});
+    const explain = db.runCommand({
+        explain: {delete: collName, deletes: [{q: {_id: {a: 1}}, limit: 0}]},
+    });
     const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });

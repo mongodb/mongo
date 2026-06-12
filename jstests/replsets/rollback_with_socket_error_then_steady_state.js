@@ -38,7 +38,11 @@ rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 

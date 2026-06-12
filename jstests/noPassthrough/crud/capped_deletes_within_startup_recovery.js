@@ -19,7 +19,9 @@ const coll = testDB.getCollection(jsTestName());
 
 assert.commandWorked(testDB.createCollection(coll.getName(), {capped: true, size: 100, max: 1}));
 
-const ts = assert.commandWorked(testDB.runCommand({insert: coll.getName(), documents: [{a: 1}]})).operationTime;
+const ts = assert.commandWorked(
+    testDB.runCommand({insert: coll.getName(), documents: [{a: 1}]}),
+).operationTime;
 configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: ts});
 
 assert.commandWorked(coll.insert([{b: 1}, {b: 2}]));

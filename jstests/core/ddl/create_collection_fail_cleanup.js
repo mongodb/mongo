@@ -26,11 +26,21 @@ collectionNames.forEach(function (collName) {
 // does not appear in top output, whereas a successfully created collection does appear. This
 // test cannot run against a mongos, since mongos does not support the 'top' command.
 if (!FixtureHelpers.isMongos(dbTest)) {
-    assert.commandFailed(dbTest.createCollection("invalid_collation_collection", {collation: {locale: "invalid"}}));
-    assert.commandWorked(dbTest.createCollection("legal_collation_collection", {collation: {locale: "en_US"}}));
+    assert.commandFailed(
+        dbTest.createCollection("invalid_collation_collection", {collation: {locale: "invalid"}}),
+    );
+    assert.commandWorked(
+        dbTest.createCollection("legal_collation_collection", {collation: {locale: "en_US"}}),
+    );
     const topOutput = dbTest.adminCommand("top");
     printjson(topOutput);
     assert(topOutput.hasOwnProperty("totals"), topOutput);
-    assert(!topOutput.totals.hasOwnProperty(dbTest.invalid_collation_collection.getFullName()), topOutput);
-    assert(topOutput.totals.hasOwnProperty(dbTest.legal_collation_collection.getFullName()), topOutput);
+    assert(
+        !topOutput.totals.hasOwnProperty(dbTest.invalid_collation_collection.getFullName()),
+        topOutput,
+    );
+    assert(
+        topOutput.totals.hasOwnProperty(dbTest.legal_collation_collection.getFullName()),
+        topOutput,
+    );
 }

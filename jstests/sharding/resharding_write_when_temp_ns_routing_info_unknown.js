@@ -16,7 +16,9 @@ reshardingTest.setup();
 
 const testCases = [
     {
-        desc: "Test ordinary insert when donor does not have temporary resharding collection " + "routing info cached",
+        desc:
+            "Test ordinary insert when donor does not have temporary resharding collection " +
+            "routing info cached",
         ns: "reshardingDb.coll_no_txn",
         opFn: (sourceCollection) => {
             const docToInsert = {_id: 0, oldKey: 5, newKey: 15};
@@ -55,7 +57,9 @@ const testCases = [
                 .getDatabase(sourceCollection.getDB().getName())
                 .getCollection(sourceCollection.getName());
 
-            const sessionCollectionB = session.getDatabase(sourceCollection.getDB().getName()).getCollection("foo");
+            const sessionCollectionB = session
+                .getDatabase(sourceCollection.getDB().getName())
+                .getCollection("foo");
             assert.commandWorked(sessionCollectionB.insert({a: 1}));
 
             const docToInsert = {_id: 0, oldKey: 5, newKey: 15};
@@ -87,7 +91,9 @@ for (const {desc, ns, opFn} of testCases) {
         //
         {
             newShardKeyPattern: {newKey: 1},
-            newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+            newChunks: [
+                {min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
+            ],
         },
         (tempNs) => {
             // Wait for the recipients to have finished cloning so the temporary resharding

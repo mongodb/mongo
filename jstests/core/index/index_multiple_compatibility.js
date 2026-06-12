@@ -55,7 +55,9 @@ function testIndexCompat(coll, index1, index2, both) {
     assert(index1.hasOwnProperty("index"));
     assert(index2.hasOwnProperty("index"));
 
-    assert.commandWorked(db.runCommand({createIndexes: coll.getName(), indexes: [index1.index, index2.index]}));
+    assert.commandWorked(
+        db.runCommand({createIndexes: coll.getName(), indexes: [index1.index, index2.index]}),
+    );
 
     // Check index 1 document.
     if (index1.hasOwnProperty("doc")) {

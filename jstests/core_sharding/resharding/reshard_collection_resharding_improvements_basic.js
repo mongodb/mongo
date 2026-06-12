@@ -59,7 +59,9 @@ const testShardDistribution = (mongos) => {
         ErrorCodes.InvalidOptions,
     );
 
-    jsTest.log("reshardCollection cmd should fail when shardDistribution is not specified using the shard key.");
+    jsTest.log(
+        "reshardCollection cmd should fail when shardDistribution is not specified using the shard key.",
+    );
     assert.commandFailedWithCode(
         mongos.adminCommand({
             reshardCollection: ns,
@@ -72,7 +74,9 @@ const testShardDistribution = (mongos) => {
         ErrorCodes.InvalidOptions,
     );
 
-    jsTest.log("reshardCollection cmd should fail when one shard specifies min/max and the other does not.");
+    jsTest.log(
+        "reshardCollection cmd should fail when one shard specifies min/max and the other does not.",
+    );
     assert.commandFailedWithCode(
         mongos.adminCommand({
             reshardCollection: ns,
@@ -85,7 +89,9 @@ const testShardDistribution = (mongos) => {
         ErrorCodes.InvalidOptions,
     );
 
-    jsTest.log("reshardCollection cmd should fail when shardDistribution is not starting with globalMin.");
+    jsTest.log(
+        "reshardCollection cmd should fail when shardDistribution is not starting with globalMin.",
+    );
     assert.commandFailedWithCode(
         mongos.adminCommand({
             reshardCollection: ns,
@@ -111,7 +117,9 @@ const testShardDistribution = (mongos) => {
         ErrorCodes.InvalidOptions,
     );
 
-    jsTest.log("reshardCollection cmd should fail when the shardId in shardDistribution is not recognized.");
+    jsTest.log(
+        "reshardCollection cmd should fail when the shardId in shardDistribution is not recognized.",
+    );
     assert.commandFailedWithCode(
         mongos.adminCommand({
             reshardCollection: ns,
@@ -124,13 +132,17 @@ const testShardDistribution = (mongos) => {
         ErrorCodes.ShardNotFound,
     );
 
-    jsTestLog("reshardCollection cmd should fail when the shardId in shardDistribution is a shard url.");
+    jsTestLog(
+        "reshardCollection cmd should fail when the shardId in shardDistribution is a shard url.",
+    );
     assert.commandFailedWithCode(
         mongos.adminCommand({
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: false,
-            shardDistribution: [{shard: shardHosts[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}],
+            shardDistribution: [
+                {shard: shardHosts[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}},
+            ],
         }),
         ErrorCodes.ShardNotFound,
     );
@@ -168,8 +180,13 @@ const testShardDistribution = (mongos) => {
 };
 
 const testForceRedistribution = (mongos) => {
-    jsTest.log("When forceRedistribution is not set to true, same-key resharding should have no effect");
-    reshardCmdTest.assertReshardCollOk({reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2}, 1);
+    jsTest.log(
+        "When forceRedistribution is not set to true, same-key resharding should have no effect",
+    );
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2},
+        1,
+    );
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2, forceRedistribution: false},
         1,
@@ -181,14 +198,18 @@ const testForceRedistribution = (mongos) => {
         2,
     );
 
-    jsTest.log("When only one shard is provided, we should reshard all data from MIN to MAX into it");
+    jsTest.log(
+        "When only one shard is provided, we should reshard all data from MIN to MAX into it",
+    );
     reshardCmdTest.assertReshardCollOk(
         {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
             numInitialChunks: 1,
-            shardDistribution: [{shard: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}],
+            shardDistribution: [
+                {shard: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}},
+            ],
         },
         1,
         [{recipientShardId: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}],
@@ -218,10 +239,20 @@ const testForceRedistribution = (mongos) => {
         assert.commandWorked(db.adminCommand({addShardToZone: shardNames[1], zone: zoneName2}));
         assert.commandWorked(db.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
         assert.commandWorked(
-            db.adminCommand({updateZoneKeyRange: ns, min: {oldKey: MinKey}, max: {oldKey: 0}, zone: zoneName1}),
+            db.adminCommand({
+                updateZoneKeyRange: ns,
+                min: {oldKey: MinKey},
+                max: {oldKey: 0},
+                zone: zoneName1,
+            }),
         );
         assert.commandWorked(
-            db.adminCommand({updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: MaxKey}, zone: zoneName2}),
+            db.adminCommand({
+                updateZoneKeyRange: ns,
+                min: {oldKey: 0},
+                max: {oldKey: MaxKey},
+                zone: zoneName2,
+            }),
         );
     };
 
@@ -274,7 +305,9 @@ const testForceRedistribution = (mongos) => {
 };
 
 const testReshardingWithIndex = (mongos) => {
-    jsTest.log("When there is no index on the new shard-key, we should create one during resharding.");
+    jsTest.log(
+        "When there is no index on the new shard-key, we should create one during resharding.",
+    );
 
     const additionalSetup = function (test) {
         assert.commandWorked(

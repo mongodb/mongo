@@ -20,7 +20,10 @@ export const vectorStage = makeMovieVectorCandidatesQuery({
     limit: limit,
     numCandidates: limit * vectorSearchOverrequestFactor,
 });
-export const searchStageWithDetails = makeMovieSearchQuery({queryString: "ape", scoreDetails: true});
+export const searchStageWithDetails = makeMovieSearchQuery({
+    queryString: "ape",
+    scoreDetails: true,
+});
 export const searchStageNoDetails = makeMovieSearchQuery({queryString: "ape", scoreDetails: false});
 export const sortAscendingStage = {
     $sort: {_id: 1},
@@ -70,7 +73,13 @@ export function fieldPresent(field, containingObj) {
  *      "weight": 0.5,
  *  }
  */
-export function checkDefaultPipelineScoreDetails(stageType, assertFieldPresent, subDetails, pipelineName, weight) {
+export function checkDefaultPipelineScoreDetails(
+    stageType,
+    assertFieldPresent,
+    subDetails,
+    pipelineName,
+    weight,
+) {
     assertFieldPresent("inputPipelineName", subDetails);
     assert.eq(subDetails["inputPipelineName"], pipelineName);
     if (stageType === "rank") {
@@ -118,7 +127,10 @@ export function checkScoreScoreDetails(foundDoc, scoreDetailsSpec) {
     assert.eq(details["value"], score);
     assert(fieldPresent("rawScore", details), details);
     assert.eq(details["rawScore"], scoreDetailsSpec["rawScore"]);
-    if (scoreDetailsSpec.hasOwnProperty("normalization") && scoreDetailsSpec["normalization"] !== "none") {
+    if (
+        scoreDetailsSpec.hasOwnProperty("normalization") &&
+        scoreDetailsSpec["normalization"] !== "none"
+    ) {
         assert(fieldPresent("normalization", details), details);
         assert.eq(details["normalization"], scoreDetailsSpec["normalization"]);
     }
@@ -126,7 +138,10 @@ export function checkScoreScoreDetails(foundDoc, scoreDetailsSpec) {
         assert(fieldPresent("expression", details), details);
         assert.eq(details["expression"], scoreDetailsSpec["expression"]);
     }
-    if (scoreDetailsSpec.hasOwnProperty("description") && scoreDetailsSpec["description"] !== null) {
+    if (
+        scoreDetailsSpec.hasOwnProperty("description") &&
+        scoreDetailsSpec["description"] !== null
+    ) {
         assert(fieldPresent("description", details), details);
         assert.eq(details["description"], scoreDetailsSpec["description"]);
     }
@@ -212,8 +227,20 @@ export function checkSearchScoreDetails(
  *      "details": []
  * }
  */
-export function checkVectorScoreDetails(stageType, assertFieldPresent, subDetails, pipelineName, weight) {
-    checkDefaultPipelineScoreDetails(stageType, assertFieldPresent, subDetails, pipelineName, weight);
+export function checkVectorScoreDetails(
+    stageType,
+    assertFieldPresent,
+    subDetails,
+    pipelineName,
+    weight,
+) {
+    checkDefaultPipelineScoreDetails(
+        stageType,
+        assertFieldPresent,
+        subDetails,
+        pipelineName,
+        weight,
+    );
     assertFieldPresent("value", subDetails); // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details", subDetails);
     assert.eq(subDetails["details"], []);
@@ -238,8 +265,20 @@ export function checkVectorScoreDetails(stageType, assertFieldPresent, subDetail
  *      "details": []
  * }
  */
-export function checkGeoNearScoreDetails(stageType, assertFieldPresent, subDetails, pipelineName, weight) {
-    checkDefaultPipelineScoreDetails(stageType, assertFieldPresent, subDetails, pipelineName, weight);
+export function checkGeoNearScoreDetails(
+    stageType,
+    assertFieldPresent,
+    subDetails,
+    pipelineName,
+    weight,
+) {
+    checkDefaultPipelineScoreDetails(
+        stageType,
+        assertFieldPresent,
+        subDetails,
+        pipelineName,
+        weight,
+    );
     assertFieldPresent("details", subDetails);
     assert.eq(subDetails["details"], []);
     let geoNearScore =
@@ -307,7 +346,10 @@ export function checkOuterScoreDetails(foundDoc, scoreDetailsSpec) {
     }
 
     function assertFieldPresent(field, obj) {
-        assert(fieldPresent(field, obj), `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+        assert(
+            fieldPresent(field, obj),
+            `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`,
+        );
     }
 
     assertFieldPresent("details", details);

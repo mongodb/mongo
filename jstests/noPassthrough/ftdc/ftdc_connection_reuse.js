@@ -24,9 +24,9 @@ const kOperations = 5;
 const testDB = st.s.getDB(kDbName);
 const coll = testDB.getCollection(kCollName);
 
-const numPools = assert.commandWorked(st.s.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}))[
-    "taskExecutorPoolSize"
-];
+const numPools = assert.commandWorked(
+    st.s.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}),
+)["taskExecutorPoolSize"];
 
 function sumOverPools(diagnosticData, host, property) {
     let sum = 0;
@@ -158,7 +158,11 @@ assert.soon(
 // Reduce pool size to verify that dropped connections were marked as having been used only once.
 jsTestLog("Reducing pool size");
 assert.commandWorked(
-    st.s.adminCommand({"setParameter": 1, ShardingTaskExecutorPoolMinSize: 1, ShardingTaskExecutorPoolMaxSize: 1}),
+    st.s.adminCommand({
+        "setParameter": 1,
+        ShardingTaskExecutorPoolMinSize: 1,
+        ShardingTaskExecutorPoolMaxSize: 1,
+    }),
 );
 
 assert.soon(

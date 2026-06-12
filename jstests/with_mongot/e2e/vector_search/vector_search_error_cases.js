@@ -36,7 +36,10 @@ assert.commandFailedWithCode(
     runPipeline([{$lookup: {from: collName, pipeline: [makeVectorSearchStage()], as: "lookup1"}}]),
     51047,
 );
-assert.commandFailedWithCode(runPipeline([{$facet: {originalPipeline: [makeVectorSearchStage()]}}]), 40600);
+assert.commandFailedWithCode(
+    runPipeline([{$facet: {originalPipeline: [makeVectorSearchStage()]}}]),
+    40600,
+);
 
 // $vectorSearch does not support $SEARCH_META.
 assert.commandFailedWithCode(

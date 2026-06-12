@@ -3,7 +3,8 @@
  */
 
 function getFCVDocument(conn) {
-    let adminDB = typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
+    let adminDB =
+        typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
     return adminDB["system.version"].findOne({_id: "featureCompatibilityVersion"});
 }
 
@@ -41,7 +42,10 @@ export function isFCVlte(conn, targetVersion) {
 }
 
 export function isFCVeq(conn, targetVersion) {
-    assert(isStableFCVSuite(), "Can't use `isFCVeq` function in suites that perform backround FCV transitions.");
+    assert(
+        isStableFCVSuite(),
+        "Can't use `isFCVeq` function in suites that perform backround FCV transitions.",
+    );
     const currentFCV = getCurrentFCV(conn);
     return MongoRunner.compareBinVersions(currentFCV, targetVersion) == 0;
 }

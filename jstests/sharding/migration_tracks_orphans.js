@@ -17,13 +17,18 @@ const st = new ShardingTest({shards: 2});
 // Setup database and collection for test
 const dbName = "db";
 const db = st.getDB(dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const coll = db["test"];
 const nss = coll.getFullName();
 assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 
 function assertOrphanCountIsCorrect(conn, ns, numOrphans) {
-    const rangeDeletionDoc = conn.getDB("config").getCollection("rangeDeletions").findOne({nss: ns});
+    const rangeDeletionDoc = conn
+        .getDB("config")
+        .getCollection("rangeDeletions")
+        .findOne({nss: ns});
     assert.neq(
         null,
         rangeDeletionDoc,
@@ -59,7 +64,9 @@ let bulkCloneFailpoint = configureFailPoint(st.shard1, "migrateThreadHangAtStep4
 const awaitResult = startParallelShell(
     funWithArgs(
         function (nss, toShardName) {
-            assert.commandWorked(db.adminCommand({moveChunk: nss, find: {_id: 0}, to: toShardName}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: nss, find: {_id: 0}, to: toShardName}),
+            );
         },
         nss,
         st.shard1.shardName,
@@ -105,7 +112,10 @@ assertOrphanCountIsCorrect(st.shard1, nss, updatedOrphanCount);
 assertOrphanCountIsCorrect(st.shard0, nss, 0);
 
 // Allow migration to finish but stop right after updating range deletion documents
-let migrationCommittedFailpoint = configureFailPoint(st.shard0, "hangBeforeForgettingMigrationAfterCommitDecision");
+let migrationCommittedFailpoint = configureFailPoint(
+    st.shard0,
+    "hangBeforeForgettingMigrationAfterCommitDecision",
+);
 transferModsFailpoint.off();
 migrationCommittedFailpoint.wait();
 assertOrphanCountIsCorrect(st.shard0, nss, updatedOrphanCount);

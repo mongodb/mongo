@@ -99,7 +99,10 @@ const dottedColl = mongos.getCollection(kDottedFullNs);
 
 assert.commandWorked(mongos.adminCommand({shardCollection: kDottedFullNs, key: {"a.b": 1}}));
 
-assert.commandFailedWithCode(dottedColl.insert({a: [{b: -5}, {b: 5}]}), ErrorCodes.ShardKeyNotFound);
+assert.commandFailedWithCode(
+    dottedColl.insert({a: [{b: -5}, {b: 5}]}),
+    ErrorCodes.ShardKeyNotFound,
+);
 assert.eq(null, dottedColl.findOne({"a.b": 5}));
 assert.eq(null, dottedColl.findOne({"a.b": -5}));
 
@@ -107,7 +110,10 @@ jsTestLog("Testing dotted path shard key with array value updates.");
 
 assert.commandWorked(dottedColl.insert({a: {b: 1}}));
 
-assert.commandFailedWithCode(dottedColl.update({a: {b: 1}}, {a: [{b: -5}, {b: 5}]}), ErrorCodes.NotSingleValueField);
+assert.commandFailedWithCode(
+    dottedColl.update({a: {b: 1}}, {a: [{b: -5}, {b: 5}]}),
+    ErrorCodes.NotSingleValueField,
+);
 
 assert.commandWorked(sessionDB[kDottedCollName].update({a: {b: 1}}, {}));
 

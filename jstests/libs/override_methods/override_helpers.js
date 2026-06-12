@@ -10,7 +10,11 @@ const preOverrideRunCommand = Mongo.prototype.runCommand;
 export const OverrideHelpers = (function () {
     function makeIsAggregationWithFirstStage(stageName) {
         return function (commandName, commandObj) {
-            if (commandName !== "aggregate" || typeof commandObj !== "object" || commandObj === null) {
+            if (
+                commandName !== "aggregate" ||
+                typeof commandObj !== "object" ||
+                commandObj === null
+            ) {
                 return false;
             }
 
@@ -112,12 +116,15 @@ export const OverrideHelpers = (function () {
     }
 
     return {
-        isAggregationWithListLocalSessionsStage: makeIsAggregationWithFirstStage("$listLocalSessions"),
+        isAggregationWithListLocalSessionsStage:
+            makeIsAggregationWithFirstStage("$listLocalSessions"),
         isAggregationWithOutOrMergeStage: isAggregationWithOutOrMergeStage,
         isAggregationWithCurrentOpStage: makeIsAggregationWithFirstStage("$currentOp"),
         isAggregationWithChangeStreamStage: makeIsAggregationWithFirstStage("$changeStream"),
         isAggregationWithPlanCacheStatsStage: makeIsAggregationWithFirstStage("$planCacheStats"),
-        isAggregationWithInternalListCollections: makeIsAggregationWithFirstStage("$_internalListCollections"),
+        isAggregationWithInternalListCollections: makeIsAggregationWithFirstStage(
+            "$_internalListCollections",
+        ),
         isAggregationWithListCatalog: makeIsAggregationWithFirstStage("$listCatalog"),
         isAggregationWithListClusterCatalog: makeIsAggregationWithFirstStage("$listClusterCatalog"),
         isAggregationWithQuerySettings: makeIsAggregationWithFirstStage("$querySettings"),

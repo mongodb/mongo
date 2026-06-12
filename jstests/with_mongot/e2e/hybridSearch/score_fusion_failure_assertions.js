@@ -32,7 +32,10 @@ const vectorSearchClauseAndSearchClause = {
 };
 
 const searchMatchAsClause = {
-    score2: [{$search: {index: "search_index", text: {query: "mystery", path: "genres"}}}, {$match: {author: "dave"}}],
+    score2: [
+        {$search: {index: "search_index", text: {query: "mystery", path: "genres"}}},
+        {$match: {author: "dave"}},
+    ],
 };
 
 const scoreInputPipelines = {
@@ -137,7 +140,9 @@ assert.commandWorked(
 
 // Check that $text match is valid.
 assert.commandWorked(coll.createIndex({text: "text"}));
-assert.commandWorked(runPipeline([{$scoreFusion: {input: {pipelines: textMatchClause, normalization: "none"}}}]));
+assert.commandWorked(
+    runPipeline([{$scoreFusion: {input: {pipelines: textMatchClause, normalization: "none"}}}]),
+);
 
 // Check that unscored pipeline is invalid.
 assert.commandFailedWithCode(
@@ -158,7 +163,10 @@ assert.commandFailedWithCode(
             $scoreFusion: {
                 input: {
                     pipelines: {
-                        pipeOne: [{$score: {score: 2, normalization: "none"}}, {$project: {score3: 1}}],
+                        pipeOne: [
+                            {$score: {score: 2, normalization: "none"}},
+                            {$project: {score3: 1}},
+                        ],
                     },
                     normalization: "none",
                 },

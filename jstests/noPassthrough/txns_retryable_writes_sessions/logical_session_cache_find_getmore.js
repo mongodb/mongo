@@ -22,6 +22,9 @@ for (let i = 0; i < 2; i++) {
 
 let session3 = conn.startSession();
 var db = session3.getDatabase("test");
-assert.commandFailed(db.runCommand({find: "foo", batchSize: 1}), "able to run find when the cache is full");
+assert.commandFailed(
+    db.runCommand({find: "foo", batchSize: 1}),
+    "able to run find when the cache is full",
+);
 
 MongoRunner.stopMongod(conn);

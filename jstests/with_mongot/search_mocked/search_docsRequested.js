@@ -113,7 +113,9 @@ function buildHistoryStandalone(coll, collUUID, extractedLimit, mongotConn) {
                 },
             },
         ];
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+        );
     }
 }
 
@@ -199,11 +201,25 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
         const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
         s1Mongot.setMockResponses(history1, cursorId, metaId);
 
-        mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(
+            collName,
+            searchQuery,
+            dbName,
+            undefined /*sortSpec*/,
+            stWithMock,
+        );
     }
 }
 
-function runAndAssert(pipeline, extractedLimit, expectedResults, coll, collUUID, standaloneConn, stConn) {
+function runAndAssert(
+    pipeline,
+    extractedLimit,
+    expectedResults,
+    coll,
+    collUUID,
+    standaloneConn,
+    stConn,
+) {
     // Only one of standaloneConn and stConn can be non-null.
     if (standaloneConn != null) {
         assert(stConn == null);
@@ -247,7 +263,9 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                 },
             },
         ];
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+        );
     } else {
         assert(mongotConn == null);
         const metaId = NumberLong(2);
@@ -328,7 +346,13 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
         const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
         s1Mongot.setMockResponses(history1, cursorId, metaId);
 
-        mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(
+            collName,
+            searchQuery,
+            dbName,
+            undefined /*sortSpec*/,
+            stWithMock,
+        );
     }
     let cursor = coll.aggregate(pipeline);
     const expected = [{"_id": 15, "title": "cakes and more cakes"}];
@@ -341,7 +365,11 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
     let limit = 3;
     let mongotReturnedDocs = calcNumDocsMongotShouldReturn(limit);
 
-    let pipeline = [{$search: searchQuery}, {$limit: limit}, {$project: {_id: 1, meta: "$$SEARCH_META"}}];
+    let pipeline = [
+        {$search: searchQuery},
+        {$limit: limit},
+        {$project: {_id: 1, meta: "$$SEARCH_META"}},
+    ];
     let expected = relevantDocs.slice(0, limit);
     // Modify the expected documents to reflect the $project stage in the pipeline.
     for (let i = 0; i < expected.length; i++) {
@@ -497,7 +525,11 @@ function buildHistorySearchWithinLookupStandalone(db, mongotConn, searchLookupQu
         ];
         // Only one response is needed, as $lookup executes $search once and caches the response.
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}),
+            mongotConn.adminCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(123),
+                history: history,
+            }),
         );
     }
 }
@@ -507,10 +539,18 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
 
     let foreignColl = db.getCollection(foreignCollName);
     assert.commandWorked(foreignColl.insertMany(foreignCollectionDocs));
-    let foreignCollUUID = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), foreignCollName);
+    let foreignCollUUID = getUUIDFromListCollections(
+        st.rs0.getPrimary().getDB(dbName),
+        foreignCollName,
+    );
 
     // Shard the foreign collection for the $lookup test and move the higher chunk to shard1.
-    st.shardColl(foreignColl, {_id: 1}, {_id: foreignChunkBoundary}, {_id: foreignChunkBoundary + 1});
+    st.shardColl(
+        foreignColl,
+        {_id: 1},
+        {_id: foreignChunkBoundary},
+        {_id: foreignChunkBoundary + 1},
+    );
 
     const planShardedSearchHistory = [
         {
@@ -718,7 +758,11 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
             },
         },
         {
-            expectedCommand: {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 5}},
+            expectedCommand: {
+                getMore: cursorId,
+                collection: coll.getName(),
+                cursorOptions: {docsRequested: 5},
+            },
             response: {
                 ok: 1,
                 cursor: {
@@ -729,7 +773,11 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
             },
         },
         {
-            expectedCommand: {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 5}},
+            expectedCommand: {
+                getMore: cursorId,
+                collection: coll.getName(),
+                cursorOptions: {docsRequested: 5},
+            },
             response: {
                 ok: 1,
                 cursor: {
@@ -740,7 +788,11 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
             },
         },
         {
-            expectedCommand: {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 4}},
+            expectedCommand: {
+                getMore: cursorId,
+                collection: coll.getName(),
+                cursorOptions: {docsRequested: 4},
+            },
             response: {
                 ok: 1,
                 cursor: {
@@ -751,7 +803,9 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
             },
         },
     ];
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal, orphanDocs) {
@@ -954,7 +1008,13 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
     const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
     s1Mongot.setMockResponses(history1, cursorId, metaId);
 
-    mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        collName,
+        searchQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 }
 
 // Perform a $search query where a getMore is required.
@@ -996,20 +1056,44 @@ function runTest(db, collUUID, standaloneConn, stConn) {
         pipeline = [{$search: searchQuery}, {$skip: skipVal}, {$limit: limitVal}];
         // The extracted limit here comes from the sum of the limit and skip values in the pipeline.
         expected = relevantDocs.slice(skipVal).slice(0, limitVal);
-        runAndAssert(pipeline, limitVal + skipVal, expected, coll, collUUID, standaloneConn, stConn);
+        runAndAssert(
+            pipeline,
+            limitVal + skipVal,
+            expected,
+            coll,
+            collUUID,
+            standaloneConn,
+            stConn,
+        );
 
         // Perform a $search query with multiple limit stages.
         pipeline = [{$search: searchQuery}, {$limit: limitVal}, {$limit: otherLimitVal}];
         // The extracted limit here comes from the minimum of the two limit values in the pipeline.
         expected = relevantDocs.slice(0, Math.min(limitVal, otherLimitVal));
-        runAndAssert(pipeline, Math.min(limitVal, otherLimitVal), expected, coll, collUUID, standaloneConn, stConn);
+        runAndAssert(
+            pipeline,
+            Math.min(limitVal, otherLimitVal),
+            expected,
+            coll,
+            collUUID,
+            standaloneConn,
+            stConn,
+        );
 
         // Perform a $search query with a limit and multiple skip stages.
         pipeline = [{$search: searchQuery}, {$skip: skipVal}, {$skip: skipVal}, {$limit: limitVal}];
         // The extracted limit here comes from the value of the limit plus the values of the two
         // skip stages in the pipeline.
         expected = relevantDocs.slice(skipVal + skipVal).slice(0, limitVal);
-        runAndAssert(pipeline, skipVal + skipVal + limitVal, expected, coll, collUUID, standaloneConn, stConn);
+        runAndAssert(
+            pipeline,
+            skipVal + skipVal + limitVal,
+            expected,
+            coll,
+            collUUID,
+            standaloneConn,
+            stConn,
+        );
 
         // Perform a $search query with multiple limit stages and multiple skip stages.
         pipeline = [
@@ -1021,7 +1105,9 @@ function runTest(db, collUUID, standaloneConn, stConn) {
         ];
         // The extracted limit here comes from the minimum of the two limit values plus the values
         // of the two skip stages in the pipeline.
-        expected = relevantDocs.slice(skipVal + skipVal).slice(0, Math.min(limitVal, otherLimitVal));
+        expected = relevantDocs
+            .slice(skipVal + skipVal)
+            .slice(0, Math.min(limitVal, otherLimitVal));
         runAndAssert(
             pipeline,
             skipVal + skipVal + Math.min(limitVal, otherLimitVal),
@@ -1046,7 +1132,12 @@ function runTest(db, collUUID, standaloneConn, stConn) {
     expectNoDocsRequestedInCommand(coll, collUUID, standaloneConn, stConn);
 
     // SERVER-80648 $search in SBE doesn't support the batch size optimization, so skip the tests.
-    if (!(checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe"))) {
+    if (
+        !(
+            checkSbeRestrictedOrFullyEnabled(db) &&
+            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")
+        )
+    ) {
         // Tests that getMore has a correct cursorOptions field.
         getMoreCase(coll, collUUID, standaloneConn, stConn);
 
@@ -1100,7 +1191,11 @@ function setupAndRunTestShardedEnv() {
     if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchBatchSizeTuning")) {
         jsTestLog("Skipping the test because it only applies when batchSize isn't enabled.");
     } else {
-        assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(
+            mongos
+                .getDB("admin")
+                .runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+        );
 
         let coll = db.getCollection(collName);
 

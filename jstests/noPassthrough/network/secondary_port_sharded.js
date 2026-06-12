@@ -52,7 +52,11 @@ describe("secondary port in a sharded cluster", function () {
 
             assert.commandWorked(coll.insert({_id: id, src: "mainPort"}));
             const doc = coll.findOne({_id: id});
-            assert.neq(doc, null, "should read back document via main port on mongos " + mongos.host);
+            assert.neq(
+                doc,
+                null,
+                "should read back document via main port on mongos " + mongos.host,
+            );
             assert.eq(doc.src, "mainPort");
         }
     });
@@ -69,7 +73,11 @@ describe("secondary port in a sharded cluster", function () {
         assert.eq(doc.src, "secondaryPort");
 
         const mainDoc = coll.findOne({_id: "main_" + this.st.s0.port});
-        assert.neq(mainDoc, null, "document from main port should be readable via mongos secondary port");
+        assert.neq(
+            mainDoc,
+            null,
+            "document from main port should be readable via mongos secondary port",
+        );
 
         conn.close();
     });
@@ -80,8 +88,14 @@ describe("secondary port in a sharded cluster", function () {
 
         const helloRes = assert.commandWorked(conn.adminCommand({hello: 1}));
         assert.eq(helloRes.ok, 1, "hello on config server secondary port should succeed");
-        assert(helloRes.isWritablePrimary, "config server should report isWritablePrimary on secondary port");
-        assert(helloRes.hasOwnProperty("setName"), "config server hello should include setName on secondary port");
+        assert(
+            helloRes.isWritablePrimary,
+            "config server should report isWritablePrimary on secondary port",
+        );
+        assert(
+            helloRes.hasOwnProperty("setName"),
+            "config server hello should include setName on secondary port",
+        );
 
         conn.close();
     });
@@ -92,8 +106,14 @@ describe("secondary port in a sharded cluster", function () {
 
         const helloRes = assert.commandWorked(conn.adminCommand({hello: 1}));
         assert.eq(helloRes.ok, 1, "hello on shard0 secondary port should succeed");
-        assert(helloRes.isWritablePrimary, "shard0 should report isWritablePrimary on secondary port");
-        assert(helloRes.hasOwnProperty("setName"), "shard0 hello should include setName on secondary port");
+        assert(
+            helloRes.isWritablePrimary,
+            "shard0 should report isWritablePrimary on secondary port",
+        );
+        assert(
+            helloRes.hasOwnProperty("setName"),
+            "shard0 hello should include setName on secondary port",
+        );
 
         conn.close();
     });
@@ -104,8 +124,14 @@ describe("secondary port in a sharded cluster", function () {
 
         const helloRes = assert.commandWorked(conn.adminCommand({hello: 1}));
         assert.eq(helloRes.ok, 1, "hello on shard1 secondary port should succeed");
-        assert(helloRes.isWritablePrimary, "shard1 should report isWritablePrimary on secondary port");
-        assert(helloRes.hasOwnProperty("setName"), "shard1 hello should include setName on secondary port");
+        assert(
+            helloRes.isWritablePrimary,
+            "shard1 should report isWritablePrimary on secondary port",
+        );
+        assert(
+            helloRes.hasOwnProperty("setName"),
+            "shard1 hello should include setName on secondary port",
+        );
 
         conn.close();
     });

@@ -20,7 +20,9 @@ const timeFieldName = "time";
 const metaFieldName = "m";
 
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 rollbackTest.transitionToRollbackOperations();

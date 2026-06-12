@@ -26,7 +26,11 @@ assert.soon(function () {
 
 // Rename the collection
 assert.commandWorked(
-    db.adminCommand({renameCollection: "test.ttl_coll", to: "test.ttl_coll_renamed", dropTarget: true}),
+    db.adminCommand({
+        renameCollection: "test.ttl_coll",
+        to: "test.ttl_coll_renamed",
+        dropTarget: true,
+    }),
 );
 
 // Re-insert 50 docs with timestamp 'now - 24h'.

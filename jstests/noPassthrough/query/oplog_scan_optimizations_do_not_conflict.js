@@ -57,7 +57,9 @@ assert.hasFields(res.cursor, ["postBatchResumeToken"]);
 const firstResumeToken = res.cursor.postBatchResumeToken;
 const firstOplogBatch = res.cursor.firstBatch;
 
-res = assert.commandWorked(localDb.runCommand({getMore: res.cursor.id, collection: oplogCollName, batchSize: 1}));
+res = assert.commandWorked(
+    localDb.runCommand({getMore: res.cursor.id, collection: oplogCollName, batchSize: 1}),
+);
 assert.eq(1, res.cursor.nextBatch.length);
 assert(res.cursor.nextBatch[0].hasOwnProperty("$recordId"));
 assert.hasFields(res.cursor, ["postBatchResumeToken"]);

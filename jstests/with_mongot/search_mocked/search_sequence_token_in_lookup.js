@@ -64,10 +64,16 @@ function testPaginationInLookup(mongotConn, db, coll) {
     let history = [historyObj];
     for (let i = 0; i < 8; i++) {
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(cursorId + i), history: history}),
+            mongotConn.adminCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(cursorId + i),
+                history: history,
+            }),
         );
 
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+        );
     }
     const pipeline = [
         {

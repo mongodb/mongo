@@ -55,14 +55,21 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 {
     // Ensure that removeQuerySettings command ignores for invalid input.
     assert.commandWorked(db.adminCommand({removeQuerySettings: nonExistentQueryShapeHash}));
-    assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: {notAValid: "query"}}), 7746402);
+    assert.commandFailedWithCode(
+        db.adminCommand({removeQuerySettings: {notAValid: "query"}}),
+        7746402,
+    );
 }
 
 {
     // Ensure that $querySettings agg stage inherits the constraints from the underlying alias
     // stages, including $queue.
     assert.commandFailedWithCode(
-        db.adminCommand({aggregate: 1, pipeline: [{$documents: []}, {$querySettings: {}}], cursor: {}}),
+        db.adminCommand({
+            aggregate: 1,
+            pipeline: [{$documents: []}, {$querySettings: {}}],
+            cursor: {},
+        }),
         40602,
     );
 }
@@ -91,7 +98,9 @@ const nonExistentQueryShapeHash = "0".repeat(64);
             db.adminCommand({
                 setQuerySettings: {find: collection, $db: dbName},
                 settings: {
-                    "indexHints": [{"ns": {"db": dbName, "coll": collection}, "allowedIndexes": [index]}],
+                    "indexHints": [
+                        {"ns": {"db": dbName, "coll": collection}, "allowedIndexes": [index]},
+                    ],
                 },
             }),
             8584900,
@@ -126,31 +135,46 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);
 
     // Ensure that inserting settings that only have the 'comment' field fails.
-    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {comment: "hello!"}}), 7746604);
+    assert.commandFailedWithCode(
+        db.adminCommand({setQuerySettings: query, settings: {comment: "hello!"}}),
+        7746604,
+    );
 
     // Insert some settings.
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
-    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
+    qsutils.assertQueryShapeConfiguration([
+        qsutils.makeQueryShapeConfiguration({reject: true}, query),
+    ]);
 
     // Ensure updating with empty query settings fails.
     const queryShapeHash = qsutils.getQueryShapeHashFromExplain(query);
-    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: queryShapeHash, settings: {}}), 8727502);
+    assert.commandFailedWithCode(
+        db.adminCommand({setQuerySettings: queryShapeHash, settings: {}}),
+        8727502,
+    );
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);
-    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
+    qsutils.assertQueryShapeConfiguration([
+        qsutils.makeQueryShapeConfiguration({reject: true}, query),
+    ]);
 
     // Ensure that updating settings that only have the 'comment' field fails.
     // Note: if only the comment is changed, the command does not fail since 'reject' is set to
     // true, which makes the settings valid. Therefore, 'reject' must be set to false, and then
     // settings with only 'comment' set are not valid.
     assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: queryShapeHash, settings: {reject: false, comment: "hi!"}}),
+        db.adminCommand({
+            setQuerySettings: queryShapeHash,
+            settings: {reject: false, comment: "hi!"},
+        }),
         7746604,
     );
     assert.commandFailedWithCode(
         db.adminCommand({setQuerySettings: query, settings: {reject: false, comment: "hi!"}}),
         7746604,
     );
-    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
+    qsutils.assertQueryShapeConfiguration([
+        qsutils.makeQueryShapeConfiguration({reject: true}, query),
+    ]);
 
     // Clean-up after the end of the test.
     qsutils.removeAllQuerySettings();
@@ -171,7 +195,9 @@ const nonExistentQueryShapeHash = "0".repeat(64);
                 settings: querySettings,
             }),
         );
-        qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(querySettings, query)]);
+        qsutils.assertQueryShapeConfiguration([
+            qsutils.makeQueryShapeConfiguration(querySettings, query),
+        ]);
     }
 
     testCommentField("Modified by: Vlad");
@@ -206,7 +232,9 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     qsutils.assertQueryShapeConfiguration([
         qsutils.makeQueryShapeConfiguration(
             {
-                "indexHints": [{"ns": {"db": db.getName(), "coll": "collNameA"}, "allowedIndexes": [{"a": 1}]}],
+                "indexHints": [
+                    {"ns": {"db": db.getName(), "coll": "collNameA"}, "allowedIndexes": [{"a": 1}]},
+                ],
             },
             query,
         ),
@@ -264,16 +292,23 @@ const nonExistentQueryShapeHash = "0".repeat(64);
         queryFramework: "sbe",
     };
 
-    const reply = assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: querySettings}));
+    const reply = assert.commandWorked(
+        db.adminCommand({setQuerySettings: query, settings: querySettings}),
+    );
 
     // Verify that the set query settings are simplified.
-    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(simplifiedQuerySettings, query)]);
+    qsutils.assertQueryShapeConfiguration([
+        qsutils.makeQueryShapeConfiguration(simplifiedQuerySettings, query),
+    ]);
 
     // Verify that reply of "setQuerySettings" command contains simplified query settings.
     assert.eq(
         reply.settings,
         simplifiedQuerySettings,
-        "Reply: " + tojson(reply) + " does not contain simplified query settings: " + tojson(simplifiedQuerySettings),
+        "Reply: " +
+            tojson(reply) +
+            " does not contain simplified query settings: " +
+            tojson(simplifiedQuerySettings),
     );
 
     qsutils.removeAllQuerySettings();

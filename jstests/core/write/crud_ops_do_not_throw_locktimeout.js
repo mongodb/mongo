@@ -52,7 +52,12 @@ const failureTimeoutMS = 1 * 1000;
 const comment = extractUUIDFromObject(UUID());
 
 assert.commandFailedWithCode(
-    db.runCommand({insert: coll.getName(), documents: [{_id: 2}], maxTimeMS: failureTimeoutMS, comment}),
+    db.runCommand({
+        insert: coll.getName(),
+        documents: [{_id: 2}],
+        maxTimeMS: failureTimeoutMS,
+        comment,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 

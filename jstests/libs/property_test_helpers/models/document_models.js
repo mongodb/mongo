@@ -14,7 +14,12 @@
  * arrays.
  * See property_test_helpers/README.md for more detail on the design.
  */
-import {dateArb, fieldArb, getScalarArb, intArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    dateArb,
+    fieldArb,
+    getScalarArb,
+    intArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -47,24 +52,33 @@ export function getDatasetModel({maxNumDocs = 250, docModel} = {}) {
     for (let i = 0; i < maxNumDocs; i++) {
         docIds.push(i);
     }
-    const uniqueIdsArb = fc.shuffledSubarray(docIds, {minLength: maxNumDocs, maxLength: maxNumDocs});
+    const uniqueIdsArb = fc.shuffledSubarray(docIds, {
+        minLength: maxNumDocs,
+        maxLength: maxNumDocs,
+    });
 
     // The size=+2 argument tells fc.array to generate array sizes closer to the max than the min.
     // This way the average number of documents produced is >100, which means our queries will be
     // less likely to produce empty results. The size argument does not affect minimization. On
     // failure, fast-check will still minimize down to 1 document if possible.
     // These docs are 'unlabeled' because we have not assigned them unique _ids yet.
-    const unlabeledDocsModel = fc.array(docModel, {minLength: 1, maxLength: maxNumDocs, size: "+2"});
-    // Now label the docs with unique _ids.
-    return fc.record({unlabeledDocs: unlabeledDocsModel, _ids: uniqueIdsArb}).map(({unlabeledDocs, _ids}) => {
-        // We can run into issues with fast-check if we mutate generated values.
-        // We'll make new docs and add _id to it.
-        return unlabeledDocs.map((oldDoc, ix) => {
-            // Make sure our unique _id overwrites the original doc _id, by
-            // putting it last in the list.
-            return Object.assign({}, oldDoc, {_id: _ids[ix]});
-        });
+    const unlabeledDocsModel = fc.array(docModel, {
+        minLength: 1,
+        maxLength: maxNumDocs,
+        size: "+2",
     });
+    // Now label the docs with unique _ids.
+    return fc
+        .record({unlabeledDocs: unlabeledDocsModel, _ids: uniqueIdsArb})
+        .map(({unlabeledDocs, _ids}) => {
+            // We can run into issues with fast-check if we mutate generated values.
+            // We'll make new docs and add _id to it.
+            return unlabeledDocs.map((oldDoc, ix) => {
+                // Make sure our unique _id overwrites the original doc _id, by
+                // putting it last in the list.
+                return Object.assign({}, oldDoc, {_id: _ids[ix]});
+            });
+        });
 }
 
 /**
@@ -74,7 +88,13 @@ export function getDatasetModel({maxNumDocs = 250, docModel} = {}) {
  * used as input to the "base" value generator. It's not a strict guarantee that objects produced
  * will have nesting depth at most 'approxMaxDepth' (hence "approx"); see note below.
  */
-export function getNestedDocModelNoArray({keyArb, approxMaxDepth, maxObjectKeys, allowUnicode, allowNullBytes} = {}) {
+export function getNestedDocModelNoArray({
+    keyArb,
+    approxMaxDepth,
+    maxObjectKeys,
+    allowUnicode,
+    allowNullBytes,
+} = {}) {
     if (!keyArb) {
         // Re-use the standard field arbitrary if keyArb is not provided. Note that some of these
         // keys could be dotted, so in reality we may end up with an object slightly more nested

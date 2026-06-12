@@ -36,7 +36,9 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
 
     assert.commandWorked(collection.createIndex({a: 1}));
     assert.commandWorked(collection.createIndex({b: 1}));
-    assert.commandWorked(collection.insertMany(Array.from({length: 100}, (_, i) => ({a: "abc", b: "def", c: i}))));
+    assert.commandWorked(
+        collection.insertMany(Array.from({length: 100}, (_, i) => ({a: "abc", b: "def", c: i}))),
+    );
 
     assert.commandWorked(db.createView("view", collName, [{$match: filter}]));
 
@@ -112,7 +114,13 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
         },
         {
             testName: "aggregate with getMore",
-            command: {explain: {aggregate: collName, pipeline: [{$match: filter}], cursor: {batchSize: 2}}},
+            command: {
+                explain: {
+                    aggregate: collName,
+                    pipeline: [{$match: filter}],
+                    cursor: {batchSize: 2},
+                },
+            },
         },
         {
             testName: "mapReduce",
@@ -158,7 +166,9 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
         failpointName: "setAutoGetCollectionWait",
         failpointOpts: {waitForMillis: waitTimeMillis},
     };
-    const nonMultiPlanningTestCases = nonMultiplanningCommands.map((cmd) => Object.assign({}, failpointBase, cmd));
+    const nonMultiPlanningTestCases = nonMultiplanningCommands.map((cmd) =>
+        Object.assign({}, failpointBase, cmd),
+    );
 
     return testCases.concat(nonMultiPlanningTestCases);
 }

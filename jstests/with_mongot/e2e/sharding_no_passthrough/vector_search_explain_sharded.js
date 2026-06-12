@@ -35,7 +35,9 @@ describe("$vectorSearch sharded explain", function () {
         const otherShardName = shardNames[1];
 
         // Enable sharding on the database with a specific primary shard.
-        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}));
+        assert.commandWorked(
+            testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}),
+        );
 
         const coll = testDb.getCollection(collName);
         coll.drop();
@@ -58,7 +60,9 @@ describe("$vectorSearch sharded explain", function () {
         );
 
         // Shard the collection and split at _id: 10.
-        assert.commandWorked(testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+        );
         assert.commandWorked(testDb.adminCommand({split: coll.getFullName(), middle: {_id: 10}}));
         assert.commandWorked(
             testDb.adminCommand({
@@ -117,8 +121,13 @@ describe("$vectorSearch sharded explain", function () {
             }
 
             // The merger $limit should also be the minimum value.
-            const mergerLimitStage = result.splitPipeline.mergerPart.find((stage) => stage.hasOwnProperty("$limit"));
-            assert(mergerLimitStage, `Expected $limit in mergerPart: ${tojson(result.splitPipeline)}`);
+            const mergerLimitStage = result.splitPipeline.mergerPart.find((stage) =>
+                stage.hasOwnProperty("$limit"),
+            );
+            assert(
+                mergerLimitStage,
+                `Expected $limit in mergerPart: ${tojson(result.splitPipeline)}`,
+            );
             assert.eq(
                 expectedLimitVal,
                 mergerLimitStage["$limit"],

@@ -16,7 +16,9 @@ coll.drop();
 assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 st.printShardingStatus();
 
-assert.commandWorked(st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 5}}}));
+assert.commandWorked(
+    st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 5}}}),
+);
 
 // Insert some data
 assert.commandWorked(coll.insert({_id: true, a: true, b: true}));
@@ -44,7 +46,9 @@ assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
 jsTest.log("Tests with _id : hashed shard key");
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(
+    st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
+);
 st.printShardingStatus();
 
 // Insert some data

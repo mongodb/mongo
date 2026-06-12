@@ -17,7 +17,11 @@ const collName = "test";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const times = [ISODate("2021-01-01T01:00:00Z"), ISODate("2021-01-01T01:10:00Z"), ISODate("2021-01-01T01:20:00Z")];
+const times = [
+    ISODate("2021-01-01T01:00:00Z"),
+    ISODate("2021-01-01T01:10:00Z"),
+    ISODate("2021-01-01T01:20:00Z"),
+];
 let docs = [
     {_id: 0, [timeFieldName]: times[0], [metaFieldName]: "A", f: 0},
     {_id: 1, [timeFieldName]: times[1], [metaFieldName]: "B", f: 1},
@@ -28,7 +32,9 @@ const coll = testDB.getCollection(collName);
 coll.drop();
 
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 assert.commandWorked(coll.insert(docs[0]));
@@ -42,7 +48,11 @@ assert.eq(buckets[0].control.max[timeFieldName], times[0]);
 let modified = buckets[0];
 modified.control.closed = true;
 let updateResult = assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, coll).update({_id: buckets[0]._id}, modified, getRawOperationSpec(testDB)),
+    getTimeseriesCollForRawOps(testDB, coll).update(
+        {_id: buckets[0]._id},
+        modified,
+        getRawOperationSpec(testDB),
+    ),
 );
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
@@ -79,7 +89,11 @@ fpInsert.wait();
 modified = buckets[1];
 modified.control.closed = true;
 updateResult = assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, coll).update({_id: buckets[1]._id}, modified, getRawOperationSpec(testDB)),
+    getTimeseriesCollForRawOps(testDB, coll).update(
+        {_id: buckets[1]._id},
+        modified,
+        getRawOperationSpec(testDB),
+    ),
 );
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);

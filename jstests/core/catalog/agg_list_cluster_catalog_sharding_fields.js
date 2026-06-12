@@ -25,7 +25,8 @@ const REPLICA_SET = 1;
 const serverType = FixtureHelpers.isMongos(db) ? SHARDED_CLUSTER : REPLICA_SET;
 const isTrackUponCreationEnabled = TestData.implicitlyTrackUnshardedCollectionOnCreation ?? false;
 const collectionPlacementIsUnstable =
-    TestData.runningWithBalancer === true || TestData.createsUnsplittableCollectionsOnRandomShards === true;
+    TestData.runningWithBalancer === true ||
+    TestData.createsUnsplittableCollectionsOnRandomShards === true;
 
 const dbTest = db.getSiblingDB(jsTestName());
 const dbName = dbTest.getName();
@@ -183,7 +184,10 @@ function checkCollectionEntry(collName, expectedResult) {
     const result = results.find((collEntry) => {
         return collEntry.ns === dbName + "." + collName;
     });
-    assert(result, "The collection '" + collName + "' has not been found on the $listClusterCatalog output.");
+    assert(
+        result,
+        "The collection '" + collName + "' has not been found on the $listClusterCatalog output.",
+    );
 
     for (const [field, value] of Object.entries(expectedResult)) {
         if (collectionPlacementIsUnstable && (field === "shards" || field === "tracked")) {
@@ -192,7 +196,10 @@ function checkCollectionEntry(collName, expectedResult) {
         assert.eq(
             value,
             result[field],
-            "The value of the field '" + field + "' doesn't match with the expected one for the collection " + collName,
+            "The value of the field '" +
+                field +
+                "' doesn't match with the expected one for the collection " +
+                collName,
         );
     }
 }
@@ -208,13 +215,20 @@ const rawShardKeysByTimeseriesCollection = {
 for (const [collName, expectedResult] of Object.entries(expectedResults[serverType])) {
     // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
     // TODO SERVER-97061: Remove once $listClusterCatalog returns a consistent state for the local and global catalog.
-    if (collName in rawShardKeysByTimeseriesCollection && runningWithViewlessTimeseriesUpgradeDowngrade(dbTest)) {
+    if (
+        collName in rawShardKeysByTimeseriesCollection &&
+        runningWithViewlessTimeseriesUpgradeDowngrade(dbTest)
+    ) {
         // Skip since the values of global catalog based fields (e.g. 'shards') can be inconsistent due to SERVER-97061.
         continue;
     }
 
     // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
-    if (results.find((collEntry) => collEntry.ns == dbName + "." + getTimeseriesBucketsColl(collName))) {
+    if (
+        results.find(
+            (collEntry) => collEntry.ns == dbName + "." + getTimeseriesBucketsColl(collName),
+        )
+    ) {
         assert(
             collName == kCollTimeseries ||
                 collName == kCollTimeseriesSharded ||
@@ -265,8 +279,15 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
     const rawEntries = rawResult.cursor.firstBatch;
 
     const regularRawEntry = rawEntries.find((e) => e.ns === dbName + "." + kCollSharded);
-    assert(regularRawEntry, "Sharded collection not found in rawData=true results: " + tojson(rawEntries));
-    assert.docEq({x: 1}, regularRawEntry.shardKey, "rawData should not affect non-timeseries shard keys");
+    assert(
+        regularRawEntry,
+        "Sharded collection not found in rawData=true results: " + tojson(rawEntries),
+    );
+    assert.docEq(
+        {x: 1},
+        regularRawEntry.shardKey,
+        "rawData should not affect non-timeseries shard keys",
+    );
 
     // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
     // TODO SERVER-97061: Remove once $listClusterCatalog returns a consistent state for the local and global catalog.
@@ -275,25 +296,37 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
     }
 
     const tsRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesSharded));
-    assert(tsRawEntry, "Sharded timeseries collection not found in rawData=true results: " + tojson(rawEntries));
+    assert(
+        tsRawEntry,
+        "Sharded timeseries collection not found in rawData=true results: " + tojson(rawEntries),
+    );
     assert.docEq(
         {"control.min.time": 1},
         tsRawEntry.shardKey,
         "rawData=true should return the raw buckets shard key for timeseries collections",
     );
 
-    const tsMetaRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesShardedByMeta));
-    assert(tsMetaRawEntry, kCollTimeseriesShardedByMeta + " not found in rawData=true results: " + tojson(rawEntries));
+    const tsMetaRawEntry = rawEntries.find((e) =>
+        e.ns.endsWith("." + kCollTimeseriesShardedByMeta),
+    );
+    assert(
+        tsMetaRawEntry,
+        kCollTimeseriesShardedByMeta + " not found in rawData=true results: " + tojson(rawEntries),
+    );
     assert.docEq(
         {meta: 1},
         tsMetaRawEntry.shardKey,
         "rawData=true should return {meta: 1} for metaField-only timeseries shard key",
     );
 
-    const tsSubfieldRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesShardedByMetaSubfield));
+    const tsSubfieldRawEntry = rawEntries.find((e) =>
+        e.ns.endsWith("." + kCollTimeseriesShardedByMetaSubfield),
+    );
     assert(
         tsSubfieldRawEntry,
-        kCollTimeseriesShardedByMetaSubfield + " not found in rawData=true results: " + tojson(rawEntries),
+        kCollTimeseriesShardedByMetaSubfield +
+            " not found in rawData=true results: " +
+            tojson(rawEntries),
     );
     assert.docEq(
         {"meta.sensorId": 1},
@@ -323,14 +356,24 @@ if (FixtureHelpers.isMongos(dbTest)) {
             updateObj["$set"]["permitMigrations"] = permitMigrations;
         }
 
-        dbTest.getSiblingDB("config").collections.updateOne({_id: dbName + "." + collName}, updateObj);
+        dbTest
+            .getSiblingDB("config")
+            .collections.updateOne({_id: dbName + "." + collName}, updateObj);
     }
 
-    function testBalancingConfiguration(collName, noBalance, permitMigrations, expectedBalancingEnabled) {
+    function testBalancingConfiguration(
+        collName,
+        noBalance,
+        permitMigrations,
+        expectedBalancingEnabled,
+    ) {
         setBalancingConfiguration(collName, noBalance, permitMigrations);
 
         const result = dbTest
-            .aggregate([{$listClusterCatalog: {balancingConfiguration: true}}, {$match: {ns: dbName + "." + collName}}])
+            .aggregate([
+                {$listClusterCatalog: {balancingConfiguration: true}},
+                {$match: {ns: dbName + "." + collName}},
+            ])
             .toArray();
         assert(
             result.length === 1 && result[0].ns === dbName + "." + collName,

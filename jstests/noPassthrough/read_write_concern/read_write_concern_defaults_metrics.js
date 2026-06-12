@@ -59,7 +59,11 @@ function verifyServerStatus(
     } else {
         // These fields are always set once a read or write concern has been set at least once and
         // the defaults document is still present.
-        assert.hasFields(defaultsRes, ["updateOpTime", "updateWallClockTime", "localUpdateWallClockTime"]);
+        assert.hasFields(defaultsRes, [
+            "updateOpTime",
+            "updateWallClockTime",
+            "localUpdateWallClockTime",
+        ]);
     }
 }
 
@@ -68,18 +72,34 @@ function testServerStatus(conn, isImplicitDefaultWCMajority) {
     verifyServerStatus(conn, {expectNoDefaultsDocument: true}, isImplicitDefaultWCMajority);
 
     // When only read concern is set.
-    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}));
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}),
+    );
     verifyServerStatus(conn, {expectedRC: {level: "majority"}}, isImplicitDefaultWCMajority);
 
     // When read concern is explicitly unset and write concern is unset.
-    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {},
+            defaultWriteConcern: {},
+        }),
+    );
     verifyServerStatus(conn, {}, isImplicitDefaultWCMajority);
 
     // When only write concern is set.
     assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {w: "majority"}}),
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {},
+            defaultWriteConcern: {w: "majority"},
+        }),
     );
-    verifyServerStatus(conn, {expectedWC: {w: "majority", wtimeout: 0}}, isImplicitDefaultWCMajority);
+    verifyServerStatus(
+        conn,
+        {expectedWC: {w: "majority", wtimeout: 0}},
+        isImplicitDefaultWCMajority,
+    );
 
     // When both read and write concern are set.
     assert.commandWorked(
@@ -118,7 +138,11 @@ function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
     //
     const latestPeriodicFTDC = verifyGetDiagnosticData(conn.getDB("admin"));
     assert.hasFields(latestPeriodicFTDC, ["serverStatus"]);
-    assert.eq(undefined, latestPeriodicFTDC.serverStatus.defaultRWConcern, tojson(latestPeriodicFTDC.serverStatus));
+    assert.eq(
+        undefined,
+        latestPeriodicFTDC.serverStatus.defaultRWConcern,
+        tojson(latestPeriodicFTDC.serverStatus),
+    );
 
     //
     // The first sample in the FTDC file should have the default read write concern, if the node is
@@ -128,7 +152,9 @@ function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
     const ftdcFiles = listFiles(ftdcDirPath);
 
     // Read from the first non-interim file.
-    const firstFullFile = ftdcFiles.filter((fileDesc) => fileDesc.baseName.indexOf("interim") == -1)[0];
+    const firstFullFile = ftdcFiles.filter(
+        (fileDesc) => fileDesc.baseName.indexOf("interim") == -1,
+    )[0];
     let ftdcData;
     assert.soon(() => {
         try {
@@ -172,8 +198,14 @@ jsTestLog("Testing sharded cluster...");
     testFTDC(st.configRS.getPrimary(), testPathConfig);
 
     // Set a default before verifying it isn't included by shards.
-    assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
-    verifyServerStatus(st.rs0.getPrimary(), {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
+    assert.commandWorked(
+        st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}),
+    );
+    verifyServerStatus(
+        st.rs0.getPrimary(),
+        {expectNothing: true},
+        true /* isImplicitDefaultWCMajority */,
+    );
     testFTDC(st.rs0.getPrimary(), testPathShard, true /* expectNothingOnRotation */);
     st.stop();
 }
@@ -207,7 +239,9 @@ jsTestLog("Testing server status for plain replica set with implicit default WC 
 jsTestLog("Testing standalone server...");
 {
     const testPath = MongoRunner.toRealPath("ftdc_dir_standalone");
-    const standalone = MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: testPath}});
+    const standalone = MongoRunner.runMongod({
+        setParameter: {diagnosticDataCollectionDirectoryPath: testPath},
+    });
 
     verifyServerStatus(standalone, {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
     testFTDC(standalone, testPath, true /* expectNothingOnRotation */);

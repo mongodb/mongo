@@ -11,13 +11,20 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const verifyMidpointTransactionMetrics = function (initialTxnMetrics, expectedParticipants) {
-    const expectedMongosTargetedShards = initialTxnMetrics.totalContactedParticipants + expectedParticipants;
-    let midpointTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const expectedMongosTargetedShards =
+        initialTxnMetrics.totalContactedParticipants + expectedParticipants;
+    let midpointTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     // More transactions can be running in the background. Check we observe the minimum.
     assert.gte(midpointTxnMetrics.totalContactedParticipants, expectedMongosTargetedShards);
 };
 
-const verifyFinalTransactionMetrics = function (initialTxnMetrics, expectedParticipants, numWriteShards) {
+const verifyFinalTransactionMetrics = function (
+    initialTxnMetrics,
+    expectedParticipants,
+    numWriteShards,
+) {
     const finalTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
     // Check we executed the expected commit type. Currently this test only runs transactions where
     // either a single shard, readOnly, or single write shard commit type should be executed
@@ -82,7 +89,9 @@ const setUpTestCase = function (
         assert.commandWorked(st.s.getDB(dbName).bar.insert(barDocsToInsert));
     }
 
-    const initialTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const initialTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
 
     return initialTxnMetrics;
 };
@@ -92,15 +101,32 @@ const setHangFps = function (shardsToSetFp) {
     // force them to hang while executing the agg request.
     const hangFps = [];
     shardsToSetFp.forEach((shard) => {
-        hangFps.push(configureFailPoint(shard, "hangAfterAcquiringCollectionCatalog", {collection: foreignColl}));
+        hangFps.push(
+            configureFailPoint(shard, "hangAfterAcquiringCollectionCatalog", {
+                collection: foreignColl,
+            }),
+        );
     });
 
     return hangFps;
 };
 
-const runAgg = function (addedParticipantIsExistingParticipantBeforeAgg, lookupPipeline, txnNum, sessionId) {
+const runAgg = function (
+    addedParticipantIsExistingParticipantBeforeAgg,
+    lookupPipeline,
+    txnNum,
+    sessionId,
+) {
     // Run the $lookup in another thread.
-    const runAggRequest = (mongosConn, dbName, collName, pipeline, sessionId, txnNum, startTransaction) => {
+    const runAggRequest = (
+        mongosConn,
+        dbName,
+        collName,
+        pipeline,
+        sessionId,
+        txnNum,
+        startTransaction,
+    ) => {
         let mongos = new Mongo(mongosConn);
         const lsid = eval("(" + sessionId + ")");
 
@@ -155,7 +181,12 @@ const testAddingParticipants = function (
         sessionId,
     );
     const hangFps = setHangFps(shardsWithForeignColl);
-    const aggRequestThread = runAgg(addedParticipantIsExistingParticipantBeforeAgg, lookupPipeline, txnNum, sessionId);
+    const aggRequestThread = runAgg(
+        addedParticipantIsExistingParticipantBeforeAgg,
+        lookupPipeline,
+        txnNum,
+        sessionId,
+    );
 
     // In order to assert that mongos did not target the shards with the foreign collection itself,
     // wait to hit the failpoint on each shard with the foreign collection, then check that mongos
@@ -239,7 +270,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: localNs, key: {_id: 1}}
 // shard2: x: [0, +inf)
 assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: shard2.shardName}));
 
 // Create one sharded collection with once chunk placed in each shard.
@@ -323,7 +356,9 @@ testAddingParticipants(
 );
 
 print("Testing that an existing participant can add itself as an additional participant");
-assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard0.shardName}),
+);
 refreshRoutingTable([shard0, shard1, shard2], foreignColl);
 
 st.refreshCatalogCacheForNs(st.s, foreignNs);
@@ -353,17 +388,23 @@ testAddingParticipants(
     shardsWithForeignColl,
 );
 
-print("Testing that a participant added on a getMore without a readOnly value participates in commit protocol");
+print(
+    "Testing that a participant added on a getMore without a readOnly value participates in commit protocol",
+);
 // Move chunks such that the localColl has chunks:
 // shard0: _id: [0, +inf]
 // shard1: _id: [-inf, 0]
 assert.commandWorked(st.s.adminCommand({split: localNs, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: localNs, find: {_id: 10}, to: shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: localNs, find: {_id: 10}, to: shard1.shardName}),
+);
 
 // Move chunks such that the foreignColl has chunks:
 // shard1: x: [-inf, 0]
 // shard2: x: [0, +inf]
-assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard1.shardName}),
+);
 
 refreshRoutingTable([shard0, shard1, shard2], foreignColl);
 st.refreshCatalogCacheForNs(st.s, foreignNs);
@@ -416,11 +457,19 @@ let initialTxnMetrics = setUpTestCase(
 //   will then return to client without shard1 ever having heard from shard2.
 
 const hangFps = setHangFps(shardsToSetHangFp);
-let aggRequestThread = runAgg(addedParticipantIsExistingParticipantBeforeAgg, lookupPipeline, txnNum, sessionId);
+let aggRequestThread = runAgg(
+    addedParticipantIsExistingParticipantBeforeAgg,
+    lookupPipeline,
+    txnNum,
+    sessionId,
+);
 
 // Wait to hit the hang failpoint on shard1, and check that mongos has only contacted the two shards
 hangFps[0].wait();
-verifyMidpointTransactionMetrics(initialTxnMetrics, 2 /* expectedNewParticipantsContactedByMongos */);
+verifyMidpointTransactionMetrics(
+    initialTxnMetrics,
+    2 /* expectedNewParticipantsContactedByMongos */,
+);
 
 // Turn off the failpoint on shard1 so that shard1 will continue with the request. Wait for shard1
 // to contact shard2 and for shard2 to hit the failpoint
@@ -439,7 +488,10 @@ aggRes.cursor.firstBatch.forEach((doc) => {
 });
 
 // Now check that mongos now tracks all 3 participants, before turning off the failpoint on shard2.
-verifyMidpointTransactionMetrics(initialTxnMetrics, 3 /* expectedNewParticipantsContactedByMongos */);
+verifyMidpointTransactionMetrics(
+    initialTxnMetrics,
+    3 /* expectedNewParticipantsContactedByMongos */,
+);
 hangFps[1].off();
 
 // Wait for the getMore to be cleaned up on shard1 to avoid a race between shard2 receiving
@@ -488,7 +540,9 @@ print("Testing a transaction in which an added participant throws a view resolut
 // shard1: x: [-inf, 0]
 // shard2: x: [0, +inf]
 
-assert.commandWorked(st.s.adminCommand({moveChunk: localNs, find: {_id: -10}, to: shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: localNs, find: {_id: -10}, to: shard1.shardName}),
+);
 
 fooDocsToInsert = [{_id: -5}, {_id: 5}]; // will live on shard1
 barDocsToInsert = [
@@ -540,7 +594,12 @@ let initialPrimaryShardTxnMetrics = assert.commandWorked(
     st.shard0.getDB("admin").adminCommand({serverStatus: 1}),
 ).transactions;
 
-aggRequestThread = runAgg(addedParticipantIsExistingParticipantBeforeAgg, lookupPipeline, txnNum, sessionId);
+aggRequestThread = runAgg(
+    addedParticipantIsExistingParticipantBeforeAgg,
+    lookupPipeline,
+    txnNum,
+    sessionId,
+);
 aggRequestThread.join();
 aggRes = aggRequestThread.returnData();
 
@@ -563,7 +622,9 @@ assert.commandWorked(
 verifyFinalTransactionMetrics(initialTxnMetrics, [st.shard1, st.shard2], 0);
 
 // Assert that the transaction was started and then aborted on the primary shard
-primaryShardTxnMetrics = assert.commandWorked(st.shard0.getDB("admin").adminCommand({serverStatus: 1})).transactions;
+primaryShardTxnMetrics = assert.commandWorked(
+    st.shard0.getDB("admin").adminCommand({serverStatus: 1}),
+).transactions;
 assert.gte(primaryShardTxnMetrics.totalStarted, initialPrimaryShardTxnMetrics.totalStarted + 1);
 assert.gte(primaryShardTxnMetrics.totalAborted, initialPrimaryShardTxnMetrics.totalAborted + 1);
 

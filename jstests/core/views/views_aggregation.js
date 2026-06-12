@@ -37,7 +37,10 @@ assert.commandWorked(viewsDB.dropDatabase());
 let assertAggResultEq = function (collection, pipeline, expected, ordered) {
     let coll = viewsDB.getCollection(collection);
     let arr = coll.aggregate(pipeline).toArray();
-    let success = typeof ordered === "undefined" || !ordered ? arrayEq(arr, expected) : orderedArrayEq(arr, expected);
+    let success =
+        typeof ordered === "undefined" || !ordered
+            ? arrayEq(arr, expected)
+            : orderedArrayEq(arr, expected);
     assert(success, tojson({got: arr, expected: expected}));
 };
 let byPopulation = function (a, b) {
@@ -58,9 +61,15 @@ assert.commandWorked(coll.insert(allDocuments));
 
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "emptyPipelineView", viewOn: "coll"}));
-assert.commandWorked(viewsDB.runCommand({create: "identityView", viewOn: "coll", pipeline: [{$match: {}}]}));
 assert.commandWorked(
-    viewsDB.runCommand({create: "noIdView", viewOn: "coll", pipeline: [{$project: {_id: 0, state: 1, pop: 1}}]}),
+    viewsDB.runCommand({create: "identityView", viewOn: "coll", pipeline: [{$match: {}}]}),
+);
+assert.commandWorked(
+    viewsDB.runCommand({
+        create: "noIdView",
+        viewOn: "coll",
+        pipeline: [{$project: {_id: 0, state: 1, pop: 1}}],
+    }),
 );
 assert.commandWorked(
     viewsDB.runCommand({
@@ -77,7 +86,11 @@ assert.commandWorked(
     assertAggResultEq("identityView", [{$match: {}}], allDocuments);
 
     // Filter documents on a view with $match.
-    assertAggResultEq("popSortedView", [{$match: {state: "NY"}}], [{_id: "New York", state: "NY", pop: 7}]);
+    assertAggResultEq(
+        "popSortedView",
+        [{$match: {state: "NY"}}],
+        [{_id: "New York", state: "NY", pop: 7}],
+    );
 
     // An aggregation still works on a view that strips _id.
     assertAggResultEq("noIdView", [{$match: {state: "NY"}}], [{state: "NY", pop: 7}]);
@@ -115,7 +128,9 @@ assert.commandWorked(
     // Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
     const validatedCollName = "collectionWithValidator";
     viewsDB[validatedCollName].drop();
-    assert.commandWorked(viewsDB.createCollection(validatedCollName, {validator: {illegalField: {$exists: false}}}));
+    assert.commandWorked(
+        viewsDB.createCollection(validatedCollName, {validator: {illegalField: {$exists: false}}}),
+    );
 
     viewsDB.invalidDocs.drop();
     viewsDB.invalidDocsView.drop();
@@ -158,7 +173,12 @@ assert.commandWorked(
     );
 
     const result1 = assert.commandWorked(
-        viewsDB.runCommand({aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
+        viewsDB.runCommand({
+            aggregate: "largeView",
+            pipeline: [{$sort: {x: -1}}],
+            cursor: {},
+            allowDiskUse: true,
+        }),
         "Expected aggregate to succeed since 'allowDiskUse' was specified",
     );
 
@@ -186,7 +206,9 @@ assert.commandWorked(
     assert(!explainPlan.hasOwnProperty("executionStats"), explainPlan);
 
     explainPlan = assert.commandWorked(
-        viewsDB.popSortedView.explain("executionStats").aggregate([{$limit: 1}, {$match: {pop: 3}}]),
+        viewsDB.popSortedView
+            .explain("executionStats")
+            .aggregate([{$limit: 1}, {$match: {pop: 3}}]),
     );
     explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
@@ -198,7 +220,9 @@ assert.commandWorked(
     assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"), explainPlan);
 
     explainPlan = assert.commandWorked(
-        viewsDB.popSortedView.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]),
+        viewsDB.popSortedView
+            .explain("allPlansExecution")
+            .aggregate([{$limit: 1}, {$match: {pop: 3}}]),
     );
     explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
@@ -243,7 +267,9 @@ assert.commandWorked(
 
     // The explain:true option should not work when paired with the explain shell helper.
     assert.throws(function () {
-        viewsDB.popSortedView.explain("executionStats").aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true});
+        viewsDB.popSortedView
+            .explain("executionStats")
+            .aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true});
     });
 })();
 
@@ -260,7 +286,14 @@ assert.commandWorked(
         coll.getName(),
         [
             {$match: {_id: "New York"}},
-            {$lookup: {from: "identityView", localField: "_id", foreignField: "_id", as: "matched"}},
+            {
+                $lookup: {
+                    from: "identityView",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "matched",
+                },
+            },
             {$unwind: "$matched"},
             {$project: {_id: 1, matchedId: "$matched._id"}},
         ],
@@ -295,7 +328,14 @@ assert.commandWorked(
             create: "viewWithLookupInside",
             viewOn: coll.getName(),
             pipeline: [
-                {$lookup: {from: "identityView", localField: "_id", foreignField: "_id", as: "matched"}},
+                {
+                    $lookup: {
+                        from: "identityView",
+                        localField: "_id",
+                        foreignField: "_id",
+                        as: "matched",
+                    },
+                },
                 {$unwind: "$matched"},
                 {$project: {_id: 1, matchedId: "$matched._id"}},
             ],
@@ -392,15 +432,26 @@ assert.commandWorked(
 
 (function testUnionReadFromView() {
     assert.eq(allDocuments.length, coll.aggregate([]).itcount());
-    assert.eq(2 * allDocuments.length, coll.aggregate([{$unionWith: "emptyPipelineView"}]).itcount());
+    assert.eq(
+        2 * allDocuments.length,
+        coll.aggregate([{$unionWith: "emptyPipelineView"}]).itcount(),
+    );
     assert.eq(2 * allDocuments.length, coll.aggregate([{$unionWith: "identityView"}]).itcount());
     assert.eq(
         2 * allDocuments.length,
-        coll.aggregate([{$unionWith: {coll: "noIdView", pipeline: [{$match: {_id: {$exists: false}}}]}}]).itcount(),
+        coll
+            .aggregate([
+                {$unionWith: {coll: "noIdView", pipeline: [{$match: {_id: {$exists: false}}}]}},
+            ])
+            .itcount(),
     );
     assert.eq(
         allDocuments.length + 1,
-        coll.aggregate([{$unionWith: {coll: "identityView", pipeline: [{$match: {_id: "New York"}}]}}]).itcount(),
+        coll
+            .aggregate([
+                {$unionWith: {coll: "identityView", pipeline: [{$match: {_id: "New York"}}]}},
+            ])
+            .itcount(),
     );
 })();
 
@@ -419,9 +470,18 @@ assert.commandWorked(
         }),
     );
     assert.eq(2 * allDocuments.length, viewsDB[viewName].find().itcount());
-    assert.eq(allDocuments.length, viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount());
     assert.eq(
-        [{_id: "New York"}, {_id: "Newark"}, {_id: "Palo Alto"}, {_id: "San Francisco"}, {_id: "Trenton"}],
+        allDocuments.length,
+        viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount(),
+    );
+    assert.eq(
+        [
+            {_id: "New York"},
+            {_id: "Newark"},
+            {_id: "Palo Alto"},
+            {_id: "San Francisco"},
+            {_id: "Trenton"},
+        ],
         viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}, {$sort: {_id: 1}}]).toArray(),
     );
     assert.eq(allDocuments.length, viewsDB[viewName].distinct("_id").length);
@@ -432,10 +492,20 @@ assert.commandWorked(
         viewsDB.runCommand({
             create: viewName,
             viewOn: coll.getName(),
-            pipeline: [{$unionWith: {coll: secondCollection.getName(), pipeline: [{$match: {state: "NY"}}]}}],
+            pipeline: [
+                {
+                    $unionWith: {
+                        coll: secondCollection.getName(),
+                        pipeline: [{$match: {state: "NY"}}],
+                    },
+                },
+            ],
         }),
     );
     assert.eq(allDocuments.length + 1, viewsDB[viewName].find().itcount());
-    assert.eq(allDocuments.length, viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount());
+    assert.eq(
+        allDocuments.length,
+        viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount(),
+    );
     assert.eq(allDocuments.length, viewsDB[viewName].distinct("_id").length);
 })();

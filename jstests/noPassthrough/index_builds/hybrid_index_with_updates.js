@@ -43,9 +43,13 @@ crudOpsForPhase(testDB.hybrid, 0);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Hang the build after the first document.
-const collScanFailPoint = configureFailPoint(testDB, "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", {
-    fieldsToMatch: {i: 1},
-});
+const collScanFailPoint = configureFailPoint(
+    testDB,
+    "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+    {
+        fieldsToMatch: {i: 1},
+    },
+);
 
 // Start the background build.
 let bgBuild = startParallelShell(function () {
@@ -98,7 +102,10 @@ yieldFailPoint.off();
 firstDrainFailPoint.wait();
 
 // Enable pause after voting commit.
-const hangAfterVoteCommit = configureFailPoint(testDB, "hangIndexBuildBeforeSignalPrimaryForCommitReadiness");
+const hangAfterVoteCommit = configureFailPoint(
+    testDB,
+    "hangIndexBuildBeforeSignalPrimaryForCommitReadiness",
+);
 
 // Add inserts that must be consumed in the second drain.
 crudOpsForPhase(testDB.hybrid, 3);

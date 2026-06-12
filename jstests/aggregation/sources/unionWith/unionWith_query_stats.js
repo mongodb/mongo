@@ -54,5 +54,8 @@ for (let idx = 0; idx < collData.length; idx++) {
         .sort((elem1, elem2) => elem1._id - elem2._id);
 
     assert.eq(output, expectedOutput);
-    assert.eq(expectedOutput.length, testDB.serverStatus().metrics.queryExecutor.scannedObjects - prevScannedObjects);
+    assert.eq(
+        expectedOutput.length,
+        testDB.serverStatus().metrics.queryExecutor.scannedObjects - prevScannedObjects,
+    );
 })();

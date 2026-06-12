@@ -7,12 +7,19 @@
  */
 let coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {"timeseries": {"timeField": "time", "metaField": "tag"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {"timeseries": {"timeField": "time", "metaField": "tag"}}),
+);
 
 // All of these documents will go in the same bucket.
 assert.commandWorked(
     coll.insertMany([
-        {_id: 0, time: new Date("2023-11-03T12:35:19.033Z"), "tag": {t: 1}, "str": "abcdefghijklmnop"},
+        {
+            _id: 0,
+            time: new Date("2023-11-03T12:35:19.033Z"),
+            "tag": {t: 1},
+            "str": "abcdefghijklmnop",
+        },
         {_id: 1, time: new Date("2023-11-03T12:35:19.033Z"), "tag": {t: 1}, "str": ""},
         {_id: 2, time: new Date("2023-11-03T12:35:19.033Z"), "tag": {t: 1}, "str": ""},
     ]),

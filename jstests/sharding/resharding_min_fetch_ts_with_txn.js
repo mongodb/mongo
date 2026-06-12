@@ -78,7 +78,10 @@ reshardingTest.withReshardingInBackground(
         assert.eq(
             1,
             timestampCmp(coordinatorDoc.cloneTimestamp, commitOperationTS),
-            "coordinatorDoc: " + tojson(coordinatorDoc) + ", commit opTs: " + tojson(commitOperationTS),
+            "coordinatorDoc: " +
+                tojson(coordinatorDoc) +
+                ", commit opTs: " +
+                tojson(commitOperationTS),
         );
     },
 );

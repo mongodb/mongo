@@ -47,7 +47,9 @@ const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 
         rst.waitForAllNewlyAddedRemovals();
         assert.soonNoExcept(() => isConfigCommitted(primary));
 
-        const replSetGetConfig = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+        const replSetGetConfig = assert.commandWorked(
+            primary.adminCommand({replSetGetConfig: 1}),
+        ).config;
         assert.eq(1, replSetGetConfig.members[1].votes);
         assert.eq(endPriority, replSetGetConfig.members[1].priority);
 
@@ -55,7 +57,10 @@ const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 
         originalConfig.members[memberIndex].votes = 0;
         originalConfig.members[memberIndex].priority = 0;
         const reconfigToOriginalConfig = `assert.commandWorked(rs.reconfig(${tojson(originalConfig)}))`;
-        assert.eq(0, runMongoProgram("mongo", "--port", primary.port, "--eval", reconfigToOriginalConfig));
+        assert.eq(
+            0,
+            runMongoProgram("mongo", "--port", primary.port, "--eval", reconfigToOriginalConfig),
+        );
         assert.soonNoExcept(() => isConfigCommitted(primary));
     } else {
         assert.neq(0, result, "expected reconfigToPSASet to fail, but it succeeded");

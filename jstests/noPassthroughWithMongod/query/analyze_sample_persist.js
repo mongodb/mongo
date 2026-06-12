@@ -45,7 +45,14 @@ const sourceDocFields = ["a", "b"];
 cleanup();
 insertDocs(20);
 {
-    assert.commandWorked(db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: "random"}));
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: 10,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -61,7 +68,14 @@ insertDocs(20);
 cleanup();
 insertDocs(20);
 {
-    assert.commandWorked(db.runCommand({analyze: collName, mode: "sample", sampleSize: 100, samplingMethod: "random"}));
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: 100,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -78,10 +92,20 @@ insertDocs(20);
 cleanup();
 insertDocs(20);
 {
-    const analyzeCmd = {analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: "random"};
+    const analyzeCmd = {
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 10,
+        samplingMethod: "random",
+    };
     assert.commandWorked(db.runCommand(analyzeCmd));
     const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-    const expectedId = PersistentSamplesUtils.getExpectedId(uuid, "random", 10, expectedSchemaVersion);
+    const expectedId = PersistentSamplesUtils.getExpectedId(
+        uuid,
+        "random",
+        10,
+        expectedSchemaVersion,
+    );
     const firstCreatedAt = PersistentSamplesUtils.getSampleDoc(samplesColl, expectedId)[
         PersistentSamplesUtils.sampleDocFieldNames.createdAtField
     ];
@@ -109,7 +133,14 @@ insertDocs(20);
 cleanup();
 assert.commandWorked(db.createCollection(collName));
 {
-    assert.commandWorked(db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: "random"}));
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: 10,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -136,7 +167,9 @@ assert.commandFailedWithCode(
 cleanup();
 insertDocs(500);
 {
-    assert.commandWorked(db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}));
+    assert.commandWorked(
+        db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
+    );
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -152,7 +185,9 @@ insertDocs(500);
 cleanup();
 insertDocs(50);
 {
-    assert.commandWorked(db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}));
+    assert.commandWorked(
+        db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
+    );
     PersistentSamplesUtils.verifySampleDoc(db, {
         sampledCollName: collName,
         mode: "sample",
@@ -263,7 +298,9 @@ cleanup();
     // Five documents at ~4 MB each accumulate to ~20 MB in the docs array, which exceeds
     // BSONObjMaxInternalSize (~16 MB) when building the persisted sample BSON document.
     const bigPayload = "x".repeat(4 * 1024 * 1024);
-    assert.commandWorked(coll.insertMany(Array.from({length: 5}, (_, i) => ({_id: i, payload: bigPayload}))));
+    assert.commandWorked(
+        coll.insertMany(Array.from({length: 5}, (_, i) => ({_id: i, payload: bigPayload}))),
+    );
 
     // sampleSize 5 == numRecords so all five documents are sampled deterministically.
     assert.commandFailedWithCode(

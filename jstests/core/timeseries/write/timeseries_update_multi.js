@@ -78,7 +78,11 @@ function testUpdate({
     const resDocs = coll.find().toArray();
     assert.eq(resDocs.length, resultDocList.length);
 
-    assert.sameMembers(resultDocList, resDocs, "Collection contents did not match expected after update");
+    assert.sameMembers(
+        resultDocList,
+        resDocs,
+        "Collection contents did not match expected after update",
+    );
 }
 
 const doc_id_1_a_b_no_metrics = {
@@ -188,7 +192,11 @@ const doc_id_12_time_int_metric = {
 (function testZeroMeasurementUpdate() {
     testUpdate({
         timeseriesOptions: {metaField: metaFieldName},
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric],
+        initialDocList: [
+            doc_id_1_a_b_no_metrics,
+            doc_id_2_a_b_array_metric,
+            doc_id_5_a_c_array_metric,
+        ],
         updateList: [
             {
                 q: {someField: "doesNotExist"},
@@ -196,7 +204,11 @@ const doc_id_12_time_int_metric = {
                 multi: true,
             },
         ],
-        resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric],
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+            doc_id_2_a_b_array_metric,
+            doc_id_5_a_c_array_metric,
+        ],
         nMatched: 0,
     });
 })();
@@ -225,7 +237,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     (function testMetaFieldQueryTimeFieldUpdate() {
         testUpdate({
             timeseriesOptions: {metaField: metaFieldName},
-            initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric],
+            initialDocList: [
+                doc_id_1_a_b_no_metrics,
+                doc_id_2_a_b_array_metric,
+                doc_id_5_a_c_array_metric,
+            ],
             updateList: [
                 {
                     q: {[metaFieldName]: {a: "A", b: "B"}},
@@ -394,7 +410,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testTimeFieldQueryRemoveMetaField() {
     testUpdate({
         timeseriesOptions: {metaField: metaFieldName},
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric],
+        initialDocList: [
+            doc_id_1_a_b_no_metrics,
+            doc_id_2_a_b_array_metric,
+            doc_id_5_a_c_array_metric,
+        ],
         updateList: [
             {
                 q: {[timeFieldName]: dateTime},
@@ -535,7 +555,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testAddNewField() {
     testUpdate({
         timeseriesOptions: {metaField: metaFieldName},
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_3_a_b_string_metric],
+        initialDocList: [
+            doc_id_1_a_b_no_metrics,
+            doc_id_2_a_b_array_metric,
+            doc_id_3_a_b_string_metric,
+        ],
         updateList: [
             {
                 q: {_id: {$lt: 3}},
@@ -567,7 +591,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testArrayModifier() {
     testUpdate({
         timeseriesOptions: {metaField: metaFieldName},
-        initialDocList: [doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric, doc_id_6_a_c_array_metric],
+        initialDocList: [
+            doc_id_2_a_b_array_metric,
+            doc_id_5_a_c_array_metric,
+            doc_id_6_a_c_array_metric,
+        ],
         updateList: [
             {
                 q: {f: {$gt: 2}},
@@ -671,7 +699,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testChangeArrayElementType() {
     testUpdate({
         timeseriesOptions: {metaField: metaFieldName},
-        initialDocList: [doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric, doc_id_6_a_c_array_metric],
+        initialDocList: [
+            doc_id_2_a_b_array_metric,
+            doc_id_5_a_c_array_metric,
+            doc_id_6_a_c_array_metric,
+        ],
         updateList: [
             {
                 q: {f: {$lte: 2}},
@@ -822,7 +854,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testSplitBucketWithUpdate() {
     testUpdate({
         timeseriesOptions: {metaField: metaFieldName},
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_3_a_b_string_metric],
+        initialDocList: [
+            doc_id_1_a_b_no_metrics,
+            doc_id_2_a_b_array_metric,
+            doc_id_3_a_b_string_metric,
+        ],
         updateList: [
             {
                 q: {},
@@ -864,7 +900,10 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
                 multi: true,
             },
         ],
-        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "A"}, doc_id_6_a_c_array_metric],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "A"},
+            doc_id_6_a_c_array_metric,
+        ],
         nMatched: 1,
     });
 })();
@@ -1104,7 +1143,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testPipelineMetaField_WithFilter() {
     testUpdate({
         timeseriesOptions: fixedBucketOptions,
-        initialDocList: [doc_id_9_time_string_metric, doc_id_11_time_no_metric, doc_id_12_time_int_metric],
+        initialDocList: [
+            doc_id_9_time_string_metric,
+            doc_id_11_time_no_metric,
+            doc_id_12_time_int_metric,
+        ],
         updateList: [
             {
                 q: {[timeFieldName]: {$gt: dateTime}},
@@ -1161,7 +1204,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
 (function testRemoveMetaField_Filter() {
     testUpdate({
         timeseriesOptions: fixedBucketOptions,
-        initialDocList: [doc_id_10_time_array_metric, doc_id_11_time_no_metric, doc_id_12_time_int_metric],
+        initialDocList: [
+            doc_id_10_time_array_metric,
+            doc_id_11_time_no_metric,
+            doc_id_12_time_int_metric,
+        ],
         updateList: [
             {
                 q: {[timeFieldName]: {$gte: times[2]}},

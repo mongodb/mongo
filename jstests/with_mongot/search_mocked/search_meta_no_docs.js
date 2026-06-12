@@ -48,7 +48,9 @@ const cursorId = NumberLong(17);
             },
         },
     ];
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+    );
 
     let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
     const expectedMeta = [{value: 42}];

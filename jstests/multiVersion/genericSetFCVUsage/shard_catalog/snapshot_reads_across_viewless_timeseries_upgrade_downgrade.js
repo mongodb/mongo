@@ -22,7 +22,9 @@ const db = rst.getPrimary().getDB(jsTestName());
 function findWithSnapshotAcrossTimeseriesUpgradeDowngrade(coll, initialFCV, fcvTransitions) {
     const expectedDocs = [{t: ISODate("2019-01-30T07:30:12.596Z"), temp: 123}];
 
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}),
+    );
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t"}}));
     assert.commandWorked(coll.insertMany(expectedDocs));
 
@@ -31,7 +33,10 @@ function findWithSnapshotAcrossTimeseriesUpgradeDowngrade(coll, initialFCV, fcvT
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));
     }
 
-    const r = coll.find({}, {_id: 0}).readConcern("snapshot", clusterTimeBeforeUpgradeDowngrade).toArray();
+    const r = coll
+        .find({}, {_id: 0})
+        .readConcern("snapshot", clusterTimeBeforeUpgradeDowngrade)
+        .toArray();
     assert.sameMembers(expectedDocs, r);
 }
 
@@ -42,9 +47,15 @@ findWithSnapshotAcrossTimeseriesUpgradeDowngrade(db.viewful_to_viewless, lastLTS
 findWithSnapshotAcrossTimeseriesUpgradeDowngrade(db.viewless_to_viewful, latestFCV, [lastLTSFCV]);
 
 // Reads across upgrade+downgrade succeed.
-findWithSnapshotAcrossTimeseriesUpgradeDowngrade(db.viewful_to_viewless_and_back, lastLTSFCV, [latestFCV, lastLTSFCV]);
+findWithSnapshotAcrossTimeseriesUpgradeDowngrade(db.viewful_to_viewless_and_back, lastLTSFCV, [
+    latestFCV,
+    lastLTSFCV,
+]);
 
 // Reads across downgrade+upgrade succeed.
-findWithSnapshotAcrossTimeseriesUpgradeDowngrade(db.viewless_to_viewful_and_back, latestFCV, [lastLTSFCV, latestFCV]);
+findWithSnapshotAcrossTimeseriesUpgradeDowngrade(db.viewless_to_viewful_and_back, latestFCV, [
+    lastLTSFCV,
+    latestFCV,
+]);
 
 rst.stopSet();

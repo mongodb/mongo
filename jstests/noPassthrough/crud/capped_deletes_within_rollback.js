@@ -18,7 +18,9 @@ const coll = function () {
     return testDB().getCollection(jsTestName());
 };
 
-assert.commandWorked(testDB().createCollection(coll().getName(), {capped: true, size: 100, max: 1}));
+assert.commandWorked(
+    testDB().createCollection(coll().getName(), {capped: true, size: 100, max: 1}),
+);
 assert.commandWorked(coll().insert({a: 1}));
 
 rollbackTest.transitionToRollbackOperations();

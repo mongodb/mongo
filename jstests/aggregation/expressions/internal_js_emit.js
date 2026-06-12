@@ -90,7 +90,10 @@ pipeline = [
         },
     },
 ];
-assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31225);
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+    31225,
+);
 
 pipeline = [
     {

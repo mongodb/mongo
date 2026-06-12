@@ -11,7 +11,11 @@
  *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator,
+} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db.getCollection("t");
 const nonTSColl = db.getCollection("c");
@@ -36,7 +40,14 @@ let res = db.adminCommand({
     ordered: true,
 });
 assert.commandWorked(res);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 3, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 3,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 res.cursor.firstBatch.forEach((entry, idx) => cursorEntryValidator(entry, {ok: 1, idx: idx, n: 1}));
 assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
 
@@ -52,7 +63,14 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}],
     ordered: true,
 });
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 0,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0});
 cursorSizeValidator(res, 1);
 assert.eq(coll.countDocuments({}), 3);
@@ -69,7 +87,14 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}],
     ordered: false,
 });
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
@@ -90,7 +115,14 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}, {ns: nonTSColl.getFullName()}],
     ordered: false,
 });
-summaryFieldsValidator(res, {nErrors: 2, nInserted: 4, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 2,
+    nInserted: 4,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0});
 cursorEntryValidator(res.cursor.firstBatch[4], {ok: 0, idx: 4, code: 11000, n: 0});
 assert.eq(coll.countDocuments({}), 8);
@@ -108,7 +140,14 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}, {ns: nonTSColl.getFullName()}],
     ordered: true,
 });
-summaryFieldsValidator(res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 1,
+    nInserted: 1,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 2, n: 0});
 cursorSizeValidator(res, 2);
 assert.eq(coll.countDocuments({}), 8);

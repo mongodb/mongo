@@ -138,7 +138,13 @@ assert.eq(out, [
     {_id: 4, a: [[{b: [1, 2, 3]}], {b: [2]}, 1, null, {}]},
 ]);
 
-function testSingleDocument(projection, input, expectedOutput, deleteId = true, assertFn = assert.eq) {
+function testSingleDocument(
+    projection,
+    input,
+    expectedOutput,
+    deleteId = true,
+    assertFn = assert.eq,
+) {
     assert(t.drop());
     assert.commandWorked(t.insert(input));
     const actualOutput = t.findOne({}, projection);
@@ -352,7 +358,13 @@ testSingleDocument({a: {$slice: 1}}, {a: {c: 123}}, {a: {c: 123}});
 
 // we use docEq() for this assertion in particular because of field ordering differences between the
 // classic engine and SBE.
-testSingleDocument({a: {$slice: 1}, d: 1}, {a: {c: 123}, d: 456}, {a: {c: 123}, d: 456}, true, assert.docEq);
+testSingleDocument(
+    {a: {$slice: 1}, d: 1},
+    {a: {c: 123}, d: 456},
+    {a: {c: 123}, d: 456},
+    true,
+    assert.docEq,
+);
 
 testSingleDocument({a: {$slice: 1}, d: 0}, {a: {c: 123}, d: 456}, {a: {c: 123}});
 
@@ -364,7 +376,11 @@ testSingleDocument({a: {$slice: 1}, d: 1}, {b: {e: 123}, d: 456}, {d: 456});
 testSingleDocument({a: {$slice: 1}, d: 0}, {b: {e: 123}, d: 456}, {b: {e: 123}});
 
 // Case when path for $slice traverses through deep arrays.
-testSingleDocument({"a.b.c": {$slice: 1}}, {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]}, {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]});
+testSingleDocument(
+    {"a.b.c": {$slice: 1}},
+    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]},
+    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]},
+);
 
 // We use docEq() for this assertion in particular because of field ordering differences between the
 // classic engine and SBE.
@@ -391,6 +407,16 @@ testSingleDocument(
 );
 
 // Test $slice with an inclusion/exclusion projection for _id field.
-testSingleDocument({_id: 1, a: {$slice: [1, 1]}}, {_id: 123, a: [1, 2, 3]}, {_id: 123, a: [2]}, false /* deleteId */);
+testSingleDocument(
+    {_id: 1, a: {$slice: [1, 1]}},
+    {_id: 123, a: [1, 2, 3]},
+    {_id: 123, a: [2]},
+    false /* deleteId */,
+);
 
-testSingleDocument({_id: 0, a: {$slice: [1, 1]}}, {_id: 123, a: [1, 2, 3]}, {a: [2]}, false /* deleteId */);
+testSingleDocument(
+    {_id: 0, a: {$slice: [1, 1]}},
+    {_id: 123, a: [1, 2, 3]},
+    {a: [2]},
+    false /* deleteId */,
+);

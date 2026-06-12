@@ -49,7 +49,11 @@ try {
 
     assert.soon(
         () => {
-            const ops = db.currentOp({"command.insert": "mycoll", "command.txnNumber": {$eq: 1}, waitingForLock: true});
+            const ops = db.currentOp({
+                "command.insert": "mycoll",
+                "command.txnNumber": {$eq: 1},
+                waitingForLock: true,
+            });
             return ops.inprog.length === 1;
         },
         () => {

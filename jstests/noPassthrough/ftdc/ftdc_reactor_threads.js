@@ -98,14 +98,16 @@ function parseHistogramKey(key, unit, hist) {
         assert.eq(
             lower,
             "(-inf",
-            () => `unexpected open lower bound ${lower} in histogram key ${key} in histogram: ${tojson(hist)}`,
+            () =>
+                `unexpected open lower bound ${lower} in histogram key ${key} in histogram: ${tojson(hist)}`,
         );
         lowerBound = -Infinity;
     } else {
         assert.eq(
             lower[0],
             "[",
-            () => `unexpected interval syntax ${lower} in histogram key ${key} in histogram: ${tojson(hist)}`,
+            () =>
+                `unexpected interval syntax ${lower} in histogram key ${key} in histogram: ${tojson(hist)}`,
         );
         const [lowerString, unitString] = lower.slice(1).split(" ");
         assert(
@@ -126,7 +128,8 @@ function parseHistogramKey(key, unit, hist) {
     assert.eq(
         upper[upper.length - 1],
         ")",
-        () => `unexpected interval syntax ${upper} in histogram key ${key} in histogram: ${tojson(hist)}`,
+        () =>
+            `unexpected interval syntax ${upper} in histogram key ${key} in histogram: ${tojson(hist)}`,
     );
     if (upper === "inf)") {
         upperBound = Infinity;

@@ -29,9 +29,14 @@ replSet.nodes.forEach(function (node) {
 
 function enableFailPoint(node) {
     jsTest.log("enable failpoint " + node.host);
-    assert.commandWorked(node.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}),
+    );
     // Wait for Oplog Applier to hang on the failpoint.
-    checkLog.contains(node, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+    checkLog.contains(
+        node,
+        "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled",
+    );
 }
 
 function disableFailPoint(node) {
@@ -42,7 +47,11 @@ function disableFailPoint(node) {
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Do an initial insert to prevent the secondary from going into recovery
@@ -55,7 +64,10 @@ replSet.awaitReplication();
 let secondaries = replSet.getSecondaries();
 secondaries.forEach(enableFailPoint);
 
-const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
+const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(
+    secondary,
+    "ReduceMajorityWriteLatency",
+);
 let bufferCountBefore = reduceMajorityWriteLatency
     ? secondary.getDB("foo").serverStatus().metrics.repl.buffer.write.count
     : secondary.getDB("foo").serverStatus().metrics.repl.buffer.count;
@@ -72,7 +84,10 @@ assert.soon(
             ? serverStatus.metrics.repl.buffer.write.count
             : serverStatus.metrics.repl.buffer.count;
         let bufferCountChange = bufferCount - bufferCountBefore;
-        jsTestLog("Number of operations buffered on secondary since stopping applier: " + bufferCountChange);
+        jsTestLog(
+            "Number of operations buffered on secondary since stopping applier: " +
+                bufferCountChange,
+        );
         return bufferCountChange == numDocuments - 1;
     },
     "secondary did not buffer operations for new inserts on primary",
@@ -94,7 +109,9 @@ assert.eq(ReplSetTest.State.SECONDARY, secondary.adminCommand({replSetGetStatus:
 assert(!secondary.adminCommand("hello").isWritablePrimary);
 
 // Prevent the producer from fetching new ops
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "stopReplProducer", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "stopReplProducer", mode: "alwaysOn"}),
+);
 
 // Allow the secondary to apply the ops already in its buffer.
 jsTestLog("Re-enabling replication on secondaries");

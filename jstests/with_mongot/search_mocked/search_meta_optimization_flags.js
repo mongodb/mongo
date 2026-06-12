@@ -48,7 +48,11 @@ const searchMetaCursorId = NumberLong(17);
         },
     ];
     assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: searchMetaCursorId, history: history}),
+        mongotConn.adminCommand({
+            setMockResponses: 1,
+            cursorId: searchMetaCursorId,
+            history: history,
+        }),
     );
 
     let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
@@ -76,7 +80,9 @@ const searchCursorId = NumberLong(18);
             },
         },
     ];
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: searchCursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: searchCursorId, history: history}),
+    );
 
     coll.aggregate([{$search: searchQuery}], {cursor: {}});
 }

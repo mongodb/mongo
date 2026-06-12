@@ -58,11 +58,16 @@ const stageName = "block_group";
 
 // 'forceIncreasedSpilling' should not be enabled for the following tests.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
+    db.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
+    }),
 );
 
 // We need the query to run in SBE to use block processing for timeseries.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+);
 
 {
     runMemoryStatsTest({
@@ -107,7 +112,10 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
     // This parameter is generally true for debug builds, but we would like to turn it off
     // for this test.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
+        }),
     );
 
     runMemoryStatsTest({

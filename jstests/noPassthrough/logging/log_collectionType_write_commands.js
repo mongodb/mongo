@@ -30,22 +30,38 @@ describe("collectionType in write command slow query logs", function () {
     it("update logs collectionType", function () {
         const comment = jsTestName() + "_update";
         assert.commandWorked(
-            this.db.runCommand({update: collName, updates: [{q: {a: 1}, u: {$set: {b: 2}}}], comment}),
+            this.db.runCommand({
+                update: collName,
+                updates: [{q: {a: 1}, u: {$set: {b: 2}}}],
+                comment,
+            }),
         );
         checkCollectionType({db: this.db, comment, command: "update", expectedCollType: "normal"});
     });
 
     it("delete logs collectionType", function () {
         const comment = jsTestName() + "_delete";
-        assert.commandWorked(this.db.runCommand({delete: collName, deletes: [{q: {a: 2}, limit: 1}], comment}));
+        assert.commandWorked(
+            this.db.runCommand({delete: collName, deletes: [{q: {a: 2}, limit: 1}], comment}),
+        );
         checkCollectionType({db: this.db, comment, command: "delete", expectedCollType: "normal"});
     });
 
     it("findAndModify logs collectionType", function () {
         const comment = jsTestName() + "_findAndModify";
         assert.commandWorked(
-            this.db.runCommand({findandmodify: collName, query: {a: 3}, update: {$set: {b: 4}}, comment}),
+            this.db.runCommand({
+                findandmodify: collName,
+                query: {a: 3},
+                update: {$set: {b: 4}},
+                comment,
+            }),
         );
-        checkCollectionType({db: this.db, comment, command: "findAndModify", expectedCollType: "normal"});
+        checkCollectionType({
+            db: this.db,
+            comment,
+            command: "findAndModify",
+            expectedCollType: "normal",
+        });
     });
 });

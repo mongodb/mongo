@@ -109,7 +109,10 @@ runQueryTest(
                     genres: 1,
                     plot_embedding: 1,
                     vs_score: {
-                        $multiply: [1, {$divide: [1, {$sum: [1, {$exp: {$multiply: [-1, "$vs_score"]}}]}]}],
+                        $multiply: [
+                            1,
+                            {$divide: [1, {$sum: [1, {$exp: {$multiply: [-1, "$vs_score"]}}]}]},
+                        ],
                     },
                 },
             },
@@ -128,7 +131,15 @@ runQueryTest(
                                     $multiply: [
                                         1,
                                         {
-                                            $divide: [1, {$sum: [1, {$exp: {$multiply: [-1, "$fts_score"]}}]}],
+                                            $divide: [
+                                                1,
+                                                {
+                                                    $sum: [
+                                                        1,
+                                                        {$exp: {$multiply: [-1, "$fts_score"]}},
+                                                    ],
+                                                },
+                                            ],
                                         },
                                     ],
                                 },
@@ -139,7 +150,10 @@ runQueryTest(
             },
         ])
         .concat(mixVsFtsResultsPipeline),
-    buildExpectedResults(/*expectedResultIds*/ [6, 1, 2, 3, 4, 5, 8, 9, 10, 12, 13, 14, 11, 7, 15], datasets.MOVIES),
+    buildExpectedResults(
+        /*expectedResultIds*/ [6, 1, 2, 3, 4, 5, 8, 9, 10, 12, 13, 14, 11, 7, 15],
+        datasets.MOVIES,
+    ),
 );
 
 // Test 2: MinMaxScaler score normalization
@@ -147,7 +161,9 @@ runQueryTest(
     vectorSearchPipeline
         .concat([
             {
-                $setWindowFields: {output: {min_vs_score: {$min: "$vs_score"}, max_vs_score: {$max: "$vs_score"}}},
+                $setWindowFields: {
+                    output: {min_vs_score: {$min: "$vs_score"}, max_vs_score: {$max: "$vs_score"}},
+                },
             },
             {
                 $project: {
@@ -196,7 +212,10 @@ runQueryTest(
             },
         ])
         .concat(mixVsFtsResultsPipeline),
-    buildExpectedResults(/*expectedResultIds*/ [6, 1, 4, 2, 8, 9, 10, 3, 12, 13, 5, 14, 11, 7, 15], datasets.MOVIES),
+    buildExpectedResults(
+        /*expectedResultIds*/ [6, 1, 4, 2, 8, 9, 10, 3, 12, 13, 5, 14, 11, 7, 15],
+        datasets.MOVIES,
+    ),
 );
 
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});

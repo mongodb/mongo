@@ -13,7 +13,9 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s.getDB(jsTestName());
 assert.commandWorked(
-    st.s.getDB("admin").runCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.name}),
+    st.s
+        .getDB("admin")
+        .runCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.name}),
 );
 
 const sourceColl = mongosDB["source"];
@@ -53,10 +55,18 @@ function removeShardAndRefreshRouter(shard) {
 
 function addShard(shard) {
     assert.commandWorked(st.s.adminCommand({addShard: shard}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: sourceColl.getFullName(), find: {shardKey: 0}, to: shard}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: sourceColl.getFullName(), find: {shardKey: 0}, to: shard}),
+    );
 }
 
-function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl, dropShard, expectFailCode) {
+function runMergeWithMode(
+    whenMatchedMode,
+    whenNotMatchedMode,
+    shardedColl,
+    dropShard,
+    expectFailCode,
+) {
     // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
     setAggHang("alwaysOn");
 

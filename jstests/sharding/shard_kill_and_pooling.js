@@ -53,7 +53,12 @@ for (let test = 0; test < 2; test++) {
     let exitCode = killWith === 9 ? MongoRunner.EXIT_SIGKILL : MongoRunner.EXIT_CLEAN;
 
     for (let node of st.rs0.nodes) {
-        st.rs0.stop(st.rs0.getNodeId(node), killWith, {allowedExitCode: exitCode}, {forRestart: true});
+        st.rs0.stop(
+            st.rs0.getNodeId(node),
+            killWith,
+            {allowedExitCode: exitCode},
+            {forRestart: true},
+        );
     }
     jsTest.log("Restart shard...");
     st.rs0.startSet({forceLock: true}, true);

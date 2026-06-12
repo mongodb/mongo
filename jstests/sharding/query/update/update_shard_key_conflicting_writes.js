@@ -23,7 +23,9 @@ let ns = kDbName + ".foo";
 let db = mongos.getDB(kDbName);
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 
 // Shards the collection "db.foo" on shard key {"x" : 1} such that negative "x" values are on
 // shard0 and positive on shard1
@@ -67,7 +69,12 @@ function opStarted(cmdName) {
 
 // Send update that will change the shard key causing the document to move shards. Wait to hit
 // failpoint specified.
-function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpointMode, shard, codeToRunInParallelShell) {
+function setFailPointAndSendUpdateToShardKeyInParallelShell(
+    failpoint,
+    failpointMode,
+    shard,
+    codeToRunInParallelShell,
+) {
     assert.commandWorked(shard.adminCommand({configureFailPoint: failpoint, mode: failpointMode}));
     let awaitShell = startParallelShell(codeToRunInParallelShell, st.s.port);
     waitForFailpoint("Hit " + failpoint, 1);
@@ -87,7 +94,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpoint
     const updatedShardKeyValue = -10;
 
     session.startTransaction();
-    assert.commandWorked(sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}));
+    assert.commandWorked(
+        sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}),
+    );
     // Attempt to update the same doc not in a transaction, this update should timeout.
     assert.commandFailedWithCode(
         db.runCommand({
@@ -102,7 +111,13 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpoint
         const mongosConn = new Mongo(host);
         return mongosConn.getDB(kDbName).foo.update(query, update);
     }
-    let thread = new Thread(conflictingUpdate, st.s.host, kDbName, {"x": originalShardKeyValue}, {$inc: {"a": 1}});
+    let thread = new Thread(
+        conflictingUpdate,
+        st.s.host,
+        kDbName,
+        {"x": originalShardKeyValue},
+        {$inc: {"a": 1}},
+    );
     thread.start();
     // We check both update and bulkWrite since this test is run in bulk_write_targeted_override
     // which rewrites the updates as bulkWrites.
@@ -134,7 +149,10 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpoint
         sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}),
         ErrorCodes.WriteConflict,
     );
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.commitTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
     assert.eq(1, sessionDB.foo.find({"x": originalShardKeyValue, "a": 7}).itcount());
     assert.eq(0, sessionDB.foo.find({"x": updatedShardKeyValue}).itcount());
 
@@ -148,7 +166,10 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpoint
         sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}),
         ErrorCodes.WriteConflict,
     );
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.commitTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
     assert.eq(0, sessionDB.foo.find({"x": originalShardKeyValue}).itcount());
     assert.eq(0, sessionDB.foo.find({"x": updatedShardKeyValue}).itcount());
 })();
@@ -367,8 +388,14 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpoint
     session2.startTransaction();
     // The first update will complete and the second should get a write conflict
     assert.commandWorked(sessionDB2.foo.update({"x": -500}, {$set: {"x": 25}}));
-    assert.commandFailedWithCode(sessionDB.foo.update({"x": -500}, {$set: {"x": 250}}), ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        sessionDB.foo.update({"x": -500}, {$set: {"x": 250}}),
+        ErrorCodes.WriteConflict,
+    );
+    assert.commandFailedWithCode(
+        session.commitTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
     assert.commandWorked(session2.commitTransaction_forTesting());
     assert.eq(1, sessionDB2.foo.find({"x": 25}).itcount());
     assert.eq(0, sessionDB2.foo.find({"x": 250}).itcount());

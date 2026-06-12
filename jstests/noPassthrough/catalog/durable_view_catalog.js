@@ -42,15 +42,23 @@ let expectedViews = [
     {"_id": "test.view3", "viewOn": "view2", "pipeline": pipe},
 ];
 assert.eq(actualViews, expectedViews, "view definitions not correctly persisted");
-let listedViews = viewsDB.runCommand({listCollections: 1, filter: {type: "view"}}).cursor.firstBatch.map(function (x) {
-    return {_id: "test." + x.name, viewOn: x.options.viewOn, pipeline: x.options.pipeline};
-});
+let listedViews = viewsDB
+    .runCommand({listCollections: 1, filter: {type: "view"}})
+    .cursor.firstBatch.map(function (x) {
+        return {_id: "test." + x.name, viewOn: x.options.viewOn, pipeline: x.options.pipeline};
+    });
 assert.sameMembers(listedViews, expectedViews, "persisted view definitions not correctly loaded");
 
 // Insert an invalid view definition directly into system.views to bypass normal validation.
 assert.commandWorked(
     viewsDB.adminCommand({
-        applyOps: [{op: "i", ns: viewsDB.getName() + ".system.views", o: {_id: "badView", pipeline: "badType"}}],
+        applyOps: [
+            {
+                op: "i",
+                ns: viewsDB.getName() + ".system.views",
+                o: {_id: "badView", pipeline: "badType"},
+            },
+        ],
     }),
 );
 
@@ -60,7 +68,11 @@ TestData.skipValidationOnInvalidViewDefinitions = true;
 // Restarting the mongod should succeed despite the presence of invalid view definitions.
 MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod(mongodArgs);
-assert.neq(null, conn, "after inserting bad views, failed to restart mongod with options: " + tojson(mongodArgs));
+assert.neq(
+    null,
+    conn,
+    "after inserting bad views, failed to restart mongod with options: " + tojson(mongodArgs),
+);
 
 // Now that we have an invalid view definition, operations on that specific invalid view should
 // fail, but operations on valid views should still work. DDL catalog operations should still fail.
@@ -72,17 +84,25 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidViewDefinition,
 );
 // Modifying an existing view (valid or invalid) is not allowed. This is to prevent chaining against invalid views.
-assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}), ErrorCodes.InvalidViewDefinition);
+assert.commandFailedWithCode(
+    viewsDB.runCommand({collMod: "view2", viewOn: "view4"}),
+    ErrorCodes.InvalidViewDefinition,
+);
 
 // Checks that dropping a nonexistent view or collection is not affected by an invalid view existing
 // in the view catalog.
 assert.commandWorked(viewsDB.runCommand({drop: "view4"}));
-assert.commandFailedWithCode(viewsDB.runCommand({listCollections: 1}), ErrorCodes.InvalidViewDefinition);
+assert.commandFailedWithCode(
+    viewsDB.runCommand({listCollections: 1}),
+    ErrorCodes.InvalidViewDefinition,
+);
 
 // Manually remove the invalid view definition from system.views, and then verify that view
 // operations work successfully without requiring a server restart.
 assert.commandWorked(
-    viewsDB.adminCommand({applyOps: [{op: "d", ns: viewsDB.getName() + ".system.views", o: {_id: "badView"}}]}),
+    viewsDB.adminCommand({
+        applyOps: [{op: "d", ns: viewsDB.getName() + ".system.views", o: {_id: "badView"}}],
+    }),
 );
 assert.commandWorked(viewsDB.runCommand({find: "view2"}));
 assert.commandWorked(viewsDB.runCommand({create: "view4", viewOn: "collection"}));

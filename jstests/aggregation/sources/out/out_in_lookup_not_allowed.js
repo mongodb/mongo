@@ -62,5 +62,7 @@ pipeline = [
 
 // Pipeline will fail because $out is not allowed to exist within a $lookup.
 // Validation for $out in a view occurs at a later point.
-const cmdRes = coll.getDB().runCommand({create: "view1", viewOn: coll.getName(), pipeline: pipeline});
+const cmdRes = coll
+    .getDB()
+    .runCommand({create: "view1", viewOn: coll.getName(), pipeline: pipeline});
 assert.commandFailedWithCode(cmdRes, ERROR_CODE_OUT_BANNED_IN_LOOKUP);

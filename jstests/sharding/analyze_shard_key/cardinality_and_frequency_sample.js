@@ -76,7 +76,9 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
     const dbName = "testDb";
     const collName = "testColl";
     if (st) {
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+        );
     }
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
@@ -97,7 +99,9 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
     if (isShardedColl) {
         assert(st);
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.shard1.shardName}),
+        );
     }
 
     // Insert documents for this collection.
@@ -177,7 +181,11 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
         }
 
         const shardKey = {a: isHashed ? "hashed" : 1};
-        const monotonicityType = isClusteredColl ? "unknown" : isHashed ? "not monotonic" : "monotonic";
+        const monotonicityType = isClusteredColl
+            ? "unknown"
+            : isHashed
+              ? "not monotonic"
+              : "monotonic";
 
         const comment = UUID();
 
@@ -198,7 +206,8 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
 
         // sampleSize < numTotalDocs (default).
         jsTest.log(
-            "Testing default 'sampleSize': " + tojsononeline({defaultSampleSize, isHashed, isUnique, isShardedColl}),
+            "Testing default 'sampleSize': " +
+                tojsononeline({defaultSampleSize, isHashed, isUnique, isShardedColl}),
         );
 
         const res = assert.commandWorked(
@@ -232,7 +241,8 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
 
         for (let {sampleSize, expectedErrCodes} of sampleSizeTestCases) {
             jsTest.log(
-                "Testing custom 'sampleSize': " + tojsononeline({sampleSize, isHashed, isUnique, isShardedColl}),
+                "Testing custom 'sampleSize': " +
+                    tojsononeline({sampleSize, isHashed, isUnique, isShardedColl}),
             );
             const comment = UUID();
             const res = conn.adminCommand({
@@ -273,10 +283,13 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
             );
         }
 
-        const sampleRateTestCases = isUnique ? sampleSizeTestCasesUnique : sampleSizeTestCasesNotUnique;
+        const sampleRateTestCases = isUnique
+            ? sampleSizeTestCasesUnique
+            : sampleSizeTestCasesNotUnique;
         for (let {sampleRate, expectedErrCodes} of sampleRateTestCases) {
             jsTest.log(
-                "Testing custom 'sampleRate': " + tojsononeline({sampleRate, isHashed, isUnique, isShardedColl}),
+                "Testing custom 'sampleRate': " +
+                    tojsononeline({sampleRate, isHashed, isUnique, isShardedColl}),
             );
             const comment = UUID();
             const res = conn.adminCommand({
@@ -330,7 +343,10 @@ const setParameterOpts = {
 };
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
+    });
 
     for (let isShardedColl of [false, true]) {
         runTest(st.s, {isUnique: true, isShardedColl, st});
@@ -341,7 +357,10 @@ const setParameterOpts = {
 }
 
 {
-    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({
+        nodes: numNodesPerRS,
+        nodeOptions: {setParameter: setParameterOpts},
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

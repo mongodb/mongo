@@ -20,7 +20,11 @@ function assertBuiltinRoles(dbname, shouldHaveRoles) {
         function assertRole(role, expect = true) {
             const filtered = builtinRoles.filter((r) => r.role === role);
             if (expect) {
-                assert.gt(filtered.length, 0, dbname + " should have role " + role + " but does not");
+                assert.gt(
+                    filtered.length,
+                    0,
+                    dbname + " should have role " + role + " but does not",
+                );
             } else {
                 assert.eq(
                     filtered.length,
@@ -35,7 +39,11 @@ function assertBuiltinRoles(dbname, shouldHaveRoles) {
         assertRole("readWriteAnyDatabase", dbname === "admin");
         assertRole("hostManager", dbname === "admin");
     } else {
-        assert.eq(builtinRoles.length, 0, dbname + " should not have builtin roles, found: " + tojson(builtinRoles));
+        assert.eq(
+            builtinRoles.length,
+            0,
+            dbname + " should not have builtin roles, found: " + tojson(builtinRoles),
+        );
     }
 }
 

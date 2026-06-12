@@ -7,7 +7,10 @@
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForVectorSearchQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mongotCommandForVectorSearchQuery,
+    MongotMock,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {prepCollection, prepMongotResponse} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
@@ -27,7 +30,12 @@ function testSimpleVectorSearchQuery(mongodConn, mongotConn) {
     let coll = db.getCollection(collName);
     const collectionUUID = getUUIDFromListCollections(db, collName);
 
-    const vectorSearchCmd = mongotCommandForVectorSearchQuery({collName, collectionUUID, ...vectorSearchQuery, dbName});
+    const vectorSearchCmd = mongotCommandForVectorSearchQuery({
+        collName,
+        collectionUUID,
+        ...vectorSearchQuery,
+        dbName,
+    });
 
     const expected = prepMongotResponse(vectorSearchCmd, coll, mongotConn);
 
@@ -66,12 +74,17 @@ let testCollMongos = testDBMongos.getCollection(collName);
 // Create and shard the collection so the commands can succeed.
 assert.commandWorked(testDBMongos.createCollection(collName));
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-assert.commandWorked(mongos.adminCommand({shardCollection: testCollMongos.getFullName(), key: {a: 1}}));
+assert.commandWorked(
+    mongos.adminCommand({shardCollection: testCollMongos.getFullName(), key: {a: 1}}),
+);
 
 // Seed the server with documents.
 prepCollection(mongos, dbName, collName);
 
 // Test that a vector search query succeeds when auth is configured enabled.
-testSimpleVectorSearchQuery(mongos, stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection());
+testSimpleVectorSearchQuery(
+    mongos,
+    stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection(),
+);
 
 stWithMock.stop();

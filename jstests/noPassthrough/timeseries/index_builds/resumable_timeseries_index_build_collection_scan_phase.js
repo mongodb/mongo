@@ -25,7 +25,9 @@ coll.drop();
 const timeFieldName = "time";
 const metaFieldName = "m";
 assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 // The {meta: 1, time: 1} index gets built by default on the time-series collection. This

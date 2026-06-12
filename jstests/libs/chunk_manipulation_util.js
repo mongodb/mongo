@@ -34,7 +34,15 @@ export function moveChunkParallel(
         "Specify either findCriteria or bounds, but not both.",
     );
 
-    function runMoveChunk(mongosURL, findCriteria, bounds, ns, toShardId, expectSuccess, forceJumbo) {
+    function runMoveChunk(
+        mongosURL,
+        findCriteria,
+        bounds,
+        ns,
+        toShardId,
+        expectSuccess,
+        forceJumbo,
+    ) {
         assert(mongosURL && ns && toShardId, "Missing arguments.");
         assert(
             (findCriteria || bounds) && !(findCriteria && bounds),
@@ -145,7 +153,10 @@ export function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
         true,
     );
     assert.commandWorked(
-        shardConnection.adminCommand({configureFailPoint: "moveChunkHangAtStep" + stepNumber, mode: mode}),
+        shardConnection.adminCommand({
+            configureFailPoint: "moveChunkHangAtStep" + stepNumber,
+            mode: mode,
+        }),
     );
 }
 
@@ -185,7 +196,10 @@ export function waitForMoveChunkStep(shardConnection, stepNumber) {
             // with a `ShardingCoordinator-<N>` desc on the coordinator path (MoveRangeCoordinator
             // runs on a ShardingCoordinatorService pool thread).
             // TODO SERVER-127253 Remove op.desc === "MoveChunk" once the legacy path is removed.
-            if (op.desc && (op.desc === "MoveChunk" || op.desc.startsWith("ShardingCoordinator-"))) {
+            if (
+                op.desc &&
+                (op.desc === "MoveChunk" || op.desc.startsWith("ShardingCoordinator-"))
+            ) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
                 if (op.msg && op.msg.startsWith(searchString)) {
@@ -246,7 +260,9 @@ export function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
     );
 
     let admin = shardConnection.getDB("admin");
-    assert.commandWorked(admin.runCommand({configureFailPoint: "migrateThreadHangAtStep" + stepNumber, mode: mode}));
+    assert.commandWorked(
+        admin.runCommand({configureFailPoint: "migrateThreadHangAtStep" + stepNumber, mode: mode}),
+    );
 }
 
 //
@@ -304,7 +320,14 @@ export function runCommandDuringTransferMods(
 ) {
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
-    let joinMoveChunk = moveChunkParallel(staticMongod, mongos.host, findCriteria, bounds, ns, toShard.shardName);
+    let joinMoveChunk = moveChunkParallel(
+        staticMongod,
+        mongos.host,
+        findCriteria,
+        bounds,
+        ns,
+        toShard.shardName,
+    );
     waitForMoveChunkStep(fromShard, moveChunkStepNames.startedMoveChunk);
 
     // Run the commands.

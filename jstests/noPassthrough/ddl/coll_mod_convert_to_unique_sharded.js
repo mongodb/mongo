@@ -27,19 +27,31 @@ const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
 const db = mongos.getDB(jsTestName());
-assert.commandWorked(mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.name}),
+);
 
 const shardedColl = db.sharded;
 
-assert.commandWorked(mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: {a: 1}}));
+assert.commandWorked(
+    mongos.adminCommand({shardCollection: shardedColl.getFullName(), key: {a: 1}}),
+);
 
 // Move {a: 1} to shard0 and {a: 2} to shard1.
 assert.commandWorked(st.splitAt(shardedColl.getFullName(), {a: 2}));
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: shardedColl.getFullName(), find: {a: 1}, to: st.shard0.shardName}),
+    mongos.adminCommand({
+        moveChunk: shardedColl.getFullName(),
+        find: {a: 1},
+        to: st.shard0.shardName,
+    }),
 );
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: shardedColl.getFullName(), find: {a: 2}, to: st.shard1.shardName}),
+    mongos.adminCommand({
+        moveChunk: shardedColl.getFullName(),
+        find: {a: 2},
+        to: st.shard1.shardName,
+    }),
 );
 
 assert.commandWorked(shardedColl.createIndex({a: 1}));
@@ -49,7 +61,12 @@ assert.commandWorked(shardedColl.insert({_id: 1, a: 2}));
 assert.commandWorked(shardedColl.insert({_id: 2, a: 2}));
 
 // Setting the indexes to 'prepareUnique' ensures no new duplicates will be inserted.
-assert.commandWorked(db.runCommand({collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    db.runCommand({
+        collMod: shardedColl.getName(),
+        index: {keyPattern: {a: 1}, prepareUnique: true},
+    }),
+);
 assert.commandFailedWithCode(shardedColl.insert({_id: 3, a: 1}), ErrorCodes.DuplicateKey);
 assert.commandFailedWithCode(shardedColl.insert({_id: 4, a: 2}), ErrorCodes.DuplicateKey);
 
@@ -61,8 +78,16 @@ assert.commandFailedWithCode(
 
 const s0Coll = st.shard0.getDB(jsTestName()).getCollection("sharded");
 const s1Coll = st.shard1.getDB(jsTestName()).getCollection("sharded");
-assert.eq(countUniqueIndexes(s0Coll, {a: 1}), 0, "index should not be unique: " + tojson(s0Coll.getIndexes()));
-assert.eq(countUniqueIndexes(s1Coll, {a: 1}), 0, "index should not be unique: " + tojson(s1Coll.getIndexes()));
+assert.eq(
+    countUniqueIndexes(s0Coll, {a: 1}),
+    0,
+    "index should not be unique: " + tojson(s0Coll.getIndexes()),
+);
+assert.eq(
+    countUniqueIndexes(s1Coll, {a: 1}),
+    0,
+    "index should not be unique: " + tojson(s1Coll.getIndexes()),
+);
 assert.eq(
     countPrepareUniqueIndexes(s0Coll, {a: 1}),
     1,
@@ -76,8 +101,18 @@ assert.eq(
 
 // Remove the duplicate and confirm the indexes are converted.
 assert.commandWorked(shardedColl.deleteOne({_id: 2}));
-assert.commandWorked(db.runCommand({collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, unique: true}}));
-assert.eq(countUniqueIndexes(s0Coll, {a: 1}), 1, "index should be unique: " + tojson(s0Coll.getIndexes()));
-assert.eq(countUniqueIndexes(s1Coll, {a: 1}), 1, "index should be unique: " + tojson(s1Coll.getIndexes()));
+assert.commandWorked(
+    db.runCommand({collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, unique: true}}),
+);
+assert.eq(
+    countUniqueIndexes(s0Coll, {a: 1}),
+    1,
+    "index should be unique: " + tojson(s0Coll.getIndexes()),
+);
+assert.eq(
+    countUniqueIndexes(s1Coll, {a: 1}),
+    1,
+    "index should be unique: " + tojson(s1Coll.getIndexes()),
+);
 
 st.stop();

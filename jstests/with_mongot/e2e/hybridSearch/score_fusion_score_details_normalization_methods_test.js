@@ -110,7 +110,10 @@ function checkScoreDetailsNormalizationCombinationMethod(
             {
                 $scoreFusion: {
                     input: {
-                        pipelines: {scorePipe1: [geoNear, scoreGeoNearMetadata], scorePipe2: [scoreAdd]},
+                        pipelines: {
+                            scorePipe1: [geoNear, scoreGeoNearMetadata],
+                            scorePipe2: [scoreAdd],
+                        },
                         normalization: normalization,
                     },
                     combination: combination,
@@ -141,7 +144,11 @@ function checkScoreDetailsNormalizationCombinationMethod(
         ])
         .toArray();
     const inputPipeline2RawScoreExpectedResults = coll
-        .aggregate([{$score: {...scoreAdd.$score, normalization: "none"}}, projectScoreStage, sortAscendingStage])
+        .aggregate([
+            {$score: {...scoreAdd.$score, normalization: "none"}},
+            projectScoreStage,
+            sortAscendingStage,
+        ])
         .toArray();
 
     // Now run $scoreFusion's input pipelines with the inner $score stage's normalization
@@ -229,7 +236,10 @@ function checkScoreDetailsNormalizationCombinationMethod(
             1,
         );
         assertFieldPresent("inputPipelineRawScore", generatedScoreDetailsOfInputPipeline);
-        assert.eq(generatedScoreDetailsOfInputPipeline["inputPipelineRawScore"], innerNormalizedScore["score"]);
+        assert.eq(
+            generatedScoreDetailsOfInputPipeline["inputPipelineRawScore"],
+            innerNormalizedScore["score"],
+        );
         assertFieldPresent("value", generatedScoreDetailsOfInputPipeline); // Normalized + weighted score.
         const inputPipelineScoreValue = generatedScoreDetailsOfInputPipeline["value"]; // This is also the normalized value
         // because the weight is 1.
@@ -268,14 +278,18 @@ function checkScoreDetailsNormalizationCombinationMethod(
             combinationMethod: combinationMethod,
             combinationExpressionString:
                 combinationMethod === "expression"
-                    ? "{ string: { \$add: [ { \$multiply: [ '$$scorePipe1', 0.5 ] }, " + "'$$scorePipe2' ] } }"
+                    ? "{ string: { \$add: [ { \$multiply: [ '$$scorePipe1', 0.5 ] }, " +
+                      "'$$scorePipe2' ] } }"
                     : null,
         });
 
         const score = foundDoc["score"];
         const details = foundDoc["details"];
         function assertFieldPresent(field, obj) {
-            assert(fieldPresent(field, obj), `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+            assert(
+                fieldPresent(field, obj),
+                `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`,
+            );
         }
 
         // Description of score fusion.

@@ -20,7 +20,9 @@ const collName = "coll1";
 
 // Define the filters that we want to apply to each field.
 function generateMatchFilters(fieldPath, fieldsToBeTested) {
-    const valuesToTest = fieldsToBeTested[fieldPath].values.concat(fieldsToBeTested[fieldPath].extraValues);
+    const valuesToTest = fieldsToBeTested[fieldPath].values.concat(
+        fieldsToBeTested[fieldPath].extraValues,
+    );
 
     const filters = [
         {[fieldPath]: {$eq: null}},
@@ -38,14 +40,23 @@ function generateMatchFilters(fieldPath, fieldsToBeTested) {
     return filters;
 }
 
-const {startPoint, fieldsToBeTested} = generateEventsAndFieldsToBeTestedForOplogRewrites(db, dbName, collName);
+const {startPoint, fieldsToBeTested} = generateEventsAndFieldsToBeTestedForOplogRewrites(
+    db,
+    dbName,
+    collName,
+);
 
 let predicatesToTest = [];
 for (let fieldToTest in fieldsToBeTested) {
     predicatesToTest = predicatesToTest.concat(generateMatchFilters(fieldToTest, fieldsToBeTested));
 }
 
-const failedTestCases = compareOptimizedAndNonOptimizedChangeStreamResults(db, dbName, predicatesToTest, startPoint);
+const failedTestCases = compareOptimizedAndNonOptimizedChangeStreamResults(
+    db,
+    dbName,
+    predicatesToTest,
+    startPoint,
+);
 
 // Assert that there were no failed test cases.
 assert(failedTestCases.length == 0, failedTestCases);

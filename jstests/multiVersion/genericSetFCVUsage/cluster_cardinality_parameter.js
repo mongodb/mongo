@@ -12,7 +12,9 @@ import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
     for (let oldVersion of ["last-lts", "last-continuous"]) {
-        jsTest.log("Running test for " + tojsononeline({oldVersion, hasTwoOrMoreShardsPriorToUpgrade}));
+        jsTest.log(
+            "Running test for " + tojsononeline({oldVersion, hasTwoOrMoreShardsPriorToUpgrade}),
+        );
         const st = new ShardingTest({
             shards: 2,
             other: {
@@ -63,7 +65,9 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
         }
 
         jsTest.log("Start upgrading the FCV for the cluster");
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
         jsTest.log("Finished upgrading the FCV for the cluster");
 
         // The cluster parameter will only be updated on upgrade if the RSEndpoint feature flag is

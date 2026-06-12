@@ -80,7 +80,9 @@ runWithDifferentIndexes(
                 {_id: 9, a: 7, b: 2, c: 6, d: 1},
             ],
             coll
-                .find({$or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}]})
+                .find({
+                    $or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}],
+                })
                 .sort({c: 1})
                 .toArray(),
         );
@@ -112,7 +114,11 @@ runWithDifferentIndexes(
         ]);
 
         assert.sameMembers(
-            coll.find({$or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}]}).toArray(),
+            coll
+                .find({
+                    $or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}],
+                })
+                .toArray(),
             [
                 {_id: 5, a: 9, b: 1, c: 5, d: 1},
                 {_id: 13, a: 9, b: 1.5, d: 1},

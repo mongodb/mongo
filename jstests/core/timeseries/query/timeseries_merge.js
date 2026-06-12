@@ -40,7 +40,9 @@ let runSimpleMergeTestCase = () => {
     ]);
 
     // Gets the actual results from time-series input collection.
-    let actualResults = TimeseriesAggTests.getOutputAggregateResults(inColl, [{$merge: {into: "out"}}]);
+    let actualResults = TimeseriesAggTests.getOutputAggregateResults(inColl, [
+        {$merge: {into: "out"}},
+    ]);
 
     // Verifies that the number of measurements is same as expected.
     assert.eq(actualResults.length, expectedResults.length, actualResults);

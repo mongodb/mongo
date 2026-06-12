@@ -21,7 +21,10 @@ expectedResult = {
         "net": {"wireObjectCheck": true},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_objcheck.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/enable_objcheck.json"},
+    expectedResult,
+);
 
 jsTest.log("Testing with no explicit network option setting");
 expectedResult = {
@@ -48,7 +51,10 @@ if (!_isWindows()) {
             "net": {"unixDomainSocket": {"enabled": true}},
         },
     };
-    testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_unixsocket.json"}, expectedResult);
+    testGetCmdLineOptsMongod(
+        {config: "jstests/libs/config_files/enable_unixsocket.json"},
+        expectedResult,
+    );
 
     jsTest.log("Testing with no explicit network option setting");
     expectedResult = {"parsed": {"net": {}}};
@@ -62,7 +68,10 @@ expectedResult = {
         "net": {"wireObjectCheck": false},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_objcheck.ini"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/disable_objcheck.ini"},
+    expectedResult,
+);
 
 jsTest.log('Testing explicitly disabled "noobjcheck" config file option');
 expectedResult = {
@@ -71,7 +80,10 @@ expectedResult = {
         "net": {"wireObjectCheck": true},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_noobjcheck.ini"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/disable_noobjcheck.ini"},
+    expectedResult,
+);
 
 jsTest.log('Testing explicitly disabled "ipv6" config file option');
 expectedResult = {
@@ -87,7 +99,10 @@ if (!_isWindows()) {
             "net": {"unixDomainSocket": {"enabled": true}},
         },
     };
-    testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nounixsocket.ini"}, expectedResult);
+    testGetCmdLineOptsMongod(
+        {config: "jstests/libs/config_files/disable_nounixsocket.ini"},
+        expectedResult,
+    );
 }
 
 print(baseName + " succeeded.");

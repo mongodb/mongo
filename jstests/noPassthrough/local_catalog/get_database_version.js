@@ -19,7 +19,10 @@ function getDatabaseVersionResponse(conn, dbName) {
     assert.commandWorked(response);
 
     responseFields.forEach((field) =>
-        assert(response[field], `Missing or null field ${field} in getDatabaseVersion response ${tojson(response)}`),
+        assert(
+            response[field],
+            `Missing or null field ${field} in getDatabaseVersion response ${tojson(response)}`,
+        ),
     );
     dbVersionFields.forEach((field) =>
         assert(
@@ -39,7 +42,10 @@ const uponDatabaseCreated = getDatabaseVersionResponse(st.shard0, dbName);
 assert(uponDatabaseCreated.isPrimaryShardForDb);
 
 // Pause movePrimary after entering the critical section.
-const movePrimaryHang = configureFailPoint(st.rs0.getPrimary(), "hangAfterMovePrimaryCriticalSection");
+const movePrimaryHang = configureFailPoint(
+    st.rs0.getPrimary(),
+    "hangAfterMovePrimaryCriticalSection",
+);
 const awaitResult = startParallelShell(
     funWithArgs(
         function (dbName, shard) {

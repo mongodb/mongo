@@ -73,7 +73,11 @@ jsTestLog("Restarting the secondary");
 
 // Restart the secondary with startClean set to true so that it goes through initial sync.
 replTest.stop(secondary, undefined /* signal */, {skipValidation: true});
-secondary = replTest.start(secondary, {startClean: true, setParameter: {"numInitialSyncAttempts": 1}}, true /* wait */);
+secondary = replTest.start(
+    secondary,
+    {startClean: true, setParameter: {"numInitialSyncAttempts": 1}},
+    true /* wait */,
+);
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
@@ -128,7 +132,11 @@ assert.eq(testColl.find({_id: 2}).toArray(), [{_id: 2}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 2}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -181,7 +189,11 @@ assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 // Make sure that another write on the same document from the third transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand({update: collName, updates: [{q: {_id: 3}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    testDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 3}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -201,7 +213,11 @@ jsTestLog("Aborting the third transaction");
 
 // Make sure we can successfully abort the third transaction after recovery.
 assert.commandWorked(
-    sessionDB3.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber3), autocommit: false}),
+    sessionDB3.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber3),
+        autocommit: false,
+    }),
 );
 assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 

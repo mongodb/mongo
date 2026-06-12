@@ -27,16 +27,26 @@ assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 2}));
 
 // Add a secondary node but make it hang before copying databases.
-let secondary = replSet.add({rsConfig: {votes: 0, priority: 0}, setParameter: {"collectionClonerBatchSize": 2}});
+let secondary = replSet.add({
+    rsConfig: {votes: 0, priority: 0},
+    setParameter: {"collectionClonerBatchSize": 2},
+});
 secondary.setSecondaryOk();
 
-const failPointBeforeCopying = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
+const failPointBeforeCopying = configureFailPoint(
+    secondary,
+    "initialSyncHangBeforeCopyingDatabases",
+);
 const failPointBeforeFinish = configureFailPoint(secondary, "initialSyncHangBeforeFinish");
 const failPointAfterFinish = configureFailPoint(secondary, "initialSyncHangAfterFinish");
-let failPointAfterNumDocsCopied = configureFailPoint(secondary, "initialSyncHangDuringCollectionClone", {
-    namespace: barColl.getFullName(),
-    numDocsToClone: 2,
-});
+let failPointAfterNumDocsCopied = configureFailPoint(
+    secondary,
+    "initialSyncHangDuringCollectionClone",
+    {
+        namespace: barColl.getFullName(),
+        numDocsToClone: 2,
+    },
+);
 replSet.reInitiate();
 
 // Wait for initial sync to pause before it copies the databases.
@@ -44,12 +54,21 @@ failPointBeforeCopying.wait();
 
 // Test that replSetGetStatus returns the correct results while initial sync is in progress.
 let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(res.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+assert(
+    res.initialSyncStatus,
+    () => "Response should have an 'initialSyncStatus' field: " + tojson(res),
+);
 
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 0}));
-assert(!res.initialSyncStatus, () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
+assert(
+    !res.initialSyncStatus,
+    () => "Response should not have an 'initialSyncStatus' field: " + tojson(res),
+);
 
-assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}),
+    ErrorCodes.TypeMismatch,
+);
 
 // Test that initialSync: 2 (summary mode) returns initialSyncStatus.
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}));
@@ -100,7 +119,10 @@ const bytesCopiedAdminDb =
     pretestDbRes.initialSyncStatus.databases.admin["admin.system.keys"].approxBytesCopied;
 // Skip size assertions when the replicated size and count feature is enabled since size accounting is different.
 if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB("test"), "ReplicatedFastCount")) {
-    assert.eq(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, bytesCopiedAdminDb + barCollRes.approxBytesCopied);
+    assert.eq(
+        pretestDbRes.initialSyncStatus.approxTotalBytesCopied,
+        bytesCopiedAdminDb + barCollRes.approxBytesCopied,
+    );
     assert.gt(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, 0);
 }
 
@@ -109,7 +131,9 @@ assert.eq(pretestDbRes.initialSyncStatus.databases.databasesCloned, 2);
 assert.eq(pretestDbRes.initialSyncStatus.databases.databasesToClone, 2);
 
 // Test summary mode (initialSync: 2) during mid-clone.
-const summaryRes = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}));
+const summaryRes = assert.commandWorked(
+    secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}),
+);
 assert(
     summaryRes.initialSyncStatus,
     () => "Summary response should have 'initialSyncStatus' field: " + tojson(summaryRes),
@@ -117,10 +141,22 @@ assert(
 const summaryDbs = summaryRes.initialSyncStatus.databases;
 
 // Summary should have aggregate counts.
-assert(summaryDbs.hasOwnProperty("databasesToClone"), "Should have databasesToClone: " + tojson(summaryDbs));
-assert(summaryDbs.hasOwnProperty("databasesCloned"), "Should have databasesCloned: " + tojson(summaryDbs));
-assert(summaryDbs.hasOwnProperty("collectionsToClone"), "Should have collectionsToClone: " + tojson(summaryDbs));
-assert(summaryDbs.hasOwnProperty("collectionsCloned"), "Should have collectionsCloned: " + tojson(summaryDbs));
+assert(
+    summaryDbs.hasOwnProperty("databasesToClone"),
+    "Should have databasesToClone: " + tojson(summaryDbs),
+);
+assert(
+    summaryDbs.hasOwnProperty("databasesCloned"),
+    "Should have databasesCloned: " + tojson(summaryDbs),
+);
+assert(
+    summaryDbs.hasOwnProperty("collectionsToClone"),
+    "Should have collectionsToClone: " + tojson(summaryDbs),
+);
+assert(
+    summaryDbs.hasOwnProperty("collectionsCloned"),
+    "Should have collectionsCloned: " + tojson(summaryDbs),
+);
 
 // Summary should NOT have per-database sub-objects.
 assert(
@@ -135,11 +171,13 @@ assert(
 // Compare with full response which should have per-database detail.
 assert(
     pretestDbRes.initialSyncStatus.databases.hasOwnProperty("pretest"),
-    "Full response should have per-database 'pretest' sub-object: " + tojson(pretestDbRes.initialSyncStatus.databases),
+    "Full response should have per-database 'pretest' sub-object: " +
+        tojson(pretestDbRes.initialSyncStatus.databases),
 );
 assert(
     pretestDbRes.initialSyncStatus.databases.pretest.hasOwnProperty("pretest.bar"),
-    "Full response should have per-collection detail: " + tojson(pretestDbRes.initialSyncStatus.databases.pretest),
+    "Full response should have per-collection detail: " +
+        tojson(pretestDbRes.initialSyncStatus.databases.pretest),
 );
 
 // Summary top-level fields should match full response.
@@ -159,7 +197,10 @@ failPointBeforeFinish.wait();
 
 // Test that replSetGetStatus returns the correct results when initial sync is at the very end.
 const endOfCloningRes = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(endOfCloningRes.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+assert(
+    endOfCloningRes.initialSyncStatus,
+    () => "Response should have an 'initialSyncStatus' field: " + tojson(res),
+);
 
 // It is possible that we update the config document after going through a reconfig. So make sure
 // we account for this.
@@ -178,7 +219,10 @@ assert.gt(
     endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
     pretestDbRes.initialSyncStatus.approxTotalBytesCopied,
 );
-assert.eq(endOfCloningRes.initialSyncStatus.approxTotalDataSize, pretestDbRes.initialSyncStatus.approxTotalDataSize);
+assert.eq(
+    endOfCloningRes.initialSyncStatus.approxTotalDataSize,
+    pretestDbRes.initialSyncStatus.approxTotalDataSize,
+);
 
 assert.eq(endOfCloningRes.initialSyncStatus.failedInitialSyncAttempts, 0);
 assert.eq(endOfCloningRes.initialSyncStatus.maxFailedInitialSyncAttempts, 10);
@@ -225,15 +269,23 @@ failPointAfterFinish.wait();
 
 // Test that replSetGetStatus returns the correct results after initial sync is finished.
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(!res.initialSyncStatus, () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
+assert(
+    !res.initialSyncStatus,
+    () => "Response should not have an 'initialSyncStatus' field: " + tojson(res),
+);
 
-assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}),
+    ErrorCodes.TypeMismatch,
+);
 
 // After initial sync completes, summary mode should also not have initialSyncStatus.
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}));
 assert(
     !res.initialSyncStatus,
-    () => "After initial sync, response with initialSync: 2 should not have 'initialSyncStatus' field: " + tojson(res),
+    () =>
+        "After initial sync, response with initialSync: 2 should not have 'initialSyncStatus' field: " +
+        tojson(res),
 );
 
 // Let initial sync finish and get into secondary state.

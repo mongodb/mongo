@@ -37,7 +37,9 @@ function checkFindAndAggSorts(sortPattern, expectedOrder) {
         .toArray();
     assert.eq(getArrayOfIds(findResult), expectedOrder, findResult);
 
-    const aggResult = coll.aggregate({$sort: sortPattern}, {$addFields: {key: {$meta: "sortKey"}}}).toArray();
+    const aggResult = coll
+        .aggregate({$sort: sortPattern}, {$addFields: {key: {$meta: "sortKey"}}})
+        .toArray();
     assert.eq(getArrayOfIds(aggResult), expectedOrder, aggResult);
 }
 

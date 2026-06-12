@@ -45,14 +45,18 @@ coll.insert([
 
 function testExtensionVectorSearch() {
     // Flag enabled; extension $vectorSearch expects an empty spec and acts as a no-op.
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+    );
     const results = coll.aggregate([{$vectorSearch: {}}]).toArray();
     assert.eq(results.length, 3, "Extension should return all docs: " + tojson(results));
 }
 
 function testLegacyVectorSearch() {
     // Flag disabled; legacy $vectorSearch calls on mongotmock.
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
     const queryVector = [1.0, 2.0, 3.0];
     const path = "x";
     const limit = 5;
@@ -75,14 +79,23 @@ function testLegacyVectorSearch() {
                     dbName,
                     collectionUUID,
                 }),
-                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), dbName + "." + collName, 1),
+                response: mongotResponseForBatch(
+                    mongotResponseBatch,
+                    NumberLong(0),
+                    dbName + "." + collName,
+                    1,
+                ),
             },
         ],
         NumberLong(123),
     );
 
     const results = coll.aggregate([{$vectorSearch: {queryVector, path, limit}}]).toArray();
-    assert.eq(results, expectedDocs, "Legacy $vectorSearch should return mongot results: " + tojson(results));
+    assert.eq(
+        results,
+        expectedDocs,
+        "Legacy $vectorSearch should return mongot results: " + tojson(results),
+    );
 }
 
 try {

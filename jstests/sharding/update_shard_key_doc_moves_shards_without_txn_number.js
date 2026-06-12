@@ -19,7 +19,8 @@ const ns = dbName + "." + collName;
 const db = st.getDB(dbName);
 const testColl = db.getCollection(collName);
 
-const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
+const updateDocumentShardKeyUsingTransactionApiEnabled =
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 
 // Set up a sharded collection with two shards:
 // shard0: [MinKey, 0]
@@ -27,7 +28,9 @@ const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKe
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 /**

@@ -41,7 +41,9 @@ function getCollectionUuid(coll) {
 function prepareCollection() {
     assertDropCollection(db, collName);
     assert.commandWorked(db.runCommand({create: collName}));
-    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "idx_x"}]}));
+    assert.commandWorked(
+        db.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "idx_x"}]}),
+    );
 
     assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: collNS, middle: {_id: 0}}));
@@ -54,7 +56,9 @@ function validateCreateEventsFromChunkMigration() {
 
     let cursor = test.startWatchingChanges({pipeline, collection: collName});
 
-    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     test.assertNextChangesEqual({
         cursor: cursor,
@@ -81,7 +85,9 @@ function validateShowSystemEventsFalse() {
     let pipeline = [{$changeStream: {showExpandedEvents: true, showSystemEvents: false}}];
     let cursor = test.startWatchingChanges({pipeline, collection: collName});
 
-    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     assert.commandWorked(db[collName].insert({_id: 1, x: 1}));
 

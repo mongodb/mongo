@@ -54,6 +54,8 @@ IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
 // This confirms that the downgrade command will complete successfully after the index build has
 // completed.
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 rst.stopSet();

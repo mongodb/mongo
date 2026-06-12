@@ -43,7 +43,11 @@ assert.commandWorked(findResult);
 assert.eq(1, findResult.cursor.firstBatch.length);
 
 jsTestLog("Starting lock-free getMore command");
-const getMoreResult = db.runCommand({getMore: NumberLong(findResult.cursor.id), collection: collName, batchSize: 1});
+const getMoreResult = db.runCommand({
+    getMore: NumberLong(findResult.cursor.id),
+    collection: collName,
+    batchSize: 1,
+});
 assert.commandWorked(getMoreResult);
 assert.eq(1, getMoreResult.cursor.nextBatch.length);
 

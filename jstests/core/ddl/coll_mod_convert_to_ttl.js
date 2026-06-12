@@ -28,7 +28,10 @@ coll.createIndex({a: 1});
 
 // Tries to modify with a string 'expireAfterSeconds' value.
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": "100"}}),
+    db.runCommand({
+        "collMod": collName,
+        "index": {"keyPattern": {a: 1}, "expireAfterSeconds": "100"},
+    }),
     ErrorCodes.TypeMismatch,
 );
 
@@ -39,19 +42,30 @@ assert.commandFailedWithCode(
 );
 
 // Successfully converts to a TTL index.
-assert.commandWorked(db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}}));
+assert.commandWorked(
+    db.runCommand({
+        "collMod": collName,
+        "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100},
+    }),
+);
 assert(findTTL(coll, {a: 1}, 100), "TTL index should be 100 now");
 
 // Tries to convert a compound index to a TTL index.
 coll.createIndex({a: 1, b: 1});
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1, b: 1}, "expireAfterSeconds": 100}}),
+    db.runCommand({
+        "collMod": collName,
+        "index": {"keyPattern": {a: 1, b: 1}, "expireAfterSeconds": 100},
+    }),
     ErrorCodes.InvalidOptions,
 );
 
 // Tries to convert the '_id' index to a TTL index.
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100}}),
+    db.runCommand({
+        "collMod": collName,
+        "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100},
+    }),
     ErrorCodes.InvalidOptions,
 );
 

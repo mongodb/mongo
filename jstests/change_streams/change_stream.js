@@ -2,7 +2,10 @@
 // Mark as assumes_read_preference_unchanged since reading from the non-replicated "system.profile"
 // collection results in a failure in the secondary reads suite.
 // @tags: [assumes_read_preference_unchanged]
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertInvalidChangeStreamNss,
@@ -213,7 +216,10 @@ jsTestLog("Testing resumability");
 assertDropAndRecreateCollection(db, "resume1");
 
 // Note we do not project away 'id.ts' as it is part of the resume token.
-let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.resume1});
+let resumeCursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: db.resume1,
+});
 
 // Insert a document and save the resulting change stream.
 assert.commandWorked(db.resume1.insert({_id: 1}));
@@ -266,7 +272,10 @@ assert.soon(() => {
 });
 
 // With trivially false predicates
-cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}, {$match: {$alwaysFalse: 1}}], collection: db.t1});
+cursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}, {$match: {$alwaysFalse: 1}}],
+    collection: db.t1,
+});
 resumeToken = cursor.postBatchResumeToken._data;
 assert.soon(() => {
     assert.commandWorked(db.t1.insert({a: 2}));

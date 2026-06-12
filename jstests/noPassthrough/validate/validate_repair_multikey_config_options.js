@@ -19,7 +19,10 @@ const incompatibleReplOptions = [{repair: true}, {fixMultikey: true, background:
 const runTest = (coll, options, expectFailure) => {
     const res = coll.validate(options);
     if (expectFailure) {
-        assert.commandFailedWithCode(res, [ErrorCodes.InvalidOptions, ErrorCodes.CommandNotSupported]);
+        assert.commandFailedWithCode(res, [
+            ErrorCodes.InvalidOptions,
+            ErrorCodes.CommandNotSupported,
+        ]);
         return;
     }
 

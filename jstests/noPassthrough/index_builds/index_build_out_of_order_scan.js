@@ -25,17 +25,27 @@ assert.commandWorked(primaryColl.insert({a: 1}));
 
 rst.awaitReplication();
 
-const hangAfterInitializingIndexBuild = configureFailPoint(primary, "hangAfterInitializingIndexBuild");
+const hangAfterInitializingIndexBuild = configureFailPoint(
+    primary,
+    "hangAfterInitializingIndexBuild",
+);
 const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
     ErrorCodes.DataCorruptionDetected,
 ]);
 
-const buildUUID = IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true})["a_1"]
-    .buildUUID;
+const buildUUID = IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+})["a_1"].buildUUID;
 
 hangAfterInitializingIndexBuild.wait();
-const WTRecordStoreUassertOutOfOrder = configureFailPoint(primary, "WTRecordStoreUassertOutOfOrder");
-const hangBeforeAbort = configureFailPoint(primary, "hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort");
+const WTRecordStoreUassertOutOfOrder = configureFailPoint(
+    primary,
+    "WTRecordStoreUassertOutOfOrder",
+);
+const hangBeforeAbort = configureFailPoint(
+    primary,
+    "hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort",
+);
 hangAfterInitializingIndexBuild.off();
 
 hangBeforeAbort.wait();

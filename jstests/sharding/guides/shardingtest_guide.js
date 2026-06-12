@@ -98,7 +98,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
     // Once we get the connection string we can use them to run commands. Below is an example
     // of an insert done on shard0.
-    assert.commandWorked(st.shard0.getDB("test").runCommand({insert: "testColl", documents: [{x: 1}]}));
+    assert.commandWorked(
+        st.shard0.getDB("test").runCommand({insert: "testColl", documents: [{x: 1}]}),
+    );
 
     st.stop();
 }
@@ -115,7 +117,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     // We can specify a common replica set size for our shards. Below we start 2 3 node
     // replica set shards, 2 mongos, 1 single node replica set config server.
 
-    let st = new ShardingTest({shards: 2, mongos: 2, config: 1, rs: {nodes: 3 /* other ReplSetTest options */}});
+    let st = new ShardingTest({
+        shards: 2,
+        mongos: 2,
+        config: 1,
+        rs: {nodes: 3 /* other ReplSetTest options */},
+    });
     st.stop();
 }
 

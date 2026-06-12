@@ -68,13 +68,17 @@ runWithParamsAllNonConfigNodes(
         assert.eq(runQuery().itcount(), kDocCount, () => runQuery().explain("executionStats"));
 
         // Set a 1-byte limit so the first document inserted into the hash table exceeds it.
-        runWithParamsAllNonConfigNodes(db, {internalSlotBasedExecutionAndHashStageMaxMemoryBytes: 1}, () => {
-            assert.throwsWithCode(
-                () => runQuery().itcount(),
-                12321801,
-                [] /*params*/,
-                () => runQuery().explain("executionStats"),
-            );
-        });
+        runWithParamsAllNonConfigNodes(
+            db,
+            {internalSlotBasedExecutionAndHashStageMaxMemoryBytes: 1},
+            () => {
+                assert.throwsWithCode(
+                    () => runQuery().itcount(),
+                    12321801,
+                    [] /*params*/,
+                    () => runQuery().explain("executionStats"),
+                );
+            },
+        );
     },
 );

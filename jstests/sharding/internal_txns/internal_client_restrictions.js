@@ -15,8 +15,15 @@ function verifyInternalSessionsForExternalClients(testDB, {expectFail}) {
             cmd.txnNumber = NumberLong(txnNum);
 
             if (expectFail) {
-                const res = assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
-                assert.eq(res.errmsg, "Internal sessions are only allowed for internal clients", tojson(res));
+                const res = assert.commandFailedWithCode(
+                    testDB.runCommand(cmd),
+                    ErrorCodes.InvalidOptions,
+                );
+                assert.eq(
+                    res.errmsg,
+                    "Internal sessions are only allowed for internal clients",
+                    tojson(res),
+                );
             } else {
                 assert.commandWorked(testDB.runCommand(cmd));
                 assert.commandWorked(
@@ -63,8 +70,15 @@ function verifyTxnRetryCounterForExternalClients(testDB, {expectFail}) {
         findCmd.txnNumber = NumberLong(txnNum);
 
         if (expectFail) {
-            const res = assert.commandFailedWithCode(testDB.runCommand(findCmd), ErrorCodes.InvalidOptions);
-            assert.eq(res.errmsg, "txnRetryCounter is only allowed for internal clients", tojson(res));
+            const res = assert.commandFailedWithCode(
+                testDB.runCommand(findCmd),
+                ErrorCodes.InvalidOptions,
+            );
+            assert.eq(
+                res.errmsg,
+                "txnRetryCounter is only allowed for internal clients",
+                tojson(res),
+            );
         } else {
             assert.commandWorked(testDB.runCommand(findCmd));
             assert.commandWorked(

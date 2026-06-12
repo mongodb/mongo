@@ -30,7 +30,11 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({name: testName, nodes: [{}, {}, {rsConfig: {priority: 0}}], useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: [{}, {}, {rsConfig: {priority: 0}}],
+    useBridge: true,
+});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 

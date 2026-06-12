@@ -10,7 +10,10 @@
  * ]
  */
 import {section, subSection} from "jstests/libs/query/pretty_md.js";
-import {outputAggregationPlanAndResults, outputDistinctPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
+import {
+    outputAggregationPlanAndResults,
+    outputDistinctPlanAndResults,
+} from "jstests/libs/query/golden_test_utils.js";
 import {setupShardedCollectionWithOrphans} from "jstests/libs/query/golden_sharding_utils.js";
 
 TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
@@ -31,19 +34,32 @@ outputDistinctPlanAndResults(coll, "notShardKey");
 outputDistinctPlanAndResults(coll, "notShardKey", {shardKey: {$eq: "chunk1_s0_1"}});
 outputDistinctPlanAndResults(coll, "notShardKey", {notShardKey: {$eq: "1notShardKey_chunk1_s0_1"}});
 outputDistinctPlanAndResults(coll, "notShardKey", {shardKey: {$gte: "chunk1_s0_1"}});
-outputDistinctPlanAndResults(coll, "notShardKey", {notShardKey: {$gte: "1notShardKey_chunk1_s0_1"}});
+outputDistinctPlanAndResults(coll, "notShardKey", {
+    notShardKey: {$gte: "1notShardKey_chunk1_s0_1"},
+});
 
 section("$group on a non-shard key field");
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$notShardKey"}}]);
 
 subSection("$group on a non-shard key field with $first/$last");
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$notShardKey", accum: {$first: "$notShardKey"}}}]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$notShardKey", accum: {$first: "$shardKey"}}}]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$notShardKey", accum: {$last: "$notShardKey"}}}]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$notShardKey", accum: {$last: "$shardKey"}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$notShardKey", accum: {$first: "$notShardKey"}}},
+]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$notShardKey", accum: {$first: "$shardKey"}}},
+]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$notShardKey", accum: {$last: "$notShardKey"}}},
+]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$notShardKey", accum: {$last: "$shardKey"}}},
+]);
 
 subSection("$group on a non-shard key field with a preceding $match");
-outputAggregationPlanAndResults(coll, [{$match: {shardKey: {$gte: "chunk1_s0_1"}}}, {$group: {_id: "$notShardKey"}}]);
+outputAggregationPlanAndResults(coll, [
+    {$match: {shardKey: {$gte: "chunk1_s0_1"}}},
+    {$group: {_id: "$notShardKey"}},
+]);
 outputAggregationPlanAndResults(coll, [
     {$match: {notShardKey: {$gte: "1notShardKey_chunk1_s0_1"}}},
     {$group: {_id: "$notShardKey"}},
@@ -158,7 +174,10 @@ outputAggregationPlanAndResults(coll, [
 ]);
 outputAggregationPlanAndResults(coll, [
     {
-        $group: {_id: "$shardKey", accum: {$bottom: {sortBy: {notShardKey: 1}, output: "$notShardKey"}}},
+        $group: {
+            _id: "$shardKey",
+            accum: {$bottom: {sortBy: {notShardKey: 1}, output: "$notShardKey"}},
+        },
     },
 ]);
 
@@ -216,8 +235,12 @@ outputAggregationPlanAndResults(coll, [
 ]);
 
 subSection("without preceding $sort, output non-shard key field");
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$first: "$notShardKey"}}}]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$shardKey", accum: {$first: "$notShardKey"}}},
+]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}},
+]);
 
 subSection("with preceding $sort and intervening $match, output non-shard key field");
 outputAggregationPlanAndResults(coll, [

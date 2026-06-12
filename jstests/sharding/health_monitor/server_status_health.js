@@ -9,7 +9,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function changeObserverIntensity(observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
-    assert.commandWorked(st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}));
+    assert.commandWorked(
+        st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}),
+    );
 }
 
 const params = {
@@ -70,7 +72,9 @@ assert.lte(kTestObserverFacet.duration, faultInformation.duration);
 assert(kTestObserverFacet.description.includes("InternalError: test msg"));
 
 // Check server status after test health observer enabled and failpoint returns success.
-assert.commandWorked(st.s0.adminCommand({"configureFailPoint": "testHealthObserver", "mode": "alwaysOn"}));
+assert.commandWorked(
+    st.s0.adminCommand({"configureFailPoint": "testHealthObserver", "mode": "alwaysOn"}),
+);
 
 assert.soon(() => {
     result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;
@@ -84,7 +88,9 @@ assert.eq(result.state, "Ok");
 assert(result.enteredStateAtTime);
 
 print("---RESULT 4 with details---");
-result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+result = assert.commandWorked(
+    st.s0.adminCommand({serverStatus: 1, health: {details: true}}),
+).health;
 print(tojson(result));
 const testObserver = result.testObserver;
 assert(testObserver.totalChecks);

@@ -7,7 +7,9 @@ const dbName = testDB.getName();
 const collNames = ["coll1", "coll2", "coll3"];
 
 function listDatabases(options) {
-    return assert.commandWorked(db.adminCommand(Object.assign({listDatabases: 1, nameOnly: true}, options))).databases;
+    return assert.commandWorked(
+        db.adminCommand(Object.assign({listDatabases: 1, nameOnly: true}, options)),
+    ).databases;
 }
 
 function assertNamespacesDoNotExist() {

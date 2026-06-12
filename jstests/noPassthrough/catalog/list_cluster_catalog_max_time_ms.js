@@ -21,7 +21,11 @@ function runTest(conn, failPointNode, timeoutMs) {
     const awaitListClusterCatalog = startParallelShell(
         funWithArgs(function (timeout) {
             assert.commandFailedWithCode(
-                db.adminCommand("aggregate", {pipeline: [{$listClusterCatalog: {}}], cursor: {}, maxTimeMS: timeout}),
+                db.adminCommand("aggregate", {
+                    pipeline: [{$listClusterCatalog: {}}],
+                    cursor: {},
+                    maxTimeMS: timeout,
+                }),
                 [ErrorCodes.MaxTimeMSExpired],
             );
         }, timeoutMs),

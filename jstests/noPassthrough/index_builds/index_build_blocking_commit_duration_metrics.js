@@ -20,7 +20,8 @@ const lastTimeBetweenVoteAndCommitMillis = "lastTimeBetweenVoteAndCommitMillis";
 const lastTimeBetweenCommitOplogAndCommitMillis = "lastTimeBetweenCommitOplogAndCommitMillis";
 const lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
     "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery";
-const lastTimeBetweenCommitOplogAndCommitMillisRestore = "lastTimeBetweenCommitOplogAndCommitMillisRestore";
+const lastTimeBetweenCommitOplogAndCommitMillisRestore =
+    "lastTimeBetweenCommitOplogAndCommitMillisRestore";
 
 function getIndexBuildServerStatusMetric(conn, metricName) {
     const serverStatus = conn.serverStatus();
@@ -31,7 +32,10 @@ function getIndexBuildServerStatusMetric(conn, metricName) {
 
     const indexBuilds = serverStatus.indexBuilds;
 
-    assert(indexBuilds.hasOwnProperty("phases"), "indexBuilds section missing phases field: " + tojson(indexBuilds));
+    assert(
+        indexBuilds.hasOwnProperty("phases"),
+        "indexBuilds section missing phases field: " + tojson(indexBuilds),
+    );
 
     const phases = indexBuilds.phases;
 
@@ -116,8 +120,15 @@ describe("indexBuilds serverStatus metrics", function () {
     it("duration between voting to commit and committing", () => {
         checkMetrics(this.primaryDB, [lastTimeBetweenVoteAndCommitMillis], [0], ["eq"]);
 
-        const fp = configureFailPoint(this.primaryDB, "hangIndexBuildAfterSignalPrimaryForCommitReadiness");
-        const awaitCreateIndex = IndexBuildTest.startIndexBuild(this.primary, this.coll.getFullName(), {x: 1});
+        const fp = configureFailPoint(
+            this.primaryDB,
+            "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+        );
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+            this.primary,
+            this.coll.getFullName(),
+            {x: 1},
+        );
 
         fp.wait();
         // Sleep so that we have a non-trivial duration for lastTimeBetweenVoteAndCommitMillis.
@@ -143,9 +154,16 @@ describe("indexBuilds serverStatus metrics", function () {
             ["eq", "eq", "eq"],
         );
 
-        const fp = configureFailPoint(this.secondary, "hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry");
+        const fp = configureFailPoint(
+            this.secondary,
+            "hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry",
+        );
 
-        const awaitCreateIndex = IndexBuildTest.startIndexBuild(this.primary, this.coll.getFullName(), {x: 1});
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+            this.primary,
+            this.coll.getFullName(),
+            {x: 1},
+        );
 
         IndexBuildTest.waitForIndexBuildToStart(this.secondaryDB);
 
@@ -188,14 +206,23 @@ describe("indexBuilds serverStatus metrics", function () {
             "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
         );
 
-        const awaitCreateIndex = IndexBuildTest.startIndexBuild(this.primary, this.coll.getFullName(), {x: 1});
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+            this.primary,
+            this.coll.getFullName(),
+            {x: 1},
+        );
 
         IndexBuildTest.waitForIndexBuildToStart(this.secondaryDB);
         hangAfterVotingFP.wait();
 
         IndexBuildTest.waitForIndexBuildToStop(this.primaryDB);
 
-        this.rst.stop(this.secondary, /*signal=*/ 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+        this.rst.stop(
+            this.secondary,
+            /*signal=*/ 9,
+            {allowedExitCode: MongoRunner.EXIT_SIGKILL},
+            {forRestart: true},
+        );
 
         this.rst.start(
             this.secondary,

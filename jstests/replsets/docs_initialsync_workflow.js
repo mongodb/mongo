@@ -42,7 +42,11 @@ function testAddWithInitialSync(secondariesDown) {
     config.version += 1;
     jsTestLog("Reconfiguring set to add node.");
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: majorityDown,
+        }),
     );
 
     jsTestLog("Waiting for node to sync.");
@@ -84,7 +88,11 @@ function testReplaceWithInitialSync(secondariesDown) {
     config.version += 1;
     config.members.splice(nodeId, 1);
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: majorityDown,
+        }),
     );
 
     jsTestLog("Stopping node for replacement");
@@ -93,7 +101,10 @@ function testReplaceWithInitialSync(secondariesDown) {
     if (!majorityDown) {
         // Add some data.  This can't work in a majority-down situation, so we don't do it then.
         assert.commandWorked(
-            testDb[testName].insert({replaceWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}),
+            testDb[testName].insert(
+                {replaceWithInitialSync: secondariesDown},
+                {writeConcern: {w: 1}},
+            ),
         );
     }
 
@@ -111,7 +122,11 @@ function testReplaceWithInitialSync(secondariesDown) {
     config.version += 1;
     jsTestLog("Reconfiguring set to add the replacement node.");
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: majorityDown,
+        }),
     );
 
     jsTestLog("Waiting for the replacement node to sync.");

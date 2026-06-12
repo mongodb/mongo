@@ -7,7 +7,10 @@ function test(date, testSynthetics) {
     c.drop();
     c.save({date: date});
 
-    let ISOfmt = date.getUTCMilliseconds() == 0 ? 'ISODate("%Y-%m-%dT%H:%M:%SZ")' : 'ISODate("%Y-%m-%dT%H:%M:%S.%LZ")';
+    let ISOfmt =
+        date.getUTCMilliseconds() == 0
+            ? 'ISODate("%Y-%m-%dT%H:%M:%SZ")'
+            : 'ISODate("%Y-%m-%dT%H:%M:%S.%LZ")';
 
     // Can't use aggregate helper or assertErrorCode because we need to handle multiple error types
     let res = c.runCommand("aggregate", {

@@ -7,7 +7,9 @@ const db = conn.getDB("test");
 
 // Enable and force AND_HASH query solution to be used to evaluate index intersections.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}),
+);
 
 const coll = db.and_hash;
 coll.drop();

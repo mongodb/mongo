@@ -76,7 +76,9 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths, directi
             "; coll=" +
             coll.getFullName(),
     );
-    assert.commandWorked(coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
+    assert.commandWorked(
+        coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}),
+    );
     assert(expectedPaths);
     // Verify the expected behaviour for every combination of path and operator.
     for (let op of operationList) {
@@ -111,7 +113,10 @@ function assertWildcardQuery(query, expectedPath, explainStats = {}) {
     // If we expect the current path to have been excluded based on the $** keyPattern
     // or projection, confirm that no indexed solution was found.
     if (!expectedPath) {
-        assert.gt(getPlanStages(getWinningPlanFromExplain(explainOutput.queryPlanner), "COLLSCAN").length, 0);
+        assert.gt(
+            getPlanStages(getWinningPlanFromExplain(explainOutput.queryPlanner), "COLLSCAN").length,
+            0,
+        );
         return;
     }
     // Verify that the winning plan uses the $** index with the expected path.
@@ -217,7 +222,9 @@ for (const indexSpec of wildcardIndexes) {
     assert.commandWorked(coll.insert({_id: 2, a: [{b: [{c: 0}, {c: 1}]}]}));
     assert.commandWorked(coll.insert({_id: 3, a: {"0": [{b: {"1": {c: 1}}}, {d: 1}]}}));
     assert.commandWorked(coll.insert({_id: 4, a: [{b: [{1: {c: 1}}]}]}));
-    assert.commandWorked(coll.insert({_id: 5, a: [{b: [{"1": {c: {"2": {d: [0, 1, 2, 3, {e: 1}]}}}}]}]}));
+    assert.commandWorked(
+        coll.insert({_id: 5, a: [{b: [{"1": {c: {"2": {d: [0, 1, 2, 3, {e: 1}]}}}}]}]}),
+    );
 
     /*
      * Multikey Metadata Keys:
@@ -252,19 +259,29 @@ for (const indexSpec of wildcardIndexes) {
     //
     // We examine the solution's 'nReturned' versus 'totalDocsExamined' to confirm this.
     // totalDocsExamined: [_id:1, _id:2, _id:3, _id:4], nReturned: [_id:2, _id:3, _id:4]
-    assertWildcardQuery({"a.0.b.1.c": 1}, Object.assign({"a.0.b.1.c": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 3,
-        "executionStats.totalDocsExamined": 4,
-    });
+    assertWildcardQuery(
+        {"a.0.b.1.c": 1},
+        Object.assign({"a.0.b.1.c": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 3,
+            "executionStats.totalDocsExamined": 4,
+        },
+    );
 
     // Test that we can query a primitive value at a specific array index.
-    assertWildcardQuery({"a.0.b.1.c.2.d.3": 3}, Object.assign({"a.0.b.1.c.2.d.3": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 1,
-        "executionStats.totalDocsExamined": 1,
-    });
+    assertWildcardQuery(
+        {"a.0.b.1.c.2.d.3": 3},
+        Object.assign({"a.0.b.1.c.2.d.3": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 1,
+            "executionStats.totalDocsExamined": 1,
+        },
+    );
 
     // Test that a $** index can't be used for a query through more than 8 nested array indices.
-    assert.commandWorked(coll.insert({_id: 6, a: [{b: [{c: [{d: [{e: [{f: [{g: [{h: [{i: [1]}]}]}]}]}]}]}]}]}));
+    assert.commandWorked(
+        coll.insert({_id: 6, a: [{b: [{c: [{d: [{e: [{f: [{g: [{h: [{i: [1]}]}]}]}]}]}]}]}]}),
+    );
     // We can query up to a depth of 8 arrays via specific indices, but not through 9 or more.
     assertWildcardQuery(
         {"a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i": 1},
@@ -299,18 +316,34 @@ for (const indexSpec of wildcardIndexes) {
 
     const isCompound = indexSpec.keyPattern.hasOwnProperty("other");
     const compoundPath = {"other": 1};
-    assertWildcardQuery({"a.0": {$gt: 1, $lt: 4}}, Object.assign({"a.0": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 2,
-    });
-    assertWildcardQuery({"a.1": {$gte: 1, $lte: 4}}, Object.assign({"a.1": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 4,
-    });
-    assertWildcardQuery({"b.2": {$in: [5, 9]}}, Object.assign({"b.2": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 1,
-    });
-    assertWildcardQuery({"c.0": {$in: [10, 11]}}, Object.assign({"c.0": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 2,
-    });
+    assertWildcardQuery(
+        {"a.0": {$gt: 1, $lt: 4}},
+        Object.assign({"a.0": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 2,
+        },
+    );
+    assertWildcardQuery(
+        {"a.1": {$gte: 1, $lte: 4}},
+        Object.assign({"a.1": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 4,
+        },
+    );
+    assertWildcardQuery(
+        {"b.2": {$in: [5, 9]}},
+        Object.assign({"b.2": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 1,
+        },
+    );
+    assertWildcardQuery(
+        {"c.0": {$in: [10, 11]}},
+        Object.assign({"c.0": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 2,
+        },
+    );
 
     // Test that the $** index doesn't trim predicates when planning across multiple nested $and/$or
     // expressions on various fieldname-or-array-index paths.
@@ -324,12 +357,18 @@ for (const indexSpec of wildcardIndexes) {
     // Verify that the expected number of documents were matched, and the $** index was used.
     // Matched documents: [_id:2, _id:3, _id:5, _id:6]
     assert.eq(trimTestExplain.executionStats.nReturned, 4);
-    const trimTestIxScans = getPlanStages(getWinningPlanFromExplain(trimTestExplain.queryPlanner), "IXSCAN");
+    const trimTestIxScans = getPlanStages(
+        getWinningPlanFromExplain(trimTestExplain.queryPlanner),
+        "IXSCAN",
+    );
     for (let ixScan of trimTestIxScans) {
         assert.eq(ixScan.keyPattern["$_path"], 1);
     }
     // Confirm that a collection scan produces the same results.
-    assertArrayEq(coll.find(trimTestQuery).toArray(), coll.find(trimTestQuery).hint({$natural: 1}).toArray());
+    assertArrayEq(
+        coll.find(trimTestQuery).toArray(),
+        coll.find(trimTestQuery).hint({$natural: 1}).toArray(),
+    );
 }
 
 coll = db.getCollection(collNamePrefix + collCount++);
@@ -357,10 +396,17 @@ for (const indexSpec of wildcardIndexes) {
     // Verify that when "a" is not multikey, a query with multiple successive positional path
     // components following "a" can use the wildcard index.
     let existenceQuery = {"a.0.1": {$exists: true}};
-    assertWildcardQuery(existenceQuery, Object.assign({"a.0.1": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 7,
-    });
-    assertArrayEq(coll.find(existenceQuery).toArray(), coll.find(existenceQuery).hint({$natural: 1}).toArray());
+    assertWildcardQuery(
+        existenceQuery,
+        Object.assign({"a.0.1": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 7,
+        },
+    );
+    assertArrayEq(
+        coll.find(existenceQuery).toArray(),
+        coll.find(existenceQuery).hint({$natural: 1}).toArray(),
+    );
 
     assert.commandWorked(coll.insert({a: [{1: "exists"}, 1]}));
     assert.commandWorked(coll.insert({a: [{0: [{1: ["exists"]}]}]}));
@@ -374,15 +420,25 @@ for (const indexSpec of wildcardIndexes) {
     assertWildcardQuery(existenceQuery, Object.assign({"a.0": 1}, isCompound ? compoundPath : {}), {
         "executionStats.nReturned": 14,
     });
-    assertArrayEq(coll.find(existenceQuery).toArray(), coll.find(existenceQuery).hint({$natural: 1}).toArray());
+    assertArrayEq(
+        coll.find(existenceQuery).toArray(),
+        coll.find(existenceQuery).hint({$natural: 1}).toArray(),
+    );
 
     // Verify that an existence query with two successive numeric path components, but where one is
     // not spelled like a BSON array index, can use a wildcard index.
     existenceQuery = {"a.01.0": {$exists: true}};
-    assertWildcardQuery(existenceQuery, Object.assign({"a.01.0": 1}, isCompound ? compoundPath : {}), {
-        "executionStats.nReturned": 1,
-    });
-    assertArrayEq(coll.find(existenceQuery).toArray(), coll.find(existenceQuery).hint({$natural: 1}).toArray());
+    assertWildcardQuery(
+        existenceQuery,
+        Object.assign({"a.01.0": 1}, isCompound ? compoundPath : {}),
+        {
+            "executionStats.nReturned": 1,
+        },
+    );
+    assertArrayEq(
+        coll.find(existenceQuery).toArray(),
+        coll.find(existenceQuery).hint({$natural: 1}).toArray(),
+    );
 
     // Verify that multiple successive positional path components preclude use of the wildcard index
     // when "a" is multikey.

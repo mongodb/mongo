@@ -81,7 +81,13 @@ function runSearchViewTest(conn, mongotMock, isSearchMeta, featureFlagValue, sha
 /**
  * Runs $search or $searchMeta inside a $unionWith subpipeline on a collection.
  */
-function runUnionWithSearchStageTests(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest = null) {
+function runUnionWithSearchStageTests(
+    conn,
+    mongotMock,
+    isSearchMeta,
+    featureFlagValue,
+    shardingTest = null,
+) {
     const {testDb, coll} = createTestView(conn, shardingTest);
 
     setUpSearchMocks(mongotMock, {
@@ -126,7 +132,13 @@ function runUnionWithSearchStageTests(conn, mongotMock, isSearchMeta, featureFla
 /**
  * Runs $search or $searchMeta inside a $unionWith subpipeline targeting a view.
  */
-function runUnionWithOnViewSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest = null) {
+function runUnionWithOnViewSearchTests(
+    conn,
+    mongotMock,
+    isSearchMeta,
+    featureFlagValue,
+    shardingTest = null,
+) {
     const {testDb, coll} = createTestView(conn, shardingTest);
 
     setUpSearchMocks(mongotMock, {
@@ -181,7 +193,8 @@ function runUnionWithOnViewWithSearchInViewDefinitionTests(
 
     const searchStage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
     const searchViewName = kTestViewName + (isSearchMeta ? "_searchMeta" : "_search");
-    const searchViewExists = testDb.getCollectionInfos({name: searchViewName, type: "view"}).length > 0;
+    const searchViewExists =
+        testDb.getCollectionInfos({name: searchViewName, type: "view"}).length > 0;
     if (!searchViewExists) {
         assert.commandWorked(testDb.createView(searchViewName, kTestCollName, [searchStage]));
     }
@@ -229,7 +242,13 @@ function runUnionWithOnViewWithSearchInViewDefinitionTests(
  * featureFlagExtensionsInsideHybridSearch is not, causing a retry with legacy $search.
  * When featureFlagSearchExtension is disabled, legacy $search is used from the start.
  */
-function runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest = null) {
+function runSearchHybridSearchTests(
+    conn,
+    mongotMock,
+    isSearchMeta,
+    featureFlagValue,
+    shardingTest = null,
+) {
     // Only $search is valid in hybrid search.
     if (isSearchMeta) {
         return;
@@ -254,9 +273,15 @@ function runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagV
     const expectedLegacyDelta = 2 * getNumNodes(shardingTest);
 
     const searchStage = {$search: kSearchQuery};
-    const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {searchPipeline: [searchStage]}}}}];
+    const rankFusionPipeline = [
+        {$rankFusion: {input: {pipelines: {searchPipeline: [searchStage]}}}},
+    ];
     const scoreFusionPipeline = [
-        {$scoreFusion: {input: {pipelines: {searchPipeline: [searchStage]}, normalization: "none"}}},
+        {
+            $scoreFusion: {
+                input: {pipelines: {searchPipeline: [searchStage]}, normalization: "none"},
+            },
+        },
     ];
 
     runQueriesAndVerifyMetrics({
@@ -271,12 +296,20 @@ function runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagV
         queries: [
             () => {
                 assert.commandWorked(
-                    testDb.runCommand({aggregate: kTestCollName, pipeline: rankFusionPipeline, cursor: {}}),
+                    testDb.runCommand({
+                        aggregate: kTestCollName,
+                        pipeline: rankFusionPipeline,
+                        cursor: {},
+                    }),
                 );
             },
             () => {
                 assert.commandWorked(
-                    testDb.runCommand({aggregate: kTestCollName, pipeline: scoreFusionPipeline, cursor: {}}),
+                    testDb.runCommand({
+                        aggregate: kTestCollName,
+                        pipeline: scoreFusionPipeline,
+                        cursor: {},
+                    }),
                 );
             },
         ],
@@ -295,8 +328,20 @@ function runTests(conn, mongotMock, shardingTest = null) {
         for (const featureFlagValue of [true, false]) {
             setParameterOnAllNonConfigNodes(conn, "featureFlagSearchExtension", featureFlagValue);
             runSearchViewTest(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest);
-            runUnionWithSearchStageTests(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest);
-            runUnionWithOnViewSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest);
+            runUnionWithSearchStageTests(
+                conn,
+                mongotMock,
+                isSearchMeta,
+                featureFlagValue,
+                shardingTest,
+            );
+            runUnionWithOnViewSearchTests(
+                conn,
+                mongotMock,
+                isSearchMeta,
+                featureFlagValue,
+                shardingTest,
+            );
             runUnionWithOnViewWithSearchInViewDefinitionTests(
                 conn,
                 mongotMock,
@@ -304,7 +349,13 @@ function runTests(conn, mongotMock, shardingTest = null) {
                 featureFlagValue,
                 shardingTest,
             );
-            runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue, shardingTest);
+            runSearchHybridSearchTests(
+                conn,
+                mongotMock,
+                isSearchMeta,
+                featureFlagValue,
+                shardingTest,
+            );
             // TODO SERVER-117259: Add coverage for the $search/$searchMeta-in-$lookup kickback.
         }
     }

@@ -86,7 +86,10 @@ GeoNearRandomTest.prototype.testPt = function (pt, opts) {
     // aggregation stage.
     const queryResults = runQuery(opts.nToTest);
     const aggResults = this.t
-        .aggregate([{$geoNear: {near: pt, distanceField: "dis", spherical: opts.sphere}}, {$limit: opts.nToTest}])
+        .aggregate([
+            {$geoNear: {near: pt, distanceField: "dis", spherical: opts.sphere}},
+            {$limit: opts.nToTest},
+        ])
         .toArray();
     assert.eq(queryResults, aggResults);
 };

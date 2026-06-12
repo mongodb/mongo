@@ -38,7 +38,10 @@ try {
         checkExtensionFailsToLoad({options: {loadExtensions: ""}, st: st, validateExitCode: false});
         // Extensions parameter is not allowed when the feature flag is disabled.
         checkExtensionFailsToLoad({
-            options: {loadExtensions: extensionNames[0], setParameter: {featureFlagExtensionsAPI: false}},
+            options: {
+                loadExtensions: extensionNames[0],
+                setParameter: {featureFlagExtensionsAPI: false},
+            },
             st: st,
         });
         // Extensions is a scalar, non-string.
@@ -46,8 +49,14 @@ try {
         // Extension does not exist.
         checkExtensionFailsToLoad({options: {loadExtensions: "extension_does_not_exist"}, st: st});
         // Attempts to load a filepath.
-        checkExtensionFailsToLoad({options: {loadExtensions: "etc/mongo/extensions/extension.conf"}, st: st});
-        checkExtensionFailsToLoad({options: {loadExtensions: "path/to/extension_does_not_exist.so"}, st: st});
+        checkExtensionFailsToLoad({
+            options: {loadExtensions: "etc/mongo/extensions/extension.conf"},
+            st: st,
+        });
+        checkExtensionFailsToLoad({
+            options: {loadExtensions: "path/to/extension_does_not_exist.so"},
+            st: st,
+        });
         // Extension with an .so that is missing the get_mongodb_extension symbol.
         checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[1]}, st: st});
         // Extension that attempts to register duplicate stage descriptors.

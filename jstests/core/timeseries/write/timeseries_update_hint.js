@@ -27,7 +27,10 @@ import {runningWithViewlessTimeseriesUpgradeDowngrade} from "jstests/core/timese
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && !db.getSession().getOptions().shouldRetryWrites()) {
+if (
+    runningWithViewlessTimeseriesUpgradeDowngrade(db) &&
+    !db.getSession().getOptions().shouldRetryWrites()
+) {
     jsTest.log.info(
         "Skipping test using parallel shell & failpoints since in this suite it may get interrupted by viewless timeseries upgrade/downgrade (SERVER-122589).",
     );
@@ -82,10 +85,15 @@ const testUpdateHintSucceeded = ({
                 assert.commandWorked(coll.insert(initialDocList));
 
                 assert.commandWorked(
-                    testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "alwaysOn"}),
+                    testDB.adminCommand({
+                        configureFailPoint: "hangAfterBatchUpdate",
+                        mode: "alwaysOn",
+                    }),
                 );
 
-                const res = assert.commandWorked(testDB.runCommand({update: coll.getName(), updates: updateList}));
+                const res = assert.commandWorked(
+                    testDB.runCommand({update: coll.getName(), updates: updateList}),
+                );
 
                 assert.eq(nModifiedBuckets, res.n);
                 assert.eq(initialDocList.length, resultDocList.length);
@@ -94,7 +102,9 @@ const testUpdateHintSucceeded = ({
                     const actualDoc = coll.findOne(resultDoc);
                     assert(
                         actualDoc,
-                        "Document " + tojson(resultDoc) + " is not found in the result collection as expected ",
+                        "Document " +
+                            tojson(resultDoc) +
+                            " is not found in the result collection as expected ",
                     );
                     assert.docEq(resultDoc, actualDoc);
                 });
@@ -113,12 +123,18 @@ const testUpdateHintSucceeded = ({
         ),
     );
     try {
-        const childCurOp = waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangAfterBatchUpdate")[0];
+        const childCurOp = waitForCurOpByFailPoint(
+            testDB,
+            coll.getFullName(),
+            "hangAfterBatchUpdate",
+        )[0];
 
         // Verify that the query plan uses the expected index.
         assert.eq(childCurOp.planSummary, expectedPlan);
     } finally {
-        assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "off"}));
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "off"}),
+        );
 
         awaitTestUpdate();
     }
@@ -127,12 +143,21 @@ const testUpdateHintSucceeded = ({
 /**
  * Confirms that the given update on the collection with the given indexes fails.
  */
-function testUpdateHintFailed({initialDocList, indexes, updateList, resultDocList, nModifiedBuckets, failCode}) {
+function testUpdateHintFailed({
+    initialDocList,
+    indexes,
+    updateList,
+    resultDocList,
+    nModifiedBuckets,
+    failCode,
+}) {
     const testDB = db.getSiblingDB(dbName);
     const coll = testDB.getCollection(collName);
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     assert.commandWorked(coll.createIndexes(indexes));
@@ -149,7 +174,10 @@ function testUpdateHintFailed({initialDocList, indexes, updateList, resultDocLis
 
     resultDocList.forEach((resultDoc) => {
         const actualDoc = coll.findOne(resultDoc);
-        assert(actualDoc, "Document " + tojson(resultDoc) + " is not found in the result collection as expected ");
+        assert(
+            actualDoc,
+            "Document " + tojson(resultDoc) + " is not found in the result collection as expected ",
+        );
         assert.docEq(resultDoc, actualDoc);
     });
 
@@ -250,7 +278,11 @@ testUpdateHintSucceeded({
             hint: {[metaFieldName]: 1, [timeFieldName]: 1},
         },
     ],
-    resultDocList: [hintDoc1, {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}}, hintDoc3],
+    resultDocList: [
+        hintDoc1,
+        {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
+        hintDoc3,
+    ],
     nModifiedBuckets: 1,
     expectedPlan: "IXSCAN { meta: 1, control.min.time: 1, control.max.time: 1 }",
 });

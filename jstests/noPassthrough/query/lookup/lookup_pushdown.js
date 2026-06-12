@@ -53,11 +53,23 @@ if (!sbeEnabled) {
  * In particular, if 'IndexedLoopJoin' was chosen, we verify that the index described by
  * 'indexKeyPattern' was chosen. Otherwise, we verify that 'NestedLoopJoin' was chosen.
  */
-function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, expectedStrategy, indexKeyPattern = {}) {
+function verifyEqLookupNodeStrategy(
+    explain,
+    eqLookupNodeIndex,
+    expectedStrategy,
+    indexKeyPattern = {},
+) {
     // Collect both EQ_LOOKUP and EQ_LOOKUP_UNWIND nodes. The latter appears when
     // featureFlagSbeEqLookupUnwind is enabled and $lookup absorbs a subsequent $unwind.
-    const eqLookupNodes = [...getAggPlanStages(explain, "EQ_LOOKUP"), ...getAggPlanStages(explain, "EQ_LOOKUP_UNWIND")];
-    assert.gt(eqLookupNodes.length, 0, "expected at least one EQ_LOOKUP node; got " + tojson(explain));
+    const eqLookupNodes = [
+        ...getAggPlanStages(explain, "EQ_LOOKUP"),
+        ...getAggPlanStages(explain, "EQ_LOOKUP_UNWIND"),
+    ];
+    assert.gt(
+        eqLookupNodes.length,
+        0,
+        "expected at least one EQ_LOOKUP node; got " + tojson(explain),
+    );
 
     // Verify that we're selecting an EQ_LOOKUP node within range.
     assert(
@@ -80,8 +92,15 @@ function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, expectedStrategy
     );
 
     if (strategy === "IndexedLoopJoin") {
-        assert(indexKeyPattern, "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
-        assert.docEq(indexKeyPattern, getLookupStageIndexStrategy(eqLookupNode).indexKeyPattern, eqLookupNode);
+        assert(
+            indexKeyPattern,
+            "expected indexKeyPattern should be set for IndexedLoopJoin algorithm",
+        );
+        assert.docEq(
+            indexKeyPattern,
+            getLookupStageIndexStrategy(eqLookupNode).indexKeyPattern,
+            eqLookupNode,
+        );
     }
 }
 
@@ -129,7 +148,11 @@ function runTest(
         // In the classic case, verify that $lookup was not lowered into SBE. Note that we don't
         // check for the presence of $lookup agg stages because in the sharded case, $lookup will
         // not execute on each shard and will not show up in the output of 'getAggPlanStages'.
-        assert.eq(eqLookupNodes.length, 0, "there should be no lowered EQ_LOOKUP stages; got " + tojson(explain));
+        assert.eq(
+            eqLookupNodes.length,
+            0,
+            "there should be no lowered EQ_LOOKUP stages; got " + tojson(explain),
+        );
 
         if (indexKeyPattern) {
             assert.eq(explain.stages[1].indexesUsed[0], indexKeyPattern, explain);
@@ -159,12 +182,17 @@ let view = db[viewName];
 
 function setLookupPushdownDisabled(value) {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionDisableLookupPushdown: value}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionDisableLookupPushdown: value,
+        }),
     );
 }
 
 (function testLookupPushdownQueryKnob() {
-    const pipeline = [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}];
+    const pipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
     setLookupPushdownDisabled(true);
     runTest(coll, pipeline, JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
     setLookupPushdownDisabled(false);
@@ -228,14 +256,20 @@ function setLookupPushdownDisabled(value) {
     // $lookup preceded by $match.
     runTest(
         coll,
-        [{$match: {a: {$gte: 0}}}, {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        [
+            {$match: {a: {$gte: 0}}},
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+        ],
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
     // $lookup preceded by $project.
     runTest(
         coll,
-        [{$project: {a: 1}}, {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        [
+            {$project: {a: 1}},
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+        ],
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
@@ -299,8 +333,13 @@ function setLookupPushdownDisabled(value) {
     // SBE-compatible even in restricted mode and will use hash join (small collection, no index).
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}, {$unwind: "$out"}],
-        sbeEqLookupUnwindEnabled ? JoinAlgorithm.HJ : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        [
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+            {$unwind: "$out"},
+        ],
+        sbeEqLookupUnwindEnabled
+            ? JoinAlgorithm.HJ
+            : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
     // $lookup that absorbs $match. When featureFlagSbeEqLookupUnwind is enabled, the absorbed
@@ -312,13 +351,18 @@ function setLookupPushdownDisabled(value) {
             {$unwind: "$out"},
             {$match: {out: {$gte: 0}}},
         ],
-        sbeEqLookupUnwindEnabled ? JoinAlgorithm.HJ : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        sbeEqLookupUnwindEnabled
+            ? JoinAlgorithm.HJ
+            : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
     // $lookup that does not absorb $match.
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}, {$match: {out: {$gte: 0}}}],
+        [
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+            {$match: {out: {$gte: 0}}},
+        ],
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
@@ -455,7 +499,9 @@ function setLookupPushdownDisabled(value) {
     );
 
     assert.commandWorked(foreignColl.dropIndexes());
-    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1}}));
+    assert.commandWorked(
+        foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1}}),
+    );
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
@@ -475,10 +521,15 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 
     // The index can be used in classic so lookup is not pushed but classic does not use it at the end.
-    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1, c: 1}}));
+    assert.commandWorked(
+        foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1, c: 1}}),
+    );
     runTest(
         coll,
-        [{$match: {"c.d": 1}}, {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        [
+            {$match: {"c.d": 1}},
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+        ],
         JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
         null /* indexKeyPattern */,
     );
@@ -711,7 +762,10 @@ function setLookupPushdownDisabled(value) {
     // undergoes multi-planning.
     runTest(
         coll,
-        [{$match: {a: {$gt: 1}}}, {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}}],
+        [
+            {$match: {a: {$gt: 1}}},
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}},
+        ],
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
         null /* indexKeyPattern */,
         {} /* aggOptions */,
@@ -782,7 +836,16 @@ function setLookupPushdownDisabled(value) {
         {
             $unionWith: {
                 coll: unionCollName,
-                pipeline: [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "results"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: foreignCollName,
+                            localField: "a",
+                            foreignField: "b",
+                            as: "results",
+                        },
+                    },
+                ],
             },
         },
     ]);
@@ -792,7 +855,11 @@ function setLookupPushdownDisabled(value) {
 
     // Wrap the subpipeline's explain output in a format that can be parsed by
     // 'getAggPlanStages'.
-    verifyEqLookupNodeStrategy({stages: unionWithSpec["pipeline"]}, 0, getJoinAlgorithmStrategyName(JoinAlgorithm.HJ));
+    verifyEqLookupNodeStrategy(
+        {stages: unionWithSpec["pipeline"]},
+        0,
+        getJoinAlgorithmStrategyName(JoinAlgorithm.HJ),
+    );
     assert(unionColl.drop());
 })();
 
@@ -1086,17 +1153,25 @@ MongoRunner.stopMongod(conn);
     }
 
     // Basic $lookup should exercise NLJ.
-    runTransactionTest([{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}], {
-        allowDiskUse: false,
-    });
+    runTransactionTest(
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        {
+            allowDiskUse: false,
+        },
+    );
 
     // $lookup with index on '_id' foreign field should exercise INLJ.
-    runTransactionTest([{$lookup: {from: foreignCollName, localField: "a", foreignField: "_id", as: "out"}}], {
-        allowDiskUse: false,
-    });
+    runTransactionTest(
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "_id", as: "out"}}],
+        {
+            allowDiskUse: false,
+        },
+    );
 
     // $lookup with 'allowDiskUse' should exercise HJ.
-    runTransactionTest([{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}]);
+    runTransactionTest([
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ]);
 
     assert.commandWorked(
         primary.adminCommand({
@@ -1106,7 +1181,9 @@ MongoRunner.stopMongod(conn);
     );
 
     // $lookup with HJ in transaction still works with spilling.
-    runTransactionTest([{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}]);
+    runTransactionTest([
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ]);
 
     rst.stopSet();
 })();
@@ -1157,7 +1234,11 @@ assert.commandWorked(db.createView(shardedViewName, name, [{$match: {b: {$gte: 0
     // Verify that the above pipeline targets a single shard and doesn't use a $mergeCursors stage.
     const singleShardExplain = coll.explain().aggregate(singleShardPipeline);
     assert(
-        !aggPlanHasStage(singleShardExplain, "$mergeCursors", "found $mergeCursors in " + tojson(singleShardExplain)),
+        !aggPlanHasStage(
+            singleShardExplain,
+            "$mergeCursors",
+            "found $mergeCursors in " + tojson(singleShardExplain),
+        ),
     );
     assert(
         singleShardExplain.hasOwnProperty("shards"),

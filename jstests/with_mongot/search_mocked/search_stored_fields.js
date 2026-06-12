@@ -5,7 +5,10 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {MongotMock, mongotMultiCursorResponseForBatch} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    MongotMock,
+    mongotMultiCursorResponseForBatch,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = jsTestName();
@@ -61,8 +64,14 @@ const searchQuery = {
                                 $searchScore: 0.654,
                                 storedSource: {_id: 2, title: "cookies and cakes", tasty: true},
                             },
-                            {$searchScore: 0.321, storedSource: {_id: 1, title: "cakes", tasty: true}},
-                            {$searchScore: 0.123, storedSource: {title: "vegetables", tasty: false}},
+                            {
+                                $searchScore: 0.321,
+                                storedSource: {_id: 1, title: "cakes", tasty: true},
+                            },
+                            {
+                                $searchScore: 0.123,
+                                storedSource: {title: "vegetables", tasty: false},
+                            },
                             // Ensure that if a returned document has an empty 'storedSource' field we
                             // can still return a corresponding document.
                             {$searchScore: 0.653, storedSource: {}},
@@ -72,7 +81,9 @@ const searchQuery = {
                 },
             },
         ];
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+        );
 
         let aggResults = coll
             .aggregate([
@@ -94,7 +105,10 @@ const searchQuery = {
             {_id: 1, score: 0.321, title: "cakes", tasty: true, meta: {value: 42}},
             {score: 0.123, title: "vegetables", tasty: false, meta: {value: 42}},
         ];
-        assert(arrayEq(expected, aggResults), "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(aggResults));
+        assert(
+            arrayEq(expected, aggResults),
+            "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(aggResults),
+        );
     }
 
     {
@@ -115,7 +129,9 @@ const searchQuery = {
                 },
             },
         ];
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+        );
 
         let pipeline = [
             {$search: searchQuery},
@@ -137,7 +153,10 @@ const searchQuery = {
         } else {
             let expected = [{_id: 4, score: 0.2, meta: {value: 42}}];
             let aggResults = coll.aggregate(pipeline).toArray();
-            assert(arrayEq(expected, aggResults), "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(aggResults));
+            assert(
+                arrayEq(expected, aggResults),
+                "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(aggResults),
+            );
         }
     }
 
@@ -162,7 +181,9 @@ const searchQuery = {
     const coll = testDB.getCollection(jsTestName());
     const collNS = coll.getFullName();
 
-    assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+    );
 
     // Documents that end up on shard0.
     assert.commandWorked(
@@ -274,13 +295,20 @@ const searchQuery = {
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, NumberLong(456), NumberLong(1457));
 
-    let pipeline = [{$search: searchQuery}, {$project: {_id: 1, old: 1, score: {$meta: "searchScore"}}}];
+    let pipeline = [
+        {$search: searchQuery},
+        {$project: {_id: 1, old: 1, score: {$meta: "searchScore"}}},
+    ];
 
     pipeline.push({$addFields: {meta: "$$SEARCH_META.val"}});
 
     const aggResults = coll.aggregate(pipeline).toArray();
     // Make sure order is according to $searchScore.
-    assert.eq(expectedDocs, aggResults, "Expected:\n" + tojson(expectedDocs) + "\nGot:\n" + tojson(aggResults));
+    assert.eq(
+        expectedDocs,
+        aggResults,
+        "Expected:\n" + tojson(expectedDocs) + "\nGot:\n" + tojson(aggResults),
+    );
 
     stWithMock.stop();
 })();

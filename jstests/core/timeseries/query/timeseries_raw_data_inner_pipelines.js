@@ -42,9 +42,12 @@ assert.commandWorked(localColl.insert({[timeField]: new Date(), join: "shard1"})
  */
 // Note we must lookup on "meta" because the foreign collection is raw.
 const results = localColl
-    .aggregate([{$lookup: {from: tsCollName, localField: "join", foreignField: "meta", as: "things"}}], {
-        rawData: true,
-    })
+    .aggregate(
+        [{$lookup: {from: tsCollName, localField: "join", foreignField: "meta", as: "things"}}],
+        {
+            rawData: true,
+        },
+    )
     .toArray();
 // Joined/looked-up results are in the "things" field.
 // Sample and ensure that it has the control field. Indicating the results is still bucketed/raw.
@@ -89,4 +92,8 @@ const resultsGraphLookup = localColl
     .toArray();
 // Joined/looked-up results are in the "things" field.
 // Sample and ensure that it has the control field. Indicating the results is still bucketed/raw.
-assert.hasFields(resultsGraphLookup[0]["things"][0], ["control"], tojson({erroneousResults: resultsGraphLookup}));
+assert.hasFields(
+    resultsGraphLookup[0]["things"][0],
+    ["control"],
+    tojson({erroneousResults: resultsGraphLookup}),
+);

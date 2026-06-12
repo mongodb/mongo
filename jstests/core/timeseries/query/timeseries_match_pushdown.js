@@ -50,10 +50,18 @@ const runTest = function ({docsToInsert, pipeline, eventFilter, wholeBucketFilte
     }
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     const unpackStages = getAggPlanStages(explain, "$_internalUnpackBucket");
-    assert.gte(unpackStages.length, 1, "Should have at least one $_internalUnpackBucket stage: " + tojson(explain));
+    assert.gte(
+        unpackStages.length,
+        1,
+        "Should have at least one $_internalUnpackBucket stage: " + tojson(explain),
+    );
     for (const unpackStageWrapper of unpackStages) {
         const unpackStage = unpackStageWrapper.$_internalUnpackBucket;
-        assert.docEq(eventFilter, unpackStage.eventFilter, "Incorrect eventFilter: " + tojson(explain));
+        assert.docEq(
+            eventFilter,
+            unpackStage.eventFilter,
+            "Incorrect eventFilter: " + tojson(explain),
+        );
         if (wholeBucketFilter) {
             assert.docEq(
                 wholeBucketFilter,
@@ -61,7 +69,10 @@ const runTest = function ({docsToInsert, pipeline, eventFilter, wholeBucketFilte
                 "Incorrect wholeBucketFilter: " + tojson(explain),
             );
         } else {
-            assert(!unpackStage.wholeBucketFilter, "Incorrect wholeBucketFilter: " + tojson(explain));
+            assert(
+                !unpackStage.wholeBucketFilter,
+                "Incorrect wholeBucketFilter: " + tojson(explain),
+            );
         }
     }
 
@@ -137,10 +148,16 @@ runTest({
 runTest({
     pipeline: [{$match: {$expr: {$gt: [`$${timeField}`, {$const: aTime}]}}}],
     eventFilter: {
-        $and: [{[timeField]: {$_internalExprGt: aTime}}, {$expr: {$gt: [`$${timeField}`, {$const: aTime}]}}],
+        $and: [
+            {[timeField]: {$_internalExprGt: aTime}},
+            {$expr: {$gt: [`$${timeField}`, {$const: aTime}]}},
+        ],
     },
     wholeBucketFilter: {
-        $and: [{[minTimeField]: {$_internalExprGt: aTime}}, {[minTimeField]: {$_internalExprGt: aTime}}],
+        $and: [
+            {[minTimeField]: {$_internalExprGt: aTime}},
+            {[minTimeField]: {$_internalExprGt: aTime}},
+        ],
     },
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:04"), [measureField]: 4, [metaField]: 1},
@@ -180,10 +197,16 @@ runTest({
 runTest({
     pipeline: [{$match: {$expr: {$gte: [`$${timeField}`, {$const: aTime}]}}}],
     eventFilter: {
-        $and: [{[timeField]: {$_internalExprGte: aTime}}, {$expr: {$gte: [`$${timeField}`, {$const: aTime}]}}],
+        $and: [
+            {[timeField]: {$_internalExprGte: aTime}},
+            {$expr: {$gte: [`$${timeField}`, {$const: aTime}]}},
+        ],
     },
     wholeBucketFilter: {
-        $and: [{[minTimeField]: {$_internalExprGte: aTime}}, {[minTimeField]: {$_internalExprGte: aTime}}],
+        $and: [
+            {[minTimeField]: {$_internalExprGte: aTime}},
+            {[minTimeField]: {$_internalExprGte: aTime}},
+        ],
     },
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:03"), [measureField]: 3, [metaField]: 1},
@@ -219,10 +242,16 @@ runTest({
 runTest({
     pipeline: [{$match: {$expr: {$lt: [`$${timeField}`, {$const: aTime}]}}}],
     eventFilter: {
-        $and: [{[timeField]: {$_internalExprLt: aTime}}, {$expr: {$lt: [`$${timeField}`, {$const: aTime}]}}],
+        $and: [
+            {[timeField]: {$_internalExprLt: aTime}},
+            {$expr: {$lt: [`$${timeField}`, {$const: aTime}]}},
+        ],
     },
     wholeBucketFilter: {
-        $and: [{[maxTimeField]: {$_internalExprLt: aTime}}, {[maxTimeField]: {$_internalExprLt: aTime}}],
+        $and: [
+            {[maxTimeField]: {$_internalExprLt: aTime}},
+            {[maxTimeField]: {$_internalExprLt: aTime}},
+        ],
     },
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:01"), [measureField]: 1, [metaField]: 0},
@@ -245,10 +274,16 @@ runTest({
 runTest({
     pipeline: [{$match: {$expr: {$lte: [`$${timeField}`, {$const: aTime}]}}}],
     eventFilter: {
-        $and: [{[timeField]: {$_internalExprLte: aTime}}, {$expr: {$lte: [`$${timeField}`, {$const: aTime}]}}],
+        $and: [
+            {[timeField]: {$_internalExprLte: aTime}},
+            {$expr: {$lte: [`$${timeField}`, {$const: aTime}]}},
+        ],
     },
     wholeBucketFilter: {
-        $and: [{[maxTimeField]: {$_internalExprLte: aTime}}, {[maxTimeField]: {$_internalExprLte: aTime}}],
+        $and: [
+            {[maxTimeField]: {$_internalExprLte: aTime}},
+            {[maxTimeField]: {$_internalExprLte: aTime}},
+        ],
     },
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:01"), [measureField]: 1, [metaField]: 0},
@@ -272,14 +307,19 @@ runTest({
 runTest({
     eventFilter: {[timeField]: {$eq: aTime}},
     wholeBucketFilter: {$and: [{[minTimeField]: {$eq: aTime}}, {[maxTimeField]: {$eq: aTime}}]},
-    expectedDocs: [{[timeField]: ISODate("2022-01-01T00:00:03"), [measureField]: 3, [metaField]: 1}],
+    expectedDocs: [
+        {[timeField]: ISODate("2022-01-01T00:00:03"), [measureField]: 3, [metaField]: 1},
+    ],
 });
 
 // $eq in $expr on time
 runTest({
     pipeline: [{$match: {$expr: {$eq: [`$${timeField}`, {$const: aTime}]}}}],
     eventFilter: {
-        $and: [{[timeField]: {$_internalExprEq: aTime}}, {$expr: {$eq: [`$${timeField}`, {$const: aTime}]}}],
+        $and: [
+            {[timeField]: {$_internalExprEq: aTime}},
+            {$expr: {$eq: [`$${timeField}`, {$const: aTime}]}},
+        ],
     },
     wholeBucketFilter: {
         $and: [
@@ -289,7 +329,9 @@ runTest({
             {[maxTimeField]: {$_internalExprEq: aTime}},
         ],
     },
-    expectedDocs: [{[timeField]: ISODate("2022-01-01T00:00:03"), [measureField]: 3, [metaField]: 1}],
+    expectedDocs: [
+        {[timeField]: ISODate("2022-01-01T00:00:03"), [measureField]: 3, [metaField]: 1},
+    ],
 });
 
 // $eq on measurement
@@ -390,7 +432,10 @@ runTest({
         {
             $match: {
                 $expr: {
-                    $and: [{$eq: [`$${metaField}`, `$${measureField}`]}, {$gt: [`$${timeField}`, aTime]}],
+                    $and: [
+                        {$eq: [`$${metaField}`, `$${measureField}`]},
+                        {$gt: [`$${timeField}`, aTime]},
+                    ],
                 },
             },
         },
@@ -400,12 +445,17 @@ runTest({
             {[timeField]: {$_internalExprGt: aTime}},
             {
                 $expr: {
-                    $and: [{$eq: [`$${metaField}`, `$${measureField}`]}, {$gt: [`$${timeField}`, {$const: aTime}]}],
+                    $and: [
+                        {$eq: [`$${metaField}`, `$${measureField}`]},
+                        {$gt: [`$${timeField}`, {$const: aTime}]},
+                    ],
                 },
             },
         ],
     },
-    expectedDocs: [{[timeField]: ISODate("2022-01-01T00:00:04"), [metaField]: 1, [measureField]: 1}],
+    expectedDocs: [
+        {[timeField]: ISODate("2022-01-01T00:00:04"), [metaField]: 1, [measureField]: 1},
+    ],
 });
 
 // $match on time and meta inside $expr. The entire $and expression can be rewritten into a
@@ -418,9 +468,14 @@ runTest({
         {[timeField]: ISODate("2022-01-01T00:00:04"), [metaField]: 1},
         {[timeField]: ISODate("2022-01-01T00:00:05"), [metaField]: 2},
     ],
-    pipeline: [{$match: {$expr: {$and: [{$eq: [`$${metaField}`, 1]}, {$gt: [`$${timeField}`, aTime]}]}}}],
+    pipeline: [
+        {$match: {$expr: {$and: [{$eq: [`$${metaField}`, 1]}, {$gt: [`$${timeField}`, aTime]}]}}},
+    ],
     wholeBucketFilter: {
-        $and: [{[minTimeField]: {$_internalExprGt: aTime}}, {[minTimeField]: {$_internalExprGt: aTime}}],
+        $and: [
+            {[minTimeField]: {$_internalExprGt: aTime}},
+            {[minTimeField]: {$_internalExprGt: aTime}},
+        ],
     },
     eventFilter: {
         $and: [
@@ -501,10 +556,18 @@ runTest({
         {$match: {[timeField]: {$lt: aTime}}},
     ],
     eventFilter: {
-        $and: [{[timeField]: {$gt: aTime}}, {[timeField]: {$lt: bTime}}, {[timeField]: {$lt: aTime}}],
+        $and: [
+            {[timeField]: {$gt: aTime}},
+            {[timeField]: {$lt: bTime}},
+            {[timeField]: {$lt: aTime}},
+        ],
     },
     wholeBucketFilter: {
-        $and: [{[minTimeField]: {$gt: aTime}}, {[maxTimeField]: {$lt: bTime}}, {[maxTimeField]: {$lt: aTime}}],
+        $and: [
+            {[minTimeField]: {$gt: aTime}},
+            {[maxTimeField]: {$lt: bTime}},
+            {[maxTimeField]: {$lt: aTime}},
+        ],
     },
     expectedDocs: [],
 });
@@ -524,7 +587,12 @@ runTest({
     pipeline: [
         {
             $match: {
-                $expr: {$and: [{$lt: [`$${measureField}`, `$${metaField}`]}, {$gt: [`$${metaField}`, 1]}]},
+                $expr: {
+                    $and: [
+                        {$lt: [`$${measureField}`, `$${metaField}`]},
+                        {$gt: [`$${metaField}`, 1]},
+                    ],
+                },
             },
         },
     ],
@@ -551,7 +619,9 @@ runTest({
         {[timeField]: ISODate("2022-01-01T00:00:05"), [measureField]: null, [metaField]: 2},
         {[timeField]: ISODate("2022-01-01T00:00:06"), [measureField]: 6, [metaField]: 3},
     ],
-    pipeline: [{$match: {$expr: {$and: [{$gte: [`$${measureField}`, 2]}, {$lt: [`$${metaField}`, 3]}]}}}],
+    pipeline: [
+        {$match: {$expr: {$and: [{$gte: [`$${measureField}`, 2]}, {$lt: [`$${metaField}`, 3]}]}}},
+    ],
     eventFilter: {
         $and: [
             {[measureField]: {$_internalExprGte: 2}},
@@ -581,13 +651,21 @@ runTest({
     pipeline: [
         {
             $match: {
-                $expr: {$or: [{$lt: [`$${measureField}`, `$${metaField}`]}, {$lte: [`$${metaField}`, 2]}]},
+                $expr: {
+                    $or: [
+                        {$lt: [`$${measureField}`, `$${metaField}`]},
+                        {$lte: [`$${metaField}`, 2]},
+                    ],
+                },
             },
         },
     ],
     eventFilter: {
         $expr: {
-            $or: [{$lt: [`$${measureField}`, `$${metaField}`]}, {$lte: [`$${metaField}`, {$const: 2}]}],
+            $or: [
+                {$lt: [`$${measureField}`, `$${metaField}`]},
+                {$lte: [`$${metaField}`, {$const: 2}]},
+            ],
         },
     },
     expectedDocs: [

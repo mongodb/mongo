@@ -113,7 +113,11 @@ function assertData(coll, sourceCollName, expectedShard) {
     // Connect to 'expectedShard' directly and verify that it has the collection and the contents
     // that we expect it to.
     if (expectedShard) {
-        const shardData = expectedShard.getDB(kDbName)[coll.getName()].find({}).sort({_id: 1}).toArray();
+        const shardData = expectedShard
+            .getDB(kDbName)
+            [coll.getName()].find({})
+            .sort({_id: 1})
+            .toArray();
         assert.eq(data, shardData);
     }
 }
@@ -124,7 +128,11 @@ function testDocumentsTargeting(writeStageSpec, expectedShard) {
     const expectedData = getExpectedData("documents");
     const pipeline = [{$documents: expectedData}, writeStageSpec];
     const explain = db.aggregate(pipeline, {explain: true});
-    assert.eq(Object.getOwnPropertyNames(explain.shards), [expectedShard.shardName], tojson(explain));
+    assert.eq(
+        Object.getOwnPropertyNames(explain.shards),
+        [expectedShard.shardName],
+        tojson(explain),
+    );
 
     db.aggregate(pipeline);
     assertData(coll3, "documents", expectedShard);
@@ -165,7 +173,11 @@ function testWritingAgg({
     const pipeline = [writingAggSpec];
     const explain = sourceColl.explain().aggregate(pipeline);
     assert.eq(explain.mergeShardId, expectedMergeShardId, tojson(explain));
-    assert.eq(Object.getOwnPropertyNames(explain.shards).sort(), expectedShards.sort(), tojson(explain));
+    assert.eq(
+        Object.getOwnPropertyNames(explain.shards).sort(),
+        expectedShards.sort(),
+        tojson(explain),
+    );
 
     sourceColl.aggregate(pipeline);
     destColl = db[destCollName];
@@ -176,15 +188,23 @@ function testWritingAgg({
  * Utility to test the behavior of a writing aggregate stage which runs concurrently with a
  * 'moveCollection' command.
  */
-function testConcurrentWriteAgg({failpointName, writeAggSpec, nameOfCollToMove, expectedDestShard, mergeShard}) {
+function testConcurrentWriteAgg({
+    failpointName,
+    writeAggSpec,
+    nameOfCollToMove,
+    expectedDestShard,
+    mergeShard,
+}) {
     let failpoint = configureFailPoint(mergeShard.rs.getPrimary(), failpointName);
     let writingAgg = startParallelShell(
         funWithArgs(
             function (dbName, sourceCollName, writeAggSpec) {
                 assert.commandWorked(
-                    db
-                        .getSiblingDB(dbName)
-                        .runCommand({aggregate: sourceCollName, pipeline: [writeAggSpec], cursor: {}}),
+                    db.getSiblingDB(dbName).runCommand({
+                        aggregate: sourceCollName,
+                        pipeline: [writeAggSpec],
+                        cursor: {},
+                    }),
                 );
             },
             kDbName,
@@ -202,7 +222,14 @@ function testConcurrentWriteAgg({failpointName, writeAggSpec, nameOfCollToMove, 
     assertData(coll3, kUnsplittable1CollName, expectedDestShard);
 }
 
-function testOut({sourceCollName, destCollName, destExists, expectedMergeShardId, expectedShards, expectedDestShard}) {
+function testOut({
+    sourceCollName,
+    destCollName,
+    destExists,
+    expectedMergeShardId,
+    expectedShards,
+    expectedDestShard,
+}) {
     const outSpec = {$out: destCollName};
     testWritingAgg({
         writingAggSpec: outSpec,
@@ -215,7 +242,13 @@ function testOut({sourceCollName, destCollName, destExists, expectedMergeShardId
     });
 }
 
-function testMerge({sourceCollName, destCollName, expectedMergeShardId, expectedShards, expectedDestShard}) {
+function testMerge({
+    sourceCollName,
+    destCollName,
+    expectedMergeShardId,
+    expectedShards,
+    expectedDestShard,
+}) {
     const mergeSpec = {$merge: {into: destCollName, on: "_id", whenMatched: "replace"}};
     testWritingAgg({
         writingAggSpec: mergeSpec,
@@ -336,7 +369,10 @@ testMerge({
 
 // Input is not a collection, but $documents, so we should run on the shard that owns output
 // collection (if present).
-testDocumentsTargeting({$merge: {into: coll3.getName(), on: "_id", whenMatched: "replace"}}, st.shard1);
+testDocumentsTargeting(
+    {$merge: {into: coll3.getName(), on: "_id", whenMatched: "replace"}},
+    st.shard1,
+);
 
 // Reset our collection placement.
 initCollectionPlacement();

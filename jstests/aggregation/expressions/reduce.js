@@ -4,7 +4,11 @@ import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.
 
 let coll = db.reduce;
 
-testExpression(coll, {$reduce: {input: [1, 2, 3], initialValue: {$literal: 0}, in: {$sum: ["$$this", "$$value"]}}}, 6);
+testExpression(
+    coll,
+    {$reduce: {input: [1, 2, 3], initialValue: {$literal: 0}, in: {$sum: ["$$this", "$$value"]}}},
+    6,
+);
 testExpression(coll, {$reduce: {input: [], initialValue: {$literal: 0}, in: 10}}, 0);
 testExpression(
     coll,

@@ -1,6 +1,8 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
-export const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}}}];
+export const rankFusionPipeline = [
+    {$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}}},
+];
 export const rankFusionPipelineWithScoreDetails = [
     {$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}, scoreDetails: true}},
     {$project: {scoreDetails: {$meta: "scoreDetails"}, score: {$meta: "score"}}},
@@ -35,11 +37,17 @@ export function setupUnshardedCollection(primaryConn, shardingTest = null) {
 
 export function assertRankFusionAggregateAccepted(db, collName) {
     // $rankFusion succeeds in an aggregation command.
-    assert.commandWorked(db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}),
+    );
 
     // $rankFusion with scoreDetails succeeds in an aggregation command.
     assert.commandWorked(
-        db.runCommand({aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+        db.runCommand({
+            aggregate: collName,
+            pipeline: rankFusionPipelineWithScoreDetails,
+            cursor: {},
+        }),
     );
 }
 
@@ -57,7 +65,14 @@ export function assertRefactoredMQLKeepsWorking(db) {
                 {
                     $lookup: {
                         from: collName,
-                        pipeline: [{$setWindowFields: {sortBy: {numOccurrences: 1}, output: {rank: {$rank: {}}}}}],
+                        pipeline: [
+                            {
+                                $setWindowFields: {
+                                    sortBy: {numOccurrences: 1},
+                                    output: {rank: {$rank: {}}},
+                                },
+                            },
+                        ],
                         as: "out",
                     },
                 },
@@ -72,7 +87,10 @@ export function assertRefactoredMQLKeepsWorking(db) {
         // the case where shards generate implicit $score metadata before mongos
         // is upgraded.
         const results = db[collName]
-            .aggregate([{$match: {$text: {$search: "xyz"}}}, {$sort: {score: {$meta: "textScore"}}}])
+            .aggregate([
+                {$match: {$text: {$search: "xyz"}}},
+                {$sort: {score: {$meta: "textScore"}}},
+            ])
             .toArray();
         assert.eq(results, [{_id: 0, foo: "xyz"}]);
     }
@@ -87,7 +105,9 @@ export function assertRefactoredMQLKeepsWorking(db) {
         let results = db[collName].aggregate(setWindowFields).toArray();
         assert.gt(results.length, 0);
 
-        results = db[collName].aggregate([{$_internalInhibitOptimization: {}}, setWindowFields]).toArray();
+        results = db[collName]
+            .aggregate([{$_internalInhibitOptimization: {}}, setWindowFields])
+            .toArray();
         assert.gt(results.length, 0);
     }
 }

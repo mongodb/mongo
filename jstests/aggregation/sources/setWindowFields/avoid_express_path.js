@@ -19,7 +19,11 @@ assert.commandWorked(coll.insert(documents));
 let q = [
     {"$match": {"_id": 31}},
     {
-        "$setWindowFields": {"sortBy": {"date": 1}, "partitionBy": "$array", "output": {"x": {"$denseRank": {}}}},
+        "$setWindowFields": {
+            "sortBy": {"date": 1},
+            "partitionBy": "$array",
+            "output": {"x": {"$denseRank": {}}},
+        },
     },
 ];
 

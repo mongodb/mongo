@@ -67,7 +67,9 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
         const aggCount =
             getAggPlanStages(explained, "$sort").filter((s) => sortMatchesKey(s, key)).length +
             splitStages.filter((s) => sortMatchesKey(s, key)).length;
-        const planStageCount = getPlanStages(explained, "SORT").filter((s) => planStageSortMatchesKey(s, key)).length;
+        const planStageCount = getPlanStages(explained, "SORT").filter((s) =>
+            planStageSortMatchesKey(s, key),
+        ).length;
         const count = explained.splitPipeline ? aggCount : aggCount + planStageCount;
         assertFn(count, expected, label + ": " + tojson(explained));
     }
@@ -88,25 +90,49 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     // [$sort{a,b}, $match{a>0}, $limit{5}, $sort{a}]: after MATCH_PUSHDOWN moves $match before
     // $sort{a,b}, the limit is absorbed and REDUNDANT_SORT_REMOVAL erases $sort{a}.
     it("match pushdown makes sorts adjacent: erases trailing $sort{a}", function () {
-        const pipeline = [{$sort: {a: 1, b: 1}}, {$match: {a: {$gt: 0}}}, {$limit: 5}, {$sort: {a: 1}}];
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$match: {a: {$gt: 0}}},
+            {$limit: 5},
+            {$sort: {a: 1}},
+        ];
         assertOrderedFieldsMatch(
             coll.aggregate(pipeline).toArray(),
             coll.aggregate([{$match: {a: {$gt: 0}}}, {$sort: {a: 1, b: 1}}, {$limit: 5}]).toArray(),
             ["a", "b"],
             "match pushdown",
         );
-        assertSortCount(pipeline, {a: 1}, assert.eq, 0, "expected $sort{a} removed after match pushdown");
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.eq,
+            0,
+            "expected $sort{a} removed after match pushdown",
+        );
     });
 
     // [$sort{a,b}, $limit{5}, $group{_id:"$a"}, $sort{a}]: $group cannot be pushed past $sort, so
     // it stays between the two sorts. REDUNDANT_SORT_REMOVAL sees $group (empty sort pattern) as
     // the preceding stage and does not erase $sort{a}.
     it("non-pushable $group between sorts blocks removal: keeps $sort{a}", function () {
-        const pipeline = [{$sort: {a: 1, b: 1}}, {$limit: 5}, {$group: {_id: "$a"}}, {$sort: {a: 1}}];
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$limit: 5},
+            {$group: {_id: "$a"}},
+            {$sort: {a: 1}},
+        ];
         const withSort = coll.aggregate(pipeline).toArray();
-        const reference = coll.aggregate([{$sort: {a: 1, b: 1}}, {$limit: 5}, {$group: {_id: "$a"}}]).toArray();
+        const reference = coll
+            .aggregate([{$sort: {a: 1, b: 1}}, {$limit: 5}, {$group: {_id: "$a"}}])
+            .toArray();
         assert.eq(withSort.length, reference.length, "length mismatch");
-        assertSortCount(pipeline, {a: 1}, assert.gte, 1, "expected $sort{a} to remain (not erased)");
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.gte,
+            1,
+            "expected $sort{a} to remain (not erased)",
+        );
     });
 
     // [$sort{a}, $limit{5}, $sort{a,b}]: $sort{a} does NOT guarantee {a,b} order, so
@@ -116,14 +142,26 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
         const withSort = coll.aggregate(pipeline).toArray();
         const reference = coll.aggregate([{$sort: {a: 1, b: 1}}, {$limit: 5}]).toArray();
         assert.eq(withSort.length, reference.length, "length mismatch");
-        assertSortCount(pipeline, {a: 1, b: 1}, assert.gte, 1, "expected $sort{a,b} to remain (insufficient prefix)");
+        assertSortCount(
+            pipeline,
+            {a: 1, b: 1},
+            assert.gte,
+            1,
+            "expected $sort{a,b} to remain (insufficient prefix)",
+        );
     });
 
     // [$match{a>0}, $sort{a}]: backward scan reaches $match which has no sort pattern so the rule
     // does not fire.
     it("no preceding sort pattern [$match{a>0}, $sort{a}] keeps $sort{a}", function () {
         const pipeline = [{$match: {a: {$gt: 0}}}, {$sort: {a: 1}}];
-        assertSortCount(pipeline, {a: 1}, assert.gte, 1, "expected $sort{a} to remain (no preceding sort pattern)");
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.gte,
+            1,
+            "expected $sort{a} to remain (no preceding sort pattern)",
+        );
     });
 
     // ---- $replaceRoot / $replaceWith as an intervening stage before the redundant $sort ----
@@ -139,10 +177,16 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     // TODO SERVER-127594: extend to $project, $addFields/$set/$unset once audited.
 
     it("$replaceRoot intervening: exact multi-field sort match removed", function () {
-        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}, {$sort: {a: 1, b: 1}}];
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+            {$sort: {a: 1, b: 1}},
+        ];
         assertOrderedFieldsMatch(
             coll.aggregate(pipeline).toArray(),
-            coll.aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}]).toArray(),
+            coll
+                .aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}])
+                .toArray(),
             ["a", "b"],
             "$replaceRoot exact match",
         );
@@ -156,20 +200,34 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     });
 
     it("$replaceWith intervening: descending superset sort removed", function () {
-        const pipeline = [{$sort: {a: -1, b: -1}}, {$replaceWith: {a: "$a", b: "$b"}}, {$sort: {a: -1}}];
+        const pipeline = [
+            {$sort: {a: -1, b: -1}},
+            {$replaceWith: {a: "$a", b: "$b"}},
+            {$sort: {a: -1}},
+        ];
         assertOrderedFieldsMatch(
             coll.aggregate(pipeline).toArray(),
             coll.aggregate([{$sort: {a: -1, b: -1}}, {$replaceWith: {a: "$a", b: "$b"}}]).toArray(),
             ["a", "b"],
             "$replaceWith descending",
         );
-        assertSortCount(pipeline, {a: -1}, assert.eq, 0, "expected $sort{a:-1} removed after $replaceWith");
+        assertSortCount(
+            pipeline,
+            {a: -1},
+            assert.eq,
+            0,
+            "expected $sort{a:-1} removed after $replaceWith",
+        );
     });
 
     // [$sort{a:-1,b:-1}, $replaceWith{a:"$a",b:"$b"}, $sort{a:1}]: initial sort is descending but
     // trailing sort is ascending so the final $sort must remain.
     it("$replaceWith intervening: opposite direction keeps trailing sort", function () {
-        const pipeline = [{$sort: {a: -1, b: -1}}, {$replaceWith: {a: "$a", b: "$b"}}, {$sort: {a: 1}}];
+        const pipeline = [
+            {$sort: {a: -1, b: -1}},
+            {$replaceWith: {a: "$a", b: "$b"}},
+            {$sort: {a: 1}},
+        ];
         assertSortCount(
             pipeline,
             {a: 1},
@@ -181,17 +239,29 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
 
     it("$replaceRoot renames sort key field: sort on new name kept", function () {
         const pipeline = [{$sort: {a: 1}}, {$replaceRoot: {newRoot: {b: "$a"}}}, {$sort: {b: 1}}];
-        assertSortCount(pipeline, {b: 1}, assert.gte, 1, "expected $sort{b} kept: preceding sort is on 'a', not 'b'");
+        assertSortCount(
+            pipeline,
+            {b: 1},
+            assert.gte,
+            1,
+            "expected $sort{b} kept: preceding sort is on 'a', not 'b'",
+        );
     });
 
     // [$sort{a,b}, $replaceRoot{a:"$a",b:"$b"}, $sort{a}]: $replaceRoot identity-maps every field
     // referenced by the trailing $sort{a:1}, so the backward scan continues past it, finds the
     // covering $sort{a:1,b:1}, and erases $sort{a:1}.
     it("$replaceRoot identity-maps all sort key fields: superset covering sort removes trailing sort", function () {
-        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}, {$sort: {a: 1}}];
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+            {$sort: {a: 1}},
+        ];
         assertOrderedFieldsMatch(
             coll.aggregate(pipeline).toArray(),
-            coll.aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}]).toArray(),
+            coll
+                .aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}])
+                .toArray(),
             ["a", "b"],
             "$replaceRoot identity-maps sort key fields",
         );
@@ -207,7 +277,11 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     // [$sort{a,b}, $replaceRoot{a:"$b",b:"$b"}, $sort{a}]: newRoot maps "$b" onto "a", overwriting
     // the sort key field with a different value, so the trailing sort stays.
     it("$replaceRoot overwrites sort key field with another field: trailing sort kept", function () {
-        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$b", b: "$b"}}}, {$sort: {a: 1}}];
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$b", b: "$b"}}},
+            {$sort: {a: 1}},
+        ];
         assertSortCount(
             pipeline,
             {a: 1},
@@ -259,7 +333,9 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
         ];
         assertOrderedFieldsMatch(
             coll.aggregate(pipeline).toArray(),
-            coll.aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}]).toArray(),
+            coll
+                .aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}])
+                .toArray(),
             ["a", "b"],
             "consecutive redundant sorts through transparent",
         );
@@ -324,7 +400,11 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     // sort guarantee for 'a' and 'b' no longer holds after the swap, so the trailing $sort{a,b}
     // must NOT be removed.
     it("$replaceRoot that swaps sort key fields: trailing sort kept", function () {
-        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$b", b: "$a"}}}, {$sort: {a: 1, b: 1}}];
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$b", b: "$a"}}},
+            {$sort: {a: 1, b: 1}},
+        ];
         assertSortCount(
             pipeline,
             {a: 1, b: 1},

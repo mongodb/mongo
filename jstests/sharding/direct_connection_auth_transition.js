@@ -58,7 +58,9 @@ function runInsertViaDirectConnection(hostName, dbName, collName) {
 assert.commandWorked(mongosAdminUser.getSiblingDB(dbName).runCommand({create: collName}));
 
 // Trigger a refresh to ensure the filtering information is known
-assert.commandWorked(shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + "." + collName}));
+assert.commandWorked(
+    shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + "." + collName}),
+);
 
 // Begin the insertion thread via a direct connection.
 const insertThread = new Thread(runInsertViaDirectConnection, st.shard0.host, dbName, collName);
@@ -68,7 +70,9 @@ insertThread.start();
 // Moving the collection ensures that checkmetadataconsistency will fail if the inserts continue
 // executing.
 assert.commandWorked(mongosAdminUser.runCommand({addShard: newShard.getURL()}));
-assert.commandWorked(mongosAdminUser.runCommand({moveCollection: dbName + "." + collName, toShard: newShard.name}));
+assert.commandWorked(
+    mongosAdminUser.runCommand({moveCollection: dbName + "." + collName, toShard: newShard.name}),
+);
 
 insertThread.join();
 

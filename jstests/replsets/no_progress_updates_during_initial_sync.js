@@ -20,7 +20,11 @@ const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 assert.commandWorked(primaryDb.test.insert({"starting": "doc"}, {writeConcern: {w: 2}}));
@@ -30,7 +34,10 @@ jsTestLog("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": primary.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {"hostAndPort": primary.host},
+        }),
         // Used to guarantee we have something to fetch.
         "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"}),
         "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
@@ -63,11 +70,15 @@ assert.commandWorked(
 jsTestLog("Inserting some docs on the primary to advance its lastApplied");
 
 // We insert these one at a time to avoid batching of inserts.
-[{a: 1}, {b: 2}, {c: 3}, {d: 4}, {e: 5}].forEach((doc) => assert.commandWorked(primaryDb.test.insert([doc])));
+[{a: 1}, {b: 2}, {c: 3}, {d: 4}, {e: 5}].forEach((doc) =>
+    assert.commandWorked(primaryDb.test.insert([doc])),
+);
 
 jsTestLog("Resuming initial sync");
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 
 assert.commandWorked(
     secondary.adminCommand({
@@ -79,8 +90,8 @@ assert.commandWorked(
 
 // 1. Make sure the initial syncing node sent no replSetUpdatePosition commands while applying.
 sleep(4 * 1000);
-const numUpdatePosition = assert.commandWorked(secondary.adminCommand({serverStatus: 1})).metrics.repl.network
-    .replSetUpdatePosition.num;
+const numUpdatePosition = assert.commandWorked(secondary.adminCommand({serverStatus: 1})).metrics
+    .repl.network.replSetUpdatePosition.num;
 assert.eq(0, numUpdatePosition);
 
 const nullOpTime = {
@@ -109,17 +120,27 @@ checkWriteConcernTimedOut(writeResWMaj);
 // 3. Make sure that even though the lastApplied and lastDurable have advanced on the secondary...
 const statusAfterWMaj = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 const secondaryOpTimes = statusAfterWMaj.optimes;
-assert.gte(bsonWoCompare(secondaryOpTimes.appliedOpTime, nullOpTime), 0, () => tojson(secondaryOpTimes));
-assert.gte(bsonWoCompare(secondaryOpTimes.durableOpTime, nullOpTime), 0, () => tojson(secondaryOpTimes));
+assert.gte(bsonWoCompare(secondaryOpTimes.appliedOpTime, nullOpTime), 0, () =>
+    tojson(secondaryOpTimes),
+);
+assert.gte(bsonWoCompare(secondaryOpTimes.durableOpTime, nullOpTime), 0, () =>
+    tojson(secondaryOpTimes),
+);
 assert.neq(nullWallTime, secondaryOpTimes.optimeDate, () => tojson(secondaryOpTimes));
 assert.neq(nullWallTime, secondaryOpTimes.optimeDurableDate, () => tojson(secondaryOpTimes));
 
 // ...the primary thinks they're still null as they were null in the heartbeat responses.
 const primaryStatusRes = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
 const secondaryOpTimesAsSeenByPrimary = primaryStatusRes.members[2];
-assert.docEq(nullOpTime, secondaryOpTimesAsSeenByPrimary.optime, () => tojson(secondaryOpTimesAsSeenByPrimary));
-assert.docEq(nullOpTime, secondaryOpTimesAsSeenByPrimary.optimeDurable, () => tojson(secondaryOpTimesAsSeenByPrimary));
-assert.eq(nullWallTime, secondaryOpTimesAsSeenByPrimary.optimeDate, () => tojson(secondaryOpTimesAsSeenByPrimary));
+assert.docEq(nullOpTime, secondaryOpTimesAsSeenByPrimary.optime, () =>
+    tojson(secondaryOpTimesAsSeenByPrimary),
+);
+assert.docEq(nullOpTime, secondaryOpTimesAsSeenByPrimary.optimeDurable, () =>
+    tojson(secondaryOpTimesAsSeenByPrimary),
+);
+assert.eq(nullWallTime, secondaryOpTimesAsSeenByPrimary.optimeDate, () =>
+    tojson(secondaryOpTimesAsSeenByPrimary),
+);
 assert.eq(nullWallTime, secondaryOpTimesAsSeenByPrimary.optimeDurableDate, () =>
     tojson(secondaryOpTimesAsSeenByPrimary),
 );
@@ -134,11 +155,15 @@ assert(
 assert.gte(statusAfterWMaj.initialSyncStatus.appliedOps, 6);
 
 // Turn off the last failpoint and wait for the node to finish initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 rst.awaitSecondaryNodes(null, [secondary]);
 
 // The set should now be able to satisfy {w:2} writes.
-assert.commandWorked(primaryDb.runCommand({insert: "test", documents: [{"will": "succeed"}], writeConcern: {w: 2}}));
+assert.commandWorked(
+    primaryDb.runCommand({insert: "test", documents: [{"will": "succeed"}], writeConcern: {w: 2}}),
+);
 
 rst.restart(1);
 rst.stopSet();

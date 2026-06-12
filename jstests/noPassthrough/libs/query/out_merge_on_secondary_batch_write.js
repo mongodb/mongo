@@ -57,7 +57,10 @@ export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication, testC
 
             // If the caller provided some error codes, assert that the command failed with one
             // of these codes.
-            const fn = () => db[collName].aggregate([aggWriteStageSpec], {$readPreference: {mode: readPref}}).itcount();
+            const fn = () =>
+                db[collName]
+                    .aggregate([aggWriteStageSpec], {$readPreference: {mode: readPref}})
+                    .itcount();
             const errMsg = "Failed to run aggregate with read preference " + readPref;
             if (errorCodes.length > 0) {
                 assert.throwsWithCode(fn, errorCodes, [] /* params */, errMsg);
@@ -94,29 +97,63 @@ export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication, testC
             ),
         "merge_keep_existing": () =>
             testWriteAggSpec(
-                {$merge: {into: targetCollName, whenMatched: "keepExisting", whenNotMatched: "insert"}},
+                {
+                    $merge: {
+                        into: targetCollName,
+                        whenMatched: "keepExisting",
+                        whenNotMatched: "insert",
+                    },
+                },
                 defaultSetUpFn,
             ),
         "merge_update": () =>
             testWriteAggSpec(
-                {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert", on: "_id"}},
+                {
+                    $merge: {
+                        into: targetCollName,
+                        whenMatched: "merge",
+                        whenNotMatched: "insert",
+                        on: "_id",
+                    },
+                },
                 mergeUpdateSetupFn,
             ),
         "merge_replace_fail": () =>
             testWriteAggSpec(
-                {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "fail", on: "_id"}},
+                {
+                    $merge: {
+                        into: targetCollName,
+                        whenMatched: "replace",
+                        whenNotMatched: "fail",
+                        on: "_id",
+                    },
+                },
                 defaultSetUpFn,
                 [ErrorCodes.MergeStageNoMatchingDocument],
             ),
         "merge_merge_fail": () =>
             testWriteAggSpec(
-                {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "fail", on: "_id"}},
+                {
+                    $merge: {
+                        into: targetCollName,
+                        whenMatched: "merge",
+                        whenNotMatched: "fail",
+                        on: "_id",
+                    },
+                },
                 defaultSetUpFn,
                 [ErrorCodes.MergeStageNoMatchingDocument],
             ),
         "merge_fail_insert": () =>
             testWriteAggSpec(
-                {$merge: {into: targetCollName, whenMatched: "fail", whenNotMatched: "insert", on: "_id"}},
+                {
+                    $merge: {
+                        into: targetCollName,
+                        whenMatched: "fail",
+                        whenNotMatched: "insert",
+                        on: "_id",
+                    },
+                },
                 mergeUpdateSetupFn,
                 [ErrorCodes.DuplicateKey],
             ),

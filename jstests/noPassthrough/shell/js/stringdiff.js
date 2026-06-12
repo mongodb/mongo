@@ -71,8 +71,10 @@ describe("diff strings", () => {
     });
 
     it("context window", () => {
-        const oldStr = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
-        const newStr = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nX\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
+        const oldStr =
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
+        const newStr =
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nX\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
         const expectedDiff = `\
  i
  j
@@ -88,8 +90,10 @@ describe("diff strings", () => {
     });
 
     it("overlapping context window", () => {
-        const oldStr = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
-        const newStr = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nX\nl\nm\nn\nY\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
+        const oldStr =
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
+        const newStr =
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nX\nl\nm\nn\nY\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
         const expectedDiff = `\
  g
  h
@@ -110,8 +114,10 @@ describe("diff strings", () => {
     });
 
     it("separate chunks", () => {
-        const oldStr = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
-        const newStr = "a\nb\nX\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nY\ny\nz";
+        const oldStr =
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nx\ny\nz";
+        const newStr =
+            "a\nb\nX\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\nu\nv\nw\nY\ny\nz";
         const expectedDiff = `\
  a
  b

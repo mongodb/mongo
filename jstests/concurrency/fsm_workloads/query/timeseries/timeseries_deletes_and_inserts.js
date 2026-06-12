@@ -101,7 +101,9 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         // Lower the following parameter to force more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}),
+            );
         });
 
         // Set the following parameter to avoid losing multi-updates and deletes,
@@ -115,7 +117,9 @@ export const $config = (function () {
         let migrationsWerentPaused = !preCheckResponse.clusterParameters[0].enabled;
         if (migrationsWerentPaused) {
             assert.commandWorked(
-                db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}),
+                db.adminCommand({
+                    setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}},
+                }),
             );
             cluster.executeOnMongosNodes((db) => {
                 // Ensure all mongoses have refreshed cluster parameter after being set.
@@ -130,7 +134,9 @@ export const $config = (function () {
         }
 
         db[collName].drop();
-        db.createCollection(collName, {timeseries: {timeField: "ts", metaField: "sensorId", granularity: "hours"}});
+        db.createCollection(collName, {
+            timeseries: {timeField: "ts", metaField: "sensorId", granularity: "hours"},
+        });
 
         // Create a bunch of measurements for different sensors. We will try to create the data
         // in such a way that a multi-delete will try to target one or more measurement from
@@ -140,7 +146,12 @@ export const $config = (function () {
         let idCounter = 0;
         for (let sensorId = 0; sensorId < data.nSensors; ++sensorId) {
             for (let i = 0; i < data.nReadingsPerSensor; ++i) {
-                bulk.insert({_id: idCounter++, sensorId: sensorId, readingNo: i, ts: new ISODate()});
+                bulk.insert({
+                    _id: idCounter++,
+                    sensorId: sensorId,
+                    readingNo: i,
+                    ts: new ISODate(),
+                });
             }
         }
         bulk.execute();
@@ -149,7 +160,9 @@ export const $config = (function () {
     function teardown(db, collName, cluster) {
         // Reset the yield parameter.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}),
+            );
         });
 
         const logColl = db[this.logColl];
@@ -211,7 +224,10 @@ export const $config = (function () {
             const minReading = retryUntilWorked((options) => {
                 return db[collName]
                     .aggregate(
-                        [{$match: {sensorId: deletedSensor}}, {$group: {_id: null, min: {$min: "$readingNo"}}}],
+                        [
+                            {$match: {sensorId: deletedSensor}},
+                            {$group: {_id: null, min: {$min: "$readingNo"}}},
+                        ],
                         options,
                     )
                     .toArray();
@@ -231,7 +247,9 @@ export const $config = (function () {
         });
         if (migrationsNeedReset) {
             assert.commandWorked(
-                db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: false}}}),
+                db.adminCommand({
+                    setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: false}},
+                }),
             );
             cluster.executeOnMongosNodes((db) => {
                 // Ensure all mongoses have refreshed cluster parameter after being set.

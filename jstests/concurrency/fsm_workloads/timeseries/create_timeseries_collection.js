@@ -26,7 +26,9 @@ export const $config = (function () {
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const timeFieldName = "time";
-            assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
+            assert.commandWorked(
+                db.createCollection(collName, {timeseries: {timeField: timeFieldName}}),
+            );
         }
 
         function insert(db, collName) {

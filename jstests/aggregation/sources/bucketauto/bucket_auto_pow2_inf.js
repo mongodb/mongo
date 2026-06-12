@@ -21,4 +21,7 @@ const pipeline = [
     },
 ];
 
-assert.commandFailedWithCode(coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}), 11785400);
+assert.commandFailedWithCode(
+    coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
+    11785400,
+);

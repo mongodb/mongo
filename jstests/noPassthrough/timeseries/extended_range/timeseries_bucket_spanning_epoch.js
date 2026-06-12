@@ -25,7 +25,9 @@ const db = conn.getDB(dbName);
     coll.drop();
 
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "t", metaField: "m", granularity: "hours"},
+        }),
     );
 
     // All measurements land in the same bucket.
@@ -40,7 +42,9 @@ const db = conn.getDB(dbName);
     coll.drop();
 
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "t", metaField: "m", granularity: "hours"},
+        }),
     );
 
     // Measurements land in same buckets.
@@ -64,7 +68,9 @@ const db = conn.getDB(dbName);
     coll.drop();
 
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "t", metaField: "m", granularity: "hours"},
+        }),
     );
 
     // Measurements land in different buckets.
@@ -80,7 +86,9 @@ const db = conn.getDB(dbName);
     coll.drop();
 
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "t", metaField: "m", granularity: "hours"},
+        }),
     );
 
     // Measurements land in different buckets.

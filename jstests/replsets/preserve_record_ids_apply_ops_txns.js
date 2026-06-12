@@ -25,7 +25,12 @@ const primDB = primary.getDB(dbName);
 primDB.runCommand({create: replRidNs});
 
 // Create collection WITHOUT replicated record Ids.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({
+        configureFailPoint: "overrideRecordIdsReplicatedFalse",
+        mode: "alwaysOn",
+    }),
+);
 primDB.runCommand({create: unRepRidlNs});
 
 const session = primDB.getMongo().startSession();
@@ -46,13 +51,18 @@ const validateMostRecentApplyOpsInOplogs = function () {
         "$group": {
             _id: {
                 ns: "$o.applyOps.ns",
-                hasRid: {"$cond": {if: {"$gt": ["$o.applyOps.rid", null]}, then: true, else: false}},
+                hasRid: {
+                    "$cond": {if: {"$gt": ["$o.applyOps.rid", null]}, then: true, else: false},
+                },
             },
             count: {"$sum": 1},
         },
     };
     const getLatestApplyOpsForError = () => {
-        return primDB.getSiblingDB("local").oplog.rs.aggregate([matchApplyOps, sortForMostRecent, limit]).toArray();
+        return primDB
+            .getSiblingDB("local")
+            .oplog.rs.aggregate([matchApplyOps, sortForMostRecent, limit])
+            .toArray();
     };
 
     // The aggregate returns the most recent 'applyOps' entry parsed into the following
@@ -68,7 +78,13 @@ const validateMostRecentApplyOpsInOplogs = function () {
     // of {'ns': <>, 'hasRid': false}.
     const applyOpsAggResult = primDB
         .getSiblingDB("local")
-        .oplog.rs.aggregate([matchApplyOps, sortForMostRecent, limit, unwind, groupByNamespaceAndRidField])
+        .oplog.rs.aggregate([
+            matchApplyOps,
+            sortForMostRecent,
+            limit,
+            unwind,
+            groupByNamespaceAndRidField,
+        ])
         .toArray();
 
     let containsReplNs = false;
@@ -125,7 +141,9 @@ replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
-jsTestLog("Testing that within a transaction the recordIds are preserved on update, upsert, and multi-update.");
+jsTestLog(
+    "Testing that within a transaction the recordIds are preserved on update, upsert, and multi-update.",
+);
 session.startTransaction();
 assert.commandWorked(replRidColl.update({a: 0}, {$set: {a: 101}}));
 assert.commandWorked(replRidColl.update({b: 300}, {$set: {a: 300}}, {upsert: true}));

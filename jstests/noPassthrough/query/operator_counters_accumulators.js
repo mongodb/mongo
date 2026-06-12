@@ -21,14 +21,20 @@ function runWindowFunction({accFn: winFn, arg, skipWindow}) {
     let winStage = null;
     if (skipWindow == true) {
         winStage = {
-            $setWindowFields: {partitionBy: "$a", sortBy: {b: 1}, output: {accumulated: {[winFn]: arg}}},
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {b: 1},
+                output: {accumulated: {[winFn]: arg}},
+            },
         };
     } else {
         winStage = {
             $setWindowFields: {
                 partitionBy: "$a",
                 sortBy: {b: 1},
-                output: {accumulated: {[winFn]: arg, window: {documents: ["unbounded", "unbounded"]}}},
+                output: {
+                    accumulated: {[winFn]: arg, window: {documents: ["unbounded", "unbounded"]}},
+                },
             },
         };
     }

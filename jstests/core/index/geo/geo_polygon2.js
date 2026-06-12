@@ -104,7 +104,12 @@ for (let test = 0; test < numTests; test++) {
             var lastTurtle = turtles[t][turtles[t].length - 1];
             let nextTurtle = [lastTurtle[0] + left, lastTurtle[1] + up];
 
-            if (nextTurtle[0] >= gridSize[0] || nextTurtle[1] >= gridSize[1] || nextTurtle[0] < 0 || nextTurtle[1] < 0)
+            if (
+                nextTurtle[0] >= gridSize[0] ||
+                nextTurtle[1] >= gridSize[1] ||
+                nextTurtle[0] < 0 ||
+                nextTurtle[1] < 0
+            )
                 continue;
 
             if (grid[nextTurtle[0]][nextTurtle[1]] == undefined) {
@@ -165,7 +170,10 @@ for (let test = 0; test < numTests; test++) {
 
         let fixedTurtlePath = [];
         for (var s = 1; s < turtlePath.length; s++) {
-            if (turtlePath[s - 1][0] == turtlePath[s][0] && turtlePath[s - 1][1] == turtlePath[s][1]) {
+            if (
+                turtlePath[s - 1][0] == turtlePath[s][0] &&
+                turtlePath[s - 1][1] == turtlePath[s][1]
+            ) {
                 continue;
             }
 

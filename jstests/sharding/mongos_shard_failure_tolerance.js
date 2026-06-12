@@ -23,14 +23,20 @@ let admin = st.s0.getDB("admin");
 
 const dbCollSharded = "fooSharded";
 const dbCollUnsharded = "fooUnsharded";
-assert.commandWorked(admin.runCommand({enableSharding: dbCollSharded, primaryShard: st.shard0.shardName}));
-assert.commandWorked(admin.runCommand({enableSharding: dbCollUnsharded, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: dbCollSharded, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    admin.runCommand({enableSharding: dbCollUnsharded, primaryShard: st.shard0.shardName}),
+);
 let collSharded = st.s0.getCollection(dbCollSharded + ".barSharded");
 let collUnsharded = st.s0.getCollection(dbCollUnsharded + ".barUnsharded");
 
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
-assert.commandWorked(admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 // Create the unsharded database
 assert.commandWorked(collUnsharded.insert({some: "doc"}));

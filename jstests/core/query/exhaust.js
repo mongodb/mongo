@@ -24,9 +24,9 @@ assert.eq(coll.find().batchSize(1).itcount(), docCount);
 assert.eq(coll.find().batchSize(1).addOption(DBQuery.Option.exhaust).itcount(), docCount);
 
 const findCommandBatchSize = (() => {
-    let batchSize = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}))[
-        "internalQueryFindCommandBatchSize"
-    ];
+    let batchSize = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
+    )["internalQueryFindCommandBatchSize"];
 
     if (FixtureHelpers.isMongos(db)) {
         // 'internalQueryFindCommandBatchSize' can have a different value on shard nodes and routers.
@@ -37,9 +37,12 @@ const findCommandBatchSize = (() => {
             func: (nodeDB) => {
                 batchSize = Math.min(
                     batchSize,
-                    assert.commandWorked(nodeDB.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}))[
-                        "internalQueryFindCommandBatchSize"
-                    ],
+                    assert.commandWorked(
+                        nodeDB.adminCommand({
+                            getParameter: 1,
+                            internalQueryFindCommandBatchSize: 1,
+                        }),
+                    )["internalQueryFindCommandBatchSize"],
                 );
             },
         });
@@ -116,9 +119,15 @@ const findCommandBatchSize = (() => {
     // has not yet been reached. When the batchSize is not specified explicitly, we use the
     // value from the 'internalQueryFindCommandBatchSize' parameter. This may be specified in
     // the TestData or retrieved through an admin command.
-    assert.eq(findCommandBatchSize, coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).itcount());
+    assert.eq(
+        findCommandBatchSize,
+        coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).itcount(),
+    );
 
-    assert.eq(50, coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).batchSize(50).itcount());
+    assert.eq(
+        50,
+        coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).batchSize(50).itcount(),
+    );
     assert.eq(1, coll.find().addOption(DBQuery.Option.exhaust).limit(-1).itcount());
 })();
 

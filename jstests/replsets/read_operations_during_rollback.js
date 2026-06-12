@@ -24,12 +24,17 @@ let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
 // Open a cursor on 'rollbackNode' which returns partial results, but will remain open and idle
 // during the rollback process.
-const findCmdRes = assert.commandWorked(rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 2}));
+const findCmdRes = assert.commandWorked(
+    rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 2}),
+);
 assert.eq(2, findCmdRes.cursor.firstBatch.length, findCmdRes);
 const idleCursorId = findCmdRes.cursor.id;
 assert.neq(0, idleCursorId, findCmdRes);
 
-const failPointAfterTransition = configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
+const failPointAfterTransition = configureFailPoint(
+    rollbackNode,
+    "rollbackHangAfterTransitionToRollback",
+);
 const failPointAfterPinCursor = configureFailPoint(rollbackNode, "getMoreHangAfterPinCursor");
 
 const joinGetMoreThread = startParallelShell(() => {
@@ -90,7 +95,9 @@ assert.commandFailedWithCode(
     ErrorCodes.NotPrimaryOrSecondary,
 );
 assert.commandFailedWithCode(
-    rollbackNode.getDB(dbName).runCommand({"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
+    rollbackNode
+        .getDB(dbName)
+        .runCommand({"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
     ErrorCodes.NotPrimaryOrSecondary,
 );
 
@@ -104,7 +111,9 @@ assert.commandFailedWithCode(
     ErrorCodes.NotPrimaryOrSecondary,
 );
 assert.commandFailedWithCode(
-    rollbackNode.getDB(dbName).runCommand({"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
+    rollbackNode
+        .getDB(dbName)
+        .runCommand({"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
     ErrorCodes.NotPrimaryOrSecondary,
 );
 
@@ -116,13 +125,15 @@ const replMetrics = assert.commandWorked(rollbackNode.adminCommand({serverStatus
 assert.eq(replMetrics.stateTransition.lastStateTransition, "rollback");
 // TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
 assert(
-    replMetrics.stateTransition.totalOperationsRunning || replMetrics.stateTransition.userOperationsRunning,
+    replMetrics.stateTransition.totalOperationsRunning ||
+        replMetrics.stateTransition.userOperationsRunning,
     () =>
         "Response should have a 'stateTransition.totalOperationsRunning' or 'stateTransition.userOperationsRunning' (bin <= 7.2) field: " +
         tojson(replMetrics),
 );
 assert(
-    replMetrics.stateTransition.totalOperationsKilled || replMetrics.stateTransition.userOperationsKilled,
+    replMetrics.stateTransition.totalOperationsKilled ||
+        replMetrics.stateTransition.userOperationsKilled,
     () =>
         "Response should have a 'stateTransition.totalOperationsKilled' or 'stateTransition.userOperationsKilled' (bin <= 7.2) field: " +
         tojson(replMetrics),

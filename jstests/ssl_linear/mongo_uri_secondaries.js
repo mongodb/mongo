@@ -63,7 +63,11 @@ try {
     const subShellCommand = function (hosts) {
         let Ms = [];
         for (let i = 0; i < 10; i++) {
-            Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] + "/?ssl=true&replicaSet=tlsSet"));
+            Ms.push(
+                new Mongo(
+                    "mongodb://" + hosts[0] + "," + hosts[1] + "/?ssl=true&replicaSet=tlsSet",
+                ),
+            );
         }
 
         for (let i = 0; i < 10; i++) {

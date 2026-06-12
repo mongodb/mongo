@@ -9,7 +9,10 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const replSet = new ReplSetTest({name: "flow_control_logging", nodes: 3});
 replSet.startSet({

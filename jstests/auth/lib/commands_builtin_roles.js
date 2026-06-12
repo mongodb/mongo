@@ -90,7 +90,13 @@ function testProperAuthorization(conn, t, testcase, r) {
         ) {
             // don't error if the test failed with code commandNotSupported since
             // some storage engines don't support some commands.
-            out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb + " with role " + r.key;
+            out =
+                "command failed with " +
+                tojson(res) +
+                " on db " +
+                testcase.runOnDb +
+                " with role " +
+                r.key;
         } else if (res.ok == 0 && testcase.expectFailWithErrorCodes) {
             if (!testcase.expectFailWithErrorCodes.includes(res.code)) {
                 out =
@@ -107,7 +113,10 @@ function testProperAuthorization(conn, t, testcase, r) {
     } else {
         // Don't error if the test failed with CommandNotFound rather than an authorization failure
         // because some commands may be guarded by feature flags.
-        if (res.ok == 1 || (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)) {
+        if (
+            res.ok == 1 ||
+            (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)
+        ) {
             out =
                 "expected authorization failure" +
                 " but received result " +

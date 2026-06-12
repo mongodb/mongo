@@ -20,7 +20,9 @@ const coll = db.getCollection(jsTestName());
 const timeFieldName = "time";
 const resetCollection = () => {
     coll.drop();
-    assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}),
+    );
 };
 
 const numMeasurements = 4;
@@ -30,7 +32,11 @@ const checkBucketSize = () => {
     // Buckets with large measurements are kept open after exceeding timeseriesBucketMaxSize
     // until they have 10 measurements. However, if the bucket size were to exceed 12MB, it gets
     // closed regardless.
-    const bucketDocs = getTimeseriesCollForRawOps(db, coll).find().rawData().sort({"control.min._id": 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(db, coll)
+        .find()
+        .rawData()
+        .sort({"control.min._id": 1})
+        .toArray();
     assert.eq(2, bucketDocs.length, bucketDocs);
 
     // First bucket should be full with three documents.

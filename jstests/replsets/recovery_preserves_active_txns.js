@@ -38,7 +38,9 @@ function doTest(commitOrAbort) {
     assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(
+        primary.getDB("test"),
+    );
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     jsTestLog("Insert documents until oplog exceeds oplogSize");

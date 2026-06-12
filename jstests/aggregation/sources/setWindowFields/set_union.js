@@ -62,4 +62,8 @@ assert.eq(result, [
 ]);
 
 // Test for errors on non-array types ($setUnion only supports arrays).
-assertErrorCode(coll, [{$setWindowFields: {output: {willFail: {$setUnion: "$notAnArray"}}}}], ErrorCodes.TypeMismatch);
+assertErrorCode(
+    coll,
+    [{$setWindowFields: {output: {willFail: {$setUnion: "$notAnArray"}}}}],
+    ErrorCodes.TypeMismatch,
+);

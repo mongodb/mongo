@@ -44,10 +44,23 @@ jsTest.log("Untrack a collection placed outside its non-primary shard returns er
 {
     // Move the collection outside its primary shard; this will also make it tracked.
     assert.commandWorked(db.adminCommand({moveCollection: kNss, toShard: anotherShard}));
-    verifyCollectionTrackingState(db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
+    verifyCollectionTrackingState(
+        db,
+        kNss,
+        true /*expectedToBeTracked*/,
+        true /*expectedToBeUnsplittable*/,
+    );
 
-    assert.commandFailedWithCode(db.adminCommand({untrackUnshardedCollection: kNss}), ErrorCodes.OperationFailed);
-    verifyCollectionTrackingState(db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
+    assert.commandFailedWithCode(
+        db.adminCommand({untrackUnshardedCollection: kNss}),
+        ErrorCodes.OperationFailed,
+    );
+    verifyCollectionTrackingState(
+        db,
+        kNss,
+        true /*expectedToBeTracked*/,
+        true /*expectedToBeUnsplittable*/,
+    );
 }
 
 jsTest.log("Untrack a collection placed on its primary shard succeeds.");

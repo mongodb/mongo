@@ -7,7 +7,11 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {awaitDbCheckCompletion, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {
+    awaitDbCheckCompletion,
+    resetAndInsert,
+    runDbCheck,
+} from "jstests/replsets/libs/dbcheck_utils.js";
 
 (function () {
     "use strict";
@@ -65,7 +69,8 @@ import {awaitDbCheckCompletion, resetAndInsert, runDbCheck} from "jstests/replse
         expectedCurOp["command"]["uuid"] = uuid;
         secondaryIndexCheckParameters.forEach((field) => {
             if (parameters.hasOwnProperty(field)) {
-                expectedCurOp["command"]["secondaryIndexCheckParameters"][field] = parameters[field];
+                expectedCurOp["command"]["secondaryIndexCheckParameters"][field] =
+                    parameters[field];
             }
         });
 

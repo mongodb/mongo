@@ -28,19 +28,30 @@ assert.commandFailedWithCode(
     ErrorCodes.IllegalOperation,
 );
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}, {$merge: {into: "test"}}], cursor: {}}),
-    ErrorCodes.IllegalOperation,
-);
-assert.commandFailedWithCode(
     db.runCommand({
-        aggregate: "coll",
-        pipeline: [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$merge: {into: "test"}}],
+        aggregate: 1,
+        pipeline: [{$listLocalSessions: {}}, {$merge: {into: "test"}}],
         cursor: {},
     }),
     ErrorCodes.IllegalOperation,
 );
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: 1, pipeline: [{$changeStream: {}}, {$merge: {into: "test"}}], cursor: {}}),
+    db.runCommand({
+        aggregate: "coll",
+        pipeline: [
+            {$_internalSplitPipeline: {mergeType: st.getMergeType(db)}},
+            {$merge: {into: "test"}},
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.IllegalOperation,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {}}, {$merge: {into: "test"}}],
+        cursor: {},
+    }),
     ErrorCodes.IllegalOperation,
 );
 

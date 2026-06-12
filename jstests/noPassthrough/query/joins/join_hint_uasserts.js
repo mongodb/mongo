@@ -66,7 +66,9 @@ assert.commandFailedWithCode(
 
 // Invalid node id.
 assert.commandFailedWithCode(
-    runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST", hint: {node: "bad"}}]}),
+    runWithHint({
+        perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST", hint: {node: "bad"}}],
+    }),
     12016301,
 );
 assert.commandFailedWithCode(
@@ -77,18 +79,26 @@ assert.commandFailedWithCode(
 );
 
 // Invalid enumeration mode string.
-assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "INVALID"}]}), 12016302);
+assert.commandFailedWithCode(
+    runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "INVALID"}]}),
+    12016302,
+);
 
 // Invalid plan shape string.
 assert.commandFailedWithCode(
-    runWithHint({planShape: "badShape", perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST"}]}),
+    runWithHint({
+        planShape: "badShape",
+        perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST"}],
+    }),
     12016303,
 );
 
 // Inavlid JoinHint.
 assert.commandFailedWithCode(
     runWithHint({
-        perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST", hint: {unknownField: "value"}}],
+        perSubsetLevelMode: [
+            {level: NumberInt(0), mode: "CHEAPEST", hint: {unknownField: "value"}},
+        ],
     }),
     12016306,
 );
@@ -98,7 +108,10 @@ assert.commandFailedWithCode(
 );
 
 // Invalid level.
-assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: [{level: NumberInt(-1), mode: "CHEAPEST"}]}), 12016308);
+assert.commandFailedWithCode(
+    runWithHint({perSubsetLevelMode: [{level: NumberInt(-1), mode: "CHEAPEST"}]}),
+    12016308,
+);
 
 // Invalid perSubsetLevelMode.
 assert.commandFailedWithCode(
@@ -110,7 +123,10 @@ assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: [{mode: "CHEAPEST"
 assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: "notAnArray"}), 12016317);
 
 // Invalid enumeration mode sequence (must start with level 0, no dupes).
-assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: [{level: NumberInt(1), mode: "CHEAPEST"}]}), 12016311);
+assert.commandFailedWithCode(
+    runWithHint({perSubsetLevelMode: [{level: NumberInt(1), mode: "CHEAPEST"}]}),
+    12016311,
+);
 assert.commandFailedWithCode(
     runWithHint({
         perSubsetLevelMode: [
@@ -147,7 +163,10 @@ assert.commandWorked(
         internalJoinReorderMode: "random",
     }),
 );
-assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST"}]}), 12016318);
+assert.commandFailedWithCode(
+    runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST"}]}),
+    12016318,
+);
 
 // $_internalJoinHint without join optimization enabled should fail.
 assert.commandWorked(

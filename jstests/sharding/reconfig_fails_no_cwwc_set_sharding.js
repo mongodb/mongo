@@ -62,7 +62,12 @@ function testReconfig(rst, config, shouldSucceed, errCode, errMsg) {
 
 jsTestLog("Testing to reconfig a shard that is not yet added to a sharded cluster.");
 let logPrefix = "While the shard is not part of a sharded cluster: ";
-let shardServer = new ReplSetTest({name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
+let shardServer = new ReplSetTest({
+    name: "shardServer",
+    nodes: 1,
+    nodeOptions: {shardsvr: ""},
+    useHostName: true,
+});
 shardServer.startSet();
 shardServer.initiate();
 
@@ -74,7 +79,9 @@ testReconfig(
     true /* shouldSucceed */,
 );
 
-jsTestLog(logPrefix + "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.");
+jsTestLog(
+    logPrefix + "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.",
+);
 shardServer.remove(arbiter);
 testReconfig(shardServer, removeNodeConfig(shardServer, arbiter), true /* shouldSucceed */);
 
@@ -82,7 +89,12 @@ shardServer.stopSet();
 
 jsTestLog("Testing to reconfig a shard that is part of a sharded cluster.");
 logPrefix = "While the shard is part of a sharded cluster: ";
-shardServer = new ReplSetTest({name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
+shardServer = new ReplSetTest({
+    name: "shardServer",
+    nodes: 1,
+    nodeOptions: {shardsvr: ""},
+    useHostName: true,
+});
 shardServer.startSet();
 shardServer.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -100,10 +112,18 @@ let admin = st.getDB("admin");
 jsTestLog("Adding the shard to the cluster should succeed.");
 assert.commandWorked(admin.runCommand({addshard: shardServer.getURL()}));
 
-jsTestLog(logPrefix + "Adding an non-arbiter node that will keep IDWC set to (w: 'Majority') should succeed.");
+jsTestLog(
+    logPrefix +
+        "Adding an non-arbiter node that will keep IDWC set to (w: 'Majority') should succeed.",
+);
 testReconfig(
     shardServer,
-    addNodeConfig(shardServer, 1 /* nodeId */, shardServer.add({shardsvr: ""}) /* conn */, false /* arbiter */),
+    addNodeConfig(
+        shardServer,
+        1 /* nodeId */,
+        shardServer.add({shardsvr: ""}) /* conn */,
+        false /* arbiter */,
+    ),
     true /* shouldSucceed */,
 );
 
@@ -119,7 +139,9 @@ testReconfig(
 
 jsTestLog("Setting the CWWC on the cluster.");
 logPrefix = "While CWWC is set on the sharded cluster: ";
-assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}),
+);
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should succeed.");
 testReconfig(
@@ -138,7 +160,9 @@ st.configRS.awaitNoPrimary();
 
 // The reason why this is okay is because CWWC had to have been set for the cluster to get to this
 // point, even if we can't check the config servers for it.
-jsTestLog(logPrefix + "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.");
+jsTestLog(
+    logPrefix + "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.",
+);
 shardServer.remove(arbiter);
 testReconfig(shardServer, removeNodeConfig(shardServer, arbiter), true /* shouldSucceed */);
 

@@ -77,7 +77,9 @@ function checkIfNewerVersionAvailable(context) {
                 .then((selection) => {
                     if (selection === "Copy Install Command") {
                         vscode.env.clipboard.writeText(installScriptPath).then(() => {
-                            vscode.window.showInformationMessage("Install command copied to clipboard!");
+                            vscode.window.showInformationMessage(
+                                "Install command copied to clipboard!",
+                            );
                         });
                     }
                 });
@@ -119,7 +121,8 @@ function registerFileSaveWarning(context) {
             createDebugAdapterTracker(_session) {
                 return {
                     onDidSendMessage(message) {
-                        if (message.type === "event" && message.event === "stopped") sessionStopped = true;
+                        if (message.type === "event" && message.event === "stopped")
+                            sessionStopped = true;
                     },
                     onWillReceiveMessage(message) {
                         if (
@@ -148,7 +151,9 @@ function registerFileSaveWarning(context) {
             // That's typical of any compiled code mid-execution, and this is a reasonable warning
             // for users in context of breakpoints.
             const hasBreakpointInFile = vscode.debug.breakpoints.some(
-                (bp) => bp instanceof vscode.SourceBreakpoint && bp.location.uri.toString() === doc.uri.toString(),
+                (bp) =>
+                    bp instanceof vscode.SourceBreakpoint &&
+                    bp.location.uri.toString() === doc.uri.toString(),
             );
             if (!hasBreakpointInFile) return;
 

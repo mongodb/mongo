@@ -45,7 +45,9 @@ function generateDoc(time, metaValue) {
 // Shard key on just the time field.
 (function timeShardKey() {
     const mongosDB = st.s.getDB(dbName);
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};
@@ -63,7 +65,10 @@ function generateDoc(time, metaValue) {
     // chunk [2020-01-01, MaxKey].
     let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
     assert.commandWorked(
-        mongosDB.adminCommand({split: getTimeseriesCollForDDLOps(mongosDB, coll).getFullName(), middle: splitPoint}),
+        mongosDB.adminCommand({
+            split: getTimeseriesCollForDDLOps(mongosDB, coll).getFullName(),
+            middle: splitPoint,
+        }),
     );
 
     // Move one of the chunks into the second shard.
@@ -110,13 +115,18 @@ function generateDoc(time, metaValue) {
 
     let indexKeys = listIndexesOutput.cursor.firstBatch.map((x) => x.key);
     assert.sameMembers(
-        [{[subField1]: 1}, {[subField2]: 1}, {[timeField]: 1}, {[metaField]: 1}].concat(extraIndexes),
+        [{[subField1]: 1}, {[subField2]: 1}, {[timeField]: 1}, {[metaField]: 1}].concat(
+            extraIndexes,
+        ),
         indexKeys,
     );
 
     assert.commandWorked(coll.dropIndex({[subField2]: 1}));
     indexKeys = coll.getIndexKeys();
-    assert.sameMembers([{[subField1]: 1}, {[timeField]: 1}, {[metaField]: 1}].concat(extraIndexes), indexKeys);
+    assert.sameMembers(
+        [{[subField1]: 1}, {[timeField]: 1}, {[metaField]: 1}].concat(extraIndexes),
+        indexKeys,
+    );
 
     plan = coll.find({[metaField]: 0}).explain();
     assert.eq(getAggPlanStages(plan, "IXSCAN").length, 2, plan);
@@ -147,15 +157,22 @@ function generateDoc(time, metaValue) {
     }
 
     assert.commandWorked(
-        getTimeseriesCollForRawOps(mongosDB, coll).dropIndexes({"meta.subField1": 1}, getRawOperationSpec(mongosDB)),
+        getTimeseriesCollForRawOps(mongosDB, coll).dropIndexes(
+            {"meta.subField1": 1},
+            getRawOperationSpec(mongosDB),
+        ),
     );
 
-    indexKeys = getTimeseriesCollForRawOps(mongosDB, coll).getIndexKeys(getRawOperationSpec(mongosDB));
+    indexKeys = getTimeseriesCollForRawOps(mongosDB, coll).getIndexKeys(
+        getRawOperationSpec(mongosDB),
+    );
     const indexesToAdd = {"control.min.time": 1, "control.max.time": 1};
     assert.sameMembers([indexesToAdd].concat(extraBucketIndexes), indexKeys);
 
     assert.commandWorked(createRawTimeseriesIndex(coll, {"meta.subField2": 1}));
-    indexKeys = getTimeseriesCollForRawOps(mongosDB, coll).getIndexKeys(getRawOperationSpec(mongosDB));
+    indexKeys = getTimeseriesCollForRawOps(mongosDB, coll).getIndexKeys(
+        getRawOperationSpec(mongosDB),
+    );
     assert.sameMembers([indexesToAdd, {"meta.subField2": 1}].concat(extraBucketIndexes), indexKeys);
 
     assert(coll.drop());

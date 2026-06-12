@@ -48,30 +48,37 @@ const shard1DB = st.shard1.getDB(jsTestName());
 // Turn off best-effort recipient metadata refresh post-migration commit on both shards because
 // it creates non-determinism for the profiler.
 assert.commandWorked(
-    st.shard0
-        .getDB("admin")
-        .runCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+    st.shard0.getDB("admin").runCommand({
+        configureFailPoint: "migrationRecipientFailPostCommitRefresh",
+        mode: "alwaysOn",
+    }),
 );
 assert.commandWorked(
-    st.shard1
-        .getDB("admin")
-        .runCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+    st.shard1.getDB("admin").runCommand({
+        configureFailPoint: "migrationRecipientFailPostCommitRefresh",
+        mode: "alwaysOn",
+    }),
 );
 
 // Turn off automatic shard refresh in mongos when a stale config error is thrown.
 assert.commandWorked(
-    mongosForAgg
-        .getDB("admin")
-        .runCommand({configureFailPoint: "doNotRefreshShardsOnRetargettingError", mode: "alwaysOn"}),
+    mongosForAgg.getDB("admin").runCommand({
+        configureFailPoint: "doNotRefreshShardsOnRetargettingError",
+        mode: "alwaysOn",
+    }),
 );
 
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Shard the test collection on _id.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // Split the collection into 4 chunks: [MinKey, -100), [-100, 0), [0, 100), [100, MaxKey).
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: -100}}));
@@ -80,10 +87,18 @@ assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), mid
 
 // Move the [0, 100) and [100, MaxKey) chunks to st.shard1.shardName.
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 50},
+        to: st.shard1.shardName,
+    }),
 );
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 150},
+        to: st.shard1.shardName,
+    }),
 );
 
 // Write one document into each of the chunks.
@@ -95,7 +110,9 @@ assert.commandWorked(mongosColl.insert({_id: 150}));
 const shardExceptions = [ErrorCodes.StaleConfig, ErrorCodes.StaleEpoch];
 
 // Create an $_internalSplitPipeline stage that forces the merge to occur on the same shard.
-let forceOwningShardMerge = [{$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}];
+let forceOwningShardMerge = [
+    {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}},
+];
 
 function runAggShardTargetTest({splitPoint}) {
     // Ensure that both mongoS have up-to-date caches, and enable the profiler on both shards.
@@ -116,7 +133,9 @@ function runAggShardTargetTest({splitPoint}) {
     testName = "agg_shard_targeting_range_single_shard_all_chunks_on_same_shard";
     assert.eq(
         mongosColl
-            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint), {comment: testName})
+            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint), {
+                comment: testName,
+            })
             .itcount(),
         2,
     );
@@ -153,7 +172,9 @@ function runAggShardTargetTest({splitPoint}) {
     assert.commandWorked(
         mongosDB.runCommand({
             aggregate: mongosColl.getName(),
-            pipeline: [{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat([{$out: testName}]),
+            pipeline: [{$match: {_id: {$gte: -150, $lte: -50}}}]
+                .concat(splitPoint)
+                .concat([{$out: testName}]),
             comment: testName,
             cursor: {},
         }),
@@ -210,9 +231,14 @@ function runAggShardTargetTest({splitPoint}) {
     testName = "agg_shard_targeting_backout_passthrough_and_split_if_cache_is_stale";
     assert.eq(
         mongosColl
-            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat(forceOwningShardMerge), {
-                comment: testName,
-            })
+            .aggregate(
+                [{$match: {_id: {$gte: -150, $lte: -50}}}]
+                    .concat(splitPoint)
+                    .concat(forceOwningShardMerge),
+                {
+                    comment: testName,
+                },
+            )
             .itcount(),
         2,
     );
@@ -300,9 +326,14 @@ function runAggShardTargetTest({splitPoint}) {
     testName = "agg_shard_targeting_backout_split_pipeline_and_reassemble_if_cache_is_stale";
     assert.eq(
         mongosColl
-            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat(forceOwningShardMerge), {
-                comment: testName,
-            })
+            .aggregate(
+                [{$match: {_id: {$gte: -150, $lte: -50}}}]
+                    .concat(splitPoint)
+                    .concat(forceOwningShardMerge),
+                {
+                    comment: testName,
+                },
+            )
             .itcount(),
         2,
     );

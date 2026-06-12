@@ -68,19 +68,34 @@ assert.gt(dataSize, memoryLimitMB * 1024 * 1024);
 function test({pipeline, expectedCodes, canSpillToDisk}) {
     // Test that 'allowDiskUse: false' does indeed prevent spilling to disk.
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: false}),
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline,
+            cursor: {},
+            allowDiskUse: false,
+        }),
         expectedCodes,
     );
 
     // If this command supports spilling to disk, ensure that it will succeed when disk use is
     // allowed.
-    const res = db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true});
+    const res = db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: pipeline,
+        cursor: {},
+        allowDiskUse: true,
+    });
     if (canSpillToDisk) {
         assert.eq(new DBCommandCursor(coll.getDB(), res).itcount(), coll.count()); // all tests output one doc per input doc
 
         if (isSbeGroupLookupPushdownEnabled) {
             const explain = db.runCommand({
-                explain: {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true},
+                explain: {
+                    aggregate: coll.getName(),
+                    pipeline: pipeline,
+                    cursor: {},
+                    allowDiskUse: true,
+                },
             });
             const hashAggGroups = getSbePlanStages(explain, "group");
             if (hashAggGroups.length > 0) {
@@ -184,13 +199,21 @@ test({
 // so may hit the group error code before we hit ExceededMemoryLimit.
 test({
     pipeline: [{$group: {_id: null, bigArray: {$push: "$bigStr"}}}],
-    expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
+    expectedCodes: [
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        ErrorCodes.ExceededMemoryLimit,
+    ],
     canSpillToDisk: false,
 });
 
 test({
-    pipeline: [{$group: {_id: null, bigArray: {$addToSet: {$concat: ["$bigStr", {$toString: "$_id"}]}}}}],
-    expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
+    pipeline: [
+        {$group: {_id: null, bigArray: {$addToSet: {$concat: ["$bigStr", {$toString: "$_id"}]}}}},
+    ],
+    expectedCodes: [
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        ErrorCodes.ExceededMemoryLimit,
+    ],
     canSpillToDisk: false,
 });
 
@@ -212,7 +235,10 @@ for (const op of ["$firstN", "$lastN", "$minN", "$maxN", "$topN", "$bottomN"]) {
     // reduce the memory consumption of our group in this case.
     test({
         pipeline: [{$group: {_id: null, bigArray: {[op]: spec}}}],
-        expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
+        expectedCodes: [
+            ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+            ErrorCodes.ExceededMemoryLimit,
+        ],
         canSpillToDisk: false,
     });
 
@@ -249,14 +275,21 @@ for (let i = 0; i < numGroups; ++i) {
 }
 
 function setHashGroupMemoryParameters(memoryLimit) {
-    return setMemoryParamHelper("internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", memoryLimit);
+    return setMemoryParamHelper(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill",
+        memoryLimit,
+    );
 }
 
 // Runs a group query containing the given 'accumulator' after sorting the data by the given
 // 'sortInputBy' field. Then verifies that the query results are equal to 'expectedOutput'. If SBE
 // is enabled, also runs explain and checks that the execution stats show that spilling occurred.
 function testAccumulator({accumulator, sortInputBy, expectedOutput, ignoreArrayOrder = false}) {
-    const pipeline = [{$sort: {[sortInputBy]: 1}}, {$group: {_id: "$a", acc: accumulator}}, {$sort: {_id: 1}}];
+    const pipeline = [
+        {$sort: {[sortInputBy]: 1}},
+        {$group: {_id: "$a", acc: accumulator}},
+        {$sort: {_id: 1}},
+    ];
     const results = coll.aggregate(pipeline).toArray();
 
     if (ignoreArrayOrder) {

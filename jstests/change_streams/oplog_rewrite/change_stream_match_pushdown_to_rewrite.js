@@ -29,7 +29,9 @@ const db = mongosConn.getDB(dbName);
 // Enable a failpoint that will prevent $expr match expressions from generating $_internalExprEq
 // or similar expressions. This ensures that the following test-cases only exercise the $expr
 // rewrites.
-assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}),
+);
 FixtureHelpers.runCommandOnEachPrimary({
     db: db.getSiblingDB("admin"),
     cmdObj: {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"},
@@ -45,7 +47,10 @@ const ns2 = dbName + ".newColl2";
 
 // Open a change stream and store the resume token. This resume token will be used to replay the
 // stream after this point.
-const resumeAfterToken = db.getSiblingDB("admin").watch([], {allChangesForCluster: true}).getResumeToken();
+const resumeAfterToken = db
+    .getSiblingDB("admin")
+    .watch([], {allChangesForCluster: true})
+    .getResumeToken();
 
 // A helper that opens a change stream on the whole cluster with the user supplied match expression
 // 'userMatchExpr' and validates that:
@@ -106,11 +111,19 @@ verifyOnWholeCluster(
 // Ensure that the '$match' on the 'to' object and equivalent '$expr' expression with only db
 // component should not emit any document and the oplog should not return any documents.
 verifyOnWholeCluster({$match: {to: {db: dbName}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$eq: ["$to", {db: dbName}]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {$expr: {$eq: ["$to", {db: dbName}]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // Ensure that the 'to' object and equivalent '$expr' expression with 'unknown' collection does not
 // exists and the oplog cursor returns 0 document.
-verifyOnWholeCluster({$match: {to: {db: dbName, coll: "unknown"}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {to: {db: dbName, coll: "unknown"}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 verifyOnWholeCluster(
     {$match: {$expr: {$eq: ["$to", {db: dbName, coll: "unknown"}]}}},
     {},
@@ -119,7 +132,11 @@ verifyOnWholeCluster(
 
 // Ensure that the 'to' object and equivalent '$expr' expression with flipped fields does not match
 // and the oplog cursor returns 0 document.
-verifyOnWholeCluster({$match: {to: {coll: "newColl1", db: dbName}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {to: {coll: "newColl1", db: dbName}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 verifyOnWholeCluster(
     {$match: {$expr: {$eq: ["$to", {coll: "newColl1", db: dbName}]}}},
     {},
@@ -172,7 +189,9 @@ verifyOnWholeCluster(
 );
 verifyOnWholeCluster(
     {
-        $match: {$expr: {$regexMatch: {input: "$to.db", regex: "^(change_stream_match_pushdown.*$)"}}},
+        $match: {
+            $expr: {$regexMatch: {input: "$to.db", regex: "^(change_stream_match_pushdown.*$)"}},
+        },
     },
     {coll1: {rename: ["newColl1"]}, coll2: {rename: ["newColl2"]}},
     [2, 0] /* expectedOplogRetDocsForEachShard*/,
@@ -186,7 +205,11 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $regexMatch: {input: "$to.db", regex: "^(Change_Stream_MATCH_PUSHDOWN.*$)", options: "i"},
+                $regexMatch: {
+                    input: "$to.db",
+                    regex: "^(Change_Stream_MATCH_PUSHDOWN.*$)",
+                    options: "i",
+                },
             },
         },
     },
@@ -201,7 +224,12 @@ verifyOnWholeCluster(
 verifyOnWholeCluster(
     {
         $match: {
-            $expr: {$regexMatch: {input: "$to.db", regex: "(^unknown$|^change_stream_match_pushdown.*$)"}},
+            $expr: {
+                $regexMatch: {
+                    input: "$to.db",
+                    regex: "(^unknown$|^change_stream_match_pushdown.*$)",
+                },
+            },
         },
     },
     {coll1: {rename: ["newColl1"]}, coll2: {rename: ["newColl2"]}},
@@ -215,7 +243,9 @@ verifyOnWholeCluster(
 verifyOnWholeCluster(
     {
         $match: {
-            $expr: {$regexMatch: {input: "$to.db", regex: "^unknown$|^change_stream_match_pushdown.*$"}},
+            $expr: {
+                $regexMatch: {input: "$to.db", regex: "^unknown$|^change_stream_match_pushdown.*$"},
+            },
         },
     },
     {coll1: {rename: ["newColl1"]}, coll2: {rename: ["newColl2"]}},
@@ -225,17 +255,33 @@ verifyOnWholeCluster(
 // Ensure that the '$match' on non-existing db and equivalent '$expr' expression should not return
 // any document and oplog should not return any document for each shard.
 verifyOnWholeCluster({$match: {"to.db": "unknown"}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$eq: ["$to.db", "unknown"]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {$expr: {$eq: ["$to.db", "unknown"]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // Ensure that the '$match' on empty db and equivalent '$expr' expression should not return any
 // document and oplog should not return any document for each shard.
 verifyOnWholeCluster({$match: {"to.db": ""}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$eq: ["$to.db", ""]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {$expr: {$eq: ["$to.db", ""]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // Ensure that the '$match' on sub field of db and equivalent '$expr' expression should not return
 // any document and oplog should not return any document for each shard.
-verifyOnWholeCluster({$match: {"to.db.extra": dbName}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$eq: ["$to.db.extra", dbName]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {"to.db.extra": dbName}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
+verifyOnWholeCluster(
+    {$match: {$expr: {$eq: ["$to.db.extra", dbName]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // This group of tests ensures that the '$match' on collection field path and equivalent '$expr'
 // expression should emit only the required documents and oplog should return only required
@@ -331,16 +377,28 @@ verifyOnWholeCluster(
 // Ensure that the '$match' on non-existing collection and equivalent '$expr' expression should not
 // return any document and oplog should not return any document for each shard.
 verifyOnWholeCluster({$match: {"to.coll": "unknown"}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$eq: ["$to.coll", "unknown"]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {$expr: {$eq: ["$to.coll", "unknown"]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // Ensure that the '$match' on empty collection and equivalent '$expr' expression should not return
 // any document and oplog should not return any document for each shard.
 verifyOnWholeCluster({$match: {"to.coll": ""}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$eq: ["$to.coll", ""]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {$expr: {$eq: ["$to.coll", ""]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // Ensure that the '$match' on sub field of collection and equivalent '$expr' expression should not
 // return any document and oplog should not return any document for each shard.
-verifyOnWholeCluster({$match: {"to.coll.extra": "coll1"}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {"to.coll.extra": "coll1"}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 verifyOnWholeCluster(
     {$match: {$expr: {$eq: ["$to.coll.extra", "coll1"]}}},
     {},
@@ -388,7 +446,13 @@ verifyOnWholeCluster(
         $match: {
             $expr: {
                 $or: [
-                    {$regexMatch: {input: "$to.db", regex: "^change_stream_MATCH.*$", options: "i"}},
+                    {
+                        $regexMatch: {
+                            input: "$to.db",
+                            regex: "^change_stream_MATCH.*$",
+                            options: "i",
+                        },
+                    },
                     {$regexMatch: {input: "$to.db", regex: "^unknown$", options: "i"}},
                 ],
             },
@@ -401,7 +465,11 @@ verifyOnWholeCluster(
 // Ensure that an empty '$in' on db path and equivalent '$expr' expression should not match any
 // collection and oplog should not return any document for each shard.
 verifyOnWholeCluster({$match: {"to.db": {$in: []}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
-verifyOnWholeCluster({$match: {$expr: {$in: ["$to.db", []]}}}, {}, 0 /* expectedOplogRetDocsForEachShard*/);
+verifyOnWholeCluster(
+    {$match: {$expr: {$in: ["$to.db", []]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard*/,
+);
 
 // Ensure that '$in' with invalid db cannot be rewritten and oplog should return all documents for
 // each shard.
@@ -430,7 +498,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$eq: ["$to.db", "unknown1"]}, {$regexMatch: {input: "$to.db", regex: "^unknown2$"}}],
+                $or: [
+                    {$eq: ["$to.db", "unknown1"]},
+                    {$regexMatch: {input: "$to.db", regex: "^unknown2$"}},
+                ],
             },
         },
     },
@@ -574,7 +645,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$eq: ["$to.coll", "newColl1"]}, {$regexMatch: {input: "$to.coll", regex: "^newColl.*2"}}],
+                $or: [
+                    {$eq: ["$to.coll", "newColl1"]},
+                    {$regexMatch: {input: "$to.coll", regex: "^newColl.*2"}},
+                ],
             },
         },
     },
@@ -593,7 +667,10 @@ verifyOnWholeCluster(
     {
         $match: {
             $expr: {
-                $or: [{$eq: ["$to.coll", "unknown1"]}, {$regexMatch: {input: "$to.coll", regex: "^unknown2$"}}],
+                $or: [
+                    {$eq: ["$to.coll", "unknown1"]},
+                    {$regexMatch: {input: "$to.coll", regex: "^unknown2$"}},
+                ],
             },
         },
     },
@@ -687,7 +764,10 @@ verifyOnWholeCluster(
                 $not: {
                     $or: [
                         {
-                            $regexMatch: {input: "$to.db", regex: "change_stream_match_pushdown_and_rewr.*"},
+                            $regexMatch: {
+                                input: "$to.db",
+                                regex: "change_stream_match_pushdown_and_rewr.*",
+                            },
                         },
                         {$regexMatch: {input: "$to.db", regex: "^unknown.*"}},
                     ],
@@ -804,7 +884,10 @@ verifyOnWholeCluster(
         $match: {
             $expr: {
                 $not: {
-                    $or: [{$eq: ["$to.coll", "newColl1"]}, {$regexMatch: {input: "$to.coll", regex: "^newColl2$"}}],
+                    $or: [
+                        {$eq: ["$to.coll", "newColl1"]},
+                        {$regexMatch: {input: "$to.coll", regex: "^newColl2$"}},
+                    ],
                 },
             },
         },

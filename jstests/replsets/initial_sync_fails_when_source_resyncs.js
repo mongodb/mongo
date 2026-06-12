@@ -16,7 +16,11 @@ let initialSyncSource = rst.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Add some data to be cloned.
@@ -33,7 +37,10 @@ const initialSyncNode = rst.add({
         // that instead.
         "failpoint.hangBeforeStartingOplogFetcher": tojson({mode: "alwaysOn"}),
         "numInitialSyncAttempts": 1,
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: initialSyncSource.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: initialSyncSource.host},
+        }),
     },
 });
 rst.reInitiate();
@@ -53,10 +60,17 @@ const failPointData = {
     nss: "test.test",
 };
 // Set us up to stop right before the given stage.
-const beforeStageFailPoint = configureFailPoint(initialSyncNodeDb, "hangBeforeClonerStage", failPointData);
+const beforeStageFailPoint = configureFailPoint(
+    initialSyncNodeDb,
+    "hangBeforeClonerStage",
+    failPointData,
+);
 // Release the initial failpoint.
 assert.commandWorked(
-    initialSyncNodeDb.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNodeDb.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 beforeStageFailPoint.wait();
 
@@ -79,13 +93,18 @@ const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus:
 assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
 // Release the sync node oplog fetcher so the test completes.
 assert.commandWorked(
-    initialSyncNodeDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+    initialSyncNodeDb.adminCommand({
+        configureFailPoint: "hangBeforeStartingOplogFetcher",
+        mode: "off",
+    }),
 );
 beforeFinishFailPoint.off();
 
 // Release the initial sync source so the test completes.
 assert.commandWorked(
-    initialSyncSource.getDB("admin").adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+    initialSyncSource
+        .getDB("admin")
+        .adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
 );
 
 // Wait for the fassert to stop the initial sync node.

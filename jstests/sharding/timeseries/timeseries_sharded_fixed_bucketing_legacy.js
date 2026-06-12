@@ -28,13 +28,14 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 
 // Reads the `fixedBucketing` value persisted in `config.collections` for the buckets namespace.
 function getConfigFixedBucketing() {
-    return st.s.getDB("config").collections.findOne({_id: `${dbName}.system.buckets.${collName}`}).timeseriesFields
-        .fixedBucketing;
+    return st.s.getDB("config").collections.findOne({_id: `${dbName}.system.buckets.${collName}`})
+        .timeseriesFields.fixedBucketing;
 }
 
 // Reads the `fixedBucketing` value visible via `listCollections` for the test collection.
 function getListCollFixedBucketing() {
-    const colls = sDB.runCommand({listCollections: 1, filter: {type: "timeseries", name: collName}}).cursor.firstBatch;
+    const colls = sDB.runCommand({listCollections: 1, filter: {type: "timeseries", name: collName}})
+        .cursor.firstBatch;
     assert.eq(colls.length, 1, colls);
     return colls[0].options.timeseries.fixedBucketing;
 }
@@ -44,7 +45,12 @@ assert.commandWorked(
     st.s.adminCommand({
         shardCollection: collNss,
         key: {"hostId": 1},
-        timeseries: {timeField: "time", metaField: "hostId", bucketMaxSpanSeconds: 100, bucketRoundingSeconds: 100},
+        timeseries: {
+            timeField: "time",
+            metaField: "hostId",
+            bucketMaxSpanSeconds: 100,
+            bucketRoundingSeconds: 100,
+        },
     }),
 );
 assert.eq(getConfigFixedBucketing(), undefined);

@@ -23,7 +23,9 @@ const collName1 = "my_coll_1";
 const collName2 = "my_coll_2";
 const viewName = "my_view";
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 
 const db = st.s.getDB(dbName);
 const coll1 = db[collName1];
@@ -62,7 +64,9 @@ withRetryOnTransientTxnError(
 
         assert.eq(
             sessionDB[collName1]
-                .aggregate([{$lookup: {from: collName2, localField: "x", foreignField: "x", as: "j"}}])
+                .aggregate([
+                    {$lookup: {from: collName2, localField: "x", foreignField: "x", as: "j"}},
+                ])
                 .itcount(),
             1,
         );

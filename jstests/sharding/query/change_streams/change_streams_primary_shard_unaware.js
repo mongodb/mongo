@@ -45,7 +45,9 @@ const st = new ShardingTest({
 const mongosDB = st.s0.getDB(testName);
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Create unsharded collection on primary shard.
 const mongosColl = mongosDB[testName];
@@ -62,7 +64,9 @@ assert.commandWorked(mongos2Coll.insert({_id: 0, a: 0}));
 assert.commandWorked(mongos2Coll.createIndex({a: 1}));
 
 // Shard the collection.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1}}),
+);
 
 // Restart the primary shard and ensure that it is no longer aware that the collection is
 // sharded.

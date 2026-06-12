@@ -61,7 +61,10 @@ function runTest(query, expectedIxBounds) {
     assertArrayEq({expected: expectedIxBounds, actual: ixscans.map((is) => is.indexBounds)});
 
     // Ensure we get the right result with/without an index.
-    assertArrayEq({expected: c.find(query).hint({$natural: 1}).toArray(), actual: c.find(query).toArray()});
+    assertArrayEq({
+        expected: c.find(query).hint({$natural: 1}).toArray(),
+        actual: c.find(query).toArray(),
+    });
 }
 
 // Able to use [null, null] bounds on th.sa.

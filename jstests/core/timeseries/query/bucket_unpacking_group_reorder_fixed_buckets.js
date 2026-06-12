@@ -63,8 +63,16 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
         const results = coll.aggregate(pipeline).toArray();
         const nonTsResults = collNonTs.aggregate(pipeline).toArray();
         if (expectedResults) {
-            assert.sameMembers(nonTsResults, expectedResults, `Results for pipeline ${tojson(pipeline)} over non-TS`);
-            assert.sameMembers(results, expectedResults, `Results for pipeline ${tojson(pipeline)}`);
+            assert.sameMembers(
+                nonTsResults,
+                expectedResults,
+                `Results for pipeline ${tojson(pipeline)} over non-TS`,
+            );
+            assert.sameMembers(
+                results,
+                expectedResults,
+                `Results for pipeline ${tojson(pipeline)}`,
+            );
         } else {
             // In randomized tests we cannot provide the oracle for expected docs but we can compare
             // the results against TS and non-TS collections.
@@ -130,7 +138,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
     // TODO (SERVER-94666) revisit conditions in which query-level rewrites can be applied, specifically
     // for untracked collections
     const isCollectionUntracked =
-        !isMongos || (isMongos && !TestData.implicitlyTrackUnshardedCollectionOnCreation && !useImplicitSharding);
+        !isMongos ||
+        (isMongos &&
+            !TestData.implicitlyTrackUnshardedCollectionOnCreation &&
+            !useImplicitSharding);
 
     const groupByDateTrunc_ExpectRewrite = [
         // Validate the rewrite occurs with a simple case, where the bucket boundary and 'unit' are the
@@ -211,7 +222,9 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
                     $group: {
                         _id: {
                             m: `$${metaField}`,
-                            t: {$dateTrunc: {date: `$${timeField}`, unit: "day", timezone: "+0800"}},
+                            t: {
+                                $dateTrunc: {date: `$${timeField}`, unit: "day", timezone: "+0800"},
+                            },
                         },
                         accmin: {$min: `$${measurementField}`},
                         accmax: {$max: `$${measurementField}`},
@@ -265,7 +278,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
         },
     ];
     (function testGroupByDateTrunct_ExpectRewrite() {
-        setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: 3600,
+            startingTime: ISODate("2022-09-30T15:00:00.000Z"),
+        });
 
         groupByDateTrunc_ExpectRewrite.forEach((testCase) => {
             checkRewrite({pipeline: testCase.pipeline, rewriteExpected: testCase.rewriteExpected});
@@ -298,7 +314,9 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
                     },
                 },
             ],
-            expectedResults: [{_id: {t: ISODate("2022-09-29T18:15:00Z")}, accmin: b[1], accmax: b[6]}],
+            expectedResults: [
+                {_id: {t: ISODate("2022-09-29T18:15:00Z")}, accmin: b[1], accmax: b[6]},
+            ],
         },
 
         // The $dateTrunc expression doesn't align with bucket boundaries.
@@ -342,7 +360,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
             pipeline: [
                 {
                     $group: {
-                        _id: {m: `$${metaField}`, t: {$dateTrunc: {date: "$otherTime", unit: "day"}}},
+                        _id: {
+                            m: `$${metaField}`,
+                            t: {$dateTrunc: {date: "$otherTime", unit: "day"}},
+                        },
                         accmax: {$max: `$${measurementField}`},
                     },
                 },
@@ -355,7 +376,9 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
             pipeline: [
                 {
                     $group: {
-                        _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "hour", binSize: "$a"}}},
+                        _id: {
+                            t: {$dateTrunc: {date: `$${timeField}`, unit: "hour", binSize: "$a"}},
+                        },
                         accmax: {$max: `$${measurementField}`},
                         accmin: {$min: `$${measurementField}`},
                     },
@@ -365,7 +388,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
         },
     ];
     (function testGroupByDateTrunct_NoRewrite() {
-        setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: 3600,
+            startingTime: ISODate("2022-09-30T15:00:00.000Z"),
+        });
 
         groupByDateTrunc_NoRewrite.forEach((testCase) => {
             checkRewrite({pipeline: testCase.pipeline, rewriteExpected: false});
@@ -374,7 +400,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
     })();
 
     (function testCollMod() {
-        setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: 3600,
+            startingTime: ISODate("2022-09-30T15:00:00.000Z"),
+        });
         // The parameters have changed, and thus the buckets are not fixed.
         assert.commandWorked(
             db.runCommand({
@@ -404,7 +433,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
     // different and becomes too unreliable.
     (function testLargeBucketSpan() {
         const secondsInTwoDays = 3600 * 48;
-        setUpSmallCollection({roundingParam: secondsInTwoDays, startingTime: ISODate("2012-06-30T23:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: secondsInTwoDays,
+            startingTime: ISODate("2012-06-30T23:00:00.000Z"),
+        });
         const timeUnits = ["minute", "second", "day", "week", "year"];
         timeUnits.forEach((timeUnit) => {
             const pipeline = [
@@ -430,7 +462,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
         const randomSpan = Math.floor(Random.rand() * (31536000 - 1) + 1);
         jsTestLog(`In testRandomBucketSpan using randomSpan: ${randomSpan}`);
 
-        setUpSmallCollection({roundingParam: randomSpan, startingTime: ISODate("2015-06-26T23:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: randomSpan,
+            startingTime: ISODate("2015-06-26T23:00:00.000Z"),
+        });
         const timeUnits = ["millisecond", "minute", "second", "day", "week", "month", "year"];
         timeUnits.forEach((timeUnit) => {
             checkResults({
@@ -451,7 +486,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
     // A leap second occurred on 2012-06-30:23:59:60. $dateTrunc and time-series rounding logic rounds
     // this time to the next minute.
     (function testLeapSeconds() {
-        setUpSmallCollection({roundingParam: 60, startingTime: ISODate("2012-06-30T23:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: 60,
+            startingTime: ISODate("2012-06-30T23:00:00.000Z"),
+        });
         // Insert documents close and at the leap second. These numbers are larger and smaller than the
         // originally inserted documents, so they should change the values of "$min" and "$max".
         const leapSecondDocs = [
@@ -491,7 +529,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
     // was 23 hours long, since the hour between 2-3:00am was skipped. We will be testing the New York
     // timezone, so 2:00 for New York in UTC is 7:00.
     (function testDaylightSavings() {
-        setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-03-13T07:00:00.000Z")});
+        setUpSmallCollection({
+            roundingParam: 3600,
+            startingTime: ISODate("2022-03-13T07:00:00.000Z"),
+        });
         // Insert documents for every hour of the day in the New York timezone, even though the day was
         // only 23 hours long.   Two hours after "startTime", will be the skipped hour, but we expect
         // that document to still be valid and exist. To double check that document will have the
@@ -561,7 +602,9 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
         // were chosen arbitrarily.
         for (let i = 0; i < 1000; i++) {
             const randomTime = new Date(
-                Math.floor(Random.rand() * (maxTime.getTime() - startTime.getTime()) + startTime.getTime()),
+                Math.floor(
+                    Random.rand() * (maxTime.getTime() - startTime.getTime()) + startTime.getTime(),
+                ),
             );
             docs.push({[timeField]: randomTime, [metaField]: "location"});
         }

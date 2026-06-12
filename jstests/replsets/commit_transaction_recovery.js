@@ -17,7 +17,11 @@ let primary = replTest.getPrimary();
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const dbName = "test";
@@ -38,7 +42,9 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Disable snapshotting on all nodes");
 // Disable snapshotting so that future operations do not enter the majority snapshot.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 jsTestLog("Committing the transaction");
 // Since the commitTimestamp is after the last snapshot, this oplog entry will be replayed

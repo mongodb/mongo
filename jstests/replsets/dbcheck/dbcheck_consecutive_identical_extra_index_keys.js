@@ -32,7 +32,10 @@ import {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     replSet.startSet();
@@ -56,10 +59,16 @@ import {
 
     function setSnapshotSize(snapshotSize) {
         assert.commandWorked(
-            primaryDB.adminCommand({"setParameter": 1, "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize}),
+            primaryDB.adminCommand({
+                "setParameter": 1,
+                "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize,
+            }),
         );
         assert.commandWorked(
-            secondaryDB.adminCommand({"setParameter": 1, "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize}),
+            secondaryDB.adminCommand({
+                "setParameter": 1,
+                "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize,
+            }),
         );
     }
     function resetSnapshotSize() {
@@ -85,7 +94,14 @@ import {
         setNumMaxIdenticalKeys(defaultNumMaxIdenticalKeys);
     }
 
-    function onlyIdenticalKeys(nDocs, batchSize, snapshotSize, numMaxIdenticalKeys, collOpts, failpoint = null) {
+    function onlyIdenticalKeys(
+        nDocs,
+        batchSize,
+        snapshotSize,
+        numMaxIdenticalKeys,
+        collOpts,
+        failpoint = null,
+    ) {
         clearRawMongoProgramOutput();
         jsTestLog(`Testing behavior with a collection of only identical index keys with ${nDocs} 
               docs, collOpts: ${collOpts}, batchSize: ${batchSize}, + snapshotSize: ${snapshotSize}, 
@@ -195,7 +211,11 @@ import {
                 "data.nConsecutiveIdenticalIndexKeysSeenAtEnd": 0,
             };
             checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
-            checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1 /* expectedNumBatches */);
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.allErrorsOrWarningsQuery,
+                1 /* expectedNumBatches */,
+            );
         } else {
             checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
         }
@@ -380,11 +400,13 @@ import {
             let expectedNumSnapshotsForDistinctDocs = expectedNumBatchesForDistinctDocs;
             if (snapshotSize < batchSize) {
                 const snapshotsPerBatch = Math.ceil(batchSize / snapshotSize);
-                const lastBatchSize = nIdenticalDocs % batchSize == 0 ? batchSize : nIdenticalDocs % batchSize;
+                const lastBatchSize =
+                    nIdenticalDocs % batchSize == 0 ? batchSize : nIdenticalDocs % batchSize;
                 const lastBatchSnapshots = Math.ceil(lastBatchSize / snapshotSize);
 
                 expectedNumSnapshotsForDistinctDocs =
-                    (expectedNumBatchesForDistinctDocs - 1) * snapshotsPerBatch + lastBatchSnapshots;
+                    (expectedNumBatchesForDistinctDocs - 1) * snapshotsPerBatch +
+                    lastBatchSnapshots;
             }
             const expectedNumSnapshots = expectedNumSnapshotsForDistinctDocs + 1;
             checkNumSnapshots(debugBuild, expectedNumSnapshots);
@@ -392,8 +414,16 @@ import {
 
         jsTestLog("Checking for correct number of batches on secondary");
         if (failpoint == "skipUnindexingDocumentWhenDeleted") {
-            checkHealthLog(secondaryHealthLog, logQueries.inconsistentBatchQuery, expectedNumBatches);
-            checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, expectedNumBatches);
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.inconsistentBatchQuery,
+                expectedNumBatches,
+            );
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.allErrorsOrWarningsQuery,
+                expectedNumBatches,
+            );
         } else {
             checkHealthLog(secondaryHealthLog, identicalKeysQuery, 1);
             checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, expectedNumBatches);
@@ -483,15 +513,31 @@ import {
 
         jsTestLog("Checking for correct number of batches on secondary");
         if (failpoint == "skipUnindexingDocumentWhenDeleted") {
-            checkHealthLog(secondaryHealthLog, logQueries.inconsistentBatchQuery, expectedNumBatches);
-            checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, expectedNumBatches);
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.inconsistentBatchQuery,
+                expectedNumBatches,
+            );
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.allErrorsOrWarningsQuery,
+                expectedNumBatches,
+            );
         } else {
             checkHealthLog(secondaryHealthLog, identicalKeysQuery, 1);
             checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, expectedNumBatches);
         }
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
 
         resetSnapshotSize();
         resetNumMaxIdenticalKeys();
@@ -550,8 +596,16 @@ import {
         jsTestLog("Checking for correct number of batches on secondary");
 
         if (failpoint == "skipUnindexingDocumentWhenDeleted") {
-            checkHealthLog(secondaryHealthLog, logQueries.inconsistentBatchQuery, expectedNumBatches);
-            checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, expectedNumBatches);
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.inconsistentBatchQuery,
+                expectedNumBatches,
+            );
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.allErrorsOrWarningsQuery,
+                expectedNumBatches,
+            );
         } else {
             checkHealthLog(secondaryHealthLog, identicalKeysQuery, 1);
             checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, expectedNumBatches);
@@ -708,13 +762,25 @@ import {
                 "data.nConsecutiveIdenticalIndexKeysSeenAtEnd": 0,
             };
             checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
-            checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1 /* expectedNumBatches */);
+            checkHealthLog(
+                secondaryHealthLog,
+                logQueries.allErrorsOrWarningsQuery,
+                1 /* expectedNumBatches */,
+            );
         } else {
             checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
         }
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
 
         // Cleanup test.
         resetSnapshotSize();
@@ -730,7 +796,8 @@ import {
     function hashingExtraIdenticalIndexKeysOnPrimary(collOpts) {
         clearRawMongoProgramOutput();
         jsTestLog(
-            "Testing that hashing will catch extra identical index keys on primary. collOpts: " + tojson(collOpts),
+            "Testing that hashing will catch extra identical index keys on primary. collOpts: " +
+                tojson(collOpts),
         );
         const nDocs = 10;
 
@@ -748,7 +815,11 @@ import {
         assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs);
         assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs);
 
-        const primaryFailpoint = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {indexName: "a_1"});
+        const primaryFailpoint = configureFailPoint(
+            primaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {indexName: "a_1"},
+        );
         const primaryColl = primaryDB.getCollection(collName);
 
         jsTestLog("Deleting n-1 docs");
@@ -777,7 +848,9 @@ import {
         // No other errors on primary.
         checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, nDocs - 1);
 
-        jsTestLog("Checking secondary for record not found error, should have 0 since secondary skips reverse lookup");
+        jsTestLog(
+            "Checking secondary for record not found error, should have 0 since secondary skips reverse lookup",
+        );
         checkHealthLog(secondaryHealthLog, logQueries.recordNotFoundQuery, 0);
 
         jsTestLog("Checking for correct number of batches on primary");
@@ -797,10 +870,22 @@ import {
             "data.nConsecutiveIdenticalIndexKeysSeenAtEnd": 1,
         };
         checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
-        checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1 /*expectedNumBatches*/);
+        checkHealthLog(
+            secondaryHealthLog,
+            logQueries.allErrorsOrWarningsQuery,
+            1 /*expectedNumBatches*/,
+        );
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
         // Cleanup test.
         resetSnapshotSize();
         resetNumMaxIdenticalKeys();
@@ -830,9 +915,13 @@ import {
         assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs);
         assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs);
 
-        const secondaryFailpoint = configureFailPoint(secondaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const secondaryFailpoint = configureFailPoint(
+            secondaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting docs");
         const primaryColl = primaryDB.getCollection(collName);
         // Delete docs. There will still be 20 identical index keys on secondary.
@@ -859,7 +948,9 @@ import {
         jsTestLog("Checking primary for no errors");
         checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 
-        jsTestLog("Checking secondary for record not found error, should have 0 since secondary skips reverse lookup");
+        jsTestLog(
+            "Checking secondary for record not found error, should have 0 since secondary skips reverse lookup",
+        );
         checkHealthLog(secondaryHealthLog, logQueries.recordNotFoundQuery, 0);
 
         jsTestLog("Checking for correct number of batches on primary");
@@ -879,10 +970,22 @@ import {
             "data.nConsecutiveIdenticalIndexKeysSeenAtEnd": numMaxIdenticalKeys,
         };
         checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
-        checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1 /*expectedNumBatches*/);
+        checkHealthLog(
+            secondaryHealthLog,
+            logQueries.allErrorsOrWarningsQuery,
+            1 /*expectedNumBatches*/,
+        );
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
 
         // Cleanup test.
         resetSnapshotSize();
@@ -913,9 +1016,13 @@ import {
         assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs);
         assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs);
 
-        const secondaryFailpoint = configureFailPoint(secondaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const secondaryFailpoint = configureFailPoint(
+            secondaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting docs");
         const primaryColl = primaryDB.getCollection(collName);
         // Delete docs after numMaxIdenticalKeys.
@@ -942,7 +1049,9 @@ import {
         jsTestLog("Checking primary for no errors");
         checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 
-        jsTestLog("Checking secondary for record not found error, should have 0 since secondary skips reverse lookup");
+        jsTestLog(
+            "Checking secondary for record not found error, should have 0 since secondary skips reverse lookup",
+        );
         checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 
         jsTestLog("Checking for correct number of batches on primary and secondary");
@@ -956,8 +1065,16 @@ import {
 
         checkNumSnapshots(debugBuild, 1);
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
 
         // Cleanup test.
         resetSnapshotSize();
@@ -989,9 +1106,13 @@ import {
         assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs + 1);
         assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs + 1);
 
-        const secondaryFailpoint = configureFailPoint(secondaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const secondaryFailpoint = configureFailPoint(
+            secondaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting docs");
         const primaryColl = primaryDB.getCollection(collName);
         assert.commandWorked(primaryColl.deleteOne({a: 1}));
@@ -1065,9 +1186,13 @@ import {
         assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs * 3);
         assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs * 3);
 
-        const secondaryFailpoint = configureFailPoint(secondaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const secondaryFailpoint = configureFailPoint(
+            secondaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting 1 doc");
         const primaryColl = primaryDB.getCollection(collName);
         assert.commandWorked(primaryColl.deleteOne({_id: 0}));
@@ -1091,7 +1216,9 @@ import {
         jsTestLog("Checking primary for no errors");
         checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 
-        jsTestLog("Checking secondary for record not found error, should have 0 since secondary skips reverse lookup");
+        jsTestLog(
+            "Checking secondary for record not found error, should have 0 since secondary skips reverse lookup",
+        );
         checkHealthLog(secondaryHealthLog, logQueries.recordNotFoundQuery, 0);
 
         jsTestLog("Checking for correct number of batches on primary");
@@ -1111,10 +1238,22 @@ import {
             "data.nConsecutiveIdenticalIndexKeysSeenAtEnd": 1,
         };
         checkHealthLog(secondaryHealthLog, query, 1 /* expectedNumBatches */);
-        checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1 /*expectedNumBatches*/);
+        checkHealthLog(
+            secondaryHealthLog,
+            logQueries.allErrorsOrWarningsQuery,
+            1 /*expectedNumBatches*/,
+        );
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
 
         // Cleanup test.
         resetSnapshotSize();
@@ -1148,7 +1287,10 @@ import {
         assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs - 1);
         assert.eq(secondaryDB.getCollection(collName).find({}).count(), nDocs - 1);
 
-        const hangBeforeExtraIndexKeysHashing = configureFailPoint(primaryDB, "hangBeforeExtraIndexKeysHashing");
+        const hangBeforeExtraIndexKeysHashing = configureFailPoint(
+            primaryDB,
+            "hangBeforeExtraIndexKeysHashing",
+        );
 
         let dbCheckParameters = {
             validateMode: "extraIndexKeysCheck",
@@ -1186,8 +1328,16 @@ import {
         jsTestLog("Checking for correct number of batches on secondary");
         checkHealthLog(secondaryHealthLog, query, 1);
 
-        checkHealthLog(primaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
-        checkHealthLog(secondaryHealthLog, {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey}, 1);
+        checkHealthLog(
+            primaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
+        checkHealthLog(
+            secondaryHealthLog,
+            {"data.batchStart.a": MinKey, "data.batchEnd.a": MaxKey},
+            1,
+        );
         // Cleanup test.
         resetSnapshotSize();
         resetNumMaxIdenticalKeys();
@@ -1274,5 +1424,8 @@ import {
         // extraDistinctIndexKeysOnSecondaryBeyondMax(collOpts);
     });
 
-    replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+    replSet.stopSet(undefined /* signal */, false /* forRestart */, {
+        skipCheckDBHashes: true,
+        skipValidation: true,
+    });
 })();

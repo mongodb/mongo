@@ -79,7 +79,11 @@ function runCommandWithOverloadRetries(conn, dbName, cmdName, cmdObj, func, make
 
         // Only backoff if the system is overloaded.
         if (hasSystemOverloadedErrorLabel(res)) {
-            const backoffMs = calculateBackoffMs(attempt, kDefaultBaseBackoffMs, kDefaultMaxBackoffMs);
+            const backoffMs = calculateBackoffMs(
+                attempt,
+                kDefaultBaseBackoffMs,
+                kDefaultMaxBackoffMs,
+            );
 
             jsTest.log.info(
                 `Overload retry override: Retrying command '${cmdName}' after overload error. ` +
@@ -100,6 +104,8 @@ function runCommandWithOverloadRetries(conn, dbName, cmdName, cmdObj, func, make
     return res;
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicitly_retry_on_overload_errors.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicitly_retry_on_overload_errors.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithOverloadRetries);

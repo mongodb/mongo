@@ -35,7 +35,10 @@ const documents = [
 ];
 assert.commandWorked(coll.insert(documents));
 
-function checkQuery({expected = [], query = {}, proj = {}, sort = null, limit = null, skip = null, desc = null}, hint) {
+function checkQuery(
+    {expected = [], query = {}, proj = {}, sort = null, limit = null, skip = null, desc = null},
+    hint,
+) {
     let findCommand = coll.find(query, proj);
     if (sort) {
         findCommand = findCommand.sort(sort);
@@ -100,7 +103,11 @@ function documentsWithExcludedField(...fieldNames) {
 // Test the IDHack plan. There's no way to hint IDHack, but we trust that the planner will choose it
 // for this query.
 function runIDHackTest() {
-    checkQuery({desc: "_id point query", expected: [{_id: 1, a: 2, b: "y", c: 11}], query: {_id: 1}});
+    checkQuery({
+        desc: "_id point query",
+        expected: [{_id: 1, a: 2, b: "y", c: 11}],
+        query: {_id: 1},
+    });
 }
 
 // These tests are intended to validate covered projections, so we prevent covered plans by
@@ -289,7 +296,13 @@ function runCollScanTests() {
                 {_id: 19, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {
                     _id: 20,
-                    x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
                 },
             ],
             proj: {_id: 1, "x.y": 1},
@@ -319,7 +332,13 @@ function runCollScanTests() {
                 {_id: 19, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {
                     _id: 20,
-                    x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
                 },
             ],
             proj: {"x.y": 1},
@@ -347,7 +366,15 @@ function runCollScanTests() {
                 {x: {y: [{z: 1}, {z: 2}]}},
                 {x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
-                {x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}]},
+                {
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
+                },
             ],
             proj: {_id: 0, "x.y": 1},
         },
@@ -433,7 +460,13 @@ function runCollScanTests() {
                 {_id: 19, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {
                     _id: 20,
-                    x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
                 },
             ],
             proj: {"x.y": 1, "v.w": 1},
@@ -613,7 +646,13 @@ function runCollScanTests() {
                 {_id: 19, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {
                     _id: 20,
-                    x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
                 },
             ],
             proj: {"z.a": 0},
@@ -657,7 +696,13 @@ function runCollScanTests() {
                 {_id: 19, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {
                     _id: 20,
-                    x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
                 },
             ],
             query: {"x.y": {$gt: 1}},
@@ -688,7 +733,13 @@ function runCollScanTests() {
                 {_id: 19, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
                 {
                     _id: 20,
-                    x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
+                    x: [
+                        [{y: {z: 1}}, {y: 2}],
+                        {y: 3},
+                        {y: {z: 2}},
+                        [[[{y: 5}, {y: {z: 3}}]]],
+                        {y: 6},
+                    ],
                 },
             ],
             proj: {"x.y.nonexistent": 0},

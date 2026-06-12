@@ -132,7 +132,11 @@ function forkThenShutdownMongoProgram(program, args) {
     const exitCode = waitForExitCode(logpath, pid);
     if (exitCode === null) {
         jsTestLog("Killing process with pid " + pid + " due to not observing shutdown.");
-        assert.eq(0, runNonMongoProgram("kill", "-s", "SIGKILL", pid), "Failed to kill forked process");
+        assert.eq(
+            0,
+            runNonMongoProgram("kill", "-s", "SIGKILL", pid),
+            "Failed to kill forked process",
+        );
         assert(false, "Didn't observe shutdown message in forked process' log file");
     }
     jsTestLog("Forked process exited with code " + exitCode);

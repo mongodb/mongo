@@ -73,7 +73,9 @@ const maxSizeRequestTestCases = (isStoredSource) => {
                 name: "tooLargeDefinitionIndex",
                 definition: {
                     "mappings": {"dynamic": true},
-                    "fields": {"large_metadata": {"type": "string", "meta": "b".repeat(1024 * 800)}},
+                    "fields": {
+                        "large_metadata": {"type": "string", "meta": "b".repeat(1024 * 800)},
+                    },
                 },
             }),
         ErrorCodes.BSONObjectTooLarge,

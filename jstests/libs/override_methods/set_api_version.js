@@ -11,7 +11,9 @@ function runCommandWithApiVersion(conn, dbName, commandName, commandObj, func, m
         commandObj.hasOwnProperty("apiStrict") ||
         commandObj.hasOwnProperty("apiDeprecationErrors")
     ) {
-        throw new Error(`Cowardly refusing to override API parameters of command ${tojson(commandObj)}`);
+        throw new Error(
+            `Cowardly refusing to override API parameters of command ${tojson(commandObj)}`,
+        );
     }
 
     // We create a copy of 'commandObj' to avoid mutating the parameter the caller specified.

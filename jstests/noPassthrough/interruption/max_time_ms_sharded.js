@@ -14,7 +14,9 @@ let st = new ShardingTest({
     // The maxTimeAlwaysTimeOut failpoint interferes with the maxAwaitTimeMS parameter sent by the
     // streamable RSM so we have mongos use the non-streamable version here.
     // Turn off maxTimeMsLocalBufferTimeMillis, as it isn't relevant when the shards are configured to never timeout and interferes with the test timing.
-    mongosOptions: {setParameter: {replicaSetMonitorProtocol: "sdam", maxTimeMsLocalBufferTimeMillis: 0}},
+    mongosOptions: {
+        setParameter: {replicaSetMonitorProtocol: "sdam", maxTimeMsLocalBufferTimeMillis: 0},
+    },
 });
 
 let mongos = st.s0;
@@ -30,24 +32,44 @@ const defaultMaxTimeMS = 60 * 1000;
 // to throw if it receives an operation with a max time. See fail point declaration for complete
 // description.
 let configureMaxTimeAlwaysTimeOut = function (mode) {
-    assert.commandWorked(shards[0].getDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
-    assert.commandWorked(shards[1].getDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
+    assert.commandWorked(
+        shards[0]
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}),
+    );
+    assert.commandWorked(
+        shards[1]
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}),
+    );
 };
 
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
 // mongod from enforcing time limits. See fail point declaration for complete description.
 let configureMaxTimeNeverTimeOut = function (mode) {
-    assert.commandWorked(shards[0].getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
-    assert.commandWorked(shards[1].getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
+    assert.commandWorked(
+        shards[0]
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}),
+    );
+    assert.commandWorked(
+        shards[1]
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}),
+    );
 };
 
 //
 // Pre-split collection: shard 0 takes {_id: {$lt: 0}}, shard 1 takes {_id: {$gte: 0}}.
 //
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 //
 // Insert 1000 documents into sharded collection, such that each shard owns 500.
@@ -108,7 +130,11 @@ cursor = coll.find({
 });
 cursor.batchSize(2);
 cursor.maxTimeMS(10 * 1000);
-assert.doesNotThrow(() => cursor.next(), [], "did not expect mongos to time out first batch of query");
+assert.doesNotThrow(
+    () => cursor.next(),
+    [],
+    "did not expect mongos to time out first batch of query",
+);
 assert.throws(() => cursor.itcount(), [], "expected mongos to abort getmore due to time limit");
 
 // Negative test. ~5s operation, with a high (1-day) limit.
@@ -284,7 +310,11 @@ assert.commandWorked(
 
 // Negative test for "setFeatureCompatibilityVersion" to upgrade
 assert.commandWorked(
-    admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true, maxTimeMS: 1000 * 60 * 60 * 24}),
+    admin.runCommand({
+        setFeatureCompatibilityVersion: latestFCV,
+        confirm: true,
+        maxTimeMS: 1000 * 60 * 60 * 24,
+    }),
     "expected setFeatureCompatibilityVersion to not hit time limit in mongod",
 );
 
@@ -316,7 +346,11 @@ const kBatchSize = nDocsPerShard;
 cursor = new DBCommandCursor(coll.getDB(), res, kBatchSize);
 // The fast shard should return relatively quickly.
 for (let i = 0; i < nDocsPerShard; ++i) {
-    let next = assert.doesNotThrow(() => cursor.next(), [], "did not expect mongos to time out first batch of query");
+    let next = assert.doesNotThrow(
+        () => cursor.next(),
+        [],
+        "did not expect mongos to time out first batch of query",
+    );
     assert.gte(next._id, 0);
 }
 // Sleep on the client-side so mongos's time budget is not being used.

@@ -28,13 +28,23 @@ function p() {
 
 p();
 
-let res = t.update({loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
+let res = t.update(
+    {loc: {$within: {$center: [[5, 5], 2]}}},
+    {$inc: {z: 1}},
+    false /*upsert*/,
+    true /*multi*/,
+);
 assert.commandWorked(res);
 p();
 
 assert.commandWorked(t.update({}, {"$inc": {"z": 1}}, false /*upsert*/, true /*multi*/));
 p();
 
-res = t.update({loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
+res = t.update(
+    {loc: {$within: {$center: [[5, 5], 2]}}},
+    {$inc: {z: 1}},
+    false /*upsert*/,
+    true /*multi*/,
+);
 assert.commandWorked(res);
 p();

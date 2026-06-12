@@ -18,8 +18,14 @@ MongoRunner.runMongos = function () {
     );
 };
 
-import {ShardingTest, kOverrideConstructor as kOverrideConstructorForST} from "jstests/libs/shardingtest.js";
-import {ReplSetTest, kOverrideConstructor as kOverrideConstructorForRST} from "jstests/libs/replsettest.js";
+import {
+    ShardingTest,
+    kOverrideConstructor as kOverrideConstructorForST,
+} from "jstests/libs/shardingtest.js";
+import {
+    ReplSetTest,
+    kOverrideConstructor as kOverrideConstructorForRST,
+} from "jstests/libs/replsettest.js";
 
 ShardingTest[kOverrideConstructorForST] = class NoSpawnShardingTest extends ShardingTest {
     constructor() {

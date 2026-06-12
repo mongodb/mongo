@@ -16,8 +16,12 @@ export function getSortedCatalogEntries(node, sortField = "ident") {
     // The admin.system.keys collection is asynchronously created and may not be immediately available.
     const isAdminSystemKeysCollection = {"db": "admin", "name": "system.keys"};
     const isLocal = {"db": "local"};
-    const match = {$nor: [isSystemProfile, isLocal, isQueryAnalysisCollection, isAdminSystemKeysCollection]};
-    return adminDB.aggregate([{$listCatalog: {}}, {$match: match}, {$sort: {[sortField]: 1}}]).toArray();
+    const match = {
+        $nor: [isSystemProfile, isLocal, isQueryAnalysisCollection, isAdminSystemKeysCollection],
+    };
+    return adminDB
+        .aggregate([{$listCatalog: {}}, {$match: match}, {$sort: {[sortField]: 1}}])
+        .toArray();
 }
 /**
  * Given catalog entries for 2 nodes, where catalog entries for both nodes must be sorted by the

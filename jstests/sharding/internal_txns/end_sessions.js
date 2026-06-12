@@ -12,7 +12,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-const st = new ShardingTest({shards: 1, rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}});
+const st = new ShardingTest({
+    shards: 1,
+    rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}},
+});
 
 const shard0Rst = st.rs0;
 const shard0Primary = shard0Rst.getPrimary();
@@ -40,7 +43,9 @@ let currentInternalTxnNumber = kInitialInternalTxnNumber;
 let numTransactionsCollEntries = 0;
 let numImageCollEntries = 0;
 
-assert.commandWorked(testDB.runCommand({insert: kCollName, documents: [{_id: 0}], lsid: parentLsid}));
+assert.commandWorked(
+    testDB.runCommand({insert: kCollName, documents: [{_id: 0}], lsid: parentLsid}),
+);
 
 const childLsid0 = {
     id: sessionUUID,
@@ -74,7 +79,10 @@ numTransactionsCollEntries++;
 
 // Use a filter to skip transactions from internal metadata operations if we're running in catalog
 // shard mode.
-assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find({txnNum: currentInternalTxnNumber}).itcount());
+assert.eq(
+    numTransactionsCollEntries,
+    transactionsCollOnPrimary.find({txnNum: currentInternalTxnNumber}).itcount(),
+);
 
 const parentTxnNumber1 = NumberLong(55123);
 
@@ -153,7 +161,10 @@ jsTest.log(
         "since the config.system.sessions entry for the parent session had already been deleted",
 );
 let txnsOnPrimary = transactionsCollOnPrimary.find({
-    $or: [{txnNum: {$gte: kInitialInternalTxnNumber, $lte: currentInternalTxnNumber}}, {txnNum: parentTxnNumber1}],
+    $or: [
+        {txnNum: {$gte: kInitialInternalTxnNumber, $lte: currentInternalTxnNumber}},
+        {txnNum: parentTxnNumber1},
+    ],
 });
 assert.eq(0, txnsOnPrimary.itcount(), tojson(txnsOnPrimary.toArray()));
 assert.eq(0, imageCollOnPrimary.find().itcount());

@@ -58,7 +58,9 @@ assert.eq(1, metrics.transactions.currentOpen);
 jsTestLog("Do a majority write to advance the stable timestamp past the prepareTimestamp");
 // Doing a majority write after preparing the transaction ensures that the stable timestamp is
 // past the prepare timestamp because this write must be in the committed snapshot.
-assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}),
+);
 
 // Fastcount reflects the insert of a prepared transaction.
 assert.eq(testColl.count(), 3);
@@ -117,7 +119,11 @@ assert.commandFailedWithCode(
 // Make sure that writing to a document that was updated in the prepared transaction causes
 // a write conflict.
 assert.commandFailedWithCode(
-    sessionDB.runCommand({update: collName, updates: [{q: {_id: 0}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    sessionDB.runCommand({
+        update: collName,
+        updates: [{q: {_id: 0}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 

@@ -46,11 +46,14 @@ function concurrentWorker(host, dbName, iterations) {
             });
             res.ok === 1
                 ? ok++
-                : res.code === ErrorCodes.ExceededMemoryLimit || res.code === ErrorCodes.JSInterpreterFailure
+                : res.code === ErrorCodes.ExceededMemoryLimit ||
+                    res.code === ErrorCodes.JSInterpreterFailure
                   ? oom++
                   : other++;
         } catch (e) {
-            e.code === ErrorCodes.ExceededMemoryLimit || e.code === ErrorCodes.JSInterpreterFailure ? oom++ : other++;
+            e.code === ErrorCodes.ExceededMemoryLimit || e.code === ErrorCodes.JSInterpreterFailure
+                ? oom++
+                : other++;
         }
     }
     return {oom, other, ok};
@@ -172,7 +175,9 @@ function mixedWorker(host, dbName, iterations) {
                 ])
                 .toArray();
         } catch (e) {
-            e.code === ErrorCodes.ExceededMemoryLimit || e.code === ErrorCodes.JSInterpreterFailure ? oom++ : other++;
+            e.code === ErrorCodes.ExceededMemoryLimit || e.code === ErrorCodes.JSInterpreterFailure
+                ? oom++
+                : other++;
         }
     }
     return {oom, other};
@@ -180,7 +185,10 @@ function mixedWorker(host, dbName, iterations) {
 
 jsTest.log.info("Phase 3: concurrent GC pressure + BufferAllocator mmap");
 assert.commandWorked(testDB.adminCommand({setParameter: 1, jsUseLegacyMemoryTracking: false}));
-const mixedTs = Array.from({length: 8}, () => new Thread(mixedWorker, conn.host, testDB.getName(), 3));
+const mixedTs = Array.from(
+    {length: 8},
+    () => new Thread(mixedWorker, conn.host, testDB.getName(), 3),
+);
 mixedTs.forEach((t) => t.start());
 const mixed = mixedTs.reduce(
     (acc, t) => {
@@ -240,7 +248,9 @@ function mallocWorker(host, dbName, iterations) {
                 ])
                 .toArray();
         } catch (e) {
-            e.code === ErrorCodes.ExceededMemoryLimit || e.code === ErrorCodes.JSInterpreterFailure ? oom++ : other++;
+            e.code === ErrorCodes.ExceededMemoryLimit || e.code === ErrorCodes.JSInterpreterFailure
+                ? oom++
+                : other++;
         }
     }
     return {oom, other};
@@ -248,7 +258,10 @@ function mallocWorker(host, dbName, iterations) {
 
 jsTest.log.info("Phase 4: concurrent malloc_bytes stress via long string allocations");
 assert.commandWorked(testDB.adminCommand({setParameter: 1, jsUseLegacyMemoryTracking: false}));
-const mallocTs = Array.from({length: 8}, () => new Thread(mallocWorker, conn.host, testDB.getName(), 3));
+const mallocTs = Array.from(
+    {length: 8},
+    () => new Thread(mallocWorker, conn.host, testDB.getName(), 3),
+);
 mallocTs.forEach((t) => t.start());
 const mallocResult = mallocTs.reduce(
     (acc, t) => {
@@ -258,7 +271,11 @@ const mallocResult = mallocTs.reduce(
     },
     {oom: 0, other: 0},
 );
-assert.eq(mallocResult.oom, 0, `malloc stress test: unexpected OOM errors: ${tojson(mallocResult)}`);
+assert.eq(
+    mallocResult.oom,
+    0,
+    `malloc stress test: unexpected OOM errors: ${tojson(mallocResult)}`,
+);
 assert.eq(mallocResult.other, 0, `malloc stress test: unexpected errors: ${tojson(mallocResult)}`);
 
 MongoRunner.stopMongod(conn);

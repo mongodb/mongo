@@ -60,7 +60,13 @@ const assertInnerLsidExplainWorked = (cmd, uid) => assertExplain(cmd, uid, false
 const assertTopLevelLsidExplainIsUnauthorized = (cmd, uid) => assertExplain(cmd, uid, true, true);
 const assertTopLevelLsidExplainWorked = (cmd, uid) => assertExplain(cmd, uid, false, true);
 
-const runCommandWithLsidTest = (isAuthZforInnerCmd, canSetTopLevelLsid, cmd, invalidUid, userUid) => {
+const runCommandWithLsidTest = (
+    isAuthZforInnerCmd,
+    canSetTopLevelLsid,
+    cmd,
+    invalidUid,
+    userUid,
+) => {
     // A user can put any arbitrary lsid/generic argument in the inner command invocation, as
     // this will be pruned when the command is wrapped into an explain command. The explain will
     // succeed so long as the user is authorized to run the command being explained. A user can

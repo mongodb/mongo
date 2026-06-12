@@ -8,7 +8,11 @@ import {
 } from "jstests/libs/cmd_object_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {everyWinningPlan, getNestedProperties, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
+import {
+    everyWinningPlan,
+    getNestedProperties,
+    isIdhackOrExpress,
+} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
@@ -51,7 +55,8 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
 
         const innerCmd = getInnerCommand(cmdObj);
         const isSupportedCommand =
-            QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) && !containsUnsupportedKeywords(innerCmd);
+            QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) &&
+            !containsUnsupportedKeywords(innerCmd);
         if (!isSupportedCommand) {
             return;
         }
@@ -84,7 +89,9 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
                 return;
             }
 
-            const isIdHackQuery = everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+            const isIdHackQuery = everyWinningPlan(explain, (winningPlan) =>
+                isIdhackOrExpress(db, winningPlan),
+            );
             if (isIdHackQuery) {
                 // Query settings cannot be applied over IDHACK or Express queries.
                 return;
@@ -132,4 +139,6 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
 OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicit_query_settings_fallback.js",
+);

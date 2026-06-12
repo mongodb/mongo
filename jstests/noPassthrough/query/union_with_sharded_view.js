@@ -62,10 +62,18 @@ function checkView(viewName, expected) {
 // CommandOnShardedViewNotSupportedOnMongod exceptions where a shard cannot resolve a view
 // definition.
 assert.commandWorked(
-    testDB.adminCommand({moveChunk: local.getFullName(), find: {shard_key: "shard1"}, to: sharded.shard1.shardName}),
+    testDB.adminCommand({
+        moveChunk: local.getFullName(),
+        find: {shard_key: "shard1"},
+        to: sharded.shard1.shardName,
+    }),
 );
 assert.commandWorked(
-    testDB.adminCommand({moveChunk: foreign.getFullName(), find: {shard_key: "shard2"}, to: sharded.shard2.shardName}),
+    testDB.adminCommand({
+        moveChunk: foreign.getFullName(),
+        find: {shard_key: "shard2"},
+        to: sharded.shard2.shardName,
+    }),
 );
 assert.commandWorked(
     testDB.adminCommand({
@@ -77,7 +85,9 @@ assert.commandWorked(
 
 // Create a view on foreign with a pipeline that references a namespace that the top-level unionWith
 // has not yet encountered and verify that the view can be queried correctly.
-assert.commandWorked(testDB.createView("unionView", foreign.getName(), [{$unionWith: "otherForeign"}]));
+assert.commandWorked(
+    testDB.createView("unionView", foreign.getName(), [{$unionWith: "otherForeign"}]),
+);
 checkView("unionView", [
     {_id: 4, shard_key: "shard2"},
     {_id: 5, shard_key: "shard2"},

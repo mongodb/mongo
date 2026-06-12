@@ -35,7 +35,11 @@ function isInTransaction(cmdObj) {
 }
 
 function isTransientTransactionError(res) {
-    return res.ok === 0 && res.hasOwnProperty("errorLabels") && res.errorLabels.includes("TransientTransactionError");
+    return (
+        res.ok === 0 &&
+        res.hasOwnProperty("errorLabels") &&
+        res.errorLabels.includes("TransientTransactionError")
+    );
 }
 
 // Replays every buffered statement of the current transaction under the current (already-bumped)

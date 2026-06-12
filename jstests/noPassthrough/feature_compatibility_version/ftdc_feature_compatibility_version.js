@@ -44,7 +44,9 @@ assert.eq(
 
 assert(
     fcvMetrics.hasOwnProperty("transitioning"),
-    "does not have 'serverStatus.featureCompatibilityVersion.transitioning' in '" + tojson(ftdcData) + "'",
+    "does not have 'serverStatus.featureCompatibilityVersion.transitioning' in '" +
+        tojson(ftdcData) +
+        "'",
 );
 
 assert.eq(fcvMetrics["transitioning"], 0, "expected transitioning to be 0 in " + tojson(ftdcData));
@@ -54,7 +56,9 @@ const hangWhileDowngradingFp = configureFailPoint(adminDb, "hangBeforeTransition
 let lastLTSFCVMajorMinor = lastLTSFCV.split(".");
 
 const downgradeThread = startParallelShell(function () {
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 }, conn.port);
 
 assert.soon(function () {
@@ -85,7 +89,9 @@ assert.soon(function () {
 let hangWhileUpgradingFp = configureFailPoint(adminDb, "hangWhileUpgrading");
 
 const upgradeThread = startParallelShell(function () {
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 }, conn.port);
 
 assert.soon(function () {

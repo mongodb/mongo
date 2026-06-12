@@ -27,7 +27,12 @@ function assertInsert(collection, obj) {
     assert.commandWorked(collection.insert(obj));
 }
 
-let cluster = new ShardingTest({name: "authwhere", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
+let cluster = new ShardingTest({
+    name: "authwhere",
+    shards: 1,
+    mongos: 1,
+    other: {keyFile: "jstests/libs/key1"},
+});
 
 // Set up the test data.
 (function () {

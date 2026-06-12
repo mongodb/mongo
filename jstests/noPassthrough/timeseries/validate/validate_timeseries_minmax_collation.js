@@ -34,7 +34,9 @@ function setupCollection(collName) {
             {t: ISODate("2024-01-01T00:00:01Z"), m: "a", notes: "berlin"},
         ]),
     );
-    assert.commandWorked(coll.insert({t: ISODate("2024-01-01T00:00:00.500Z"), m: "a", notes: "Berlin"}));
+    assert.commandWorked(
+        coll.insert({t: ISODate("2024-01-01T00:00:00.500Z"), m: "a", notes: "Berlin"}),
+    );
 
     let buckets = rawColl.find().rawData().toArray();
     assert.eq(1, buckets.length);
@@ -71,7 +73,9 @@ function setupCollection(collName) {
             {t: ISODate("2024-01-01T00:00:03Z"), m: "a", notes: "zebra"},
         ]),
     );
-    assert.commandWorked(coll.insert({t: ISODate("2024-01-01T00:00:00.500Z"), m: "a", notes: "Apple"}));
+    assert.commandWorked(
+        coll.insert({t: ISODate("2024-01-01T00:00:00.500Z"), m: "a", notes: "Apple"}),
+    );
     assert.commandWorked(coll.insert({t: ISODate("2024-01-01T00:00:02Z"), m: "a", notes: "Zebra"}));
 
     let buckets = rawColl.find().rawData().toArray();

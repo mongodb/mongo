@@ -24,7 +24,8 @@ function assertSortExistsAfterVectorSearch(aggPipeline) {
     // A $sort stage must exist somewhere in the pipeline after $_internalSearchMongotRemote.
     assert(
         getIndexOfStageOnSingleNode(explain, "$sort") > 0,
-        "'$sort' does not exist in the pipeline after $search. explain for query: " + tojson(explain),
+        "'$sort' does not exist in the pipeline after $search. explain for query: " +
+            tojson(explain),
     );
 }
 
@@ -58,7 +59,9 @@ const indexName = "sort-after-vector-search-test-index";
 const vectorIndex = {
     name: indexName,
     type: "vectorSearch",
-    definition: {"fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]},
+    definition: {
+        "fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}],
+    },
 };
 
 createSearchIndex(coll, vectorIndex);
@@ -93,14 +96,24 @@ assertNoSortExistsAfterVectorSearch([
 // Implicit $sort after $vectorSearch from desugared $setWindowFields should get removed.
 assertNoSortExistsAfterVectorSearch([
     {$vectorSearch: vectorSearchQuery},
-    {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}},
+    {
+        $setWindowFields: {
+            sortBy: {score: {$meta: "vectorSearchScore"}},
+            output: {rank: {$rank: {}}},
+        },
+    },
 ]);
 
 // Mixed explicit and implicit $sort after $vectorSearch should both get removed.
 assertNoSortExistsAfterVectorSearch([
     {$vectorSearch: vectorSearchQuery},
     {$sort: {score: {$meta: "vectorSearchScore"}}},
-    {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}},
+    {
+        $setWindowFields: {
+            sortBy: {score: {$meta: "vectorSearchScore"}},
+            output: {rank: {$rank: {}}},
+        },
+    },
 ]);
 
 // Currently cannot optimize $sort that is not directly after $vectorSearch.

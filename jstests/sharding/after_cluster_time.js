@@ -40,7 +40,9 @@ assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 const testDB = st.s.getDB("test");
 
 // Insert some data to find later.
-assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{_id: 1, x: 1}], writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testDB.runCommand({insert: "foo", documents: [{_id: 1, x: 1}], writeConcern: {w: "majority"}}),
+);
 
 // Test the afterClusterTime API without causal consistency enabled on the mongo connection.
 
@@ -51,9 +53,17 @@ assertAfterClusterTimeReadFailsWithCode(
 );
 
 // Reads with afterClusterTime require a non-zero timestamp.
-assertAfterClusterTimeReadFailsWithCode(testDB, {level: "local", afterClusterTime: {}}, ErrorCodes.TypeMismatch);
+assertAfterClusterTimeReadFailsWithCode(
+    testDB,
+    {level: "local", afterClusterTime: {}},
+    ErrorCodes.TypeMismatch,
+);
 
-assertAfterClusterTimeReadFailsWithCode(testDB, {level: "local", afterClusterTime: 10}, ErrorCodes.TypeMismatch);
+assertAfterClusterTimeReadFailsWithCode(
+    testDB,
+    {level: "local", afterClusterTime: 10},
+    ErrorCodes.TypeMismatch,
+);
 
 assertAfterClusterTimeReadFailsWithCode(
     testDB,
@@ -69,9 +79,17 @@ assertAfterClusterTimeReadFailsWithCode(
 
 // Reads with proper afterClusterTime arguments return committed data after the given time.
 // Reads with afterClusterTime require a non-zero timestamp.
-assertAfterClusterTimeReadFailsWithCode(testDB, {level: "majority", afterClusterTime: {}}, ErrorCodes.TypeMismatch);
+assertAfterClusterTimeReadFailsWithCode(
+    testDB,
+    {level: "majority", afterClusterTime: {}},
+    ErrorCodes.TypeMismatch,
+);
 
-assertAfterClusterTimeReadFailsWithCode(testDB, {level: "majority", afterClusterTime: 10}, ErrorCodes.TypeMismatch);
+assertAfterClusterTimeReadFailsWithCode(
+    testDB,
+    {level: "majority", afterClusterTime: 10},
+    ErrorCodes.TypeMismatch,
+);
 
 assertAfterClusterTimeReadFailsWithCode(
     testDB,
@@ -88,7 +106,10 @@ assertAfterClusterTimeReadFailsWithCode(
 // Reads with proper afterClusterTime arguments return committed data after the given time.
 let testReadOwnWrite = function (readConcern) {
     let res = assert.commandWorked(
-        testDB.runCommand({find: "foo", readConcern: {level: readConcern, afterClusterTime: Timestamp(1, 1)}}),
+        testDB.runCommand({
+            find: "foo",
+            readConcern: {level: readConcern, afterClusterTime: Timestamp(1, 1)},
+        }),
     );
 
     assert.eq(
@@ -117,9 +138,17 @@ assertAfterClusterTimeReadFailsWithCode(
 );
 
 // Reads with afterClusterTime still require a non-zero timestamp.
-assertAfterClusterTimeReadFailsWithCode(testDB, {level: "majority", afterClusterTime: {}}, ErrorCodes.TypeMismatch);
+assertAfterClusterTimeReadFailsWithCode(
+    testDB,
+    {level: "majority", afterClusterTime: {}},
+    ErrorCodes.TypeMismatch,
+);
 
-assertAfterClusterTimeReadFailsWithCode(testDB, {level: "majority", afterClusterTime: 10}, ErrorCodes.TypeMismatch);
+assertAfterClusterTimeReadFailsWithCode(
+    testDB,
+    {level: "majority", afterClusterTime: 10},
+    ErrorCodes.TypeMismatch,
+);
 
 assertAfterClusterTimeReadFailsWithCode(
     testDB,

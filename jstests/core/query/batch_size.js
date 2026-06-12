@@ -140,7 +140,10 @@ explain = coll
     .explain("executionStats");
 if (FixtureHelpers.isMongos(db)) {
     // If we're talking to a mongos, we expect at most one batch from each shard.
-    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6, explain.executionStats.nReturned);
+    assert.gte(
+        FixtureHelpers.numberOfShardsForCollection(coll) * 6,
+        explain.executionStats.nReturned,
+    );
 } else {
     assert.eq(6, explain.executionStats.nReturned);
 }
@@ -157,7 +160,10 @@ assert.lte(explain.executionStats.totalKeysExamined, 60);
 assert.lte(explain.executionStats.totalDocsExamined, 60);
 if (FixtureHelpers.isMongos(db)) {
     // If we're talking to a mongos, we expect at most one batch from each shard.
-    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6, explain.executionStats.nReturned);
+    assert.gte(
+        FixtureHelpers.numberOfShardsForCollection(coll) * 6,
+        explain.executionStats.nReturned,
+    );
 } else {
     assert.eq(6, explain.executionStats.nReturned);
 }

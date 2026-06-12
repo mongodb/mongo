@@ -20,7 +20,10 @@ const staticLimit = db.adminCommand({
 }).internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals;
 
 const setStaticLimit = function (limit) {
-    return db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: limit});
+    return db.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: limit,
+    });
 };
 
 /**

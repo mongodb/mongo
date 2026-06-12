@@ -15,7 +15,11 @@ function runTest(conn) {
 
     conn.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]});
     conn.getDB("admin").auth("admin", "pwd");
-    conn.getDB("admin").createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
+    conn.getDB("admin").createUser({
+        user: "userAdmin",
+        pwd: "pwd",
+        roles: ["userAdminAnyDatabase"],
+    });
     conn.getDB("admin").logout();
 
     let userAdminConn = new Mongo(conn.host);
@@ -25,7 +29,11 @@ function runTest(conn) {
     let testUserAdmin = userAdminConn.getDB("test");
     testUserAdmin.createRole({role: "testRole1", privileges: [], roles: []});
     testUserAdmin.createRole({role: "testRole2", privileges: [], roles: ["testRole1"]});
-    testUserAdmin.createUser({user: "testUser", pwd: "pwd", roles: ["testRole2", {role: "adminRole", db: "admin"}]});
+    testUserAdmin.createUser({
+        user: "testUser",
+        pwd: "pwd",
+        roles: ["testRole2", {role: "adminRole", db: "admin"}],
+    });
 
     let testDB = conn.getDB("test");
     assert(testDB.auth("testUser", "pwd"));
@@ -44,7 +52,9 @@ function runTest(conn) {
         testDB.foo.findOne();
     });
 
-    testUserAdmin.grantPrivilegesToRole("testRole1", [{resource: {db: "test", collection: ""}, actions: ["find"]}]);
+    testUserAdmin.grantPrivilegesToRole("testRole1", [
+        {resource: {db: "test", collection: ""}, actions: ["find"]},
+    ]);
 
     hasAuthzError(testDB.foo.insert({a: 1}));
     assert.doesNotThrow(function () {
@@ -67,7 +77,9 @@ function runTest(conn) {
     hasAuthzError(testDB.bar.insert({a: 1}));
     assert.eq(0, testDB.bar.count());
 
-    adminUserAdmin.grantPrivilegesToRole("adminRole", [{resource: {db: "", collection: "foo"}, actions: ["update"]}]);
+    adminUserAdmin.grantPrivilegesToRole("adminRole", [
+        {resource: {db: "", collection: "foo"}, actions: ["update"]},
+    ]);
     assert.commandWorked(testDB.foo.update({a: 1}, {$inc: {a: 1}}));
     assert.eq(2, testDB.foo.findOne().a);
     assert.commandWorked(testDB.foo.update({b: 1}, {$inc: {b: 1}}, true)); // upsert
@@ -76,7 +88,9 @@ function runTest(conn) {
     hasAuthzError(testDB.foo.remove({b: 2}));
     assert.eq(2, testDB.foo.count());
 
-    adminUserAdmin.grantPrivilegesToRole("adminRole", [{resource: {db: "", collection: ""}, actions: ["remove"]}]);
+    adminUserAdmin.grantPrivilegesToRole("adminRole", [
+        {resource: {db: "", collection: ""}, actions: ["remove"]},
+    ]);
     assert.commandWorked(testDB.foo.remove({b: 2}));
     assert.eq(1, testDB.foo.count());
 
@@ -135,7 +149,9 @@ function runTest(conn) {
 
     // Test privileges on the cluster resource
     assert.commandFailed(testDB.runCommand({serverStatus: 1}));
-    adminUserAdmin.grantPrivilegesToRole("adminRole", [{resource: {cluster: true}, actions: ["serverStatus"]}]);
+    adminUserAdmin.grantPrivilegesToRole("adminRole", [
+        {resource: {cluster: true}, actions: ["serverStatus"]},
+    ]);
     assert.commandWorked(testDB.serverStatus());
 }
 

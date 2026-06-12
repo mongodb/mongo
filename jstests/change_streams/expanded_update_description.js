@@ -14,11 +14,15 @@ const kLargeStr = "*".repeat(128);
 assert.commandWorked(
     db.coll.insert({
         _id: 100,
-        "topLevelArray": [{subArray: [0, [0, [{bottomArray: [1, 2, kLargeStr]}]], 2, 3, kLargeStr]}],
+        "topLevelArray": [
+            {subArray: [0, [0, [{bottomArray: [1, 2, kLargeStr]}]], 2, 3, kLargeStr]},
+        ],
         "arrayForReplacement": [0, 1, 2, 3],
         "arrayForResize": [kLargeStr, 1],
         obj: {
-            "sub.obj": {"d.o.t.t.e.d.a.r.r.a.y..": [[{a: {"b.c": 1, field: kLargeStr}}, "truncated"]]},
+            "sub.obj": {
+                "d.o.t.t.e.d.a.r.r.a.y..": [[{a: {"b.c": 1, field: kLargeStr}}, "truncated"]],
+            },
         },
         "d.o.t.t.e.d.o.b.j.": {"sub.obj": {"b.c": 2}},
         "objectWithNumericField": {"0": {"1": "numeric", field: kLargeStr}},
@@ -38,7 +42,11 @@ assert.commandWorked(
     db.coll.update(
         {_id: 100},
         {
-            $set: {"a": 2, "topLevelArray.0.subArray.1.1.0.bottomArray.2": 3, "arrayForReplacement": [0]},
+            $set: {
+                "a": 2,
+                "topLevelArray.0.subArray.1.1.0.bottomArray.2": 3,
+                "arrayForReplacement": [0],
+            },
         },
     ),
 );
@@ -48,7 +56,11 @@ let expected = {
     ns: {db: "test", coll: "coll"},
     operationType: "update",
     updateDescription: {
-        updatedFields: {"arrayForReplacement": [0], "a": 2, "topLevelArray.0.subArray.1.1.0.bottomArray.2": 3},
+        updatedFields: {
+            "arrayForReplacement": [0],
+            "a": 2,
+            "topLevelArray.0.subArray.1.1.0.bottomArray.2": 3,
+        },
         removedFields: [],
         truncatedArrays: [],
         disambiguatedPaths: {},
@@ -58,7 +70,9 @@ cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expect
 
 // Tests that an update modifying a non-array numeric field name is reported as a string rather than
 // as an integer under 'disambiguatedPaths'. Array indexes are reported as integers.
-assert.commandWorked(db.coll.update({_id: 100}, {$set: {"arrayWithNumericField.0.0.1": {"b.c": 1}}}));
+assert.commandWorked(
+    db.coll.update({_id: 100}, {$set: {"arrayWithNumericField.0.0.1": {"b.c": 1}}}),
+);
 expected = {
     documentKey: {_id: 100},
     ns: {db: "test", coll: "coll"},
@@ -126,7 +140,9 @@ cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expect
 assert.commandWorked(
     db.coll.update({_id: 100}, [
         {
-            $replaceWith: {$setField: {field: "d.o.t.t.e.d.o.b.j.", input: "$$ROOT", value: {"subObj": 1}}},
+            $replaceWith: {
+                $setField: {field: "d.o.t.t.e.d.o.b.j.", input: "$$ROOT", value: {"subObj": 1}},
+            },
         },
         {$replaceWith: {$setField: {field: "new.Field.", input: "$$ROOT", value: 1}}},
     ]),
@@ -139,7 +155,10 @@ expected = {
         updatedFields: {"d.o.t.t.e.d.o.b.j.": {subObj: 1}, "new.Field.": 1},
         removedFields: [],
         truncatedArrays: [],
-        disambiguatedPaths: {"d.o.t.t.e.d.o.b.j.": ["d.o.t.t.e.d.o.b.j."], "new.Field.": ["new.Field."]},
+        disambiguatedPaths: {
+            "d.o.t.t.e.d.o.b.j.": ["d.o.t.t.e.d.o.b.j."],
+            "new.Field.": ["new.Field."],
+        },
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
@@ -154,7 +173,9 @@ assert.commandWorked(
                         field: "sub.obj",
                         input: "$obj",
                         value: {
-                            $literal: {"d.o.t.t.e.d.a.r.r.a.y..": [[{a: {"b.c": 2, field: kLargeStr}}]]},
+                            $literal: {
+                                "d.o.t.t.e.d.a.r.r.a.y..": [[{a: {"b.c": 2, field: kLargeStr}}]],
+                            },
                         },
                     },
                 },
@@ -171,7 +192,12 @@ expected = {
         removedFields: [],
         truncatedArrays: [{field: "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0", newSize: 1}],
         disambiguatedPaths: {
-            "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0": ["obj", "sub.obj", "d.o.t.t.e.d.a.r.r.a.y..", 0],
+            "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0": [
+                "obj",
+                "sub.obj",
+                "d.o.t.t.e.d.a.r.r.a.y..",
+                0,
+            ],
             "obj.sub.obj.d.o.t.t.e.d.a.r.r.a.y...0.0.a.b.c": [
                 "obj",
                 "sub.obj",

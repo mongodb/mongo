@@ -174,7 +174,8 @@ export const $config = (function () {
         // run right after the TTL thread has started to sleep, which requires us to wait another
         // period for it to wake up and delete the expired documents. We wait at least another
         // period just to avoid race-prone tests on overloaded test hosts.
-        const timeoutMS = (TestData.inEvergreen ? 10 : 2) * Math.max(ttlMonitorSleepSecs, ttlSeconds) * 1000;
+        const timeoutMS =
+            (TestData.inEvergreen ? 10 : 2) * Math.max(ttlMonitorSleepSecs, ttlSeconds) * 1000;
 
         print("Waiting for data to be deleted by TTL monitor");
         collName = this.getCollectionName(collName);

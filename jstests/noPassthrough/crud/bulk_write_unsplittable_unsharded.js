@@ -5,7 +5,11 @@
  *   requires_fcv_83,
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator,
+} from "jstests/libs/bulk_write_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -25,13 +29,19 @@ const db1 = st.s1.getDB(dbName);
 
 // Run a sharding command to establish a database version on mongos 1.
 assert.commandWorked(
-    db1.runCommand({createUnsplittableCollection: unsplittableCollName, dataShard: st.shard0.shardName}),
+    db1.runCommand({
+        createUnsplittableCollection: unsplittableCollName,
+        dataShard: st.shard0.shardName,
+    }),
 );
 
 // Recreated the database to update the database version on mongos 0.
 db0.dropDatabase();
 assert.commandWorked(
-    db0.runCommand({createUnsplittableCollection: unsplittableCollName, dataShard: st.shard0.shardName}),
+    db0.runCommand({
+        createUnsplittableCollection: unsplittableCollName,
+        dataShard: st.shard0.shardName,
+    }),
 );
 assert.commandWorked(db0.createCollection(unshardedCollName));
 
@@ -49,7 +59,14 @@ const res = assert.commandWorked(
 
 // Validate the bulkWrite response.
 cursorSizeValidator(res, 2);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, n: 1, idx: 1});
 

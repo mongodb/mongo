@@ -20,17 +20,31 @@ import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
         const valid = test["valid"];
 
         try {
-            assertSchemaMatch(coll, {properties: {schema_test_wrapper: schema}}, {schema_test_wrapper: data}, valid);
+            assertSchemaMatch(
+                coll,
+                {properties: {schema_test_wrapper: schema}},
+                {schema_test_wrapper: data},
+                valid,
+            );
 
             // Run against a top-level schema if the data is an object, since MongoDB only stores
             // records as documents.
             // (Note: JS notion of an 'object' includes arrays and null.)
-            if (typeof data === "object" && !Array.isArray(data) && data !== null && banFromTopLevel !== true) {
+            if (
+                typeof data === "object" &&
+                !Array.isArray(data) &&
+                data !== null &&
+                banFromTopLevel !== true
+            ) {
                 assertSchemaMatch(coll, schema, data, valid);
             }
         } catch (e) {
             throw new Error(
-                tojson(e) + "\n\nJSON Schema test failed for schema " + tojson(schema) + " and data " + tojson(data),
+                tojson(e) +
+                    "\n\nJSON Schema test failed for schema " +
+                    tojson(schema) +
+                    " and data " +
+                    tojson(data),
             );
         }
     }
@@ -39,6 +53,8 @@ import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
     testGroupList.forEach(function (testGroup) {
         assert(testGroup.hasOwnProperty("schema"), "JSON Schema test requires a 'schema'");
         assert(testGroup.hasOwnProperty("tests"), "JSON Schema test requires a 'tests' list");
-        testGroup["tests"].forEach((test) => runSchemaTest(test, testGroup["schema"], testGroup["banFromTopLevel"]));
+        testGroup["tests"].forEach((test) =>
+            runSchemaTest(test, testGroup["schema"], testGroup["banFromTopLevel"]),
+        );
     });
 })();

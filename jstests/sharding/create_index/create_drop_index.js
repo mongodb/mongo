@@ -24,7 +24,8 @@ const db = mongos.getDB(dbName);
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
 
 function getIndexes(conn, collectionName) {
-    return assert.commandWorked(conn.getDB(dbName).runCommand({listIndexes: collectionName})).cursor.firstBatch;
+    return assert.commandWorked(conn.getDB(dbName).runCommand({listIndexes: collectionName})).cursor
+        .firstBatch;
 }
 
 function testCreateDropIndexes(collMustBeCreatedOnPrimaryShard, collMustBeSharded) {
@@ -37,7 +38,10 @@ function testCreateDropIndexes(collMustBeCreatedOnPrimaryShard, collMustBeSharde
 
     if (!collMustBeCreatedOnPrimaryShard) {
         assert.commandWorked(
-            mongos.getDB(dbName).runCommand({createUnsplittableCollection: collName, dataShard: nonPrimaryShardName}),
+            mongos.getDB(dbName).runCommand({
+                createUnsplittableCollection: collName,
+                dataShard: nonPrimaryShardName,
+            }),
         );
     }
 
@@ -47,8 +51,12 @@ function testCreateDropIndexes(collMustBeCreatedOnPrimaryShard, collMustBeSharde
         // Shard/distribute collection: shard0 will own [minKey, 0) and shard1 will own [0, maxKey)
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
         assert.commandWorked(st.splitAt(ns, {_id: 0}));
-        assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: -1}, to: primaryShardName}));
-        assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: nonPrimaryShardName}));
+        assert.commandWorked(
+            mongos.adminCommand({moveChunk: ns, find: {_id: -1}, to: primaryShardName}),
+        );
+        assert.commandWorked(
+            mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: nonPrimaryShardName}),
+        );
     }
 
     // Create index and check that the expected shards have it (indexes: {_id: 1} and {a:1})

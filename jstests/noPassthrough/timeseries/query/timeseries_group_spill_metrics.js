@@ -9,7 +9,9 @@
  */
 import {getAggPlanStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 
-const conn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true},
+});
 const db = conn.getDB("test");
 // Debug mode changes how often we spill. This test assumes SBE is being used.
 if (
@@ -45,7 +47,10 @@ assert.commandWorked(bulk.execute());
 
 // Grouping by $bigStr and $a (a unique field) produces enough keys in our hash table to go over the
 // memory limit and spill.
-const pipeline = [{$match: {a: {$gt: 0}}}, {$group: {_id: {x: "$bigStr", y: "$a"}, min: {$min: "$b"}}}];
+const pipeline = [
+    {$match: {a: {$gt: 0}}},
+    {$group: {_id: {x: "$bigStr", y: "$a"}, min: {$min: "$b"}}},
+];
 const expectedMetrics = {
     spills: 4,
     spilledDataStorageSize: 4096,
@@ -59,7 +64,8 @@ const metricsBefore = db.serverStatus().metrics.query.group;
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: maxMemoryLimitForGroupStage,
+        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
+            maxMemoryLimitForGroupStage,
     }),
 );
 
@@ -91,7 +97,15 @@ assert.eq(
     actualSpilledDataStorageSize + metricsBefore.spilledDataStorageSize,
     explain,
 );
-assert.eq(metricsAfter.spilledRecords, actualSpilledRecords + metricsBefore.spilledRecords, explain);
-assert.eq(metricsAfter.spilledRecords, actualSpilledRecords + metricsBefore.spilledRecords, explain);
+assert.eq(
+    metricsAfter.spilledRecords,
+    actualSpilledRecords + metricsBefore.spilledRecords,
+    explain,
+);
+assert.eq(
+    metricsAfter.spilledRecords,
+    actualSpilledRecords + metricsBefore.spilledRecords,
+    explain,
+);
 
 MongoRunner.stopMongod(conn);

@@ -24,7 +24,11 @@ if (testingReplication && TestData && TestData.mixedBinVersions) {
             TestData.mixedBinVersions[i] === "new"
                 ? latestBinVersion
                 : MongoRunner.getBinVersionFor(TestData.multiversionBinVersion);
-        print(actualVersion, expectedVersion, MongoRunner.getBinVersionFor(TestData.multiversionBinVersion));
+        print(
+            actualVersion,
+            expectedVersion,
+            MongoRunner.getBinVersionFor(TestData.multiversionBinVersion),
+        );
         print(TestData.multiversionBinVersion);
         assert(MongoRunner.areBinVersionsTheSame(actualVersion, expectedVersion));
     }

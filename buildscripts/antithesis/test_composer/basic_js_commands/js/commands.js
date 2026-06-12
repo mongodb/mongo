@@ -1,4 +1,6 @@
-const MONGO_URI = connection_string.includes("/") ? connection_string : `mongodb://${connection_string}`;
+const MONGO_URI = connection_string.includes("/")
+    ? connection_string
+    : `mongodb://${connection_string}`;
 
 const MAX_RETRIES = 180; // 3 minutes
 
@@ -87,7 +89,9 @@ function retryOnFailure(func) {
                 err.name === "PoolClearedOnNetworkError" ||
                 err.name === "WriteConcernError"
             ) {
-                print(`Attempt ${retries} failed due to "${err.name}: ${err.message}", retrying in 1 second...`);
+                print(
+                    `Attempt ${retries} failed due to "${err.name}: ${err.message}", retrying in 1 second...`,
+                );
                 sleep(1_000);
                 continue;
             }
@@ -95,11 +99,13 @@ function retryOnFailure(func) {
             const errLabels = err.errorLabels || err.errorResponse?.errorLabels || [];
             if (
                 Array.isArray(errLabels) &&
-                ["RetryableWriteError", "TransientTransactionError", "RetryableError"].some((label) =>
-                    errLabels.includes(label),
+                ["RetryableWriteError", "TransientTransactionError", "RetryableError"].some(
+                    (label) => errLabels.includes(label),
                 )
             ) {
-                print(`Attempt ${retries} failed due to "${err.codeName}: ${err.message}", retrying in 1 second...`);
+                print(
+                    `Attempt ${retries} failed due to "${err.codeName}: ${err.message}", retrying in 1 second...`,
+                );
                 sleep(1_000);
                 continue;
             }
@@ -162,7 +168,11 @@ function pitRead() {
     const _id = ObjectId();
     retryOnFailure(() => {
         db.createCollection("test_snapshots");
-        db.test_snapshots.updateOne({_id}, {$set: {value: 0}}, {upsert: true, writeConcern: {w: "majority"}});
+        db.test_snapshots.updateOne(
+            {_id},
+            {$set: {value: 0}},
+            {upsert: true, writeConcern: {w: "majority"}},
+        );
     });
 
     // Execute an update (set value=1) and capture its timestamp as t1
@@ -214,7 +224,9 @@ function validateCollections() {
         const collectionNames = retryOnFailure(() => db.getSiblingDB(dbName).getCollectionNames());
         collectionNames.forEach((coll) => {
             print(`validating ${dbName}.${coll}...`);
-            const validateResult = retryOnFailure(() => db.getSiblingDB(dbName).getCollection(coll).validate());
+            const validateResult = retryOnFailure(() =>
+                db.getSiblingDB(dbName).getCollection(coll).validate(),
+            );
             assert(
                 validateResult.valid,
                 `collection ${dbName}.${coll} is not valid: ${JSON.stringify(validateResult)}`,
@@ -231,11 +243,19 @@ function aggregate() {
         // $group with $sum and $avg
         [{$group: {_id: null, total: {$sum: "$x"}, avg: {$avg: "$x"}, count: {$sum: 1}}}],
         // $match + $sort + $project + $limit
-        [{$match: {x: {$gt: randomInt(5_000)}}}, {$sort: {x: -1}}, {$project: {_id: 0, x: 1}}, {$limit: 10}],
+        [
+            {$match: {x: {$gt: randomInt(5_000)}}},
+            {$sort: {x: -1}},
+            {$project: {_id: 0, x: 1}},
+            {$limit: 10},
+        ],
         // $group by bucket
         [{$group: {_id: {$mod: ["$x", 10]}, count: {$sum: 1}}}, {$sort: {_id: 1}}],
         // $match + $group with $min/$max
-        [{$match: {x: {$exists: true}}}, {$group: {_id: null, max: {$max: "$x"}, min: {$min: "$x"}}}],
+        [
+            {$match: {x: {$exists: true}}},
+            {$group: {_id: null, max: {$max: "$x"}, min: {$min: "$x"}}},
+        ],
         // $lookup (self-join) + $unwind
         [
             {$limit: 5},
@@ -258,11 +278,15 @@ function update() {
         const val = randomInt(10_000) + 1;
         const op = randomInt(3);
         if (op === 0) {
-            retryOnFailure(() => db.test.updateOne({x: {$gt: val}}, {$set: {x: randomInt(10_000) + 1}}));
+            retryOnFailure(() =>
+                db.test.updateOne({x: {$gt: val}}, {$set: {x: randomInt(10_000) + 1}}),
+            );
         } else if (op === 1) {
             retryOnFailure(() => db.test.updateMany({x: {$lt: val}}, {$inc: {x: 1}}));
         } else {
-            retryOnFailure(() => db.test.updateOne({x: val}, {$push: {tags: `tag_${randomInt(5)}`}}, {upsert: true}));
+            retryOnFailure(() =>
+                db.test.updateOne({x: val}, {$push: {tags: `tag_${randomInt(5)}`}}, {upsert: true}),
+            );
         }
     }
     print("done executing update");
@@ -313,7 +337,9 @@ function txn() {
                 session.abortTransaction();
                 session.endSession();
             } catch (err) {
-                print(`Caught exception while aborting transaction, ignoring: ${JSON.stringify(err)}`);
+                print(
+                    `Caught exception while aborting transaction, ignoring: ${JSON.stringify(err)}`,
+                );
             }
 
             const isRetryableErr = isRetryableError(err.code, err.message);
@@ -327,7 +353,9 @@ function txn() {
                 err.name === "MongoPoolClearedError";
 
             if (txnRetries++ < MAX_TXN_RETRIES && (isRetryableErr || isTransient || isNetwork)) {
-                print(`txn attempt ${txnRetries} failed (${err.name ?? err.codeName}), retrying...`);
+                print(
+                    `txn attempt ${txnRetries} failed (${err.name ?? err.codeName}), retrying...`,
+                );
                 sleep(1_000);
                 continue;
             }

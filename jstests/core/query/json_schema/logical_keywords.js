@@ -86,8 +86,18 @@ assertSchemaMatch(coll, {allOf: [{properties: {foo: {type: "string"}}}]}, {foo: 
 assertSchemaMatch(coll, {allOf: [{properties: {foo: {type: "string"}}}]}, {foo: 1}, false);
 
 // Test that 'allOf' in conjunction with another keyword matches the correct documents.
-assertSchemaMatch(coll, {properties: {foo: {type: "number", allOf: [{minimum: 1}]}}}, {foo: 1}, true);
-assertSchemaMatch(coll, {properties: {foo: {type: "number", allOf: [{minimum: 1}]}}}, {foo: "str"}, false);
+assertSchemaMatch(
+    coll,
+    {properties: {foo: {type: "number", allOf: [{minimum: 1}]}}},
+    {foo: 1},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {properties: {foo: {type: "number", allOf: [{minimum: 1}]}}},
+    {foo: "str"},
+    false,
+);
 
 // Test that the 'anyOf' keyword correctly returns documents that match at least one schema
 // in the array.
@@ -261,7 +271,12 @@ assertSchemaMatch(coll, schema, {a: {name: "tiny", size: "large"}}, true);
 assertSchemaMatch(coll, schema, {a: {size: "large", name: "tiny"}}, true);
 
 // Test that the 'enum' keyword does not match documents with additional fields.
-assertSchemaMatch(coll, {properties: {a: {enum: [{name: "tiny"}]}}}, {a: {size: "large", name: "tiny"}}, false);
+assertSchemaMatch(
+    coll,
+    {properties: {a: {enum: [{name: "tiny"}]}}},
+    {a: {size: "large", name: "tiny"}},
+    false,
+);
 
 // Test that a top-level 'enum' matches the correct documents.
 assertSchemaMatch(coll, {enum: [{_id: 0}]}, {_id: 0}, true);

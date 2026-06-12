@@ -106,11 +106,17 @@ export const $config = (function () {
 
     function setup(db, collName, cluster) {
         cluster.executeOnMongodNodes(function (db) {
-            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs,
+            });
         });
 
         cluster.executeOnMongosNodes(function (db) {
-            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs,
+            });
         });
     }
 

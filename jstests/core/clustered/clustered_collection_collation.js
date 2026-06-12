@@ -36,9 +36,14 @@ const simpleCollation = {
 };
 
 assert.commandWorked(
-    db.createCollection(collatedName, {clusteredIndex: {key: {_id: 1}, unique: true}, collation: defaultCollation}),
+    db.createCollection(collatedName, {
+        clusteredIndex: {key: {_id: 1}, unique: true},
+        collation: defaultCollation,
+    }),
 );
-assert.commandWorked(db.createCollection(noncollatedName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    db.createCollection(noncollatedName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 
 const expectedCollation = {
     locale: "en",
@@ -55,7 +60,11 @@ const expectedCollation = {
 
 // Verify clustered collection collation is reflected on the index spec.
 const indexes = collated.getIndexes();
-assert.eq(0, bsonWoCompare(indexes[0].collation, expectedCollation), "Default index doesn't match expected collation");
+assert.eq(
+    0,
+    bsonWoCompare(indexes[0].collation, expectedCollation),
+    "Default index doesn't match expected collation",
+);
 
 // Collation spec for "simple" is now explicitly included.
 assertDropCollection(db, "simpleCollation");
@@ -66,7 +75,10 @@ assert.commandWorked(
     }),
 );
 // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-const indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, db.simpleCollation.getIndexes()[0]);
+const indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(
+    db,
+    db.simpleCollation.getIndexes()[0],
+);
 assert.eq(indexSpec.collation.locale, "simple", "Default index should have simple collation");
 
 const insertDocuments = function (coll) {
@@ -166,7 +178,12 @@ const testBounds = function (coll, expected, defaultCollation) {
     verifyHasBoundsAndFindsN(coll, 1, {_id: 5}, incompatibleCollation);
     verifyHasBoundsAndFindsN(coll, 1, {_id: {int: 5}}, incompatibleCollation);
     verifyHasBoundsAndFindsN(coll, 1, {_id: {ints: [5, 10]}}, incompatibleCollation);
-    verifyNoTightBoundsAndFindsN(coll, 2, {_id: {$in: [5, {ints: [5, 10]}]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll,
+        2,
+        {_id: {$in: [5, {ints: [5, 10]}]}},
+        incompatibleCollation,
+    );
 
     // Test strings respect the collation.
     verifyHasBoundsAndFindsN(coll, expected, {_id: "A"});
@@ -193,9 +210,24 @@ const testBounds = function (coll, expected, defaultCollation) {
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}}, incompatibleCollation);
-    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["", {str: "A"}]}}, incompatibleCollation);
-    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}}, incompatibleCollation);
-    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll,
+        expected,
+        {_id: {$in: ["", {str: "A"}]}},
+        incompatibleCollation,
+    );
+    verifyNoTightBoundsAndFindsN(
+        coll,
+        expected,
+        {_id: {$in: [{}, {strs: ["A", "b"]}]}},
+        incompatibleCollation,
+    );
+    verifyNoTightBoundsAndFindsN(
+        coll,
+        expected,
+        {_id: {$in: [[], {strs: ["a", "B"]}]}},
+        incompatibleCollation,
+    );
 
     if (defaultCollation != undefined && defaultCollation.locale != simpleCollation.locale) {
         // 'Simple' collations are treated differently than non-simple queries since they are the
@@ -207,9 +239,24 @@ const testBounds = function (coll, expected, defaultCollation) {
         verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, simpleCollation);
         verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}}, simpleCollation);
         verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}}, simpleCollation);
-        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["", {str: "A"}]}}, simpleCollation);
-        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}}, simpleCollation);
-        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(
+            coll,
+            expected,
+            {_id: {$in: ["", {str: "A"}]}},
+            simpleCollation,
+        );
+        verifyNoTightBoundsAndFindsN(
+            coll,
+            expected,
+            {_id: {$in: [{}, {strs: ["A", "b"]}]}},
+            simpleCollation,
+        );
+        verifyNoTightBoundsAndFindsN(
+            coll,
+            expected,
+            {_id: {$in: [[], {strs: ["a", "B"]}]}},
+            simpleCollation,
+        );
     }
 
     // Test compatible query collations generate bounds
@@ -220,8 +267,18 @@ const testBounds = function (coll, expected, defaultCollation) {
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}}, defaultCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}}, defaultCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["", {str: "A"}]}}, defaultCollation);
-    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}}, defaultCollation);
-    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}}, defaultCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll,
+        expected,
+        {_id: {$in: [{}, {strs: ["A", "b"]}]}},
+        defaultCollation,
+    );
+    verifyNoTightBoundsAndFindsN(
+        coll,
+        expected,
+        {_id: {$in: [[], {strs: ["a", "B"]}]}},
+        defaultCollation,
+    );
 };
 
 insertDocuments(collated);
@@ -254,13 +311,20 @@ validateClusteredCollectionHint(collated, {
     },
 });
 assert.commandFailedWithCode(
-    db.runCommand({explain: {find: noncollatedName, hint: {_id: 1}, min: {_id: "a"}, max: {_id: "C"}}}),
+    db.runCommand({
+        explain: {find: noncollatedName, hint: {_id: 1}, min: {_id: "a"}, max: {_id: "C"}},
+    }),
     6137401,
 ); // max() must be greater than min().
 validateClusteredCollectionHint(noncollated, {
     expectedNReturned: 3, // "a", "b" and "B"
     cmd: {find: noncollatedName, hint: {_id: 1}, min: {_id: "A"}, max: {_id: "c"}},
-    expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: "A", maxRecord: "c"},
+    expectedWinningPlanStats: {
+        stage: "CLUSTERED_IXSCAN",
+        direction: "forward",
+        minRecord: "A",
+        maxRecord: "c",
+    },
 });
 
 // Strings with incompatible collation.
@@ -293,12 +357,22 @@ assert.commandFailedWithCode(
 validateClusteredCollectionHint(collated, {
     expectedNReturned: 2,
     cmd: {find: collatedName, hint: {_id: 1}, min: {_id: 5}, max: {_id: 11}},
-    expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11},
+    expectedWinningPlanStats: {
+        stage: "CLUSTERED_IXSCAN",
+        direction: "forward",
+        minRecord: 5,
+        maxRecord: 11,
+    },
 });
 validateClusteredCollectionHint(noncollated, {
     expectedNReturned: 2,
     cmd: {find: noncollatedName, hint: {_id: 1}, min: {_id: 5}, max: {_id: 11}},
-    expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11},
+    expectedWinningPlanStats: {
+        stage: "CLUSTERED_IXSCAN",
+        direction: "forward",
+        minRecord: 5,
+        maxRecord: 11,
+    },
 });
 
 // Numeric with incompatible collation.
@@ -311,7 +385,12 @@ validateClusteredCollectionHint(collated, {
         max: {_id: 11},
         collation: incompatibleCollation,
     },
-    expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11},
+    expectedWinningPlanStats: {
+        stage: "CLUSTERED_IXSCAN",
+        direction: "forward",
+        minRecord: 5,
+        maxRecord: 11,
+    },
 });
 validateClusteredCollectionHint(noncollated, {
     expectedNReturned: 2,
@@ -322,5 +401,10 @@ validateClusteredCollectionHint(noncollated, {
         max: {_id: 11},
         collation: incompatibleCollation,
     },
-    expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11},
+    expectedWinningPlanStats: {
+        stage: "CLUSTERED_IXSCAN",
+        direction: "forward",
+        minRecord: 5,
+        maxRecord: 11,
+    },
 });

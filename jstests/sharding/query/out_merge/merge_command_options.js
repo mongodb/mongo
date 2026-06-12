@@ -32,16 +32,22 @@ assert.commandWorked(primaryDB.setProfilingLevel(2));
 assert.commandWorked(nonPrimaryDB.setProfilingLevel(2));
 
 // Enable sharding on the test DB and ensure that shard0 is the primary.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the target collection, and set the unique flag to ensure that there's a unique
 // index on the shard key.
 const shardKey = {
     sk: 1,
 };
-assert.commandWorked(mongosDB.adminCommand({shardCollection: target.getFullName(), key: shardKey, unique: true}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: target.getFullName(), key: shardKey, unique: true}),
+);
 assert.commandWorked(mongosDB.adminCommand({split: target.getFullName(), middle: {sk: 1}}));
-assert.commandWorked(mongosDB.adminCommand({moveChunk: target.getFullName(), find: {sk: 1}, to: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: target.getFullName(), find: {sk: 1}, to: st.rs1.getURL()}),
+);
 
 assert.commandWorked(source.insert({sk: "dummy"}));
 
@@ -57,7 +63,10 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
     // the agg request below, causing it to retry the agg command from the top and thus send
     // listIndexes to the primary shard twice.
     assert.commandWorked(
-        st.rs0.getPrimary().getDB("test").adminCommand({_flushDatabaseCacheUpdates: "test", syncFromConfig: true}),
+        st.rs0
+            .getPrimary()
+            .getDB("test")
+            .adminCommand({_flushDatabaseCacheUpdates: "test", syncFromConfig: true}),
     );
 }
 
@@ -106,7 +115,9 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
     // Configure the "maxTimeAlwaysTimeOut" fail point on the primary shard, which forces
     // mongod to throw if it receives an operation with a max time.
     assert.commandWorked(
-        primaryDB.getSiblingDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}),
+        primaryDB
+            .getSiblingDB("admin")
+            .runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}),
     );
 
     // Test that the $merge correctly fails when the maxTimeMS is exceeded.
@@ -154,7 +165,9 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
     });
 
     assert.commandWorked(
-        primaryDB.getSiblingDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}),
+        primaryDB
+            .getSiblingDB("admin")
+            .runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}),
     );
 })();
 

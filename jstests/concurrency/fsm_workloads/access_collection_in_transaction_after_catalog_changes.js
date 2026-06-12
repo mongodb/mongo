@@ -40,49 +40,105 @@ export const $config = (function () {
             const op = function (ddlColl) {
                 ddlColl.aggregate([{$limit: 1}]).itcount();
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "aggregate", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "aggregate",
+                op,
+            );
         }
 
         function distinct(db, collName) {
             const op = function (ddlColl) {
                 ddlColl.distinct("x");
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "distinct", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "distinct",
+                op,
+            );
         }
 
         function findAndModify(db, collName) {
             const op = function (ddlColl) {
                 ddlColl.findAndModify({query: {}, sort: {x: 1}, update: {$inc: {x: 1}}});
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findAndModify", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "findAndModify",
+                op,
+            );
         }
 
         function findCollScan(db, collName) {
             const op = function (ddlColl) {
                 ddlColl.findOne();
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findCollScan", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "findCollScan",
+                op,
+            );
         }
 
         function findGetMore(db, collName) {
             const op = function (ddlColl) {
                 ddlColl.find().batchSize(1).itcount();
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findGetMore", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "findGetMore",
+                op,
+            );
         }
 
         function findIdScan(db, collName) {
             const op = function (ddlColl) {
                 ddlColl.findOne({_id: 0});
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findIdScan", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "findIdScan",
+                op,
+            );
         }
 
         function findSecondaryIndexScan(db, collName) {
             const op = function (ddlColl) {
                 ddlColl.findOne({x: 1});
             };
-            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findSecondaryIndexScan", op);
+            runOpInTxn(
+                this.session,
+                db,
+                collName,
+                this.ddlDBName,
+                this.ddlCollName,
+                "findSecondaryIndexScan",
+                op,
+            );
         }
 
         function insert(db, collName) {
@@ -137,9 +193,15 @@ export const $config = (function () {
 
         function renameColl(db, collName) {
             const ddlCollFullName = db.getSiblingDB(this.ddlDBName)[this.ddlCollName].getFullName();
-            const renameCollFullName = db.getSiblingDB(this.ddlDBName)[this.renameCollName].getFullName();
+            const renameCollFullName = db
+                .getSiblingDB(this.ddlDBName)
+                [this.renameCollName].getFullName();
             assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({renameCollection: ddlCollFullName, to: renameCollFullName, dropTarget: true}),
+                db.adminCommand({
+                    renameCollection: ddlCollFullName,
+                    to: renameCollFullName,
+                    dropTarget: true,
+                }),
                 ErrorCodes.NamespaceNotFound,
             );
         }

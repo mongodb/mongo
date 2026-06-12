@@ -10,7 +10,8 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function getInvalidationCount(db) {
-    return db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+    return db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness
+        .queriesFailedDueToInvalidation;
 }
 
 const fetchCase = {
@@ -37,7 +38,14 @@ const clusteredCollScanCase = {
 };
 
 function runTest({testCase, setParameters, expect}) {
-    jsTest.log.info("Running " + testCase.mode + " with setParameters=" + tojson(setParameters) + ", expect=" + expect);
+    jsTest.log.info(
+        "Running " +
+            testCase.mode +
+            " with setParameters=" +
+            tojson(setParameters) +
+            ", expect=" +
+            expect,
+    );
 
     const conn = MongoRunner.runMongod({setParameter: setParameters});
     assert.neq(null, conn, "mongod was unable to start up");
@@ -48,7 +56,11 @@ function runTest({testCase, setParameters, expect}) {
     coll.drop();
 
     if (testCase.createClustered) {
-        assert.commandWorked(testDb.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            testDb.createCollection(coll.getName(), {
+                clusteredIndex: {key: {_id: 1}, unique: true},
+            }),
+        );
     }
 
     assert.commandWorked(coll.createIndex({"a.b": 1}));
@@ -71,7 +83,9 @@ function runTest({testCase, setParameters, expect}) {
         );
     }
 
-    assert.commandWorked(testDb.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+    assert.commandWorked(
+        testDb.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+    );
 
     const fp = configureFailPoint(testDb, "setYieldAllLocksHang", {namespace: coll.getFullName()});
 
@@ -86,10 +100,18 @@ function runTest({testCase, setParameters, expect}) {
                     const runAgg = () => testColl.aggregate(pipeline, aggOptions).toArray();
                     if (expect === "killed") {
                         const err = assert.throws(runAgg);
-                        assert.eq(err.code, ErrorCodes.QueryPlanKilled, "Unexpected error: " + tojson(err));
+                        assert.eq(
+                            err.code,
+                            ErrorCodes.QueryPlanKilled,
+                            "Unexpected error: " + tojson(err),
+                        );
                     } else if (expect === "correct") {
                         const results = runAgg();
-                        assert.sameMembers(results, [{_id: 1}], "Unexpected results: " + tojson(results));
+                        assert.sameMembers(
+                            results,
+                            [{_id: 1}],
+                            "Unexpected results: " + tojson(results),
+                        );
                     } else {
                         throw new Error("Unknown expect value: " + expect);
                     }
@@ -119,26 +141,38 @@ function runTest({testCase, setParameters, expect}) {
         fp.off();
         awaitShell();
 
-        const after = testDb.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+        const after = testDb.adminCommand({serverStatus: 1}).metrics.query.pathArrayness
+            .queriesFailedDueToInvalidation;
         const expectedDelta = expect === "killed" ? 1 : 0;
-        assert.eq(after - before, expectedDelta, "expected invalidation counter change to be " + expectedDelta, {
-            before,
-            after,
-            expect,
-        });
+        assert.eq(
+            after - before,
+            expectedDelta,
+            "expected invalidation counter change to be " + expectedDelta,
+            {
+                before,
+                after,
+                expect,
+            },
+        );
     } finally {
         fp.off();
     }
 
     // A fresh query sees updated PathArrayness and returns the correct result.
     const freshResults = coll.aggregate(testCase.pipeline, testCase.aggOptions).toArray();
-    assert.eq(freshResults, [{_id: 1}], "A fresh query must find the matching document. Got: " + tojson(freshResults));
+    assert.eq(
+        freshResults,
+        [{_id: 1}],
+        "A fresh query must find the matching document. Got: " + tojson(freshResults),
+    );
 
     MongoRunner.stopMongod(conn);
 }
 
 function runReadTransactionTest({testCase, setParameters}) {
-    jsTest.log.info("Running transaction " + testCase.mode + " with setParameters=" + tojson(setParameters));
+    jsTest.log.info(
+        "Running transaction " + testCase.mode + " with setParameters=" + tojson(setParameters),
+    );
 
     const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: setParameters}});
     rst.startSet();
@@ -151,7 +185,11 @@ function runReadTransactionTest({testCase, setParameters}) {
     coll.drop();
 
     if (testCase.createClustered) {
-        assert.commandWorked(testDb.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            testDb.createCollection(coll.getName(), {
+                clusteredIndex: {key: {_id: 1}, unique: true},
+            }),
+        );
     }
 
     assert.commandWorked(coll.createIndex({"a.b": 1}));
@@ -174,7 +212,9 @@ function runReadTransactionTest({testCase, setParameters}) {
         );
     }
 
-    assert.commandWorked(testDb.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+    assert.commandWorked(
+        testDb.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+    );
 
     // Force the arrayness check to kill the query if and only if it is reached on a yield.
     const fp = configureFailPoint(testDb, "pathArraynessYieldInvalidation");
@@ -182,9 +222,15 @@ function runReadTransactionTest({testCase, setParameters}) {
     try {
         // Positive control: a normal read yields (YIELD_AUTO), reaches the check, and is killed.
         const beforeControl = getInvalidationCount(testDb);
-        const err = assert.throws(() => coll.aggregate(testCase.pipeline, testCase.aggOptions).toArray());
+        const err = assert.throws(() =>
+            coll.aggregate(testCase.pipeline, testCase.aggOptions).toArray(),
+        );
         assert.eq(err.code, ErrorCodes.QueryPlanKilled, "control query should be killed", {err});
-        assert.eq(getInvalidationCount(testDb) - beforeControl, 1, "control must increment the counter");
+        assert.eq(
+            getInvalidationCount(testDb) - beforeControl,
+            1,
+            "control must increment the counter",
+        );
 
         // Snapshot read: INTERRUPT_ONLY means yieldOrInterrupt never reaches the check.
         const beforeTxn = getInvalidationCount(testDb);
@@ -193,12 +239,22 @@ function runReadTransactionTest({testCase, setParameters}) {
             session.startTransaction({readConcern: {level: "snapshot"}});
             const sessionColl = session.getDatabase(testDb.getName())[coll.getName()];
             const results = sessionColl.aggregate(testCase.pipeline, testCase.aggOptions).toArray();
-            assert.sameMembers(results, [], "snapshot read must not be killed", undefined /*compareFn*/, {results});
+            assert.sameMembers(
+                results,
+                [],
+                "snapshot read must not be killed",
+                undefined /*compareFn*/,
+                {results},
+            );
             session.commitTransaction();
         } finally {
             session.endSession();
         }
-        assert.eq(getInvalidationCount(testDb) - beforeTxn, 0, "snapshot read must not invoke the arrayness check");
+        assert.eq(
+            getInvalidationCount(testDb) - beforeTxn,
+            0,
+            "snapshot read must not invoke the arrayness check",
+        );
     } finally {
         fp.off();
     }

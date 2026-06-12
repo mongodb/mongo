@@ -18,8 +18,9 @@ const db = rst.getPrimary().getDB("test");
 const collName = "mycollection";
 const cmdNss = db.getName() + ".$cmd";
 
-const currentFCV = assert.commandWorked(db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-    .featureCompatibilityVersion.version;
+const currentFCV = assert.commandWorked(
+    db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+).featureCompatibilityVersion.version;
 const testVersionContext = {
     OFCV: currentFCV,
 };
@@ -27,7 +28,9 @@ const testVersionContext = {
 // versionContext is allowed in applyOps, and gets replicated in the produced oplog entries
 assert.commandWorked(
     db.adminCommand({
-        applyOps: [{op: "c", ns: cmdNss, o: {create: collName}, versionContext: testVersionContext}],
+        applyOps: [
+            {op: "c", ns: cmdNss, o: {create: collName}, versionContext: testVersionContext},
+        ],
     }),
 );
 
@@ -49,7 +52,14 @@ assert.commandFailedWithCode(
                 op: "c",
                 ns: "admin.$cmd",
                 o: {
-                    applyOps: [{op: "c", ns: cmdNss, o: {create: collName}, versionContext: testVersionContext}],
+                    applyOps: [
+                        {
+                            op: "c",
+                            ns: cmdNss,
+                            o: {create: collName},
+                            versionContext: testVersionContext,
+                        },
+                    ],
                 },
             },
         ],

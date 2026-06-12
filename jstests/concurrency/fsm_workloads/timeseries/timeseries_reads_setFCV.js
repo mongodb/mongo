@@ -61,7 +61,9 @@ export const $config = (function () {
             const targetFCV = fcvValues[Random.randInt(2)];
             jsTestLog("Executing FCV state, setting to:" + targetFCV);
             try {
-                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+                assert.commandWorked(
+                    db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+                );
             } catch (e) {
                 if (handleRandomSetFCVErrors(e, targetFCV)) return;
                 throw e;
@@ -70,11 +72,15 @@ export const $config = (function () {
         },
 
         listCollections: function (db, collName) {
-            const listCollections = db.getCollectionInfos({name: {$regex: new RegExp(jsTestName())}});
+            const listCollections = db.getCollectionInfos({
+                name: {$regex: new RegExp(jsTestName())},
+            });
             const collectionNames = new Set(listCollections.map((n) => n.name));
 
             // All timeseries collections used by the FSM should be visible.
-            const mainCollections = listCollections.filter((n) => !n.name.startsWith("system.buckets."));
+            const mainCollections = listCollections.filter(
+                (n) => !n.name.startsWith("system.buckets."),
+            );
             assert.eq(mainCollections.length, numCollections, tojson(listCollections));
 
             // We should observe a consistent state: Each timeseries collection should have a
@@ -89,7 +95,9 @@ export const $config = (function () {
         find: function (db, collName) {
             const coll = getCollection(db, Random.randInt(numCollections));
 
-            const actualDocs = withRetryOnTimeseriesUpgradeDowngradeError(() => coll.find({}, {_id: 0}).toArray());
+            const actualDocs = withRetryOnTimeseriesUpgradeDowngradeError(() =>
+                coll.find({}, {_id: 0}).toArray(),
+            );
             assert.sameMembers(expectedDocs, actualDocs);
         },
 
@@ -152,7 +160,9 @@ export const $config = (function () {
         // by spending a bigger fraction on time of setFCV on timeseries upgrade/downgrade.
         for (let i = 0; i < numCollections; i++) {
             const coll = getCollection(db, i);
-            assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t"}}));
+            assert.commandWorked(
+                db.createCollection(coll.getName(), {timeseries: {timeField: "t"}}),
+            );
             assert.commandWorked(coll.insertMany(expectedDocs));
         }
 
@@ -173,7 +183,9 @@ export const $config = (function () {
             configureFailPoint(adminDb, "hangBeforePublishingCatalogUpdates", {}, "off");
         });
 
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
 
     return {

@@ -64,13 +64,17 @@ const literalLetParam = {
 
 // Run aggregate commands with 'let' parameters containing expressions.
 {
-    let result = coll.aggregate([{$match: {$expr: {$eq: ["$a", "$$c"]}}}], {let: {c: missingLetParam}}).toArray();
+    let result = coll
+        .aggregate([{$match: {$expr: {$eq: ["$a", "$$c"]}}}], {let: {c: missingLetParam}})
+        .toArray();
     assertArrayEq({
         actual: result,
         expected: [{_id: 3, b: 1}],
     });
 
-    result = coll.aggregate([{$match: {$expr: {$eq: ["$a", "$$c"]}}}], {let: {c: literalLetParam}}).toArray();
+    result = coll
+        .aggregate([{$match: {$expr: {$eq: ["$a", "$$c"]}}}], {let: {c: literalLetParam}})
+        .toArray();
     assertArrayEq({
         actual: result,
         expected: [{_id: 4, a: "$notAFieldPath"}],

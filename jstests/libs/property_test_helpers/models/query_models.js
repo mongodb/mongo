@@ -15,7 +15,10 @@ import {
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
-import {getEqLookupArb, getEqLookupUnwindArb} from "jstests/libs/property_test_helpers/models/lookup_models.js";
+import {
+    getEqLookupArb,
+    getEqLookupUnwindArb,
+} from "jstests/libs/property_test_helpers/models/lookup_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -26,7 +29,10 @@ import {
 } from "jstests/libs/property_test_helpers/models/project_models.js";
 
 // Add field with a constant argument. {$addFields: {a: 5}}
-export const addFieldsConstArb = fc.tuple(nonEmptyFieldArb, leafParameterArb).map(function ([destField, leafParams]) {
+export const addFieldsConstArb = fc.tuple(nonEmptyFieldArb, leafParameterArb).map(function ([
+    destField,
+    leafParams,
+]) {
     return {$addFields: {[destField]: leafParams}};
 });
 // Add field from source field, parameterized on the dest and src field arbs.
@@ -38,13 +44,12 @@ export function getAddFieldsVarArb(destFieldArb, srcFieldArb) {
 }
 export const addFieldsVarArb = getAddFieldsVarArb(nonEmptyFieldArb, dollarFieldArb);
 // $replaceRoot projection
-export const replaceRootArb = fc.tuple(getAssignableFieldArb(false /*allowEmpty*/), dollarFieldArb).map(function ([
-    destField,
-    sourceField,
-]) {
-    // We use $$ROOT to keep the overall schema in order to better cooperate with other stages.
-    return {$replaceRoot: {newRoot: {$mergeObjects: ["$$ROOT", {[destField]: sourceField}]}}};
-});
+export const replaceRootArb = fc
+    .tuple(getAssignableFieldArb(false /*allowEmpty*/), dollarFieldArb)
+    .map(function ([destField, sourceField]) {
+        // We use $$ROOT to keep the overall schema in order to better cooperate with other stages.
+        return {$replaceRoot: {newRoot: {$mergeObjects: ["$$ROOT", {[destField]: sourceField}]}}};
+    });
 
 /*
  * Generates a random $sort, with [1, maxNumSortComponents] sort components.
@@ -143,9 +148,17 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
 /*
  * The pipeline arb generates a pipeline of stages.
  */
-export function getAggPipelineArb({allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {}) {
+export function getAggPipelineArb({
+    allowOrs = true,
+    deterministicBag = true,
+    allowedStages = [],
+    isTS = false,
+} = {}) {
     // TODO SERVER-83072 remove 'isTS' once $group timeseries array bug is fixed.
-    const stages = allowedStages.length == 0 ? getAllowedStages(allowOrs, deterministicBag, isTS) : allowedStages;
+    const stages =
+        allowedStages.length == 0
+            ? getAllowedStages(allowOrs, deterministicBag, isTS)
+            : allowedStages;
     // Length 6 seems long enough to cover interactions between stages.
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
 }
@@ -264,6 +277,8 @@ export function getQueryAndOptionsModel({
     const noCollation = fc.constant({});
     return fc.record({
         "pipeline": getAggPipelineArb({allowOrs, deterministicBag, allowedStages, isTS}),
-        "options": allowCollation ? oneof(noCollation, fc.record({"collation": collationArb})) : noCollation,
+        "options": allowCollation
+            ? oneof(noCollation, fc.record({"collation": collationArb}))
+            : noCollation,
     });
 }

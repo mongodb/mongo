@@ -11,7 +11,9 @@ function testFormat(date, formatStr, expectedStr) {
     assert.commandWorked(coll.insert({date: date}));
 
     const res = coll
-        .aggregate([{$project: {_id: 0, formatted: {$dateToString: {format: formatStr, date: "$date"}}}}])
+        .aggregate([
+            {$project: {_id: 0, formatted: {$dateToString: {format: formatStr, date: "$date"}}}},
+        ])
         .toArray();
 
     assert.eq(res[0].formatted, expectedStr);
@@ -30,7 +32,11 @@ function testDateValueError(dateVal, errCode) {
     coll.drop();
     assert.commandWorked(coll.insert({date: dateVal}));
 
-    assertErrorCode(coll, {$project: {formatted: {$dateToString: {format: "%Y", date: "$date"}}}}, errCode);
+    assertErrorCode(
+        coll,
+        {$project: {formatted: {$dateToString: {format: "%Y", date: "$date"}}}},
+        errCode,
+    );
 }
 
 const now = ISODate();

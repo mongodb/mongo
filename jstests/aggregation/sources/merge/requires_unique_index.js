@@ -9,7 +9,10 @@
 // @tags: [
 //   requires_fcv_81,
 // ]
-import {assertMergeFailsWithoutUniqueIndex, withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {
+    assertMergeFailsWithoutUniqueIndex,
+    withEachMergeMode,
+} from "jstests/aggregation/extras/merge_helpers.js";
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const testDB = db.getSiblingDB("merge_requires_unique_index");
@@ -116,7 +119,11 @@ function dropWithoutImplicitRecreate(coll) {
         ]),
     );
 
-    assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["_id", "a", "b"], target: target});
+    assertMergeFailsWithoutUniqueIndex({
+        source: source,
+        onFields: ["_id", "a", "b"],
+        target: target,
+    });
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["a", "b"], target: target});
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["b"], target: target});
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["a"], target: target});
@@ -126,7 +133,12 @@ function dropWithoutImplicitRecreate(coll) {
     assert.doesNotThrow(() =>
         source.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "a"},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                    on: "a",
+                },
             },
         ]),
     );
@@ -145,7 +157,9 @@ function dropWithoutImplicitRecreate(coll) {
     dropWithoutImplicitRecreate(target);
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
 
-    assert.commandWorked(target.createIndex({a: 1}, {unique: true, partialFilterExpression: {a: {$gte: 2}}}));
+    assert.commandWorked(
+        target.createIndex({a: 1}, {unique: true, partialFilterExpression: {a: {$gte: 2}}}),
+    );
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["_id", "a"], target: target});
 })();
@@ -208,7 +222,9 @@ function dropWithoutImplicitRecreate(coll) {
     // collection-default collation, but from the source collection, not the $merge's target
     // collection.
     dropWithoutImplicitRecreate(target);
-    assert.commandWorked(testDB.runCommand({create: target.getName(), collation: {locale: "en_US"}}));
+    assert.commandWorked(
+        testDB.runCommand({create: target.getName(), collation: {locale: "en_US"}}),
+    );
     assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
     assertMergeFailsWithoutUniqueIndex({
         source: source,
@@ -235,7 +251,9 @@ function dropWithoutImplicitRecreate(coll) {
     // collation, a unique index on the foreign collection can be used.
     const newSourceColl = testDB.new_source;
     dropWithoutImplicitRecreate(newSourceColl);
-    assert.commandWorked(testDB.runCommand({create: newSourceColl.getName(), collation: {locale: "en_US"}}));
+    assert.commandWorked(
+        testDB.runCommand({create: newSourceColl.getName(), collation: {locale: "en_US"}}),
+    );
     assert.commandWorked(
         newSourceColl.insert([
             {_id: 1, a: 1},
@@ -248,7 +266,12 @@ function dropWithoutImplicitRecreate(coll) {
     assert.doesNotThrow(() =>
         newSourceColl.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "a"},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                    on: "a",
+                },
             },
         ]),
     );
@@ -291,7 +314,9 @@ function dropWithoutImplicitRecreate(coll) {
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: "text", target: target});
 
     dropWithoutImplicitRecreate(target);
-    assert.commandWorked(target.createIndex({a: 1, geo: "2dsphere"}, add2dsphereVersionIfNeeded({unique: true})));
+    assert.commandWorked(
+        target.createIndex({a: 1, geo: "2dsphere"}, add2dsphereVersionIfNeeded({unique: true})),
+    );
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["a", "geo"], target: target});
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["geo", "a"], target: target});
@@ -434,7 +459,12 @@ function dropWithoutImplicitRecreate(coll) {
     assert.doesNotThrow(() =>
         source.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "a"},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                    on: "a",
+                },
             },
         ]),
     );
@@ -442,7 +472,12 @@ function dropWithoutImplicitRecreate(coll) {
     assert.doesNotThrow(() =>
         source.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "a"},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                    on: "a",
+                },
             },
         ]),
     );

@@ -47,17 +47,24 @@ function testMrOutput({inputSharded, outputSharded}) {
         assert.commandWorked(inputColl.mapReduce(mapFn, reduceFn, outOptions));
     }
 
-    runMRTestWithOutput({out: Object.assign({merge: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
+    runMRTestWithOutput({
+        out: Object.assign({merge: outputColl.getName()}, outputSharded ? {sharded: true} : {}),
+    });
 
     assert.commandWorked(outputColl.remove({}));
-    runMRTestWithOutput({out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
+    runMRTestWithOutput({
+        out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {}),
+    });
     // Test the same thing using runCommand directly.
     assert.commandWorked(
         testDB.runCommand({
             mapReduce: inputColl.getName(),
             map: mapFn,
             reduce: reduceFn,
-            out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {}),
+            out: Object.assign(
+                {reduce: outputColl.getName()},
+                outputSharded ? {sharded: true} : {},
+            ),
         }),
     );
 

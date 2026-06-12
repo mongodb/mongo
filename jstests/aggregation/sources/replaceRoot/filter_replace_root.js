@@ -25,7 +25,9 @@ assert(arrayEq(expected, result), {expected, result});
 // This case also exercises an SBE edge case, where optimizing a $replaceRoot can introduce
 // SBE-incompatible operators. If the planner does not observe the change in compatibility and tries
 // to lower the expression to SBE anyway, it will crash the server.
-expected = docs.map((doc) => ({_id: doc._id, subdoc: doc.subdoc.a > doc.subdoc.subdoc.a})).filter((doc) => doc.subdoc);
+expected = docs
+    .map((doc) => ({_id: doc._id, subdoc: doc.subdoc.a > doc.subdoc.subdoc.a}))
+    .filter((doc) => doc.subdoc);
 result = coll
     .aggregate([
         {

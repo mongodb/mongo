@@ -53,10 +53,18 @@ replTest.stepUp(replTest.getSecondary());
 
 // Manually update the bucket for collection 1.
 assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB(), coll(1)).update({}, {$set: {meta: 1}}, getRawOperationSpec(testDB())),
+    getTimeseriesCollForRawOps(testDB(), coll(1)).update(
+        {},
+        {$set: {meta: 1}},
+        getRawOperationSpec(testDB()),
+    ),
 );
 assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB(), coll(1)).update({}, {$set: {meta: 0}}, getRawOperationSpec(testDB())),
+    getTimeseriesCollForRawOps(testDB(), coll(1)).update(
+        {},
+        {$set: {meta: 0}},
+        getRawOperationSpec(testDB()),
+    ),
 );
 
 // Drop, recreate, and reinsert the bucket for collection 2.
@@ -75,7 +83,11 @@ const checkColl = function (num, numBuckets) {
     jsTestLog("Checking collection " + num);
     assert.docEq(docs, coll(num).find().sort({_id: 1}).toArray());
     const buckets = getTimeseriesCollForRawOps(testDB(), coll(num)).find().rawData().toArray();
-    assert.eq(buckets.length, numBuckets, "Expected " + numBuckets + " bucket(s) but found: " + tojson(buckets));
+    assert.eq(
+        buckets.length,
+        numBuckets,
+        "Expected " + numBuckets + " bucket(s) but found: " + tojson(buckets),
+    );
 };
 
 // For collection 0, the original bucket should still be usable.

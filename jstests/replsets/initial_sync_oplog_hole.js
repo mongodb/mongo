@@ -32,7 +32,11 @@ TestData.collectionName = collName;
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 jsTestLog("Writing data before oplog hole to collection.");
@@ -48,7 +52,9 @@ const failPoint = configureFailPoint(primaryDB, "hangAfterCollectionInserts", {
 
 const db = primaryDB;
 const joinHungWrite = startParallelShell(() => {
-    assert.commandWorked(db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}));
+    assert.commandWorked(
+        db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}),
+    );
 }, primary.port);
 failPoint.wait();
 
@@ -73,7 +79,9 @@ checkLog.contains(secondaryDB.getMongo(), "Starting initial sync");
 jsTestLog("Allow the uncommitted write to finish in 5 seconds.");
 const joinDisableFailPoint = startParallelShell(() => {
     sleep(5000);
-    assert.commandWorked(db.adminCommand({configureFailPoint: "hangAfterCollectionInserts", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "hangAfterCollectionInserts", mode: "off"}),
+    );
 }, primary.port);
 
 jsTestLog("Waiting for initial sync to complete.");

@@ -41,7 +41,8 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 function setParameterOnAllNodes(db, params) {
     FixtureHelpers.mapOnEachShardNode({
         db,
-        func: (nodeDb) => assert.commandWorked(nodeDb.adminCommand(Object.assign({setParameter: 1}, params))),
+        func: (nodeDb) =>
+            assert.commandWorked(nodeDb.adminCommand(Object.assign({setParameter: 1}, params))),
         primaryNodeOnly: false,
     });
 }
@@ -57,7 +58,9 @@ function getMongodDb(db) {
 }
 
 function isExecutionSplitInShards(explain) {
-    return FixtureHelpers.isMongos(db) && explain?.queryPlanner?.winningPlan?.stage !== "SINGLE_SHARD";
+    return (
+        FixtureHelpers.isMongos(db) && explain?.queryPlanner?.winningPlan?.stage !== "SINGLE_SHARD"
+    );
 }
 
 function shardsHaveShardingFilter(explain) {

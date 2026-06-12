@@ -1,7 +1,10 @@
 // Test rewrite to have a $in of the form {$expr: {$in: [<const>, <$field-path>]}} use an index.
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {tojsonMultiLineSortKeys, tojsonOnelineSortKeys} from "jstests/libs/query_optimization/golden_test.js";
+import {
+    tojsonMultiLineSortKeys,
+    tojsonOnelineSortKeys,
+} from "jstests/libs/query_optimization/golden_test.js";
 import {code, line, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {formatExplainRoot} from "jstests/libs/query/analyze_plan.js";
 
@@ -145,9 +148,15 @@ try {
     validateResultsSame({$expr: {$in: [[/abc/], "$m"]}});
     validateResultsSame({$expr: {$or: [{$in: [1, "$m"]}]}});
     validateResultsSame({$expr: {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}});
-    validateResultsSame({$expr: {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}, {$in: ["$a", [1, 2, 10]]}]}});
-    validateResultsSame({$expr: {$and: [{$in: ["$a", [1, 2]]}, {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}]}});
-    validateResultsSame({$expr: {$and: [{$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}, {$in: ["$a", [null]]}]}});
+    validateResultsSame({
+        $expr: {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}, {$in: ["$a", [1, 2, 10]]}]},
+    });
+    validateResultsSame({
+        $expr: {$and: [{$in: ["$a", [1, 2]]}, {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}]},
+    });
+    validateResultsSame({
+        $expr: {$and: [{$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}, {$in: ["$a", [null]]}]},
+    });
 
     // Tests for "$m.a".
     validateResultsSame({$expr: {$in: [1, "$m.a"]}});
@@ -169,5 +178,7 @@ try {
     // We accept this because we have precedent.
     // validateError({$expr: {$in: [1, "$m"]}});
 } finally {
-    assert.commandWorked(db.adminCommand({setParameter: 1, [paramName]: cachedParamValue[paramName]}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, [paramName]: cachedParamValue[paramName]}),
+    );
 }

@@ -139,7 +139,9 @@ export function makeFilterArb(timeFieldname, metaFieldname, opts = {}) {
         fc.constant(Filter.matchAll()),
         seedArb.map((s) => Filter.byId(s)),
         seedArb.map((s) => Filter.byMetaEq(s)),
-        fc.tuple(seedArb, expandFactorArb).map(([s, expandFactor]) => Filter.byTimeRange(s, {expandFactor})),
+        fc
+            .tuple(seedArb, expandFactorArb)
+            .map(([s, expandFactor]) => Filter.byTimeRange(s, {expandFactor})),
         // byFieldEqFromDoc:
         seedArb.chain((s) => {
             const excludeArb = fc.constant(defaultExclude);
@@ -168,8 +170,13 @@ export function makeFilterArb(timeFieldname, metaFieldname, opts = {}) {
         filter: fc.oneof(
             leafArb,
             fc
-                .tuple(fc.constantFrom("and", "or"), fc.array(tie("filter"), {minLength: 1, maxLength: maxChildren}))
-                .map(([op, children]) => (op === "and" ? Filter.and(children) : Filter.or(children))),
+                .tuple(
+                    fc.constantFrom("and", "or"),
+                    fc.array(tie("filter"), {minLength: 1, maxLength: maxChildren}),
+                )
+                .map(([op, children]) =>
+                    op === "and" ? Filter.and(children) : Filter.or(children),
+                ),
         ),
     })).filter;
 }
@@ -193,7 +200,10 @@ export function makeInsertOldBucketCommandArb(timeFieldname, metaFieldname) {
     const timeSeedArb = fc.integer({min: -0x7fffffff, max: 0x7fffffff});
     return fc
         .tuple(pickArb, timeSeedArb)
-        .map(([pick, timeSeed]) => new InsertOldBucketCommand(pick, timeSeed, timeFieldname, metaFieldname));
+        .map(
+            ([pick, timeSeed]) =>
+                new InsertOldBucketCommand(pick, timeSeed, timeFieldname, metaFieldname),
+        );
 }
 
 /**
@@ -245,7 +255,10 @@ export function makeUpdateByFilterCommandArb(timeFieldname, metaFieldname, filte
 
     return fc
         .tuple(makeFilterArb(timeFieldname, metaFieldname, filterOpts), seedArb)
-        .map(([filter, seed]) => new UpdateByFilterCommand(filter, seed, timeFieldname, metaFieldname));
+        .map(
+            ([filter, seed]) =>
+                new UpdateByFilterCommand(filter, seed, timeFieldname, metaFieldname),
+        );
 }
 
 /**

@@ -60,7 +60,10 @@ export const $config = (function () {
             // but it will test that the rename drops it even if it appears mid-operation
             const otherTid = Random.randInt(this.threadCount);
             const toDB = db.getSiblingDB(toDBName(otherTid));
-            assert.commandWorkedOrFailedWithCode(toDB.createCollection(collName), ErrorCodes.NamespaceExists);
+            assert.commandWorkedOrFailedWithCode(
+                toDB.createCollection(collName),
+                ErrorCodes.NamespaceExists,
+            );
         },
     };
 

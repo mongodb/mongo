@@ -33,7 +33,9 @@ export var CreateShardedCollectionUtil = (function () {
 
         const shards = assert.commandWorked(adminDB.runCommand({listShards: 1})).shards;
         for (let shard of shards) {
-            assert.commandWorked(adminDB.runCommand({addShardToZone: shard._id, zone: makeZoneName(shard._id)}));
+            assert.commandWorked(
+                adminDB.runCommand({addShardToZone: shard._id, zone: makeZoneName(shard._id)}),
+            );
         }
 
         assert.lt(0, chunks.length, "chunks array must not be empty");
@@ -56,7 +58,11 @@ export var CreateShardedCollectionUtil = (function () {
         let prevChunk;
         for (let chunk of chunks) {
             if (prevChunk !== undefined) {
-                assert.eq(prevChunk.max, chunk.min, "found gap between chunk's max and another chunk's min");
+                assert.eq(
+                    prevChunk.max,
+                    chunk.min,
+                    "found gap between chunk's max and another chunk's min",
+                );
             }
 
             assert.commandWorked(
@@ -97,7 +103,9 @@ export var CreateShardedCollectionUtil = (function () {
         }
 
         for (let shard of shards) {
-            assert.commandWorked(adminDB.runCommand({removeShardFromZone: shard._id, zone: makeZoneName(shard._id)}));
+            assert.commandWorked(
+                adminDB.runCommand({removeShardFromZone: shard._id, zone: makeZoneName(shard._id)}),
+            );
         }
     }
 

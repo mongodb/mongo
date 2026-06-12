@@ -23,6 +23,9 @@ ReadWriteConcernDefaultsPropagation.runTests(st.s0, mongosAndConfigNodes, true /
 
 ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.s0, mongosAndConfigNodes);
 
-ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.configRS.getPrimary(), mongosAndConfigNodes);
+ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(
+    st.configRS.getPrimary(),
+    mongosAndConfigNodes,
+);
 
 st.stop();

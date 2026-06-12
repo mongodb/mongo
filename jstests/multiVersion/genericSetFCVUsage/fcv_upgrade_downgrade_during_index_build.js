@@ -14,9 +14,13 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 describe("fcv change forbidden during index build", function () {
     before(() => {
         this.startIndexBuild = () => {
-            this.awaitCreateIdxJob = IndexBuildTest.startIndexBuild(this.rs.getPrimary(), this.coll.getFullName(), {
-                a: 1,
-            });
+            this.awaitCreateIdxJob = IndexBuildTest.startIndexBuild(
+                this.rs.getPrimary(),
+                this.coll.getFullName(),
+                {
+                    a: 1,
+                },
+            );
             this.fp.wait();
         };
     });
@@ -42,26 +46,38 @@ describe("fcv change forbidden during index build", function () {
 
     it("upgrade", () => {
         assert.commandWorked(
-            this.rs.getPrimary().getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            this.rs
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
 
         this.startIndexBuild(this.rs.getPrimary());
 
         assert.commandFailedWithCode(
-            this.rs.getPrimary().getDB("admin").runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+            this.rs
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
             ErrorCodes.BackgroundOperationInProgressForNamespace,
         );
     });
 
     it("downgrade", () => {
         assert.commandWorked(
-            this.rs.getPrimary().getDB("admin").runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+            this.rs
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
         );
 
         this.startIndexBuild(this.rs.getPrimary());
 
         assert.commandFailedWithCode(
-            this.rs.getPrimary().getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            this.rs
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
             ErrorCodes.BackgroundOperationInProgressForNamespace,
         );
     });

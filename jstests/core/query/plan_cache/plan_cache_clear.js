@@ -24,7 +24,10 @@
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanCacheKeyFromPipeline, getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanCacheKeyFromPipeline,
+    getPlanCacheKeyFromShape,
+} from "jstests/libs/query/analyze_plan.js";
 import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.jstests_plan_cache_clear;
@@ -32,7 +35,9 @@ coll.drop();
 
 function planCacheContainsQuerySet(curCache, collArg, expectedQuerySetSize) {
     const keyHashes = Array.from(curCache);
-    const res = collArg.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: {$in: keyHashes}}}]).toArray();
+    const res = collArg
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: {$in: keyHashes}}}])
+        .toArray();
     return res.length == curCache.size && curCache.size == expectedQuerySetSize;
 }
 
@@ -42,7 +47,14 @@ function planCacheContainsQuerySet(curCache, collArg, expectedQuerySetSize) {
 // Essentially, this functions runs a query, and add its both to the query cache and to
 // the map 'curCache' which should mirror the queries in the query cache.
 // This allows the test to keep curCache in sync with the query cache.
-function addToQueryCache({queryArg = {}, projectArg = {}, collArg, resCount, curCache, numCachedQueries}) {
+function addToQueryCache({
+    queryArg = {},
+    projectArg = {},
+    collArg,
+    resCount,
+    curCache,
+    numCachedQueries,
+}) {
     let keyHash = "";
     if (queryArg instanceof Array) {
         // In case of $lookup, we have to run the pipeline to refresh foreign coll routing info, it
@@ -56,7 +68,12 @@ function addToQueryCache({queryArg = {}, projectArg = {}, collArg, resCount, cur
         keyHash = getPlanCacheKeyFromPipeline(queryArg, collArg);
     } else {
         assert.eq(resCount, collArg.find(queryArg, projectArg).itcount());
-        keyHash = getPlanCacheKeyFromShape({query: queryArg, projection: projectArg, collection: collArg, db: db});
+        keyHash = getPlanCacheKeyFromShape({
+            query: queryArg,
+            projection: projectArg,
+            collection: collArg,
+            db: db,
+        });
     }
     curCache.add(keyHash);
     assert.eq(curCache.size, numCachedQueries);
@@ -145,7 +162,9 @@ deleteFromQueryCache({a: 1, b: 1, $expr: {$eq: ["$a", 1]}}, coll, cachedQueries)
 assert.eq(true, planCacheContainsQuerySet(cachedQueries, coll, 0), dumpPlanCacheState(coll));
 
 // planCacheClear fails with an $expr query with an unbound variable.
-assert.commandFailed(coll.runCommand("planCacheClear", {query: {a: 1, b: 1, $expr: {$eq: ["$a", "$$unbound"]}}}));
+assert.commandFailed(
+    coll.runCommand("planCacheClear", {query: {a: 1, b: 1, $expr: {$eq: ["$a", "$$unbound"]}}}),
+);
 
 // Insert two more shapes into the cache.
 addToQueryCache({
@@ -166,17 +185,35 @@ addToQueryCache({
 assert.eq(true, planCacheContainsQuerySet(cachedQueries, coll, 2), dumpPlanCacheState(coll));
 
 // Error cases.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {query: 12345}), ErrorCodes.TypeMismatch);
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {query: /regex/}), ErrorCodes.TypeMismatch);
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {query: {a: {$no_such_op: 1}}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {query: 12345}),
+    ErrorCodes.TypeMismatch,
+);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {query: /regex/}),
+    ErrorCodes.TypeMismatch,
+);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {query: {a: {$no_such_op: 1}}}),
+    ErrorCodes.BadValue,
+);
 
 // 'sort' parameter is not allowed without 'query' parameter.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {sort: {a: 1}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {sort: {a: 1}}),
+    ErrorCodes.BadValue,
+);
 // 'sort' parameter must be an object.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {query: {a: 1}, sort: 1}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {query: {a: 1}, sort: 1}),
+    ErrorCodes.TypeMismatch,
+);
 
 // 'projection' parameter is not allowed without 'query' parameter.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {projection: {_id: 0, a: 1}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {projection: {_id: 0, a: 1}}),
+    ErrorCodes.BadValue,
+);
 // 'projection' parameter must be an object.
 assert.commandFailedWithCode(
     coll.runCommand("planCacheClear", {query: {a: 1}, projection: 1}),
@@ -184,11 +221,20 @@ assert.commandFailedWithCode(
 );
 
 // 'collation' parameter is not allowed without 'query' parameter.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {collation: {locale: "fr"}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {collation: {locale: "fr"}}),
+    ErrorCodes.BadValue,
+);
 // 'collation' parameter must be an object.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {query: {a: 1}, collation: 1}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {query: {a: 1}, collation: 1}),
+    ErrorCodes.TypeMismatch,
+);
 // 'collation' parameter cannot be empty.
-assert.commandFailedWithCode(coll.runCommand("planCacheClear", {query: {a: 1}, collation: {}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    coll.runCommand("planCacheClear", {query: {a: 1}, collation: {}}),
+    ErrorCodes.BadValue,
+);
 
 // Internal 'isTimeseriesNamespace' parameter cannot be set when command is issued against a mongos.
 if (FixtureHelpers.isMongos(db)) {
@@ -197,7 +243,9 @@ if (FixtureHelpers.isMongos(db)) {
         ErrorCodes.InvalidOptions,
     );
 } else {
-    assert.commandWorked(coll.runCommand("planCacheClear", {query: {a: 1}, isTimeseriesNamespace: true}));
+    assert.commandWorked(
+        coll.runCommand("planCacheClear", {query: {a: 1}, isTimeseriesNamespace: true}),
+    );
 }
 
 // Drop query cache. This clears all cached queries in the collection.
@@ -236,7 +284,11 @@ if (sbePlanCacheEnabled(db)) {
         curCache: foreignCachedQueries,
         numCachedQueries: 1,
     });
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1),
+        dumpPlanCacheState(foreignColl),
+    );
 
     // Run the '$lookup' query and make sure it's cached.
     addToQueryCache({
@@ -251,7 +303,11 @@ if (sbePlanCacheEnabled(db)) {
     // Drop query cache on the main collection. This clears all cached queries in the main
     // collection only.
     clearQueryCaches(coll, cachedQueries);
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1),
+        dumpPlanCacheState(foreignColl),
+    );
 
     // Test case 2: clear plan cache on the foreign collection.
     //
@@ -280,7 +336,11 @@ if (sbePlanCacheEnabled(db)) {
         curCache: foreignCachedQueries,
         numCachedQueries: 1,
     });
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1),
+        dumpPlanCacheState(foreignColl),
+    );
 
     // Run the '$lookup' query and make sure it's cached.
     addToQueryCache({
@@ -295,7 +355,11 @@ if (sbePlanCacheEnabled(db)) {
     // Drop query cache by the query shape. This clears all cached queries in the main
     // collection only.
     deleteFromQueryCache(pipeline[0].$match, coll, cachedQueries);
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1),
+        dumpPlanCacheState(foreignColl),
+    );
 
     // Test case 4: clear plan cache on the foreign collection by (empty) query shape.
     //
@@ -314,7 +378,11 @@ if (sbePlanCacheEnabled(db)) {
         curCache: foreignCachedQueries,
         numCachedQueries: 2,
     });
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 2), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 2),
+        dumpPlanCacheState(foreignColl),
+    );
 
     // Run the '$lookup' query and make sure it's cached.
     addToQueryCache({
@@ -330,7 +398,11 @@ if (sbePlanCacheEnabled(db)) {
     // query in the foreign collection only.
     deleteFromQueryCache({}, foreignColl, foreignCachedQueries);
     assert.eq(true, planCacheContainsQuerySet(cachedQueries, coll, 1), dumpPlanCacheState(coll));
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1),
+        dumpPlanCacheState(foreignColl),
+    );
 
     // Test case 5: clear by query shape which matches $lookup and non-$lookup queries.
     //
@@ -359,7 +431,11 @@ if (sbePlanCacheEnabled(db)) {
     // the main collection which match the query shape.
     deleteFromQueryCache({a: 1}, coll, cachedQueries);
     assert.eq(true, planCacheContainsQuerySet(cachedQueries, coll, 1), dumpPlanCacheState(coll));
-    assert.eq(true, planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1), dumpPlanCacheState(foreignColl));
+    assert.eq(
+        true,
+        planCacheContainsQuerySet(foreignCachedQueries, foreignColl, 1),
+        dumpPlanCacheState(foreignColl),
+    );
 }
 
 //

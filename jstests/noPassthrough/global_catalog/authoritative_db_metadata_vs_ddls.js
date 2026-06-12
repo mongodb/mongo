@@ -19,7 +19,10 @@ function getDbMetadataFromGlobalCatalog(db) {
 }
 
 function validateShardCatalog(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard = shard.getDB("config").getCollection("shard.catalog.databases").findOne({_id: dbName});
+    const dbMetadataFromShard = shard
+        .getDB("config")
+        .getCollection("shard.catalog.databases")
+        .findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
@@ -48,7 +51,9 @@ let statistics;
     assert.eq(statistics.durableChanges, 0);
     assert.eq(statistics.inMemoryClears, 2);
 
-    assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     statistics = getStatistics(st.rs0.getPrimary());
     assert.eq(statistics.durableChanges, 1);

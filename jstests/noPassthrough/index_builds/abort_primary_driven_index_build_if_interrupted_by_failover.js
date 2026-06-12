@@ -47,26 +47,41 @@ const runTest = function (restartSecondary) {
     const collNss = primary.getDB(dbName).getCollection(collName).getFullName();
 
     jsTest.log.info("3. Pause index build before commit");
-    const primFp = configureFailPoint(primary, "hangIndexBuildBeforeSignalPrimaryForCommitReadiness");
+    const primFp = configureFailPoint(
+        primary,
+        "hangIndexBuildBeforeSignalPrimaryForCommitReadiness",
+    );
 
     jsTest.log.info("4. Start index build on primary");
-    const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, collNss, indexSpec, {name: indexName}, [
-        ErrorCodes.InterruptedDueToReplStateChange,
-    ]);
+    const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+        primary,
+        collNss,
+        indexSpec,
+        {name: indexName},
+        [ErrorCodes.InterruptedDueToReplStateChange],
+    );
 
     primFp.wait();
 
     jsTest.log.info("5. Get buildUUID");
     let buildUUID = extractUUIDFromObject(
-        IndexBuildTest.assertIndexes(primary.getDB(dbName).getCollection(collName), 2, ["_id_"], [indexName], {
-            includeBuildUUIDs: true,
-        })[indexName].buildUUID,
+        IndexBuildTest.assertIndexes(
+            primary.getDB(dbName).getCollection(collName),
+            2,
+            ["_id_"],
+            [indexName],
+            {
+                includeBuildUUIDs: true,
+            },
+        )[indexName].buildUUID,
     );
     jsTest.log.info(`buildUUID: ${tojson(buildUUID)}`);
 
     jsTest.log.info("6. Setting commitQuorum is ignored while primary-driven");
     assert.commandWorked(
-        primary.getDB(dbName).runCommand({setIndexCommitQuorum: collName, indexNames: [indexName], commitQuorum: 1}),
+        primary
+            .getDB(dbName)
+            .runCommand({setIndexCommitQuorum: collName, indexNames: [indexName], commitQuorum: 1}),
     );
     assert(
         checkLog.checkContainsWithCountJson(primary, 11302401, undefined, 1),
@@ -105,10 +120,14 @@ const runTest = function (restartSecondary) {
     jsTest.log.info("10. Ensure that original primary does not resume the aborted index build");
 
     rst.awaitReplication();
-    IndexBuildTest.assertIndexes(restartedPrimary.getDB(dbName).getCollection(collName), 1, ["_id_"]);
+    IndexBuildTest.assertIndexes(restartedPrimary.getDB(dbName).getCollection(collName), 1, [
+        "_id_",
+    ]);
 
     jsTest.log.info("11. Attempt to build an identical index successfully");
-    assert.commandWorked(newPriDB.getCollection(collName).createIndex(indexSpec, {name: indexName}));
+    assert.commandWorked(
+        newPriDB.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+    );
     IndexBuildTest.assertIndexes(newPriColl, 2, ["_id_", indexName]);
 
     rst.stopSet();

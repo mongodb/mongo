@@ -11,7 +11,10 @@ export function queryIDS(coll, search, filter, extra, limit) {
             .find(query, {score: {"$meta": "textScore"}})
             .sort({score: {"$meta": "textScore"}})
             .limit(limit);
-    else result = coll.find(query, {score: {"$meta": "textScore"}}).sort({score: {"$meta": "textScore"}});
+    else
+        result = coll
+            .find(query, {score: {"$meta": "textScore"}})
+            .sort({score: {"$meta": "textScore"}});
 
     return getIDS(result);
 }

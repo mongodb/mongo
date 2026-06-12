@@ -24,7 +24,11 @@ const batchSize = 2;
 
 // Helper function to perform generic comparisons and dump the oplog on failure.
 function assertCompare(cmpFn, left, right, cmpOp, cmpVal) {
-    assert[cmpOp](cmpFn(left, right), cmpVal, {left: left, right: right, oplogEntries: oplogColl.find().toArray()});
+    assert[cmpOp](cmpFn(left, right), cmpVal, {
+        left: left,
+        right: right,
+        oplogEntries: oplogColl.find().toArray(),
+    });
 }
 
 // Start watching the test collection in order to capture a resume token.

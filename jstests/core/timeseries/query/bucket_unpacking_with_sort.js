@@ -52,12 +52,24 @@ runRewritesTest({m: -1, t: -1}, {m: -1, t: -1}, {m: -1, t: -1}, forwardIxscan, m
 runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true);
 
 // Intermediary projects that don't modify sorted fields are allowed.
-runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true, [{$project: {a: 0}}]);
-runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true, [{$project: {m: 1, t: 1}}]);
-runRewritesTest({t: 1}, {t: 1}, {t: 1}, forwardIxscan, metaColl, true, [{$project: {m: 0, _id: 0}}]);
-runRewritesTest({"m.b": 1, t: 1}, {"m.b": 1, t: 1}, {"m.b": 1, t: 1}, forwardIxscan, metaCollSubFields, true, [
-    {$project: {"m.a": 0}},
+runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true, [
+    {$project: {a: 0}},
 ]);
+runRewritesTest({m: 1, t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, metaColl, true, [
+    {$project: {m: 1, t: 1}},
+]);
+runRewritesTest({t: 1}, {t: 1}, {t: 1}, forwardIxscan, metaColl, true, [
+    {$project: {m: 0, _id: 0}},
+]);
+runRewritesTest(
+    {"m.b": 1, t: 1},
+    {"m.b": 1, t: 1},
+    {"m.b": 1, t: 1},
+    forwardIxscan,
+    metaCollSubFields,
+    true,
+    [{$project: {"m.a": 0}}],
+);
 
 // Test multiple meta fields
 let metaIndexObj = Object.assign({}, ...subFields.map((field) => ({[`m.${field}`]: 1})));

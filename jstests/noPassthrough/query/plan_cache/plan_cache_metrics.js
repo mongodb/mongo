@@ -38,7 +38,11 @@ function verifyPlanCacheSizeIncrease(coll) {
 
     let prevCacheSize = getPlanCacheSize(db);
     // Populate plan cache.
-    assert.eq(1, coll.find(queryObj, projectionObj).sort(sortObj).itcount(), "unexpected document count");
+    assert.eq(
+        1,
+        coll.find(queryObj, projectionObj).sort(sortObj).itcount(),
+        "unexpected document count",
+    );
 
     // Verify that the plan cache entry exists.
     assertCacheLength(coll, 1);

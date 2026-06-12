@@ -20,7 +20,9 @@ const timeseriesCollName = jsTestName();
 const tsColl = db.getCollection(timeseriesCollName);
 assertDropCollection(db, timeseriesCollName);
 assert.commandWorked(
-    db.createCollection(timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(timeseriesCollName, {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 const nDocs = 10;
@@ -43,7 +45,12 @@ assert.commandWorked(bulk.execute());
                     from: timeseriesCollName,
                     let: {lkey: "$key"},
                     pipeline: [
-                        {$search: {index: "default", text: {query: "example", path: metaFieldName}}},
+                        {
+                            $search: {
+                                index: "default",
+                                text: {query: "example", path: metaFieldName},
+                            },
+                        },
                         {$match: {$expr: {$eq: ["$fieldName", "$$lkey"]}}},
                     ],
                     as: "joined",
@@ -54,7 +61,14 @@ assert.commandWorked(bulk.execute());
             {
                 $unionWith: {
                     coll: timeseriesCollName,
-                    pipeline: [{$search: {index: "default", text: {query: "example", path: metaFieldName}}}],
+                    pipeline: [
+                        {
+                            $search: {
+                                index: "default",
+                                text: {query: "example", path: metaFieldName},
+                            },
+                        },
+                    ],
                 },
             },
         ],
@@ -82,7 +96,12 @@ assert.commandWorked(bulk.execute());
             pipeline: [
                 {
                     $_internalDocumentResultsAndMetadata: {
-                        source: {$search: {index: "default", text: {query: "example", path: metaFieldName}}},
+                        source: {
+                            $search: {
+                                index: "default",
+                                text: {query: "example", path: metaFieldName},
+                            },
+                        },
                     },
                 },
             ],
@@ -177,13 +196,21 @@ assert.commandWorked(bulk.execute());
     let searchIndexDef = {
         mappings: {dynamic: true, fields: {}},
     };
-    expectCreateSearchIndexFails(tsColl, {name: tsSearchIndexName, definition: searchIndexDef}, [10840700, 10840701]);
+    expectCreateSearchIndexFails(
+        tsColl,
+        {name: tsSearchIndexName, definition: searchIndexDef},
+        [10840700, 10840701],
+    );
 
     // 2. updateSearchIndex
     searchIndexDef.storedSource = {
         exclude: [metaFieldName],
     };
-    expectUpdateSearchIndexFails(tsColl, {name: tsSearchIndexName, definition: searchIndexDef}, [10840700, 10840701]);
+    expectUpdateSearchIndexFails(
+        tsColl,
+        {name: tsSearchIndexName, definition: searchIndexDef},
+        [10840700, 10840701],
+    );
 
     // 3. dropSearchIndex
     expectDropSearchIndexFails(tsColl, {name: tsSearchIndexName}, [10840700, 10840701]);

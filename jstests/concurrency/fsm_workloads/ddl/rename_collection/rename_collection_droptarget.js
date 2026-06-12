@@ -50,7 +50,10 @@ export const $config = (function () {
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
             // after the rename occurs
-            let res = db[this.fromCollName].renameCollection(this.toCollName, true /* dropTarget */);
+            let res = db[this.fromCollName].renameCollection(
+                this.toCollName,
+                true /* dropTarget */,
+            );
 
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request

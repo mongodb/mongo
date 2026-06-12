@@ -72,7 +72,11 @@ function createPreparedTransactions(num) {
         priSession.startTransaction();
         assert.commandWorked(priSessionColl.insert({_id: i}));
         const prepareTimestamp = PrepareHelpers.prepareTransaction(priSession);
-        sessions.push({session: priSession, commitTs: prepareTimestamp, state: TxnState.InProgress});
+        sessions.push({
+            session: priSession,
+            commitTs: prepareTimestamp,
+            state: TxnState.InProgress,
+        });
     }
     return sessions;
 }
@@ -144,7 +148,10 @@ jsTestLog("Checking visibility of all transaction operations.");
 // If a transaction committed then its document should be visible. If it aborted then its document
 // should not be visible.
 let docs = testDB[collName].find().toArray();
-let committedTxnIds = sessions.reduce((acc, s, i) => (s.state === TxnState.Committed ? acc.concat(i) : acc), []);
+let committedTxnIds = sessions.reduce(
+    (acc, s, i) => (s.state === TxnState.Committed ? acc.concat(i) : acc),
+    [],
+);
 let commitCount = committedTxnIds.length;
 let abortCount = sessions.length - committedTxnIds.length;
 jsTestLog("Committed " + commitCount + " transactions, Aborted " + abortCount + " transactions.");

@@ -13,7 +13,11 @@ let NOSUBJ_NOSAN_CERT = getX509Path("server_no_subject_no_SAN.pem");
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     jsTestLog("Testing certificate: " + JSON.stringify(arguments));
-    let mongod = MongoRunner.runMongod({tlsMode: "requireTLS", tlsCertificateKeyFile: certPath, tlsCAFile: CA_CERT});
+    let mongod = MongoRunner.runMongod({
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: certPath,
+        tlsCAFile: CA_CERT,
+    });
 
     let mongo;
     if (allowInvalidCert) {
@@ -61,10 +65,18 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
 
     if (shouldSucceed) {
         // runMongoProgram returns 0 on success
-        assert.eq(0, mongo, "Connection attempt failed when it should succeed certPath: " + certPath);
+        assert.eq(
+            0,
+            mongo,
+            "Connection attempt failed when it should succeed certPath: " + certPath,
+        );
     } else {
         // runMongoProgram returns 1 on failure
-        assert.eq(1, mongo, "Connection attempt succeeded when it should fail certPath: " + certPath);
+        assert.eq(
+            1,
+            mongo,
+            "Connection attempt succeeded when it should fail certPath: " + certPath,
+        );
     }
     MongoRunner.stopMongod(mongod);
 }

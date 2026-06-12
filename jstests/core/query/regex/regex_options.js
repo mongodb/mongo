@@ -33,8 +33,13 @@ assert.commandFailedWithCode(
 
 // Test in projection.
 assert.eq(1, coll.find({}, {p: {$regexFind: {input: "$txt", regex: /^hello.*/}}}).toArray().length);
-assert.eq(1, coll.find({}, {p: {$regexFind: {input: "$txt", regex: /^hello.*/u}}}).toArray().length);
+assert.eq(
+    1,
+    coll.find({}, {p: {$regexFind: {input: "$txt", regex: /^hello.*/u}}}).toArray().length,
+);
 assert.commandFailedWithCode(
-    assert.throws(() => coll.find({}, {p: {$regexFind: {input: "$txt", regex: /^hello.*/g}}}).itcount()),
+    assert.throws(() =>
+        coll.find({}, {p: {$regexFind: {input: "$txt", regex: /^hello.*/g}}}).itcount(),
+    ),
     51108,
 );

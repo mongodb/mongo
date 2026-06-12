@@ -5,7 +5,10 @@
  * ]
  */
 
-import {assertErrMsgContains, assertErrMsgDoesNotContain} from "jstests/aggregation/extras/utils.js";
+import {
+    assertErrMsgContains,
+    assertErrMsgDoesNotContain,
+} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.single_stage_alias_error;
 

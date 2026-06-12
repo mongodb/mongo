@@ -44,7 +44,10 @@ describe("change streams correctly return documents containing $v attributes", (
     // We update in different order here than update, so that we don't cause no-op updates.
     it("tests that updates using $v inside an object literal fail", () => {
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
-            assert.commandFailedWithCode(db[kCollName].update({_id: i}, {$v: v}), ErrorCodes.FailedToParse);
+            assert.commandFailedWithCode(
+                db[kCollName].update({_id: i}, {$v: v}),
+                ErrorCodes.FailedToParse,
+            );
         });
     });
 
@@ -69,7 +72,9 @@ describe("change streams correctly return documents containing $v attributes", (
     it("tests that updates using $v inside $set and an object literal succeed with upsert when the source documents do not exist", () => {
         // Target documents do not yet exist, so the upsert creates them using inserts.
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
-            assert.commandWorked(db[kCollName].update({_id: i + 10}, {$set: {$v: v}}, {upsert: true}));
+            assert.commandWorked(
+                db[kCollName].update({_id: i + 10}, {$set: {$v: v}}, {upsert: true}),
+            );
             let expected = {
                 documentKey: {_id: i + 10},
                 fullDocument: {_id: i + 10, $v: v},
@@ -82,7 +87,9 @@ describe("change streams correctly return documents containing $v attributes", (
 
     it("tests that pipeline updates using $v inside $replaceWith and $literal succeed", () => {
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
-            assert.commandWorked(db[kCollName].update({_id: i}, [{$replaceWith: {$literal: {_id: i, $v: v}}}]));
+            assert.commandWorked(
+                db[kCollName].update({_id: i}, [{$replaceWith: {$literal: {_id: i, $v: v}}}]),
+            );
             let expected = {
                 documentKey: {_id: i},
                 fullDocument: {_id: i, $v: v},
@@ -95,14 +102,19 @@ describe("change streams correctly return documents containing $v attributes", (
 
     it("tests that pipeline updates using $v inside using $replaceWith and an object literal fail", () => {
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
-            assert.commandFailedWithCode(db[kCollName].update({_id: i}, [{$replaceWith: {_id: i, $v: v}}]), 16410);
+            assert.commandFailedWithCode(
+                db[kCollName].update({_id: i}, [{$replaceWith: {_id: i, $v: v}}]),
+                16410,
+            );
         });
     });
 
     it("tests that pipeline updates using $v inside using $replaceRoot and $literal succeed", () => {
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
             assert.commandWorked(
-                db[kCollName].update({_id: i}, [{$replaceRoot: {newRoot: {$literal: {_id: i, $v: v}}}}]),
+                db[kCollName].update({_id: i}, [
+                    {$replaceRoot: {newRoot: {$literal: {_id: i, $v: v}}}},
+                ]),
             );
             let expected = {
                 documentKey: {_id: i},
@@ -134,7 +146,10 @@ describe("change streams correctly return documents containing $v attributes", (
 
     it("tests that updates using $v inside $addFields fails", () => {
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
-            assert.commandFailedWithCode(db[kCollName].update({_id: i}, [{$addFields: {$v: i}}]), 16410);
+            assert.commandFailedWithCode(
+                db[kCollName].update({_id: i}, [{$addFields: {$v: i}}]),
+                16410,
+            );
         });
     });
 
@@ -142,7 +157,11 @@ describe("change streams correctly return documents containing $v attributes", (
         ["test", 1, 2, "1", "2"].forEach((v, i) => {
             assert.commandWorked(
                 db[kCollName].update({_id: i}, [
-                    {$replaceWith: {$setField: {field: {$literal: "$v"}, input: "$$ROOT", value: v}}},
+                    {
+                        $replaceWith: {
+                            $setField: {field: {$literal: "$v"}, input: "$$ROOT", value: v},
+                        },
+                    },
                 ]),
             );
             let expected = {

@@ -22,17 +22,26 @@ assert.commandWorked(t.createIndex({loc: indexname}, add2dsphereVersionIfNeeded(
 
 // parseFlatPoint
 let err = t.insert({loc: {type: "Point", coordinates: "hello"}});
-assert.includes(err.getWriteError().errmsg, "Point must be an array or object, instead got type string");
+assert.includes(
+    err.getWriteError().errmsg,
+    "Point must be an array or object, instead got type string",
+);
 
 err = t.insert({loc: {type: "Point", coordinates: ["hello", 5]}});
-assert.includes(err.getWriteError().errmsg, "Point must only contain numeric elements, instead got type string");
+assert.includes(
+    err.getWriteError().errmsg,
+    "Point must only contain numeric elements, instead got type string",
+);
 
 err = t.insert({loc: {type: "Point", coordinates: [5 / 0, 5]}});
 assert.includes(err.getWriteError().errmsg, "Point coordinates must be finite numbers");
 
 // parseGeoJSONCoordinate
 err = t.insert({loc: {type: "LineString", coordinates: [5, 5]}});
-assert.includes(err.getWriteError().errmsg, "GeoJSON coordinates must be an array, instead got type double");
+assert.includes(
+    err.getWriteError().errmsg,
+    "GeoJSON coordinates must be an array, instead got type double",
+);
 
 // parseArrayOfCoordinates
 err = t.insert({loc: {type: "LineString", coordinates: 5}});
@@ -53,11 +62,17 @@ err = t.insert({
         ],
     },
 });
-assert.includes(err.getWriteError().errmsg, "Loop is not closed, first vertex does not equal last vertex:");
+assert.includes(
+    err.getWriteError().errmsg,
+    "Loop is not closed, first vertex does not equal last vertex:",
+);
 
 // parseGeoJSONPolygonCoordinates
 err = t.insert({loc: {type: "Polygon", coordinates: "hi"}});
-assert.includes(err.getWriteError().errmsg, "Polygon coordinates must be an array, instead got type string");
+assert.includes(
+    err.getWriteError().errmsg,
+    "Polygon coordinates must be an array, instead got type string",
+);
 
 err = t.insert({
     loc: {
@@ -78,7 +93,10 @@ assert.includes(
 
 // parseBigSimplePolygonCoordinates
 err = t.insert({loc: {type: "Polygon", coordinates: "", crs: bigCRS}});
-assert.includes(err.getWriteError().errmsg, "Coordinates of polygon must be an array, instead got type string");
+assert.includes(
+    err.getWriteError().errmsg,
+    "Coordinates of polygon must be an array, instead got type string",
+);
 
 err = t.insert({
     loc: {
@@ -96,7 +114,10 @@ err = t.insert({
         crs: bigCRS,
     },
 });
-assert.includes(err.getWriteError().errmsg, "Only one simple loop is allowed in a big polygon, instead provided 2");
+assert.includes(
+    err.getWriteError().errmsg,
+    "Only one simple loop is allowed in a big polygon, instead provided 2",
+);
 err = t.insert({
     loc: {
         type: "Polygon",
@@ -138,12 +159,18 @@ err = t.insert({
         crs: {type: "name", properties: {nam: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}},
     },
 });
-assert.includes(err.getWriteError().errmsg, 'In CRS, "properties.name" must be a string, instead got type missing');
+assert.includes(
+    err.getWriteError().errmsg,
+    'In CRS, "properties.name" must be a string, instead got type missing',
+);
 
 // parseMultiPolygon
 err = t.insert({loc: {type: "MultiPolygon", coordinates: ""}});
 
-assert.includes(err.getWriteError().errmsg, "MultiPolygon coordinates must be an array, instead got type string");
+assert.includes(
+    err.getWriteError().errmsg,
+    "MultiPolygon coordinates must be an array, instead got type string",
+);
 
 // Geometry collection
 err = t.insert({
@@ -163,4 +190,7 @@ err = t.insert({
         ],
     },
 });
-assert.includes(err.getWriteError().errmsg, 'Element 1 of "geometries" must be an object, instead got type double:');
+assert.includes(
+    err.getWriteError().errmsg,
+    'Element 1 of "geometries" must be an object, instead got type double:',
+);

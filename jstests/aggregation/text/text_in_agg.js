@@ -57,8 +57,14 @@ const assertSameAsFind = function (query) {
 assertSameAsFind({query: {}}); // sanity check
 assertSameAsFind({query: {$text: {$search: "apple"}}});
 assertSameAsFind({query: {_id: 1, $text: {$search: "apple"}}});
-assertSameAsFind({query: {$text: {$search: "apple"}}, project: {_id: 1, score: {$meta: "textScore"}}});
-assertSameAsFind({query: {$text: {$search: "apple banana"}}, project: {_id: 1, score: {$meta: "textScore"}}});
+assertSameAsFind({
+    query: {$text: {$search: "apple"}},
+    project: {_id: 1, score: {$meta: "textScore"}},
+});
+assertSameAsFind({
+    query: {$text: {$search: "apple banana"}},
+    project: {_id: 1, score: {$meta: "textScore"}},
+});
 assertSameAsFind({
     query: {$text: {$search: "apple banana"}},
     project: {_id: 1, score: {$meta: "textScore"}},
@@ -94,7 +100,10 @@ assert.throws(function () {
 
 // $meta sort specification should be rejected if the type of meta sort is not known.
 assert.throws(function () {
-    coll.aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: {$meta: "unknown"}}}]).itcount();
+    coll.aggregate([
+        {$match: {$text: {$search: "apple banana"}}},
+        {$sort: {textScore: {$meta: "unknown"}}},
+    ]).itcount();
 });
 
 // Sort specification should be rejected if a $-keyword other than $meta is used.
@@ -107,7 +116,10 @@ assert.throws(function () {
 
 // Sort specification should be rejected if it is a string, not an object with $meta.
 assert.throws(function () {
-    coll.aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: "textScore"}}]).itcount();
+    coll.aggregate([
+        {$match: {$text: {$search: "apple banana"}}},
+        {$sort: {textScore: "textScore"}},
+    ]).itcount();
 });
 
 // sharded find requires projecting the score to sort, but sharded agg does not.
@@ -119,7 +131,10 @@ let findRes = coll
         return obj;
     });
 let res = coll
-    .aggregate([{$match: {$text: {$search: "apple banana"}}}, {$sort: {textScore: {$meta: "textScore"}}}])
+    .aggregate([
+        {$match: {$text: {$search: "apple banana"}}},
+        {$sort: {textScore: {$meta: "textScore"}}},
+    ])
     .toArray();
 assert.eq(res, findRes);
 
@@ -180,7 +195,10 @@ res = coll
 assert.eq(res[0].score, score);
 
 // Make sure the pipeline fails if it tries to reference the text score and it doesn't exist.
-res = coll.runCommand({aggregate: coll.getName(), pipeline: [{$project: {_id: 1, score: {$meta: "textScore"}}}]});
+res = coll.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{$project: {_id: 1, score: {$meta: "textScore"}}}],
+});
 assert.commandFailed(res);
 
 // Make sure the metadata is 'missing()' when it doesn't exist because the document changed

@@ -19,7 +19,9 @@ const st = new ShardingTest({
     mongos: 2,
     shards: 2,
     rs: {nodes: 3},
-    configOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
+    configOptions: {
+        setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS},
+    },
 });
 
 const mongos = st.s0;
@@ -61,8 +63,14 @@ function validateCRUDAfterRefine() {
     const sessionDB = session.getDatabase(kDbName);
 
     // Verify that documents inserted before refineCollectionShardKey have not been corrupted.
-    assert.eq([{a: 5, b: 5, c: 5, d: 5}], sessionDB.getCollection(kCollName).find({a: 5}, {_id: 0}).toArray());
-    assert.eq([{a: 10, b: 10, c: 10, d: 10}], sessionDB.getCollection(kCollName).find({a: 10}, {_id: 0}).toArray());
+    assert.eq(
+        [{a: 5, b: 5, c: 5, d: 5}],
+        sessionDB.getCollection(kCollName).find({a: 5}, {_id: 0}).toArray(),
+    );
+    assert.eq(
+        [{a: 10, b: 10, c: 10, d: 10}],
+        sessionDB.getCollection(kCollName).find({a: 10}, {_id: 0}).toArray(),
+    );
 
     // A write with the incomplete shard key is treated as if the missing values are null.
 
@@ -77,9 +85,15 @@ function validateCRUDAfterRefine() {
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
 
     // This enables the feature allows writes to omit the shard key in their queries.
-    assert.commandWorked(sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {x: 2}}));
-    assert.commandWorked(sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
-    assert.commandWorked(sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {x: 2}}),
+    );
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}),
+    );
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}),
+    );
 
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
@@ -96,11 +110,19 @@ function validateCRUDAfterRefine() {
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true));
 
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 2, c: 1, d: 1}, true));
-    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: 4, c: -1, d: -1}, true));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: -1, b: 4, c: -1, d: -1}, true),
+    );
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 5, b: 5, c: 5, d: 5}, true));
-    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 10, b: 10, c: 10, d: 10}, true));
-    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 1, c: null, d: null}, true));
-    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: -1, c: null, d: null}, true));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: 10, b: 10, c: 10, d: 10}, true),
+    );
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: 1, b: 1, c: null, d: null}, true),
+    );
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).remove({a: -1, b: -1, c: null, d: null}, true),
+    );
 
     assert.eq(null, sessionDB.getCollection(kCollName).findOne());
 }
@@ -110,7 +132,9 @@ function validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr) {
     assert.eq(1, collArr.length);
     assert.sameMembers(oldCollArr, collArr);
 
-    const chunkArr = findChunksUtil.findChunksByNs(mongos.getDB("config"), kUnrelatedName).toArray();
+    const chunkArr = findChunksUtil
+        .findChunksByNs(mongos.getDB("config"), kUnrelatedName)
+        .toArray();
     assert.eq(3, chunkArr.length);
     assert.sameMembers(oldChunkArr, chunkArr);
 
@@ -140,7 +164,10 @@ assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1
 
 // Configure failpoint 'hangRefineCollectionShardKeyAfterRefresh' on staleMongos and run
 // refineCollectionShardKey against this mongos in a parallel thread.
-let hangAfterRefreshFailPoint = configureFailPoint(staleMongos, "hangRefineCollectionShardKeyAfterRefresh");
+let hangAfterRefreshFailPoint = configureFailPoint(
+    staleMongos,
+    "hangRefineCollectionShardKeyAfterRefresh",
+);
 const awaitShellToTriggerNamespaceNotSharded = startParallelShell(() => {
     assert.commandFailedWithCode(
         db.adminCommand({refineCollectionShardKey: "db.foo", key: {_id: 1, aKey: 1}}),
@@ -232,8 +259,14 @@ function compareMinAndMaxFields(shardedArr, refinedArr) {
 // Verifies the min and max fields are the same for the chunks and tags in the given collections.
 function compareBoundaries(conn, shardedNs, refinedNs) {
     // Compare chunks.
-    const shardedChunks = findChunksUtil.findChunksByNs(conn.getDB("config"), shardedNs).sort({max: 1}).toArray();
-    const refinedChunks = findChunksUtil.findChunksByNs(conn.getDB("config"), refinedNs).sort({max: 1}).toArray();
+    const shardedChunks = findChunksUtil
+        .findChunksByNs(conn.getDB("config"), shardedNs)
+        .sort({max: 1})
+        .toArray();
+    const refinedChunks = findChunksUtil
+        .findChunksByNs(conn.getDB("config"), refinedNs)
+        .sort({max: 1})
+        .toArray();
     compareMinAndMaxFields(shardedChunks, refinedChunks);
 
     // Compare tags.
@@ -253,11 +286,15 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     const shardedNs = dbName + ".shardedColl";
     const refinedNs = dbName + ".refinedColl";
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone_1"}));
 
     assert.commandWorked(st.s.adminCommand({shardCollection: shardedNs, key: {a: 1, b: 1, c: 1}}));
-    assert.commandWorked(st.s.adminCommand({split: shardedNs, middle: {a: 0, b: MinKey, c: MinKey}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: shardedNs, middle: {a: 0, b: MinKey, c: MinKey}}),
+    );
     assert.commandWorked(
         st.s.adminCommand({
             updateZoneKeyRange: shardedNs,
@@ -278,14 +315,26 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     assert.commandWorked(st.s.adminCommand({shardCollection: refinedNs, key: {a: 1}}));
     assert.commandWorked(st.s.adminCommand({split: refinedNs, middle: {a: 0}}));
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: refinedNs, min: {a: MinKey}, max: {a: 0}, zone: "zone_1"}),
+        st.s.adminCommand({
+            updateZoneKeyRange: refinedNs,
+            min: {a: MinKey},
+            max: {a: 0},
+            zone: "zone_1",
+        }),
     );
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: refinedNs, min: {a: 10}, max: {a: MaxKey}, zone: "zone_1"}),
+        st.s.adminCommand({
+            updateZoneKeyRange: refinedNs,
+            min: {a: 10},
+            max: {a: MaxKey},
+            zone: "zone_1",
+        }),
     );
 
     assert.commandWorked(st.s.getCollection(refinedNs).createIndex({a: 1, b: 1, c: 1}));
-    assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: refinedNs, key: {a: 1, b: 1, c: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({refineCollectionShardKey: refinedNs, key: {a: 1, b: 1, c: 1}}),
+    );
 
     compareBoundaries(st.s, shardedNs, refinedNs);
 })();
@@ -296,11 +345,17 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     const shardedNs = dbName + ".shardedColl";
     const refinedNs = dbName + ".refinedColl";
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone_1"}));
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: shardedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
-    assert.commandWorked(st.s.adminCommand({split: shardedNs, middle: {"a.b": 0, "c.d.e": MinKey, f: MinKey}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: shardedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({split: shardedNs, middle: {"a.b": 0, "c.d.e": MinKey, f: MinKey}}),
+    );
     assert.commandWorked(
         st.s.adminCommand({
             updateZoneKeyRange: shardedNs,
@@ -321,14 +376,26 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     assert.commandWorked(st.s.adminCommand({shardCollection: refinedNs, key: {"a.b": 1}}));
     assert.commandWorked(st.s.adminCommand({split: refinedNs, middle: {"a.b": 0}}));
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: refinedNs, min: {"a.b": MinKey}, max: {"a.b": 0}, zone: "zone_1"}),
+        st.s.adminCommand({
+            updateZoneKeyRange: refinedNs,
+            min: {"a.b": MinKey},
+            max: {"a.b": 0},
+            zone: "zone_1",
+        }),
     );
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: refinedNs, min: {"a.b": 10}, max: {"a.b": MaxKey}, zone: "zone_1"}),
+        st.s.adminCommand({
+            updateZoneKeyRange: refinedNs,
+            min: {"a.b": 10},
+            max: {"a.b": MaxKey},
+            zone: "zone_1",
+        }),
     );
 
     assert.commandWorked(st.s.getCollection(refinedNs).createIndex({"a.b": 1, "c.d.e": 1, f: 1}));
-    assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: refinedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({refineCollectionShardKey: refinedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}),
+    );
 
     compareBoundaries(st.s, shardedNs, refinedNs);
 })();

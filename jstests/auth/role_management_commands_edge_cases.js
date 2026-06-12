@@ -59,7 +59,11 @@ function runTest(conn) {
 
         // Try to create a role with an invalid privilege
         assert.throws(function () {
-            db.createRole({role: "role8", roles: [], privileges: [{resource: {}, actions: ["find"]}]});
+            db.createRole({
+                role: "role8",
+                roles: [],
+                privileges: [{resource: {}, actions: ["find"]}],
+            });
         });
         assert.throws(function () {
             db.createRole({
@@ -93,7 +97,9 @@ function runTest(conn) {
             db.createRole({
                 role: "role13",
                 roles: [],
-                privileges: [{resource: {db: "test", collection: "foo", cluster: true}, actions: ["find"]}],
+                privileges: [
+                    {resource: {db: "test", collection: "foo", cluster: true}, actions: ["find"]},
+                ],
             });
         });
         assert.throws(function () {
@@ -280,7 +286,9 @@ function runTest(conn) {
         // Try to revoke a privilege the role doesn't have
         // Should not error but should do nothing.
         assert.doesNotThrow(function () {
-            db.revokePrivilegesFromRole("role3", [{resource: {db: "test", collection: "foobar"}, actions: ["insert"]}]);
+            db.revokePrivilegesFromRole("role3", [
+                {resource: {db: "test", collection: "foobar"}, actions: ["insert"]},
+            ]);
         });
         assert.eq(0, db.getRole("role2", {showPrivileges: true}).privileges.length);
 
@@ -291,7 +299,9 @@ function runTest(conn) {
 
         // Try to remove from built-in role
         assert.throws(function () {
-            db.revokePrivilegesFromRole("readWrite", [{resource: {db: "test", collection: ""}, actions: ["find"]}]);
+            db.revokePrivilegesFromRole("readWrite", [
+                {resource: {db: "test", collection: ""}, actions: ["find"]},
+            ]);
         });
 
         let basicPriv = {resource: {db: "test", collection: ""}, actions: ["find"]};

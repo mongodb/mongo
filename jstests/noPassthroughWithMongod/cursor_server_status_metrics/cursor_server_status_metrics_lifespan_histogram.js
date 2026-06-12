@@ -41,7 +41,10 @@ function cursorsDeadSinceStartLt30Seconds() {
         getNumCursorsLessThan5Seconds() +
         getNumCursorsLessThan15Seconds() +
         getNumCursorsLessThan30Seconds() -
-        (initialNumCursorsLt1s + initialNumCursorsLt5s + initialNumCursorsLt15s + initialNumCursorsLt30s)
+        (initialNumCursorsLt1s +
+            initialNumCursorsLt5s +
+            initialNumCursorsLt15s +
+            initialNumCursorsLt30s)
     );
 }
 

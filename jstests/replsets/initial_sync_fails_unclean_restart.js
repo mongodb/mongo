@@ -48,7 +48,10 @@ const beforeFinishFailPoint = configureFailPoint(initialSyncNode, "initialSyncHa
 
 jsTestLog("Resuming database cloner on the initialSyncNode");
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 jsTestLog("Waiting for data cloning to complete on the initialSyncNode");
@@ -64,7 +67,12 @@ assert.commandWorked(
 const rollbackIdBefore = syncSourceNode.getDB("local").system.rollback.id.findOne();
 
 jsTestLog("Shutting down the syncSourceNode uncleanly");
-rst.stop(syncSourceNode, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, waitPid: true});
+rst.stop(
+    syncSourceNode,
+    9,
+    {allowedExitCode: MongoRunner.EXIT_SIGKILL},
+    {forRestart: true, waitPid: true},
+);
 
 // Make sure some retries happen due to resumable initial sync and the initial sync does not
 // immediately fail while the sync source is completely down.
@@ -81,12 +89,19 @@ const rollbackIdAfter = syncSourceNode.getDB("local").system.rollback.id.findOne
 assert.eq(
     rollbackIdAfter.rollbackId,
     rollbackIdBefore.rollbackId + 1,
-    () => "rollbackIdBefore: " + tojson(rollbackIdBefore) + " rollbackIdAfter: " + tojson(rollbackIdAfter),
+    () =>
+        "rollbackIdBefore: " +
+        tojson(rollbackIdBefore) +
+        " rollbackIdAfter: " +
+        tojson(rollbackIdAfter),
 );
 
 jsTestLog("Resuming initial sync after the data cloning phase on the initialSyncNode");
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangAfterDataCloning",
+        mode: "off",
+    }),
 );
 
 jsTestLog("Waiting for initial sync to fail on the initialSyncNode");

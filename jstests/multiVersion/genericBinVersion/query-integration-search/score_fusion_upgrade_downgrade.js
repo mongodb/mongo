@@ -13,7 +13,10 @@ const scoreFusionPipeline = [
     {
         $scoreFusion: {
             input: {
-                pipelines: {otherField: [{$score: {score: "$bar"}}], field: [{$score: {score: "$foo"}}]},
+                pipelines: {
+                    otherField: [{$score: {score: "$bar"}}],
+                    field: [{$score: {score: "$foo"}}],
+                },
                 normalization: "minMaxScaler",
             },
         },
@@ -23,7 +26,10 @@ const scoreFusionPipelineWithScoreDetails = [
     {
         $scoreFusion: {
             input: {
-                pipelines: {otherField: [{$score: {score: "$bar"}}], field: [{$score: {score: "$foo"}}]},
+                pipelines: {
+                    otherField: [{$score: {score: "$bar"}}],
+                    field: [{$score: {score: "$foo"}}],
+                },
                 normalization: "none",
             },
             scoreDetails: true,
@@ -66,10 +72,10 @@ function assertScoreFusionCompletelyRejected(primaryConn) {
     db[viewName].drop();
 
     // Creating a view with $scoreFusion/$score is rejected.
-    assert.commandFailedWithCode(db.createView("bad_score_fusion_view", collName, scoreFusionPipeline), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.OptionNotSupportedOnView,
-    ]);
+    assert.commandFailedWithCode(
+        db.createView("bad_score_fusion_view", collName, scoreFusionPipeline),
+        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.OptionNotSupportedOnView],
+    );
     assert.commandFailedWithCode(db.createView("bad_score_view", collName, scorePipeline), [
         kUnrecognizedPipelineStageErrorCode,
         ErrorCodes.OptionNotSupportedOnView,
@@ -77,18 +83,24 @@ function assertScoreFusionCompletelyRejected(primaryConn) {
 
     // $scoreFusion/$score on a view is rejected.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
-    assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: scoreFusionPipeline, cursor: {}}), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView,
-        ErrorCodes.FailedToParse,
-    ]);
-    assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: scorePipeline, cursor: {}}), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView,
-        ErrorCodes.FailedToParse,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: viewName, pipeline: scoreFusionPipeline, cursor: {}}),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.OptionNotSupportedOnView,
+            ErrorCodes.FailedToParse,
+        ],
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: viewName, pipeline: scorePipeline, cursor: {}}),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.OptionNotSupportedOnView,
+            ErrorCodes.FailedToParse,
+        ],
+    );
 
     // $projects referencing score and scoreDetails metadata are rejected in aggregation
     // commands.
@@ -98,7 +110,12 @@ function assertScoreFusionCompletelyRejected(primaryConn) {
             pipeline: [...scorePipelineWithScoreDetails, projectStage],
             cursor: {},
         }),
-        [ErrorCodes.FailedToParse, ErrorCodes.QueryFeatureNotAllowed, kUnrecognizedPipelineStageErrorCode, 17308],
+        [
+            ErrorCodes.FailedToParse,
+            ErrorCodes.QueryFeatureNotAllowed,
+            kUnrecognizedPipelineStageErrorCode,
+            17308,
+        ],
     );
     assert.commandFailedWithCode(
         db.runCommand({
@@ -106,33 +123,56 @@ function assertScoreFusionCompletelyRejected(primaryConn) {
             pipeline: [...scorePipelineWithScoreDetails, projectStage],
             cursor: {},
         }),
-        [ErrorCodes.FailedToParse, ErrorCodes.QueryFeatureNotAllowed, kUnrecognizedPipelineStageErrorCode, 17308],
+        [
+            ErrorCodes.FailedToParse,
+            ErrorCodes.QueryFeatureNotAllowed,
+            kUnrecognizedPipelineStageErrorCode,
+            17308,
+        ],
     );
 
     // $scoreFusion is rejected in a plain aggregation command.
-    assert.commandFailedWithCode(db.runCommand({aggregate: collName, pipeline: scoreFusionPipeline, cursor: {}}), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.FailedToParse,
-        ErrorCodes.QueryFeatureNotAllowed,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: collName, pipeline: scoreFusionPipeline, cursor: {}}),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.FailedToParse,
+            ErrorCodes.QueryFeatureNotAllowed,
+        ],
+    );
 
     // $scoreFusion with scoreDetails is still rejected.
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: collName, pipeline: scoreFusionPipelineWithScoreDetails, cursor: {}}),
-        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.FailedToParse, ErrorCodes.QueryFeatureNotAllowed],
+        db.runCommand({
+            aggregate: collName,
+            pipeline: scoreFusionPipelineWithScoreDetails,
+            cursor: {},
+        }),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.FailedToParse,
+            ErrorCodes.QueryFeatureNotAllowed,
+        ],
     );
 
     // $score is rejected in a plain aggregation command.
-    assert.commandFailedWithCode(db.runCommand({aggregate: collName, pipeline: scorePipeline, cursor: {}}), [
-        kUnrecognizedPipelineStageErrorCode,
-        ErrorCodes.FailedToParse,
-        ErrorCodes.QueryFeatureNotAllowed,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: collName, pipeline: scorePipeline, cursor: {}}),
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.FailedToParse,
+            ErrorCodes.QueryFeatureNotAllowed,
+        ],
+    );
 
     // $score with scoreDetails is still rejected.
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collName, pipeline: scorePipelineWithScoreDetails, cursor: {}}),
-        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.FailedToParse, ErrorCodes.QueryFeatureNotAllowed],
+        [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.FailedToParse,
+            ErrorCodes.QueryFeatureNotAllowed,
+        ],
     );
 }
 
@@ -141,35 +181,50 @@ function assertScoreFusionCompletelyAccepted(primaryConn) {
     db[viewName].drop();
 
     // Creating a view with $scoreFusion/$score is rejected.
-    assert.commandFailedWithCode(db.createView("bad_score_fusion_view", collName, scoreFusionPipeline), [
-        ErrorCodes.OptionNotSupportedOnView,
-    ]);
+    assert.commandFailedWithCode(
+        db.createView("bad_score_fusion_view", collName, scoreFusionPipeline),
+        [ErrorCodes.OptionNotSupportedOnView],
+    );
     assert.commandFailedWithCode(db.createView("bad_score_view", collName, scorePipeline), [
         ErrorCodes.OptionNotSupportedOnView,
     ]);
 
     // $scoreFusion/$score on a view works.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
-    assert.commandWorked(db.runCommand({aggregate: viewName, pipeline: scoreFusionPipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: viewName, pipeline: scoreFusionPipeline, cursor: {}}),
+    );
     assert.commandWorked(db.runCommand({aggregate: viewName, pipeline: scorePipeline, cursor: {}}));
 
     // $projects referencing score and scoreDetails metadata succeed in aggregation commands.
-    assert.commandWorked(db.runCommand({aggregate: collName, pipeline: scoreFusionPipelineWithProject, cursor: {}}));
-    assert.commandWorked(db.runCommand({aggregate: collName, pipeline: scorePipelineWithProject, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: collName, pipeline: scoreFusionPipelineWithProject, cursor: {}}),
+    );
+    assert.commandWorked(
+        db.runCommand({aggregate: collName, pipeline: scorePipelineWithProject, cursor: {}}),
+    );
 
     // $scoreFusion succeeds in an aggregation command.
-    assert.commandWorked(db.runCommand({aggregate: collName, pipeline: scoreFusionPipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: collName, pipeline: scoreFusionPipeline, cursor: {}}),
+    );
 
     // $scoreFusion with scoreDetails succeeds in an aggregation command.
     assert.commandWorked(
-        db.runCommand({aggregate: collName, pipeline: scoreFusionPipelineWithScoreDetails, cursor: {}}),
+        db.runCommand({
+            aggregate: collName,
+            pipeline: scoreFusionPipelineWithScoreDetails,
+            cursor: {},
+        }),
     );
 
     // $score succeeds in an aggregation command.
     assert.commandWorked(db.runCommand({aggregate: collName, pipeline: scorePipeline, cursor: {}}));
 
     // $score with scoreDetails succeeds in an aggregation command.
-    assert.commandWorked(db.runCommand({aggregate: collName, pipeline: scorePipelineWithScoreDetails, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: collName, pipeline: scorePipelineWithScoreDetails, cursor: {}}),
+    );
 }
 
 testPerformUpgradeReplSet({

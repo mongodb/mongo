@@ -54,16 +54,26 @@ checkCoordinatorCommandsAgainstNonAdminDbRejected(st.configRS.getPrimary());
 
 st.stop();
 
-jsTest.log("Verify that a shard server that has not yet been added to a cluster does not accept coordinator commands");
+jsTest.log(
+    "Verify that a shard server that has not yet been added to a cluster does not accept coordinator commands",
+);
 const shardsvrReplSet = new ReplSetTest({nodes: 1, nodeOptions: {shardsvr: ""}});
 shardsvrReplSet.startSet();
 shardsvrReplSet.initiate();
-checkCoordinatorCommandsRejected(shardsvrReplSet.getPrimary(), ErrorCodes.ShardingStateNotInitialized);
+checkCoordinatorCommandsRejected(
+    shardsvrReplSet.getPrimary(),
+    ErrorCodes.ShardingStateNotInitialized,
+);
 shardsvrReplSet.stopSet();
 
-jsTest.log("Verify that a non-config server, non-shard server does not accept coordinator commands");
+jsTest.log(
+    "Verify that a non-config server, non-shard server does not accept coordinator commands",
+);
 const standaloneReplSet = new ReplSetTest({nodes: 1});
 standaloneReplSet.startSet();
 standaloneReplSet.initiate();
-checkCoordinatorCommandsRejected(standaloneReplSet.getPrimary(), ErrorCodes.ShardingStateNotInitialized);
+checkCoordinatorCommandsRejected(
+    standaloneReplSet.getPrimary(),
+    ErrorCodes.ShardingStateNotInitialized,
+);
 standaloneReplSet.stopSet();

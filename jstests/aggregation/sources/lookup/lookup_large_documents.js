@@ -25,7 +25,12 @@ assert.commandWorked(localColl.insert({local: 1}));
 for (let preventProjectPushdown of [false, true]) {
     const pipeline = [
         {
-            $lookup: {from: foreignCollName, localField: "local", foreignField: "foreign", as: "result"},
+            $lookup: {
+                from: foreignCollName,
+                localField: "local",
+                foreignField: "foreign",
+                as: "result",
+            },
         },
     ];
     if (preventProjectPushdown) {
@@ -35,5 +40,8 @@ for (let preventProjectPushdown of [false, true]) {
 
     const results = localColl.aggregate(pipeline).toArray();
 
-    assert(arrayEq(results, [{foo: 3}]), "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
+    assert(
+        arrayEq(results, [{foo: 3}]),
+        "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results),
+    );
 }

@@ -19,7 +19,10 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {verifyProfilerMetrics, verifySlowQueryLogMetrics} from "jstests/libs/query/memory_tracking_utils.js";
+import {
+    verifyProfilerMetrics,
+    verifySlowQueryLogMetrics,
+} from "jstests/libs/query/memory_tracking_utils.js";
 
 const serverParams = {
     setParameter: {
@@ -105,7 +108,10 @@ for (let i = 0; i < cursorIds.length; i++) {
             });
 
             // Assert that getMore succeeded
-            assert.commandWorked(getMoreResult, `Shell ${args.shellIndex} getMore failed for cursor ${args.cursorId}`);
+            assert.commandWorked(
+                getMoreResult,
+                `Shell ${args.shellIndex} getMore failed for cursor ${args.cursorId}`,
+            );
 
             const batch = getMoreResult.cursor.nextBatch;
             totalDocs += batch.length;
@@ -128,7 +134,12 @@ for (let i = 0; i < cursorIds.length; i++) {
         let logLines = [];
         assert.soon(() => {
             const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-            logLines = [...iterateMatchingLogLines(globalLog.log, {msg: "Slow query", cursorid: args.cursorId})];
+            logLines = [
+                ...iterateMatchingLogLines(globalLog.log, {
+                    msg: "Slow query",
+                    cursorid: args.cursorId,
+                }),
+            ];
             return logLines.length >= expectedRequests;
         }, `Failed to find 10 log lines for cursorid: ${args.cursorId.toString()}`);
 

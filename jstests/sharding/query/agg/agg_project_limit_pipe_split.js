@@ -6,7 +6,9 @@ const db = shardingTest.getDB("project_limit");
 const coll = db.project_limit_pipe_split;
 coll.drop();
 assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName()}));
-assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(
+    shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
+);
 const bulkOp = coll.initializeOrderedBulkOp();
 for (let i = 0; i < 400; ++i) {
     bulkOp.insert({x: i, y: ["a", "b", "c"], z: Math.floor(i / 12)});
@@ -31,7 +33,12 @@ assert.eq(
     agg.toArray(),
 );
 
-agg = coll.aggregate([{$sort: {x: 1}}, {$redact: "$$KEEP"}, {$project: {x: 1, y: 1, z: 1, _id: 0}}, {$limit: 6}]);
+agg = coll.aggregate([
+    {$sort: {x: 1}},
+    {$redact: "$$KEEP"},
+    {$project: {x: 1, y: 1, z: 1, _id: 0}},
+    {$limit: 6},
+]);
 assert.eq(
     [
         {"x": 0, "y": ["a", "b", "c"], "z": 0},
@@ -44,10 +51,20 @@ assert.eq(
     agg.toArray(),
 );
 
-agg = coll.aggregate([{$sort: {x: -1}}, {$skip: 399}, {$project: {x: 1, y: 1, z: 1, _id: 0}}, {$limit: 6}]);
+agg = coll.aggregate([
+    {$sort: {x: -1}},
+    {$skip: 399},
+    {$project: {x: 1, y: 1, z: 1, _id: 0}},
+    {$limit: 6},
+]);
 assert.eq([{"x": 0, "y": ["a", "b", "c"], "z": 0}], agg.toArray());
 
-agg = coll.aggregate([{$sort: {x: -1}}, {$project: {x: 1, y: 1, z: 1, _id: 0}}, {$skip: 401}, {$limit: 6}]);
+agg = coll.aggregate([
+    {$sort: {x: -1}},
+    {$project: {x: 1, y: 1, z: 1, _id: 0}},
+    {$skip: 401},
+    {$limit: 6},
+]);
 assert.eq(0, agg.itcount());
 
 agg = coll.aggregate([

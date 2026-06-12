@@ -136,7 +136,10 @@ function Explainable(collection, verbosity) {
                 extraOptsCopy = Object.extend(extraOptsCopy, {cursor: {}});
             }
 
-            let aggCmd = Object.extend({"aggregate": this._collection.getName(), pipeline}, extraOptsCopy);
+            let aggCmd = Object.extend(
+                {"aggregate": this._collection.getName(), pipeline},
+                extraOptsCopy,
+            );
             let explainCmd = buildExplainCmd(aggCmd, this._verbosity);
             let explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
@@ -377,7 +380,12 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
         "totalDocsExamined",
     ];
 
-    const kTrialSummaryStats = ["nReturned", "executionTimeMillisEstimate", "totalKeysExamined", "totalDocsExamined"];
+    const kTrialSummaryStats = [
+        "nReturned",
+        "executionTimeMillisEstimate",
+        "totalKeysExamined",
+        "totalDocsExamined",
+    ];
 
     const kAggregateStats = ["seeks", "numReads"];
 
@@ -391,7 +399,13 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
             }
         }
 
-        for (let childStageName of ["inputStage", "thenStage", "elseStage", "outerStage", "innerStage"]) {
+        for (let childStageName of [
+            "inputStage",
+            "thenStage",
+            "elseStage",
+            "outerStage",
+            "innerStage",
+        ]) {
             if (childStageName in root) {
                 walkTree(root[childStageName], callbackFn);
             }
@@ -491,8 +505,17 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
         for (let i = 0; i < reformatted.length; ++i) {
             assert(allPlansExecution[i].hasOwnProperty("executionStages"));
             reformatted[i].trialSlotBasedPlanVerbose = allPlansExecution[i].executionStages;
-            fillAggregatedExecStats(allPlansExecution[i], reformatted[i].queryPlan, "trialExecStats");
-            addSummaryStats(allPlansExecution[i], "trialSummaryStats", kTrialSummaryStats, reformatted[i]);
+            fillAggregatedExecStats(
+                allPlansExecution[i],
+                reformatted[i].queryPlan,
+                "trialExecStats",
+            );
+            addSummaryStats(
+                allPlansExecution[i],
+                "trialSummaryStats",
+                kTrialSummaryStats,
+                reformatted[i],
+            );
         }
     }
 
@@ -677,7 +700,10 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
     }
 
     const queryPlanner = explain.queryPlanner;
-    const isShardedFind = queryPlanner && queryPlanner.winningPlan && queryPlanner.winningPlan.hasOwnProperty("shards");
+    const isShardedFind =
+        queryPlanner &&
+        queryPlanner.winningPlan &&
+        queryPlanner.winningPlan.hasOwnProperty("shards");
     if (isShardedFind) {
         return doShardedFindReformatting(explain, fieldsToKeepSet);
     }

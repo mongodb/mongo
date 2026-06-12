@@ -57,10 +57,14 @@ export const setupColl = (coll, collName, usesMeta, subFields = null) => {
     }
     assert.commandWorked(coll.insert(docs));
 
-    TimeseriesTest.ensureDataIsDistributedIfSharded(coll, new Date((numberOfItemsPerBucket / 2) * 6000));
+    TimeseriesTest.ensureDataIsDistributedIfSharded(
+        coll,
+        new Date((numberOfItemsPerBucket / 2) * 6000),
+    );
 };
 
-const hasInternalBoundedSort = (pipeline) => pipeline.some((stage) => stage.hasOwnProperty("$_internalBoundedSort"));
+const hasInternalBoundedSort = (pipeline) =>
+    pipeline.some((stage) => stage.hasOwnProperty("$_internalBoundedSort"));
 
 const findFirstMatch = (pipeline) => pipeline.find((stage) => stage.hasOwnProperty("$match"));
 
@@ -149,7 +153,10 @@ export const runRewritesTest = (
     if (hasInternalBoundedSort(ogExplain)) {
         printjson({ogExplainFull});
         printjson({ogExplain});
-        assert(false, "Did not expect to see a $_internalBoundedSort stage in the original explain");
+        assert(
+            false,
+            "Did not expect to see a $_internalBoundedSort stage in the original explain",
+        );
     }
 
     // For some queries we expect to see an extra predicate, to defend against bucketMaxSpanSeconds
@@ -157,13 +164,20 @@ export const runRewritesTest = (
     const bucketSpanMatch = {
         $match: {
             $expr: {
-                $lte: [{$subtract: ["$control.max.t", "$control.min.t"]}, {$const: NumberLong(3600000)}],
+                $lte: [
+                    {$subtract: ["$control.max.t", "$control.min.t"]},
+                    {$const: NumberLong(3600000)},
+                ],
             },
         },
     };
     let foundMatch = findFirstMatch(optExplain);
     if (!precise) {
-        assert.docEq(bucketSpanMatch, foundMatch, "Expected an extra $match to check the bucket span");
+        assert.docEq(
+            bucketSpanMatch,
+            foundMatch,
+            "Expected an extra $match to check the bucket span",
+        );
     } else {
         // (We don't have a 'assert.notDocEq' helper, but docEq is 'eq' + 'sortDoc'.)
         assert.neq(
@@ -183,8 +197,16 @@ export const runRewritesTest = (
     }
 };
 
-export const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, intermediaryStages = []) => {
-    jsTestLog(`runDoesntRewriteTest ${tojson({sortSpec, createIndex, hint, testColl, intermediaryStages})}`);
+export const runDoesntRewriteTest = (
+    sortSpec,
+    createIndex,
+    hint,
+    testColl,
+    intermediaryStages = [],
+) => {
+    jsTestLog(
+        `runDoesntRewriteTest ${tojson({sortSpec, createIndex, hint, testColl, intermediaryStages})}`,
+    );
     setup(testColl, createIndex);
 
     const optPipeline = [...intermediaryStages, {$sort: sortSpec}];
@@ -200,6 +222,9 @@ export const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, inte
     if (containsOptimization) {
         printjson({optExplainFull});
         printjson({optExplain});
-        assert(false, "Did not expect to see a $_internalBoundedSort stage in the optimized explain");
+        assert(
+            false,
+            "Did not expect to see a $_internalBoundedSort stage in the optimized explain",
+        );
     }
 };

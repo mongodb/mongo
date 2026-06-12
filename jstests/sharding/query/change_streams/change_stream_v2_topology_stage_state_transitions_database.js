@@ -215,7 +215,10 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 [
                     {from: S.Uninitialized, to: S.FetchingInitialization},
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
@@ -264,12 +267,25 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
 
             const logOffsetAfterInit = checkLog.getGlobalLog(st.s).length;
 
-            assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
-            awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () => csTest.assertNoChange(csCursor));
+            assert.commandWorked(
+                st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}),
+            );
+            awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () =>
+                csTest.assertNoChange(csCursor),
+            );
 
             // The stage must not have left FetchingGettingChangeEvent.
-            assertNoV2StageStateTransitionFrom(st.s, logOffsetAfterInit, S.FetchingGettingChangeEvent);
-            assertOpenCursors(st, [st.shard1.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+            assertNoV2StageStateTransitionFrom(
+                st.s,
+                logOffsetAfterInit,
+                S.FetchingGettingChangeEvent,
+            );
+            assertOpenCursors(
+                st,
+                [st.shard1.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
         });
 
         it("IRS mode: stays in FetchingNormalGettingChangeEvent during movePrimary", () => {
@@ -292,7 +308,13 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             csTest = new ChangeStreamTest(db);
             const csCursor = csTest.startWatchingChanges({
                 pipeline: [
-                    {$changeStream: {version: "v2", startAtOperationTime: currentTime, ignoreRemovedShards: true}},
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            startAtOperationTime: currentTime,
+                            ignoreRemovedShards: true,
+                        },
+                    },
                 ],
                 collection: 1,
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
@@ -301,18 +323,36 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             awaitV2StageStateTransitions(
                 st.s,
                 logOffset,
-                [{from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent}],
+                [
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
+                ],
                 () => csTest.assertNoChange(csCursor),
             );
 
             const logOffsetAfterInit = checkLog.getGlobalLog(st.s).length;
 
-            assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
-            awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () => csTest.assertNoChange(csCursor));
+            assert.commandWorked(
+                st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}),
+            );
+            awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () =>
+                csTest.assertNoChange(csCursor),
+            );
 
             // The stage must not have left FetchingNormalGettingChangeEvent.
-            assertNoV2StageStateTransitionFrom(st.s, logOffsetAfterInit, S.FetchingNormalGettingChangeEvent);
-            assertOpenCursors(st, [st.shard1.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+            assertNoV2StageStateTransitionFrom(
+                st.s,
+                logOffsetAfterInit,
+                S.FetchingNormalGettingChangeEvent,
+            );
+            assertOpenCursors(
+                st,
+                [st.shard1.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
         });
     });
 });

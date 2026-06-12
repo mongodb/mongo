@@ -38,7 +38,10 @@ function assertContainsLog(expectLog, severityCode) {
             }
 
             const res = mapped.filter(
-                (l) => l.id === 5060500 && l.s === severityCode && 0 === bsonWoCompare(l.attr, expectLog),
+                (l) =>
+                    l.id === 5060500 &&
+                    l.s === severityCode &&
+                    0 === bsonWoCompare(l.attr, expectLog),
             ).length;
 
             assert.lt(res, 2, "Repeated log entry: " + assertMsg);

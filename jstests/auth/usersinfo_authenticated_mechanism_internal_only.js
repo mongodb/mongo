@@ -35,7 +35,9 @@ adminDB.logout();
 assert(adminDB.auth("system", "pwd"));
 
 // Should succeed with __system role.
-assert.commandWorked(testDB.runCommand({usersInfo: "testUser", authenticatedMechanism: "SCRAM-SHA-256"}));
+assert.commandWorked(
+    testDB.runCommand({usersInfo: "testUser", authenticatedMechanism: "SCRAM-SHA-256"}),
+);
 
 adminDB.logout();
 MongoRunner.stopMongod(conn);

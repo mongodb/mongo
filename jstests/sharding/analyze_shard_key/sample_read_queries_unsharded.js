@@ -34,7 +34,9 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st
 assert.commandWorked(mongosDB.createCollection(collName));
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}),
+);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];

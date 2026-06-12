@@ -117,7 +117,13 @@ let authenticate = function (mongo) {
 };
 
 let start = function (useHostName) {
-    const rs = new ReplSetTest({name: replSetName, nodes: 3, keyFile: keyfile, auth: "", useHostName: useHostName});
+    const rs = new ReplSetTest({
+        name: replSetName,
+        nodes: 3,
+        keyFile: keyfile,
+        auth: "",
+        useHostName: useHostName,
+    });
 
     rs.startSet();
     rs.initiate();
@@ -221,7 +227,9 @@ let runNonlocalTest = function (ipAddr) {
     });
 
     assert.throws(function () {
-        mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+        mongo
+            .getDB("admin")
+            .createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
     });
 
     shutdown(rs);

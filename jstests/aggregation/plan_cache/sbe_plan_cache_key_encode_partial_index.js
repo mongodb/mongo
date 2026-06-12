@@ -10,7 +10,10 @@ const coll = assertDropAndRecreateCollection(db, "partial_index_subplanner_cache
 
 // Create a partial index on date.
 assert.commandWorked(
-    coll.createIndex({"date": 1}, {partialFilterExpression: {"date": {$gt: new Date("2019-05-22T21:56:29.813Z")}}}),
+    coll.createIndex(
+        {"date": 1},
+        {partialFilterExpression: {"date": {$gt: new Date("2019-05-22T21:56:29.813Z")}}},
+    ),
 );
 assert.commandWorked(coll.createIndex({"str": 1}));
 

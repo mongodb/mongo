@@ -78,7 +78,9 @@ const searchCmd = {
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 // Perform a $search query.
@@ -109,7 +111,9 @@ assert.eq(expected, cursor.toArray());
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}),
+    );
     const err = assert.throws(() => coll.aggregate([{$search: searchQuery}]));
     assert.commandFailedWithCode(err, ErrorCodes.InternalError);
 }
@@ -145,7 +149,9 @@ assert.eq(expected, cursor.toArray());
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 
     // The aggregate() (and search command) should succeed.
     // Note that 'batchSize' here only tells mongod how many docs to return per batch and has
@@ -172,8 +178,13 @@ assert.eq(expected, cursor.toArray());
 }
 
 // Fail on non-local read concern.
-const err = assert.throws(() => coll.aggregate([{$search: {}}], {readConcern: {level: "majority"}}));
-assert.commandFailedWithCode(err, [ErrorCodes.InvalidOptions, ErrorCodes.ReadConcernMajorityNotEnabled]);
+const err = assert.throws(() =>
+    coll.aggregate([{$search: {}}], {readConcern: {level: "majority"}}),
+);
+assert.commandFailedWithCode(err, [
+    ErrorCodes.InvalidOptions,
+    ErrorCodes.ReadConcernMajorityNotEnabled,
+]);
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

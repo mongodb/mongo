@@ -6,7 +6,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 
 function validateBuckets(bucketsDocs, expectedLogicalDocNum) {
     let logicalDocNum = 0;
@@ -41,7 +44,11 @@ toInsert.forEach((doc) => coll.insertOne(doc));
 
 // Fetch documents with aggregate
 let docs = coll.aggregate([{$match: {}}]).toArray();
-assert.eq(numDocs, docs.length, `Unexpected number of documents found with aggregate ${tojson(docs)}`);
+assert.eq(
+    numDocs,
+    docs.length,
+    `Unexpected number of documents found with aggregate ${tojson(docs)}`,
+);
 
 // Count documents
 assert.eq(numDocs, coll.countDocuments({}), `Unexpected number of documents with countDocuments`);
@@ -80,7 +87,10 @@ function testRawDataQueries() {
     );
 
     // Should return the same count as distinct().length.
-    assert.eq(numBucketDocs, getTimeseriesCollForRawOps(coll).count(bucketPredicate, kRawOperationSpec));
+    assert.eq(
+        numBucketDocs,
+        getTimeseriesCollForRawOps(coll).count(bucketPredicate, kRawOperationSpec),
+    );
     // No unpacked documents should match the bucket structure.
     assert.eq(0, coll.count(bucketPredicate));
 }

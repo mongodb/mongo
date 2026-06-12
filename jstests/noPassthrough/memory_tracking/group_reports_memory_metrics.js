@@ -71,7 +71,9 @@ if (checkSbeFullyEnabled(db)) {
         knobName: "internalDocumentSourceGroupMaxMemoryBytes",
     };
 }
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: config.framework}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: config.framework}),
+);
 
 {
     runMemoryStatsTest({

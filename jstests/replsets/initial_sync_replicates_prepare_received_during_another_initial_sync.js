@@ -43,7 +43,10 @@ function restartSecondaryAndForceSyncSource(replSet, secondary, syncSource, dbNa
             startClean: true,
             // Force this secondary to sync from the primary.
             setParameter: {
-                "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: syncSource.host}}),
+                "failpoint.forceSyncSourceCandidate": tojson({
+                    mode: "alwaysOn",
+                    data: {hostAndPort: syncSource.host},
+                }),
             },
         },
         true /* wait */,
@@ -109,7 +112,13 @@ restartSecondaryAndForceSyncSource(replSet, secondary1, primary, dbName, cluster
 jsTestLog("secondary1 successfully replicated prepared transaction after initial sync");
 
 jsTestLog("Restarting secondary2");
-restartSecondaryAndForceSyncSource(replSet, secondary2, secondary1, dbName, clusterTimeAfterPrepare);
+restartSecondaryAndForceSyncSource(
+    replSet,
+    secondary2,
+    secondary1,
+    dbName,
+    clusterTimeAfterPrepare,
+);
 jsTestLog("secondary2 successfully replicated prepared transaction after initial sync");
 
 // Commit the transaction.

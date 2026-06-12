@@ -21,13 +21,18 @@ const secondary = replSet.getSecondary();
 const primaryDB = primary.getDB("test");
 const secondaryDB = secondary.getDB("test");
 
-assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 0}], writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primaryDB.runCommand({insert: collName, documents: [{_id: 0}], writeConcern: {w: "majority"}}),
+);
 
 jsTestLog("Adding a new node");
 const newNode = replSet.add({
     rsConfig: {priority: 0},
     setParameter: {
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": primary.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {"hostAndPort": primary.host},
+        }),
         "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"}),
         "numInitialSyncAttempts": 1,
         // Set a large snapshot history window of 1 hour.
@@ -60,8 +65,14 @@ const findAtClusterTimeDuringInitialSync = {
     readConcern: {level: "snapshot", atClusterTime: timestampDuringInitialSync},
 };
 const documents = [{_id: 0}, {_id: 1}];
-assert.sameMembers(primaryDB.runCommand(findAtClusterTimeDuringInitialSync).cursor.firstBatch, documents);
-assert.sameMembers(secondaryDB.runCommand(findAtClusterTimeDuringInitialSync).cursor.firstBatch, documents);
+assert.sameMembers(
+    primaryDB.runCommand(findAtClusterTimeDuringInitialSync).cursor.firstBatch,
+    documents,
+);
+assert.sameMembers(
+    secondaryDB.runCommand(findAtClusterTimeDuringInitialSync).cursor.firstBatch,
+    documents,
+);
 
 // Test reading at a timestamp before initial sync finishes is not allowed while the node is in
 // initial sync.
@@ -75,13 +86,18 @@ assert.commandFailedWithCode(
 assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 2}]}));
 
 // Allow the new node to complete initial sync.
-assert.commandWorked(newNode.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    newNode.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 replSet.awaitSecondaryNodes(null, [newNode]);
 replSet.awaitLastOpCommitted();
 
 // Test reading at a timestamp before initial sync finishes is not allowed even if the node has
 // finished initial sync and has a large snapshot history window size.
-assert.commandFailedWithCode(newNodeDB.runCommand(findAtClusterTimeDuringInitialSync), ErrorCodes.SnapshotTooOld);
+assert.commandFailedWithCode(
+    newNodeDB.runCommand(findAtClusterTimeDuringInitialSync),
+    ErrorCodes.SnapshotTooOld,
+);
 
 // Test snapshot readConcern reads all committed writes.
 assert.sameMembers(

@@ -36,13 +36,23 @@ function runTests(collName, commandName, writeConcern) {
     const ns = dbName + "." + collName;
     // Non-existing collection with a random expected UUID (command succeeds, noop)
     assert.commandWorked(
-        db.runCommand(appenWriteConcern({[`${commandName}`]: collName, expectedCollectionUUID: UUID()}, writeConcern)),
+        db.runCommand(
+            appenWriteConcern(
+                {[`${commandName}`]: collName, expectedCollectionUUID: UUID()},
+                writeConcern,
+            ),
+        ),
     );
 
     // Existing collection with a random expected UUID (command succeeds after successful drop)
     assert.commandWorked(db.getCollection(collName).insert({_id: 0}));
     assert.commandWorked(
-        db.runCommand(appenWriteConcern({[`${commandName}`]: collName, expectedCollectionUUID: UUID()}, writeConcern)),
+        db.runCommand(
+            appenWriteConcern(
+                {[`${commandName}`]: collName, expectedCollectionUUID: UUID()},
+                writeConcern,
+            ),
+        ),
     );
     assert.eq(null, db.getCollection(collName).findOne({_id: 0}));
 
@@ -54,12 +64,17 @@ function runTests(collName, commandName, writeConcern) {
     assert.commandWorked(db.getCollection(collName).insert({_id: 0}));
     assert.commandWorked(
         db.runCommand(
-            appenWriteConcern({[`${commandName}`]: collName, expectedCollectionUUID: collUUID}, writeConcern),
+            appenWriteConcern(
+                {[`${commandName}`]: collName, expectedCollectionUUID: collUUID},
+                writeConcern,
+            ),
         ),
     );
     assert.neq(null, db.getCollection(collName).findOne({_id: 0}));
 }
 
-runTests("coll2", "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern", {writeConcern: {w: "majority"}});
+runTests("coll2", "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern", {
+    writeConcern: {w: "majority"},
+});
 
 st.stop();

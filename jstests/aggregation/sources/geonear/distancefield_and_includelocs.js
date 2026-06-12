@@ -142,14 +142,22 @@ const assertCloseEnough = (left, right) =>
     // Test that "distanceField" and "includeLocs" can be the same path. The result is arbitrary
     // ("includeLocs" wins).
     assertCloseEnough(
-        firstGeoNearResult({near: doc.ptForNearQuery, distanceField: "newField", includeLocs: "newField"}),
+        firstGeoNearResult({
+            near: doc.ptForNearQuery,
+            distanceField: "newField",
+            includeLocs: "newField",
+        }),
         docPlusNewFields({newField: doc.geo}),
     );
 
     // Test that "distanceField" and "includeLocs" are both preserved when their paths share a
     // prefix but do not conflict.
     assertCloseEnough(
-        firstGeoNearResult({near: doc.ptForNearQuery, distanceField: "comp.dist", includeLocs: "comp.loc"}),
+        firstGeoNearResult({
+            near: doc.ptForNearQuery,
+            distanceField: "comp.dist",
+            includeLocs: "comp.loc",
+        }),
         docPlusNewFields({comp: {dist: expectedDistance, loc: doc.geo}}),
     );
 
@@ -178,20 +186,29 @@ const assertCloseEnough = (left, right) =>
 
     // Test that "includeLocs" can overwrite an existing scalar field.
     assertCloseEnough(
-        firstGeoNearResult({near: doc.ptForNearQuery, distanceField: "d", includeLocs: "scalar"}, removeDistFieldProj),
+        firstGeoNearResult(
+            {near: doc.ptForNearQuery, distanceField: "d", includeLocs: "scalar"},
+            removeDistFieldProj,
+        ),
         docPlusNewFields({scalar: doc.geo}),
     );
 
     // Test that "includeLocs" can completely overwrite an existing array field.
     assertCloseEnough(
-        firstGeoNearResult({near: doc.ptForNearQuery, distanceField: "d", includeLocs: "arr"}, removeDistFieldProj),
+        firstGeoNearResult(
+            {near: doc.ptForNearQuery, distanceField: "d", includeLocs: "arr"},
+            removeDistFieldProj,
+        ),
         docPlusNewFields({arr: doc.geo}),
     );
 
     // TODO (SERVER-35561): When "includeLocs" shares a path prefix with an existing field, the
     // fields are overwritten, even if they could be preserved.
     assertCloseEnough(
-        firstGeoNearResult({near: doc.ptForNearQuery, distanceField: "d", includeLocs: "arr.a"}, removeDistFieldProj),
+        firstGeoNearResult(
+            {near: doc.ptForNearQuery, distanceField: "d", includeLocs: "arr.a"},
+            removeDistFieldProj,
+        ),
         docPlusNewFields({arr: {a: doc.geo}}),
     );
 });

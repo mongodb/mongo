@@ -11,18 +11,50 @@ import {
     verifyTLSConfigurationPasses,
 } from "jstests/with_mongot/search_mocked/ssl/lib/search_tls_utils.js";
 
-verifyTLSConfigurationPasses({mongotMockTLSMode: "disabled", mongodTLSMode: "disabled", searchTLSMode: "globalTLS"});
-verifyTLSConfigurationPasses({mongotMockTLSMode: "preferTLS", mongodTLSMode: "disabled", searchTLSMode: "globalTLS"});
-verifyTLSConfigurationPasses({mongotMockTLSMode: "allowTLS", mongodTLSMode: "disabled", searchTLSMode: "globalTLS"});
+verifyTLSConfigurationPasses({
+    mongotMockTLSMode: "disabled",
+    mongodTLSMode: "disabled",
+    searchTLSMode: "globalTLS",
+});
+verifyTLSConfigurationPasses({
+    mongotMockTLSMode: "preferTLS",
+    mongodTLSMode: "disabled",
+    searchTLSMode: "globalTLS",
+});
+verifyTLSConfigurationPasses({
+    mongotMockTLSMode: "allowTLS",
+    mongodTLSMode: "disabled",
+    searchTLSMode: "globalTLS",
+});
 // This fails since mongod doesn't communicate with mongotmock using TLS when it has to.
-verifyTLSConfigurationFails({mongotMockTLSMode: "requireTLS", mongodTLSMode: "disabled", searchTLSMode: "globalTLS"});
+verifyTLSConfigurationFails({
+    mongotMockTLSMode: "requireTLS",
+    mongodTLSMode: "disabled",
+    searchTLSMode: "globalTLS",
+});
 
 // Test that setting 'searchTLSMode' to 'disabled' or 'allowTLS' has the same behavior.
 for (const mode of ["disabled", "allowTLS"]) {
-    verifyTLSConfigurationPasses({mongotMockTLSMode: "disabled", mongodTLSMode: "disabled", searchTLSMode: mode});
-    verifyTLSConfigurationPasses({mongotMockTLSMode: "preferTLS", mongodTLSMode: "disabled", searchTLSMode: mode});
-    verifyTLSConfigurationPasses({mongotMockTLSMode: "allowTLS", mongodTLSMode: "disabled", searchTLSMode: mode});
-    verifyTLSConfigurationFails({mongotMockTLSMode: "requireTLS", mongodTLSMode: "disabled", searchTLSMode: mode});
+    verifyTLSConfigurationPasses({
+        mongotMockTLSMode: "disabled",
+        mongodTLSMode: "disabled",
+        searchTLSMode: mode,
+    });
+    verifyTLSConfigurationPasses({
+        mongotMockTLSMode: "preferTLS",
+        mongodTLSMode: "disabled",
+        searchTLSMode: mode,
+    });
+    verifyTLSConfigurationPasses({
+        mongotMockTLSMode: "allowTLS",
+        mongodTLSMode: "disabled",
+        searchTLSMode: mode,
+    });
+    verifyTLSConfigurationFails({
+        mongotMockTLSMode: "requireTLS",
+        mongodTLSMode: "disabled",
+        searchTLSMode: mode,
+    });
 }
 
 // Test that nonsense searchTLSMode will error.
@@ -30,7 +62,8 @@ clearRawMongoProgramOutput();
 assert.throws(() => MongoRunner.runMongod({setParameter: {searchTLSMode: "randomValue"}}));
 assert(
     rawMongoProgramOutput(".*").includes(
-        "searchTLSMode must be one of: (globalTLS|disabled|allowTLS|preferTLS|requireTLS)." + " Input was: randomValue",
+        "searchTLSMode must be one of: (globalTLS|disabled|allowTLS|preferTLS|requireTLS)." +
+            " Input was: randomValue",
     ),
 );
 
@@ -50,7 +83,10 @@ for (const mode of ["preferTLS", "requireTLS"]) {
 // sure this setting combination now works to communicate with a mongot that "requiresTLS".
 clearRawMongoProgramOutput();
 assert.throws(() =>
-    MongoRunner.runMongod({tlsCertificateKeyFile: CLIENT_CERT, setParameter: {searchTLSMode: "requireTLS"}}),
+    MongoRunner.runMongod({
+        tlsCertificateKeyFile: CLIENT_CERT,
+        setParameter: {searchTLSMode: "requireTLS"},
+    }),
 );
 assert(
     rawMongoProgramOutput(".*").includes(

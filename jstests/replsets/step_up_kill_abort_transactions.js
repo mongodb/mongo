@@ -57,9 +57,13 @@ jsTest.log("Stop secondary oplog replication before the last operation in the tr
 // The stopReplProducerOnDocument failpoint ensures that secondary stops replicating before
 // applying the last operation in the transaction. This depends on the oplog fetcher batch size
 // being 1.
-const stopReplProducerOnDocumentFailPoint = configureFailPoint(newPrimary, "stopReplProducerOnDocument", {
-    document: {"applyOps.o._id": "last in txn"},
-});
+const stopReplProducerOnDocumentFailPoint = configureFailPoint(
+    newPrimary,
+    "stopReplProducerOnDocument",
+    {
+        document: {"applyOps.o._id": "last in txn"},
+    },
+);
 
 jsTestLog("Start a transaction.");
 const session = primary.startSession({causalConsistency: false});
@@ -82,12 +86,17 @@ jsTestLog("Find the start and commit optimes on the primary.");
 let txnTableEntry = getTxnTableEntry(primaryDB);
 assert.eq(txnTableEntry.state, "committed");
 const commitOpTime = txnTableEntry.lastWriteOpTime;
-const startOpTime = primaryDB.getSiblingDB("local").oplog.rs.findOne({ts: commitOpTime.ts}).prevOpTime;
+const startOpTime = primaryDB
+    .getSiblingDB("local")
+    .oplog.rs.findOne({ts: commitOpTime.ts}).prevOpTime;
 
 jsTestLog("Wait for the new primary to block on fail point.");
 stopReplProducerOnDocumentFailPoint.wait();
 
-jsTestLog("Wait for the new primary to apply the first op of transaction at timestamp: " + tojson(startOpTime));
+jsTestLog(
+    "Wait for the new primary to apply the first op of transaction at timestamp: " +
+        tojson(startOpTime),
+);
 assert.soon(() => {
     const lastOpTime = getLastOpTime(newPrimary);
     jsTestLog("Current lastOpTime on the new primary: " + tojson(lastOpTime));

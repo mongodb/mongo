@@ -24,7 +24,9 @@ describe("Profile Abandoned Writes", function () {
     before(function () {
         // Start mongod with low threshold for abandoned writes per second.
         conn = MongoRunner.runMongod({
-            setParameter: {internalProfilingMaxAbandonedWritesPerSecondPerDb: maxAbandonedWritesPerSecond},
+            setParameter: {
+                internalProfilingMaxAbandonedWritesPerSecondPerDb: maxAbandonedWritesPerSecond,
+            },
         });
         adminDB = conn.getDB("admin");
     });
@@ -106,19 +108,31 @@ describe("Profile Abandoned Writes", function () {
 
         // Verify that dbsPastThreshold has incremented.
         const finalDbsPastThreshold = stats.dbsPastThreshold;
-        assert.eq(finalDbsPastThreshold, initialDbsPastThreshold + 1, "Expected dbsPastThreshold to increment by 1");
+        assert.eq(
+            finalDbsPastThreshold,
+            initialDbsPastThreshold + 1,
+            "Expected dbsPastThreshold to increment by 1",
+        );
 
         assertNoteDocExists(testDB);
 
         // Verify profiling level is now 0 (disabled).
         const profilingStatus = assert.commandWorked(testDB.runCommand({profile: -1}));
-        assert.eq(profilingStatus.was, 0, "Expected profiling level to be 0 after exceeding threshold");
+        assert.eq(
+            profilingStatus.was,
+            0,
+            "Expected profiling level to be 0 after exceeding threshold",
+        );
 
         // Verify profiling is now disabled - additional operations should not be profiled.
         const countBefore = testDB.system.profile.count();
         performOperations(coll, 5, "autoDisableTest-after-disable");
         const countAfter = testDB.system.profile.count();
-        assert.eq(countAfter, countBefore, "Expected no new profile entries after profiling was disabled");
+        assert.eq(
+            countAfter,
+            countBefore,
+            "Expected no new profile entries after profiling was disabled",
+        );
     });
 
     it("can be re-enabled after automatic disable", function () {
@@ -126,11 +140,19 @@ describe("Profile Abandoned Writes", function () {
         assert.commandWorked(testDB.dropDatabase());
         const coll = testDB.getCollection("testColl");
 
-        doSomeProblematicProfiling(coll, 2 * maxAbandonedWritesPerSecond, "manualReenableTest-disable");
+        doSomeProblematicProfiling(
+            coll,
+            2 * maxAbandonedWritesPerSecond,
+            "manualReenableTest-disable",
+        );
 
         // Verify profiling is disabled (level should be 0).
         let profilingStatus = testDB.runCommand({profile: -1});
-        assert.eq(profilingStatus.was, 0, "Expected profiling level to be 0 after exceeding threshold");
+        assert.eq(
+            profilingStatus.was,
+            0,
+            "Expected profiling level to be 0 after exceeding threshold",
+        );
 
         let profileDocs = testDB.system.profile.find({note: {$exists: true}}).toArray();
         assert.gt(profileDocs.length, 0, "Expected to find note about profiling being disabled");
@@ -182,7 +204,11 @@ describe("Profile Abandoned Writes", function () {
         const stats1 = getProfilerStats();
         const initialDbsPastThreshold = stats1.dbsPastThreshold;
 
-        doSomeProblematicProfiling(firstHotColl, 2 * maxAbandonedWritesPerSecond, "test3-db1-disable");
+        doSomeProblematicProfiling(
+            firstHotColl,
+            2 * maxAbandonedWritesPerSecond,
+            "test3-db1-disable",
+        );
 
         // Verify profiling level is 0 for DB1.
         let profilingStatus = firstHotDb.runCommand({profile: -1});
@@ -200,10 +226,18 @@ describe("Profile Abandoned Writes", function () {
 
         // Verify dbsPastThreshold incremented by 1 (only for DB1).
         const stats2 = getProfilerStats();
-        assert.eq(stats2.dbsPastThreshold, initialDbsPastThreshold + 1, "Expected dbsPastThreshold to increment by 1");
+        assert.eq(
+            stats2.dbsPastThreshold,
+            initialDbsPastThreshold + 1,
+            "Expected dbsPastThreshold to increment by 1",
+        );
 
         // Now disable profiling for DB2 as well.
-        doSomeProblematicProfiling(secondHotColl, 2 * maxAbandonedWritesPerSecond, "test3-db2-disable");
+        doSomeProblematicProfiling(
+            secondHotColl,
+            2 * maxAbandonedWritesPerSecond,
+            "test3-db2-disable",
+        );
 
         // Verify profiling level is 0 for DB2.
         profilingStatus = secondHotDb.runCommand({profile: -1});
@@ -243,7 +277,11 @@ describe("Profile Abandoned Writes", function () {
 
         // Verify dbsPastThreshold incremented.
         const stats2 = getProfilerStats();
-        assert.eq(stats2.dbsPastThreshold, initialDbsPastThreshold + 1, "Expected dbsPastThreshold to increment");
+        assert.eq(
+            stats2.dbsPastThreshold,
+            initialDbsPastThreshold + 1,
+            "Expected dbsPastThreshold to increment",
+        );
 
         // Re-enable profiling by setting the level back to 2.
         assert.commandWorked(testDB.setProfilingLevel(2));
@@ -270,25 +308,43 @@ describe("Profile Abandoned Writes", function () {
 
     it("validates parameters correctly", function () {
         // Test internalProfilingMaxAbandonedWritesPerSecondPerDb.
-        let result = adminDB.runCommand({setParameter: 1, internalProfilingMaxAbandonedWritesPerSecondPerDb: -1});
+        let result = adminDB.runCommand({
+            setParameter: 1,
+            internalProfilingMaxAbandonedWritesPerSecondPerDb: -1,
+        });
         assert.commandFailed(
             result,
             "Expected setting internalProfilingMaxAbandonedWritesPerSecondPerDb to -1 to fail",
         );
 
         // Test internalQueryGlobalProfilingLockDeadlineMs.
-        result = adminDB.runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: -1});
-        assert.commandFailed(result, "Expected setting internalQueryGlobalProfilingLockDeadlineMs to -1 to fail");
+        result = adminDB.runCommand({
+            setParameter: 1,
+            internalQueryGlobalProfilingLockDeadlineMs: -1,
+        });
+        assert.commandFailed(
+            result,
+            "Expected setting internalQueryGlobalProfilingLockDeadlineMs to -1 to fail",
+        );
 
         // Test valid boundary values (0 is allowed).
-        result = adminDB.runCommand({setParameter: 1, internalProfilingMaxAbandonedWritesPerSecondPerDb: 0});
+        result = adminDB.runCommand({
+            setParameter: 1,
+            internalProfilingMaxAbandonedWritesPerSecondPerDb: 0,
+        });
         assert.commandWorked(
             result,
             "Expected setting internalProfilingMaxAbandonedWritesPerSecondPerDb to 0 to succeed",
         );
 
-        result = adminDB.runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 0});
-        assert.commandWorked(result, "Expected setting internalQueryGlobalProfilingLockDeadlineMs to 0 to succeed");
+        result = adminDB.runCommand({
+            setParameter: 1,
+            internalQueryGlobalProfilingLockDeadlineMs: 0,
+        });
+        assert.commandWorked(
+            result,
+            "Expected setting internalQueryGlobalProfilingLockDeadlineMs to 0 to succeed",
+        );
 
         // Reset to reasonable values.
         assert.commandWorked(
@@ -297,7 +353,9 @@ describe("Profile Abandoned Writes", function () {
                 internalProfilingMaxAbandonedWritesPerSecondPerDb: maxAbandonedWritesPerSecond,
             }),
         );
-        assert.commandWorked(adminDB.runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1}));
+        assert.commandWorked(
+            adminDB.runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1}),
+        );
     });
 
     it("disables profiling immediately with zero tolerance threshold", function () {
@@ -310,7 +368,10 @@ describe("Profile Abandoned Writes", function () {
 
         // Set threshold to 0 (zero tolerance for abandoned writes per second).
         assert.commandWorked(
-            adminDB.runCommand({setParameter: 1, internalProfilingMaxAbandonedWritesPerSecondPerDb: 0}),
+            adminDB.runCommand({
+                setParameter: 1,
+                internalProfilingMaxAbandonedWritesPerSecondPerDb: 0,
+            }),
         );
 
         const stats1 = getProfilerStats();

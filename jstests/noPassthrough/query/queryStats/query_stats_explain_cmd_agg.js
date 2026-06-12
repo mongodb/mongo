@@ -4,7 +4,11 @@
  * @tags: [requires_fcv_72]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getLatestQueryStatsEntry, getValueAtPath, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getLatestQueryStatsEntry,
+    getValueAtPath,
+    withQueryStatsEnabled,
+} from "jstests/libs/query/query_stats_utils.js";
 
 const testColl = jsTestName();
 

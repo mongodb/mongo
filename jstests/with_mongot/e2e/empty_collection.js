@@ -12,7 +12,9 @@ createSearchIndex(coll, {name: indexName, definition: {mappings: {dynamic: true}
 
 // Delete the document (collection still exists) and check that a search query correctly returns no results.
 coll.deleteOne({_id: 1});
-let result = coll.aggregate([{$search: {index: indexName, text: {path: "a", query: "bar"}}}]).toArray();
+let result = coll
+    .aggregate([{$search: {index: indexName, text: {path: "a", query: "bar"}}}])
+    .toArray();
 assert.eq(0, result.length, result);
 
 // Drop the collection and check that a search query correctly returns no results.

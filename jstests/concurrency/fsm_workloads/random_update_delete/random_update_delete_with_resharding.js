@@ -53,7 +53,8 @@ const $baseConfig = {
                 const res = assert.commandWorked(
                     db.adminCommand({
                         setParameter: 1,
-                        reshardingMinimumOperationDurationMillis: this.originalReshardingMinimumOperationDurationMillis,
+                        reshardingMinimumOperationDurationMillis:
+                            this.originalReshardingMinimumOperationDurationMillis,
                     }),
                 );
             });

@@ -39,11 +39,15 @@ for (let i = 0; i < numdocs; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.commandWorked(db.createView("viewWithNow", coll.getName(), [{$addFields: {timeField: "$$NOW"}}]));
+assert.commandWorked(
+    db.createView("viewWithNow", coll.getName(), [{$addFields: {timeField: "$$NOW"}}]),
+);
 const viewWithNow = db["viewWithNow"];
 
 assert.commandWorked(
-    db.createView("viewWithClusterTime", coll.getName(), [{$addFields: {timeField: "$$CLUSTER_TIME"}}]),
+    db.createView("viewWithClusterTime", coll.getName(), [
+        {$addFields: {timeField: "$$CLUSTER_TIME"}},
+    ]),
 );
 const viewWithClusterTime = db["viewWithClusterTime"];
 
@@ -76,7 +80,9 @@ function baseCollectionNowFind() {
 
 function baseCollectionClusterTimeFind() {
     // The test validator examines 'timeField', so we copy clusterTimeField into timeField here.
-    const results = otherColl.find({$expr: {$lt: ["$clusterTimeField", "$$CLUSTER_TIME"]}}).toArray();
+    const results = otherColl
+        .find({$expr: {$lt: ["$clusterTimeField", "$$CLUSTER_TIME"]}})
+        .toArray();
     results.forEach((val, idx) => {
         results[idx].timeField = results[idx].clusterTimeField;
     });

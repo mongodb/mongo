@@ -5,7 +5,8 @@ export default {
     meta: {
         type: "problem",
         docs: {
-            description: "Shell files may only statically import bundled modules (src/mongo/shell/ or std:)",
+            description:
+                "Shell files may only statically import bundled modules (src/mongo/shell/ or std:)",
         },
     },
 

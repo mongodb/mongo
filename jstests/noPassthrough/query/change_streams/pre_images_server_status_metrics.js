@@ -9,7 +9,10 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 
 const kCollName = jsTestName();
 
@@ -19,7 +22,9 @@ describe("change streams pre-images metrics in serverStatus output", () => {
     const setupPreImagesCollection = (db, suffix, n) => {
         const coll = assertDropAndRecreateCollection(db, kCollName + suffix);
 
-        assert.commandWorked(db.runCommand({collMod: coll.getName(), changeStreamPreAndPostImages: {enabled: true}}));
+        assert.commandWorked(
+            db.runCommand({collMod: coll.getName(), changeStreamPreAndPostImages: {enabled: true}}),
+        );
 
         let bulk = coll.initializeOrderedBulkOp();
         for (let i = 0; i < n; ++i) {
@@ -36,7 +41,8 @@ describe("change streams pre-images metrics in serverStatus output", () => {
     };
 
     const getMarkerCreationMetrics = (conn) => {
-        return assert.commandWorked(conn.adminCommand({serverStatus: 1})).changeStreamPreImages.markerCreation;
+        return assert.commandWorked(conn.adminCommand({serverStatus: 1})).changeStreamPreImages
+            .markerCreation;
     };
 
     before(() => {

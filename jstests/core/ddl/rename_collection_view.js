@@ -41,7 +41,11 @@ jsTest.log(
     );
 
     assert.commandFailedWithCode(
-        db.adminCommand({renameCollection: srcView.getFullName(), to: dstColl.getFullName(), dropTarget: true}),
+        db.adminCommand({
+            renameCollection: srcView.getFullName(),
+            to: dstColl.getFullName(),
+            dropTarget: true,
+        }),
         ErrorCodes.CommandNotSupportedOnView,
         "rename view to existing collection should fail with CommandNotSupportedOnView even if dropTarget is true",
     );
@@ -53,7 +57,11 @@ jsTest.log(
     );
 
     assert.commandFailedWithCode(
-        db.adminCommand({renameCollection: srcView.getFullName(), to: dstView.getFullName(), dropTarget: true}),
+        db.adminCommand({
+            renameCollection: srcView.getFullName(),
+            to: dstView.getFullName(),
+            dropTarget: true,
+        }),
         ErrorCodes.CommandNotSupportedOnView,
         "rename view to existing view should fail with CommandNotSupportedOnView even if dropTarget is true",
     );
@@ -73,7 +81,11 @@ jsTest.log("Rename coll to existing view should fail with NamespaceExists");
     );
 
     assert.commandFailedWithCode(
-        db.adminCommand({renameCollection: srcColl.getFullName(), to: dstView.getFullName(), dropTarget: true}),
+        db.adminCommand({
+            renameCollection: srcColl.getFullName(),
+            to: dstView.getFullName(),
+            dropTarget: true,
+        }),
         ErrorCodes.NamespaceExists,
         "rename collection to existing view should fail with NamespaceExists even if dropTarget is true",
     );

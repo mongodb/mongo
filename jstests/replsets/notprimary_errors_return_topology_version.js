@@ -23,7 +23,11 @@ const notPrimaryErrorCodes = [
     ErrorCodes.PrimarySteppedDown,
 ];
 
-const otherErrorCodes = [ErrorCodes.InterruptedAtShutdown, ErrorCodes.ShutdownInProgress, ErrorCodes.InternalError];
+const otherErrorCodes = [
+    ErrorCodes.InterruptedAtShutdown,
+    ErrorCodes.ShutdownInProgress,
+    ErrorCodes.InternalError,
+];
 
 function runFailInCommandDispatch(errorCode, isWCError) {
     jsTestLog(
@@ -68,7 +72,9 @@ function runFailInCommandDispatch(errorCode, isWCError) {
 }
 
 function runFailInRunCommand(errorCode) {
-    jsTestLog(`Testing with errorCode: ${errorCode} with failPoint: failWithErrorCodeInRunCommand.`);
+    jsTestLog(
+        `Testing with errorCode: ${errorCode} with failPoint: failWithErrorCodeInRunCommand.`,
+    );
 
     assert.commandWorked(
         primary.adminCommand({
@@ -90,7 +96,9 @@ function runFailInRunCommand(errorCode) {
     }
     // We expect 'configureFailPoint' to succeed here since the 'failWithErrorCodeInRunCommand' fail
     // point only affects commands that support writeConcern.
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "failWithErrorCodeInRunCommand", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "failWithErrorCodeInRunCommand", mode: "off"}),
+    );
 }
 
 notPrimaryErrorCodes.forEach(function (code) {

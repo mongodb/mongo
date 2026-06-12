@@ -22,11 +22,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const collName = jsTestName();
 
 function enableQueryStatsSampling(conn) {
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1}),
+    );
 }
 
 function disableQueryStatsSampling(conn) {
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0}),
+    );
 }
 
 /**
@@ -66,7 +70,15 @@ const updateSpec = {
             },
         ],
     }),
-    expectedWrites: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
+    expectedWrites: {
+        nMatched: 8,
+        nUpserted: 0,
+        nModified: 8,
+        nDeleted: 0,
+        nInserted: 0,
+        nUpdateOps: 1,
+        nDeleteOps: 0,
+    },
     verifyShardMetrics: (metrics) => {
         assert.eq(metrics.nModified, 1);
         assert.eq(metrics.nMatched, 1);
@@ -85,7 +97,15 @@ const deleteSpec = {
         delete: collName,
         deletes: [{q: {v: 1}, limit: 0, includeQueryStatsMetricsForOpIndex: NumberInt(opIndex)}],
     }),
-    expectedWrites: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 8, nInserted: 0, nUpdateOps: 0, nDeleteOps: 1},
+    expectedWrites: {
+        nMatched: 0,
+        nUpserted: 0,
+        nModified: 0,
+        nDeleted: 8,
+        nInserted: 0,
+        nUpdateOps: 0,
+        nDeleteOps: 1,
+    },
     verifyShardMetrics: (metrics) => {
         assert.eq(metrics.nDeleted, 1);
     },
@@ -99,7 +119,10 @@ const deleteSpec = {
  */
 function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, spec) {
     if (spec.featureFlag && !FeatureFlagUtil.isEnabled(testDB, spec.featureFlag)) {
-        jsTest.log.info("Skipping runIncludeMetricsTest because this feature flag is off: ", spec.featureFlag);
+        jsTest.log.info(
+            "Skipping runIncludeMetricsTest because this feature flag is off: ",
+            spec.featureFlag,
+        );
         return;
     }
 
@@ -119,10 +142,14 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
         // TODO SERVER-128278 remove special handling for deletes on sharded clusters. On sharded
         // clusters, docsExamined may exceed 8 (the number of documents in the collection) but should never exceed double.
         const isShardedDelete = !isStandalone && spec.featureFlag !== null;
-        const docsExamined = isShardedDelete ? getQueryExecMetrics(entry.metrics).docsExamined.sum : 8;
+        const docsExamined = isShardedDelete
+            ? getQueryExecMetrics(entry.metrics).docsExamined.sum
+            : 8;
         if (isShardedDelete) {
             assert.gte(docsExamined, 8, "docsExamined should be >= 8 for sharded delete", {entry});
-            assert.lte(docsExamined, 16, "docsExamined should be <= 16 for sharded delete", {entry});
+            assert.lte(docsExamined, 16, "docsExamined should be <= 16 for sharded delete", {
+                entry,
+            });
         }
         // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will pass in the actual docsExamined value.
         assertAggregatedMetricsSingleExec(entry, {
@@ -144,8 +171,10 @@ function registerIncludeMetricsTests(getConn, getDB, isStandalone, spec) {
         before(() => enableQueryStatsSampling(getConn()));
         beforeEach(() => resetQueryStatsStore(getConn(), "1MB"));
 
-        it(`opIndex=0 is returned in response`, () => runIncludeMetricsTest(getDB(), 0, isStandalone, true, spec));
-        it(`opIndex=42 is returned in response`, () => runIncludeMetricsTest(getDB(), 42, isStandalone, true, spec));
+        it(`opIndex=0 is returned in response`, () =>
+            runIncludeMetricsTest(getDB(), 0, isStandalone, true, spec));
+        it(`opIndex=42 is returned in response`, () =>
+            runIncludeMetricsTest(getDB(), 42, isStandalone, true, spec));
     });
 
     describe(`Disable sampling (${spec.featureFlag ?? "update"})`, () => {
@@ -164,12 +193,17 @@ function registerIncludeMetricsTests(getConn, getDB, isStandalone, spec) {
  */
 function runPrimaryShardTest(fixture, testDB, opIndex, spec) {
     if (spec.featureFlag && !FeatureFlagUtil.isEnabled(testDB, spec.featureFlag)) {
-        jsTest.log.info("Skipping runPrimaryShardTest because this feature flag is disabled: ", spec.featureFlag);
+        jsTest.log.info(
+            "Skipping runPrimaryShardTest because this feature flag is disabled: ",
+            spec.featureFlag,
+        );
         return;
     }
 
     const dbName = testDB.getName();
-    const databaseVersion = assert.commandWorked(fixture.s.adminCommand({getDatabaseVersion: dbName})).dbVersion;
+    const databaseVersion = assert.commandWorked(
+        fixture.s.adminCommand({getDatabaseVersion: dbName}),
+    ).dbVersion;
     const res = fixture.getPrimaryShard(dbName).adminCommand({
         _shardsvrCoordinateMultiUpdate: `${dbName}.${collName}`,
         uuid: UUID(),
@@ -236,10 +270,14 @@ describe("Sharded", () => {
             before(() => {
                 assert.commandWorked(
                     st.s.adminCommand({
-                        setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: pauseMigrations}},
+                        setClusterParameter: {
+                            pauseMigrationsDuringMultiUpdates: {enabled: pauseMigrations},
+                        },
                     }),
                 );
-                assert.commandWorked(st.s.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+                assert.commandWorked(
+                    st.s.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}),
+                );
             });
 
             registerIncludeMetricsTests(
@@ -258,15 +296,19 @@ describe("Sharded", () => {
             describe("_shardsvrCoordinateMultiUpdate (update)", () => {
                 before(() => enableQueryStatsSampling(st.s));
 
-                it("op 0 returns metrics from primary shard", () => runPrimaryShardTest(st, testDB, 0, updateSpec));
-                it("op 42 returns metrics from primary shard", () => runPrimaryShardTest(st, testDB, 42, updateSpec));
+                it("op 0 returns metrics from primary shard", () =>
+                    runPrimaryShardTest(st, testDB, 0, updateSpec));
+                it("op 42 returns metrics from primary shard", () =>
+                    runPrimaryShardTest(st, testDB, 42, updateSpec));
             });
 
             describe("_shardsvrCoordinateMultiUpdate (delete)", () => {
                 before(() => enableQueryStatsSampling(st.s));
 
-                it("op 0 returns metrics from primary shard", () => runPrimaryShardTest(st, testDB, 0, deleteSpec));
-                it("op 42 returns metrics from primary shard", () => runPrimaryShardTest(st, testDB, 42, deleteSpec));
+                it("op 0 returns metrics from primary shard", () =>
+                    runPrimaryShardTest(st, testDB, 0, deleteSpec));
+                it("op 42 returns metrics from primary shard", () =>
+                    runPrimaryShardTest(st, testDB, 42, deleteSpec));
             });
         });
     }

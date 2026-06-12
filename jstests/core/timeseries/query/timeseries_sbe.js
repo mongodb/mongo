@@ -17,7 +17,11 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeStatus, kFeatureFlagSbeFullEnabled, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeStatus,
+    kFeatureFlagSbeFullEnabled,
+    kSbeDisabled,
+} from "jstests/libs/query/sbe_util.js";
 
 // We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true and when
 // featureFlagTimeSeriesInSbe is set.
@@ -26,14 +30,17 @@ const sbeStatus = checkSbeStatus(db);
 const sbeFullyEnabled = sbeStatus == kFeatureFlagSbeFullEnabled;
 const sbeUnpackPushdownEnabled =
     // SBE can't be disabled altogether.
-    sbeStatus != kSbeDisabled && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
+    sbeStatus != kSbeDisabled &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
 
 // const sbeUnpackPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db) &&
 //     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 // The dataset doesn't matter, as we only care about the choice of the plan to execute the query.
 assert.commandWorked(coll.insert({t: new Date(), m: 1, a: 42, b: 17}));
 
@@ -58,7 +65,8 @@ function runTest({pipeline, shouldUseSbe, aggStages}) {
             assert.neq(
                 0,
                 foundStages.length,
-                () => "Expected to find " + stage + " in classic agg plan but ran " + tojson(explain),
+                () =>
+                    "Expected to find " + stage + " in classic agg plan but ran " + tojson(explain),
             );
         }
     }
@@ -75,7 +83,10 @@ runTest({pipeline: [{$project: {a: 1, b: 1}}], shouldUseSbe: sbeFullyEnabled});
 
 // $addFields, $project lowered only in SBE full.
 runTest({
-    pipeline: [{$addFields: {computedField: {$add: ["$a", 1]}}}, {$project: {computedField: 1, b: 1}}],
+    pipeline: [
+        {$addFields: {computedField: {$add: ["$a", 1]}}},
+        {$project: {computedField: 1, b: 1}},
+    ],
     shouldUseSbe: sbeFullyEnabled,
 });
 
@@ -111,14 +122,22 @@ runTest({
 
 // $match-$group, followed by a stage like $unwind. The $unwind will remain in classic.
 runTest({
-    pipeline: [{$match: {t: {$gt: new Date()}}}, {$group: {_id: "$m", sum: {$sum: "$a"}}}, {$unwind: "$x"}],
+    pipeline: [
+        {$match: {t: {$gt: new Date()}}},
+        {$group: {_id: "$m", sum: {$sum: "$a"}}},
+        {$unwind: "$x"},
+    ],
     shouldUseSbe: sbeUnpackPushdownEnabled,
     aggStages: ["$unwind"],
 });
 
 // $match-$group, followed by a stage like $unwind. The $unwind will remain in classic.
 runTest({
-    pipeline: [{$match: {t: {$gt: new Date()}}}, {$group: {_id: "$m", sum: {$sum: "$a"}}}, {$group: {_id: "$sum"}}],
+    pipeline: [
+        {$match: {t: {$gt: new Date()}}},
+        {$group: {_id: "$m", sum: {$sum: "$a"}}},
+        {$group: {_id: "$sum"}},
+    ],
     shouldUseSbe: sbeUnpackPushdownEnabled,
     aggStages: sbeFullyEnabled ? [] : ["$group"],
 });
@@ -157,7 +176,11 @@ runTest({
 
 // A stack of $project stages is permitted only in SBE full.
 runTest({
-    pipeline: [{"$project": {"_id": 0, "m": 1}}, {"$project": {"_id": 0, "t": "$t"}}, {"$project": {"_id": 1, "t": 1}}],
+    pipeline: [
+        {"$project": {"_id": 0, "m": 1}},
+        {"$project": {"_id": 0, "t": "$t"}},
+        {"$project": {"_id": 1, "t": 1}},
+    ],
     shouldUseSbe: sbeFullyEnabled,
 });
 

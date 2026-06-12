@@ -78,7 +78,11 @@ testSingleDocument({x: {$elemMatch: {$nin: [4, 5, 6]}}}, {x: [1, 2, 3, 4, 5]}, {
 testSingleDocument({x: {$elemMatch: {$all: [1]}}}, {x: [1, 2, 3, 4, 5]}, {x: [1]});
 
 // Empty $elemMatch predicate must match first array or object.
-testSingleDocument({x: {$elemMatch: {}}}, {x: ["string", 123, [1, 2, 3], {a: 1}]}, {x: [[1, 2, 3]]});
+testSingleDocument(
+    {x: {$elemMatch: {}}},
+    {x: ["string", 123, [1, 2, 3], {a: 1}]},
+    {x: [[1, 2, 3]]},
+);
 testSingleDocument({x: {$elemMatch: {}}}, {x: ["string", 123, {a: 1}]}, {x: [{a: 1}]});
 
 // Nested $elemMatch.
@@ -239,8 +243,16 @@ testSingleDocument({x: {$elemMatch: {$gt: 2}}, d: 0}, {x: {a: 123}, d: 456}, {})
 // Test $elemMatch with empty predicate.
 testSingleDocument({x: {$elemMatch: {}}}, {x: ["string", 123, {b: 123}]}, {x: [{b: 123}]});
 testSingleDocument({x: {$elemMatch: {}}}, {x: ["string", 123, [1, 2, 3]]}, {x: [[1, 2, 3]]});
-testSingleDocument({x: {$elemMatch: {$or: [{}, {}]}}}, {x: ["string", 123, {b: 123}]}, {x: [{b: 123}]});
-testSingleDocument({x: {$elemMatch: {$or: [{}, {}]}}}, {x: ["string", 123, [1, 2, 3]]}, {x: [[1, 2, 3]]});
+testSingleDocument(
+    {x: {$elemMatch: {$or: [{}, {}]}}},
+    {x: ["string", 123, {b: 123}]},
+    {x: [{b: 123}]},
+);
+testSingleDocument(
+    {x: {$elemMatch: {$or: [{}, {}]}}},
+    {x: ["string", 123, [1, 2, 3]]},
+    {x: [[1, 2, 3]]},
+);
 
 // Test $elemMatch with no matching elements.
 testSingleDocument({x: {$elemMatch: {$lt: 0}}}, {x: [1, 2, 3]}, {});

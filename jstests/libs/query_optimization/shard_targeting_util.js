@@ -41,7 +41,10 @@ export class ShardTargetingTest {
         let stageIdx = 0;
         for (const stage of expectedStages) {
             const spec = actualStages[stageIdx];
-            assert(spec.hasOwnProperty(stage), "Expected stage " + tojson(stage) + " in explain " + tojson(explain));
+            assert(
+                spec.hasOwnProperty(stage),
+                "Expected stage " + tojson(stage) + " in explain " + tojson(explain),
+            );
             stageIdx++;
         }
     }
@@ -131,7 +134,12 @@ export class ShardTargetingTest {
                 "specificShard",
                 "Expected not to merge on a specific shard; explain " + tojson(explain),
             );
-            assert.neq(explain.mergeType, "anyShard", "Expected not to merge on any shard", explain);
+            assert.neq(
+                explain.mergeType,
+                "anyShard",
+                "Expected not to merge on any shard",
+                explain,
+            );
         }
 
         if (expectedShard) {
@@ -188,11 +196,22 @@ export class ShardTargetingTest {
     setupColl({collName, indexList, docs, collType, shardKey, chunkList, owningShard}) {
         const coll = this.db[collName];
         if (collType === "sharded") {
-            assert(shardKey && chunkList, "Must specify shard key and chunk list when setting up a sharded collection");
+            assert(
+                shardKey && chunkList,
+                "Must specify shard key and chunk list when setting up a sharded collection",
+            );
             CreateShardedCollectionUtil.shardCollectionWithChunks(coll, shardKey, chunkList);
         } else if (collType == "unsplittable") {
-            assert(owningShard, "Must specify an owning shard when setting up an unsplittable collection");
-            assert.commandWorked(this.db.runCommand({createUnsplittableCollection: collName, dataShard: owningShard}));
+            assert(
+                owningShard,
+                "Must specify an owning shard when setting up an unsplittable collection",
+            );
+            assert.commandWorked(
+                this.db.runCommand({
+                    createUnsplittableCollection: collName,
+                    dataShard: owningShard,
+                }),
+            );
         } else {
             assert(false, "Unknown collection type " + tojson(collType));
         }
@@ -218,7 +237,14 @@ export class ShardTargetingTest {
      * - 'profileFilters' is a map from shard name to objects containing arguments to create a
      * filter to query the profiler output.
      */
-    assertShardTargeting({pipeline, targetCollName, explainAssertionObj, expectedResults, comment, profileFilters}) {
+    assertShardTargeting({
+        pipeline,
+        targetCollName,
+        explainAssertionObj,
+        expectedResults,
+        comment,
+        profileFilters,
+    }) {
         const coll = this.db[targetCollName];
 
         const options = comment ? {"comment": comment} : {};

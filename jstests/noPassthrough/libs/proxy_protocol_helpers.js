@@ -20,7 +20,9 @@ export const connectAndHello = (port, isRouter) => {
 export const timeoutEmptyConnection = (ingressPort, egressPort, isRouter) => {
     // Use the connection to set a lower proxy header timeout and validate that empty connections
     // timeout.
-    const conn = new Mongo(`mongodb://127.0.0.1:${ingressPort}${isRouter ? "/?loadBalanced=true" : ""}`);
+    const conn = new Mongo(
+        `mongodb://127.0.0.1:${ingressPort}${isRouter ? "/?loadBalanced=true" : ""}`,
+    );
     const previousParameter = conn.adminCommand({getParameter: 1, proxyProtocolTimeoutSecs: 1});
     conn.adminCommand({setParameter: 1, proxyProtocolTimeoutSecs: 1});
 
@@ -28,7 +30,10 @@ export const timeoutEmptyConnection = (ingressPort, egressPort, isRouter) => {
     // out the connection that doesn't send data after 1 second, otherwise the test will hang.
     assert.eq(0, runProgram("bash", "-c", `cat </dev/tcp/127.0.0.1/${egressPort}`));
 
-    conn.adminCommand({setParameter: 1, proxyProtocolTimeoutSecs: previousParameter.proxyProtocolTimeoutSecs});
+    conn.adminCommand({
+        setParameter: 1,
+        proxyProtocolTimeoutSecs: previousParameter.proxyProtocolTimeoutSecs,
+    });
 };
 
 export const emptyMessageTest = (ingressPort, egressPort, node, isRouter) => {
@@ -160,7 +165,12 @@ export const testProxyProtocolShardedClusterWithProxyUnixSocket = (ingressPort, 
 };
 
 // Verify that the "client metadata" log (id 51800) emits the remote attribute properly.
-export const testClientMetadataLogOverUnixSocket = (ingressPort, unixSockPrefix, node, isRouter) => {
+export const testClientMetadataLogOverUnixSocket = (
+    ingressPort,
+    unixSockPrefix,
+    node,
+    isRouter,
+) => {
     const kClientMetadataLogId = 51800;
     const unixSockPath = `${unixSockPrefix}/mongodb-${node.port}.sock`;
     const proxyUnixSockPath = `${unixSockPrefix}/proxy-mongodb-${node.port}.sock`;

@@ -54,15 +54,24 @@ function assertViewCanBeCreatedButNotExecuted(primaryConnection) {
     // bindata-to-double and bindata-to-long conversions.
     db[toIntViewName].drop();
     assert.commandWorked(db.createView(toIntViewName, collectionName, toIntPipeline));
-    assert.commandFailedWithCode(db.runCommand({find: toIntViewName, filter: {}}), ErrorCodes.ConversionFailure);
+    assert.commandFailedWithCode(
+        db.runCommand({find: toIntViewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
 
     db[toLongViewName].drop();
     assert.commandWorked(db.createView(toLongViewName, collectionName, toLongPipeline));
-    assert.commandFailedWithCode(db.runCommand({find: toLongViewName, filter: {}}), ErrorCodes.ConversionFailure);
+    assert.commandFailedWithCode(
+        db.runCommand({find: toLongViewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
 
     db[toDoubleViewName].drop();
     assert.commandWorked(db.createView(toDoubleViewName, collectionName, toDoublePipeline));
-    assert.commandFailedWithCode(db.runCommand({find: toDoubleViewName, filter: {}}), ErrorCodes.ConversionFailure);
+    assert.commandFailedWithCode(
+        db.runCommand({find: toDoubleViewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
 }
 
 function assertViewCanBeCreatedAndExecuted(primaryConnection) {
@@ -85,9 +94,18 @@ function assertQueriesOnViewsFail(primaryConnection) {
     const db = getDB(primaryConnection);
 
     // Queries on views using BinData $convert numeric should fail after downgrading the FCV.
-    assert.commandFailedWithCode(db.runCommand({find: toIntViewName, filter: {}}), ErrorCodes.ConversionFailure);
-    assert.commandFailedWithCode(db.runCommand({find: toLongViewName, filter: {}}), ErrorCodes.ConversionFailure);
-    assert.commandFailedWithCode(db.runCommand({find: toDoubleViewName, filter: {}}), ErrorCodes.ConversionFailure);
+    assert.commandFailedWithCode(
+        db.runCommand({find: toIntViewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({find: toLongViewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({find: toDoubleViewName, filter: {}}),
+        ErrorCodes.ConversionFailure,
+    );
 
     // BinData to int / long / double conversion still succeeds with onError value.
     assert.commandWorked(
@@ -245,7 +263,9 @@ function assertQueriesOnViewsFail(primaryConnection) {
             pipeline: [
                 {
                     $project: {
-                        BinDataFromInt: {$convert: {input: "$asLong", to: "binData", byteOrder: "little"}},
+                        BinDataFromInt: {
+                            $convert: {input: "$asLong", to: "binData", byteOrder: "little"},
+                        },
                     },
                 },
             ],
@@ -260,7 +280,9 @@ function assertQueriesOnViewsFail(primaryConnection) {
             pipeline: [
                 {
                     $project: {
-                        BinDataFromDouble: {$convert: {input: "$asDouble", to: "binData", byteOrder: "little"}},
+                        BinDataFromDouble: {
+                            $convert: {input: "$asDouble", to: "binData", byteOrder: "little"},
+                        },
                     },
                 },
             ],

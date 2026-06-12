@@ -55,7 +55,13 @@ function runInsert(timestamp, metaValue) {
     assert.commandWorked(sDB.getCollection(unshardedColl).insert(doc));
 }
 
-function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = true, expectCollScan = false}) {
+function runQuery({
+    query,
+    expectedDocs,
+    expectedShards,
+    expectQueryRewrite = true,
+    expectCollScan = false,
+}) {
     // Restart profiler.
     for (let shardDB of [shard0DB, shard1DB]) {
         shardDB.setProfilingLevel(0);
@@ -153,7 +159,10 @@ function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = tru
     // chunk [2020-01-01, MaxKey].
     let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
     assert.commandWorked(
-        sDB.adminCommand({split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}),
+        sDB.adminCommand({
+            split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+            middle: splitPoint,
+        }),
     );
 
     // Move one of the chunks into the second shard.
@@ -480,12 +489,19 @@ function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = tru
     const shardKey = {[metaPrefix]: 1, [metaSuffix]: 1};
     const coll = sDB[collName];
     assert.commandWorked(
-        sDB.adminCommand({shardCollection: coll.getFullName(), key: shardKey, timeseries: {timeField, metaField}}),
+        sDB.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: shardKey,
+            timeseries: {timeField, metaField},
+        }),
     );
 
     let splitPoint = {"meta.prefix": 0, "meta.suffix": 0};
     assert.commandWorked(
-        sDB.adminCommand({split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}),
+        sDB.adminCommand({
+            split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+            middle: splitPoint,
+        }),
     );
 
     // Move one of the chunks into the second shard.

@@ -31,7 +31,11 @@ function testAbortIndexBuild() {
     }
 
     const exitCode = createIdx({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being terminated");
+    assert.neq(
+        0,
+        exitCode,
+        "expected shell to exit abnormally due to index build being terminated",
+    );
 
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.

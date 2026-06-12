@@ -16,7 +16,9 @@ const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB.getCollection(collName);
 
 jsTestLog("Issuing a write within accepted wtimeout bounds");
-assert.commandWorked(primaryColl.insert({a: 1}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    primaryColl.insert({a: 1}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 jsTestLog("Issuing a high wtimeout write and confirming that it gets rejected");
 

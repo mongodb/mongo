@@ -31,7 +31,10 @@ assert.soon(
                 // Depending on whether CurOp::setNS_inlock() has been called, the "ns" field
                 // may either be the full collection name or the command namespace.
                 {
-                    $or: [{ns: coll.getFullName()}, {ns: db.$cmd.getFullName(), "command.insert": coll.getName()}],
+                    $or: [
+                        {ns: coll.getFullName()},
+                        {ns: db.$cmd.getFullName(), "command.insert": coll.getName()},
+                    ],
                 },
                 {type: "op"},
             ],

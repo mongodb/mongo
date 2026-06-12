@@ -30,7 +30,9 @@ if (!FixtureHelpers.isReplSet(db)) {
 }
 
 // Test creation oplog entry
-assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 let opEntries = db.getSiblingDB("local").runCommand({
     find: "oplog.rs",
     filter: {

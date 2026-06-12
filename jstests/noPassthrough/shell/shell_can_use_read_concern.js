@@ -61,12 +61,18 @@ function runTests({withSession}) {
         if (expectedSession) {
             assert(
                 cmdObjSeen.hasOwnProperty("lsid"),
-                "Expected operation " + tojson(cmdObjSeen) + " to have a logical session id: " + func.toString(),
+                "Expected operation " +
+                    tojson(cmdObjSeen) +
+                    " to have a logical session id: " +
+                    func.toString(),
             );
         } else {
             assert(
                 !cmdObjSeen.hasOwnProperty("lsid"),
-                "Expected operation " + tojson(cmdObjSeen) + " to not have a logical session id: " + func.toString(),
+                "Expected operation " +
+                    tojson(cmdObjSeen) +
+                    " to not have a logical session id: " +
+                    func.toString(),
             );
         }
 
@@ -117,7 +123,9 @@ function runTests({withSession}) {
         );
 
         testCommandCanBeCausallyConsistent(function () {
-            assert.commandWorked(db.runCommand({find: coll.getName(), batchSize: 5, singleBatch: true}));
+            assert.commandWorked(
+                db.runCommand({find: coll.getName(), batchSize: 5, singleBatch: true}),
+            );
         });
 
         const cursor = coll.find().batchSize(2);
@@ -172,12 +180,19 @@ function runTests({withSession}) {
 
     {
         testCommandCanBeCausallyConsistent(function () {
-            assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}}));
+            assert.commandWorked(
+                db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}}),
+            );
         });
 
         testCommandCanBeCausallyConsistent(function () {
             assert.commandWorked(
-                db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}, explain: true}),
+                db.runCommand({
+                    aggregate: coll.getName(),
+                    pipeline: [],
+                    cursor: {batchSize: 5},
+                    explain: true,
+                }),
             );
         });
 

@@ -18,13 +18,18 @@ function runTest(downgradeVersion) {
 
     // Assert that a mongos using the downgraded binary version will crash when connecting to a
     // cluster running on the 'latest' binary version with the 'latest' FCV.
-    let downgradedMongos = MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: downgradeVersion});
+    let downgradedMongos = MongoRunner.runMongos({
+        configdb: st.configRS.getURL(),
+        binVersion: downgradeVersion,
+    });
 
     assert(!downgradedMongos);
 
     // Assert that a mongos using the downgraded binary version will successfully connect to a
     // cluster running on the 'latest' binary version with the downgraded FCV.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
 
     // wait until all config server nodes are downgraded
     // awaitReplication waits for all secondaries to replicate primary's latest opTime which will
@@ -32,7 +37,10 @@ function runTest(downgradeVersion) {
     // change FCV.
     st.configRS.awaitReplication();
 
-    downgradedMongos = MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: downgradeVersion});
+    downgradedMongos = MongoRunner.runMongos({
+        configdb: st.configRS.getURL(),
+        binVersion: downgradeVersion,
+    });
     assert.neq(
         null,
         downgradedMongos,
@@ -52,7 +60,9 @@ function runTest(downgradeVersion) {
 
     // Assert that the 'downgradeVersion' binary mongos will crash after the cluster is upgraded to
     // 'latestFCV'.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     let error = assert.throws(function () {
         downgradedMongos.getDB("test").foo.insert({x: 1});
     });

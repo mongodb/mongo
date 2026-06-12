@@ -16,7 +16,11 @@ assert.commandWorked(
 );
 
 // Test computing the most frequent commenters using $replaceRoot.
-let pipeline = [{$unwind: "$comments"}, {$replaceRoot: {newRoot: "$comments"}}, {$sortByCount: "$user_id"}];
+let pipeline = [
+    {$unwind: "$comments"},
+    {$replaceRoot: {newRoot: "$comments"}},
+    {$sortByCount: "$user_id"},
+];
 const expectedResults = [
     {_id: "y", count: 2},
     {_id: "x", count: 1},

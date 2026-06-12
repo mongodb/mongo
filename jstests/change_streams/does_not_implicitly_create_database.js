@@ -18,13 +18,18 @@ const collName = "test";
 
 // Start a new $changeStream on the non-existent db.
 const cst = new ChangeStreamTest(testDB);
-const changeStreamCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
+const changeStreamCursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: collName,
+});
 
 // Confirm that a $changeStream cursor has been opened on the namespace.
 assert.gt(changeStreamCursor.id, 0);
 
 // Confirm that the database has not been implicitly created.
-dbList = assert.commandWorked(db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}));
+dbList = assert.commandWorked(
+    db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}),
+);
 assert.docEq([], dbList.databases);
 
 // Confirm that a non-$changeStream aggregation on the non-existent database returns an empty
@@ -42,7 +47,9 @@ assert.commandWorked(testDB[collName].update({_id: 1}, {$set: {updated: true}}))
 assert.commandWorked(testDB[collName].remove({_id: 2}));
 
 // ... confirm that the database has been created...
-dbList = assert.commandWorked(db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}));
+dbList = assert.commandWorked(
+    db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}),
+);
 assert.docEq([{name: testDB.getName()}], dbList.databases);
 
 // ... and verify that the changes are observed by the stream.

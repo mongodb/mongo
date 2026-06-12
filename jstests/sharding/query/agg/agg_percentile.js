@@ -19,7 +19,9 @@ const collUnsharded = db[jsTestName() + "_unsharded"];
 assert.commandWorked(db.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Range-shard the test collection on _id.
 assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -30,15 +32,21 @@ assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey) chunks to shard1.
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}),
+);
 
 function runTest({testName}) {
     const p = 0.9;
     const percentileSpec = {$percentile: {p: [p], input: "$x", method: "approximate"}};
 
     const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
-    const resUnsharded = collUnsharded.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
+    const resUnsharded = collUnsharded
+        .aggregate([{$group: {_id: null, p: percentileSpec}}])
+        .toArray();
 
     // Compute the expected value of the percentile without using $percentile.
     const expected = collUnsharded
@@ -138,7 +146,9 @@ shardTargetingTest.setupColl({
 // $percentile with the approximate method should allow parallel computation on the shards,
 // therefore the $group will be pushed down. On a small dataset approximate will match discrete
 // solution.
-let pipeline = [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "approximate"}}}}];
+let pipeline = [
+    {$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "approximate"}}}},
+];
 let expectedResults = [{"_id": null, "p": [2]}];
 
 shardTargetingTest.assertShardTargeting({
@@ -172,7 +182,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
     // $percentile with the discrete method should not allow parallel computation on the shards,
     // therefore the $group cannot be pushed down. $project on the fields required by percentile can
     // be pushed down to reduce memory usage.
-    pipeline = [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "discrete"}}}}];
+    pipeline = [
+        {$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "discrete"}}}},
+    ];
     expectedResults = [{"_id": null, "p": [2]}];
 
     shardTargetingTest.assertShardTargeting({
@@ -205,7 +217,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
     // $percentile with the continuous method should not allow parallel computation on the shards,
     // therefore the $group cannot be pushed down. $project on the fields required by percentile can
     // be pushed down to reduce memory usage.
-    pipeline = [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "continuous"}}}}];
+    pipeline = [
+        {$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "continuous"}}}},
+    ];
     expectedResults = [{"_id": null, "p": [1.8]}];
 
     shardTargetingTest.assertShardTargeting({

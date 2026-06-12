@@ -22,13 +22,18 @@ const st = new ShardingTest({
 // Setup database and collection for test
 const dbName = "db";
 const db = st.getDB(dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const coll = db["test"];
 const nss = coll.getFullName();
 assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 
 function assertRangeDeletionDoc(conn, ns, orphanCount, processing) {
-    const rangeDeletionDoc = conn.getDB("config").getCollection("rangeDeletions").findOne({nss: ns});
+    const rangeDeletionDoc = conn
+        .getDB("config")
+        .getCollection("rangeDeletions")
+        .findOne({nss: ns});
     assert.neq(
         null,
         rangeDeletionDoc,
@@ -75,7 +80,12 @@ const numBatches = numDocs / rangeDeleterBatchSize;
 for (let i = 0; i < numBatches; i++) {
     // Wait for failpoint and check num orphans
     beforeDeletionFailpoint.wait();
-    assertRangeDeletionDoc(st.shard0, nss, /*orphanCount=*/ numDocs - rangeDeleterBatchSize * i, /*processing=*/ true);
+    assertRangeDeletionDoc(
+        st.shard0,
+        nss,
+        /*orphanCount=*/ numDocs - rangeDeleterBatchSize * i,
+        /*processing=*/ true,
+    );
     // Unset and reset failpoint without allowing any batches deleted in the meantime
     afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");
     beforeDeletionFailpoint.off();

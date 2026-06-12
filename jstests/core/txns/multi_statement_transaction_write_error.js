@@ -37,7 +37,10 @@ function runInTxn({cmd, msg, code, nExpected, expectedErrorIndex}) {
             throw e;
         }
     } finally {
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
     }
 }
 

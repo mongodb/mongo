@@ -22,7 +22,8 @@
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
 export const $config = (function () {
-    const runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+    const runningWithStepdowns =
+        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
     let states = {
         collMod: function (db, collName) {
@@ -53,7 +54,10 @@ export const $config = (function () {
         createIndex: function (db, collName) {
             // Create a logical {meta: 1} index. This should not be targetted by collMod.
             // This will implicitly create a regular collection if it does not exist.
-            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({meta: 1}), ErrorCodes.NamespaceExists);
+            assert.commandWorkedOrFailedWithCode(
+                db[collName].createIndex({meta: 1}),
+                ErrorCodes.NamespaceExists,
+            );
         },
 
         drop: function (db, collName) {

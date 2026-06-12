@@ -86,7 +86,11 @@ const errorTestCases = [
 errorTestCases.forEach(function (testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
-    assertErrorCode(coll, {$project: {computed: {$divide: ["$left", "$right"]}}}, testCase.errorCodes);
+    assertErrorCode(
+        coll,
+        {$project: {computed: {$divide: ["$left", "$right"]}}},
+        testCase.errorCodes,
+    );
 
     assert(coll.drop());
 });

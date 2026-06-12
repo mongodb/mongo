@@ -19,7 +19,8 @@ export const $config = (function () {
     // run with transactions and shard stepdowns, the query state function will be retried outside a
     // transaction, which fails the test. This can be avoided by not running explain with this
     // configuration.
-    const skipExplainInErrorMessage = TestData.runInsideTransaction && TestData.runningWithShardStepdowns;
+    const skipExplainInErrorMessage =
+        TestData.runInsideTransaction && TestData.runningWithShardStepdowns;
 
     let data = {
         // Number of docs to insert at the beginning.
@@ -52,7 +53,9 @@ export const $config = (function () {
                     "Verifier failed!\nQuery: " +
                         tojson(cursor._query) +
                         "\n" +
-                        (skipExplainInErrorMessage ? "" : "Query plan: " + tojson(safeExplain(cursor))) +
+                        (skipExplainInErrorMessage
+                            ? ""
+                            : "Query plan: " + tojson(safeExplain(cursor))) +
                         "\n" +
                         "Previous doc: " +
                         tojson(prevDoc) +
@@ -147,8 +150,12 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         // Lower the following parameters to force even more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}),
+            );
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}),
+            );
         });
         // Set up some data to query.
         let N = this.nDocs;
@@ -168,8 +175,12 @@ export const $config = (function () {
      */
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function resetYieldParams(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}),
+            );
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}),
+            );
         });
     }
 

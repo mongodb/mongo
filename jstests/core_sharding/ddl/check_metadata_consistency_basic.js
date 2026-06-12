@@ -44,13 +44,21 @@ function assertNoInconsistencies() {
         let db = mongos.getDB(dbName);
         let res = db.checkMetadataConsistency(checkOptions).toArray();
         res = handlePossibleInconsistencies(res);
-        assert.eq(0, res.length, "Found unexpected metadata inconsistencies at database level: " + tojson(res));
+        assert.eq(
+            0,
+            res.length,
+            "Found unexpected metadata inconsistencies at database level: " + tojson(res),
+        );
 
         db.getCollectionNames().forEach((collName) => {
             let coll = db.getCollection(collName);
             res = coll.checkMetadataConsistency(checkOptions).toArray();
             res = handlePossibleInconsistencies(res);
-            assert.eq(0, res.length, "Found unexpected metadata inconsistencies at collection level: " + tojson(res));
+            assert.eq(
+                0,
+                res.length,
+                "Found unexpected metadata inconsistencies at collection level: " + tojson(res),
+            );
         });
     });
 }

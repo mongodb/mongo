@@ -35,7 +35,10 @@ export const $config = (function () {
             } catch (e) {
                 // We expect to see errors caused by the plan executor being killed, because of the
                 // collection getting dropped on another thread.
-                const kAllowedErrorCodes = [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound];
+                const kAllowedErrorCodes = [
+                    ErrorCodes.QueryPlanKilled,
+                    ErrorCodes.NamespaceNotFound,
+                ];
                 if (!kAllowedErrorCodes.includes(e.code)) {
                     throw e;
                 }

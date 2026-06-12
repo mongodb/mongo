@@ -42,7 +42,9 @@ allDocuments.forEach(function (doc) {
 assert.commandWorked(bulk.execute());
 
 // Create views on the data.
-assert.commandWorked(viewsDB.runCommand({create: "identityView", viewOn: "coll", pipeline: [{$match: {}}]}));
+assert.commandWorked(
+    viewsDB.runCommand({create: "identityView", viewOn: "coll", pipeline: [{$match: {}}]}),
+);
 assert.commandWorked(
     viewsDB.runCommand({
         create: "noIdView",
@@ -64,9 +66,10 @@ assertFindResultEq({find: "noIdView", filter: {state: "NY"}, projection: {pop: 1
 // Sort, limit and batchSize.
 const doOrderedSort = true;
 assertFindResultEq({find: "identityView", sort: {_id: 1}}, allDocuments, doOrderedSort);
-assertFindResultEq({find: "identityView", limit: 1, batchSize: 1, sort: {_id: 1}, projection: {_id: 1}}, [
-    {_id: "New York"},
-]);
+assertFindResultEq(
+    {find: "identityView", limit: 1, batchSize: 1, sort: {_id: 1}, projection: {_id: 1}},
+    [{_id: "New York"}],
+);
 
 // $natural sort against a view is permitted, since it has the same meaning as $natural hint.
 // Likewise, $natural hint against a view is permitted.
@@ -123,10 +126,20 @@ assert.eq(res.cursor.firstBatch, [{_id: "New York", state: "NY", pop: 7}]);
 assert.eq(res.cursor.id, 0);
 // The behavior should be the same with batchSize: 1.
 res = assert.commandWorked(
-    viewsDB.runCommand({find: "identityView", filter: {}, singleBatch: true, limit: 1, batchSize: 1}),
+    viewsDB.runCommand({
+        find: "identityView",
+        filter: {},
+        singleBatch: true,
+        limit: 1,
+        batchSize: 1,
+    }),
 );
 assert.eq(res.cursor.id, 0);
-assert.eq(viewsDB.identityView.findOne({_id: "San Francisco"}), {_id: "San Francisco", state: "CA", pop: 4});
+assert.eq(viewsDB.identityView.findOne({_id: "San Francisco"}), {
+    _id: "San Francisco",
+    state: "CA",
+    pop: 4,
+});
 
 // The readOnce cursor option is not allowed on views.  But if we're in a transaction,
 // the error code saying that it's not allowed in a transaction takes precedence.

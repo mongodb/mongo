@@ -27,7 +27,9 @@ const primaryDB = primary.getDB("test");
 const primaryColl = primaryDB.getCollection("restart_node_with_bridge");
 
 function assertWriteReplicates() {
-    assert.commandWorked(primaryColl.update({_id: 0}, {$inc: {counter: 1}}, {upsert: true, writeConcern: {w: 2}}));
+    assert.commandWorked(
+        primaryColl.update({_id: 0}, {$inc: {counter: 1}}, {upsert: true, writeConcern: {w: 2}}),
+    );
 }
 
 function assertWriteFailsToReplicate() {

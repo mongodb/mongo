@@ -20,7 +20,11 @@
 
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getPlanStages, getQueryPlanners, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getQueryPlanners,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
@@ -83,7 +87,9 @@ const query = qsutils.withoutDollarDB(querySettingsQuery);
 assertExplain(query, {indexFilterSet: false, querySettings: undefined, expectedIndexScan: indexAB});
 
 // Set index filters and ensure they are used for the given 'query'.
-assert.commandWorked(db.runCommand({planCacheSetFilter: coll.getName(), query: query.filter, indexes: [indexA]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: coll.getName(), query: query.filter, indexes: [indexA]}),
+);
 assertExplain(query, {indexFilterSet: true, querySettings: undefined, expectedIndexScan: indexA});
 
 // Ensure that if query settings are set, index filters are ignored and query settings are used
@@ -92,7 +98,11 @@ const settings = {
     indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: [indexB]},
 };
 qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-    assertExplain(query, {indexFilterSet: false, querySettings: settings, expectedIndexScan: indexB});
+    assertExplain(query, {
+        indexFilterSet: false,
+        querySettings: settings,
+        expectedIndexScan: indexB,
+    });
 });
 
 // Ensure that once query settings are removed, index filters are used again .

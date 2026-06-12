@@ -14,7 +14,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -64,10 +67,16 @@ TimeseriesTest.run((insert) => {
         );
 
         // Check that the index is usable.
-        assert.gt(timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length, 0);
         assert.gt(
-            getTimeseriesCollForRawOps(timeseriescoll).find(bucketsFindQuery).rawData().hint(bucketsIndexSpec).toArray()
-                .length,
+            timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length,
+            0,
+        );
+        assert.gt(
+            getTimeseriesCollForRawOps(timeseriescoll)
+                .find(bucketsFindQuery)
+                .rawData()
+                .hint(bucketsIndexSpec)
+                .toArray().length,
             0,
         );
 
@@ -83,7 +92,11 @@ TimeseriesTest.run((insert) => {
         );
         assert.commandFailedWithCode(
             assert.throws(() =>
-                getTimeseriesCollForRawOps(timeseriescoll).find().rawData().hint(bucketsIndexSpec).toArray(),
+                getTimeseriesCollForRawOps(timeseriescoll)
+                    .find()
+                    .rawData()
+                    .hint(bucketsIndexSpec)
+                    .toArray(),
             ),
             ErrorCodes.BadValue,
         );
@@ -93,10 +106,16 @@ TimeseriesTest.run((insert) => {
 
         // Unhide the index and check that the find cmd with 'bucketsIndexSpec' works again.
         assert.commandWorked(timeseriescoll.unhideIndex(timeseriesIndexSpec));
-        assert.gt(timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length, 0);
         assert.gt(
-            getTimeseriesCollForRawOps(timeseriescoll).find(bucketsFindQuery).rawData().hint(bucketsIndexSpec).toArray()
-                .length,
+            timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length,
+            0,
+        );
+        assert.gt(
+            getTimeseriesCollForRawOps(timeseriescoll)
+                .find(bucketsFindQuery)
+                .rawData()
+                .hint(bucketsIndexSpec)
+                .toArray().length,
             0,
         );
     }
@@ -128,7 +147,11 @@ TimeseriesTest.run((insert) => {
         }
         expectedKeys.push(timeseriesIndexSpec);
 
-        assert.sameMembers(expectedKeys, keys, "Found unexpected index spec: " + tojson(timeseriesListIndexesCursor));
+        assert.sameMembers(
+            expectedKeys,
+            keys,
+            "Found unexpected index spec: " + tojson(timeseriesListIndexesCursor),
+        );
     }
 
     /**
@@ -147,8 +170,16 @@ TimeseriesTest.run((insert) => {
     );
 
     // Only 1 of these 2 documents will be returned by a sparse index on 'mm.tag2'.
-    const sparseDocIndexed = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {"tag1": "a", "tag2": "b"}};
-    const sparseDocNotIndexed = {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: {"tag1": "c"}};
+    const sparseDocIndexed = {
+        _id: 0,
+        [timeFieldName]: ISODate(),
+        [metaFieldName]: {"tag1": "a", "tag2": "b"},
+    };
+    const sparseDocNotIndexed = {
+        _id: 1,
+        [timeFieldName]: ISODate(),
+        [metaFieldName]: {"tag1": "c"},
+    };
     assert.commandWorked(
         insert(timeseriescoll, sparseDocIndexed),
         "Failed to insert sparseDocIndexed: " + tojson(sparseDocIndexed),
@@ -168,7 +199,11 @@ TimeseriesTest.run((insert) => {
     );
     assert.eq(
         1,
-        getTimeseriesCollForRawOps(timeseriescoll).find().rawData().hint(sparseBucketsIndexSpec).toArray().length,
+        getTimeseriesCollForRawOps(timeseriescoll)
+            .find()
+            .rawData()
+            .hint(sparseBucketsIndexSpec)
+            .toArray().length,
         "Failed to use index: " + tojson(sparseBucketsIndexSpec),
     );
     assert.eq(2, timeseriescoll.find().toArray().length, "Failed to see all time-series documents");
@@ -200,13 +235,24 @@ TimeseriesTest.run((insert) => {
             ],
         },
     };
-    assert.commandWorked(insert(timeseriescoll, multikeyDoc), "Failed to insert multikeyDoc: " + tojson(multikeyDoc));
+    assert.commandWorked(
+        insert(timeseriescoll, multikeyDoc),
+        "Failed to insert multikeyDoc: " + tojson(multikeyDoc),
+    );
 
     const bucketsFindExplain = assert.commandWorked(
-        getTimeseriesCollForRawOps(timeseriescoll).find().rawData().hint(multikeyBucketsIndexSpec).explain(),
+        getTimeseriesCollForRawOps(timeseriescoll)
+            .find()
+            .rawData()
+            .hint(multikeyBucketsIndexSpec)
+            .explain(),
     );
     const planStage = getPlanStage(getWinningPlanFromExplain(bucketsFindExplain), "IXSCAN");
-    assert.eq(true, planStage.isMultiKey, "Index should have been marked as multikey: " + tojson(planStage));
+    assert.eq(
+        true,
+        planStage.isMultiKey,
+        "Index should have been marked as multikey: " + tojson(planStage),
+    );
     assert.eq(
         {"meta.a": ["meta.a"]},
         planStage.multiKeyPaths,
@@ -232,7 +278,10 @@ TimeseriesTest.run((insert) => {
 
     // Insert a 2d index usable document.
     const twoDDoc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: [40, 40]};
-    assert.commandWorked(insert(timeseriescoll, twoDDoc), "Failed to insert twoDDoc: " + tojson(twoDDoc));
+    assert.commandWorked(
+        insert(timeseriescoll, twoDDoc),
+        "Failed to insert twoDDoc: " + tojson(twoDDoc),
+    );
 
     assert.eq(
         1,
@@ -247,7 +296,10 @@ TimeseriesTest.run((insert) => {
         1,
         getTimeseriesCollForRawOps(timeseriescoll)
             .aggregate(
-                [{$geoNear: {near: [40.4, -70.4], distanceField: "dist", spherical: true}}, {$limit: 1}],
+                [
+                    {$geoNear: {near: [40.4, -70.4], distanceField: "dist", spherical: true}},
+                    {$limit: 1},
+                ],
                 kRawOperationSpec,
             )
             .toArray().length,
@@ -385,7 +437,11 @@ TimeseriesTest.run((insert) => {
         .find({[metaFieldName + ".c.d"]: 1})
         .hint(wildcardTimeseriesIndexSpec)
         .toArray();
-    assert.eq(2, wildcardTimeseriesResults.length, "Query results: " + tojson(wildcardTimeseriesResults));
+    assert.eq(
+        2,
+        wildcardTimeseriesResults.length,
+        "Query results: " + tojson(wildcardTimeseriesResults),
+    );
 
     hideUnhideListIndexes(
         wildcardTimeseriesIndexSpec,
@@ -414,7 +470,10 @@ TimeseriesTest.run((insert) => {
     };
     assert.commandWorked(timeseriescoll.insert(wildcardMultikeyDoc));
 
-    assert.eq(1, timeseriescoll.find({"mm.d.zip": "01234"}).hint(wildcardTimeseriesIndexSpec).itcount());
+    assert.eq(
+        1,
+        timeseriescoll.find({"mm.d.zip": "01234"}).hint(wildcardTimeseriesIndexSpec).itcount(),
+    );
     const wildcardFindExplain = assert.commandWorked(
         getTimeseriesCollForRawOps(timeseriescoll)
             .find({"meta.d.zip": "01234"})
@@ -422,8 +481,14 @@ TimeseriesTest.run((insert) => {
             .hint(wildcardBucketsIndexSpec)
             .explain(),
     );
-    const planWildcardStage = getPlanStage(getWinningPlanFromExplain(wildcardFindExplain), "IXSCAN");
-    assert(planWildcardStage.isMultiKey, "Index should have been marked as multikey: " + tojson(planWildcardStage));
+    const planWildcardStage = getPlanStage(
+        getWinningPlanFromExplain(wildcardFindExplain),
+        "IXSCAN",
+    );
+    assert(
+        planWildcardStage.isMultiKey,
+        "Index should have been marked as multikey: " + tojson(planWildcardStage),
+    );
     assert(
         planWildcardStage.multiKeyPaths.hasOwnProperty("meta.d.zip"),
         "Index has wrong multikey paths after insert; plan: " + tojson(planWildcardStage),

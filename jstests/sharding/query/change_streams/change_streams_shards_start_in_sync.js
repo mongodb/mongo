@@ -37,16 +37,26 @@ const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the test collection on _id.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey).
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
 
 // Move the [0, MaxKey) chunk to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 1},
+        to: st.rs1.getURL(),
+    }),
+);
 
 async function checkStream() {
     const {assertChangeStreamEventEq} = await import("jstests/libs/query/change_stream_util.js");
@@ -101,9 +111,13 @@ function listIdleCursorsOnTestNs(rs, filter = {}) {
 
 // Start the $changeStream and hang shard 1 when the mongos attempts to establish a $changeStream
 // cursor on it.
-const hangCursorEstablishingOnShard1 = configureFailPoint(st.shard1, "hangAfterAcquiringCollectionCatalog", {
-    collection: mongosColl.getName(),
-});
+const hangCursorEstablishingOnShard1 = configureFailPoint(
+    st.shard1,
+    "hangAfterAcquiringCollectionCatalog",
+    {
+        collection: mongosColl.getName(),
+    },
+);
 let waitForShell = startParallelShell(checkStream, st.s1.port);
 
 // Helper function which waits for a $changeStream cursor to appear in currentOp on the given shard.

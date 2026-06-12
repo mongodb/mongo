@@ -51,7 +51,14 @@ function runTimeSeriesExtendedRangeTest(st, testCase) {
 
     jsTestLog(`Running: ${testCase.name}`);
 
-    const {createCollectionFn, docsToInsert, moveChunksFn, matchPredicate, parsedQueryPreds, expected} = testCase;
+    const {
+        createCollectionFn,
+        docsToInsert,
+        moveChunksFn,
+        matchPredicate,
+        parsedQueryPreds,
+        expected,
+    } = testCase;
 
     const db = st.getDB(dbName);
     let coll = db.getCollection(collName);
@@ -78,7 +85,9 @@ function runTimeSeriesExtendedRangeTest(st, testCase) {
 }
 
 let st = new ShardingTest({mongos: 1, shards: 3});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 let createUnshardedOnPrimary = function (db) {
     assert.commandWorked(
@@ -161,7 +170,10 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("1980-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1975-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1965-01-01")},
+            {[timeFieldName]: new Date("1975-01-01")},
+        ],
     },
     {
         name: "Unsharded on primary: does not have extended range data",
@@ -179,7 +191,10 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("1980-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1971-01-01")}, {[timeFieldName]: new Date("1975-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1971-01-01")},
+            {[timeFieldName]: new Date("1975-01-01")},
+        ],
     },
     {
         name: "Unsharded on primary: does not have extended range data, always true",
@@ -225,7 +240,10 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("1980-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1975-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1965-01-01")},
+            {[timeFieldName]: new Date("1975-01-01")},
+        ],
     },
     {
         name: "Unsharded on non-primary: does not have extended range data",
@@ -243,7 +261,10 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("1980-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1971-01-01")}, {[timeFieldName]: new Date("1975-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1971-01-01")},
+            {[timeFieldName]: new Date("1975-01-01")},
+        ],
     },
     {
         name: "Unsharded on non-primary: does not have extended range data, always true",
@@ -278,7 +299,10 @@ let testCases = [
         name: "Sharded: data on primary shard, extended range data",
         createCollectionFn: createSharded,
         moveChunksFn: moveChunks,
-        docsToInsert: [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1971-01-01")}],
+        docsToInsert: [
+            {[timeFieldName]: new Date("1965-01-01")},
+            {[timeFieldName]: new Date("1971-01-01")},
+        ],
         matchPredicate: {[timeFieldName]: {$lt: new Date("1980-01-01")}},
         parsedQueryPreds: {
             [st.shard0.shardName]: [
@@ -286,13 +310,19 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("1980-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1971-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1965-01-01")},
+            {[timeFieldName]: new Date("1971-01-01")},
+        ],
     },
     {
         name: "Sharded: data on primary shard, no extended range data",
         createCollectionFn: createSharded,
         moveChunksFn: moveChunks,
-        docsToInsert: [{[timeFieldName]: new Date("1971-01-01")}, {[timeFieldName]: new Date("1975-01-01")}],
+        docsToInsert: [
+            {[timeFieldName]: new Date("1971-01-01")},
+            {[timeFieldName]: new Date("1975-01-01")},
+        ],
         matchPredicate: {[timeFieldName]: {$lt: new Date("1980-01-01")}},
         parsedQueryPreds: {
             [st.shard0.shardName]: [
@@ -301,13 +331,19 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("1980-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1971-01-01")}, {[timeFieldName]: new Date("1975-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1971-01-01")},
+            {[timeFieldName]: new Date("1975-01-01")},
+        ],
     },
     {
         name: "Sharded: data on non-primary shard, extended range data",
         createCollectionFn: createSharded,
         moveChunksFn: moveChunks,
-        docsToInsert: [{[timeFieldName]: new Date("2030-01-01")}, {[timeFieldName]: new Date("2040-01-01")}],
+        docsToInsert: [
+            {[timeFieldName]: new Date("2030-01-01")},
+            {[timeFieldName]: new Date("2040-01-01")},
+        ],
         matchPredicate: {[timeFieldName]: {$gt: new Date("2020-01-01")}},
         parsedQueryPreds: {
             [st.shard2.shardName]: [
@@ -315,13 +351,19 @@ let testCases = [
                 {"control.min.time": {"$_internalExprGt": ISODate("2019-12-31T23:00:00Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("2030-01-01")}, {[timeFieldName]: new Date("2040-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("2030-01-01")},
+            {[timeFieldName]: new Date("2040-01-01")},
+        ],
     },
     {
         name: "Sharded: data on non-primary shard, no extended range data",
         createCollectionFn: createSharded,
         moveChunksFn: moveChunks,
-        docsToInsert: [{[timeFieldName]: new Date("2030-01-01")}, {[timeFieldName]: new Date("2035-01-01")}],
+        docsToInsert: [
+            {[timeFieldName]: new Date("2030-01-01")},
+            {[timeFieldName]: new Date("2035-01-01")},
+        ],
         matchPredicate: {[timeFieldName]: {$gt: new Date("2020-01-01")}},
         parsedQueryPreds: {
             [st.shard2.shardName]: [
@@ -330,13 +372,19 @@ let testCases = [
                 {"control.min.time": {"$_internalExprGt": ISODate("2019-12-31T23:00:00Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("2030-01-01")}, {[timeFieldName]: new Date("2035-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("2030-01-01")},
+            {[timeFieldName]: new Date("2035-01-01")},
+        ],
     },
     {
         name: "Sharded: data on two shards including primary",
         createCollectionFn: createSharded,
         moveChunksFn: moveChunks,
-        docsToInsert: [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1995-01-01")}],
+        docsToInsert: [
+            {[timeFieldName]: new Date("1965-01-01")},
+            {[timeFieldName]: new Date("1995-01-01")},
+        ],
         matchPredicate: {[timeFieldName]: {$lt: new Date("2000-01-01")}},
         parsedQueryPreds: {
             [st.shard0.shardName]: [
@@ -350,13 +398,19 @@ let testCases = [
                 {"control.min.time": {"$_internalExprLt": ISODate("2000-01-01T00:00:00.000Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1995-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("1965-01-01")},
+            {[timeFieldName]: new Date("1995-01-01")},
+        ],
     },
     {
         name: "Sharded: data on two shards including not including primary",
         createCollectionFn: createSharded,
         moveChunksFn: moveChunks,
-        docsToInsert: [{[timeFieldName]: new Date("2000-01-01")}, {[timeFieldName]: new Date("2040-01-01")}],
+        docsToInsert: [
+            {[timeFieldName]: new Date("2000-01-01")},
+            {[timeFieldName]: new Date("2040-01-01")},
+        ],
         matchPredicate: {[timeFieldName]: {$gt: new Date("1995-01-01")}},
         parsedQueryPreds: {
             [st.shard1.shardName]: [
@@ -370,7 +424,10 @@ let testCases = [
                 {"control.min.time": {"$_internalExprGt": ISODate("1994-12-31T23:00:00Z")}},
             ],
         },
-        expected: [{[timeFieldName]: new Date("2000-01-01")}, {[timeFieldName]: new Date("2040-01-01")}],
+        expected: [
+            {[timeFieldName]: new Date("2000-01-01")},
+            {[timeFieldName]: new Date("2040-01-01")},
+        ],
     },
 ];
 

@@ -92,7 +92,9 @@ function getShardedViewExceptions(comment) {
                 doc["resolvedViews"] &&
                 doc["command"]["comment"] === comment,
         )
-        .flatMap((doc) => doc["resolvedViews"].flatMap((resolvedView) => resolvedView["dependencyChain"]))
+        .flatMap((doc) =>
+            doc["resolvedViews"].flatMap((resolvedView) => resolvedView["dependencyChain"]),
+        )
         .reduce((prev, curr) => {
             const namespace = "test." + curr;
             if (prev[namespace]) {
@@ -106,7 +108,10 @@ function getShardedViewExceptions(comment) {
 
 function testGraphLookupView({collection, pipeline, expectedResults, expectedExceptions}) {
     const comment = "test " + testCount;
-    assertArrayEq({actual: collection.aggregate(pipeline, {comment}).toArray(), expected: expectedResults});
+    assertArrayEq({
+        actual: collection.aggregate(pipeline, {comment}).toArray(),
+        expected: expectedResults,
+    });
     if (expectedExceptions) {
         // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that they
         // match the number we were expecting.
@@ -199,7 +204,9 @@ testGraphLookupView({
                 connectFromField: "parent",
                 connectToField: "name",
                 as: "subjects",
-                restrictSearchWithMatch: {"name": {$nin: ["Anthropology", "Archaeology", "Humanities"]}},
+                restrictSearchWithMatch: {
+                    "name": {$nin: ["Anthropology", "Archaeology", "Humanities"]},
+                },
             },
         },
         {
@@ -221,7 +228,9 @@ testGraphLookupView({
 });
 
 // Create a view with an empty pipeline on the existing empty view on 'subjects'.
-assert.commandWorked(testDB.createView("emptyViewOnViewOnSubjects", testDB.emptyViewOnSubjects.getName(), []));
+assert.commandWorked(
+    testDB.createView("emptyViewOnViewOnSubjects", testDB.emptyViewOnSubjects.getName(), []),
+);
 checkView("emptyViewOnViewOnSubjects", subjectsDocs);
 
 // Test a $graphLookup that triggers a CommandOnShardedViewNotSupportedOnMongod exception for a view
@@ -346,7 +355,9 @@ testGraphLookupView({
 
 // Create a view with a pipeline on 'physicists' to test resolution of a view on another view.
 assert.commandWorked(
-    testDB.createView("physicist", testDB.physicists.getName(), [{$match: {"specialty": "Astrophysics"}}]),
+    testDB.createView("physicist", testDB.physicists.getName(), [
+        {$match: {"specialty": "Astrophysics"}},
+    ]),
 );
 
 // Test a $graphLookup that triggers a CommandOnShardedViewNotSupportedOnMongod exception for a view

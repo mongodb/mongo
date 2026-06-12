@@ -29,7 +29,11 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const dbName = "test";
@@ -101,7 +105,12 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangDuringCollectionClone",
+        mode: "off",
+    }),
+);
 
 // Unblock index build.
 // Let the primary finish its index build and replicate a commit to the secondary.

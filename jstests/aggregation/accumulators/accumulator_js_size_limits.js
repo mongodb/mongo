@@ -165,7 +165,11 @@ res = coll
         {$addFields: {a: {$range: [0, 250000]}}},
         {$unwind: "$a"}, // Create a number of documents to be executed by the accumulator.
         {
-            $bucket: {groupBy: "$groupBy", boundaries: [1, 2, 3], output: {count: largeAccumulator}},
+            $bucket: {
+                groupBy: "$groupBy",
+                boundaries: [1, 2, 3],
+                output: {count: largeAccumulator},
+            },
         },
     ])
     .toArray();

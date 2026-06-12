@@ -57,7 +57,9 @@ describe("fsyncLock advances durableOpTime to lastWritten", function () {
         // inserting (w:1, j:false) until durableOpTime < writtenOpTime, confirming the gap is
         // open and the flusher is parked. Without this confirmation the test would be vacuous:
         // if the flusher caught up before we took fsyncLock, there would be nothing to fix.
-        assert.commandWorked(adminDB.runCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "alwaysOn"}));
+        assert.commandWorked(
+            adminDB.runCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "alwaysOn"}),
+        );
 
         let writeOpTime;
         assert.soon(
@@ -115,6 +117,8 @@ describe("fsyncLock advances durableOpTime to lastWritten", function () {
         assert.commandWorked(findRes);
 
         assert.commandWorked(adminDB.runCommand({fsyncUnlock: 1}));
-        assert.commandWorked(adminDB.runCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "off"}));
+        assert.commandWorked(
+            adminDB.runCommand({configureFailPoint: "pauseJournalFlusherThread", mode: "off"}),
+        );
     });
 });

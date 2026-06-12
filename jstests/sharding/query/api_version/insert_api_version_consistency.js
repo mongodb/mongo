@@ -43,7 +43,9 @@ const DOC = {
 let test = function (db) {
     // We have to create a collection until _configsvrCreateDatabase is in API Version 1.
     assert.commandWorked(db.createCollection("collection"));
-    assert.commandWorked(db.runCommand({insert: "collection", documents: [DOC], apiVersion: "1", apiStrict: true}));
+    assert.commandWorked(
+        db.runCommand({insert: "collection", documents: [DOC], apiVersion: "1", apiStrict: true}),
+    );
     const val = db.collection.findOne();
 
     assert.eq(val.x01, 0.01);
@@ -53,7 +55,10 @@ let test = function (db) {
 
     assert.eq(val.x05.x00, BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
     assert.eq(val.x05.x01, BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
-    assert.eq(val.x05.x02, BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c="));
+    assert.eq(
+        val.x05.x02,
+        BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c="),
+    );
     assert.eq(val.x05.x03, BinData(3, "OEJTfmD8twzaj/LPKLIVkA=="));
     assert.eq(val.x05.x04, BinData(4, "OEJTfmD8twzaj/LPKLIVkA=="));
     assert.eq(val.x05.x05, BinData(5, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));

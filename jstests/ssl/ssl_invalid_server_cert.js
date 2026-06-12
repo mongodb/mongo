@@ -15,7 +15,11 @@ function runTest(name, config, expect) {
     assert.eq(null, mongod, "Mongod started unexpectedly");
 
     const output = rawMongoProgramOutput(".*");
-    assert.eq(true, output.includes(expect), "Server failure message did not include '" + expect + "'");
+    assert.eq(
+        true,
+        output.includes(expect),
+        "Server failure message did not include '" + expect + "'",
+    );
 }
 
 const validityMessage = "The provided SSL certificate is expired or not yet valid";

@@ -60,14 +60,20 @@ let coll = primary.getDB("test")["foo"];
 
 let origInsertTs = primary
     .getDB("test")
-    .runCommand({insert: "foo", documents: [{_id: 1}], writeConcern: {w: "majority"}})["operationTime"];
+    .runCommand({insert: "foo", documents: [{_id: 1}], writeConcern: {w: "majority"}})[
+    "operationTime"
+];
 
 // Pin with an arbitrarily small timestamp. Let the rounding tell us where the pin ended up. The
 // write to the `mdb_testing.pinned_timestamp` collection is not logged/replayed during replication
 // recovery. Repinning across startup happens before replication recovery. Do a majority write for
 // predictability of the test.
 assert.commandWorked(
-    primary.adminCommand({"pinHistoryReplicated": incTs(origInsertTs), round: true, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        "pinHistoryReplicated": incTs(origInsertTs),
+        round: true,
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let s1 = primary.startSession();
@@ -90,7 +96,8 @@ assert.commandWorked(coll.remove({_id: 4}));
 // a) if recordIdsReplicated:true, replaying the prepare oplog entry will give the previously
 // inserted document the same RID it had then - RID: 2 - as this info is present in the oplog entry.
 // b) if recordIdsReplicated:false, determine that RID 4 is not visible and insert at RID 5.
-let preparedRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].info.recordIdsReplicated
+let preparedRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].info
+    .recordIdsReplicated
     ? NumberLong(2)
     : NumberLong(5);
 replTest.restart(primary);
@@ -129,7 +136,8 @@ assert.commandWorked(s2.commitTransaction_forTesting());
 
 coll = primary.getDB("test")["foo"];
 assert.commandWorked(coll.insert({_id: 6})); // Should not re-use any RecordIds
-const newestRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].info.recordIdsReplicated
+const newestRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].info
+    .recordIdsReplicated
     ? NumberLong(5)
     : NumberLong(6);
 docs = sessionDb["foo"].find().showRecordId().toArray();

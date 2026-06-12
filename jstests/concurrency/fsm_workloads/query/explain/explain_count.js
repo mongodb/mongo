@@ -36,12 +36,20 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "COUNT_SCAN"));
             },
             explainCountNoSkipLimit: function explainCountNoSkipLimit(db, collName) {
-                let res = db[collName].explain("executionStats").find({i: this.nInserted}).skip(1).count(false);
+                let res = db[collName]
+                    .explain("executionStats")
+                    .find({i: this.nInserted})
+                    .skip(1)
+                    .count(false);
                 assert.commandWorked(res);
                 assertNCounted(1, res, db);
             },
             explainCountSkipLimit: function explainCountSkipLimit(db, collName) {
-                let res = db[collName].explain("executionStats").find({i: this.nInserted}).skip(1).count(true);
+                let res = db[collName]
+                    .explain("executionStats")
+                    .find({i: this.nInserted})
+                    .skip(1)
+                    .count(true);
                 assert.commandWorked(res);
                 assertNCounted(0, res, db);
             },

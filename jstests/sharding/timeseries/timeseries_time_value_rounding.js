@@ -73,7 +73,10 @@ function runTest() {
     // Manually split the data into two chunks.
     const splitPoint = {[`control.min.${timeField}`]: ISODate("2000-01-01T10:30")};
     assert.commandWorked(
-        mongos.adminCommand({split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}),
+        mongos.adminCommand({
+            split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+            middle: splitPoint,
+        }),
     );
 
     // Ensure that currently both chunks reside on the primary shard.

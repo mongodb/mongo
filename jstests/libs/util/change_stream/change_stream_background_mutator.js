@@ -59,7 +59,9 @@ class BackgroundMutator {
                 const {BackgroundMutator} = await import(
                     "jstests/libs/util/change_stream/change_stream_background_mutator.js"
                 );
-                const {Connector} = await import("jstests/libs/util/change_stream/change_stream_connector.js");
+                const {Connector} = await import(
+                    "jstests/libs/util/change_stream/change_stream_connector.js"
+                );
                 const conn = new Mongo(host);
                 try {
                     BackgroundMutator._execute(conn, config);
@@ -88,7 +90,10 @@ class BackgroundMutator {
         if (!BackgroundMutator._thread) {
             return;
         }
-        Connector.notifyDone(new Mongo(BackgroundMutator._host), `${BackgroundMutator._instanceName}_stop`);
+        Connector.notifyDone(
+            new Mongo(BackgroundMutator._host),
+            `${BackgroundMutator._instanceName}_stop`,
+        );
         try {
             BackgroundMutator._thread.join();
         } finally {
@@ -110,7 +115,9 @@ class BackgroundMutator {
             const opType = ops[Random.randInt(ops.length)];
             const delay = minDelayMs + Random.randInt(maxDelayMs - minDelayMs);
 
-            jsTest.log.debug(`BackgroundMutator [${config.instanceName}]: sleeping ${delay}ms before ${opType}`);
+            jsTest.log.debug(
+                `BackgroundMutator [${config.instanceName}]: sleeping ${delay}ms before ${opType}`,
+            );
             sleep(delay);
 
             if (Connector.isDone(conn, stopFlag)) {
@@ -159,9 +166,12 @@ class BackgroundMutator {
             // resetPlacementHistory requires latestFCV. If FCV is downgraded or mid-transition
             // (e.g. because _flipFCV just ran), skip this iteration; the loop will retry later.
             if (e.code === ErrorCodes.CommandNotSupported) {
-                jsTest.log.debug("BackgroundMutator: resetPlacementHistory skipped (FCV not at latest)", {
-                    errmsg: e.message,
-                });
+                jsTest.log.debug(
+                    "BackgroundMutator: resetPlacementHistory skipped (FCV not at latest)",
+                    {
+                        errmsg: e.message,
+                    },
+                );
                 return;
             }
             throw e;
@@ -179,7 +189,8 @@ class BackgroundMutator {
      * @private
      */
     static _flipFCV(conn, config) {
-        const delayMs = config.versionChangeDelayMs || BackgroundMutator.kDefaultVersionChangeDelayMs;
+        const delayMs =
+            config.versionChangeDelayMs || BackgroundMutator.kDefaultVersionChangeDelayMs;
         // Default to lastContinuousFCV: it is always exactly one step below latestFCV, so the
         // downgrade is always a valid single-step transition. Callers may pass downgradeFCV
         // explicitly if they need a specific target (e.g. lastLTSFCV), but must then ensure the
@@ -187,13 +198,17 @@ class BackgroundMutator {
         const downgradeFCV = config.downgradeFCV || lastContinuousFCV;
 
         // Downgrade to the configured FCV.
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+        );
 
         // Wait for the system to settle in the downgraded state.
         sleep(delayMs);
 
         // Upgrade back to latestFCV.
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     }
 
     /**
@@ -210,12 +225,15 @@ class BackgroundMutator {
 
         const st = config.shardingTest;
         const oldBinaryVersion = config.oldBinaryVersion;
-        const delayMs = config.versionChangeDelayMs || BackgroundMutator.kDefaultVersionChangeDelayMs;
+        const delayMs =
+            config.versionChangeDelayMs || BackgroundMutator.kDefaultVersionChangeDelayMs;
 
         // Phase 1: Downgrade FCV first (required before binary downgrade).
         // Use binVersionToFCV to get the appropriate FCV for the target binary version.
         const downgradeFCV = binVersionToFCV(oldBinaryVersion);
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+        );
 
         // Phase 2: Downgrade binary (mongos first, then shards, then config servers).
         st.downgradeCluster(oldBinaryVersion, {waitUntilStable: true});
@@ -227,7 +245,9 @@ class BackgroundMutator {
         st.upgradeCluster("latest", {waitUntilStable: true});
 
         // Phase 4: Upgrade FCV (after binary upgrade).
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     }
 }
 

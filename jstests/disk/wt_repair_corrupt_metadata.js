@@ -35,7 +35,10 @@ let runTest = function (mongodOptions) {
 
     // Force a checkpoint and make a copy of the turtle file.
     assert.commandWorked(mongod.getDB(baseName).adminCommand({fsync: 1}));
-    jsTestLog("Making copy of metadata file before creating the collection: " + turtleFileWithoutCollection);
+    jsTestLog(
+        "Making copy of metadata file before creating the collection: " +
+            turtleFileWithoutCollection,
+    );
     copyFile(turtleFile, turtleFileWithoutCollection);
 
     let testColl = mongod.getDB(baseName)[collName];

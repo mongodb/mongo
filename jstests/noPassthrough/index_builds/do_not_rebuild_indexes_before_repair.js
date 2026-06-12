@@ -35,7 +35,11 @@ let coll = testDB.getCollection(collName);
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 assert.commandWorked(
@@ -58,7 +62,9 @@ rst.startSet(undefined, true);
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
 nodes.forEach((node) =>
-    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+    ),
 );
 
 // Dropping the index would normally modify the collection metadata and drop the
@@ -77,7 +83,10 @@ rst.stopSet(undefined, true);
 
 // This should succeed in rebuilding the indexes, but only after the databases have been
 // repaired.
-assert.eq(0, runMongoProgram("mongod", "--repair", "--port", primaryPort, "--dbpath", primaryDbpath));
+assert.eq(
+    0,
+    runMongoProgram("mongod", "--repair", "--port", primaryPort, "--dbpath", primaryDbpath),
+);
 
 // Restarting the replica set would roll back the index drop. Instead we want to start a
 // standalone and verify that repair rebuilt the indexes.

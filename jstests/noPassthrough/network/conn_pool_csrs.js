@@ -63,7 +63,9 @@ const setCSPoolBounds = (min, max) => {
 const connectConfigServer = () => {
     jsTestLog("Cause Config Server connection");
     assert.commandWorked(
-        mongos.getDB("config").runCommand({find: "databases", limit: 1, "$readPreference": {mode: "primary"}}),
+        mongos
+            .getDB("config")
+            .runCommand({find: "databases", limit: 1, "$readPreference": {mode: "primary"}}),
     );
 };
 
@@ -71,7 +73,9 @@ const connectConfigServer = () => {
 const connectMongodServer = () => {
     jsTestLog("Cause Mongod Server connection");
     assert.commandWorked(
-        mongos.getDB("test").runCommand({find: "test", limit: 1, "$readPreference": {mode: "primary"}}),
+        mongos
+            .getDB("test")
+            .runCommand({find: "test", limit: 1, "$readPreference": {mode: "primary"}}),
     );
 };
 

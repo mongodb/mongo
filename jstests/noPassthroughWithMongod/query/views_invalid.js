@@ -23,7 +23,9 @@ assert.eq(
     "find on view created with direct write to views catalog should work",
 );
 assert.commandWorked(
-    invalidDB.adminCommand({applyOps: [{op: "i", ns: dbname + ".system.views", o: {_id: "invalid", pipeline: 3.0}}]}),
+    invalidDB.adminCommand({
+        applyOps: [{op: "i", ns: dbname + ".system.views", o: {_id: "invalid", pipeline: 3.0}}],
+    }),
 );
 
 // Make sure we logged an error message about the invalid view.
@@ -81,7 +83,9 @@ assert.commandWorked(
 
 // Now fix the database by removing the invalid system.views entry, and check all is OK.
 assert.commandWorked(
-    invalidDB.adminCommand({applyOps: [{op: "d", ns: dbname + ".system.views", o: {_id: "invalid"}}]}),
+    invalidDB.adminCommand({
+        applyOps: [{op: "d", ns: dbname + ".system.views", o: {_id: "invalid"}}],
+    }),
     "should be able to remove invalid view with direct write to view catalog",
 );
 
@@ -90,4 +94,8 @@ assert.commandWorked(
     "after removing invalid view from catalog, should be able to create new view",
 );
 
-assert.eq(true, invalidDB.view2.drop(), "after removing invalid view from catalog, should be able to drop any view");
+assert.eq(
+    true,
+    invalidDB.view2.drop(),
+    "after removing invalid view from catalog, should be able to drop any view",
+);

@@ -78,7 +78,9 @@ function testForReplicaSet() {
     let coll = db[collectionName];
 
     // Ensure we are in last LTS FCV (8.0).
-    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     assert.commandWorked(
         db.runCommand({
@@ -97,7 +99,9 @@ function testForReplicaSet() {
         assertExpectedCollectionIndexSpecWithNamespaceField(node, true);
     });
 
-    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Ensure changes are replicated to all nodes before asserting.
     rst.awaitReplication();
@@ -114,11 +118,15 @@ function testForShardedCluster() {
     const st = new ShardingTest({shards: 2, mongos: 1, config: 1, rs: {nodes: 2}});
 
     // Ensure we are in last LTS FCV (8.0).
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     const fullCollName = databaseName + "." + collectionName;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: databaseName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: databaseName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: fullCollName, key: {x: 1}}));
 
     jsTestLog(st.s.getDB("config").collections.find().toArray());
@@ -142,12 +150,15 @@ function testForShardedCluster() {
 
     // Verify shard1 has no collection.
     assert.eq(
-        assert.commandWorked(st.rs1.getPrimary().getDB(databaseName).runCommand({listCollections: 1})).cursor.firstBatch
-            .length,
+        assert.commandWorked(
+            st.rs1.getPrimary().getDB(databaseName).runCommand({listCollections: 1}),
+        ).cursor.firstBatch.length,
         0,
     );
 
-    assert.commandWorked(st.s.adminCommand({moveChunk: fullCollName, find: {x: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: fullCollName, find: {x: 0}, to: st.shard1.shardName}),
+    );
 
     // Ensure changes are replicated to all nodes before asserting.
     st.rs0.awaitReplication();
@@ -155,8 +166,9 @@ function testForShardedCluster() {
 
     // Verify shard1 has cloned collection.
     assert.eq(
-        assert.commandWorked(st.rs1.getPrimary().getDB(databaseName).runCommand({listCollections: 1})).cursor.firstBatch
-            .length,
+        assert.commandWorked(
+            st.rs1.getPrimary().getDB(databaseName).runCommand({listCollections: 1}),
+        ).cursor.firstBatch.length,
         1,
     );
 

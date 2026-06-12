@@ -10,10 +10,18 @@ assert.commandFailedWithCode(
         aggregate: coll.getName(),
         pipeline: [
             {
-                $_internalUnpackBucket: {exclude: [], timeField: "time", bucketMaxSpanSeconds: NumberInt(3600)},
+                $_internalUnpackBucket: {
+                    exclude: [],
+                    timeField: "time",
+                    bucketMaxSpanSeconds: NumberInt(3600),
+                },
             },
             {
-                $_internalUnpackBucket: {exclude: [], timeField: "time", bucketMaxSpanSeconds: NumberInt(3600)},
+                $_internalUnpackBucket: {
+                    exclude: [],
+                    timeField: "time",
+                    bucketMaxSpanSeconds: NumberInt(3600),
+                },
             },
         ],
         cursor: {},
@@ -28,7 +36,11 @@ assert.commandFailedWithCode(
         pipeline: [
             {$_unpackBucket: {timeField: "time"}},
             {
-                $_internalUnpackBucket: {exclude: [], timeField: "time", bucketMaxSpanSeconds: NumberInt(3600)},
+                $_internalUnpackBucket: {
+                    exclude: [],
+                    timeField: "time",
+                    bucketMaxSpanSeconds: NumberInt(3600),
+                },
             },
         ],
         cursor: {},
@@ -40,7 +52,11 @@ assert.commandFailedWithCode(
         aggregate: coll.getName(),
         pipeline: [
             {
-                $_internalUnpackBucket: {exclude: [], timeField: "time", bucketMaxSpanSeconds: NumberInt(3600)},
+                $_internalUnpackBucket: {
+                    exclude: [],
+                    timeField: "time",
+                    bucketMaxSpanSeconds: NumberInt(3600),
+                },
             },
             {$_unpackBucket: {timeField: "time"}},
         ],

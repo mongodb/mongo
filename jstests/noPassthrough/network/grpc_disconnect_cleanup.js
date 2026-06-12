@@ -18,7 +18,9 @@ function setupShardedCollection(st, dbName, collName) {
     assert.commandWorked(admin.runCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(admin.runCommand({shardCollection: fullNss, key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: fullNss, middle: {_id: 0}}));
-    assert.commandWorked(admin.runCommand({moveChunk: fullNss, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: fullNss, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     // Insert some docs on each shard
     let coll = admin.getSiblingDB(dbName).getCollection(collName);
@@ -56,7 +58,14 @@ function runCursorTest(conn) {
     const dbName = kTestName;
     const collName = kTestName;
     const comment = kTestName;
-    const cursorThread = new Thread(openCursor, conn.host, dbName, collName, comment, countdownLatch);
+    const cursorThread = new Thread(
+        openCursor,
+        conn.host,
+        dbName,
+        collName,
+        comment,
+        countdownLatch,
+    );
     cursorThread.start();
 
     // Wait until we see the cursor is idle
@@ -144,7 +153,14 @@ function runTransactionTest(conn) {
     const collName = kTestName;
     const appName = kTestName;
 
-    const transactionThread = new Thread(startTransaction, conn.host, dbName, collName, appName, countdownLatch);
+    const transactionThread = new Thread(
+        startTransaction,
+        conn.host,
+        dbName,
+        collName,
+        appName,
+        countdownLatch,
+    );
     transactionThread.start();
 
     let idleSession = {};

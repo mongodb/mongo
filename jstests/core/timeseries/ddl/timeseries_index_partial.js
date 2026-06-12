@@ -12,9 +12,17 @@
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getPlanStage, getPlanStages, getRejectedPlan, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getPlanStages,
+    getRejectedPlan,
+    getRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const coll = db[jsTestName()];
@@ -33,7 +41,9 @@ function resetCollection(collation) {
     const createTimeseriesSpec = {
         timeseries: {timeField, metaField},
     };
-    assert.commandWorked(db.createCollection(coll.getName(), addCollation(createTimeseriesSpec, collation)));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), addCollation(createTimeseriesSpec, collation)),
+    );
 
     // If the collection is sharded, expect an implicitly-created index on time. It will appear
     // differently in listIndexes depending on whether you look at the user-visible index or the
@@ -143,7 +153,9 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     // Make sure the query results match a collection-scan plan.
     function checkResults(predicate) {
         const result = coll.aggregate([{$match: predicate}], {hint: {a: 1}}).toArray();
-        const unindexed = coll.aggregate([{$_internalInhibitOptimization: {}}, {$match: predicate}]).toArray();
+        const unindexed = coll
+            .aggregate([{$_internalInhibitOptimization: {}}, {$match: predicate}])
+            .toArray();
         assert.sameMembers(result, unindexed);
     }
     function checkPlanAndResults(predicate) {
@@ -189,22 +201,30 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         const t2 = ISODate("2000-01-01T00:00:02Z");
 
         assert.commandWorked(coll.dropIndex({a: 1}));
-        assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$lt: t1}}}));
+        assert.commandWorked(
+            coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$lt: t1}}}),
+        );
         check({a: {$lt: 999}, [timeField]: {$lt: t1}});
         check({a: {$lt: 999}, [timeField]: {$lt: t0}});
 
         assert.commandWorked(coll.dropIndex({a: 1}));
-        assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$lte: t1}}}));
+        assert.commandWorked(
+            coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$lte: t1}}}),
+        );
         check({a: {$lt: 999}, [timeField]: {$lte: t1}});
         check({a: {$lt: 999}, [timeField]: {$lte: t0}});
 
         assert.commandWorked(coll.dropIndex({a: 1}));
-        assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$gt: t1}}}));
+        assert.commandWorked(
+            coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$gt: t1}}}),
+        );
         check({a: {$lt: 999}, [timeField]: {$gt: t1}});
         check({a: {$lt: 999}, [timeField]: {$gt: t2}});
 
         assert.commandWorked(coll.dropIndex({a: 1}));
-        assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$gte: t1}}}));
+        assert.commandWorked(
+            coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$gte: t1}}}),
+        );
         check({a: {$lt: 999}, [timeField]: {$gte: t1}});
         check({a: {$lt: 999}, [timeField]: {$gte: t2}});
 
@@ -238,7 +258,11 @@ assert.commandWorked(
         {a: 1},
         {
             partialFilterExpression: {
-                $and: [{time: {$gt: ISODate("2000-01-01")}}, {[metaField + ".bucket"]: {$gte: "B"}}, {b: {$gte: 0}}],
+                $and: [
+                    {time: {$gt: ISODate("2000-01-01")}},
+                    {[metaField + ".bucket"]: {$gte: "B"}},
+                    {b: {$gte: 0}},
+                ],
             },
         },
     ),
@@ -247,7 +271,10 @@ let actualBucketIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperat
 
 // Set the collation to simple if it is not present, which happens on older versions.
 // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-actualBucketIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, actualBucketIndexes);
+actualBucketIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(
+    db,
+    actualBucketIndexes,
+);
 
 assert.sameMembers(
     actualBucketIndexes,
@@ -265,9 +292,17 @@ assert.sameMembers(
                     {
                         $and: [
                             // $gt on time creates a bound on the max time.
-                            {"control.max.time": {"$_internalExprGt": ISODate("2000-01-01T00:00:00Z")}},
+                            {
+                                "control.max.time": {
+                                    "$_internalExprGt": ISODate("2000-01-01T00:00:00Z"),
+                                },
+                            },
                             // We also have a bound on the min time, derived from bucketMaxSpanSeconds.
-                            {"control.min.time": {"$_internalExprGt": ISODate("1999-12-31T23:00:00Z")}},
+                            {
+                                "control.min.time": {
+                                    "$_internalExprGt": ISODate("1999-12-31T23:00:00Z"),
+                                },
+                            },
                         ],
                     },
                     // $gt on a non-time field can only bound the control.max for that field.
@@ -308,13 +343,21 @@ assert.sameMembers(
 
     // Queries on the collection use the collection's collation by default.
     assert.docEq(
-        [{[metaField]: {x: "500"}}, {[metaField]: {x: "500"}}, {[metaField]: {x: "1000"}}, {[metaField]: {x: "1000"}}],
+        [
+            {[metaField]: {x: "500"}},
+            {[metaField]: {x: "500"}},
+            {[metaField]: {x: "1000"}},
+            {[metaField]: {x: "1000"}},
+        ],
         coll
             .find({}, {_id: 0, [metaField + ".x"]: 1})
             .sort({[metaField + ".x"]: 1})
             .toArray(),
     );
-    assert.docEq([{a: "3"}, {a: "3"}, {a: "120"}, {a: "120"}], coll.find({}, {_id: 0, a: 1}).sort({a: 1}).toArray());
+    assert.docEq(
+        [{a: "3"}, {a: "3"}, {a: "120"}, {a: "120"}],
+        coll.find({}, {_id: 0, a: 1}).sort({a: 1}).toArray(),
+    );
 
     // Specifying a collation and partialFilterExpression together fails, even if the collation
     // matches the collection's default collation.
@@ -343,11 +386,17 @@ assert.sameMembers(
     );
 
     assert.commandWorked(
-        coll.createIndex({a: 1}, {name: "a_lt_25_default", partialFilterExpression: {a: {$lt: "25"}}}),
+        coll.createIndex(
+            {a: 1},
+            {name: "a_lt_25_default", partialFilterExpression: {a: {$lt: "25"}}},
+        ),
     );
 
     // Verify that the index contains what we expect.
-    assert.docEq([{a: "3"}, {a: "3"}], coll.find({}, {_id: 0, a: 1}).hint("a_lt_25_default").toArray());
+    assert.docEq(
+        [{a: "3"}, {a: "3"}],
+        coll.find({}, {_id: 0, a: 1}).hint("a_lt_25_default").toArray(),
+    );
 
     // Verify that the index is used when possible.
     function checkPlanAndResult({predicate, collation, stageName, indexName, expectedResults}) {
@@ -443,7 +492,10 @@ assert.sameMembers(
     assert.eq(coll.getIndexes()[0].collation.locale, "en_US");
     assert.eq(coll.getIndexes()[0].collation.numericOrdering, true);
     function checkPredicateDisallowed(predicate) {
-        assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: predicate}), [5916301]);
+        assert.commandFailedWithCode(
+            coll.createIndex({a: 1}, {partialFilterExpression: predicate}),
+            [5916301],
+        );
     }
     function checkPredicateOK({input: predicate, output: expectedBucketPredicate}) {
         const name = "example_pushdown_index";
@@ -483,7 +535,10 @@ assert.sameMembers(
     checkPredicateOK({
         input: {a: 5},
         output: {
-            $and: [{"control.min.a": {$_internalExprLte: 5}}, {"control.max.a": {$_internalExprGte: 5}}],
+            $and: [
+                {"control.min.a": {$_internalExprLte: 5}},
+                {"control.max.a": {$_internalExprGte: 5}},
+            ],
         },
     });
 
@@ -499,7 +554,10 @@ assert.sameMembers(
     checkPredicateOK({
         input: {a: {$eq: /a/}},
         output: {
-            $and: [{"control.min.a": {$_internalExprLte: /a/}}, {"control.max.a": {$_internalExprGte: /a/}}],
+            $and: [
+                {"control.min.a": {$_internalExprLte: /a/}},
+                {"control.max.a": {$_internalExprGte: /a/}},
+            ],
         },
     });
 
@@ -525,7 +583,10 @@ assert.sameMembers(
     checkPredicateOK({
         input: {$or: [{"a": {$lt: 5}}, {b: {$lt: 6}}]},
         output: {
-            $or: [{"control.min.a": {$_internalExprLt: 5}}, {"control.min.b": {$_internalExprLt: 6}}],
+            $or: [
+                {"control.min.a": {$_internalExprLt: 5}},
+                {"control.min.b": {$_internalExprLt: 6}},
+            ],
         },
     });
     checkPredicateOK({
@@ -552,13 +613,22 @@ assert.sameMembers(
         output: {
             $or: [
                 {
-                    $and: [{"control.min.a": {$_internalExprLte: 1}}, {"control.max.a": {$_internalExprGte: 1}}],
+                    $and: [
+                        {"control.min.a": {$_internalExprLte: 1}},
+                        {"control.max.a": {$_internalExprGte: 1}},
+                    ],
                 },
                 {
-                    $and: [{"control.min.a": {$_internalExprLte: 2}}, {"control.max.a": {$_internalExprGte: 2}}],
+                    $and: [
+                        {"control.min.a": {$_internalExprLte: 2}},
+                        {"control.max.a": {$_internalExprGte: 2}},
+                    ],
                 },
                 {
-                    $and: [{"control.min.a": {$_internalExprLte: 5}}, {"control.max.a": {$_internalExprGte: 5}}],
+                    $and: [
+                        {"control.min.a": {$_internalExprLte: 5}},
+                        {"control.max.a": {$_internalExprGte: 5}},
+                    ],
                 },
             ],
         },

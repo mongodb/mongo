@@ -133,7 +133,10 @@ function assertCostsAlmostZero(commands, path, threshold = 0.1) {
     assert(path !== undefined);
     for (const command of commands) {
         const cost = getCost(command, path);
-        assert(cost < threshold, `Expected cost at path '${path}' to be less than ${threshold} (${cost}).`);
+        assert(
+            cost < threshold,
+            `Expected cost at path '${path}' to be less than ${threshold} (${cost}).`,
+        );
     }
 }
 
@@ -147,14 +150,28 @@ describe("Costing of individual inputs to a join", () => {
                 {
                     aggregate: "no_rows",
                     pipeline: [
-                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
                     ],
                 },
                 {
                     aggregate: "many_rows",
                     pipeline: [
-                        {"$lookup": {"from": "no_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "no_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
                     ],
                 },
@@ -174,7 +191,14 @@ describe("Costing of individual inputs to a join", () => {
                 {
                     aggregate: "many_rows",
                     pipeline: [
-                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
                         {"$match": {i_idx: -1}},
                     ],
@@ -205,14 +229,28 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -225,7 +263,14 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                     {"$match": {i_noidx: {$gt: 500}}},
                 ],
@@ -233,7 +278,14 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                     {"$match": {i_noidx: {$gt: 250}}},
                 ],
@@ -247,7 +299,14 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                     {"$match": {i_idx: {$lt: 50}}},
                 ],
@@ -255,7 +314,14 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                     {"$match": {i_idx: {$lt: 250}}},
                 ],
@@ -269,14 +335,28 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -289,7 +369,14 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                     {"$match": {"i_idx": 1}},
                 ],
@@ -297,7 +384,14 @@ describe("Costing of individual inputs to a join", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                     {"$match": {"i_noidx": 1}},
                 ],
@@ -314,14 +408,28 @@ describe("Costing entire joins", () => {
                 {
                     aggregate: "no_rows",
                     pipeline: [
-                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
                     ],
                 },
                 {
                     aggregate: "many_rows",
                     pipeline: [
-                        {"$lookup": {"from": "no_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "no_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
                     ],
                 },
@@ -340,7 +448,14 @@ describe("Costing entire joins", () => {
                 {
                     aggregate: "many_rows",
                     pipeline: [
-                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
                         {"$match": {i_idx: -1}},
                     ],
@@ -371,14 +486,28 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -389,14 +518,28 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "a",
+                            "foreignField": "a",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -409,14 +552,28 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "d_idx", "foreignField": "d_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "d_idx",
+                            "foreignField": "d_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "c_idx", "foreignField": "c_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "c_idx",
+                            "foreignField": "c_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -427,14 +584,28 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "d_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "d_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "d_idx", "foreignField": "d_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "d_idx",
+                            "foreignField": "d_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -447,14 +618,28 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
@@ -467,17 +652,38 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -488,23 +694,58 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "c"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "c",
+                        },
+                    },
                     {"$unwind": "$c"},
                 ],
             },
@@ -518,30 +759,72 @@ describe("Costing entire joins", () => {
                 {
                     aggregate: "no_rows",
                     pipeline: [
-                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "i_idx",
+                                "foreignField": "i_idx",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
 
-                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "i_idx",
+                                "foreignField": "i_idx",
+                                "as": "b",
+                            },
+                        },
                         {"$unwind": "$b"},
                     ],
                 },
                 {
                     aggregate: "many_rows",
                     pipeline: [
-                        {"$lookup": {"from": "no_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "no_rows",
+                                "localField": "i_idx",
+                                "foreignField": "i_idx",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
 
-                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "i_idx",
+                                "foreignField": "i_idx",
+                                "as": "b",
+                            },
+                        },
                         {"$unwind": "$b"},
                     ],
                 },
                 {
                     aggregate: "many_rows",
                     pipeline: [
-                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "i_idx",
+                                "foreignField": "i_idx",
+                                "as": "a",
+                            },
+                        },
                         {"$unwind": "$a"},
 
-                        {"$lookup": {"from": "no_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                        {
+                            "$lookup": {
+                                "from": "no_rows",
+                                "localField": "i_idx",
+                                "foreignField": "i_idx",
+                                "as": "b",
+                            },
+                        },
                         {"$unwind": "$b"},
                     ],
                 },
@@ -555,20 +838,48 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "one_row",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -579,20 +890,48 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "one_row",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -614,14 +953,28 @@ describe("Costing entire joins", () => {
                     },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
 
                     {
@@ -645,20 +998,48 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "d_idx", "foreignField": "d_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "d_idx",
+                            "foreignField": "d_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -669,20 +1050,48 @@ describe("Costing entire joins", () => {
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "d_idx", "foreignField": "d_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "d_idx",
+                            "foreignField": "d_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -706,7 +1115,14 @@ describe("Costing entire joins", () => {
                     },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -724,7 +1140,14 @@ describe("Costing entire joins", () => {
                     },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
@@ -746,17 +1169,38 @@ describe("Costing entire joins", () => {
                     },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },
             {
                 aggregate: "many_rows",
                 pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                        },
+                    },
                     {"$unwind": "$a"},
 
-                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "b",
+                        },
+                    },
                     {"$unwind": "$b"},
                 ],
             },

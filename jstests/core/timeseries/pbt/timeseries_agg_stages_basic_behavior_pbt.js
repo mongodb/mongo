@@ -24,7 +24,11 @@
 
 import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineArb, getSortArb, limitArb} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    getAggPipelineArb,
+    getSortArb,
+    limitArb,
+} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -127,7 +131,11 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
     testProperty(
         propFn,
         {experimentColl},
-        makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun: 20}),
+        makeWorkloadModel({
+            collModel: getCollectionModel({isTS: true}),
+            aggModel,
+            numQueriesPerRun: 20,
+        }),
         numRuns,
     );
 }

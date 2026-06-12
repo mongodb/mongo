@@ -52,7 +52,10 @@ setServerParameter(sbeIncreasedSpillingKnob, "never");
 
 // For _internalInhibitOptimization tests, prevent DSCursor from reading all the data in a single
 // batch.
-const dsCursorKnobs = ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
+const dsCursorKnobs = [
+    "internalDocumentSourceCursorInitialBatchSize",
+    "internalDocumentSourceCursorBatchSizeBytes",
+];
 const dsCursorKnobValues = [];
 for (const knob of dsCursorKnobs) {
     dsCursorKnobValues.push(getServerParameter(knob));
@@ -103,7 +106,10 @@ const tests = [];
 for (let pipeline of [lookupWithPipeline, lookupWithoutPipeline]) {
     tests.push({localColl: people, pipeline: pipeline});
     // Add {$_internalInhibitOptimization: {}} to avoid pipeline elimination.
-    tests.push({localColl: students, pipeline: pipeline.concat([{$_internalInhibitOptimization: {}}])});
+    tests.push({
+        localColl: students,
+        pipeline: pipeline.concat([{$_internalInhibitOptimization: {}}]),
+    });
 }
 
 for (let {localColl, pipeline} of tests) {
@@ -129,7 +135,10 @@ for (let {localColl, pipeline} of tests) {
         let initialSpillCount = getSpillCounter();
 
         // Retrieve the first batch without spilling.
-        const cursor = localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursor = localColl.aggregate(pipeline, {
+            "allowDiskUse": true,
+            cursor: {batchSize: 1},
+        });
         const cursorId = cursor.getId();
 
         // Assert it did not spill during the first batch.
@@ -160,7 +169,10 @@ for (let {localColl, pipeline} of tests) {
         let initialSpillCount = getSpillCounter();
 
         // Retrieve the first batch.
-        const cursor = localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursor = localColl.aggregate(pipeline, {
+            "allowDiskUse": true,
+            cursor: {batchSize: 1},
+        });
         const cursorId = cursor.getId();
 
         // Assert it spilt during the first batch.
@@ -187,7 +199,10 @@ for (let {localColl, pipeline} of tests) {
     // No disk space available for spilling.
     {
         jsTest.log(`Running releaseMemory with no disk space available`);
-        const cursor = localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursor = localColl.aggregate(pipeline, {
+            "allowDiskUse": true,
+            cursor: {batchSize: 1},
+        });
         const cursorId = cursor.getId();
 
         // Release memory (i.e., spill)

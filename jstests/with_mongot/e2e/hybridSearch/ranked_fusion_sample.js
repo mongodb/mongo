@@ -23,7 +23,11 @@ assertErrorCode(
 );
 
 // Make sure a $sample which is eligible to be optimized into a random cursor is also rejected.
-assertErrorCode(coll, [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: 4}}]}}}}], [9191100, 12108702]);
+assertErrorCode(
+    coll,
+    [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: 4}}]}}}}],
+    [9191100, 12108702],
+);
 
 // Test that it is rejected in any position.
 assertErrorCode(
@@ -65,7 +69,9 @@ assertErrorCode(
 assert.commandWorked(
     db.runCommand({
         aggregate: jsTestName(),
-        pipeline: [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: 4}}, {$sort: {i: 1}}]}}}}],
+        pipeline: [
+            {$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: 4}}, {$sort: {i: 1}}]}}}},
+        ],
         cursor: {},
     }),
 );

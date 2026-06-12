@@ -40,7 +40,10 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
     getAggPlanStage,
@@ -51,7 +54,9 @@ import {
 } from "jstests/libs/query/analyze_plan.js";
 
 if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
-    jsTest.log.info("Skipping test because we can not assume canonical timeseries buckets layout in the current suite");
+    jsTest.log.info(
+        "Skipping test because we can not assume canonical timeseries buckets layout in the current suite",
+    );
     quit();
 }
 
@@ -78,7 +83,9 @@ let lpx1 = undefined; // lastpoint value of x for m = 1
 let lpx2 = undefined; // lastpoint value of x for m = 2
 (function setupCollection() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     coll.insert({t: timestamps.t2, m: 1, x: 2}); // create bucket #3
     coll.insert({t: timestamps.t4, m: 1, x: 4}); // add to bucket #3
@@ -206,7 +213,10 @@ const casesNoLastpointOptimization = [
     ],
     [{$group: {_id: {a: "$m.a", b: "$m.b"}, acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
     [{$group: {_id: {$add: [1, "$m"]}, acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
-    [{$addFields: {mm: {$add: [1, "$m"]}}}, {$group: {_id: "$mm", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
+    [
+        {$addFields: {mm: {$add: [1, "$m"]}}},
+        {$group: {_id: "$mm", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}},
+    ],
 
     // Fields computed from 'metaField' cannot be used in the $group stage. Pushing down the
     // computed fields 'mm' would disable the last point optimization, as the optimization relies
@@ -325,28 +335,36 @@ const casesLastpointOptimization = [
         ],
     },
     {
-        pipeline: [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: 1, t: 1}, output: ["$x"]}}}}],
+        pipeline: [
+            {$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: 1, t: 1}, output: ["$x"]}}}},
+        ],
         expectedResult: [
             {_id: 1, acc: [[lpx1]]},
             {_id: 2, acc: [[lpx2]]},
         ],
     },
     {
-        pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: 1, t: -1}, output: ["$x"]}}}}],
+        pipeline: [
+            {$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: 1, t: -1}, output: ["$x"]}}}},
+        ],
         expectedResult: [
             {_id: 1, acc: [[lpx1]]},
             {_id: 2, acc: [[lpx2]]},
         ],
     },
     {
-        pipeline: [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: -1, t: 1}, output: ["$x"]}}}}],
+        pipeline: [
+            {$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: -1, t: 1}, output: ["$x"]}}}},
+        ],
         expectedResult: [
             {_id: 1, acc: [[lpx1]]},
             {_id: 2, acc: [[lpx2]]},
         ],
     },
     {
-        pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: -1, t: -1}, output: ["$x"]}}}}],
+        pipeline: [
+            {$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: -1, t: -1}, output: ["$x"]}}}},
+        ],
         expectedResult: [
             {_id: 1, acc: [[lpx1]]},
             {_id: 2, acc: [[lpx2]]},
@@ -355,14 +373,20 @@ const casesLastpointOptimization = [
 
     // Multiple $first ($last) are supported. As well as multiple outputs in top/bottom.
     {
-        pipeline: [{$sort: {t: 1}}, {$group: {_id: "$m", acc1: {$last: "$x"}, acc2: {$last: "$y"}}}],
+        pipeline: [
+            {$sort: {t: 1}},
+            {$group: {_id: "$m", acc1: {$last: "$x"}, acc2: {$last: "$y"}}},
+        ],
         expectedResult: [
             {_id: 1, acc1: lpx1, acc2: null},
             {_id: 2, acc1: lpx2, acc2: null},
         ],
     },
     {
-        pipeline: [{$sort: {t: -1}}, {$group: {_id: "$m", acc1: {$first: "$x"}, acc2: {$first: "$y"}}}],
+        pipeline: [
+            {$sort: {t: -1}},
+            {$group: {_id: "$m", acc1: {$first: "$x"}, acc2: {$first: "$y"}}},
+        ],
         expectedResult: [
             {_id: 1, acc1: lpx1, acc2: null},
             {_id: 2, acc1: lpx2, acc2: null},
@@ -376,7 +400,9 @@ const casesLastpointOptimization = [
         ],
     },
     {
-        pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {t: -1}, output: ["$x", "$y"]}}}}],
+        pipeline: [
+            {$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {t: -1}, output: ["$x", "$y"]}}}},
+        ],
         expectedResult: [
             {_id: 1, acc: [[lpx1, null]]},
             {_id: 2, acc: [[lpx2, null]]},
@@ -385,11 +411,18 @@ const casesLastpointOptimization = [
 
     // A filter on 'metaField' should not prevent this optimization.
     {
-        pipeline: [{$match: {m: 1}}, {$sort: {m: -1, t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
+        pipeline: [
+            {$match: {m: 1}},
+            {$sort: {m: -1, t: 1}},
+            {$group: {_id: "$m", acc: {$last: "$x"}}},
+        ],
         expectedResult: [{_id: 1, acc: lpx1}],
     },
     {
-        pipeline: [{$match: {m: {$lte: 1}}}, {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
+        pipeline: [
+            {$match: {m: {$lte: 1}}},
+            {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}},
+        ],
         expectedResult: [{_id: 1, acc: [lpx1]}],
     },
     {

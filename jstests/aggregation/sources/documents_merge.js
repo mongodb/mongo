@@ -6,7 +6,10 @@
  * @tags: [ requires_fcv_80 ]
  */
 
-import {dropWithoutImplicitRecreate, withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {
+    dropWithoutImplicitRecreate,
+    withEachMergeMode,
+} from "jstests/aggregation/extras/merge_helpers.js";
 
 const outColl = db[`${jsTest.name()}_out`];
 const outCollName = outColl.getName();
@@ -59,7 +62,10 @@ function testFn(pipeline, assertFn) {
 
 {
     // Tests $merge with non-empty pipeline in whenMatched spec.
-    const pipeline = [documentsStage, {$merge: {into: outCollName, whenMatched: [{$set: {new: true}}], on: "x"}}];
+    const pipeline = [
+        documentsStage,
+        {$merge: {into: outCollName, whenMatched: [{$set: {new: true}}], on: "x"}},
+    ];
 
     testFn(pipeline, (res) => {
         assert.eq(res.filter((elem) => elem.new === true).length, 1);

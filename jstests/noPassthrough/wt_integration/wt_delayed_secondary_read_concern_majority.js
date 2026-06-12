@@ -53,14 +53,23 @@ if (storageEngine !== "wiredTiger") {
     // reconfig.
     assert.soonNoExcept(function () {
         assert.commandWorked(
-            primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: 1}}),
+            primary.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: 1},
+            }),
         );
         return true;
     });
 
     // Reconfigure primary with a small cache size so less data needs to be
     // inserted to make the cache full while trying to trigger a stall.
-    assert.commandWorked(primary.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=100MB"}));
+    assert.commandWorked(
+        primary.adminCommand({
+            setParameter: 1,
+            "wiredTigerEngineRuntimeConfig": "cache_size=100MB",
+        }),
+    );
 
     let coll = primary.getCollection("test.coll");
     let bigstr = "a".repeat(4000);

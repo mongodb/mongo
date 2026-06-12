@@ -47,7 +47,9 @@ const st = new ShardingTest({
 let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
 
 // Create a shard collection with documents having both a key field and a non-key field.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {_id: 1}}));
 const mongosColl = st.s.getCollection(collNS);
 assert.commandWorked(mongosColl.insert({_id: -2, name: "emma", age: 20})); // Test case 4
@@ -62,7 +64,9 @@ assert.commandWorked(mongosColl.insert({_id: 6, name: "liam", age: 60})); // Tes
 
 // Move the chunk to the second shard leaving orphaned documents on the first shard.
 assert.commandWorked(st.s.adminCommand({split: collNS, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 // Setup a change stream on the collection to receive real-time events on any data changes.
 const changeStream = mongosColl.watch([]);
@@ -110,7 +114,9 @@ jsTest.log("A direct delete to a shard of an orphaned document does generate an 
 jsTest.log("A direct update to a shard of multi-documents does not generate update events");
 {
     // Send a direct update to first shard on two orphaned documents.
-    assert.commandWorked(st.shard0.getCollection(collNS).update({name: "matt"}, {$set: {age: 31}}, {multi: true}));
+    assert.commandWorked(
+        st.shard0.getCollection(collNS).update({name: "matt"}, {$set: {age: 31}}, {multi: true}),
+    );
 
     // No change stream event is generated.
     assertNoChanges(changeStream);
@@ -227,7 +233,9 @@ jsTest.log(
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
     withTxnAndAutoRetryOnMongos(session, () => {
-        assert.commandWorked(sessionColl.update({name: "olivia"}, {$set: {age: 26}}, {multi: true}));
+        assert.commandWorked(
+            sessionColl.update({name: "olivia"}, {$set: {age: 26}}, {multi: true}),
+        );
         assert.commandWorked(sessionColl.update({name: "james"}, {$set: {age: 56}}, {multi: true}));
     });
     session.endSession();

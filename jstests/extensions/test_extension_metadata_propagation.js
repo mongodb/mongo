@@ -76,7 +76,10 @@ describe("extension stage metadata propagation", function () {
 
         // Verify that score metadata was accessible (should not throw error)
         result.forEach((doc) => {
-            assert(doc.hasOwnProperty("scoreValue"), "Document should have scoreValue from textScore metadata");
+            assert(
+                doc.hasOwnProperty("scoreValue"),
+                "Document should have scoreValue from textScore metadata",
+            );
             assert.gte(doc.scoreValue, 0, "Score should be non-negative");
         });
 

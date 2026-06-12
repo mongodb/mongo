@@ -62,7 +62,9 @@ print("k = " + tojson(k));
 assert.eq({sub: {$id: [{x: 2, y: 2}]}}, k);
 
 // Check that DBRef fields can be excluded
-assert.commandWorked(t.insert({_id: 0, shouldExclude: 1, sub: {$ref: "foo", $id: 10, $db: "someDb"}}));
+assert.commandWorked(
+    t.insert({_id: 0, shouldExclude: 1, sub: {$ref: "foo", $id: 10, $db: "someDb"}}),
+);
 assert.eq(t.find({shouldExclude: 1}, {"sub.$ref": 0}).toArray(), [
     {_id: 0, shouldExclude: 1, sub: {$id: 10, $db: "someDb"}},
 ]);

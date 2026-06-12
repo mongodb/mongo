@@ -99,7 +99,11 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assert(!db.auth("spencer", "pwd"));
         assert(db.auth("spencer", "password"));
 
-        testUserAdmin.updateUser("spencer", {customData: {zipCode: 10036}, roles: ["read", "testRole"]}, writeConcern);
+        testUserAdmin.updateUser(
+            "spencer",
+            {customData: {zipCode: 10036}, roles: ["read", "testRole"]},
+            writeConcern,
+        );
         const user = testUserAdmin.getUser("spencer");
         assert.eq(10036, user.customData.zipCode);
         hasAuthzError(db.foo.insert({a: 1}));
@@ -110,7 +114,11 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         });
         assert.commandFailedWithCode(db.adminCommand("connPoolSync"), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser("spencer", {roles: ["readWrite", {role: "adminRole", db: "admin"}]}, writeConcern);
+        testUserAdmin.updateUser(
+            "spencer",
+            {roles: ["readWrite", {role: "adminRole", db: "admin"}]},
+            writeConcern,
+        );
         assert.commandWorked(db.foo.update({}, {$inc: {a: 1}}));
         assert.eq(2, db.foo.findOne().a);
         assert.eq(1, db.foo.count());
@@ -127,7 +135,13 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
 
         testUserAdmin.grantRolesToUser(
             "spencer",
-            ["readWrite", "dbAdmin", {role: "readWrite", db: "test"}, {role: "testRole", db: "test"}, "readWrite"],
+            [
+                "readWrite",
+                "dbAdmin",
+                {role: "readWrite", db: "test"},
+                {role: "testRole", db: "test"},
+                "readWrite",
+            ],
             writeConcern,
         );
 
@@ -164,7 +178,11 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         });
         assert.commandWorked(db.adminCommand("connPoolSync"));
 
-        testUserAdmin.revokeRolesFromUser("spencer", [{role: "adminRole", db: "admin"}], writeConcern);
+        testUserAdmin.revokeRolesFromUser(
+            "spencer",
+            [{role: "adminRole", db: "admin"}],
+            writeConcern,
+        );
 
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}));
         assert.throws(function () {
@@ -222,14 +240,20 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
                 expectedInheritedPrivilegesLength,
                 expectedInheritedAuthenticationRestrictionsLength,
             );
-            assert.eq(expectedAuthenticationRestrictionsLength, user.authenticationRestrictions.length);
+            assert.eq(
+                expectedAuthenticationRestrictionsLength,
+                user.authenticationRestrictions.length,
+            );
         }
 
         jsTestLog("Testing usersInfo");
 
         jsTestLog("Running without viewUsers privilege can only view authenticated user's info");
         assert.commandWorked(db.runCommand({usersInfo: {user: "spencer", db: "test"}}));
-        assert.commandFailedWithCode(db.runCommand({usersInfo: {user: "andy", db: "test"}}), ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(
+            db.runCommand({usersInfo: {user: "andy", db: "test"}}),
+            ErrorCodes.Unauthorized,
+        );
 
         jsTestLog("Running exact usersInfo with default options on username only");
         let res = testUserAdmin.runCommand({usersInfo: "spencer"});
@@ -246,7 +270,10 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assertNoExtraInfo(res.users[0]);
 
         jsTestLog("Running exact usersInfo on single user with showCredentials set to true");
-        res = testUserAdmin.runCommand({usersInfo: {user: "spencer", db: "test"}, showCredentials: true});
+        res = testUserAdmin.runCommand({
+            usersInfo: {user: "spencer", db: "test"},
+            showCredentials: true,
+        });
         printjson(res);
         assert.eq(1, res.users.length);
         assert.eq(10036, res.users[0].customData.zipCode);
@@ -254,7 +281,10 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assertNoPrivilegesOrAuthRestrictions(res.users[0]);
 
         jsTestLog("Running exact usersInfo on single user with showPrivileges set to true");
-        res = testUserAdmin.runCommand({usersInfo: {user: "spencer", db: "test"}, showPrivileges: true});
+        res = testUserAdmin.runCommand({
+            usersInfo: {user: "spencer", db: "test"},
+            showPrivileges: true,
+        });
         printjson(res);
         assert.eq(1, res.users.length);
         assert.eq(10036, res.users[0].customData.zipCode);
@@ -262,7 +292,9 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assertShowPrivileges(res.users[0], 1, 2, 0);
         assert(!res.users[0].authenticationRestrictions);
 
-        jsTestLog("Running exact usersInfo on single user with showAuthenticationRestrictions set to true");
+        jsTestLog(
+            "Running exact usersInfo on single user with showAuthenticationRestrictions set to true",
+        );
         res = testUserAdmin.runCommand({
             usersInfo: {user: "spencer", db: "test"},
             showAuthenticationRestrictions: true,
@@ -274,7 +306,10 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assertShowAuthenticationRestrictions(res.users[0], 1, 2, 0, 0);
 
         jsTestLog("Running exact usersInfo on single user with showCustomData set to false");
-        res = testUserAdmin.runCommand({usersInfo: {user: "spencer", db: "test"}, showCustomData: false});
+        res = testUserAdmin.runCommand({
+            usersInfo: {user: "spencer", db: "test"},
+            showCustomData: false,
+        });
         printjson(res);
         assert.eq(1, res.users.length);
         assert(!res.users[0].customData);
@@ -343,7 +378,9 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assertShowPrivileges(res.users[1], 1, 9, 0);
         assert(!res.users[1].authenticationRestrictions);
 
-        jsTestLog("Running exact usersInfo on multiple users with showAuthenticationRestrictions set to true");
+        jsTestLog(
+            "Running exact usersInfo on multiple users with showAuthenticationRestrictions set to true",
+        );
         res = testUserAdmin.runCommand({
             usersInfo: ["spencer", {user: "userAdmin", db: "admin"}],
             showAuthenticationRestrictions: true,
@@ -390,13 +427,19 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         // showPrivileges and showAuthenticationRestrictions should not be allowed on non-exact
         // usersInfo queries.
         assert.commandFailed(testUserAdmin.runCommand({usersInfo: 1, showPrivileges: true}));
-        assert.commandFailed(testUserAdmin.runCommand({usersInfo: 1, showAuthenticationRestrictions: true}));
+        assert.commandFailed(
+            testUserAdmin.runCommand({usersInfo: 1, showAuthenticationRestrictions: true}),
+        );
 
         // showCredentials and showCustomData should be allowed on non-exact usersInfo queries.
         jsTestLog(
             "Running non-exact usersInfo on current db with showCredentials and showCustomData set to non-defaults",
         );
-        res = testUserAdmin.runCommand({usersInfo: 1, showCredentials: true, showCustomData: false});
+        res = testUserAdmin.runCommand({
+            usersInfo: 1,
+            showCredentials: true,
+            showCustomData: false,
+        });
         printjson(res);
         assert.eq(2, res.users.length);
         assert.eq("andy", res.users[0].user);
@@ -415,13 +458,22 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
         assert.eq("userAdmin", res.users[3].user);
         // showPrivileges and showAuthenticationRestrictions should not be allowed on non-exact
         // usersInfo queries.
-        assert.commandFailed(testUserAdmin.runCommand({usersInfo: {forAllDBs: true}, showPrivileges: true}));
         assert.commandFailed(
-            testUserAdmin.runCommand({usersInfo: {forAllDBs: true}, showAuthenticationRestrictions: true}),
+            testUserAdmin.runCommand({usersInfo: {forAllDBs: true}, showPrivileges: true}),
+        );
+        assert.commandFailed(
+            testUserAdmin.runCommand({
+                usersInfo: {forAllDBs: true},
+                showAuthenticationRestrictions: true,
+            }),
         );
 
         // showCredentials and showCustomData should be allowed on non-exact usersInfo queries.
-        res = testUserAdmin.runCommand({usersInfo: {forAllDBs: true}, showCredentials: true, showCustomData: false});
+        res = testUserAdmin.runCommand({
+            usersInfo: {forAllDBs: true},
+            showCredentials: true,
+            showCustomData: false,
+        });
         printjson(res);
         assert.eq(4, res.users.length);
         assert.eq("admin", res.users[0].user);

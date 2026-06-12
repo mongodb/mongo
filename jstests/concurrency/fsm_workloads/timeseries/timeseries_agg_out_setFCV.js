@@ -68,10 +68,18 @@ export const $config = (function () {
                     .find({}, {value: 1, [metaFieldName]: 1, _id: 0})
                     .sort({value: 1})
                     .toArray();
-                assert.eq(docs.length, numDocs, `Expected ${numDocs} documents in ${outName}, got ${docs.length}`);
+                assert.eq(
+                    docs.length,
+                    numDocs,
+                    `Expected ${numDocs} documents in ${outName}, got ${docs.length}`,
+                );
                 for (let i = 0; i < numDocs; i++) {
                     assert.eq(docs[i].value, i, `Unexpected value at index ${i} in ${outName}`);
-                    assert.eq(docs[i][metaFieldName], i, `Unexpected tag at index ${i} in ${outName}`);
+                    assert.eq(
+                        docs[i][metaFieldName],
+                        i,
+                        `Unexpected tag at index ${i} in ${outName}`,
+                    );
                 }
                 return true;
             } catch (e) {
@@ -105,7 +113,11 @@ export const $config = (function () {
         assert.soon(() => {
             try {
                 const infos = db.getCollectionInfos({name: outName});
-                assert.eq(infos.length, 1, `Expected 1 collection info for ${outName}, got ${tojson(infos)}`);
+                assert.eq(
+                    infos.length,
+                    1,
+                    `Expected 1 collection info for ${outName}, got ${tojson(infos)}`,
+                );
                 const info = infos[0];
                 if (timeseriesOut) {
                     assert.eq(
@@ -183,7 +195,8 @@ export const $config = (function () {
         } else {
             // TODO(SERVER-123600): Remove the recordIdsReplicated workaround.
             if (
-                (res.code === ErrorCodes.CommandNotSupported || res.code === ErrorCodes.CommandFailed) &&
+                (res.code === ErrorCodes.CommandNotSupported ||
+                    res.code === ErrorCodes.CommandFailed) &&
                 (res.errmsg || "").includes("recordIdsReplicated")
             ) {
                 jsTestLog(`Ignoring expected $out error during FCV transition: ${tojson(res)}`);

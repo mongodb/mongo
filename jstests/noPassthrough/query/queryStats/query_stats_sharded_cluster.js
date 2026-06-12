@@ -65,7 +65,10 @@ describe("query stats sharded cluster", function () {
         shard1Conn = st.shard1;
 
         assert.commandWorked(
-            mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+            mongosDB.adminCommand({
+                enableSharding: mongosDB.getName(),
+                primaryShard: st.shard0.shardName,
+            }),
         );
 
         setupCollections();
@@ -107,7 +110,12 @@ describe("query stats sharded cluster", function () {
         );
         shardedOneShardColl.createIndex({y: 1});
         // Don't move any chunks - all data stays on primary shard.
-        assert.commandWorked(mongosDB.adminCommand({shardCollection: shardedOneShardColl.getFullName(), key: {y: 1}}));
+        assert.commandWorked(
+            mongosDB.adminCommand({
+                shardCollection: shardedOneShardColl.getFullName(),
+                key: {y: 1},
+            }),
+        );
 
         // Sharded collection on two shards - split data between shards.
         const shardedTwoShardsColl = mongosDB[collConfigs.shardedTwoShards.name];
@@ -122,9 +130,16 @@ describe("query stats sharded cluster", function () {
             ]),
         );
         shardedTwoShardsColl.createIndex({y: 1});
-        assert.commandWorked(mongosDB.adminCommand({shardCollection: shardedTwoShardsColl.getFullName(), key: {y: 1}}));
+        assert.commandWorked(
+            mongosDB.adminCommand({
+                shardCollection: shardedTwoShardsColl.getFullName(),
+                key: {y: 1},
+            }),
+        );
         // Split at y: 0 and move positive chunk to shard1.
-        assert.commandWorked(mongosDB.adminCommand({split: shardedTwoShardsColl.getFullName(), middle: {y: 0}}));
+        assert.commandWorked(
+            mongosDB.adminCommand({split: shardedTwoShardsColl.getFullName(), middle: {y: 0}}),
+        );
         assert.commandWorked(
             mongosDB.adminCommand({
                 moveChunk: shardedTwoShardsColl.getFullName(),
@@ -134,7 +149,13 @@ describe("query stats sharded cluster", function () {
         );
     }
 
-    function assertQueryStatsEntry({conn, getStatsFn, numEntries, description, expectedKeyOnShards}) {
+    function assertQueryStatsEntry({
+        conn,
+        getStatsFn,
+        numEntries,
+        description,
+        expectedKeyOnShards,
+    }) {
         const entries = getStatsFn(conn);
         assert.eq(
             entries.length,
@@ -237,7 +258,10 @@ describe("query stats sharded cluster", function () {
 
                 testCommand({
                     commandName: "aggregate",
-                    getStatsFn: (conn) => getQueryStatsAggCmd(conn.getDB(mongosDB.getName()), {collName: config.name}),
+                    getStatsFn: (conn) =>
+                        getQueryStatsAggCmd(conn.getDB(mongosDB.getName()), {
+                            collName: config.name,
+                        }),
                     runCommandFn: (coll) => {
                         coll.aggregate([{$match: {x: {$gte: 1}}}]).toArray();
                     },
@@ -316,7 +340,10 @@ describe("query stats sharded cluster", function () {
 
                 testCommand({
                     commandName: "aggregate",
-                    getStatsFn: (conn) => getQueryStatsAggCmd(conn.getDB(mongosDB.getName()), {collName: config.name}),
+                    getStatsFn: (conn) =>
+                        getQueryStatsAggCmd(conn.getDB(mongosDB.getName()), {
+                            collName: config.name,
+                        }),
                     runCommandFn: (coll) => {
                         coll.aggregate([{$planCacheStats: {allHosts: true}}]).toArray();
                     },

@@ -47,7 +47,12 @@ coll.insert({_id: 0});
                 db: dbName,
                 collectionUUID: collUUID,
             }),
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
     ];
     mongotMock.setMockResponses(history, cursorId);
@@ -71,7 +76,12 @@ coll.insert({_id: 0});
                 db: dbName,
                 collectionUUID: collUUID,
             }),
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
     ];
     mongotMock.setMockResponses(history, cursorId);
@@ -83,7 +93,10 @@ coll.insert({_id: 0});
     const mongotQuery = {scoreDetails: true};
     const cursorId = NumberLong(123);
     const searchScoreDetails = {value: 1.234, description: "great score", details: []};
-    const pipeline = [{$search: mongotQuery}, {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}}];
+    const pipeline = [
+        {$search: mongotQuery},
+        {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}},
+    ];
     const mongotResponseBatch = [{_id: 0, $searchScoreDetails: searchScoreDetails}];
     const responseOk = 1;
     const expectedDocs = [{_id: 0, scoreInfo: searchScoreDetails}];
@@ -96,7 +109,12 @@ coll.insert({_id: 0});
                 db: dbName,
                 collectionUUID: collUUID,
             }),
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
     ];
     mongotMock.setMockResponses(history, cursorId);
@@ -107,7 +125,10 @@ coll.insert({_id: 0});
 {
     const mongotQuery = {scoreDetails: true};
     const cursorId = NumberLong(123);
-    const pipeline = [{$search: mongotQuery}, {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}}];
+    const pipeline = [
+        {$search: mongotQuery},
+        {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}},
+    ];
     const mongotResponseBatch = [{_id: 0, $searchScoreDetails: "great score"}];
     const responseOk = 1;
 
@@ -119,7 +140,12 @@ coll.insert({_id: 0});
                 db: dbName,
                 collectionUUID: collUUID,
             }),
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
     ];
     mongotMock.setMockResponses(history, cursorId);
@@ -177,7 +203,10 @@ coll.insert({_id: 20});
         },
     ];
     mongotMock.setMockResponses(history, cursorId);
-    assert.eq(testDB[collName].aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(), expectedDocs);
+    assert.eq(
+        testDB[collName].aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(),
+        expectedDocs,
+    );
 }
 
 mongotMock.stop();

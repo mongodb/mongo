@@ -27,8 +27,12 @@ describe("Check transition to dedicated config server starts, returns correct st
 
     beforeEach(() => {
         // Add sharded collection
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: "testDB", primaryShard: "config"}));
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: "testDB.testColl", key: {_id: 1}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({enableSharding: "testDB", primaryShard: "config"}),
+        );
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: "testDB.testColl", key: {_id: 1}}),
+        );
         const session = this.st.s.startSession({retryWrites: true});
         assert.commandWorked(session.getDatabase("testDB").testColl.insert({_id: 1}));
         assert.commandWorked(session.getDatabase("testDB").testColl.insert({_id: 2}));
@@ -41,9 +45,14 @@ describe("Check transition to dedicated config server starts, returns correct st
         const numShards = this.st.s.getDB("config").shards.count();
         if (numShards == 2) {
             jsTest.log.info("Stop transition to dedicated config server");
-            assert.commandWorked(this.st.s.adminCommand({stopTransitionToDedicatedConfigServer: 1}));
+            assert.commandWorked(
+                this.st.s.adminCommand({stopTransitionToDedicatedConfigServer: 1}),
+            );
             // Check that config shard draining has stopped successfully
-            const notDrainingShards = this.st.s.getDB("config").shards.find({"draining": true}).toArray();
+            const notDrainingShards = this.st.s
+                .getDB("config")
+                .shards.find({"draining": true})
+                .toArray();
             assert.eq(0, notDrainingShards.length);
         } else {
             jsTest.log.info("Transition back to embedded config server");
@@ -74,16 +83,22 @@ describe("Check transition to dedicated config server starts, returns correct st
         this.st.configRS.awaitReplication();
 
         // Check draining status is ongoing
-        const drainingStatus0 = this.st.s.adminCommand({getTransitionToDedicatedConfigServerStatus: 1});
+        const drainingStatus0 = this.st.s.adminCommand({
+            getTransitionToDedicatedConfigServerStatus: 1,
+        });
         assert.commandWorked(drainingStatus0);
         assert.eq("ongoing", drainingStatus0.state);
 
         jsTest.log.info("Move unsharded collection's primary to another shard");
-        assert.commandWorked(this.st.s.adminCommand({movePrimary: "testDB", to: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "testDB", to: this.st.shard1.shardName}),
+        );
 
         jsTest.log.info("Wait for draining to complete");
         assert.soon(() => {
-            const drainingStatus1 = this.st.s.adminCommand({getTransitionToDedicatedConfigServerStatus: 1});
+            const drainingStatus1 = this.st.s.adminCommand({
+                getTransitionToDedicatedConfigServerStatus: 1,
+            });
             assert.commandWorked(drainingStatus1);
             return "drainingComplete" == drainingStatus1.state;
         }, "getTransitionToDedicatedConfigServerStatus did not return 'drainingComplete' status within the timeout");
@@ -95,11 +110,15 @@ describe("Check transition to dedicated config server starts, returns correct st
         this.st.configRS.awaitReplication();
 
         jsTest.log.info("Move unsharded collection's primary to another shard");
-        assert.commandWorked(this.st.s.adminCommand({movePrimary: "testDB", to: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "testDB", to: this.st.shard1.shardName}),
+        );
 
         jsTest.log.info("Wait for draining to complete");
         assert.soon(() => {
-            const drainingStatus = this.st.s.adminCommand({getTransitionToDedicatedConfigServerStatus: 1});
+            const drainingStatus = this.st.s.adminCommand({
+                getTransitionToDedicatedConfigServerStatus: 1,
+            });
             assert.commandWorked(drainingStatus);
             return "drainingComplete" == drainingStatus.state;
         }, "getTransitionToDedicatedConfigServerStatus did not return 'drainingComplete' status within the timeout");
@@ -125,11 +144,15 @@ describe("Check transition to dedicated config server starts, returns correct st
         this.st.configRS.awaitReplication();
 
         jsTest.log.info("Move unsharded collection's primary to another shard");
-        assert.commandWorked(this.st.s.adminCommand({movePrimary: "testDB", to: this.st.shard1.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "testDB", to: this.st.shard1.shardName}),
+        );
 
         jsTest.log.info("Wait for draining to complete");
         assert.soon(() => {
-            const drainingStatus = this.st.s.adminCommand({getTransitionToDedicatedConfigServerStatus: 1});
+            const drainingStatus = this.st.s.adminCommand({
+                getTransitionToDedicatedConfigServerStatus: 1,
+            });
             assert.commandWorked(drainingStatus);
             return "drainingComplete" == drainingStatus.state;
         }, "getTransitionToDedicatedConfigServerStatus did not return 'drainingComplete' status within the timeout");
@@ -138,16 +161,35 @@ describe("Check transition to dedicated config server starts, returns correct st
         assert.commandWorked(this.st.s.adminCommand({commitTransitionToDedicatedConfigServer: 1}));
 
         const configPrimary = this.st.configRS.getPrimary();
-        assert.eq(0, configPrimary.getDB("config").getCollection("shard.catalog.databases").find().itcount());
-        assert.eq(0, configPrimary.getDB("config").getCollection("shard.catalog.collections").find().itcount());
-        assert.eq(0, configPrimary.getDB("config").getCollection("shard.catalog.chunks").find().itcount());
+        assert.eq(
+            0,
+            configPrimary.getDB("config").getCollection("shard.catalog.databases").find().itcount(),
+        );
+        assert.eq(
+            0,
+            configPrimary
+                .getDB("config")
+                .getCollection("shard.catalog.collections")
+                .find()
+                .itcount(),
+        );
+        assert.eq(
+            0,
+            configPrimary.getDB("config").getCollection("shard.catalog.chunks").find().itcount(),
+        );
 
-        jsTest.log.info("Drop and recreate the tracked collection while the config server is dedicated");
+        jsTest.log.info(
+            "Drop and recreate the tracked collection while the config server is dedicated",
+        );
         assert.commandWorked(this.st.s.getDB("testDB").runCommand({drop: "testColl"}));
-        assert.commandWorked(this.st.s.adminCommand({shardCollection: "testDB.testColl", key: {_id: 1}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({shardCollection: "testDB.testColl", key: {_id: 1}}),
+        );
         assert.commandWorked(this.st.s.getDB("testDB").testColl.insert({_id: 1}));
 
-        jsTest.log.info("Transition back to embedded config server and move the recreated chunk to config");
+        jsTest.log.info(
+            "Transition back to embedded config server and move the recreated chunk to config",
+        );
         assert.commandWorked(this.st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
         assert.commandWorked(
             this.st.s.adminCommand({

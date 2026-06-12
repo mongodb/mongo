@@ -135,7 +135,9 @@ let tests = {
         assert.commandWorked(x.insert({_id: 1, x: 1}));
         assert.commandWorked(y.insert({_id: 1, y: 1}));
 
-        assert.commandWorked(mydb.adminCommand({renameCollection: x.getFullName(), to: z.getFullName()})); // across databases
+        assert.commandWorked(
+            mydb.adminCommand({renameCollection: x.getFullName(), to: z.getFullName()}),
+        ); // across databases
         assert.commandWorked(z.insert({_id: 2, x: 2}));
         assert.commandWorked(x.insert({_id: 2, x: false}));
         assert.commandWorked(y.insert({y: 2}));
@@ -147,7 +149,9 @@ let tests = {
                 dropTarget: true,
             }),
         ); // within database
-        assert.commandWorked(mydb.adminCommand({renameCollection: z.getFullName(), to: y.getFullName()})); // across databases
+        assert.commandWorked(
+            mydb.adminCommand({renameCollection: z.getFullName(), to: y.getFullName()}),
+        ); // across databases
         return [mydb, otherdb];
     },
     renameCollectionAcrossDatabasesWithDropAndConvertToCapped: (db1) => {
@@ -160,17 +164,29 @@ let tests = {
         let [c, d] = getCollections(db2, ["c", "d"]);
 
         assert.commandWorked(
-            db1.adminCommand({renameCollection: a.getFullName(), to: c.getFullName(), dropTarget: true}),
+            db1.adminCommand({
+                renameCollection: a.getFullName(),
+                to: c.getFullName(),
+                dropTarget: true,
+            }),
         );
 
         assert(d.drop());
 
         assert.commandWorked(
-            db1.adminCommand({renameCollection: c.getFullName(), to: d.getFullName(), dropTarget: false}),
+            db1.adminCommand({
+                renameCollection: c.getFullName(),
+                to: d.getFullName(),
+                dropTarget: false,
+            }),
         );
 
         assert.commandWorked(
-            db1.adminCommand({renameCollection: b.getFullName(), to: c.getFullName(), dropTarget: false}),
+            db1.adminCommand({
+                renameCollection: b.getFullName(),
+                to: c.getFullName(),
+                dropTarget: false,
+            }),
         );
         assert.commandWorked(db2.runCommand({convertToCapped: "d", size: 1000}));
 

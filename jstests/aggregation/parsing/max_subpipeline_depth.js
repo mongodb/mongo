@@ -25,13 +25,25 @@ function makeUnionNDeep(n) {
 
 const maxDepth = 20;
 
-assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [makeUnionNDeep(maxDepth - 1)], cursor: {}}));
+assert.commandWorked(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [makeUnionNDeep(maxDepth - 1)],
+        cursor: {},
+    }),
+);
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: [makeUnionNDeep(maxDepth)], cursor: {}}),
     ErrorCodes.MaxSubPipelineDepthExceeded,
 );
 
-assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [makeLookupNDeep(maxDepth - 1)], cursor: {}}));
+assert.commandWorked(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [makeLookupNDeep(maxDepth - 1)],
+        cursor: {},
+    }),
+);
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: [makeLookupNDeep(maxDepth)], cursor: {}}),
     ErrorCodes.MaxSubPipelineDepthExceeded,

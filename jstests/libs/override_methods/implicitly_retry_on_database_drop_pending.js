@@ -134,9 +134,11 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
 }
 
 Mongo.prototype.runCommand = function (dbName, commandObj, options) {
-    return runCommandWithRetries(this, dbName, commandObj, mongoRunCommandOriginal, (commandObj) => [
+    return runCommandWithRetries(
+        this,
         dbName,
         commandObj,
-        options,
-    ]);
+        mongoRunCommandOriginal,
+        (commandObj) => [dbName, commandObj, options],
+    );
 };

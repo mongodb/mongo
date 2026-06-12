@@ -18,7 +18,9 @@ const coll = testDB.coll;
 const time = ISODate("2024-01-16T20:48:39.448Z");
 
 coll.drop();
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 assert.commandWorked(
     coll.insertMany([
         {t: time, m: 0, a: 1, b: 3, c: 4}, // Create Bucket 0

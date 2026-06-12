@@ -20,7 +20,9 @@ let coll = testDB.coll;
 let ns = coll.getFullName();
 let shardKey = {x: 1};
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}),
+);
 
 jsTest.log("Shard the collection and create chunks.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
@@ -44,7 +46,10 @@ jsTest.log("Check the docs are on shard0.");
 assert.eq(docs.length, primaryShard.getCollection(ns).count());
 
 jsTest.log("Remove shard0 to set it in draining mode");
-const removeShardFp = configureFailPoint(st.configRS.getPrimary(), "hangRemoveShardAfterSettingDrainingFlag");
+const removeShardFp = configureFailPoint(
+    st.configRS.getPrimary(),
+    "hangRemoveShardAfterSettingDrainingFlag",
+);
 const awaitRemoveShard = startParallelShell(
     funWithArgs(async function (shardToRemove) {
         const {removeShard} = await import("jstests/sharding/libs/remove_shard_util.js");
@@ -64,14 +69,24 @@ removeShardFp.wait();
 jsTest.log("Add shards to zones and assign zone key ranges.");
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneA"}));
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "zoneB"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: 10}, zone: "zoneA"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 10}, max: {x: MaxKey}, zone: "zoneB"}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: 10}, zone: "zoneA"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 10}, max: {x: MaxKey}, zone: "zoneB"}),
+);
 
 jsTest.log("Check that the shards have the assigned zones.");
-let shardTags = {[st.shard0.shardName]: ["zoneA"], [st.shard1.shardName]: ["zoneB"], [st.shard2.shardName]: []};
+let shardTags = {
+    [st.shard0.shardName]: ["zoneA"],
+    [st.shard1.shardName]: ["zoneB"],
+    [st.shard2.shardName]: [],
+};
 assertShardTags(configDB, shardTags);
 
-jsTest.log("Let the balancer do the balancing, and check that the chunks and the docs are on the right shards.");
+jsTest.log(
+    "Let the balancer do the balancing, and check that the chunks and the docs are on the right shards.",
+);
 {
     runBalancer(st, 2);
     const shardChunkBounds = {
@@ -91,7 +106,9 @@ jsTest.log("Let the balancer do the balancing, and check that the chunks and the
     assert.eq(docs.length, coll.countDocuments({}));
 }
 
-jsTest.log("Add shard2 to zoneA to be able to move all the chunks out of the draining shard (shard0)");
+jsTest.log(
+    "Add shard2 to zoneA to be able to move all the chunks out of the draining shard (shard0)",
+);
 //   - shard0 -> [zoneA]
 //   - shard1 -> [zoneB]
 //   - shard2 -> [zoneA]
@@ -100,7 +117,9 @@ jsTest.log("Add shard2 to zoneA to be able to move all the chunks out of the dra
 //   - zoneB: [10, MaxKey)
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: "zoneA"}));
 
-jsTest.log("Let the balancer do the balancing, and check that the chunks and the docs are on the right shards.");
+jsTest.log(
+    "Let the balancer do the balancing, and check that the chunks and the docs are on the right shards.",
+);
 {
     runBalancer(st, 3);
     const shardChunkBounds = {

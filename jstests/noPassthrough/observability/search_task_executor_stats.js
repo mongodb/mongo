@@ -29,8 +29,14 @@ function searchTaskExecutorMetricsTests() {
         describe(executorName, function () {
             it("has diagnosticInfo sub-section", function () {
                 const executor = this.metrics[executorName];
-                assert(executor.hasOwnProperty("diagnosticInfo"), `${executorName} missing diagnosticInfo sub-section`);
-                assert(Object.keys(executor.diagnosticInfo).length > 0, `${executorName}.diagnosticInfo is empty`);
+                assert(
+                    executor.hasOwnProperty("diagnosticInfo"),
+                    `${executorName} missing diagnosticInfo sub-section`,
+                );
+                assert(
+                    Object.keys(executor.diagnosticInfo).length > 0,
+                    `${executorName}.diagnosticInfo is empty`,
+                );
             });
 
             it("has networkInterface sub-section", function () {
@@ -39,13 +45,22 @@ function searchTaskExecutorMetricsTests() {
                     executor.hasOwnProperty("networkInterface"),
                     `${executorName} missing networkInterface sub-section`,
                 );
-                assert(Object.keys(executor.networkInterface).length > 0, `${executorName}.networkInterface is empty`);
+                assert(
+                    Object.keys(executor.networkInterface).length > 0,
+                    `${executorName}.networkInterface is empty`,
+                );
             });
 
             it("has connectionPool sub-section", function () {
                 const executor = this.metrics[executorName];
-                assert(executor.hasOwnProperty("connectionPool"), `${executorName} missing connectionPool sub-section`);
-                assert(Object.keys(executor.connectionPool).length > 0, `${executorName}.connectionPool is empty`);
+                assert(
+                    executor.hasOwnProperty("connectionPool"),
+                    `${executorName} missing connectionPool sub-section`,
+                );
+                assert(
+                    Object.keys(executor.connectionPool).length > 0,
+                    `${executorName}.connectionPool is empty`,
+                );
             });
         });
     }

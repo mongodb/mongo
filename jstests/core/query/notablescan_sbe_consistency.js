@@ -20,7 +20,9 @@ db.foo.createIndex({a: 1});
 db.foo.insert({a: 1});
 db.foo2.insert({b: 1});
 
-const prevnotablescan = assert.commandWorked(db.adminCommand({getParameter: 1, notablescan: 1})).notablescan;
+const prevnotablescan = assert.commandWorked(
+    db.adminCommand({getParameter: 1, notablescan: 1}),
+).notablescan;
 try {
     assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: 1}));
     function runWithHint(hint) {
@@ -28,7 +30,10 @@ try {
         // index.
         let cmd = {
             aggregate: "foo",
-            pipeline: [{$match: {a: 1}}, {$lookup: {from: "foo2", as: "res", localField: "a", foreignField: "b"}}],
+            pipeline: [
+                {$match: {a: 1}},
+                {$lookup: {from: "foo2", as: "res", localField: "a", foreignField: "b"}},
+            ],
             cursor: {},
         };
         if (hint != undefined) {
@@ -43,7 +48,13 @@ try {
         assert.commandFailedWithCode(res, [ErrorCodes.NoQueryExecutionPlans]);
     }
 
-    const naturalHints = [undefined, {"$natural": []}, {"$natural": 1}, {"$natural": -1}, {"$natural": [1, -1]}];
+    const naturalHints = [
+        undefined,
+        {"$natural": []},
+        {"$natural": 1},
+        {"$natural": -1},
+        {"$natural": [1, -1]},
+    ];
 
     function runCmds() {
         naturalHints.forEach(runWithHint);
@@ -53,13 +64,19 @@ try {
         db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
     ).internalQueryFrameworkControl;
     try {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeRestricted"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeRestricted"}),
+        );
         runCmds();
 
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        );
         runCmds();
     } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevQueryEngine}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevQueryEngine}),
+        );
     }
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: prevnotablescan}));

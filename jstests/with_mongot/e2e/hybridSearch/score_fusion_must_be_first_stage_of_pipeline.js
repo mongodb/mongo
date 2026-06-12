@@ -38,7 +38,10 @@ let scoreFusionWithoutSearchStage = {
     $scoreFusion: {
         input: {
             pipelines: {
-                a: [{$sort: {_id: 1}}, {$score: {score: "$number_of_reviews", normalization: "none"}}],
+                a: [
+                    {$sort: {_id: 1}},
+                    {$score: {score: "$number_of_reviews", normalization: "none"}},
+                ],
             },
             normalization: "none",
         },
@@ -91,7 +94,11 @@ assertScoreFusionMustBeFirstStageInPipeline([matchStage, scoreFusionWithSearchSt
 
 // In this case where the desugared output of the aggregation would be a valid query,
 // but we should still reject because we catch that $scoreFusion is the first stage.
-assertScoreFusionMustBeFirstStageInPipeline([matchStage, scoreFusionWithoutSearchStage, limitStage]);
+assertScoreFusionMustBeFirstStageInPipeline([
+    matchStage,
+    scoreFusionWithoutSearchStage,
+    limitStage,
+]);
 
 // Tests that its not sufficient for $scoreFusion to be the first stage of the pipeline,
 // it must also not be any stage other than the first.

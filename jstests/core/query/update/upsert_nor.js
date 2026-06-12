@@ -34,7 +34,9 @@ const filter = {
     $nor: [{$or: [{"x": 1}, {"y": 2}]}, {"x": {$ne: 3}}],
 };
 
-const upsertResult = assert.commandWorked(coll.updateOne(filter, [{"$unset": "z"}], {upsert: true}));
+const upsertResult = assert.commandWorked(
+    coll.updateOne(filter, [{"$unset": "z"}], {upsert: true}),
+);
 
 // Make sure that we upserted the document.
 assert(upsertResult.upsertedId);

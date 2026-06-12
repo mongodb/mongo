@@ -75,7 +75,12 @@ const awaitIndexBuild = startParallelShell(() => {
 
 IndexBuildTest.waitForIndexBuildToStart(db, collName, "a_1");
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangDuringCollectionClone",
+        mode: "off",
+    }),
+);
 
 rst.awaitReplication();
 rst.awaitSecondaryNodes();

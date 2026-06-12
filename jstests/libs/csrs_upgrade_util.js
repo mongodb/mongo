@@ -76,7 +76,12 @@ export var CSRSUpgradeCoordinator = function () {
                 return isMasterReply.ismaster;
             },
             function () {
-                return "Expected " + dnode.name + " to respond ismaster:true, but got " + tojson(isMasterReply);
+                return (
+                    "Expected " +
+                    dnode.name +
+                    " to respond ismaster:true, but got " +
+                    tojson(isMasterReply)
+                );
             },
         );
     };
@@ -88,7 +93,12 @@ export var CSRSUpgradeCoordinator = function () {
      */
     this.restartFirstConfigAsReplSet = function () {
         jsTest.log("Restarting " + st.c0.name + " as a standalone replica set");
-        csrsConfig = {_id: csrsName, version: 1, configsvr: true, members: [{_id: 0, host: st.c0.name}]};
+        csrsConfig = {
+            _id: csrsName,
+            version: 1,
+            configsvr: true,
+            members: [{_id: 0, host: st.c0.name}],
+        };
         assert.commandWorked(st.c0.adminCommand({replSetInitiate: csrsConfig}));
         csrs = [];
         csrs0Opts = Object.extend({}, st.c0.fullOptions, /* deep */ true);
@@ -107,7 +117,13 @@ export var CSRSUpgradeCoordinator = function () {
     this.startNewCSRSNodes = function () {
         jsTest.log("Starting new CSRS nodes");
         for (let i = 1; i < numCsrsMembers; ++i) {
-            csrs.push(MongoRunner.runMongod({replSet: csrsName, configsvr: "", storageEngine: "wiredTiger"}));
+            csrs.push(
+                MongoRunner.runMongod({
+                    replSet: csrsName,
+                    configsvr: "",
+                    storageEngine: "wiredTiger",
+                }),
+            );
             csrsConfig.members.push({_id: i, host: csrs[i].name, votes: 0, priority: 0});
         }
         csrsConfig.version = 2;

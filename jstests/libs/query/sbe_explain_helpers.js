@@ -12,7 +12,9 @@ export function isIdIndexScan(db, root, expectedParentStageForIxScan) {
     const ixscan = parentStage.inputStage;
     if (!ixscan) return false;
 
-    return ixscan.stage === "IXSCAN" && !ixscan.hasOwnProperty("filter") && ixscan.indexName === "_id_";
+    return (
+        ixscan.stage === "IXSCAN" && !ixscan.hasOwnProperty("filter") && ixscan.indexName === "_id_"
+    );
 }
 
 /**

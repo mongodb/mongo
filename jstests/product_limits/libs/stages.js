@@ -222,7 +222,9 @@ export class WorkloadGetField extends PipelineWorkload {
     pipeline() {
         return [
             {
-                $project: {"getField": {$getField: {field: `f${this.scale() - 1}`, input: "$$CURRENT"}}},
+                $project: {
+                    "getField": {$getField: {field: `f${this.scale() - 1}`, input: "$$CURRENT"}},
+                },
             },
             {$unset: "_id"},
         ];

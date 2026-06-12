@@ -13,7 +13,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 function killBeforeVoteCommitSucceeds(rst) {
-    jsTestLog("Index build in a secondary can be killed by the DiskSpaceMonitor before it has voted for commit.");
+    jsTestLog(
+        "Index build in a secondary can be killed by the DiskSpaceMonitor before it has voted for commit.",
+    );
 
     const dbName = "test";
     const collName = "coll";
@@ -30,8 +32,10 @@ function killBeforeVoteCommitSucceeds(rst) {
     const secondaryDB = secondary.getDB(dbName);
     const secondaryColl = secondaryDB.getCollection(collName);
 
-    const primaryKilledDueToDiskSpaceBefore = primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
-    const secondaryKilledDueToDiskSpaceBefore = secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
+    const primaryKilledDueToDiskSpaceBefore =
+        primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
+    const secondaryKilledDueToDiskSpaceBefore =
+        secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
 
     // Pause the index build on the primary after it replicates the startIndexBuild oplog entry,
     // effectively pausing the index build on the secondary too as it will wait for the primary to
@@ -41,10 +45,17 @@ function killBeforeVoteCommitSucceeds(rst) {
     const tookActionCountBefore = secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction;
 
     jsTestLog("Waiting for index build to start on secondary");
-    const hangAfterInitFailPoint = configureFailPoint(secondaryDB, "hangAfterInitializingIndexBuild");
-    const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
-        ErrorCodes.IndexBuildAborted,
-    ]);
+    const hangAfterInitFailPoint = configureFailPoint(
+        secondaryDB,
+        "hangAfterInitializingIndexBuild",
+    );
+    const createIdx = IndexBuildTest.startIndexBuild(
+        primary,
+        primaryColl.getFullName(),
+        {a: 1},
+        null,
+        [ErrorCodes.IndexBuildAborted],
+    );
     IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), "a_1");
 
     // Ensure the index build is in an abortable state before the DiskSpaceMonitor runs.
@@ -58,7 +69,9 @@ function killBeforeVoteCommitSucceeds(rst) {
 
     jsTestLog("Waiting for the disk space monitor to take action on secondary");
     assert.soon(() => {
-        return secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction > tookActionCountBefore;
+        return (
+            secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction > tookActionCountBefore
+        );
     });
     IndexBuildTest.resumeIndexBuilds(primary);
 
@@ -88,7 +101,10 @@ function killBeforeVoteCommitSucceeds(rst) {
     // before it has voted for commit, and this ensures that is the case.
     hangAfterInitFailPoint.off();
 
-    assert.eq(primaryKilledDueToDiskSpaceBefore, primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
+    assert.eq(
+        primaryKilledDueToDiskSpaceBefore,
+        primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace,
+    );
     assert.eq(
         secondaryKilledDueToDiskSpaceBefore + 1,
         secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace,
@@ -100,7 +116,9 @@ function killBeforeVoteCommitSucceeds(rst) {
 }
 
 function killAfterVoteCommitFails(rst) {
-    jsTestLog("Index build in a secondary cannot killed by the DiskSpaceMonitor after it has voted for commit");
+    jsTestLog(
+        "Index build in a secondary cannot killed by the DiskSpaceMonitor after it has voted for commit",
+    );
 
     const dbName = "test";
     const collName = "coll";
@@ -117,8 +135,10 @@ function killAfterVoteCommitFails(rst) {
     const secondaryDB = secondary.getDB(dbName);
     const secondaryColl = secondaryDB.getCollection(collName);
 
-    const primaryKilledDueToDiskSpaceBefore = primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
-    const secondaryKilledDueToDiskSpaceBefore = secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
+    const primaryKilledDueToDiskSpaceBefore =
+        primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
+    const secondaryKilledDueToDiskSpaceBefore =
+        secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace;
 
     // Pause the index build on the primary after it replicates the startIndexBuild oplog entry,
     // effectively pausing the index build on the secondary too as it will wait for the primary to
@@ -128,8 +148,16 @@ function killAfterVoteCommitFails(rst) {
     const tookActionCountBefore = secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction;
 
     jsTestLog("Waiting for index build to start on secondary");
-    const hangAfterVoteCommit = configureFailPoint(secondaryDB, "hangIndexBuildAfterSignalPrimaryForCommitReadiness");
-    const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null);
+    const hangAfterVoteCommit = configureFailPoint(
+        secondaryDB,
+        "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+    );
+    const createIdx = IndexBuildTest.startIndexBuild(
+        primary,
+        primaryColl.getFullName(),
+        {a: 1},
+        null,
+    );
     IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), "a_1");
 
     // Ensure the index build is in an abortable state before the DiskSpaceMonitor runs.
@@ -143,7 +171,9 @@ function killAfterVoteCommitFails(rst) {
 
     jsTestLog("Waiting for the disk space monitor to take action on secondary");
     assert.soon(() => {
-        return secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction > tookActionCountBefore;
+        return (
+            secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction > tookActionCountBefore
+        );
     });
     IndexBuildTest.resumeIndexBuilds(primary);
 
@@ -158,7 +188,10 @@ function killAfterVoteCommitFails(rst) {
     createIdx();
     simulateDiskSpaceFp.off();
 
-    assert.eq(primaryKilledDueToDiskSpaceBefore, primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
+    assert.eq(
+        primaryKilledDueToDiskSpaceBefore,
+        primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace,
+    );
     assert.eq(
         secondaryKilledDueToDiskSpaceBefore,
         secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace,

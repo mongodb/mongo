@@ -59,7 +59,10 @@ assert.commandWorked(
 // for the join due to the use of unique index metadata.
 for (let i = 0; i < 10; i++) {
     const uniqueExplain = coll1.explain().aggregate(pipeline);
-    assert(joinOptUsed(uniqueExplain), "Join optimizer was not used as expected: " + tojson(uniqueExplain));
+    assert(
+        joinOptUsed(uniqueExplain),
+        "Join optimizer was not used as expected: " + tojson(uniqueExplain),
+    );
 
     const uniqueWinningPlan = getWinningPlanFromExplain(uniqueExplain);
     assert(
@@ -70,13 +73,15 @@ for (let i = 0; i < 10; i++) {
     assert.eq(
         uniqueWinningPlan.cardinalityEstimate,
         1000,
-        "Cardinality estimate was not equal to the expected value of 1000: " + tojson(uniqueExplain),
+        "Cardinality estimate was not equal to the expected value of 1000: " +
+            tojson(uniqueExplain),
     );
     const result = coll1.aggregate(pipeline).toArray();
     assert.eq(
         result.length,
         1000,
-        "Expected 1000 results from the join, but did not, with prior explain" + tojson(uniqueExplain),
+        "Expected 1000 results from the join, but did not, with prior explain" +
+            tojson(uniqueExplain),
     );
 }
 

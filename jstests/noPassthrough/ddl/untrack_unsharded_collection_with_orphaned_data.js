@@ -30,7 +30,10 @@ function verifyShardingCatalogStateAfterUntracking(st, primaryShard, ns, uuid) {
         [st.shard0, st.shard1].forEach((shard) => {
             const configDb = shard.getDB("config");
             assert.eq(null, configDb.getCollection("shard.catalog.collections").findOne({_id: ns}));
-            assert.eq(0, configDb.getCollection("shard.catalog.chunks").countDocuments({uuid: uuid}));
+            assert.eq(
+                0,
+                configDb.getCollection("shard.catalog.chunks").countDocuments({uuid: uuid}),
+            );
         });
         return;
     }
@@ -77,7 +80,10 @@ jsTest.log("Untrack a collection on a new primary shard works but non-empty orph
 
     // Untrack the collection; the operation is only expected to succeed when its data are located
     // on the primary shard.
-    assert.commandFailedWithCode(st.s.adminCommand({untrackUnshardedCollection: kNss}), ErrorCodes.OperationFailed);
+    assert.commandFailedWithCode(
+        st.s.adminCommand({untrackUnshardedCollection: kNss}),
+        ErrorCodes.OperationFailed,
+    );
     assert.commandWorked(st.s.adminCommand({movePrimary: kDbName, to: shard0Name}));
     assert.commandWorked(st.s.adminCommand({untrackUnshardedCollection: kNss}));
     verifyShardingCatalogStateAfterUntracking(st, st.shard0, kNss, lastUUID);

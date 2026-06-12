@@ -16,7 +16,12 @@ let admin = mongos.getDB("admin");
 let coll = mongos.getCollection("foo.bar");
 
 // Shard collection with initial chunk on shard0
-assert.commandWorked(mongos.adminCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({
+        enableSharding: coll.getDB().getName(),
+        primaryShard: st.shard0.shardName,
+    }),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 // Insert one document
@@ -24,10 +29,20 @@ assert.commandWorked(coll.insert({hello: "world"}));
 
 // Migrate the collection to and from shard1 so shard0 loads the shard1 host
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: coll + "",
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 assert.commandWorked(
-    mongos.adminCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+    mongos.adminCommand({
+        moveChunk: coll + "",
+        find: {_id: 0},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 // Guarantee the sessions collection chunk isn't on shard1.
@@ -53,7 +68,9 @@ jsTest.log("Shard was dropped and re-added with same name...");
 st.printShardingStatus();
 
 // Try a migration
-assert.commandWorked(mongos.adminCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 let shard2Conn = shard2.getPrimary();
 assert.eq("world", shard2Conn.getCollection(coll + "").findOne().hello);

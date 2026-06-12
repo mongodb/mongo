@@ -81,7 +81,9 @@ const readColl = secondary.getDB("test").foo;
 
         // In SBE also check the statistics for disk usage. Note: 'explain()' doesn't support the
         // 'writeConcern' option so we test spilling on the secondary but without using the concern.
-        const explainRes = readColl.explain("executionStats").aggregate(pipeline, {allowDiskUse: true});
+        const explainRes = readColl
+            .explain("executionStats")
+            .aggregate(pipeline, {allowDiskUse: true});
         const hashAggGroups = getSbePlanStages(explainRes, "group");
         assert.eq(hashAggGroups.length, 1, explainRes);
         const hashAggGroup = hashAggGroups[0];
@@ -126,7 +128,12 @@ const readColl = secondary.getDB("test").foo;
         // large".
         const pipeline = [
             {
-                $lookup: {from: readColl.getName(), localField: "key", foreignField: "key", as: "results"},
+                $lookup: {
+                    from: readColl.getName(),
+                    localField: "key",
+                    foreignField: "key",
+                    as: "results",
+                },
             },
         ];
         const expectedSpilledRecordsAtLeast = cRecords;
@@ -145,7 +152,9 @@ const readColl = secondary.getDB("test").foo;
 
         // In SBE also check the statistics for disk usage. Note: 'explain()' doesn't support the
         // 'writeConcern' option so we test spilling on the secondary but without using the concern.
-        const explainRes = readColl.explain("executionStats").aggregate(pipeline, {allowDiskUse: true});
+        const explainRes = readColl
+            .explain("executionStats")
+            .aggregate(pipeline, {allowDiskUse: true});
 
         const hLookups = getSbePlanStages(explainRes, "hash_lookup");
         assert.eq(hLookups.length, 1, explainRes);
@@ -159,7 +168,8 @@ const readColl = secondary.getDB("test").foo;
         assert.commandWorked(
             secondary.adminCommand({
                 setParameter: 1,
-                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: oldSetting,
+                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
+                    oldSetting,
             }),
         );
     }
@@ -183,13 +193,16 @@ const readColl = secondary.getDB("test").foo;
     }
     // Create large partition.
     for (let i = 0; i < largePartitionSize; i++) {
-        assert.commandWorked(insertCollWFs.insert({_id: i + smallPartitionSize, val: i, partition: 2}));
+        assert.commandWorked(
+            insertCollWFs.insert({_id: i + smallPartitionSize, val: i, partition: 2}),
+        );
     }
 
     assert.commandWorked(
         secondary.adminCommand({
             setParameter: 1,
-            internalDocumentSourceSetWindowFieldsMaxMemoryBytes: largePartitionSize * avgDocSize + 1,
+            internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
+                largePartitionSize * avgDocSize + 1,
         }),
     );
 

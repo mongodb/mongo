@@ -24,11 +24,16 @@ export var LogicalSessionCacheRefreshSerializationTest = (function () {
         {
             const session = primary.startSession();
             const sessionId = session.getSessionId();
-            assert.commandWorked(session.getDatabase("test").runCommand({insert: "coll", documents: [{_id: 1000}]}));
+            assert.commandWorked(
+                session.getDatabase("test").runCommand({insert: "coll", documents: [{_id: 1000}]}),
+            );
 
-            jsTest.log.info("Waiting for session to be added to the cache after logicalSessionRefreshMillis elapses", {
-                sessionId,
-            });
+            jsTest.log.info(
+                "Waiting for session to be added to the cache after logicalSessionRefreshMillis elapses",
+                {
+                    sessionId,
+                },
+            );
             assert.soon(
                 () => sessionsColl.find({"_id.id": sessionId.id}).itcount() === 1,
                 "Session should be present after logicalSessionRefreshMillis elapses",
@@ -44,7 +49,9 @@ export var LogicalSessionCacheRefreshSerializationTest = (function () {
             const session = primary.startSession();
             sessions.push(session);
             const sessionId = session.getSessionId();
-            assert.commandWorked(session.getDatabase("test").runCommand({insert: "coll", documents: [{_id: i}]}));
+            assert.commandWorked(
+                session.getDatabase("test").runCommand({insert: "coll", documents: [{_id: i}]}),
+            );
 
             jsTest.log.info(`Call refreshLogicalSessionCacheNow iteration ${i}`);
             assert.commandWorked(adminDB.runCommand({refreshLogicalSessionCacheNow: 1}));

@@ -6,7 +6,10 @@
  *   uses_snapshot_read_concern,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function incrementOID(oid) {
@@ -30,9 +33,15 @@ const tsColl = assertDropAndRecreateCollection(sessionDB, tsCollName, {
     timeseries: {timeField: timeFieldName, metaField: metaFieldName},
 });
 
-assert.commandWorked(tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 1}));
-assert.commandWorked(tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 2}));
-assert.commandWorked(tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 3}));
+assert.commandWorked(
+    tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 1}),
+);
+assert.commandWorked(
+    tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 2}),
+);
+assert.commandWorked(
+    tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 3}),
+);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 
@@ -71,19 +80,33 @@ assert.commandWorked(getTimeseriesCollForRawOps(tsColl).insert(bogusBucket, kRaw
 
 jsTestLog("Testing update.");
 assert.commandWorked(
-    getTimeseriesCollForRawOps(tsColl).update({_id: bogusBucket._id}, {$set: {[metaFieldName]: 4}}, kRawOperationSpec),
+    getTimeseriesCollForRawOps(tsColl).update(
+        {_id: bogusBucket._id},
+        {$set: {[metaFieldName]: 4}},
+        kRawOperationSpec,
+    ),
 );
 assert.commandWorked(
     getTimeseriesCollForRawOps(tsColl).update(
         {[metaFieldName]: 65},
-        {$set: {_id: incrementOID(bogusBucket._id), "control": bogusBucket.control, "data": bogusBucket.data}},
+        {
+            $set: {
+                _id: incrementOID(bogusBucket._id),
+                "control": bogusBucket.control,
+                "data": bogusBucket.data,
+            },
+        },
         {upsert: true, ...kRawOperationSpec},
     ),
 );
 
 jsTestLog("Testing remove.");
-assert.commandWorked(getTimeseriesCollForRawOps(tsColl).remove({[metaFieldName]: 65}, kRawOperationSpec));
-assert.commandWorked(getTimeseriesCollForRawOps(tsColl).remove({_id: {$exists: true}}, kRawOperationSpec));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(tsColl).remove({[metaFieldName]: 65}, kRawOperationSpec),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(tsColl).remove({_id: {$exists: true}}, kRawOperationSpec),
+);
 
 jsTestLog("Testing find");
 assert.eq(getTimeseriesCollForRawOps(tsColl).find().rawData().itcount(), 0);

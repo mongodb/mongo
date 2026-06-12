@@ -23,5 +23,8 @@ let res = t.find({"$text": {"$search": "foo"}, x: 1}, {score: {"$meta": "textSco
 assert(res[0].score > 0, tojson(res.toArray()));
 
 // repeat "search" with "language" specified, SERVER-8999
-res = t.find({"$text": {"$search": "foo", "$language": "english"}, x: 1}, {score: {"$meta": "textScore"}});
+res = t.find(
+    {"$text": {"$search": "foo", "$language": "english"}, x: 1},
+    {score: {"$meta": "textScore"}},
+);
 assert(res[0].score > 0, tojson(res.toArray()));

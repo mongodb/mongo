@@ -39,9 +39,15 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const updateField = this.metaField + ".tid" + this.tid;
         const oldValue = Random.randInt(numValues);
 
-        jsTestLog("Executing bucket level update on: " + collName + " on field '" + updateField + "'");
+        jsTestLog(
+            "Executing bucket level update on: " + collName + " on field '" + updateField + "'",
+        );
         assert.commandWorked(
-            shardedColl.update({[updateField]: {$gte: oldValue}}, {$inc: {[updateField]: 1}}, {multi: true}),
+            shardedColl.update(
+                {[updateField]: {$gte: oldValue}},
+                {$inc: {[updateField]: 1}},
+                {multi: true},
+            ),
         );
     };
 
@@ -54,7 +60,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             db[collName].aggregate(pipeline),
             db[this.nonShardCollName].aggregate(pipeline),
         );
-        assert.eq(diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+        assert.eq(diff, {
+            docsWithDifferentContents: [],
+            docsMissingOnFirst: [],
+            docsMissingOnSecond: [],
+        });
     };
 
     $config.transitions = {

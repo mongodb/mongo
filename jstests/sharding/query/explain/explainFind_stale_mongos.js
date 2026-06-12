@@ -23,7 +23,9 @@ assert.commandWorked(freshMongos.adminCommand({shardCollection: ns, key: {"_id":
 jsTest.log("Ensure the shard knows " + ns + " is sharded");
 const clusterVersionInfo = st.getClusterVersionInfo();
 if (clusterVersionInfo.isMixedVersion) {
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}),
+    );
 } else {
     // _flushRoutingTableCacheUpdatesWithWriteConcern did not exist in older versions of the server.
     // Confirm that flushing the routing table with write concern does not change the existing

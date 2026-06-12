@@ -48,9 +48,11 @@ export var ShardingTopologyHelpers = (function () {
     }
 
     function getShardNames(mongosConn) {
-        return assert.commandWorked(mongosConn.adminCommand({listShards: 1})).shards.map((shard) => {
-            return shard._id;
-        });
+        return assert
+            .commandWorked(mongosConn.adminCommand({listShards: 1}))
+            .shards.map((shard) => {
+                return shard._id;
+            });
     }
 
     return {

@@ -73,6 +73,11 @@ IndexBuildTest.assertIndexesSoon(primaryColl, 1, ["_id_"]);
 IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ["_id_"]);
 
 // Verify failure reason is due to step-up check.
-checkLog.checkContainsOnceJsonStringMatch(secondaryColl, 4656003, "error", "Skipped records retry failed on step-up");
+checkLog.checkContainsOnceJsonStringMatch(
+    secondaryColl,
+    4656003,
+    "error",
+    "Skipped records retry failed on step-up",
+);
 
 rst.stopSet();

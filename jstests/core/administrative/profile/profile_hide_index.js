@@ -24,7 +24,11 @@ const coll = assertDropAndRecreateCollection(testDb, collName);
 
 function setPostCommandFailpoint({mode, options}) {
     assert.commandWorked(
-        testDb.adminCommand({configureFailPoint: "waitAfterCommandFinishesExecution", mode: mode, data: options}),
+        testDb.adminCommand({
+            configureFailPoint: "waitAfterCommandFinishesExecution",
+            mode: mode,
+            data: options,
+        }),
     );
 }
 
@@ -37,7 +41,10 @@ function testHiddenFlagInCurrentOp({runCmd, isCommandExpected, cmdName}) {
 
     let awaitHideIndex;
     try {
-        setPostCommandFailpoint({mode: "alwaysOn", options: {ns: coll.getFullName(), commands: [cmdName]}});
+        setPostCommandFailpoint({
+            mode: "alwaysOn",
+            options: {ns: coll.getFullName(), commands: [cmdName]},
+        });
 
         awaitHideIndex = startParallelShell(runCmd);
 
@@ -45,7 +52,10 @@ function testHiddenFlagInCurrentOp({runCmd, isCommandExpected, cmdName}) {
             function () {
                 const inprogs = testDb
                     .getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"ns": "profile_hide_index.profile_hide_index"}}])
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {"ns": "profile_hide_index.profile_hide_index"}},
+                    ])
                     .toArray();
                 return inprogs.length > 0 && isCommandExpected(inprogs);
             },
@@ -110,12 +120,16 @@ testDb.system.profile.drop();
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDb.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDb.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDb.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDb
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 assert.commandWorked(coll.createIndex({b: 1}, {hidden: true}));
@@ -128,7 +142,9 @@ profilerHasSingleMatchingEntryOrThrow({
     },
 });
 
-assert.commandWorked(testDb.runCommand({"collMod": coll.getName(), "index": {"name": "b_1", "hidden": false}}));
+assert.commandWorked(
+    testDb.runCommand({"collMod": coll.getName(), "index": {"name": "b_1", "hidden": false}}),
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: testDb,
     filter: {

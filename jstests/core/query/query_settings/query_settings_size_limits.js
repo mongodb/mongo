@@ -49,7 +49,9 @@ describe("QuerySettings", function () {
     it("should not contain a representative query if failed to set query settings", function () {
         // Specifying query settings with the same large index name should succed as total size of
         // 'querySettings' cluster parameter is less than 16MB.
-        assert.commandWorked(db.adminCommand({setQuerySettings: queryA, settings: querySettingsWithLargeIndexName}));
+        assert.commandWorked(
+            db.adminCommand({setQuerySettings: queryA, settings: querySettingsWithLargeIndexName}),
+        );
 
         // Due to orphaned representative queries, we can not run assertRepresentativeQueries() with
         // an empty array, so we capture the existing representative queries and ensure no new ones
@@ -82,8 +84,12 @@ describe("QuerySettings", function () {
     it("should contain a representative query if we successfully inserted a query settings, but then failed to update it due to 16MB limit", function () {
         // Set query settings with a 10MB index name, which should succeed and representative
         // query should be present.
-        assert.commandWorked(db.adminCommand({setQuerySettings: queryA, settings: querySettingsWithSmallIndexName}));
-        assert.commandWorked(db.adminCommand({setQuerySettings: queryB, settings: querySettingsWithLargeIndexName}));
+        assert.commandWorked(
+            db.adminCommand({setQuerySettings: queryA, settings: querySettingsWithSmallIndexName}),
+        );
+        assert.commandWorked(
+            db.adminCommand({setQuerySettings: queryB, settings: querySettingsWithLargeIndexName}),
+        );
         qsutils.assertQueryShapeConfiguration([
             qsutils.makeQueryShapeConfiguration(querySettingsWithSmallIndexName, queryA),
             qsutils.makeQueryShapeConfiguration(querySettingsWithLargeIndexName, queryB),

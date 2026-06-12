@@ -29,7 +29,12 @@ function coerceMetricToNumber(v, fieldName) {
     if (typeof v === "number") {
         return v;
     }
-    assert(false, () => `metrics.shardRequests.${fieldName} is not numeric: ` + `type=${typeof v}, value=${tojson(v)}`);
+    assert(
+        false,
+        () =>
+            `metrics.shardRequests.${fieldName} is not numeric: ` +
+            `type=${typeof v}, value=${tojson(v)}`,
+    );
 }
 
 function getShardRequestMetrics(mongos) {
@@ -43,7 +48,10 @@ function getShardRequestMetrics(mongos) {
     const shardMetrics = status.metrics.shardRequests;
 
     ["inQueue", "awaitingResponse", "complete"].forEach((field) => {
-        assert(field in shardMetrics, () => `metrics.shardRequests missing '${field}': ` + tojson(shardMetrics));
+        assert(
+            field in shardMetrics,
+            () => `metrics.shardRequests missing '${field}': ` + tojson(shardMetrics),
+        );
     });
 
     return {
@@ -69,10 +77,14 @@ const collName = "testColl";
 const coll = testDB.getCollection(collName);
 
 // Shard the collection so that we exercise the sharding fixed executor.
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
-assert.commandWorked(mongos.adminCommand({moveChunk: coll.getFullName(), find: {x: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: coll.getFullName(), find: {x: 0}, to: st.shard1.shardName}),
+);
 
 // Seed some data.
 let bulk = coll.initializeUnorderedBulkOp();
@@ -187,7 +199,9 @@ const kWaitTimeoutMs = 2 * 60 * 1000; // 2 minutes per assert.soon
             return m.complete >= before3.complete + before3.awaitingResponse;
         },
         () =>
-            "complete should be at least before3.complete + before3.awaitingResponse, " + "before3=" + tojson(before3),
+            "complete should be at least before3.complete + before3.awaitingResponse, " +
+            "before3=" +
+            tojson(before3),
         kWaitTimeoutMs,
         200,
         {runHangAnalyzer: false},

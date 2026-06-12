@@ -18,7 +18,9 @@ const indexNameC = "c_1";
 const runTest = function (db, replSets, timeseries, setUp) {
     const coll = timeseries ? db.coll_ts : db.coll;
     if (timeseries) {
-        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+        );
     }
     if (setUp) {
         setUp(coll);
@@ -226,22 +228,40 @@ runTest(replDb, [replTest], false);
 runTest(replDb, [replTest], true);
 replTest.stopSet();
 
-const shardingTest = new ShardingTest({shards: 2, rs: {...replSetConfig, ...reduceOplogMaxTimeParam}});
+const shardingTest = new ShardingTest({
+    shards: 2,
+    rs: {...replSetConfig, ...reduceOplogMaxTimeParam},
+});
 const shardingDb = shardingTest.s.getDB(jsTestName());
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], false, (coll) => {
-    assert.commandWorked(shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
+    assert.commandWorked(
+        shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}),
+    );
     assert.commandWorked(shardingDb.adminCommand({split: coll.getFullName(), middle: {m: 5}}));
     assert.commandWorked(
-        shardingDb.adminCommand({moveChunk: coll.getFullName(), find: {m: 0}, to: shardingTest.shard0.shardName}),
+        shardingDb.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {m: 0},
+            to: shardingTest.shard0.shardName,
+        }),
     );
     assert.commandWorked(
-        shardingDb.adminCommand({moveChunk: coll.getFullName(), find: {m: 10}, to: shardingTest.shard1.shardName}),
+        shardingDb.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {m: 10},
+            to: shardingTest.shard1.shardName,
+        }),
     );
 });
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], true, (coll) => {
-    assert.commandWorked(shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
     assert.commandWorked(
-        shardingDb.adminCommand({split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(), middle: {meta: 5}}),
+        shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}),
+    );
+    assert.commandWorked(
+        shardingDb.adminCommand({
+            split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+            middle: {meta: 5},
+        }),
     );
     assert.commandWorked(
         shardingDb.adminCommand({

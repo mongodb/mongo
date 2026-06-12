@@ -37,7 +37,9 @@ describe("$changeStream", function () {
 
     beforeEach(function () {
         db = st.s.getDB(dbName);
-        assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
     });
 
     afterEach(function () {
@@ -85,7 +87,9 @@ describe("$changeStream", function () {
         // Create sharded collection.
         assert.commandWorked(db.createCollection(shardedCollName));
         assert.commandWorked(db[shardedCollName].createIndex({data: 1}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: `${dbName}.${shardedCollName}`, key: {data: 1}}));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: `${dbName}.${shardedCollName}`, key: {data: 1}}),
+        );
 
         // Open a database-level change stream with showExpandedEvents (required to see
         // create/createIndexes event types) and the parameterized showSystemEvents setting.

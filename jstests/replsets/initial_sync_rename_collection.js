@@ -25,7 +25,11 @@ const pRenameColl = primaryDB["r_" + collName];
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Used for cross-DB renames.
@@ -63,7 +67,10 @@ function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
     // set is 2, the primary will be unable to advance its stable, leaving this node
     // stuck in initial sync. We must disable the wait to avoid this scenario.
     secondaryStartupParams["initialSyncWaitForSyncSourceLastStableRecoveryTs"] = false;
-    secondary = replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
+    secondary = replTest.restart(secondary, {
+        startClean: true,
+        setParameter: secondaryStartupParams,
+    });
     secondaryDB = secondary.getDB(dbName);
     secondaryColl = secondaryDB[collName];
 
@@ -147,14 +154,18 @@ runRenameTest({
     renameAcrossDBs: true,
 });
 
-jsTestLog("[3] Testing rename between listIndexes and find, with new same-name collection created.");
+jsTestLog(
+    "[3] Testing rename between listIndexes and find, with new same-name collection created.",
+);
 runRenameTest({
     failPoint: "hangBeforeClonerStage",
     extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
     createNew: true,
 });
 
-jsTestLog("[4] Testing cross-DB rename between listIndexes and find, with new same-name collection created.");
+jsTestLog(
+    "[4] Testing cross-DB rename between listIndexes and find, with new same-name collection created.",
+);
 runRenameTest({
     failPoint: "hangBeforeClonerStage",
     extraFailPointData: {cloner: "CollectionCloner", stage: "query"},

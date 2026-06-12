@@ -24,14 +24,20 @@ assert.docEq([], csCmdRes.cursor.firstBatch);
 assert.eq(csCmdRes.cursor.id, 0);
 
 // Test that attempting to open a whole-db stream results in an empty, closed cursor response.
-csCmdRes = assert.commandWorked(testDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}}));
+csCmdRes = assert.commandWorked(
+    testDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}}),
+);
 assert.docEq([], csCmdRes.cursor.firstBatch);
 assert.eq(csCmdRes.cursor.id, 0);
 
 // Test that attempting to open a cluster-wide stream results in an empty, closed cursor
 // response.
 csCmdRes = assert.commandWorked(
-    adminDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {allChangesForCluster: true}}], cursor: {}}),
+    adminDB.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {allChangesForCluster: true}}],
+        cursor: {},
+    }),
 );
 assert.docEq([], csCmdRes.cursor.firstBatch);
 assert.eq(csCmdRes.cursor.id, 0);

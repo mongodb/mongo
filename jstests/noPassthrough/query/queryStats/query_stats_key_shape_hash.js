@@ -107,7 +107,10 @@ assert.eq(untransformedShapeHashes.length, totalShapes, tojson(untransformedEntr
 
 // We need to filter on the HMAC-ed collection name when we set {transformIdentifiers: true}.
 const transformedCollName = "uxMLCvpiJ5N/IRqt4c28/2fNlHUyCLcxnrHfncmv1vs=";
-const transformedEntries = getQueryStatsFindCmd(conn, {collName: transformedCollName, transformIdentifiers: true});
+const transformedEntries = getQueryStatsFindCmd(conn, {
+    collName: transformedCollName,
+    transformIdentifiers: true,
+});
 const transformedKeyHashes = getQueryStatsKeyHashes(transformedEntries);
 const transformedShapeHashes = getQueryStatsShapeHashes(transformedEntries);
 

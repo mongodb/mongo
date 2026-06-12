@@ -49,7 +49,10 @@ const readBlockedOnPrepareConflictThread = startParallelShell(() => {
 
     // Advance the clusterTime with another insert.
     let res = assert.commandWorked(
-        parallelTestDB.runCommand({insert: parallelTestCollName, documents: [{advanceClusterTime: 1}]}),
+        parallelTestDB.runCommand({
+            insert: parallelTestCollName,
+            documents: [{advanceClusterTime: 1}],
+        }),
     );
     assert(res.hasOwnProperty("$clusterTime"), res);
     assert(res.$clusterTime.hasOwnProperty("clusterTime"), res);
@@ -75,7 +78,9 @@ failPoint.wait();
 // Once we have confirmed that the find command has hit a prepare conflict, we can perform
 // a step down.
 jsTestLog("Stepping down primary");
-assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
+assert.commandWorked(
+    primaryAdmin.adminCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}),
+);
 
 readBlockedOnPrepareConflictThread();
 

@@ -20,7 +20,10 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, it, before, after, beforeEach, afterEach} from "jstests/libs/mochalite.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {
     ChangeStreamTest,
     distributeCollectionDataOverShards,
@@ -43,7 +46,8 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
     before(() => {
         // Store the current value of 'skipCheckingIndexesConsistentAcrossCluster' so that we can
         // restore it later.
-        skipCheckingIndexesConsistentAcrossClusterWas = TestData.skipCheckingIndexesConsistentAcrossCluster;
+        skipCheckingIndexesConsistentAcrossClusterWas =
+            TestData.skipCheckingIndexesConsistentAcrossCluster;
 
         // Temporarily turn off this check because it fails when at least one of the shards of the
         // `ShardingTest` Fixture has been removed. It is fine to skip the index consistency in this
@@ -75,7 +79,8 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         st.stop();
         // Restore the previous value of 'skipCheckingIndexesConsistentAcrossCluster' so that the
         // change does not leak into any following tests running in the same instance.
-        TestData.skipCheckingIndexesConsistentAcrossCluster = skipCheckingIndexesConsistentAcrossClusterWas;
+        TestData.skipCheckingIndexesConsistentAcrossCluster =
+            skipCheckingIndexesConsistentAcrossClusterWas;
     });
 
     beforeEach(function () {
@@ -115,10 +120,17 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
     function getCollDataDistribution(coll) {
         let docs = {};
         [st.shard0, st.shard1, st.shard2, st.shard3].forEach((shardConn) => {
-            docs[shardConn.shardName] = shardConn.getDB(db.getName())[coll.getName()].find().itcount();
+            docs[shardConn.shardName] = shardConn
+                .getDB(db.getName())
+                [coll.getName()].find()
+                .itcount();
         });
         extraReplicaSetsToRemove.forEach((shard) => {
-            docs[shard.shardName] = shard.getPrimary().getDB(db.getName())[coll.getName()].find().itcount();
+            docs[shard.shardName] = shard
+                .getPrimary()
+                .getDB(db.getName())
+                [coll.getName()].find()
+                .itcount();
         });
         return docs;
     }
@@ -229,7 +241,11 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             // returned document keys for the events to include the new shard key field.
             jsTest.log.info("Resharding collection to {shard1, shard2}");
             assert.commandWorked(
-                st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
+                st.s.adminCommand({
+                    reshardCollection: coll.getFullName(),
+                    key: {a: 1},
+                    numInitialChunks: 1,
+                }),
             );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {a: 0},
@@ -267,7 +283,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
                 jsTest.log.info(`Decommissioning shard ${shardToDecommission.shardName}`);
                 removeShard(st, shardToDecommission.shardName);
                 st.restartShardClean(shardToDecommission);
-                jsTest.log.info(`Shard ${shardToDecommission.shardName} successfully decommissioned`);
+                jsTest.log.info(
+                    `Shard ${shardToDecommission.shardName} successfully decommissioned`,
+                );
             });
         });
 
@@ -297,7 +315,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Create and shard a collection and allocate collection to {shard0, shard1}.
         const collName1 = "test1";
         const coll1 = assertCreateCollection(db, collName1);
-        assert.commandWorked(db.adminCommand({shardCollection: coll1.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            db.adminCommand({shardCollection: coll1.getFullName(), key: {_id: 1}}),
+        );
 
         // Enable the balancer for the following operations, as it is needed for certain operations
         // that need move data between the shards, such as the 'removeShard' command.
@@ -314,7 +334,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             // Create and shard a collection and allocate collection to {shard1, shard2}.
             const collName2 = "test2";
             const coll2 = assertCreateCollection(db, collName2);
-            assert.commandWorked(db.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}),
+            );
 
             distributeCollectionDataOverShards(db, coll2, {
                 middle: {_id: 0},
@@ -351,7 +373,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
                 jsTest.log.info(`Decommissioning shard ${shardToDecommission.shardName}`);
                 removeShard(st, shardToDecommission.shardName);
                 st.restartShardClean(shardToDecommission);
-                jsTest.log.info(`Shard ${shardToDecommission.shardName} successfully decommissioned`);
+                jsTest.log.info(
+                    `Shard ${shardToDecommission.shardName} successfully decommissioned`,
+                );
             });
         });
     }

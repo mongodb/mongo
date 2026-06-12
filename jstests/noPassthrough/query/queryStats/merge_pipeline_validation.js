@@ -35,7 +35,13 @@ function runTest(testDB, {queryStatsEnabled, isMongos, customSetupFn = () => {}}
     customSetupFn(source);
 
     const problematicMergePipeline = [
-        {$merge: {into: target.getName(), whenMatched: [{$addFields: 2}], whenNotMatched: "insert"}},
+        {
+            $merge: {
+                into: target.getName(),
+                whenMatched: [{$addFields: 2}],
+                whenNotMatched: "insert",
+            },
+        },
     ];
     const addFieldsErrorCode = 40272;
 
@@ -92,7 +98,9 @@ function runSetFieldNullCharsMergeTest(testDB, {queryStatsEnabled}) {
             ];
         }
 
-        const expectedCodes = queryStatsEnabled ? [...codes, ErrorCodes.QueryStatsFailedToRecord] : codes;
+        const expectedCodes = queryStatsEnabled
+            ? [...codes, ErrorCodes.QueryStatsFailedToRecord]
+            : codes;
 
         assertErrorCode(coll, useWithinMergePipeline(setFieldExpression), expectedCodes);
         assertErrorCode(coll, useWithinMergePipeline(unsetFieldExpression), expectedCodes);

@@ -48,7 +48,11 @@ export const $config = (function () {
         this.buildIndex(db, {x: 1});
 
         let bulk = db[this.collName].initializeOrderedBulkOp();
-        for (let i = this.nDocumentsInTotal; i < this.nDocumentsInTotal + this.nDocumentsToInsert; i++) {
+        for (
+            let i = this.nDocumentsInTotal;
+            i < this.nDocumentsInTotal + this.nDocumentsToInsert;
+            i++
+        ) {
             bulk.insert({_id: i, x: i});
         }
         let res = bulk.execute(writeConcern);

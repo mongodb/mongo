@@ -72,14 +72,20 @@ const baselineMetrics = waitForIndexStatusMetrics(
 // Set the failpoint after the collection scan phase. It is expected that we never hit this
 // failpoint due to the immediate index build failure. If this is hit, it will hang the test
 // indefinitely.
-const failpointHangAfterScan = configureFailPoint(testDB, "hangAfterIndexBuildDumpsInsertsFromBulk");
+const failpointHangAfterScan = configureFailPoint(
+    testDB,
+    "hangAfterIndexBuildDumpsInsertsFromBulk",
+);
 
 // Block the primary from actually aborting and replicating the 'abortIndexBuild', to give time for
 // the secondary to finish the scan.
 const failpointBeforeAbort = configureFailPoint(testDB, "hangIndexBuildBeforeAbortCleanUp");
 
 // The secondary should continue to the next index build phase after suppressing the error.
-const failpointHangAfterScanSecondary = configureFailPoint(secondaryDB, "hangAfterIndexBuildDumpsInsertsFromBulk");
+const failpointHangAfterScanSecondary = configureFailPoint(
+    secondaryDB,
+    "hangAfterIndexBuildDumpsInsertsFromBulk",
+);
 
 // Create the index and start the build.
 const createIdx = IndexBuildTest.startIndexBuild(

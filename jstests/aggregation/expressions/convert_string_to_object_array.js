@@ -41,7 +41,10 @@ const conversionTestDocs = [
     makeValidConversion(9, '[[[["nested", {"object":"here"}]]]]'),
     makeValidConversion(10, '{"nested": [[["array"]]]}'),
     // Very deep and wide (but not too deep or large) inputs.
-    makeValidConversion(11, `{"nested145": ${makeNestedArrayString(145)}, "another": ${makeNestedArrayString(145)}}`),
+    makeValidConversion(
+        11,
+        `{"nested145": ${makeNestedArrayString(145)}, "another": ${makeNestedArrayString(145)}}`,
+    ),
     makeValidConversion(12, `{"long100K": ${makeLongArrayString(100_000)}}`),
     // Numeric conversions.
     makeValidConversion(13, '{"number": 1.2e+3}'),
@@ -92,6 +95,10 @@ const illegalConversionTestDocs = [
 ];
 
 // One test document for each "nullish" value.
-const nullTestDocs = [{_id: 0, input: null}, {_id: 1, input: undefined}, {_id: 2 /* input is missing */}];
+const nullTestDocs = [
+    {_id: 0, input: null},
+    {_id: 1, input: undefined},
+    {_id: 2 /* input is missing */},
+];
 
 runConvertTests({coll, requiresFCV83, conversionTestDocs, illegalConversionTestDocs, nullTestDocs});

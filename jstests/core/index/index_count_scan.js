@@ -44,7 +44,9 @@ const getQueryPlan = function (explain) {
         explain = explain.stages[0].$cursor;
     }
     let winningPlan = explain.queryPlanner.winningPlan;
-    return winningPlan.queryPlan ? [winningPlan.queryPlan, winningPlan.slotBasedPlan] : [winningPlan, null];
+    return winningPlan.queryPlan
+        ? [winningPlan.queryPlan, winningPlan.slotBasedPlan]
+        : [winningPlan, null];
 };
 
 const runAndVerify = function (expectedCount, pipeline, stage, sbePlanStage) {

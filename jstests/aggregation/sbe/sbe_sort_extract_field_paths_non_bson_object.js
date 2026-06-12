@@ -8,6 +8,9 @@ assert.commandWorked(
         "m": {"m1": NumberInt(0), "m2": NumberInt(0)},
     }),
 );
-assert.eq(db.c.aggregate([{"$sort": {"m.m1": 1}}, {"$group": {"_id": null, "a": {"$min": "$m.m1"}}}]).toArray(), [
-    {"_id": null, "a": NumberInt(0)},
-]);
+assert.eq(
+    db.c
+        .aggregate([{"$sort": {"m.m1": 1}}, {"$group": {"_id": null, "a": {"$min": "$m.m1"}}}])
+        .toArray(),
+    [{"_id": null, "a": NumberInt(0)}],
+);

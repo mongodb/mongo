@@ -25,7 +25,9 @@ const unshardedViewName = "unsharded_view";
 const viewOnShardedViewName = "sharded_view_view";
 
 function setUpUnshardedCollectionAndView(st, session, primaryShard) {
-    assert.commandWorked(st.s.adminCommand({enableSharding: unshardedDbName, primaryShard: primaryShard}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: unshardedDbName, primaryShard: primaryShard}),
+    );
 
     assert.commandWorked(
         st.s
@@ -35,7 +37,11 @@ function setUpUnshardedCollectionAndView(st, session, primaryShard) {
 
     const unshardedView = session.getDatabase(unshardedDbName)[unshardedViewName];
     assert.commandWorked(
-        unshardedView.runCommand("create", {viewOn: unshardedCollName, pipeline: [], writeConcern: {w: "majority"}}),
+        unshardedView.runCommand("create", {
+            viewOn: unshardedCollName,
+            pipeline: [],
+            writeConcern: {w: "majority"},
+        }),
     );
 
     return unshardedView;
@@ -44,21 +50,33 @@ function setUpUnshardedCollectionAndView(st, session, primaryShard) {
 function setUpShardedCollectionAndView(st, session, primaryShard) {
     const ns = shardedDbName + "." + shardedCollName;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: shardedDbName, primaryShard: primaryShard}));
     assert.commandWorked(
-        st.s.getDB(shardedDbName)[shardedCollName].insert({_id: -1, x: "sharded -1"}, {writeConcern: {w: "majority"}}),
+        st.s.adminCommand({enableSharding: shardedDbName, primaryShard: primaryShard}),
     );
     assert.commandWorked(
-        st.s.getDB(shardedDbName)[shardedCollName].insert({_id: 1, x: "sharded +1"}, {writeConcern: {w: "majority"}}),
+        st.s
+            .getDB(shardedDbName)
+            [shardedCollName].insert({_id: -1, x: "sharded -1"}, {writeConcern: {w: "majority"}}),
+    );
+    assert.commandWorked(
+        st.s
+            .getDB(shardedDbName)
+            [shardedCollName].insert({_id: 1, x: "sharded +1"}, {writeConcern: {w: "majority"}}),
     );
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}),
+    );
 
     const shardedView = session.getDatabase(shardedDbName)[shardedViewName];
     assert.commandWorked(
-        shardedView.runCommand("create", {viewOn: shardedCollName, pipeline: [], writeConcern: {w: "majority"}}),
+        shardedView.runCommand("create", {
+            viewOn: shardedCollName,
+            pipeline: [],
+            writeConcern: {w: "majority"},
+        }),
     );
 
     flushRoutersAndRefreshShardMetadata(st, {ns, dbNames: [shardedDbName, unshardedDbName]});
@@ -76,10 +94,16 @@ const st = new ShardingTest({
 function disableDurableRecovery(conn) {
     const nodes = FixtureHelpers.getAllNodes(conn.getDB("admin"));
     for (const node of nodes) {
-        const res = node.adminCommand({getParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 1});
+        const res = node.adminCommand({
+            getParameter: 1,
+            durableRecoveryForCollectionCatalogEntryChance: 1,
+        });
         if (res.ok) {
             assert.commandWorked(
-                node.adminCommand({setParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 0}),
+                node.adminCommand({
+                    setParameter: 1,
+                    durableRecoveryForCollectionCatalogEntryChance: 0,
+                }),
             );
         }
     }
@@ -101,7 +125,11 @@ const shardedView = setUpShardedCollectionAndView(st, session, st.shard0.shardNa
 // Set up a view on the sharded view, in the same database.
 const viewOnShardedView = session.getDatabase(shardedDbName)[viewOnShardedViewName];
 assert.commandWorked(
-    viewOnShardedView.runCommand("create", {viewOn: shardedViewName, pipeline: [], writeConcern: {w: "majority"}}),
+    viewOnShardedView.runCommand("create", {
+        viewOn: shardedViewName,
+        pipeline: [],
+        writeConcern: {w: "majority"},
+    }),
 );
 
 //
@@ -465,7 +493,9 @@ if (areAdditionalParticipantsAllowed) {
     // Test unsharded collection lookup.
     let lookupDbName = unshardedDbName;
     const lookupCollName = "collForLookup";
-    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}),
+    );
     let lookupColl = session.getDatabase(lookupDbName)[lookupCollName];
 
     // Lookup the document in the unsharded collection with _id: 1 through the unsharded view.
@@ -474,7 +504,12 @@ if (areAdditionalParticipantsAllowed) {
         [
             {$match: {_id: 1}},
             {
-                $lookup: {from: unshardedViewName, localField: "_id", foreignField: "_id", as: "matched"},
+                $lookup: {
+                    from: unshardedViewName,
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "matched",
+                },
             },
             {$unwind: "$matched"},
             {$project: {_id: 1, matchedX: "$matched.x"}},
@@ -506,13 +541,23 @@ if (areAdditionalParticipantsAllowed) {
     // here but sharding it first.
     lookupDbName = shardedDbName;
     lookupColl = session.getDatabase(lookupDbName)[lookupCollName];
-    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
-    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}),
+    );
+    assert.commandWorked(
+        st.s.getDB(lookupDbName)[lookupCollName].insert({_id: -1}, {writeConcern: {w: "majority"}}),
+    );
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: lookupColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: lookupColl.getFullName(), key: {_id: 1}}),
+    );
     assert.commandWorked(st.s.adminCommand({split: lookupColl.getFullName(), middle: {_id: 0}}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: lookupColl.getFullName(), find: {_id: 1}, to: st.shard1.shardName}),
+        st.s.adminCommand({
+            moveChunk: lookupColl.getFullName(),
+            find: {_id: 1},
+            to: st.shard1.shardName,
+        }),
     );
 
     // Lookup the documents in the now sharded collection through the sharded view.
@@ -520,7 +565,12 @@ if (areAdditionalParticipantsAllowed) {
         lookupColl,
         [
             {
-                $lookup: {from: shardedViewName, localField: "_id", foreignField: "_id", as: "matched"},
+                $lookup: {
+                    from: shardedViewName,
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "matched",
+                },
             },
             {$unwind: "$matched"},
             {$project: {_id: 1, matchedX: "$matched.x"}},

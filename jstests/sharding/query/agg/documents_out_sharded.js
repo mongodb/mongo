@@ -20,10 +20,20 @@ assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 1}}));
 assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: coll + "",
+        find: {_id: 1},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+    admin.runCommand({
+        moveChunk: coll + "",
+        find: {_id: 0},
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 assert.doesNotThrow(() =>

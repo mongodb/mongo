@@ -44,14 +44,20 @@ function runTest(verbosity, pipeline, expectedStages) {
 }
 
 // Test each verbosity for the $explain stage. $explain includes its input as well as a verbosity string in its output.
-runTest("queryPlanner", [{$explain: {input: "hello"}}], {$explain: {input: "hello", verbosity: "queryPlanner"}});
-runTest("executionStats", [{$explain: {input: "hello"}}], {$explain: {input: "hello", verbosity: "executionStats"}});
+runTest("queryPlanner", [{$explain: {input: "hello"}}], {
+    $explain: {input: "hello", verbosity: "queryPlanner"},
+});
+runTest("executionStats", [{$explain: {input: "hello"}}], {
+    $explain: {input: "hello", verbosity: "executionStats"},
+});
 runTest("allPlansExecution", [{$explain: {input: "hello"}}], {
     $explain: {input: "hello", verbosity: "allPlansExecution"},
 });
 
 function runUnionWithTest(verbosity, pipeline, expectedStages) {
-    const result = coll.explain(verbosity).aggregate({$unionWith: {coll: coll.getName(), pipeline}});
+    const result = coll
+        .explain(verbosity)
+        .aggregate({$unionWith: {coll: coll.getName(), pipeline}});
 
     for (const unionWithStage of getAggPlanStages(result, "$unionWith")) {
         const unionWithPipelineExplainOutput = unionWithStage["$unionWith"]["pipeline"];
@@ -77,7 +83,9 @@ runUnionWithTest("executionStats", [{$explain: {input: "hello"}}], {
 // Test explain output for view with extension stage in definition.
 {
     const viewName = "explain_in_def";
-    assert.commandWorked(db.createView(viewName, coll.getName(), [{$explain: {input: "fromView"}}]));
+    assert.commandWorked(
+        db.createView(viewName, coll.getName(), [{$explain: {input: "fromView"}}]),
+    );
 
     for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
         const explain = db[viewName].explain(verbosity).aggregate([]);

@@ -225,7 +225,10 @@ expectFailureWithArgs(
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", -1]}},
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x"},
+                window: {documents: ["unbounded", -1]},
+            },
         },
     },
     ErrorCodes.FailedToParse,
@@ -379,7 +382,10 @@ expectFailureWithArgs(
     {
         sortBy: {y: -1},
         output: {
-            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x"},
+                window: {range: ["unbounded", "unbounded"]},
+            },
         },
     },
     8947401,
@@ -390,7 +396,10 @@ expectFailureWithArgs(
     {
         sortBy: {_id: -1},
         output: {
-            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", "unbounded"]}},
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x"},
+                window: {range: ["current", "unbounded"]},
+            },
         },
     },
     8947401,
@@ -433,7 +442,10 @@ expectFailureWithArgs(
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
-        "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x"},
+            window: {documents: ["current", "unbounded"]},
+        },
     },
 });
 expectSuccessWithArgs({
@@ -460,7 +472,10 @@ expectSuccessWithArgs({
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
-        "relativeXValue": {$minMaxScaler: {input: "$x", min: 0, max: 10}, window: {range: [0, "unbounded"]}},
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x", min: 0, max: 10},
+            window: {range: [0, "unbounded"]},
+        },
     },
 });
 expectSuccessWithArgs({

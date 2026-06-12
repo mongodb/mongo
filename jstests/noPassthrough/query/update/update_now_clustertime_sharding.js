@@ -14,7 +14,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {nodes: 1}});
 
 const db = st.s.getDB(jsTestName());
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const otherColl = db.other;
 const coll = db.test;
@@ -55,9 +57,13 @@ assert.commandFailedWithCode(
 // Test that $$NOW and $$CLUSTER_TIME are available and remain constant across all updated
 // documents.
 let writeResult = assert.commandWorked(
-    coll.update({$where: "sleep(10); return true"}, [{$addFields: {now: "$$NOW", ctime: "$$CLUSTER_TIME"}}], {
-        multi: true,
-    }),
+    coll.update(
+        {$where: "sleep(10); return true"},
+        [{$addFields: {now: "$$NOW", ctime: "$$CLUSTER_TIME"}}],
+        {
+            multi: true,
+        },
+    ),
 );
 
 assert.eq(writeResult.nMatched, numDocs);
@@ -169,8 +175,12 @@ assert.commandWorked(
 // size, it may issue two or more separate update commands. $$NOW and $$CLUSTER_TIME will be
 // constant within each update command, but not across commands.
 bulk = coll.initializeUnorderedBulkOp();
-bulk.find({$where: "sleep(10); return true"}).update([{$addFields: {now5: "$$NOW", ctime5: "$$CLUSTER_TIME"}}]);
-bulk.find({$where: "sleep(10); return true"}).update([{$addFields: {now6: "$$NOW", ctime6: "$$CLUSTER_TIME"}}]);
+bulk.find({$where: "sleep(10); return true"}).update([
+    {$addFields: {now5: "$$NOW", ctime5: "$$CLUSTER_TIME"}},
+]);
+bulk.find({$where: "sleep(10); return true"}).update([
+    {$addFields: {now6: "$$NOW", ctime6: "$$CLUSTER_TIME"}},
+]);
 writeResult = assert.commandWorked(bulk.execute());
 
 assert.eq(writeResult.nMatched, numDocs * 2);
@@ -205,7 +215,10 @@ let returnedDoc = coll.findAndModify({
     query: {
         shard: 0,
         $expr: {
-            $and: [{$lt: ["$_id", {$min: [_idMidpoint, "$$NOW"]}]}, {$gt: ["$$CLUSTER_TIME", "$insertClusterTime"]}],
+            $and: [
+                {$lt: ["$_id", {$min: [_idMidpoint, "$$NOW"]}]},
+                {$gt: ["$$CLUSTER_TIME", "$insertClusterTime"]},
+            ],
         },
     },
     update: [{$addFields: {nowFAM: "$$NOW", ctimeFAM: "$$CLUSTER_TIME"}}],
@@ -266,7 +279,9 @@ assert.commandWorked(
                 ],
             },
         },
-        update: [{$addFields: {explainDoesNotWrite1: "$$NOW", explainDoesNotWrite2: "$$CLUSTER_TIME"}}],
+        update: [
+            {$addFields: {explainDoesNotWrite1: "$$NOW", explainDoesNotWrite2: "$$CLUSTER_TIME"}},
+        ],
         sort: {_id: 1},
         new: true,
     }),
@@ -275,7 +290,9 @@ assert.commandWorked(
 // Test that we can use $$NOW and $$CLUSTER_TIME in an update via a $merge aggregation. We first
 // use $merge to copy the current contents of 'coll' into 'otherColl'.
 assert.doesNotThrow(() =>
-    coll.aggregate([{$merge: {into: otherColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]),
+    coll.aggregate([
+        {$merge: {into: otherColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+    ]),
 );
 // Run an aggregation which adds $$NOW and $$CLUSTER_TIME fields into the pipeline document,
 // then do the same to the documents in the output collection via a pipeline update.

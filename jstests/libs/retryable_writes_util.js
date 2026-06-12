@@ -91,7 +91,12 @@ export var RetryableWritesUtil = (function () {
         let res;
         for (let i = 0; i < nTimes; i++) {
             jsTestLog(
-                "Executing command: " + tojson(command) + "\nIteration: " + i + "\nExpected Code: " + expectedErrorCode,
+                "Executing command: " +
+                    tojson(command) +
+                    "\nIteration: " +
+                    i +
+                    "\nExpected Code: " +
+                    expectedErrorCode,
             );
             res = conn.runCommand(command);
         }
@@ -104,7 +109,8 @@ export var RetryableWritesUtil = (function () {
     }
 
     function isFailedToSatisfyPrimaryReadPreferenceError(res) {
-        const kReplicaSetMonitorError = /Could not find host matching read preference.*mode:.*primary/;
+        const kReplicaSetMonitorError =
+            /Could not find host matching read preference.*mode:.*primary/;
         if (res.code === ErrorCodes.FailedToSatisfyReadPreference && res.hasOwnProperty("reason")) {
             return res.reason.match(kReplicaSetMonitorError);
         }
@@ -163,7 +169,10 @@ export var RetryableWritesUtil = (function () {
                 return (
                     !executionStats.executionSuccess &&
                     (isRetryableCode(executionStats.errorCode) ||
-                        isRetryableExecutorCodeAndMessage(executionStats.errorCode, executionStats.errorMessage))
+                        isRetryableExecutorCodeAndMessage(
+                            executionStats.errorCode,
+                            executionStats.errorMessage,
+                        ))
                 );
             };
             const executionStats = res.executionStats.executionStages.hasOwnProperty("shards")

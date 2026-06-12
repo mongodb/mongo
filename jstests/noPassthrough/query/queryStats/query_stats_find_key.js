@@ -109,14 +109,23 @@ function validateSystemVariables(coll) {
     assert.commandWorked(
         testDB.runCommand({
             find: collName,
-            filter: {$expr: {$and: [{$eq: ["$document", "$$ROOT"]}, {$gte: ["$$NOW", ISODate("2000-01-01")]}]}},
+            filter: {
+                $expr: {
+                    $and: [
+                        {$eq: ["$document", "$$ROOT"]},
+                        {$gte: ["$$NOW", ISODate("2000-01-01")]},
+                    ],
+                },
+            },
             // This will be correctly treated as a string and not an internal system variable.
             projection: {"NOW": 0},
         }),
     );
     const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: collName});
     const queryShape = entry.key.queryShape;
-    assert.eq(queryShape.filter, {$expr: {$and: [{$eq: ["$document", "$$ROOT"]}, {$gte: ["$$NOW", "?date"]}]}});
+    assert.eq(queryShape.filter, {
+        $expr: {$and: [{$eq: ["$document", "$$ROOT"]}, {$gte: ["$$NOW", "?date"]}]},
+    });
     assert.eq(queryShape.projection, {"NOW": false});
 }
 

@@ -19,9 +19,21 @@ const predicate = {
 };
 
 function checkFind() {
-    assert.eq(49, coll.find(predicate).count(), "Expected count() with predicate to return correct result");
-    assert.eq(49, coll.find(predicate).itcount(), "Expected find() used with itcount() to return correct result");
-    assert.eq(20, coll.find(predicate).limit(20).itcount(), "Expected find() with limit to return correct result");
+    assert.eq(
+        49,
+        coll.find(predicate).count(),
+        "Expected count() with predicate to return correct result",
+    );
+    assert.eq(
+        49,
+        coll.find(predicate).itcount(),
+        "Expected find() used with itcount() to return correct result",
+    );
+    assert.eq(
+        20,
+        coll.find(predicate).limit(20).itcount(),
+        "Expected find() with limit to return correct result",
+    );
 }
 
 function checkExplainWithExecutionStats() {

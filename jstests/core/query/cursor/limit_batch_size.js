@@ -40,14 +40,25 @@ function testSingleBatchAggregate({pipeline, batchSize, expectSingleBatch}) {
     assertSingleBatch({cursor, batchSize, expectSingleBatch});
 }
 
-testSingleBatchFind({query: {index: {$gte: 50}}, limit: 10, batchSize: 10, expectSingleBatch: true});
+testSingleBatchFind({
+    query: {index: {$gte: 50}},
+    limit: 10,
+    batchSize: 10,
+    expectSingleBatch: true,
+});
 testSingleBatchAggregate({
     pipeline: [{$match: {index: {$gte: 50}}}, {$limit: 10}],
     batchSize: 10,
     expectSingleBatch: true,
 });
 
-testSingleBatchFind({query: {index: {$gte: 50}}, sort: {index: 1}, limit: 10, batchSize: 10, expectSingleBatch: true});
+testSingleBatchFind({
+    query: {index: {$gte: 50}},
+    sort: {index: 1},
+    limit: 10,
+    batchSize: 10,
+    expectSingleBatch: true,
+});
 testSingleBatchAggregate({
     pipeline: [{$match: {index: {$gte: 50}}}, {$sort: {index: 1}}, {$limit: 10}],
     batchSize: 10,
@@ -60,7 +71,11 @@ testSingleBatchFind({query: {index: {$gte: 50}}, batchSize: 10, expectSingleBatc
 // the scan to be sure. On sharded clusters his case is not stable, because is some cases mongos
 // may pull the whole output from mongod and know that we are finished.
 if (!FixtureHelpers.isSharded(coll)) {
-    testSingleBatchAggregate({pipeline: [{$match: {index: {$lt: 10}}}], batchSize: 10, expectSingleBatch: false});
+    testSingleBatchAggregate({
+        pipeline: [{$match: {index: {$lt: 10}}}],
+        batchSize: 10,
+        expectSingleBatch: false,
+    });
 }
 
 // $_internalInhibitOptimization prevents the optimizer from reordering stages and forces the

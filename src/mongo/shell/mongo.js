@@ -49,7 +49,10 @@ Mongo.prototype.getSecondaryOk = function () {
  * @this {Mongo}
  */
 Mongo.prototype.getDB = function (name) {
-    if (jsTest.options().keyFile && (typeof this.authenticated == "undefined" || !this.authenticated)) {
+    if (
+        jsTest.options().keyFile &&
+        (typeof this.authenticated == "undefined" || !this.authenticated)
+    ) {
         jsTest.authenticate(this);
     }
     // There is a weird issue where typeof(db._name) !== "string" when the db name
@@ -105,7 +108,10 @@ Mongo.prototype.getDBs = function (
         // Calling listDatases is only valid if we have a security token in multitenancy mode.
         // Otherwise we call listDatabasesForAllTenants which list db.name and db.tenantId
         // separately. The result never has a tenant prefix.
-        let cmdObj = multitenancy && !this._securityToken ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
+        let cmdObj =
+            multitenancy && !this._securityToken
+                ? {listDatabasesForAllTenants: 1}
+                : {listDatabases: 1};
         if (filter !== undefined) {
             cmdObj.filter = filter;
         }
@@ -207,7 +213,11 @@ Mongo.prototype.getLogComponents = function (driverSession = this._getDefaultSes
  * Accepts optional second argument "component",
  * string of form "storage.journaling"
  */
-Mongo.prototype.setLogLevel = function (logLevel, component, driverSession = this._getDefaultSession()) {
+Mongo.prototype.setLogLevel = function (
+    logLevel,
+    component,
+    driverSession = this._getDefaultSession(),
+) {
     let componentNames = [];
     if (typeof component === "string") {
         componentNames = component.split(".");
@@ -264,7 +274,11 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  */
 Mongo.prototype.setReadPref = function (mode, tagSet) {
-    if (this._readPrefMode === "primary" && typeof tagSet !== "undefined" && Object.keys(tagSet).length > 0) {
+    if (
+        this._readPrefMode === "primary" &&
+        typeof tagSet !== "undefined" &&
+        Object.keys(tagSet).length > 0
+    ) {
         // we allow empty arrays/objects or no tagSet for compatibility reasons
         throw Error('Cannot supply tagSet with readPref mode "primary"');
     }
@@ -575,7 +589,10 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
     let count = 0;
     while (count < maxRetries) {
         if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
-            if (this._clusterTime.hasOwnProperty("signature") && this._clusterTime.signature.keyId > 0) {
+            if (
+                this._clusterTime.hasOwnProperty("signature") &&
+                this._clusterTime.signature.keyId > 0
+            ) {
                 return;
             }
         }
@@ -678,7 +695,10 @@ Mongo.prototype.watch = function (pipeline, options) {
 
     const [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
     changeStreamStage.$changeStream.allChangesForCluster = true;
-    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: [changeStreamStage, ...pipeline]}, aggOptions);
+    return this.getDB("admin")._runAggregate(
+        {aggregate: 1, pipeline: [changeStreamStage, ...pipeline]},
+        aggOptions,
+    );
 };
 
 Mongo.prototype.refreshClusterParameters = function () {

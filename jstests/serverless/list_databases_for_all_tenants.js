@@ -27,10 +27,15 @@ function runTestNoMultiTenancySupport() {
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");
 
-    assert.commandWorked(adminDB.runCommand({createUser: "internalUsr", pwd: "pwd", roles: ["__system"]}));
+    assert.commandWorked(
+        adminDB.runCommand({createUser: "internalUsr", pwd: "pwd", roles: ["__system"]}),
+    );
     assert(adminDB.auth("internalUsr", "pwd"));
 
-    assert.commandFailedWithCode(adminDB.runCommand({listDatabasesForAllTenants: 1}), ErrorCodes.CommandNotSupported);
+    assert.commandFailedWithCode(
+        adminDB.runCommand({listDatabasesForAllTenants: 1}),
+        ErrorCodes.CommandNotSupported,
+    );
 
     rst.stopSet();
 }

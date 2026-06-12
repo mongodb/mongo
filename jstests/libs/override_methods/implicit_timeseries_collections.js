@@ -61,7 +61,11 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     // should be handled the same way as findAndModify).
     switch (cmdName.toLowerCase()) {
         case "insert": {
-            createCollectionImplicitly(conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
+            createCollectionImplicitly(
+                conn.getDB(dbName),
+                `${dbName}.${cmdObj[cmdName]}`,
+                cmdObj[cmdName],
+            );
             // Add the timestamp property to every document in the insert.
             if ("documents" in cmdObj) {
                 cmdObj["documents"].forEach((doc) => {
@@ -91,7 +95,11 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         case "findandmodify": {
             const upsert = cmdObj["upsert"] == true;
             if (upsert) {
-                createCollectionImplicitly(conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
+                createCollectionImplicitly(
+                    conn.getDB(dbName),
+                    `${dbName}.${cmdObj[cmdName]}`,
+                    cmdObj[cmdName],
+                );
             }
             addTimeFieldForUpdate(cmdObj["update"], upsert);
             let findAndModifyResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
@@ -118,7 +126,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
             // haven't already.
             const collAgg =
                 typeof cmdObj["explain"]["aggregate"] === "string" &&
-                bsonWoCompare(cmdObj["explain"]["pipeline"][0], {"$project": {[timeFieldName]: 0}}) != 0;
+                bsonWoCompare(cmdObj["explain"]["pipeline"][0], {
+                    "$project": {[timeFieldName]: 0},
+                }) != 0;
             if (collAgg) {
                 cmdObj["explain"]["pipeline"].unshift({"$project": {[timeFieldName]: 0}});
             }
@@ -138,7 +148,11 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 cmdObj["updates"].forEach((upd) => {
                     const upsert = upd["upsert"];
                     if (upsert) {
-                        createCollectionImplicitly(conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
+                        createCollectionImplicitly(
+                            conn.getDB(dbName),
+                            `${dbName}.${cmdObj[cmdName]}`,
+                            cmdObj[cmdName],
+                        );
                     }
                     addTimeFieldForUpdate(upd["u"], upsert);
                 });
@@ -155,7 +169,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 conn,
                 makeFuncArgs({
                     ...cmdObj,
-                    setQuerySettings: applyTimefieldProjectionToRepresentativeQuery(cmdObj.setQuerySettings),
+                    setQuerySettings: applyTimefieldProjectionToRepresentativeQuery(
+                        cmdObj.setQuerySettings,
+                    ),
                 }),
             );
         }
@@ -163,7 +179,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
             return clientFunction.apply(
                 conn,
                 makeFuncArgs({
-                    removeQuerySettings: applyTimefieldProjectionToRepresentativeQuery(cmdObj.removeQuerySettings),
+                    removeQuerySettings: applyTimefieldProjectionToRepresentativeQuery(
+                        cmdObj.removeQuerySettings,
+                    ),
                 }),
             );
         }
@@ -219,7 +237,10 @@ function createCollectionImplicitly(db, collFullName, collName) {
         return;
     }
 
-    db.runCommand({create: collName, timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
+    db.runCommand({
+        create: collName,
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    });
 }
 
 /**
@@ -295,10 +316,15 @@ function removeTimeFieldForUpdate(upd, upsert) {
 
 const assertIndexScanStageInit = QuerySettingsIndexHintsTests.prototype.assertIndexScanStage;
 QuerySettingsIndexHintsTests.prototype.assertIndexScanStage = function (cmd, expectedIndex, ns) {
-    return assertIndexScanStageInit.call(this, cmd, transformIndexHintsForTimeseriesCollection(expectedIndex), {
-        ...ns,
-        coll: getTimeseriesCollForDDLOps(db, db.getSiblingDB(ns.db)[ns.coll]).getName(),
-    });
+    return assertIndexScanStageInit.call(
+        this,
+        cmd,
+        transformIndexHintsForTimeseriesCollection(expectedIndex),
+        {
+            ...ns,
+            coll: getTimeseriesCollForDDLOps(db, db.getSiblingDB(ns.db)[ns.coll]).getName(),
+        },
+    );
 };
 
 QuerySettingsUtils.prototype.assertQueryFramework = function ({query, settings, expectedEngine}) {
@@ -306,7 +332,9 @@ QuerySettingsUtils.prototype.assertQueryFramework = function ({query, settings, 
     // not eligible for SBE on timeseries collections.
     // TODO SERVER-92864 Remove this exclusion when timeseries queries support running in SBE.
     if (query["find"] || (expectedEngine === "sbe" && !checkSbeFullFeatureFlagEnabled(db))) {
-        jsTestLog("Skipping assertions because sbe conditions for timeseries collections are not met.");
+        jsTestLog(
+            "Skipping assertions because sbe conditions for timeseries collections are not met.",
+        );
         return;
     }
 
@@ -326,7 +354,11 @@ QuerySettingsUtils.prototype.assertQueryFramework = function ({query, settings, 
         : this.withoutDollarDB(query);
     const explain = assert.commandWorked(this._db.runCommand({explain: withoutDollarDB}));
     const engine = getEngine(explain);
-    assert.eq(engine, expectedEngine, `Expected engine to be ${expectedEngine} but found ${engine}`);
+    assert.eq(
+        engine,
+        expectedEngine,
+        `Expected engine to be ${expectedEngine} but found ${engine}`,
+    );
 
     // Ensure that no $cursor stage exists, which means the whole query got pushed down to find,
     // if 'expectedEngine' is SBE.
@@ -345,13 +377,18 @@ QuerySettingsUtils.prototype.assertQueryFramework = function ({query, settings, 
         const winningPlan = getWinningPlanFromExplain(explain);
         const ixscanStage = getPlanStages(winningPlan, "IXSCAN")[0];
 
-        assert.eq(transformIndexHintsForTimeseriesCollection(query.hint), ixscanStage.keyPattern, winningPlan);
+        assert.eq(
+            transformIndexHintsForTimeseriesCollection(query.hint),
+            ixscanStage.keyPattern,
+            winningPlan,
+        );
     }
 
     this.removeAllQuerySettings();
 };
 
-const assertQueryShapeConfigurationInit = QuerySettingsUtils.prototype.assertQueryShapeConfiguration;
+const assertQueryShapeConfigurationInit =
+    QuerySettingsUtils.prototype.assertQueryShapeConfiguration;
 QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function (
     expectedQueryShapeConfigurations,
     shouldRunExplain = true,
@@ -363,7 +400,9 @@ QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function (
         }
         return {
             ...config,
-            representativeQuery: applyTimefieldProjectionToRepresentativeQuery(config["representativeQuery"]),
+            representativeQuery: applyTimefieldProjectionToRepresentativeQuery(
+                config["representativeQuery"],
+            ),
         };
     });
     return assertQueryShapeConfigurationInit.call(
@@ -374,7 +413,8 @@ QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function (
     );
 };
 
-const getQueryShapeHashFromQuerySettingsInit = QuerySettingsUtils.prototype.getQueryShapeHashFromQuerySettings;
+const getQueryShapeHashFromQuerySettingsInit =
+    QuerySettingsUtils.prototype.getQueryShapeHashFromQuerySettings;
 QuerySettingsUtils.prototype.getQueryShapeHashFromQuerySettings = function (representativeQuery) {
     return getQueryShapeHashFromQuerySettingsInit.call(
         this,

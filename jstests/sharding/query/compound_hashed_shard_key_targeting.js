@@ -20,7 +20,9 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
 const ns = kDbName + ".coll";
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 
 // Enable 'retryWrites' so that the shard key fields are updatable.
 const session = st.s.startSession({retryWrites: true});
@@ -59,7 +61,9 @@ function validateFindCmdOutputAndPlan({filter, expectedStages, expectedOutput, t
 /**
  * Tests when range field is a prefix of compound hashed shard key.
  */
-assert.commandWorked(st.s.getDB("config").adminCommand({shardCollection: ns, key: {a: 1, b: "hashed", c: 1}}));
+assert.commandWorked(
+    st.s.getDB("config").adminCommand({shardCollection: ns, key: {a: 1, b: "hashed", c: 1}}),
+);
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {a: 0, b: MinKey, c: MinKey}}));
 
 // Postive numbers of 'a' should go to 'shard1DB' and negative numbers should go to 'shard0DB'
@@ -83,17 +87,35 @@ for (let i = 20; i < 40; i++) {
     assert.commandWorked(coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard0DB,
-        filter: {ns: ns, op: shardCmdName, "command.insert": {$exists: true}, "command.documents.a": i},
+        filter: {
+            ns: ns,
+            op: shardCmdName,
+            "command.insert": {$exists: true},
+            "command.documents.a": i,
+        },
     });
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard1DB,
-        filter: {ns: ns, op: shardCmdName, "command.insert": {$exists: true}, "command.documents.a": i, "ninserted": 1},
+        filter: {
+            ns: ns,
+            op: shardCmdName,
+            "command.insert": {$exists: true},
+            "command.documents.a": i,
+            "ninserted": 1,
+        },
     });
 
-    assert.commandWorked(coll.insert({a: -i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
+    assert.commandWorked(
+        coll.insert({a: -i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}),
+    );
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard1DB,
-        filter: {ns: ns, op: shardCmdName, "command.insert": {$exists: true}, "command.documents.a": -i},
+        filter: {
+            ns: ns,
+            op: shardCmdName,
+            "command.insert": {$exists: true},
+            "command.documents.a": -i,
+        },
     });
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
@@ -172,13 +194,22 @@ res = assert.commandWorked(coll.update({a: 22, b: {subObj: "str_0"}, c: "update"
 assert.eq(res.nModified, 1, res);
 
 // Verify that the 'update' command gets targeted to 'shard1DB'.
-profilerHasAtLeastOneMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
+profilerHasAtLeastOneMatchingEntryOrThrow({
+    profileDB: shard1DB,
+    filter: {ns: ns, "op": shardCmdName},
+});
 profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
 
 // Verify that the 'count' command gets targeted to 'shard0DB' after the update.
 assert.eq(coll.count(updateObj["$set"]), 1);
-profilerHasSingleMatchingEntryOrThrow({profileDB: shard0DB, filter: {ns: ns, "command.count": "coll"}});
-profilerHasZeroMatchingEntriesOrThrow({profileDB: shard1DB, filter: {ns: ns, "command.count": "coll"}});
+profilerHasSingleMatchingEntryOrThrow({
+    profileDB: shard0DB,
+    filter: {ns: ns, "command.count": "coll"},
+});
+profilerHasZeroMatchingEntriesOrThrow({
+    profileDB: shard1DB,
+    filter: {ns: ns, "command.count": "coll"},
+});
 
 // Test to verify that the 'delete' command with a range query predicate can target a single shard
 // if all values in the range are on that shard.
@@ -238,7 +269,9 @@ for (let i = -10; i < 10; i++) {
         "command.documents.a": i,
         "ninserted": 1,
     };
-    assert.commandWorked(coll.insert({_id: i, a: i, b: {subObj: "str_" + (i % 5)}, c: NumberInt(i % 4)}));
+    assert.commandWorked(
+        coll.insert({_id: i, a: i, b: {subObj: "str_" + (i % 5)}, c: NumberInt(i % 4)}),
+    );
     verifyProfilerEntryOnCorrectShard(i, profileFilter);
 }
 
@@ -313,6 +346,8 @@ verifyProfilerEntryOnCorrectShard(1, profileFilter);
 
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
-assert.commandWorked(coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}));
+assert.commandWorked(
+    coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}),
+);
 
 st.stop();

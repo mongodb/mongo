@@ -29,10 +29,30 @@ assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: func}}, project: 
 assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: func}}, project: proj, count: 1});
 
 // Test for equality against the original inserted function.
-assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: insertedFunc}}, project: proj, count: 0});
-assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: insertedFunc}}, project: proj, count: 1});
-assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: insertedFunc}}, project: proj, count: 0});
-assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: insertedFunc}}, project: proj, count: 1});
+assertCoveredQueryAndCount({
+    collection: coll,
+    query: {a: {$gt: insertedFunc}},
+    project: proj,
+    count: 0,
+});
+assertCoveredQueryAndCount({
+    collection: coll,
+    query: {a: {$gte: insertedFunc}},
+    project: proj,
+    count: 1,
+});
+assertCoveredQueryAndCount({
+    collection: coll,
+    query: {a: {$lt: insertedFunc}},
+    project: proj,
+    count: 0,
+});
+assertCoveredQueryAndCount({
+    collection: coll,
+    query: {a: {$lte: insertedFunc}},
+    project: proj,
+    count: 1,
+});
 
 // Test that documents that lie outside of the generated index bounds are not returned.
 coll.remove({});

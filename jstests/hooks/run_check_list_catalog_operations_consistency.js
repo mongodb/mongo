@@ -12,7 +12,8 @@ assert.soonRetryOnNetworkErrors(
         dbs = assert.commandWorked(db.adminCommand(cmdObj)).databases;
         return true;
     },
-    () => "Timed out while retrying " + tojson(cmdObj) + " for catalog operations consistency check",
+    () =>
+        "Timed out while retrying " + tojson(cmdObj) + " for catalog operations consistency check",
 );
 
 for (const dbRes of dbs) {

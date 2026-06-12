@@ -55,7 +55,9 @@ for (let versions of [
     rst.startSet({binVersion: versions});
     let err = assert.throws(() => rst.initiate());
     assert(
-        err.message.includes("Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+        err.message.includes(
+            "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.",
+        ),
         err,
     );
     rst.stopSet();
@@ -81,7 +83,9 @@ for (let versions of [
 
     let err = assert.throws(() => rst.initiate());
     assert(
-        err.message.includes("Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+        err.message.includes(
+            "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.",
+        ),
         err,
     );
     rst.stopSet();

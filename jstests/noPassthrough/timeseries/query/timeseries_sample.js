@@ -60,13 +60,20 @@ let assertPlanForSample = (explainRes, backupPlanSelected) => {
  */
 function fillBuckets(coll, measurementsPerBucket) {
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     let numDocs = nBuckets * measurementsPerBucket;
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i++) {
-        bulk.insert({_id: ObjectId(), [timeFieldName]: ISODate(), [metaFieldName]: i % nBuckets, x: i});
+        bulk.insert({
+            _id: ObjectId(),
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: i % nBuckets,
+            x: i,
+        });
     }
     assert.commandWorked(bulk.execute());
 
@@ -93,7 +100,9 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
     assertUniqueDocuments(result);
 
     // Check that we have executed the correct branch of the TrialStage.
-    const optimizedSamplePlan = coll.explain("executionStats").aggregate([{$sample: {size: sampleSize}}]);
+    const optimizedSamplePlan = coll
+        .explain("executionStats")
+        .aggregate([{$sample: {size: sampleSize}}]);
     assertPlanForSample(optimizedSamplePlan, backupPlanSelected);
 
     // Run an agg pipeline with optimization disabled.
@@ -125,7 +134,9 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
 
     // Check that $lookup against a time-series collection doesn't cache inner pipeline results if
     // it contains a $sample stage.
-    result = coll.aggregate({$lookup: {from: coll.getName(), as: "docs", pipeline: [{$sample: {size: 1}}]}}).toArray();
+    result = coll
+        .aggregate({$lookup: {from: coll.getName(), as: "docs", pipeline: [{$sample: {size: 1}}]}})
+        .toArray();
 
     // Each subquery should be an independent sample by checking that we didn't sample the same
     // document repeatedly. It's sufficient for now to make sure that the seen set contains at least
@@ -192,11 +203,16 @@ assert.neq(multiIteratorStage, null, explainRes);
 // projected data fields. Only the time field should be absent from the results.
 {
     const sampleSize = 20;
-    const result = coll.aggregate([{$sample: {size: sampleSize}}, {$project: {[metaFieldName]: 1, x: 1}}]).toArray();
+    const result = coll
+        .aggregate([{$sample: {size: sampleSize}}, {$project: {[metaFieldName]: 1, x: 1}}])
+        .toArray();
     assert.eq(result.length, sampleSize, result);
     for (const doc of result) {
         assert(!doc.hasOwnProperty(timeFieldName), `time field should be excluded: ${tojson(doc)}`);
-        assert(doc.hasOwnProperty("x"), `data field 'x' missing from $sample result: ${tojson(doc)}`);
+        assert(
+            doc.hasOwnProperty("x"),
+            `data field 'x' missing from $sample result: ${tojson(doc)}`,
+        );
     }
 }
 

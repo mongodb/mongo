@@ -12,7 +12,10 @@ export default {
     create(context) {
         return {
             CallExpression: function (node) {
-                if (node.callee.type == "Identifier" && stopList.some((fn) => fn == node.callee.name)) {
+                if (
+                    node.callee.type == "Identifier" &&
+                    stopList.some((fn) => fn == node.callee.name)
+                ) {
                     context.report({
                         node,
                         message: `Direct use of '${

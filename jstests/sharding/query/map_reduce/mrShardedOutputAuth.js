@@ -9,7 +9,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
-const st = new ShardingTest({name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
+const st = new ShardingTest({
+    name: "mrShardedOutputAuth",
+    shards: 1,
+    mongos: 1,
+    other: {keyFile: "jstests/libs/key1"},
+});
 
 // Setup the users to the input, output and admin databases
 const authenticatedConn = st.s;
@@ -35,7 +40,9 @@ assert.eq(inputDb.numbers.count(), nDocs);
 function doMapReduce(connection, outputDb) {
     // clean output db and run m/r
     outputDb.numbers_out.drop();
-    assert.commandWorked(adminDb.runCommand({shardCollection: outputDb.numbers_out.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(
+        adminDb.runCommand({shardCollection: outputDb.numbers_out.getFullName(), key: {_id: 1}}),
+    );
 
     return connection.getDB("input").runCommand({
         mapreduce: "numbers",

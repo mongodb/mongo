@@ -94,7 +94,10 @@ for (var i = 0; i < numPerTypeToCreate; i++) {
 }
 
 jsTestLog("Testing that persistent connections increased the current and totalCreated counters");
-waitForConnections(originalConnInfo.current + numPerTypeToCreate, originalConnInfo.totalCreated + numPerTypeToCreate);
+waitForConnections(
+    originalConnInfo.current + numPerTypeToCreate,
+    originalConnInfo.totalCreated + numPerTypeToCreate,
+);
 
 jsTestLog("Creating temporary connections");
 db.getSiblingDB(testDB).dropDatabase();

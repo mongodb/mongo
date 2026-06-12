@@ -27,11 +27,15 @@ const testDB = st.s.getDB(dbName);
 function generateRandomTimestamp() {
     const startTime = ISODate("2012-01-01T00:01:00.000Z");
     const maxTime = ISODate("2015-12-31T23:59:59.000Z");
-    return new Date(Math.floor(Random.rand() * (maxTime.getTime() - startTime.getTime()) + startTime.getTime()));
+    return new Date(
+        Math.floor(Random.rand() * (maxTime.getTime() - startTime.getTime()) + startTime.getTime()),
+    );
 }
 
 function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert, failpoint) {
-    jsTest.log(`Running testcase: orderedInsert = ${tojson(orderedInsert)}, failpoint = ${failpoint}`);
+    jsTest.log(
+        `Running testcase: orderedInsert = ${tojson(orderedInsert)}, failpoint = ${failpoint}`,
+    );
 
     testDB[collName].drop();
 
@@ -47,7 +51,9 @@ function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert, 
     );
 
     jsTest.log("Move collection to non-primary shard");
-    assert.commandWorked(st.s.adminCommand({moveCollection: dbName + "." + collName, toShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: dbName + "." + collName, toShard: st.shard1.shardName}),
+    );
 
     let docs = [];
     // Insert 100 documents at random times spanning 3 years (between 2012 and 2015). These dates
@@ -77,7 +83,9 @@ function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert, 
     writeFP.wait();
 
     jsTest.log("Move collection");
-    assert.commandWorked(st.s.adminCommand({moveCollection: dbName + "." + collName, toShard: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: dbName + "." + collName, toShard: st.shard2.shardName}),
+    );
 
     jsTest.log("Release failpoint and wait for result");
     writeFP.off();
@@ -87,7 +95,9 @@ function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert, 
     assertArrayEq({actual: insertedDocs, expected: docs, fieldsToSkip: ["_id"]});
 }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 runInsertRandomTimeseriesWithIntermittentMoveCollection(
     {ordered: false},

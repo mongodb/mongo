@@ -24,10 +24,14 @@ const far = {
     coll.drop();
 
     // Create the desired index type and populate the collection.
-    assert.commandWorked(coll.createIndex({pt: geoType}, add2dsphereVersionIfNeededForSpec({pt: geoType})));
+    assert.commandWorked(
+        coll.createIndex({pt: geoType}, add2dsphereVersionIfNeededForSpec({pt: geoType})),
+    );
     [origin, near, far].forEach((doc) => {
         doc.distFromOrigin =
-            geoType === "2dsphere" ? Geo.sphereDistance(doc.pt, origin.pt) : Geo.distance(doc.pt, origin.pt);
+            geoType === "2dsphere"
+                ? Geo.sphereDistance(doc.pt, origin.pt)
+                : Geo.distance(doc.pt, origin.pt);
         assert.commandWorked(coll.insert(doc));
     });
 
@@ -45,7 +49,11 @@ const far = {
         };
         const projStage = {$project: {_id: 0, dist: 0}};
         const res = coll.aggregate([geoNearStage, projStage]).toArray();
-        assert.eq(res, expected, () => `Unexpected results from ${tojson(geoNearStage)} using a ${geoType} index`);
+        assert.eq(
+            res,
+            expected,
+            () => `Unexpected results from ${tojson(geoNearStage)} using a ${geoType} index`,
+        );
     }
 
     // If no minimum nor maximum distance is set, all points are returned.
@@ -57,7 +65,10 @@ const far = {
 
     // Negative values and non-numeric values are illegal.
     assert.throwsWithCode(() => assertGeoNearResults({minDistance: -1.1}), ErrorCodes.BadValue);
-    assert.throwsWithCode(() => assertGeoNearResults({minDistance: "3.2"}), ErrorCodes.TypeMismatch);
+    assert.throwsWithCode(
+        () => assertGeoNearResults({minDistance: "3.2"}),
+        ErrorCodes.TypeMismatch,
+    );
 
     // A minimum distance of 0 returns all points.
     assertGeoNearResults({minDistance: -0.0}, [origin, near, far]);
@@ -74,7 +85,10 @@ const far = {
 
     // Negative values and non-numeric values are illegal.
     assert.throwsWithCode(() => assertGeoNearResults({maxDistance: -1.1}), ErrorCodes.BadValue);
-    assert.throwsWithCode(() => assertGeoNearResults({maxDistance: "3.2"}), ErrorCodes.TypeMismatch);
+    assert.throwsWithCode(
+        () => assertGeoNearResults({maxDistance: "3.2"}),
+        ErrorCodes.TypeMismatch,
+    );
 
     // A maximum distance of 0 returns only the origin.
     assertGeoNearResults({maxDistance: 0.0}, [origin]);
@@ -92,7 +106,10 @@ const far = {
     assertGeoNearResults({minDistance: 0.0, maxDistance: kMaxDistance}, [origin, near, far]);
 
     // A narrower range excludes the origin and the far point.
-    assertGeoNearResults({minDistance: near.distFromOrigin / 2, maxDistance: near.distFromOrigin + 0.01}, [near]);
+    assertGeoNearResults(
+        {minDistance: near.distFromOrigin / 2, maxDistance: near.distFromOrigin + 0.01},
+        [near],
+    );
 
     // An impossible range is legal but returns no results.
     assertGeoNearResults({minDistance: 3.0, maxDistance: 1.0}, []);

@@ -39,7 +39,11 @@ function executeDocumentValidationTestCase(testCase) {
     // Verify that document validation failed and the document validation error matches the
     // expected.
     assertDocumentValidationFailure(result, coll);
-    assert.docEq(testCase.expectedError, result.getWriteError().errInfo.details, `Test case ${testCase.name}`);
+    assert.docEq(
+        testCase.expectedError,
+        result.getWriteError().errInfo.details,
+        `Test case ${testCase.name}`,
+    );
 }
 
 const testCases = [
@@ -156,7 +160,10 @@ const testCases = [
                         enum: ["Math", "English", "Computer Science", "History", null],
                         description: "can only be one of the enum values and is required",
                     },
-                    gpa: {bsonType: ["double"], description: "must be a double if the field exists"},
+                    gpa: {
+                        bsonType: ["double"],
+                        description: "must be a double if the field exists",
+                    },
                     address: {
                         bsonType: "object",
                         required: ["city"],
@@ -193,7 +200,13 @@ const testCases = [
                                 {
                                     operatorName: "enum",
                                     specifiedAs: {
-                                        enum: ["Math", "English", "Computer Science", "History", null],
+                                        enum: [
+                                            "Math",
+                                            "English",
+                                            "Computer Science",
+                                            "History",
+                                            null,
+                                        ],
                                     },
                                     reason: "value was not found in enum",
                                     consideredValue: "Software Engineering",
@@ -458,7 +471,13 @@ const testCases = [
                                                     details: [
                                                         {
                                                             operatorName: "required",
-                                                            specifiedAs: {required: ["directory", "file", "command"]},
+                                                            specifiedAs: {
+                                                                required: [
+                                                                    "directory",
+                                                                    "file",
+                                                                    "command",
+                                                                ],
+                                                            },
                                                             missingProperties: ["command"],
                                                         },
                                                     ],
@@ -468,7 +487,13 @@ const testCases = [
                                                     details: [
                                                         {
                                                             operatorName: "required",
-                                                            specifiedAs: {required: ["directory", "file", "arguments"]},
+                                                            specifiedAs: {
+                                                                required: [
+                                                                    "directory",
+                                                                    "file",
+                                                                    "arguments",
+                                                                ],
+                                                            },
                                                             missingProperties: ["arguments"],
                                                         },
                                                     ],
@@ -515,7 +540,10 @@ const testCases = [
                                         {file: "file1", environment: ["web", "console"]},
                                         {file: "file2", dir: true},
                                     ],
-                                    duplicatedValue: {file: "file1", environment: ["web", "console"]},
+                                    duplicatedValue: {
+                                        file: "file1",
+                                        environment: ["web", "console"],
+                                    },
                                 },
                                 {
                                     operatorName: "items",
@@ -532,7 +560,10 @@ const testCases = [
                                                             operatorName: "type",
                                                             specifiedAs: {type: "string"},
                                                             reason: "type did not match",
-                                                            consideredValue: {file: "file2", dir: true},
+                                                            consideredValue: {
+                                                                file: "file2",
+                                                                dir: true,
+                                                            },
                                                             consideredType: "object",
                                                         },
                                                     ],
@@ -542,7 +573,9 @@ const testCases = [
                                                     details: [
                                                         {
                                                             operatorName: "additionalProperties",
-                                                            specifiedAs: {additionalProperties: false},
+                                                            specifiedAs: {
+                                                                additionalProperties: false,
+                                                            },
                                                             additionalProperties: ["dir"],
                                                         },
                                                     ],

@@ -21,7 +21,9 @@ function runTest(downgradeFCV) {
 
     let primary = rst.getPrimary();
     let adminDB = primary.getDB("admin");
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+    );
     assert.commandFailedWithCode(
         adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
         549181,

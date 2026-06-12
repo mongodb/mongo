@@ -49,7 +49,9 @@ function runTestForCWSP(conn) {
     const admin = conn.getDB("admin");
     const initial = assertion(admin.runCommand({getClusterParameter: kSP}));
     jsTest.log("Initial: " + tojson(initial));
-    const set = assertion(admin.runCommand({setClusterParameter: {[kSP]: {intData: val(initial) + 1}}}));
+    const set = assertion(
+        admin.runCommand({setClusterParameter: {[kSP]: {intData: val(initial) + 1}}}),
+    );
     jsTest.log("Set: " + tojson(set));
     const changed = assertion(admin.runCommand({getClusterParameter: kSP}));
     jsTest.log("Changed: " + tojson(changed));

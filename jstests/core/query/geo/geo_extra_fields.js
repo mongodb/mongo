@@ -39,7 +39,10 @@ assert.eq(
                 {
                     "be": {
                         $geoWithin: {
-                            $centerSphere: [[179.03531532305314, 0.7050703681776871], 2.145221550434281],
+                            $centerSphere: [
+                                [179.03531532305314, 0.7050703681776871],
+                                2.145221550434281,
+                            ],
                         },
                     },
                 },
@@ -50,7 +53,9 @@ assert.eq(
 
 assert.eq(
     4,
-    testDB.find({$or: [{"be": {$geoIntersects: {$geometry: {type: "Point", coordinates: coords}}}}]}).itcount(),
+    testDB
+        .find({$or: [{"be": {$geoIntersects: {$geometry: {type: "Point", coordinates: coords}}}}]})
+        .itcount(),
 );
 
 assert.commandWorked(testDB.createIndex({be: "2dsphere"}));

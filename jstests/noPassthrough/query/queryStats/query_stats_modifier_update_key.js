@@ -60,7 +60,10 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
         });
 
         it("should validate complex modifier update key fields", function () {
-            const queryShapeModifierUpdateFieldsComplex = [...queryShapeUpdateFieldsRequired, "collation"];
+            const queryShapeModifierUpdateFieldsComplex = [
+                ...queryShapeUpdateFieldsRequired,
+                "collation",
+            ];
 
             // Test with all possible update modifier operators.
             const modifierUpdateCommandObjComplex = {
@@ -142,10 +145,19 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
         it("should validate modifier update with array filters", function () {
             const modifierUpdateCommandObjSimple = {
                 update: collName,
-                updates: [{q: {v: 3}, u: {$set: {"myArray.$[element]": 10}}, arrayFilters: [{element: 0}]}],
+                updates: [
+                    {
+                        q: {v: 3},
+                        u: {$set: {"myArray.$[element]": 10}},
+                        arrayFilters: [{element: 0}],
+                    },
+                ],
             };
 
-            const queryShapeUpdateFieldsRequiredWithArrayFilters = [...queryShapeUpdateFieldsRequired, "arrayFilters"];
+            const queryShapeUpdateFieldsRequiredWithArrayFilters = [
+                ...queryShapeUpdateFieldsRequired,
+                "arrayFilters",
+            ];
             runCommandAndValidateQueryStats({
                 coll: coll,
                 commandName: "update",

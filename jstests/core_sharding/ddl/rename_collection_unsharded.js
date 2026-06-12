@@ -19,7 +19,10 @@
  *  ]
  */
 
-import {getRandomShardName, setupTestDatabase} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
+import {
+    getRandomShardName,
+    setupTestDatabase,
+} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
@@ -33,7 +36,10 @@ const toCollName = "to";
 function setupShardedCollection(conn, dbName, collName) {
     const testDB = conn.getSiblingDB(dbName);
     const primaryShardId = conn.getSiblingDB(dbName).getDatabasePrimaryShardId();
-    assert(primaryShardId, `Must explicitly invoke createDatabase(${dbName}) before calling this method`);
+    assert(
+        primaryShardId,
+        `Must explicitly invoke createDatabase(${dbName}) before calling this method`,
+    );
     const ns = dbName + "." + collName;
     const nonPrimaryShardId = getRandomShardName(db, [primaryShardId]);
     assert.commandWorked(conn.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -91,7 +97,10 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     unshardedColl.insert({x: 1});
 
     assert.commandWorked(
-        fromDB.adminCommand({renameCollection: unshardedColl.getFullName(), to: `${toDB.getName()}.${toCollName}`}),
+        fromDB.adminCommand({
+            renameCollection: unshardedColl.getFullName(),
+            to: `${toDB.getName()}.${toCollName}`,
+        }),
     );
     assert.eq(0, unshardedColl.countDocuments({}));
     assert.eq(1, toDB[toCollName].countDocuments({}));
@@ -120,7 +129,9 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
 
 // Test that the rename of an unsharded collection across DBs after performing movePrimary.
 {
-    jsTest.log("Renaming an unsharded collection across DBs under the same primary after performing movePrimary");
+    jsTest.log(
+        "Renaming an unsharded collection across DBs under the same primary after performing movePrimary",
+    );
     const originalPrimaryShard = getRandomShardName(db);
     const anotherPrimaryShard = getRandomShardName(db, /* exclude =*/ [originalPrimaryShard]);
 
@@ -162,7 +173,14 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     const toColl = testDB.getCollection(toCollName);
     toColl.insert({a: 0});
 
-    testRename(testDB, dbName, fromCollName, toCollName, true /* dropTarget */, false /* mustFail */);
+    testRename(
+        testDB,
+        dbName,
+        fromCollName,
+        toCollName,
+        true /* dropTarget */,
+        false /* mustFail */,
+    );
 }
 
 {
@@ -174,7 +192,14 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     const toColl = testDB.getCollection(toCollName);
     toColl.insert({a: 0});
 
-    testRename(testDB, dbName, fromCollName, toCollName, false /* dropTarget */, true /* mustFail*/);
+    testRename(
+        testDB,
+        dbName,
+        fromCollName,
+        toCollName,
+        false /* dropTarget */,
+        true /* mustFail*/,
+    );
 }
 
 {
@@ -190,7 +215,15 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     assert.commandWorked(unshardedFromColl.renameCollection(toCollName, true /* dropTarget */));
 
     // Source collection just has documents with field `a`
-    assert.eq(shardedToColl.find({a: {$exists: true}}).itcount(), 1, "Expected one source document");
+    assert.eq(
+        shardedToColl.find({a: {$exists: true}}).itcount(),
+        1,
+        "Expected one source document",
+    );
     // Source collection has no documents with field `x` (belonging to the dropped target).
-    assert.eq(shardedToColl.find({x: {$exists: true}}).itcount(), 0, "Expected no target documents");
+    assert.eq(
+        shardedToColl.find({x: {$exists: true}}).itcount(),
+        0,
+        "Expected no target documents",
+    );
 }

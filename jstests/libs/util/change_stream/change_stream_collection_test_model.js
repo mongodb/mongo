@@ -26,7 +26,8 @@ class CollectionTestModel {
      */
     constructor(startState) {
         assert(
-            startState === State.DATABASE_ABSENT || startState === State.DATABASE_PRESENT_COLLECTION_ABSENT,
+            startState === State.DATABASE_ABSENT ||
+                startState === State.DATABASE_PRESENT_COLLECTION_ABSENT,
             `Unsupported start state: ${startState}`,
         );
         this.states = new Set();
@@ -70,7 +71,10 @@ class CollectionTestModel {
         ]);
 
         this._configureDbPresentCollectionAbsent();
-        this._configureCollectionPresentStates(/* includeDropDatabase */ true, /* includeCrossDbRename */ true);
+        this._configureCollectionPresentStates(
+            /* includeDropDatabase */ true,
+            /* includeCrossDbRename */ true,
+        );
     }
 
     /**
@@ -85,7 +89,10 @@ class CollectionTestModel {
         this._initializeCollectionStates();
 
         this._configureDbPresentCollectionAbsent();
-        this._configureCollectionPresentStates(/* includeDropDatabase */ false, /* includeCrossDbRename */ false);
+        this._configureCollectionPresentStates(
+            /* includeDropDatabase */ false,
+            /* includeCrossDbRename */ false,
+        );
     }
 
     _initializeCollectionStates() {
@@ -154,8 +161,14 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             ...(includeCrossDbRename
                 ? [
-                      [Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-                      [Action.RENAME_TO_EXISTENT_DIFFERENT_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+                      [
+                          Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB,
+                          State.DATABASE_PRESENT_COLLECTION_ABSENT,
+                      ],
+                      [
+                          Action.RENAME_TO_EXISTENT_DIFFERENT_DB,
+                          State.DATABASE_PRESENT_COLLECTION_ABSENT,
+                      ],
                   ]
                 : []),
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
@@ -173,8 +186,14 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             ...(includeCrossDbRename
                 ? [
-                      [Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-                      [Action.RENAME_TO_EXISTENT_DIFFERENT_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+                      [
+                          Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB,
+                          State.DATABASE_PRESENT_COLLECTION_ABSENT,
+                      ],
+                      [
+                          Action.RENAME_TO_EXISTENT_DIFFERENT_DB,
+                          State.DATABASE_PRESENT_COLLECTION_ABSENT,
+                      ],
                   ]
                 : []),
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],

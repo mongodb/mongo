@@ -30,7 +30,13 @@ assert.commandWorked(
 
 {
     assert.eq(
-        coll.aggregate([{"$match": {"array": {"$all": []}}}, {"$sort": {"a": -1, "_id": 1}}, {"$limit": 6}]).itcount(),
+        coll
+            .aggregate([
+                {"$match": {"array": {"$all": []}}},
+                {"$sort": {"a": -1, "_id": 1}},
+                {"$limit": 6},
+            ])
+            .itcount(),
         0,
     );
     const explain = coll.explain().aggregate([{"$match": {"array": {"$all": []}}}]);

@@ -32,7 +32,11 @@ assert(!dest.isCapped());
 
 // should all fit
 assert.commandWorked(
-    db.runCommand({cloneCollectionAsCapped: source.getName(), toCollection: dest.getName(), size: 100000}),
+    db.runCommand({
+        cloneCollectionAsCapped: source.getName(),
+        toCollection: dest.getName(),
+        size: 100000,
+    }),
 );
 assert(!source.isCapped());
 assert(dest.isCapped());
@@ -44,7 +48,11 @@ dest.drop();
 // should NOT all fit
 assert(!dest.isCapped());
 assert.commandWorked(
-    db.runCommand({cloneCollectionAsCapped: source.getName(), toCollection: dest.getName(), size: 1000}),
+    db.runCommand({
+        cloneCollectionAsCapped: source.getName(),
+        toCollection: dest.getName(),
+        size: 1000,
+    }),
 );
 assert(!source.isCapped());
 assert(dest.isCapped());

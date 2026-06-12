@@ -48,10 +48,14 @@ jsTest.log("Running test command createUnsplittableCollection to track an unshar
 jsTest.log("Check that createCollection can create a tracked unsharded collection");
 {
     const coll = db[genCollName()];
-    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName()}));
+    assert.commandWorked(
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName()}),
+    );
 
     // running the same request again will behave as no-op
-    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName()}));
+    assert.commandWorked(
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName()}),
+    );
 
     let res = assert.commandWorked(
         st.getPrimaryShard(kDbName).getDB(kDbName).runCommand({listIndexes: coll.getName()}),
@@ -65,17 +69,27 @@ jsTest.log("Check that createCollection can create a tracked unsharded collectio
     assert.eq(st.s.getCollection("config.chunks").countDocuments({uuid: col.uuid}), 1);
 }
 
-jsTest.log("Check that by creating a valid unsharded collection, relevant events are logged on the CSRS");
+jsTest.log(
+    "Check that by creating a valid unsharded collection, relevant events are logged on the CSRS",
+);
 {
     // Create a non-sharded collection
     const coll = db[genCollName()];
-    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName()}));
+    assert.commandWorked(
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName()}),
+    );
 
     // Verify that the create collection end event has been logged
-    const startLogCount = st.config.changelog.countDocuments({what: "createCollection.start", ns: coll.getFullName()});
+    const startLogCount = st.config.changelog.countDocuments({
+        what: "createCollection.start",
+        ns: coll.getFullName(),
+    });
     assert.gte(startLogCount, 1, "createCollection start event not found in changelog");
 
-    const endLogCount = st.config.changelog.countDocuments({what: "createCollection.end", ns: coll.getFullName()});
+    const endLogCount = st.config.changelog.countDocuments({
+        what: "createCollection.end",
+        ns: coll.getFullName(),
+    });
     assert.gte(endLogCount, 1, "createCollection start event not found in changelog");
 }
 
@@ -84,11 +98,14 @@ jsTest.log("If a view already exists with same namespace fail with NamespaceExis
     const view = db[genCollName()];
     const targetColl = db[genCollName()];
 
-    assert.commandWorked(st.s.getDB(kDbName).createView(view.getName(), targetColl.getFullName(), []));
+    assert.commandWorked(
+        st.s.getDB(kDbName).createView(view.getName(), targetColl.getFullName(), []),
+    );
 
-    assert.commandFailedWithCode(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: view.getName()}), [
-        ErrorCodes.NamespaceExists,
-    ]);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: view.getName()}),
+        [ErrorCodes.NamespaceExists],
+    );
 }
 
 jsTest.log("Check that shardCollection won't generate an unsplittable collection");
@@ -106,7 +123,10 @@ jsTest.log("Running command to create a timeseries collection");
 {
     const coll = db[genCollName()];
     assert.commandWorked(
-        db.runCommand({createUnsplittableCollection: coll.getName(), timeseries: {timeField: "time"}}),
+        db.runCommand({
+            createUnsplittableCollection: coll.getName(),
+            timeseries: {timeField: "time"},
+        }),
     );
     const collMetadata = st.s
         .getCollection("config.collections")
@@ -133,7 +153,11 @@ jsTest.log("Shard an unexistent timeseries collection");
 {
     const coll = db[genCollName()];
     assert.commandWorked(
-        st.s.adminCommand({shardCollection: coll.getFullName(), key: {time: 1}, timeseries: {timeField: "time"}}),
+        st.s.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: {time: 1},
+            timeseries: {timeField: "time"},
+        }),
     );
     const collMetadata = st.s
         .getCollection("config.collections")
@@ -145,10 +169,17 @@ jsTest.log("Shard an unsplittable timeseries collection");
 {
     const coll = db[genCollName()];
     assert.commandWorked(
-        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: coll.getName(), timeseries: {timeField: "time"}}),
+        st.s.getDB(kDbName).runCommand({
+            createUnsplittableCollection: coll.getName(),
+            timeseries: {timeField: "time"},
+        }),
     );
     assert.commandWorked(
-        st.s.adminCommand({shardCollection: coll.getFullName(), key: {time: 1}, timeseries: {timeField: "time"}}),
+        st.s.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: {time: 1},
+            timeseries: {timeField: "time"},
+        }),
     );
     const collMetadata = st.s
         .getCollection("config.collections")

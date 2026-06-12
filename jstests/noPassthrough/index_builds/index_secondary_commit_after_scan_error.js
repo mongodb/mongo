@@ -44,9 +44,14 @@ IndexBuildTest.pauseIndexBuilds(primary);
 const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 assert.commandWorked(
-    secondaryDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "alwaysOn"}),
+    secondaryDB.adminCommand({
+        configureFailPoint: "hangAfterStartingIndexBuildUnlocked",
+        mode: "alwaysOn",
+    }),
 );
-assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondaryDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: "alwaysOn"}),
+);
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
@@ -57,10 +62,17 @@ try {
 
     // The index build on the secondary will fail but will wait for the abortIndexBuild oplog entry
     // from the primary.
-    const secondaryOpId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "a_1");
+    const secondaryOpId = IndexBuildTest.waitForIndexBuildToStart(
+        secondaryDB,
+        coll.getName(),
+        "a_1",
+    );
     IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, secondaryOpId);
 } finally {
-    secondaryDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "off"});
+    secondaryDB.adminCommand({
+        configureFailPoint: "hangAfterStartingIndexBuildUnlocked",
+        mode: "off",
+    });
     IndexBuildTest.resumeIndexBuilds(primary);
 }
 

@@ -37,7 +37,9 @@ const st = new ShardingTest({
             setParameter: {
                 // This failpoint will force this mongos to not count any queries that it runs.
                 // This will force its local sample rate to be exactly 0.
-                "failpoint.overwriteQueryAnalysisSamplerAvgLastCountToZero": tojson({mode: "alwaysOn"}),
+                "failpoint.overwriteQueryAnalysisSamplerAvgLastCountToZero": tojson({
+                    mode: "alwaysOn",
+                }),
                 queryAnalysisSamplerConfigurationRefreshSecs,
                 logComponentVerbosity: tojson({sharding: 2}),
             },
@@ -94,10 +96,22 @@ function runCommandAndAssertCurrentOpAndServerStatus(opKind, cmdObj, oldState) {
         newState = getCurrentOpAndServerStatus();
         return (
             assertCurrentOpAndServerStatusMongos(ns, opKind, oldState.mongos0, newState.mongos0) &&
-            assertCurrentOpAndServerStatusMongos(ns, opKindNoop, oldState.mongos1, newState.mongos1, {
-                expectedSamplesPerSecond: 0,
-            }) &&
-            assertCurrentOpAndServerStatusMongod(ns, opKind, oldState.mongod, newState.mongod, true /* isShardSvr */)
+            assertCurrentOpAndServerStatusMongos(
+                ns,
+                opKindNoop,
+                oldState.mongos1,
+                newState.mongos1,
+                {
+                    expectedSamplesPerSecond: 0,
+                },
+            ) &&
+            assertCurrentOpAndServerStatusMongod(
+                ns,
+                opKind,
+                oldState.mongod,
+                newState.mongod,
+                true /* isShardSvr */,
+            )
         );
     });
     return newState;
@@ -108,7 +122,11 @@ assert.eq(bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatus(0)), 0
 
 // Start query sampling.
 assert.commandWorked(
-    st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}),
+    st.s0.adminCommand({
+        configureQueryAnalyzer: ns,
+        mode: "full",
+        samplesPerSecond: samplesPerSecond,
+    }),
 );
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
@@ -117,7 +135,11 @@ const cmdObj0 = {
     find: collName,
     filter: {x: 1},
 };
-const state0 = runCommandAndAssertCurrentOpAndServerStatus(opKindRead, cmdObj0, makeInitialCurrentOpAndServerStatus(1));
+const state0 = runCommandAndAssertCurrentOpAndServerStatus(
+    opKindRead,
+    cmdObj0,
+    makeInitialCurrentOpAndServerStatus(1),
+);
 
 const cmdObj1 = {
     count: collName,
@@ -156,6 +178,9 @@ expectedFinalState.mongos1.serverStatus.activeCollections = 0;
 expectedFinalState.mongod.serverStatus.activeCollections = 0;
 
 const actualFinalState = getCurrentOpAndServerStatus();
-assert.eq(0, bsonWoCompare(actualFinalState, expectedFinalState), {actualFinalState, expectedFinalState});
+assert.eq(0, bsonWoCompare(actualFinalState, expectedFinalState), {
+    actualFinalState,
+    expectedFinalState,
+});
 
 st.stop();

@@ -59,17 +59,29 @@ function runCommandAndAssertCurrentOpAndServerStatus(opKind, cmdObj, oldState) {
     let newState;
     assert.soon(() => {
         newState = getCurrentOpAndServerStatusMongod(primary);
-        return assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newState, false /* isShardSvr */);
+        return assertCurrentOpAndServerStatusMongod(
+            ns,
+            opKind,
+            oldState,
+            newState,
+            false /* isShardSvr */,
+        );
     });
     return newState;
 }
 
 let currentState = getCurrentOpAndServerStatusMongod(primary);
-assert.eq(bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatusMongod(0)), 0, {currentState});
+assert.eq(bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatusMongod(0)), 0, {
+    currentState,
+});
 
 // Start query sampling.
 assert.commandWorked(
-    primary.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}),
+    primary.adminCommand({
+        configureQueryAnalyzer: ns,
+        mode: "full",
+        samplesPerSecond: samplesPerSecond,
+    }),
 );
 QuerySamplingUtil.waitForActiveSamplingReplicaSet(rst, ns, collUuid);
 
@@ -117,6 +129,9 @@ expectedFinalState.currentOp = [];
 expectedFinalState.serverStatus.activeCollections = 0;
 
 const actualFinalState = getCurrentOpAndServerStatusMongod(primary);
-assert.eq(0, bsonWoCompare(actualFinalState, expectedFinalState), {actualFinalState, expectedFinalState});
+assert.eq(0, bsonWoCompare(actualFinalState, expectedFinalState), {
+    actualFinalState,
+    expectedFinalState,
+});
 
 rst.stopSet();

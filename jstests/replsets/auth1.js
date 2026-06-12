@@ -21,7 +21,11 @@ let key2_600 = path + "key2";
 let key1_644 = path + "key1_644";
 
 print("try starting mongod with auth");
-let m = MongoRunner.runMongod({auth: "", port: port[4], dbpath: MongoRunner.dataDir + "/wrong-auth"});
+let m = MongoRunner.runMongod({
+    auth: "",
+    port: port[4],
+    dbpath: MongoRunner.dataDir + "/wrong-auth",
+});
 
 assert(!m.getDB("local").auth("__system", ""));
 
@@ -32,7 +36,15 @@ if (!_isWindows()) {
     run("chmod", "644", key1_644);
 
     print("try starting mongod");
-    m = runMongoProgram("mongod", "--keyFile", key1_644, "--port", port[0], "--dbpath", MongoRunner.dataPath + name);
+    m = runMongoProgram(
+        "mongod",
+        "--keyFile",
+        key1_644,
+        "--port",
+        port[0],
+        "--dbpath",
+        MongoRunner.dataPath + name,
+    );
 
     print("should fail with wrong permissions");
     assert.eq(m, 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
@@ -71,7 +83,9 @@ let mId = rs.getNodeId(primary);
 let secondary = rs.getSecondary();
 assert(primary.getDB("admin").auth("foo", "bar"));
 assert.commandWorked(
-    primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+    primary
+        .getDB("test")
+        .foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
 );
 
 print("try some legal and illegal reads");

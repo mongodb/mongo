@@ -70,7 +70,11 @@ const oldCBRConfig = getCBRConfig(db);
 try {
     for (const mode of ["automaticCE", "samplingCE"]) {
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: mode}),
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: true,
+                internalQueryCBRCEMode: mode,
+            }),
         );
 
         triviallyTrue();

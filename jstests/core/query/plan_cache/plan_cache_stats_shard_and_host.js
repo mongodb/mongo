@@ -41,7 +41,11 @@ function filterPlanCacheEntriesByKey(planCacheKey, planCacheContents) {
 let planCacheContents = filterPlanCacheEntriesByKey(planCacheKey, planCache.list());
 
 // We expect every shard that has a chunk for the collection to have produced a plan cache entry.
-assert.eq(FixtureHelpers.numberOfShardsForCollection(coll), planCacheContents.length, planCacheContents);
+assert.eq(
+    FixtureHelpers.numberOfShardsForCollection(coll),
+    planCacheContents.length,
+    planCacheContents,
+);
 
 // Check that the "host" field is present for every plan cache entry.
 for (const entry of planCacheContents) {
@@ -54,7 +58,8 @@ for (const entry of planCacheContents) {
 for (const entry of planCacheContents) {
     assert.eq(
         FixtureHelpers.isMongos(db) ||
-            (TestData.hasOwnProperty("testingReplicaSetEndpoint") && TestData.testingReplicaSetEndpoint),
+            (TestData.hasOwnProperty("testingReplicaSetEndpoint") &&
+                TestData.testingReplicaSetEndpoint),
         entry.hasOwnProperty("shard"),
         entry,
     );

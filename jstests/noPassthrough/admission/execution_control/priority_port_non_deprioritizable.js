@@ -55,13 +55,19 @@ describe("Priority port non-deprioritizable", function () {
         assert.commandWorked(priorityDb.runCommand({find: "coll", filter: {_id: 1}}));
         const after = getTotalMarkedNonDeprioritizableCount(primary);
 
-        assert.gt(after, before, "Expected totalMarkedNonDeprioritizable to increase after find on priority port.");
+        assert.gt(
+            after,
+            before,
+            "Expected totalMarkedNonDeprioritizable to increase after find on priority port.",
+        );
     });
 
     it("should keep index builds as background tasks even when initiated from priority port", function () {
         const lowPriorityWritesBefore = getLowPriorityWriteCount(primary);
 
-        assert.commandWorked(priorityDb.runCommand({createIndexes: "coll", indexes: [{key: {x: 1}, name: "x_1"}]}));
+        assert.commandWorked(
+            priorityDb.runCommand({createIndexes: "coll", indexes: [{key: {x: 1}, name: "x_1"}]}),
+        );
 
         const lowPriorityWritesAfter = getLowPriorityWriteCount(primary);
 

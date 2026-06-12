@@ -25,8 +25,10 @@ export const $config = (function () {
     const metaField = "meta";
     const valueField = "value";
 
-    const secondsRoundingSeconds = TimeseriesTest.getBucketRoundingSecondsFromGranularity("seconds");
-    const minutesRoundingSeconds = TimeseriesTest.getBucketRoundingSecondsFromGranularity("minutes");
+    const secondsRoundingSeconds =
+        TimeseriesTest.getBucketRoundingSecondsFromGranularity("seconds");
+    const minutesRoundingSeconds =
+        TimeseriesTest.getBucketRoundingSecondsFromGranularity("minutes");
     const hoursRoundingSeconds = TimeseriesTest.getBucketRoundingSecondsFromGranularity("hours");
 
     const data = {
@@ -40,7 +42,10 @@ export const $config = (function () {
 
         read: function (db, collName) {
             const i = Random.randInt(collCount);
-            assert.eq(this.docCount[i], db[shardedCollName(i)].countDocuments({[valueField]: this.tid}));
+            assert.eq(
+                this.docCount[i],
+                db[shardedCollName(i)].countDocuments({[valueField]: this.tid}),
+            );
         },
 
         write: function (db, collName) {
@@ -73,7 +78,8 @@ export const $config = (function () {
                 // than their previous values, so we base the next bucketing value off of the
                 // bucketMaxSpanSeconds since it is the higher of the two parameters when
                 // derived from a granularity value.
-                nextBucketingValue = TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(collGranularity) + 1;
+                nextBucketingValue =
+                    TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(collGranularity) + 1;
             }
 
             assert.commandWorked(
@@ -100,7 +106,10 @@ export const $config = (function () {
             const collGranularity = this.currentGranularityForEachColl[j];
             const currentBucketRoundingSeconds = this.currentBucketRoundingSecondsForEachColl[j];
 
-            if (collGranularity !== "hours" && currentBucketRoundingSeconds <= hoursRoundingSeconds) {
+            if (
+                collGranularity !== "hours" &&
+                currentBucketRoundingSeconds <= hoursRoundingSeconds
+            ) {
                 let newGranularity = "hours";
                 let newRoundingSeconds = hoursRoundingSeconds;
                 if (collGranularity === "seconds") {
@@ -118,7 +127,10 @@ export const $config = (function () {
 
                 const i = this.tid * collPerThread + j;
                 assert.commandWorked(
-                    db.runCommand({collMod: shardedCollName(i), timeseries: {granularity: newGranularity}}),
+                    db.runCommand({
+                        collMod: shardedCollName(i),
+                        timeseries: {granularity: newGranularity},
+                    }),
                 );
                 this.currentGranularityForEachColl[j] = newGranularity;
                 this.currentBucketRoundingSecondsForEachColl[j] = newRoundingSeconds;
@@ -134,8 +146,12 @@ export const $config = (function () {
                 bucketMaxSpanSeconds: 1,
                 bucketRoundingSeconds: 1,
             };
-            assert.commandWorked(db.createCollection(unshardedCollName(i), {timeseries: timeseriesOptions}));
-            assert.commandWorked(db.createCollection(shardedCollName(i), {timeseries: timeseriesOptions}));
+            assert.commandWorked(
+                db.createCollection(unshardedCollName(i), {timeseries: timeseriesOptions}),
+            );
+            assert.commandWorked(
+                db.createCollection(shardedCollName(i), {timeseries: timeseriesOptions}),
+            );
 
             cluster.shardCollection(db[shardedCollName(i)], {[timeField]: 1}, false);
         }
@@ -154,7 +170,12 @@ export const $config = (function () {
         read: {read: 0.35, write: 0.35, customBucketingUpdate: 0.2, granularityUpdate: 0.1},
         write: {read: 0.35, write: 0.35, customBucketingUpdate: 0.2, granularityUpdate: 0.1},
         customBucketingUpdate: {read: 0.45, write: 0.45, customBucketingUpdate: 0.1},
-        granularityUpdate: {read: 0.35, write: 0.35, customBucketingUpdate: 0.2, granularityUpdate: 0.1},
+        granularityUpdate: {
+            read: 0.35,
+            write: 0.35,
+            customBucketingUpdate: 0.2,
+            granularityUpdate: 0.1,
+        },
     };
 
     return {

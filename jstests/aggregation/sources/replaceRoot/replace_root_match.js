@@ -132,7 +132,11 @@ const assertFail = (pipeline) => {
 {
     // Multiple replaceWiths before match should fail because <replacementDocument> resolves to a
     // missing document for some documents in the collection.
-    const pipeline = [{$replaceWith: "$subDocument"}, {$replaceWith: "$subDocument"}, {$match: {"x.a": 2}}];
+    const pipeline = [
+        {$replaceWith: "$subDocument"},
+        {$replaceWith: "$subDocument"},
+        {$match: {"x.a": 2}},
+    ];
     assertFail(pipeline);
 }
 {
@@ -204,13 +208,19 @@ const assertFail = (pipeline) => {
 }
 {
     // match on $expr with $literal will match on a field that contains '$' in its name.
-    const pipeline = [{$replaceWith: "$subDocument"}, {$match: {$expr: {$eq: [{$getField: {$literal: "$a.0"}}, 2]}}}];
+    const pipeline = [
+        {$replaceWith: "$subDocument"},
+        {$match: {$expr: {$eq: [{$getField: {$literal: "$a.0"}}, 2]}}},
+    ];
     const expected = [subdocIsDollarDottedPathWithNumericStrField];
     runTestWithSubdocExpectedResult(pipeline, expected);
 }
 {
     // match on $expr with $getField will match on a dotted field path.
-    const pipeline = [{$replaceWith: "$subDocument"}, {$match: {$expr: {$gt: [{$getField: "a.b"}, 2]}}}];
+    const pipeline = [
+        {$replaceWith: "$subDocument"},
+        {$match: {$expr: {$gt: [{$getField: "a.b"}, 2]}}},
+    ];
     const expected = [subdocIsDottedPath];
     runTestWithSubdocExpectedResult(pipeline, expected);
 }
@@ -224,7 +234,11 @@ assert.commandWorked(coll.insert(subdocIsArray));
 {
     // First stage matches on a subDocument that is not an object. Note that {$type: "object"} will
     // sometimes match on documents with array values at "field".
-    const pipeline = [{$match: {subDocument: {$type: "object"}}}, {$replaceWith: "$subDocument"}, {$match: {a: 3}}];
+    const pipeline = [
+        {$match: {subDocument: {$type: "object"}}},
+        {$replaceWith: "$subDocument"},
+        {$match: {a: 3}},
+    ];
     assertFail(pipeline);
 }
 {
@@ -232,7 +246,9 @@ assert.commandWorked(coll.insert(subdocIsArray));
     // followed by match.
     const pipeline = [
         {
-            $match: {$and: [{subDocument: {$type: "object"}}, {subDocument: {$not: {$type: "array"}}}]},
+            $match: {
+                $and: [{subDocument: {$type: "object"}}, {subDocument: {$not: {$type: "array"}}}],
+            },
         },
         {$replaceWith: "$subDocument"},
         {$match: {a: 3}},

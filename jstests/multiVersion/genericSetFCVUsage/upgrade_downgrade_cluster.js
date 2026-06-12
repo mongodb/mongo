@@ -7,7 +7,10 @@ import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/multi_cluster.js";
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {testCRUDAndAgg, testDDLOps} from "jstests/multiVersion/libs/upgrade_downgrade_cluster_shared.js";
+import {
+    testCRUDAndAgg,
+    testDDLOps,
+} from "jstests/multiVersion/libs/upgrade_downgrade_cluster_shared.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 // When checking UUID consistency, the shell attempts to run a command on the node it believes is
@@ -42,11 +45,15 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     assert.neq(null, clusterID);
 
     // Setup sharded collection
-    assert.commandWorked(st.s.adminCommand({enableSharding: "sharded", primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: "sharded", primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(st.s.adminCommand({shardCollection: "sharded.foo", key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: "sharded.foo", middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: st.shard1.shardName}),
+    );
 
     testCRUDAndAgg(st.s.getDB("unsharded"));
     testCRUDAndAgg(st.s.getDB("sharded"));

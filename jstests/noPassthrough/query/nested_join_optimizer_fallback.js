@@ -63,7 +63,11 @@ let pipeline = [
                         foreignField: "b",
                         as: "fromColl2",
                         // This is a nested subpipeline, it has a depth of 2.
-                        pipeline: [{$match: {d: {$lt: 3}}}, {$match: {c: "blah"}}, {$match: {_id: {$gte: 0}}}],
+                        pipeline: [
+                            {$match: {d: {$lt: 3}}},
+                            {$match: {c: "blah"}},
+                            {$match: {_id: {$gte: 0}}},
+                        ],
                     },
                 },
                 {

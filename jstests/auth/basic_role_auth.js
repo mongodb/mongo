@@ -40,10 +40,25 @@ let AUTH_INFO = {
 
 // Constants that lists the privileges of a given role.
 let READ_PERM = {query: 1, index_r: 1, killCursor: 1};
-let READ_WRITE_PERM = {insert: 1, update: 1, remove: 1, query: 1, index_r: 1, index_w: 1, killCursor: 1};
+let READ_WRITE_PERM = {
+    insert: 1,
+    update: 1,
+    remove: 1,
+    query: 1,
+    index_r: 1,
+    index_w: 1,
+    killCursor: 1,
+};
 let ADMIN_PERM = {index_r: 1, index_w: 1, profile_r: 1};
 let UADMIN_PERM = {user_r: 1, user_w: 1};
-let CLUSTER_PERM = {killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, killAnyCursor: 1, profile_r: 1};
+let CLUSTER_PERM = {
+    killOp: 1,
+    currentOp: 1,
+    fsync_unlock: 1,
+    killCursor: 1,
+    killAnyCursor: 1,
+    profile_r: 1,
+};
 
 /**
  * Checks whether an error occurs after running an operation.
@@ -180,7 +195,9 @@ let testOps = function (db, allowedActions) {
         let cmdRes = db2.runCommand({
             find: db2.kill_cursor.getName(),
             batchSize: 2,
-            ...(inTransaction ? {startTransaction: true, autocommit: false, txnNumber: NumberLong(0)} : {}),
+            ...(inTransaction
+                ? {startTransaction: true, autocommit: false, txnNumber: NumberLong(0)}
+                : {}),
         });
         assert.commandWorked(cmdRes);
         let cursorId = cmdRes.cursor.id;
@@ -196,8 +213,10 @@ let testOps = function (db, allowedActions) {
             }
 
             // users can kill their own cursors
-            const users = assert.commandWorked(db.runCommand({connectionStatus: 1})).authInfo.authenticatedUsers;
-            const users2 = assert.commandWorked(db2.runCommand({connectionStatus: 1})).authInfo.authenticatedUsers;
+            const users = assert.commandWorked(db.runCommand({connectionStatus: 1})).authInfo
+                .authenticatedUsers;
+            const users2 = assert.commandWorked(db2.runCommand({connectionStatus: 1})).authInfo
+                .authenticatedUsers;
             if (!users.length && !users2.length) {
                 // Special case, no-auth
                 return true;
@@ -219,7 +238,13 @@ let testOps = function (db, allowedActions) {
             );
         });
         if (inTransaction) {
-            assert.commandWorked(db2.adminCommand({abortTransaction: 1, txnNumber: NumberLong(0), autocommit: false}));
+            assert.commandWorked(
+                db2.adminCommand({
+                    abortTransaction: 1,
+                    txnNumber: NumberLong(0),
+                    autocommit: false,
+                }),
+            );
         }
     };
     checkKillCursor(false);
@@ -474,7 +499,11 @@ let runTests = function (conn) {
         let testDB = conn.getDB("test");
         let adminDB = conn.getDB("admin");
 
-        adminDB.createUser({user: "root", pwd: AUTH_INFO.admin.root.pwd, roles: AUTH_INFO.admin.root.roles});
+        adminDB.createUser({
+            user: "root",
+            pwd: AUTH_INFO.admin.root.pwd,
+            roles: AUTH_INFO.admin.root.roles,
+        });
         adminDB.auth("root", AUTH_INFO.admin.root.pwd);
 
         for (let x = 0; x < 10; x++) {

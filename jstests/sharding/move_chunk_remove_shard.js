@@ -29,7 +29,9 @@ let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: "test.user", middle: {x: 0}}));
 

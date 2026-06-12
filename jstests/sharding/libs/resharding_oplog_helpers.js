@@ -83,7 +83,9 @@ export function runOplogFetcherReplLagTest(config) {
     const collName = "testColl";
     const ns = dbName + "." + collName;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     setupCollection(st, dbName, collName);
 
@@ -98,8 +100,14 @@ export function runOplogFetcherReplLagTest(config) {
     // Turn on profiling on all nodes on the donor shard.
     st.rs0.nodes.forEach((node) => resetProfilerCollection(node.getDB("local")));
 
-    const beforeQueryingRemainingTimeFp = configureFailPoint(configPrimary, "hangBeforeQueryingRecipients");
-    const beforeCriticalSectionFp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
+    const beforeQueryingRemainingTimeFp = configureFailPoint(
+        configPrimary,
+        "hangBeforeQueryingRecipients",
+    );
+    const beforeCriticalSectionFp = configureFailPoint(
+        configPrimary,
+        "reshardingPauseCoordinatorBeforeBlockingWrites",
+    );
     const moveThread = new Thread(runMoveCollection, st.s.host, ns, st.shard1.shardName);
     moveThread.start();
 
@@ -291,7 +299,9 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
         ErrorCodes.OplogQueryMinTsMissing,
     );
 
-    jsTest.log("Run aggregation pipeline on incomplete oplog with $_requestReshardingResumeToken set to false");
+    jsTest.log(
+        "Run aggregation pipeline on incomplete oplog with $_requestReshardingResumeToken set to false",
+    );
     assert.commandWorked(
         localDb.runCommand({
             aggregate: "oplog.rs",
@@ -325,7 +335,10 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
  * Returns true if timestamp 'ts1' value is greater than timestamp 'ts2' value.
  */
 function timestampGreaterThan(ts1, ts2) {
-    return ts1.getTime() > ts2.getTime() || (ts1.getTime() == ts2.getTime() && ts1.getInc() > ts2.getInc());
+    return (
+        ts1.getTime() > ts2.getTime() ||
+        (ts1.getTime() == ts2.getTime() && ts1.getInc() > ts2.getInc())
+    );
 }
 
 /**
@@ -378,7 +391,9 @@ export function runOplogSyncAggResumeTokenTest(config) {
 
     // Ensure that postBatchResumeToken attribute is returned for getMore command.
     const cursorId = resEnabled.cursor.id;
-    const resGetMore = assert.commandWorked(localDb.runCommand({getMore: cursorId, collection: "oplog.rs"}));
+    const resGetMore = assert.commandWorked(
+        localDb.runCommand({getMore: cursorId, collection: "oplog.rs"}),
+    );
 
     assert.commandWorked(resGetMore);
     assert(resGetMore.cursor.hasOwnProperty("postBatchResumeToken"), resGetMore);
@@ -480,12 +495,17 @@ export function runOplogSyncAggResumeTokenTest(config) {
     assert.eq(result.cursor.firstBatch.length, batchSize, result);
 
     // Verify that the postBatchResumeToken is equal to the 'ts' of the last record.
-    assert.eq(result.cursor.postBatchResumeToken.ts, result.cursor.firstBatch[result.cursor.firstBatch.length - 1].ts);
+    assert.eq(
+        result.cursor.postBatchResumeToken.ts,
+        result.cursor.firstBatch[result.cursor.firstBatch.length - 1].ts,
+    );
 
     // Ensure that postBatchResumeToken attribute is returned for getMore command by reading the
     // second batch. There are not enough matching documents left in the oplog to fill an entire
     // batch, so we expect the PBRT to exceed the ts of the final entry.
-    result = assert.commandWorked(localDb.runCommand({getMore: result.cursor.id, collection: "oplog.rs"}));
+    result = assert.commandWorked(
+        localDb.runCommand({getMore: result.cursor.id, collection: "oplog.rs"}),
+    );
     assert(result.cursor.hasOwnProperty("postBatchResumeToken"), result);
     assert(result.cursor.postBatchResumeToken.hasOwnProperty("ts"), result);
     let resultsBatch = result.cursor.nextBatch;
@@ -494,7 +514,10 @@ export function runOplogSyncAggResumeTokenTest(config) {
     // Verify that the postBatchResumeToken is greater than the 'ts' of the last read record since
     // the documents in the rest of the collection do not match the filter.
     assert(
-        timestampGreaterThan(result.cursor.postBatchResumeToken.ts, resultsBatch[resultsBatch.length - 1].ts),
+        timestampGreaterThan(
+            result.cursor.postBatchResumeToken.ts,
+            resultsBatch[resultsBatch.length - 1].ts,
+        ),
         "postBatchResumeToken value should be greater than 'ts' of the last record",
     );
 
@@ -516,7 +539,10 @@ export function runOplogSyncAggResumeTokenTest(config) {
     // Verify that the postBatchResumeToken is greater than the 'ts' of the last read record since
     // the documents in the rest of the collection do not match the filter.
     assert(
-        timestampGreaterThan(result.cursor.postBatchResumeToken.ts, resultsBatch[resultsBatch.length - 1].ts),
+        timestampGreaterThan(
+            result.cursor.postBatchResumeToken.ts,
+            resultsBatch[resultsBatch.length - 1].ts,
+        ),
         "postBatchResumeToken value should be greater than 'ts' of the last record",
     );
 

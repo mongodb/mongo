@@ -8,7 +8,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 function runTest(conn) {
     let authzErrorCode = 13;
 
-    conn.getDB("admin").createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
+    conn.getDB("admin").createUser({
+        user: "userAdmin",
+        pwd: "pwd",
+        roles: ["userAdminAnyDatabase"],
+    });
 
     let userAdminConn = new Mongo(conn.host);
     userAdminConn.getDB("admin").auth("userAdmin", "pwd");
@@ -16,7 +20,11 @@ function runTest(conn) {
     let adminUserAdmin = userAdminConn.getDB("admin");
     testUserAdmin.createRole({role: "testRole", roles: [], privileges: []});
     adminUserAdmin.createRole({role: "adminRole", roles: [], privileges: []});
-    testUserAdmin.createUser({user: "spencer", pwd: "pwd", roles: ["testRole", {role: "adminRole", db: "admin"}]});
+    testUserAdmin.createUser({
+        user: "spencer",
+        pwd: "pwd",
+        roles: ["testRole", {role: "adminRole", db: "admin"}],
+    });
     adminUserAdmin.createUser({user: "otherUser", pwd: "pwd", roles: []});
 
     var db = conn.getDB("test");
@@ -150,7 +158,10 @@ function runTest(conn) {
         res = db.runCommand({grantRolesToRole: "testRole", roles: ["read"]});
         assert.commandFailedWithCode(res, authzErrorCode);
 
-        res = admindb.runCommand({grantRolesToUser: "otherUser", roles: [{role: "read", db: "test"}]});
+        res = admindb.runCommand({
+            grantRolesToUser: "otherUser",
+            roles: [{role: "read", db: "test"}],
+        });
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -166,7 +177,10 @@ function runTest(conn) {
         assert.commandFailedWithCode(res, authzErrorCode);
 
         // Granting roles from this db to users in another db, however, should work
-        res = admindb.runCommand({grantRolesToUser: "otherUser", roles: [{role: "read", db: "test"}]});
+        res = admindb.runCommand({
+            grantRolesToUser: "otherUser",
+            roles: [{role: "read", db: "test"}],
+        });
         assert.commandWorked(res);
     })();
 
@@ -179,7 +193,10 @@ function runTest(conn) {
         res = db.runCommand({revokeRolesFromRole: "testRole", roles: ["read"]});
         assert.commandFailedWithCode(res, authzErrorCode);
 
-        res = admindb.runCommand({revokeRolesFromUser: "otherUser", roles: [{role: "read", db: "test"}]});
+        res = admindb.runCommand({
+            revokeRolesFromUser: "otherUser",
+            roles: [{role: "read", db: "test"}],
+        });
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -194,7 +211,10 @@ function runTest(conn) {
         assert.commandFailedWithCode(res, authzErrorCode);
 
         // Revoking roles from this db from users in another db, however, should work
-        res = admindb.runCommand({revokeRolesFromUser: "otherUser", roles: [{role: "read", db: "test"}]});
+        res = admindb.runCommand({
+            revokeRolesFromUser: "otherUser",
+            roles: [{role: "read", db: "test"}],
+        });
         assert.commandWorked(res);
     })();
 

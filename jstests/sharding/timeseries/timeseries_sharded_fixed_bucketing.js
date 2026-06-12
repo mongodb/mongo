@@ -30,13 +30,16 @@ const fbTimeseries = {timeField: "time", metaField: "hostId", fixedBucketing: tr
 
 // Reads the `fixedBucketing` value persisted for the test collection in `config.collections`.
 function getConfigFixedBucketing() {
-    return st.s.getDB("config").collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(sDB, collName)}`})
+    return st.s
+        .getDB("config")
+        .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(sDB, collName)}`})
         .timeseriesFields.fixedBucketing;
 }
 
 // Reads the `fixedBucketing` value visible via `listCollections` for the test collection.
 function getListCollFixedBucketing() {
-    const colls = sDB.runCommand({listCollections: 1, filter: {type: "timeseries", name: collName}}).cursor.firstBatch;
+    const colls = sDB.runCommand({listCollections: 1, filter: {type: "timeseries", name: collName}})
+        .cursor.firstBatch;
     assert.eq(colls.length, 1, colls);
     return colls[0].options.timeseries.fixedBucketing;
 }
@@ -44,7 +47,9 @@ function getListCollFixedBucketing() {
 // shardCollection creates the collection with fixedBucketing: true. Both config.collections and
 // listCollections must reflect the value.
 (function implicitCreateWithFixedBucketing() {
-    assert.commandWorked(st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries: fbTimeseries}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries: fbTimeseries}),
+    );
     assert.eq(getConfigFixedBucketing(), true);
     assert.eq(getListCollFixedBucketing(), true);
     assert(sDB.ts.drop());
@@ -64,7 +69,9 @@ function getListCollFixedBucketing() {
 // set fixedBucketing to false in both the global catalog (`config.collections`) and the durable
 // catalog (visible via `listCollections`).
 (function collModBucketingChangeDisablesFixedBucketing() {
-    assert.commandWorked(st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries: fbTimeseries}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries: fbTimeseries}),
+    );
     assert.eq(getConfigFixedBucketing(), true);
     assert.eq(getListCollFixedBucketing(), true);
 
@@ -97,7 +104,9 @@ const mismatchedPairs = [
 
 for (const {createVal, shardVal} of mismatchedPairs) {
     (function () {
-        assert.commandWorked(sDB.createCollection(collName, {timeseries: tsWithFixedBucketing(createVal)}));
+        assert.commandWorked(
+            sDB.createCollection(collName, {timeseries: tsWithFixedBucketing(createVal)}),
+        );
         assert.commandFailedWithCode(
             st.s.adminCommand({
                 shardCollection: collNss,

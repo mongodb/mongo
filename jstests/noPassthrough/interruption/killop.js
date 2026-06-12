@@ -14,8 +14,12 @@ const collName = "test";
 function runKillOpTest(conn, shardConn) {
     const db = conn.getDB(dbName);
 
-    assert.commandWorked(shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    assert.commandWorked(shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
+    assert.commandWorked(
+        shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+    );
+    assert.commandWorked(
+        shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}),
+    );
 
     const findComment = "unique_find_comment";
     const queryToKill =
@@ -60,7 +64,9 @@ function runKillOpTest(conn, shardConn) {
     assert(result.inprog[0].hasOwnProperty("killPending"));
     assert.eq(true, result.inprog[0].killPending);
 
-    assert.commandWorked(shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
+    assert.commandWorked(
+        shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}),
+    );
 
     const exitCode = awaitShell({checkExitSuccess: false});
     assert.neq(0, exitCode, "Expected shell to exit with failure due to operation kill");
@@ -75,8 +81,12 @@ function runKillOpTest(conn, shardConn) {
 function runMetricTest(conn, shardConn) {
     const db = conn.getDB(dbName);
 
-    assert.commandWorked(shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    assert.commandWorked(shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
+    assert.commandWorked(
+        shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+    );
+    assert.commandWorked(
+        shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}),
+    );
 
     const findComment = "metric_test_find_comment";
     const awaitShell = startParallelShell(
@@ -92,7 +102,10 @@ function runMetricTest(conn, shardConn) {
     let opId;
 
     assert.soon(function () {
-        const result = db.currentOp({"ns": dbName + "." + collName, "command.comment": findComment});
+        const result = db.currentOp({
+            "ns": dbName + "." + collName,
+            "command.comment": findComment,
+        });
         assert.commandWorked(result);
         if (result.inprog.length === 1 && result.inprog[0].numYields > 0) {
             opId = result.inprog[0].opid;
@@ -103,9 +116,13 @@ function runMetricTest(conn, shardConn) {
 
     const metricsBefore = shardConn.adminCommand({serverStatus: 1}).metrics.operation;
 
-    assert.commandWorked(db.adminCommand({killOp: 1, op: opId, errorCode: ErrorCodes.InterruptedDueToOverload}));
+    assert.commandWorked(
+        db.adminCommand({killOp: 1, op: opId, errorCode: ErrorCodes.InterruptedDueToOverload}),
+    );
 
-    assert.commandWorked(shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
+    assert.commandWorked(
+        shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}),
+    );
     awaitShell();
 
     const metricsAfter = shardConn.adminCommand({serverStatus: 1}).metrics.operation;

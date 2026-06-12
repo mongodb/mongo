@@ -16,7 +16,9 @@ function runMoveCollection(host, ns, toShard) {
 }
 
 function getFlushReshardingStateChangeMetrics(conn) {
-    const shardingStatistics = assert.commandWorked(conn.adminCommand({serverStatus: 1})).shardingStatistics;
+    const shardingStatistics = assert.commandWorked(
+        conn.adminCommand({serverStatus: 1}),
+    ).shardingStatistics;
     return {
         countFlushReshardingStateChangeTotalShardingMetadataRefreshes:
             shardingStatistics.countFlushReshardingStateChangeTotalShardingMetadataRefreshes,
@@ -29,7 +31,11 @@ function getFlushReshardingStateChangeMetrics(conn) {
 
 function validateFlushReshardingStateChangeMetrics(metrics) {
     assert.gte(metrics.countFlushReshardingStateChangeTotalShardingMetadataRefreshes, 0, metrics);
-    assert.gte(metrics.countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes, 0, metrics);
+    assert.gte(
+        metrics.countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes,
+        0,
+        metrics,
+    );
     assert.gte(metrics.countFlushReshardingStateChangeFailedShardingMetadataRefreshes, 0, metrics);
     assert.gte(
         metrics.countFlushReshardingStateChangeTotalShardingMetadataRefreshes,
@@ -46,7 +52,9 @@ function assertSoonFlushReshardingStateChangeStartRetryingOnRefreshErrors(conn) 
         const metrics = getFlushReshardingStateChangeMetrics(conn);
         validateFlushReshardingStateChangeMetrics(metrics);
         if (numTries % 100 == 0) {
-            jsTest.log("Waiting for _flushReshardingStateChange to hit refresh errors: " + tojson(metrics));
+            jsTest.log(
+                "Waiting for _flushReshardingStateChange to hit refresh errors: " + tojson(metrics),
+            );
         }
         return (
             metrics.countFlushReshardingStateChangeTotalShardingMetadataRefreshes > 1 &&
@@ -108,14 +116,17 @@ function stepUpNewPrimary(rst) {
 
 function testRetryOnTransientError(st) {
     jsTest.log(
-        "Start testing that _flushReshardingStateChange retries sharding metadata refresh " + "on transient error",
+        "Start testing that _flushReshardingStateChange retries sharding metadata refresh " +
+            "on transient error",
     );
     // Set up the collection to reshard.
     const dbName = "testDbBasic";
     const collName = "testColl";
     const ns = dbName + "." + collName;
     const testColl = st.s.getCollection(ns);
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
     assert.commandWorked(testColl.createIndex({x: 1}));
 
@@ -154,7 +165,8 @@ function testRetryOnTransientError(st) {
 
 function testStopRetryingOnFailover(st) {
     jsTest.log(
-        "Start testing that _flushReshardingStateChange stops retrying sharding metadata " + "refresh on failover",
+        "Start testing that _flushReshardingStateChange stops retrying sharding metadata " +
+            "refresh on failover",
     );
 
     // Set up the collection to reshard.
@@ -162,7 +174,9 @@ function testStopRetryingOnFailover(st) {
     const collName = "testColl";
     const ns = dbName + "." + collName;
     const testColl = st.s.getCollection(ns);
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
     assert.commandWorked(testColl.createIndex({x: 1}));
 
@@ -178,9 +192,13 @@ function testStopRetryingOnFailover(st) {
     const moveThread = new Thread(runMoveCollection, st.s.host, ns, st.shard1.shardName);
     moveThread.start();
 
-    jsTest.log("Waiting for _flushReshardingStateChange on shard0 to start retrying on refresh errors");
+    jsTest.log(
+        "Waiting for _flushReshardingStateChange on shard0 to start retrying on refresh errors",
+    );
     assertSoonFlushReshardingStateChangeStartRetryingOnRefreshErrors(primary0BeforeFailover);
-    jsTest.log("Waiting for _flushReshardingStateChange to shard1 to start retrying on refresh errors");
+    jsTest.log(
+        "Waiting for _flushReshardingStateChange to shard1 to start retrying on refresh errors",
+    );
     assertSoonFlushReshardingStateChangeStartRetryingOnRefreshErrors(primary1BeforeFailover);
 
     jsTest.log("Triggering a failover on shard0");

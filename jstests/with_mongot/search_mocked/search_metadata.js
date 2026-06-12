@@ -60,7 +60,9 @@ const collUUID = getUUIDFromListCollections(testDB, coll.getName());
         },
     ];
     const responseOk = 1;
-    const expectedDocs = [{_id: 0, foo: 1, score: 1.234, highlights: highlights, scoreInfo: searchScoreDetails}];
+    const expectedDocs = [
+        {_id: 0, foo: 1, score: 1.234, highlights: highlights, scoreInfo: searchScoreDetails},
+    ];
 
     const history = [
         {
@@ -70,7 +72,12 @@ const collUUID = getUUIDFromListCollections(testDB, coll.getName());
                 db: dbName,
                 collectionUUID: collUUID,
             }),
-            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), responseOk),
+            response: mongotResponseForBatch(
+                mongotResponseBatch,
+                NumberLong(0),
+                coll.getFullName(),
+                responseOk,
+            ),
         },
     ];
     mongotMock.setMockResponses(history, cursorId);
@@ -275,7 +282,9 @@ const collUUID = getUUIDFromListCollections(testDB, coll.getName());
         assert.eq(coll.aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(), expectedDoc);
     }
 
-    const response3 = [{_id: 1, $searchScore: 0.1, $searchHighlights: [], $searchScoreDetails: null}];
+    const response3 = [
+        {_id: 1, $searchScore: 0.1, $searchHighlights: [], $searchScoreDetails: null},
+    ];
 
     mongotMock.setMockResponses(makeHistory(response3), cursorId);
     assert.throwsWithCode(() => coll.aggregate(pipeline), [7856603, 8107800, 10065]);

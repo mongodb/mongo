@@ -66,7 +66,10 @@ assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "tim
 
 // Finish the collection cloning phase on the initial syncing node.
 assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 rst.awaitSecondaryNodes(null, [secondary]);

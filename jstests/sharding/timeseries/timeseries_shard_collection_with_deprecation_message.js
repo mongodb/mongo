@@ -19,14 +19,22 @@ const timeseries = {
 };
 
 jsTestLog("Creating sharded time series");
-assert.commandWorked(st.s.adminCommand({shardCollection: "test.meta_only", key: {"hostId": 1}, timeseries}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: "test.meta_only", key: {"hostId": 1}, timeseries}),
+);
 assert.soon(() => checkLog.checkContainsWithCountJson(st.rs0.getPrimary(), 8864700, {}, 0));
 
-assert.commandWorked(st.s.adminCommand({shardCollection: "test.time_only", key: {"time": 1}, timeseries}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: "test.time_only", key: {"time": 1}, timeseries}),
+);
 assert.soon(() => checkLog.checkContainsWithCountJson(st.rs0.getPrimary(), 8864700, {}, 1));
 
 assert.commandWorked(
-    st.s.adminCommand({shardCollection: "test.time_meta_compund", key: {"hostId": 1, "time": 1}, timeseries}),
+    st.s.adminCommand({
+        shardCollection: "test.time_meta_compund",
+        key: {"hostId": 1, "time": 1},
+        timeseries,
+    }),
 );
 assert.soon(() => checkLog.checkContainsWithCountJson(st.rs0.getPrimary(), 8864700, {}, 2));
 

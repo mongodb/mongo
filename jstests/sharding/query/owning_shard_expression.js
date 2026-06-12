@@ -59,7 +59,10 @@ function buildProjectionStageWithOwningShardExpression(
 // Asserts that $_internalOwningShard expression correctly computes the shard id.
 function assertOwningShardExpressionResults(shardVersion, expectedResult) {
     const projectionStage = buildProjectionStageWithOwningShardExpression(shardVersion);
-    assert.eq(sourceColl.aggregate([projectionStage, {$sort: {"indexData._id": 1}}]).toArray(), expectedResult);
+    assert.eq(
+        sourceColl.aggregate([projectionStage, {$sort: {"indexData._id": 1}}]).toArray(),
+        expectedResult,
+    );
 }
 
 // Asserts that $_internalOwningShard expression fails when routing information is stale.
@@ -131,7 +134,9 @@ assertOwningShardExpressionResults(shardVersion, expectedResult);
 
 // Assert that $_internalOwningShard expression will fail when routing information is stale. This is
 // simulated by providing a sharding version with a timestamp from the future.
-const futureShardVersion = Object.assign({}, shardVersion, {t: new Timestamp(Math.pow(2, 32) - 1, 0)});
+const futureShardVersion = Object.assign({}, shardVersion, {
+    t: new Timestamp(Math.pow(2, 32) - 1, 0),
+});
 assertOwningShardExpressionFailure(futureShardVersion);
 
 // Assert invalid inputs will fail with correct error codes.

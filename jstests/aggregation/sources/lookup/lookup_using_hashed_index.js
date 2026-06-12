@@ -16,7 +16,9 @@ const testIndexName = "testIndex";
 // Creates 'indexForeignColl' on foreignColl with 'options', and checks that the result of running
 // an aggregation with 'pipeline' with 'options' matches 'expected'.
 function runTest(indexForeignColl, pipeline, expected, options = {}) {
-    assert.commandWorked(foreignColl.createIndex(indexForeignColl, {name: testIndexName, ...options}));
+    assert.commandWorked(
+        foreignColl.createIndex(indexForeignColl, {name: testIndexName, ...options}),
+    );
     const results = coll.aggregate(pipeline, options).toArray();
     assert(resultsEq(results, expected, true), [results, expected]);
     assert.commandWorked(foreignColl.dropIndex(testIndexName));
@@ -30,7 +32,9 @@ assert.commandWorked(foreignColl.insert(allDocs));
 // collections are identical.
 const expected = allDocs.map((doc) => Object.merge(doc, {relookup: [doc]}));
 
-const pipeline = [{$lookup: {from: foreignCollName, localField: "a", foreignField: "a", as: "relookup"}}];
+const pipeline = [
+    {$lookup: {from: foreignCollName, localField: "a", foreignField: "a", as: "relookup"}},
+];
 
 // Test 1: foreignField IS the hashed field.
 runTest({a: "hashed", b: 1}, pipeline, expected);
@@ -47,7 +51,9 @@ const collationOptions = {
         strength: 1,
     },
 };
-const collatedPipeline = [{$lookup: {from: foreignCollName, localField: "str", foreignField: "str", as: "relookup"}}];
+const collatedPipeline = [
+    {$lookup: {from: foreignCollName, localField: "str", foreignField: "str", as: "relookup"}},
+];
 const collatedExpected = [
     {
         _id: 0,

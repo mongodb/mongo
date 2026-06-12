@@ -28,7 +28,11 @@ assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
 
 function runTest({query, sort, skip, limit, expectedCard}) {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
     let cmd = coll.find(query);
     if (sort !== undefined) {
@@ -91,7 +95,11 @@ try {
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
 
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "histogramCE",
+        }),
     );
 
     const query = {a: 1};
@@ -99,7 +107,10 @@ try {
 
     // Get the cost of the skip stage
     const smallCardSkipExplain = coll.find(query).skip(skip).explain();
-    const smallCardSkipCost = getPlanStage(getWinningPlanFromExplain(smallCardSkipExplain), "SKIP").costEstimate;
+    const smallCardSkipCost = getPlanStage(
+        getWinningPlanFromExplain(smallCardSkipExplain),
+        "SKIP",
+    ).costEstimate;
 
     // Add more docs to the collection and update histogram
     assert.commandWorked(coll.insert(docs));
@@ -107,7 +118,10 @@ try {
 
     // Get the cost of the skip stage
     const largeCardSkipExplain = coll.find(query).skip(skip).explain();
-    const largeCardSkipCost = getPlanStage(getWinningPlanFromExplain(largeCardSkipExplain), "SKIP").costEstimate;
+    const largeCardSkipCost = getPlanStage(
+        getWinningPlanFromExplain(largeCardSkipExplain),
+        "SKIP",
+    ).costEstimate;
 
     assert.gt(largeCardSkipCost, smallCardSkipCost);
 } finally {

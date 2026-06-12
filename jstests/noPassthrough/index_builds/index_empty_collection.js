@@ -66,8 +66,17 @@ try {
     // Index build optimization for empty collection is replicated via old-style createIndexes
     // oplog entry.
     const cmdNs = testDB.getCollection("$cmd").getFullName();
-    const ops = rst.dumpOplog(primary, {op: "c", ns: cmdNs, "o.createIndexes": emptyColl.getName(), "o.name": "b_1"});
-    assert.eq(1, ops.length, "createIndexes oplog entry not generated for empty collection: " + tojson(ops));
+    const ops = rst.dumpOplog(primary, {
+        op: "c",
+        ns: cmdNs,
+        "o.createIndexes": emptyColl.getName(),
+        "o.name": "b_1",
+    });
+    assert.eq(
+        1,
+        ops.length,
+        "createIndexes oplog entry not generated for empty collection: " + tojson(ops),
+    );
 } finally {
     // Wait for the index build to stop.
     IndexBuildTest.resumeIndexBuilds(primary);

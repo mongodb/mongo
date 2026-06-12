@@ -182,7 +182,10 @@ function testValidWriteConcern(cmd) {
     cmd.setupFunc();
     let res = db.runCommand(cmd.req);
     assert.commandWorked(res);
-    assert(!res.writeConcernError, "command on a full replicaset had writeConcernError: " + tojson(res));
+    assert(
+        !res.writeConcernError,
+        "command on a full replicaset had writeConcernError: " + tojson(res),
+    );
     cmd.confirmFunc();
 }
 

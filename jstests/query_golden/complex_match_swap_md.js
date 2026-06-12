@@ -86,20 +86,27 @@ try {
     pipeline = [{$set: {a: "$b.c"}}, {$match: {a: {$eq: 42}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Inclusion projection with a match on a subpath of the renamed path (variation 1)";
+    testCaseName =
+        "Inclusion projection with a match on a subpath of the renamed path (variation 1)";
     pipeline = [{$project: {_id: 1, a: "$b.c", z: 1}}, {$match: {"a.e": {$eq: 42}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Inclusion projection with a match on a subpath of the renamed path (variation 2)";
+    testCaseName =
+        "Inclusion projection with a match on a subpath of the renamed path (variation 2)";
     pipeline = [{$project: {_id: 0, a: "$b.c", z: 1}}, {$match: {"a.e": {$gte: 42}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Inclusion projection with a match on a subpath of the renamed path (variation 3)";
+    testCaseName =
+        "Inclusion projection with a match on a subpath of the renamed path (variation 3)";
     pipeline = [{$project: {_id: 0, a: "$b.c"}}, {$match: {"a.e": {$type: "number"}}}];
     runPipeline(testCaseName, pipeline);
 
     testCaseName = "Exclusion/inclusion projection with a match on a subpath of the renamed path";
-    pipeline = [{$project: {_id: 0, z: 0}}, {$project: {a: "$b.c"}}, {$match: {"a.e": {$mod: [7, 0]}}}];
+    pipeline = [
+        {$project: {_id: 0, z: 0}},
+        {$project: {a: "$b.c"}},
+        {$match: {"a.e": {$mod: [7, 0]}}},
+    ];
     runPipeline(testCaseName, pipeline);
 
     testCaseName = "$addFields with a match on a subpath of the renamed path";
@@ -120,7 +127,10 @@ try {
     runPipeline(testCaseName, pipeline);
 
     testCaseName = "Multiple complex renames";
-    pipeline = [{$project: {n: "$b.c", q: "$h.i"}}, {$match: {$or: [{n: {$gt: 15}}, {q: {$lt: 13}}]}}];
+    pipeline = [
+        {$project: {n: "$b.c", q: "$h.i"}},
+        {$match: {$or: [{n: {$gt: 15}}, {q: {$lt: 13}}]}},
+    ];
     runPipeline(testCaseName, pipeline);
 
     testCaseName = "Multiple complex renames as successive pipeline stages";
@@ -140,7 +150,13 @@ try {
     // when the data doesn't have arrays, the pipeline itself can introduce arrays.
     testCaseName = "$match swaps past rename in the presence of arrays created by the pipeline";
     pipeline = [
-        {$lookup: {from: "complex_match_swap", pipeline: [{$group: {_id: "$a", b: {$push: "$b"}}}], as: "arr"}},
+        {
+            $lookup: {
+                from: "complex_match_swap",
+                pipeline: [{$group: {_id: "$a", b: {$push: "$b"}}}],
+                as: "arr",
+            },
+        },
         {$project: {c: "$arr.b"}},
         {$match: {c: {$eq: {}}}},
     ];
@@ -170,7 +186,8 @@ try {
     pipeline = [{$project: {_id: 0, "x.y": "$b.c", z: 1}}, {$match: {"x.y": {$lte: 42}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Negative case: Dotted path on the left and the right with match on a subpath of the renamed path";
+    testCaseName =
+        "Negative case: Dotted path on the left and the right with match on a subpath of the renamed path";
     pipeline = [{$project: {_id: 0, "x.y": "$b.c", z: 1}}, {$match: {"x.y.e": {$lte: 42}}}];
     runPipeline(testCaseName, pipeline);
 
@@ -178,11 +195,13 @@ try {
     pipeline = [{$project: {_id: 0, "n.q.r": "$b.c", z: 1}}, {$match: {"n.q.r.e": {$lte: 42}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Negative case: Dotted path of length 3 on the left, expressed with nested objects";
+    testCaseName =
+        "Negative case: Dotted path of length 3 on the left, expressed with nested objects";
     pipeline = [{$project: {_id: 0, n: {q: {r: "$b.c"}}, z: 1}}, {$match: {"n.q.r.e": {$lte: 42}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Negative case: Dotted path of length 3 on the left, expressed with nested objects and $addFields";
+    testCaseName =
+        "Negative case: Dotted path of length 3 on the left, expressed with nested objects and $addFields";
     pipeline = [{$addFields: {n: {q: {r: "$b.c"}}}}, {$match: {"n.q.r.e": {$lte: 42}}}];
     runPipeline(testCaseName, pipeline);
 
@@ -217,7 +236,8 @@ try {
     pipeline = [{$project: {a: "$b.c.f.g", z: 1}}, {$match: {a: {$eq: 9}}}];
     runPipeline(testCaseName, pipeline);
 
-    testCaseName = "Negative case: $match cannot swap past complex rename when matching on subfield of $group key";
+    testCaseName =
+        "Negative case: $match cannot swap past complex rename when matching on subfield of $group key";
     pipeline = [{$group: {_id: {x: "$b.c"}}}, {$match: {"_id.x.e": {$lte: 42}}}];
     runPipeline(testCaseName, pipeline);
 

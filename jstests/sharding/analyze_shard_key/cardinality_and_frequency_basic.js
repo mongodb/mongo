@@ -21,7 +21,10 @@ const setParameterOpts = {
 };
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
+    });
 
     const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
     testAnalyzeCandidateShardKeysUnshardedCollection(st.s, {st}, writeConcern);
@@ -33,7 +36,10 @@ const setParameterOpts = {
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Remove block
-    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({
+        nodes: numNodesPerRS,
+        nodeOptions: {setParameter: setParameterOpts},
+    });
     rst.startSet();
     rst.initiate();
 

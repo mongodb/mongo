@@ -90,7 +90,9 @@ function makeUpgradeDowngradeCmd(isUpgrade, uuid) {
 {
     jsTest.log("Phase 2: Testing downgrade via applyOps at last-LTS FCV");
 
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     // Create a viewless timeseries collection via applyOps.
     const fp2 = configureFailPoint(primary, "skipCreateTimeseriesVersionMismatchCheck");
@@ -98,7 +100,11 @@ function makeUpgradeDowngradeCmd(isUpgrade, uuid) {
     fp2.off();
     const collUUID = mainColl.getUUID();
     assert.neq(null, mainColl.exists(), "Main collection should exist after create");
-    assert.eq(null, bucketsColl.exists(), "system.buckets should not exist for viewless collection");
+    assert.eq(
+        null,
+        bucketsColl.exists(),
+        "system.buckets should not exist for viewless collection",
+    );
 
     // Downgrade: viewless -> viewful via applyOps.
     assert.commandWorked(testDB.adminCommand(makeUpgradeDowngradeCmd(false, collUUID)));

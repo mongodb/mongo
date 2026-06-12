@@ -40,7 +40,10 @@ if (TestData.doesNotSupportGracefulStepdown) {
 
 function setUpTestMode(mode) {
     if (mode == kTestMode.kRestart) {
-        rst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true, skipCheckDBHashes: true});
+        rst.stopSet(null /* signal */, true /*forRestart */, {
+            skipValidation: true,
+            skipCheckDBHashes: true,
+        });
         rst.startSet({restart: true});
         primary = rst.getPrimary();
     } else if (mode == kTestMode.kFailoverOldPrimary) {
@@ -48,7 +51,9 @@ function setUpTestMode(mode) {
         const oldSecondary = rst.getSecondary();
 
         assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
-        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
 
         const newPrimary = rst.getPrimary();
@@ -59,7 +64,9 @@ function setUpTestMode(mode) {
         const oldSecondary = rst.getSecondary();
 
         assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: 0}));
-        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
 
         const newPrimary = rst.getPrimary();
         assert.neq(oldPrimary, newPrimary);
@@ -107,7 +114,9 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
     rst.awaitLastOpCommitted();
 
     let runNewTxnNumber = async function (primaryHost, parentSessionUUIDString, dbName, collName) {
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
         const {withRetryOnTransientTxnErrorIncrementTxnNum} = await import(
             "jstests/libs/auto_retry_transaction_in_sharding.js"
         );

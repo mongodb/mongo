@@ -79,9 +79,20 @@ describe("Execution control statistics and observability", function () {
             assert.eq(expected.usesPrioritization, stats.usesPrioritization);
             assert.eq(expected.deprioritizationGate, stats.deprioritizationGate);
             assert.eq(expected.heuristicDeprioritization, stats.heuristicDeprioritization);
-            assert.eq(expected.backgroundTasksDeprioritization, stats.backgroundTasksDeprioritization);
-            verifyTicketAggregationStats(expected.ticketAssertFunc, stats.read, stats.read.normalPriority);
-            verifyTicketAggregationStats(expected.ticketAssertFunc, stats.write, stats.write.normalPriority);
+            assert.eq(
+                expected.backgroundTasksDeprioritization,
+                stats.backgroundTasksDeprioritization,
+            );
+            verifyTicketAggregationStats(
+                expected.ticketAssertFunc,
+                stats.read,
+                stats.read.normalPriority,
+            );
+            verifyTicketAggregationStats(
+                expected.ticketAssertFunc,
+                stats.write,
+                stats.write.normalPriority,
+            );
         }
 
         before(function () {
@@ -314,7 +325,10 @@ describe("Execution control statistics and observability", function () {
             assert.gte(afterLowStats.totalTickets, beforeStats.normalPriority.totalTickets);
 
             // Check the stats aggregate.
-            assert.gte(afterLowStats.out, afterLowStats.normalPriority.out + afterLowStats.lowPriority.out);
+            assert.gte(
+                afterLowStats.out,
+                afterLowStats.normalPriority.out + afterLowStats.lowPriority.out,
+            );
             assert.gte(
                 afterLowStats.available,
                 afterLowStats.normalPriority.available + afterLowStats.lowPriority.available,
@@ -369,7 +383,10 @@ describe("Execution control statistics and observability", function () {
 
             const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
             const logLine = findMatchingLogLine(log, {msg: "Slow query", comment: slowLogComment});
-            assert(logLine, `Could not find slow query log line for find with comment: ${slowLogComment}`);
+            assert(
+                logLine,
+                `Could not find slow query log line for find with comment: ${slowLogComment}`,
+            );
 
             const parsedLog = JSON.parse(logLine);
             assert.eq(
@@ -453,7 +470,10 @@ describe("Execution control statistics and observability", function () {
             const queryStats = getQueryStats(mongod, {collName: coll.getName()});
             assert(
                 queryStats.length === 1,
-                "Expected to find exactly one query stats entry for '" + coll.getName() + "' " + tojson(queryStats),
+                "Expected to find exactly one query stats entry for '" +
+                    coll.getName() +
+                    "' " +
+                    tojson(queryStats),
             );
             verifyQueryStatsMetrics(queryStats[0].metrics);
         });
@@ -514,7 +534,10 @@ describe("Execution control statistics and observability", function () {
             failPoint.off();
 
             const afterStats = getExecutionControlStats(mongod).read.lowPriority;
-            assert.gt(afterStats.totalDelinquentAcquisitions, beforeStats.totalDelinquentAcquisitions);
+            assert.gt(
+                afterStats.totalDelinquentAcquisitions,
+                beforeStats.totalDelinquentAcquisitions,
+            );
         });
     });
 
@@ -556,13 +579,19 @@ describe("Execution control statistics and observability", function () {
 
         function assertPerAcquisitionStatsPresent(stats) {
             perAcquisitionKeys.forEach((key) => {
-                assert(stats.hasOwnProperty(key), `Missing ${key} in per-acquisition stats: ` + tojson(stats));
+                assert(
+                    stats.hasOwnProperty(key),
+                    `Missing ${key} in per-acquisition stats: ` + tojson(stats),
+                );
             });
         }
 
         function assertFinalizedStatsPresent(stats) {
             finalizedStatsKeys.forEach((key) => {
-                assert(stats.hasOwnProperty(key), `Missing ${key} in finalized stats: ` + tojson(stats));
+                assert(
+                    stats.hasOwnProperty(key),
+                    `Missing ${key} in finalized stats: ` + tojson(stats),
+                );
             });
         }
 
@@ -598,19 +627,34 @@ describe("Execution control statistics and observability", function () {
 
             // Verify that totalAdmissions equals the sum of per-priority counters.
             const verifyAndGetTotalAdmissions = (bucket, name) => {
-                const sumOfPriorities = bucket.totalNormalPriorityAdmissions + bucket.totalLowPriorityAdmissions;
+                const sumOfPriorities =
+                    bucket.totalNormalPriorityAdmissions + bucket.totalLowPriorityAdmissions;
                 assert.eq(
                     bucket.totalAdmissions,
                     sumOfPriorities,
-                    name + " totalAdmissions should equal sum of per-priority counters: " + tojson(bucket),
+                    name +
+                        " totalAdmissions should equal sum of per-priority counters: " +
+                        tojson(bucket),
                 );
                 return sumOfPriorities;
             };
 
-            verifyAndGetTotalAdmissions(executionStats.read.nonDeprioritizable, "read.nonDeprioritizable");
-            verifyAndGetTotalAdmissions(executionStats.read.deprioritizable, "read.deprioritizable");
-            verifyAndGetTotalAdmissions(executionStats.write.nonDeprioritizable, "write.nonDeprioritizable");
-            verifyAndGetTotalAdmissions(executionStats.write.deprioritizable, "write.deprioritizable");
+            verifyAndGetTotalAdmissions(
+                executionStats.read.nonDeprioritizable,
+                "read.nonDeprioritizable",
+            );
+            verifyAndGetTotalAdmissions(
+                executionStats.read.deprioritizable,
+                "read.deprioritizable",
+            );
+            verifyAndGetTotalAdmissions(
+                executionStats.write.nonDeprioritizable,
+                "write.nonDeprioritizable",
+            );
+            verifyAndGetTotalAdmissions(
+                executionStats.write.deprioritizable,
+                "write.deprioritizable",
+            );
 
             assert.gte(
                 executionStats.read.normalPriority.startedProcessing +
@@ -632,7 +676,8 @@ describe("Execution control statistics and observability", function () {
 
         function assertExecutionShedStatsCorrect(executionStats) {
             assert.gt(
-                executionStats.nonDeprioritizable.totalOpsLoadShed + executionStats.deprioritizable.totalOpsLoadShed,
+                executionStats.nonDeprioritizable.totalOpsLoadShed +
+                    executionStats.deprioritizable.totalOpsLoadShed,
                 0,
                 "totalOpsLoadShed mismatch: " + tojson(executionStats),
             );
@@ -791,7 +836,10 @@ describe("Execution control statistics and observability", function () {
                 "1025+",
             ];
             for (const bucket of expectedBuckets) {
-                assert(histogram.hasOwnProperty(bucket), `Missing histogram bucket ${bucket}: ` + tojson(histogram));
+                assert(
+                    histogram.hasOwnProperty(bucket),
+                    `Missing histogram bucket ${bucket}: ` + tojson(histogram),
+                );
             }
         });
 

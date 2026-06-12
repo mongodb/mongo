@@ -51,7 +51,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             $and: [
                 {active: true},
                 {
-                    $or: [{"command.comment": this.commentStr}, {"cursor.originatingCommand.comment": this.commentStr}],
+                    $or: [
+                        {"command.comment": this.commentStr},
+                        {"cursor.originatingCommand.comment": this.commentStr},
+                    ],
                 },
             ],
         });
@@ -92,7 +95,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                     if (result.cursor) {
                         const cursorId = result.cursor.cursorId;
                         jsTestLog(`Killing cursor: ${cursorId}, database ${db.getName()}`);
-                        assert.commandWorked(db.runCommand({killCursors: collName, cursors: [cursorId]}));
+                        assert.commandWorked(
+                            db.runCommand({killCursors: collName, cursors: [cursorId]}),
+                        );
                     }
                 }
             };

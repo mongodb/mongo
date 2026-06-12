@@ -49,7 +49,9 @@ const stParams = {
     shards: 3,
     rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}},
     other: {
-        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+        mongosOptions: {
+            setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        },
     },
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
@@ -92,12 +94,16 @@ function createUsers(conn, grantDirectShardOperationsRole) {
 
     let rolesUserInprog = ["readWriteAnyDatabase", "role_inprog"];
     if (grantDirectShardOperationsRole) rolesUserInprog.push("directShardOperations");
-    assert.commandWorked(adminDB.runCommand({createUser: "user_inprog", pwd: "pwd", roles: rolesUserInprog}));
+    assert.commandWorked(
+        adminDB.runCommand({createUser: "user_inprog", pwd: "pwd", roles: rolesUserInprog}),
+    );
 
     let rolesUserNoInprog = ["readWriteAnyDatabase"];
     if (grantDirectShardOperationsRole) rolesUserNoInprog.push("directShardOperations");
 
-    assert.commandWorked(adminDB.runCommand({createUser: "user_no_inprog", pwd: "pwd", roles: rolesUserNoInprog}));
+    assert.commandWorked(
+        adminDB.runCommand({createUser: "user_no_inprog", pwd: "pwd", roles: rolesUserNoInprog}),
+    );
 }
 
 // Create necessary users at both cluster and shard-local level.
@@ -116,7 +122,10 @@ if (!TestData.configShard) {
 assert(clusterAdminDB.auth("admin", "pwd"));
 
 assert.commandWorked(
-    clusterTestDB.adminCommand({enableSharding: clusterTestDB.getName(), primaryShard: st.shard0.shardName}),
+    clusterTestDB.adminCommand({
+        enableSharding: clusterTestDB.getName(),
+        primaryShard: st.shard0.shardName,
+    }),
 );
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(clusterTestDB.test.insert({_id: i, a: i}));
@@ -168,7 +177,11 @@ function runInParallelShell({conn, testfunc, username, password, ns}) {
         dbName: "admin",
         username: username,
         password: password,
-        cmdObj: {configureFailPoint: "setYieldAllLocksHang", data: {namespace: ns}, mode: "alwaysOn"},
+        cmdObj: {
+            configureFailPoint: "setYieldAllLocksHang",
+            data: {namespace: ns},
+            mode: "alwaysOn",
+        },
     });
 
     testfunc = function () {
@@ -189,7 +202,9 @@ function assertCurrentOpHasSingleMatchingEntry({conn, currentOpAggFilter, curOpS
 
     assert.soon(
         function () {
-            curOpResult = connAdminDB.aggregate([{$currentOp: curOpSpec}, {$match: currentOpAggFilter}]).toArray();
+            curOpResult = connAdminDB
+                .aggregate([{$currentOp: curOpSpec}, {$match: currentOpAggFilter}])
+                .toArray();
 
             return curOpResult.length === 1;
         },
@@ -234,7 +249,11 @@ function getMoreTest({conn, curOpSpec, getMoreBatchSize}) {
     const connAdminDB = conn.getDB("admin");
 
     const aggCmdRes = assert.commandWorked(
-        connAdminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: curOpSpec}], cursor: {batchSize: 0}}),
+        connAdminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: curOpSpec}],
+            cursor: {batchSize: 0},
+        }),
     );
     assert.neq(aggCmdRes.cursor.id, 0);
 
@@ -267,7 +286,11 @@ function runCommonTests(conn, curOpSpec) {
     assert(adminDB.logout());
 
     assert.commandFailedWithCode(
-        adminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: addToSpec({allUsers: false})}], cursor: {}}),
+        adminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: addToSpec({allUsers: false})}],
+            cursor: {},
+        }),
         ErrorCodes.Unauthorized,
     );
 
@@ -284,7 +307,11 @@ function runCommonTests(conn, curOpSpec) {
     // Test that $currentOp fails with {allUsers: true} for a user without the "inprog"
     // privilege.
     assert.commandFailedWithCode(
-        adminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: addToSpec({allUsers: true})}], cursor: {}}),
+        adminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: addToSpec({allUsers: true})}],
+            cursor: {},
+        }),
         ErrorCodes.Unauthorized,
     );
 
@@ -308,13 +335,21 @@ function runCommonTests(conn, curOpSpec) {
     // $currentOp stages since any other stage in the initial position will trip the {aggregate:
     // 1} namespace check.
     assert.commandFailedWithCode(
-        adminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: curOpSpec}], cursor: {}}),
+        adminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: {}}, {$currentOp: curOpSpec}],
+            cursor: {},
+        }),
         40602,
     );
 
     // Test that $currentOp fails when run on admin without {aggregate: 1}.
     assert.commandFailedWithCode(
-        adminDB.runCommand({aggregate: "collname", pipeline: [{$currentOp: curOpSpec}], cursor: {}}),
+        adminDB.runCommand({
+            aggregate: "collname",
+            pipeline: [{$currentOp: curOpSpec}],
+            cursor: {},
+        }),
         ErrorCodes.InvalidNamespace,
     );
 
@@ -335,7 +370,9 @@ function runCommonTests(conn, curOpSpec) {
     const ones = [1, 1.0, NumberInt(1), NumberLong(1), NumberDecimal(1)];
 
     for (let one of ones) {
-        assert.commandWorked(adminDB.runCommand({aggregate: one, pipeline: [{$currentOp: curOpSpec}], cursor: {}}));
+        assert.commandWorked(
+            adminDB.runCommand({aggregate: one, pipeline: [{$currentOp: curOpSpec}], cursor: {}}),
+        );
 
         assert.commandWorked(adminDB.runCommand({currentOp: one, $ownOps: true}));
     }
@@ -343,7 +380,11 @@ function runCommonTests(conn, curOpSpec) {
     // Test that $currentOp with {allUsers: true} succeeds for a user with the "inprog"
     // privilege.
     assert.commandWorked(
-        adminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: addToSpec({allUsers: true})}], cursor: {}}),
+        adminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: addToSpec({allUsers: true})}],
+            cursor: {},
+        }),
     );
 
     // Test that the currentOp command with {$ownOps: false} succeeds for a user with the
@@ -374,7 +415,10 @@ function runCommonTests(conn, curOpSpec) {
     const idleConn = new Mongo(conn.host);
 
     const activeConns = adminDB
-        .aggregate([{$currentOp: addToSpec({allUsers: true, idleConnections: false})}, {$match: {active: false}}])
+        .aggregate([
+            {$currentOp: addToSpec({allUsers: true, idleConnections: false})},
+            {$match: {active: false}},
+        ])
         .toArray();
     assert.eq(
         activeConns.length,
@@ -389,7 +433,10 @@ function runCommonTests(conn, curOpSpec) {
     // Test that {idleConnections: true} returns inactive connections.
     assert.gte(
         adminDB
-            .aggregate([{$currentOp: addToSpec({allUsers: true, idleConnections: true})}, {$match: {active: false}}])
+            .aggregate([
+                {$currentOp: addToSpec({allUsers: true, idleConnections: true})},
+                {$match: {active: false}},
+            ])
             .itcount(),
         1,
     );
@@ -403,10 +450,13 @@ function runCommonTests(conn, curOpSpec) {
 
     assert.eq(
         adminDB
-            .aggregate([{$currentOp: curOpSpec}, {$match: {[matchField]: "AGG_currént_op_COLLATION"}}], {
-                collation: {locale: "en_US", strength: 1}, // Case and diacritic insensitive.
-                comment: "agg_current_op_collation",
-            })
+            .aggregate(
+                [{$currentOp: curOpSpec}, {$match: {[matchField]: "AGG_currént_op_COLLATION"}}],
+                {
+                    collation: {locale: "en_US", strength: 1}, // Case and diacritic insensitive.
+                    comment: "agg_current_op_collation",
+                },
+            )
             .itcount(),
         numExpectedMatches,
     );
@@ -419,7 +469,10 @@ function runCommonTests(conn, curOpSpec) {
                     {$currentOp: curOpSpec},
                     {
                         $facet: {
-                            testFacet: [{$match: {[matchField]: "agg_current_op_facets"}}, {$count: "count"}],
+                            testFacet: [
+                                {$match: {[matchField]: "agg_current_op_facets"}},
+                                {$count: "count"},
+                            ],
                         },
                     },
                     {$unwind: "$testFacet"},
@@ -435,12 +488,18 @@ function runCommonTests(conn, curOpSpec) {
     const explainPlan = assert.commandWorked(
         adminDB.runCommand({
             aggregate: 1,
-            pipeline: [{$currentOp: addToSpec({idleConnections: true, allUsers: false})}, {$match: {desc: "test"}}],
+            pipeline: [
+                {$currentOp: addToSpec({idleConnections: true, allUsers: false})},
+                {$match: {desc: "test"}},
+            ],
             explain: true,
         }),
     );
 
-    let expectedStages = [{$currentOp: {idleConnections: true, allUsers: false}}, {$match: {desc: {$eq: "test"}}}];
+    let expectedStages = [
+        {$currentOp: {idleConnections: true, allUsers: false}},
+        {$match: {desc: {$eq: "test"}}},
+    ];
 
     if (isRemoteShardCurOp) {
         assert.docEq(expectedStages, explainPlan.splitPipeline.shardsPart);
@@ -492,7 +551,11 @@ assert(clusterAdminDB.logout());
 assert(clusterAdminDB.auth("user_no_inprog", "pwd"));
 
 assert.commandFailedWithCode(
-    clusterAdminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}),
+    clusterAdminDB.runCommand({
+        aggregate: 1,
+        pipeline: [{$currentOp: {allUsers: false}}],
+        cursor: {},
+    }),
     ErrorCodes.Unauthorized,
 );
 
@@ -560,7 +623,14 @@ function runLocalOpsTests(conn) {
 
     let awaitShell = runInParallelShell({
         testfunc: function () {
-            assert.eq(db.getSiblingDB(jsTestName()).test.find({}).comment("agg_current_op_allusers_test").itcount(), 5);
+            assert.eq(
+                db
+                    .getSiblingDB(jsTestName())
+                    .test.find({})
+                    .comment("agg_current_op_allusers_test")
+                    .itcount(),
+                5,
+            );
         },
         conn: conn,
         username: "admin",
@@ -578,7 +648,10 @@ function runLocalOpsTests(conn) {
     // Only test on a replica set since 'localOps' isn't supported by the currentOp command.
     if (!isMongos) {
         assert.eq(
-            connAdminDB.currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"}).inprog.length,
+            connAdminDB.currentOp({
+                $ownOps: false,
+                "command.comment": "agg_current_op_allusers_test",
+            }).inprog.length,
             1,
         );
     }
@@ -589,7 +662,11 @@ function runLocalOpsTests(conn) {
     assert(connAdminDB.auth("user_no_inprog", "pwd"));
 
     assert.commandWorked(
-        connAdminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {allUsers: false, localOps: true}}], cursor: {}}),
+        connAdminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: {allUsers: false, localOps: true}}],
+            cursor: {},
+        }),
     );
 
     // Test that the currentOp command succeeds with {$ownOps: true} for a user without the
@@ -615,7 +692,10 @@ function runLocalOpsTests(conn) {
     // 'localOps' parameter for the currentOp command.
     if (!isMongos) {
         assert.eq(
-            connAdminDB.currentOp({$ownOps: true, "command.comment": "agg_current_op_allusers_test"}).inprog.length,
+            connAdminDB.currentOp({
+                $ownOps: true,
+                "command.comment": "agg_current_op_allusers_test",
+            }).inprog.length,
             0,
         );
     }
@@ -733,7 +813,12 @@ function runIdleSessionsTests(conn, adminDB, txnDB, useLocalOps) {
 
     // Confirm that the 'idleSessions' parameter defaults to true.
     assert.eq(
-        adminDB.aggregate([{$currentOp: {allUsers: true, localOps: useLocalOps}}, {$match: sessionFilter()}]).itcount(),
+        adminDB
+            .aggregate([
+                {$currentOp: {allUsers: true, localOps: useLocalOps}},
+                {$match: sessionFilter()},
+            ])
+            .itcount(),
         3,
     );
 
@@ -791,7 +876,9 @@ assert.soonNoExcept(() => {
 // Set and save the transaction's lifetime. We will use this later to assert that our
 // transaction's expiry time is equal to its start time + lifetime.
 const transactionLifeTime = 10;
-assert.commandWorked(sessionDB.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+assert.commandWorked(
+    sessionDB.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}),
+);
 
 // Start but do not complete a transaction.
 assert.commandWorked(
@@ -810,11 +897,19 @@ sessions = [session];
 const timeAfterTransactionStarts = new ISODate();
 
 // Use $currentOp to confirm that the incomplete transaction has stashed its locks.
-assert.eq(shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}]).itcount(), 1);
+assert.eq(
+    shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}]).itcount(),
+    1,
+);
 
 // Confirm that idleSessions:false omits the stashed locks from the report.
 assert.eq(
-    shardAdminDB.aggregate([{$currentOp: {allUsers: false, idleSessions: false}}, {$match: sessionFilter()}]).itcount(),
+    shardAdminDB
+        .aggregate([
+            {$currentOp: {allUsers: false, idleSessions: false}},
+            {$match: sessionFilter()},
+        ])
+        .itcount(),
     0,
 );
 
@@ -827,14 +922,26 @@ const prepareRes = assert.commandWorked(
         writeConcern: {w: "majority"},
     }),
 );
-assert(prepareRes.prepareTimestamp, "prepareTransaction did not return a 'prepareTimestamp': " + tojson(prepareRes));
-assert(prepareRes.prepareTimestamp instanceof Timestamp, "prepareTimestamp was not a Timestamp: " + tojson(prepareRes));
-assert.neq(prepareRes.prepareTimestamp, Timestamp(0, 0), "prepareTimestamp cannot be null: " + tojson(prepareRes));
+assert(
+    prepareRes.prepareTimestamp,
+    "prepareTransaction did not return a 'prepareTimestamp': " + tojson(prepareRes),
+);
+assert(
+    prepareRes.prepareTimestamp instanceof Timestamp,
+    "prepareTimestamp was not a Timestamp: " + tojson(prepareRes),
+);
+assert.neq(
+    prepareRes.prepareTimestamp,
+    Timestamp(0, 0),
+    "prepareTimestamp cannot be null: " + tojson(prepareRes),
+);
 
 const timeBeforeCurrentOp = new ISODate();
 
 // Check that the currentOp's transaction subdocument's fields align with our expectations.
-let currentOp = shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}]).toArray();
+let currentOp = shardAdminDB
+    .aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}])
+    .toArray();
 let transactionDocument = currentOp[0].transaction;
 assert.eq(transactionDocument.parameters.autocommit, false);
 assert.eq(transactionDocument.parameters.readConcern.level, "snapshot");
@@ -859,7 +966,10 @@ assert.eq(
 
 // Allow the transactions to complete and close the session. We must commit prepared
 // transactions at a timestamp greater than the prepare timestamp.
-const commitTimestamp = Timestamp(prepareRes.prepareTimestamp.getTime(), prepareRes.prepareTimestamp.getInc() + 1);
+const commitTimestamp = Timestamp(
+    prepareRes.prepareTimestamp.getTime(),
+    prepareRes.prepareTimestamp.getInc() + 1,
+);
 assert.commandWorked(
     sessionDB.adminCommand({
         commitTransaction: 1,
@@ -886,7 +996,11 @@ function runNoAuthTests(conn, curOpSpec) {
         connAdminDB
             .aggregate([
                 {
-                    $currentOp: {allUsers: false, idleConnections: true, localOps: curOpSpec.localOps},
+                    $currentOp: {
+                        allUsers: false,
+                        idleConnections: true,
+                        localOps: curOpSpec.localOps,
+                    },
                 },
                 {$match: {connectionId: {$exists: false}}},
             ])
@@ -898,10 +1012,16 @@ function runNoAuthTests(conn, curOpSpec) {
     // regardless of
     // the $ownOps parameter, by confirming that we can see non-client system operations when
     // {$ownOps: true} is specified.
-    assert.gte(connAdminDB.currentOp({$ownOps: true, $all: true, connectionId: {$exists: false}}).inprog.length, 1);
+    assert.gte(
+        connAdminDB.currentOp({$ownOps: true, $all: true, connectionId: {$exists: false}}).inprog
+            .length,
+        1,
+    );
 
     // Test that a user can run getMore on a $currentOp cursor when authentication is disabled.
-    assert.commandWorked(getMoreTest({conn: conn, curOpSpec: {allUsers: true, localOps: curOpSpec.localOps}}));
+    assert.commandWorked(
+        getMoreTest({conn: conn, curOpSpec: {allUsers: true, localOps: curOpSpec.localOps}}),
+    );
 }
 
 runNoAuthTests(shardConn);
@@ -937,7 +1057,12 @@ assert.eq(
 // Test that attempting to 'spoof' a sharded request on non-shardsvr mongoD fails.
 // External clients get BadValue from validateRequestWithClient before $currentOp (40465) fires.
 assert.commandFailedWithCode(
-    shardAdminDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {}}], fromRouter: true, cursor: {}}),
+    shardAdminDB.runCommand({
+        aggregate: 1,
+        pipeline: [{$currentOp: {}}],
+        fromRouter: true,
+        cursor: {},
+    }),
     [40465, ErrorCodes.BadValue],
 );
 
@@ -964,11 +1089,17 @@ aggPipeline[1].$match.$or[1].padding = "a".repeat(bsonUserSizeLimit - Object.bso
 
 assert.eq(Object.bsonsize(aggPipeline), bsonUserSizeLimit);
 
-assert.eq(shardAdminDB.aggregate(aggPipeline, {comment: "agg_current_op_bson_limit_test"}).itcount(), 1);
+assert.eq(
+    shardAdminDB.aggregate(aggPipeline, {comment: "agg_current_op_bson_limit_test"}).itcount(),
+    1,
+);
 
 // Test that $currentOp can run while the mongoD is write-locked.
 let awaitShell = startParallelShell(function () {
-    assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", secs: 300}), ErrorCodes.Interrupted);
+    assert.commandFailedWithCode(
+        db.adminCommand({sleep: 1, lock: "w", secs: 300}),
+        ErrorCodes.Interrupted,
+    );
 }, shardConn.port);
 
 const op = assertCurrentOpHasSingleMatchingEntry({

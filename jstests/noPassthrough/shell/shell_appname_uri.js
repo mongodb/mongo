@@ -11,7 +11,9 @@ function assertProfileOnlyContainsAppName(db, appname) {
     if (res.length > 1 || res.indexOf(appname) === -1) {
         // Dump collection.
         jsTest.log.info("dumping db.system.profile", {profile: db.system.profile.find().toArray()});
-        doassert(`system.profile expected to only have appName=${appname}` + ` but found ${tojson(res)}`);
+        doassert(
+            `system.profile expected to only have appName=${appname}` + ` but found ${tojson(res)}`,
+        );
     }
 }
 

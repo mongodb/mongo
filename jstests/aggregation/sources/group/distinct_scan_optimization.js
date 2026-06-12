@@ -69,11 +69,18 @@ const indexSpecArb = fc
     });
 // Arbitrary representing values for RHS. This set is small to keep the minimization time fast and
 // ensure that each bucket in a $group has multiple entries.
-const fieldValueArb = fc.oneof(fc.integer({min: 1, max: 3}), fc.constantFrom("aaa", "bbb", "ccc"), fc.constant(null));
+const fieldValueArb = fc.oneof(
+    fc.integer({min: 1, max: 3}),
+    fc.constantFrom("aaa", "bbb", "ccc"),
+    fc.constant(null),
+);
 
 // Arbitrary like 'fieldValueArb' which cannot be null. Used for $match stage before $sort.
 // Comparison to null prevents the distinct scan optimization.
-const nonNullFieldArb = fc.oneof(fc.integer({min: 1, max: 3}), fc.constantFrom("aaa", "bbb", "ccc"));
+const nonNullFieldArb = fc.oneof(
+    fc.integer({min: 1, max: 3}),
+    fc.constantFrom("aaa", "bbb", "ccc"),
+);
 
 // Arbitrary representing an array of integers.
 const multikeyValueArb = fc.array(fc.integer(), {maxLength: 3});

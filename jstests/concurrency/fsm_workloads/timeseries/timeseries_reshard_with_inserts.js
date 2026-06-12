@@ -45,12 +45,17 @@ export const $config = (function () {
     const kMaxReshardingExecutions = 4;
 
     function executeReshardTimeseries(db, collName, newShardKey) {
-        print(`Started Resharding Timeseries Collection ${collName}. New Shard Key ${tojson(newShardKey)}`);
+        print(
+            `Started Resharding Timeseries Collection ${collName}. New Shard Key ${tojson(newShardKey)}`,
+        );
 
         let ns = db + "." + collName;
         let reshardCollectionCmd = {reshardCollection: ns, key: newShardKey, numInitialChunks: 1};
         if (TestData.runningWithShardStepdowns) {
-            const isVerificationFeatureFlagEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+            const isVerificationFeatureFlagEnabled = FeatureFlagUtil.isEnabled(
+                db,
+                "ReshardingVerification",
+            );
             if (isVerificationFeatureFlagEnabled) {
                 // TODO (SERVER-101249): Re-enable resharding verification in
                 // timeseries_reshard_with_inserts.js when running in stepdown suites
@@ -73,7 +78,9 @@ export const $config = (function () {
             assert.commandWorked(db.adminCommand(reshardCollectionCmd));
         }
 
-        print(`Finished Resharding Timeseries Collection ${collName}. New Shard Key ${tojson(newShardKey)}`);
+        print(
+            `Finished Resharding Timeseries Collection ${collName}. New Shard Key ${tojson(newShardKey)}`,
+        );
     }
 
     const states = {
@@ -123,11 +130,17 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         db[collName].drop();
 
-        assert.commandWorked(db.createCollection(collName, {timeseries: {metaField: metaField, timeField: timeField}}));
+        assert.commandWorked(
+            db.createCollection(collName, {
+                timeseries: {metaField: metaField, timeField: timeField},
+            }),
+        );
         cluster.shardCollection(db[collName], {"meta.x": 1}, false);
 
         const shards = Object.keys(cluster.getSerializedCluster().shards);
-        ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {"meta.x": 5});
+        ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {
+            "meta.x": 5,
+        });
 
         ChunkHelper.moveChunk(
             db,
@@ -154,7 +167,13 @@ export const $config = (function () {
         let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(numInitialDocs, res.nInserted);
-        assert.eq(100, getTimeseriesCollForRawOps(db, db[collName]).countDocuments({}, getRawOperationSpec(db)));
+        assert.eq(
+            100,
+            getTimeseriesCollForRawOps(db, db[collName]).countDocuments(
+                {},
+                getRawOperationSpec(db),
+            ),
+        );
     }
 
     return {

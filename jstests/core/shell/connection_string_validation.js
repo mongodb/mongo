@@ -15,7 +15,11 @@ if (db.getMongo().host.indexOf(":") >= 0) {
     port = db.getMongo().host.substring(idx + 1);
 }
 
-let goodStrings = ["localhost:" + port + "/test", "127.0.0.1:" + port + "/test", "127.0.0.1:" + port + "/"];
+let goodStrings = [
+    "localhost:" + port + "/test",
+    "127.0.0.1:" + port + "/test",
+    "127.0.0.1:" + port + "/",
+];
 
 let missingConnString = /^Missing connection string$/;
 let incorrectType = /^Incorrect type/;
@@ -67,7 +71,13 @@ function testGoodAsURI(i, uri) {
         return;
     }
     let message =
-        "FAILED to correctly validate goodString " + i + ' ("' + uri + '"):  exception was "' + tojson(exception) + '"';
+        "FAILED to correctly validate goodString " +
+        i +
+        ' ("' +
+        uri +
+        '"):  exception was "' +
+        tojson(exception) +
+        '"';
     doassert(message);
 }
 
@@ -91,12 +101,29 @@ function testBad(i, connectionString, errorRegex, errorCode) {
         }
     }
     if (gotCorrectErrorText || gotCorrectErrorCode) {
-        print("Bad connection string " + i + ' ("' + connectionString + '") correctly rejected:\n' + tojson(exception));
+        print(
+            "Bad connection string " +
+                i +
+                ' ("' +
+                connectionString +
+                '") correctly rejected:\n' +
+                tojson(exception),
+        );
         return;
     }
-    let message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
+    let message =
+        "FAILED to generate correct exception for badString " +
+        i +
+        ' ("' +
+        connectionString +
+        '"): ';
     if (gotException) {
-        message += 'exception was "' + tojson(exception) + '", it should have matched "' + errorRegex.toString() + '"';
+        message +=
+            'exception was "' +
+            tojson(exception) +
+            '", it should have matched "' +
+            errorRegex.toString() +
+            '"';
     } else {
         message += "no exception was thrown";
     }

@@ -101,7 +101,9 @@ assert.commandWorked(bulk.execute());
 
 (function testInternalQueryTopNAccumulatorBytesSetting() {
     // Capture the default value of 'internalQueryTopNAccumulatorBytes' to reset in between runs.
-    const res = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryTopNAccumulatorBytes: 1}));
+    const res = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryTopNAccumulatorBytes: 1}),
+    );
     const topNDefault = res["internalQueryTopNAccumulatorBytes"];
 
     // Test that the 'n' family of accumulators behaves similarly.
@@ -143,7 +145,13 @@ assert.commandWorked(bulk.execute());
     const reducePipeline = [
         {
             $project: {
-                a: {$reduce: {input: {$range: [0, 100]}, initialValue: [], in: {$concatArrays: ["$$value", [str]]}}},
+                a: {
+                    $reduce: {
+                        input: {$range: [0, 100]},
+                        initialValue: [],
+                        in: {$concatArrays: ["$$value", [str]]},
+                    },
+                },
             },
         },
     ];
@@ -153,7 +161,9 @@ assert.commandWorked(bulk.execute());
     assert.doesNotThrow(() => coll.aggregate(reducePipeline));
 
     // Now lower the limit to test that its configuration is obeyed.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxMapReduceExpressionBytes: memLimitArray}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxMapReduceExpressionBytes: memLimitArray}),
+    );
     assert.throwsWithCode(() => coll.aggregate(mapPipeline), ErrorCodes.ExceededMemoryLimit);
     assert.throwsWithCode(() => coll.aggregate(reducePipeline), ErrorCodes.ExceededMemoryLimit);
 })();
@@ -163,8 +173,13 @@ assert.commandWorked(bulk.execute());
     assert.doesNotThrow(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]));
 
     // Now lower the limit to test that its configuration is obeyed.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxRangeBytes: memLimitArray}));
-    assert.throwsWithCode(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]), ErrorCodes.ExceededMemoryLimit);
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxRangeBytes: memLimitArray}),
+    );
+    assert.throwsWithCode(
+        () => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]),
+        ErrorCodes.ExceededMemoryLimit,
+    );
 })();
 
 MongoRunner.stopMongod(conn);

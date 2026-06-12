@@ -16,7 +16,10 @@ let primary = replSet.getPrimary();
 const syncTarget = replSet.add({
     rsConfig: {votes: 0, priority: 0},
     setParameter: {
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: primary.name}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: primary.name},
+        }),
     },
 });
 syncTarget.setSecondaryOk();
@@ -64,7 +67,10 @@ assert(replInfo.now, replInfoString);
 
 // calling this function with and without a primary, should provide sufficient code coverage
 // to catch any JS errors
-let mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
+let mongo = startParallelShell(
+    "db.getSiblingDB('admin').printSlaveReplicationInfo();",
+    primary.port,
+);
 mongo();
 subStr = "behind the primary";
 assert(rawMongoProgramOutput(subStr).match(subStr));
@@ -87,7 +93,10 @@ clearRawMongoProgramOutput();
 assert.eq(rawMongoProgramOutput(subStr).match(subStr), null);
 
 // Ensure that the new helper, printSecondaryReplicationInfo works the same.
-mongo = startParallelShell("db.getSiblingDB('admin').printSecondaryReplicationInfo();", primary.port);
+mongo = startParallelShell(
+    "db.getSiblingDB('admin').printSecondaryReplicationInfo();",
+    primary.port,
+);
 mongo();
 assert(rawMongoProgramOutput(subStr).match(subStr));
 

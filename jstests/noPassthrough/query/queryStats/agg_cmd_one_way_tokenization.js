@@ -34,11 +34,20 @@ function runTest(conn) {
 
     // First checks proper tokenization on a basic pipeline.
     {
-        db.test.aggregate([{$sort: {a: -1}}, {$match: {a: {$regex: "foo(.*)"}, b: {$gt: 10}}}, {$skip: 5}]).toArray();
+        db.test
+            .aggregate([
+                {$sort: {a: -1}},
+                {$match: {a: {$regex: "foo(.*)"}, b: {$gt: 10}}},
+                {$skip: 5},
+            ])
+            .toArray();
 
         const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
-        assert.eq(1, stats.length, {allStats: getQueryStats(admin), metrics: db.serverStatus().metrics.queryStats});
+        assert.eq(1, stats.length, {
+            allStats: getQueryStats(admin),
+            metrics: db.serverStatus().metrics.queryStats,
+        });
         const key = stats[0].key;
         verifyConsistentFields(key);
         // Make sure there is no otherNss field when there are no secondary namespaces.
@@ -50,7 +59,10 @@ function runTest(conn) {
                 {"$sort": {[kHashedFieldA]: -1}},
                 {
                     "$match": {
-                        "$and": [{[kHashedFieldA]: {"$regex": "?string"}}, {[kHashedFieldB]: {"$gt": "?number"}}],
+                        "$and": [
+                            {[kHashedFieldA]: {"$regex": "?string"}},
+                            {[kHashedFieldB]: {"$gt": "?number"}},
+                        ],
                     },
                 },
                 {"$skip": "?number"},
@@ -75,7 +87,10 @@ function runTest(conn) {
             [
                 {
                     "$match": {
-                        "$and": [{[kHashedFieldA]: {"$regex": "?string"}}, {[kHashedFieldB]: {"$gt": "?number"}}],
+                        "$and": [
+                            {[kHashedFieldA]: {"$regex": "?string"}},
+                            {[kHashedFieldB]: {"$gt": "?number"}},
+                        ],
                     },
                 },
             ],
@@ -104,7 +119,10 @@ function runTest(conn) {
                                 {
                                     $match: {
                                         $expr: {
-                                            $and: [{$eq: ["$a", "$$order_name"]}, {$lte: ["$$price", "$$max_price"]}],
+                                            $and: [
+                                                {$eq: ["$a", "$$order_name"]},
+                                                {$lte: ["$$price", "$$max_price"]},
+                                            ],
                                         },
                                     },
                                 },
@@ -141,10 +159,16 @@ function runTest(conn) {
                                     "$expr": {
                                         "$and": [
                                             {
-                                                "$eq": [asFieldPath(kHashedFieldA), asVarRef(kHashedFieldOrderName)],
+                                                "$eq": [
+                                                    asFieldPath(kHashedFieldA),
+                                                    asVarRef(kHashedFieldOrderName),
+                                                ],
                                             },
                                             {
-                                                "$lte": [asVarRef(kHashedFieldPrice), asVarRef(kHashedFieldMaxPrice)],
+                                                "$lte": [
+                                                    asVarRef(kHashedFieldPrice),
+                                                    asVarRef(kHashedFieldMaxPrice),
+                                                ],
                                             },
                                         ],
                                     },
@@ -156,7 +180,10 @@ function runTest(conn) {
                 {
                     "$match": {
                         "$expr": {
-                            "$eq": [asFieldPath(kHashedFieldRole), asVarRef("USER_ROLES." + kHashedFieldRole)],
+                            "$eq": [
+                                asFieldPath(kHashedFieldRole),
+                                asVarRef("USER_ROLES." + kHashedFieldRole),
+                            ],
                         },
                     },
                 },

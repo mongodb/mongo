@@ -47,7 +47,10 @@ function generateBatch(size) {
 
 function verifyBucketsOnShard(shard, expectedBuckets) {
     const shardDB = shard.getDB(dbName);
-    const buckets = getTimeseriesCollForRawOps(shardDB, shardDB.getCollection(collName)).find().rawData().toArray();
+    const buckets = getTimeseriesCollForRawOps(shardDB, shardDB.getCollection(collName))
+        .find()
+        .rawData()
+        .toArray();
     assert.eq(buckets.length, expectedBuckets.length, tojson(buckets));
 
     const usedBucketIds = new Set();
@@ -66,12 +69,19 @@ function verifyBucketsOnShard(shard, expectedBuckets) {
             }
         }
 
-        assert(found, "Failed to find bucket " + tojson(expectedBucket) + " in the list " + tojson(buckets));
+        assert(
+            found,
+            "Failed to find bucket " + tojson(expectedBucket) + " in the list " + tojson(buckets),
+        );
     }
 }
 
 function runTest(getShardKey, insert) {
-    assert.commandWorked(mainDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        mainDB.createCollection(collName, {
+            timeseries: {timeField: timeField, metaField: metaField},
+        }),
+    );
     const coll = mainDB.getCollection(collName);
 
     // TODO SERVER-101784: Get rid of checks involving the `isTimeseriesNamespace` parameter,
@@ -88,9 +98,11 @@ function runTest(getShardKey, insert) {
     // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series
     // buckets namespace.
     assert.commandFailedWithCode(
-        st.shard0
-            .getDB(dbName)
-            .runCommand({insert: collName, documents: [{[timeField]: ISODate()}], isTimeseriesNamespace: true}),
+        st.shard0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{[timeField]: ISODate()}],
+            isTimeseriesNamespace: true,
+        }),
         [5916400, 7934201],
     );
 
@@ -120,7 +132,10 @@ function runTest(getShardKey, insert) {
     }
 
     assert.commandWorked(
-        mongos.adminCommand({split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}),
+        mongos.adminCommand({
+            split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+            middle: splitPoint,
+        }),
     );
 
     // Ensure that currently both chunks reside on the primary shard.

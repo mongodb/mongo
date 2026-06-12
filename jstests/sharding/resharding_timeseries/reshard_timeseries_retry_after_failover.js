@@ -29,5 +29,6 @@ runRetryAfterFailover({
         {min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]},
     ],
     getAbortNs: (coll) => getTimeseriesCollForDDLOps(coll.getDB(), coll).getFullName(),
-    getCollUUID: (db, coll) => getUUIDFromListCollections(db, getTimeseriesCollForDDLOps(db, coll).getName()),
+    getCollUUID: (db, coll) =>
+        getUUIDFromListCollections(db, getTimeseriesCollForDDLOps(db, coll).getName()),
 });

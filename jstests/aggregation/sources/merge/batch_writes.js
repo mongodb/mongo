@@ -7,7 +7,10 @@
  *   tsan_incompatible,
  * ]
  */
-import {dropWithoutImplicitRecreate, withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {
+    dropWithoutImplicitRecreate,
+    withEachMergeMode,
+} from "jstests/aggregation/extras/merge_helpers.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.batch_writes;
@@ -72,7 +75,10 @@ assert.soon(() => {
 // preventing a duplicate key error from arising later on.
 assertErrorCode(
     coll,
-    [{$sort: {a: 1}}, {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}],
+    [
+        {$sort: {a: 1}},
+        {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+    ],
     ErrorCodes.DuplicateKey,
 );
 assert.soon(() => {

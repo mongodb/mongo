@@ -41,7 +41,10 @@ describe("Query Shape Hash Output Tests", function () {
 
         this.dbName = jsTestName();
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
 
         this.routerDB = this.st.s.getDB(this.dbName);
@@ -75,7 +78,13 @@ describe("Query Shape Hash Output Tests", function () {
         });
     });
 
-    function runUpdateAndAssertHashOnMongod(ctx, collName, updateSpec, testDescription, isShardedColl = false) {
+    function runUpdateAndAssertHashOnMongod(
+        ctx,
+        collName,
+        updateSpec,
+        testDescription,
+        isShardedColl = false,
+    ) {
         const comment = `${testDescription.replace(/\s+/g, "_")}_${UUID().toString()}`;
 
         jsTest.log.info(`\n=== Testing: ${testDescription} ===`);
@@ -94,7 +103,11 @@ describe("Query Shape Hash Output Tests", function () {
             queryComment: comment,
             options: {commandType: "update"},
         });
-        assert.neq(shard0Hash, null, `Shard0 queryShapeHash should not be null: ${testDescription}`);
+        assert.neq(
+            shard0Hash,
+            null,
+            `Shard0 queryShapeHash should not be null: ${testDescription}`,
+        );
 
         if (isShardedColl) {
             const shard1Hash = getQueryShapeHashFromSlowLogs({
@@ -102,7 +115,11 @@ describe("Query Shape Hash Output Tests", function () {
                 queryComment: comment,
                 options: {commandType: "update"},
             });
-            assert.neq(shard1Hash, null, `Shard1 queryShapeHash should not be null: ${testDescription}`);
+            assert.neq(
+                shard1Hash,
+                null,
+                `Shard1 queryShapeHash should not be null: ${testDescription}`,
+            );
         }
     }
 

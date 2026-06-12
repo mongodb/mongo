@@ -29,7 +29,9 @@ let aChunk = findChunksUtil.findOneChunkByNs(mongos.getDB("config"), ns, {shard:
 assert(aChunk);
 
 // Assert counts field exists in the changelog entry for moveChunk.commit
-assert.commandWorked(mongos.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}),
+);
 assertCountsInChangelog();
 
 mongos.getDB(kDbName).fooHashed.drop();

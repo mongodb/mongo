@@ -47,7 +47,8 @@ rst.stop(restartedNodeId, undefined /* signal */, {} /* opts */, {forRestart: tr
 const restarted = rst.start(
     restartedNodeId,
     {
-        setParameter: "failpoint.hangBeforeStartingSteadyStateReplicationAfterRecovery={'mode':'alwaysOn'}",
+        setParameter:
+            "failpoint.hangBeforeStartingSteadyStateReplicationAfterRecovery={'mode':'alwaysOn'}",
     },
     true /* restart */,
 );
@@ -100,7 +101,9 @@ assert.commandWorked(
 jsTest.log.info("Verifying the restarted node becomes a healthy writable primary after release.");
 assert.soonNoExcept(
     () => {
-        const res = restarted.getDB("test").runCommand({insert: "c", documents: [{from: "restarted"}]});
+        const res = restarted
+            .getDB("test")
+            .runCommand({insert: "c", documents: [{from: "restarted"}]});
         return res.ok === 1;
     },
     "restarted node did not become a healthy writable primary after release",
@@ -113,7 +116,8 @@ stepUpShell();
 // been hit.
 const logContents = rawMongoProgramOutput(".*");
 assert(
-    !/Fatal assertion.*4017301/.test(logContents) && !/must be after the stable timestamp/.test(logContents),
+    !/Fatal assertion.*4017301/.test(logContents) &&
+        !/must be after the stable timestamp/.test(logContents),
     "Restarted node hit the WiredTiger stable-timestamp fatal invariant (4017301)",
 );
 

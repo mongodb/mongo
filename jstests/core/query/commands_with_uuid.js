@@ -34,7 +34,9 @@ if (FixtureHelpers.isMongos(db)) {
 }
 
 assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: "FOO"}]}));
-assert.commandWorked(db.runCommand({insert: subCollName, documents: [{fooField: "BAR"}, {fooField: "FOOBAR"}]}));
+assert.commandWorked(
+    db.runCommand({insert: subCollName, documents: [{fooField: "BAR"}, {fooField: "FOOBAR"}]}),
+);
 
 // Ensure passing a UUID to find retrieves results from the correct collection.
 let cmd = {find: uuid};
@@ -67,7 +69,11 @@ assert(
 // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.
 const missingUUID = UUID();
 for (cmd of [{count: missingUUID}, {find: missingUUID}, {listIndexes: missingUUID}]) {
-    assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    assert.commandFailedWithCode(
+        db.runCommand(cmd),
+        ErrorCodes.NamespaceNotFound,
+        "command: " + tojson(cmd),
+    );
 }
 
 // Ensure passing a UUID to listIndexes retrieves results from the correct collection.
@@ -104,5 +110,9 @@ assert.commandWorked(dbWithUUID.runCommand({find: uuid}));
 // also test that the same command succeeds when there is no database mismatch.
 for (cmd of [{count: uuid}, {distinct: uuid, key: "a"}, {find: uuid}, {listIndexes: uuid}]) {
     assert.commandWorked(dbWithUUID.runCommand(cmd));
-    assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    assert.commandFailedWithCode(
+        db.runCommand(cmd),
+        ErrorCodes.NamespaceNotFound,
+        "command: " + tojson(cmd),
+    );
 }

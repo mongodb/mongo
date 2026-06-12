@@ -47,10 +47,18 @@ const expectedSbeCases = [
     [{$match: {a: 1}}, {$sort: {b: 1}}],
     [{$match: {a: 1}}, {$sort: {b: 1, c: 1}}],
     [{$match: {a: 1}}, {$project: {b: 1, c: 1}}, {$sort: {b: 1, c: 1}}],
-    [{$match: {a: 1, b: 1, "c.d.e": {$mod: [2, 0]}}}, {$project: {b: 1, c: 1}}, {$sort: {b: 1, c: 1}}],
+    [
+        {$match: {a: 1, b: 1, "c.d.e": {$mod: [2, 0]}}},
+        {$project: {b: 1, c: 1}},
+        {$sort: {b: 1, c: 1}},
+    ],
 
     // $lookup and $group should work as expected.
-    [{$match: {a: 1}}, {$project: {a: 1}}, {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}}],
+    [
+        {$match: {a: 1}},
+        {$project: {a: 1}},
+        {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}},
+    ],
     [{$match: {a: 1}}, {$project: {a: 1}}, {$group: {_id: "$a", out: {$sum: 1}}}],
 
     // If we have a non-SBE compatible expression after the pushdown boundary, this should not
@@ -99,7 +107,12 @@ const expectedSbeCases = [
     [
         {$match: {$and: [{$expr: {$eq: ["$a", "$b"]}}, {c: 1}]}},
         {
-            $lookup: {from: collName, localField: "c_custkey", foreignField: "o_custkey", as: "custsale"},
+            $lookup: {
+                from: collName,
+                localField: "c_custkey",
+                foreignField: "o_custkey",
+                as: "custsale",
+            },
         },
     ],
 
@@ -108,26 +121,40 @@ const expectedSbeCases = [
     [{$sort: {d: 1, e: 1}}, {$project: {"a.b": 0}}],
     [{$match: {$or: [{a: {$gt: 0}}, {b: {$gt: 0}}]}}, {$project: {"d.a": 1}}],
 
-    [{$project: {"a.b": 1, "a.d": 1}}, {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}}],
+    [
+        {$project: {"a.b": 1, "a.d": 1}},
+        {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}},
+    ],
 
     // Computed projections should inhibit pushdown.
     [{$match: {foo: {$gt: 0}}}, {$project: {a: {$add: ["$foo", "$bar"]}}}],
     [{$project: {a: {$add: ["$foo", "$bar"]}}}, {$sort: {a: 1}}],
     [{$project: {a: {$add: ["$foo", "$bar"]}}}, {$group: {_id: "$a", "ct": {$sum: 1}}}],
-    [{$project: {a: {$add: ["$out", 1]}}}, {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}}],
+    [
+        {$project: {a: {$add: ["$out", 1]}}},
+        {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}},
+    ],
 
     // Sorts with common prefixes should inhibit pushdown.
     [{$match: {foo: {$gt: 0}}}, {$sort: {"a.b": 1, "a.c": 1}}],
     [{$sort: {"a.b.f.g": 1, "a.d.e.f": 1}}, {$project: {a: 1}}],
     [{$match: {$or: [{a: {$gt: 0}}, {b: {$gt: 0}}]}}, {$sort: {"d.a": 1, "d.b": 1}}],
     [{$sort: {"a.b": 1, "a.c": 1}}, {$group: {_id: {a: "$foo", b: "$bar"}, "a": {$sum: 1}}}],
-    [{$sort: {"b.c": 1, "b.d": 1}}, {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}}],
+    [
+        {$sort: {"b.c": 1, "b.d": 1}},
+        {$lookup: {from: collName, localField: "a", foreignField: "a", as: "out"}},
+    ],
 
     // TPC-H query whose $lookup is SBE compatible, but which features a $match which uses $expr.
     // Note that $match will be pushed to the front of the pipeline.
     [
         {
-            $lookup: {from: collName, localField: "c_custkey", foreignField: "o_custkey", as: "custsale"},
+            $lookup: {
+                from: collName,
+                localField: "c_custkey",
+                foreignField: "o_custkey",
+                as: "custsale",
+            },
         },
         {$addFields: {cntrycode: {$substr: ["$c_phone", 0, 2]}, custsale: {$size: "$custsale"}}},
         {

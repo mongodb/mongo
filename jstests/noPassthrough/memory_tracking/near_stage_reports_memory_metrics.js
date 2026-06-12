@@ -22,8 +22,12 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}),
+);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -42,7 +46,11 @@ const pipeline = [{$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distan
 
 const preliminaryExplain = coll.explain("executionStats").aggregate(pipeline);
 const nearStages = getAggPlanStages(preliminaryExplain, "GEO_NEAR_2DSPHERE");
-assert.gt(nearStages.length, 0, "Expected query to use GEO_NEAR_2DSPHERE stage with forceClassicEngine");
+assert.gt(
+    nearStages.length,
+    0,
+    "Expected query to use GEO_NEAR_2DSPHERE stage with forceClassicEngine",
+);
 
 const kBatchSize = 10;
 runMemoryStatsTest({
@@ -91,9 +99,16 @@ runMemoryStatsTest({
         .filter((e) => e.hasOwnProperty("inUseTrackedMemBytes"))
         .map((e) => e.inUseTrackedMemBytes);
 
-    assert.gt(inUseValues.length, 1, "Expected multiple profiler entries with inUseTrackedMemBytes");
+    assert.gt(
+        inUseValues.length,
+        1,
+        "Expected multiple profiler entries with inUseTrackedMemBytes",
+    );
     const foundDecrease = inUseValues.some((val, i) => i > 0 && val < inUseValues[i - 1]);
-    assert(foundDecrease, "Expected in-use memory to decrease between consecutive batches: " + tojson(inUseValues));
+    assert(
+        foundDecrease,
+        "Expected in-use memory to decrease between consecutive batches: " + tojson(inUseValues),
+    );
     db.setProfilingLevel(0);
 }
 

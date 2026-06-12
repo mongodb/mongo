@@ -178,7 +178,9 @@ function executeTest(db, isMongos) {
         const t = db.max_time_ms_many_batch_positive_get_more;
 
         for (let i = 0; i < 5; i++) {
-            assert.commandWorked(t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]));
+            assert.commandWorked(
+                t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]),
+            );
         }
         cursor = t
             .find({
@@ -210,7 +212,9 @@ function executeTest(db, isMongos) {
     (function manyBatchNegativeGetMore() {
         const t = db.many_batch_negative_get_more;
         for (let i = 0; i < 5; i++) {
-            assert.commandWorked(t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]));
+            assert.commandWorked(
+                t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]),
+            );
         }
         cursor = t
             .find({
@@ -261,7 +265,9 @@ function executeTest(db, isMongos) {
             // Test-only sleep command is not supported on mongos.
             return;
         }
-        assert.commandWorked(db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 10 * 1000, lock: "none"}));
+        assert.commandWorked(
+            db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 10 * 1000, lock: "none"}),
+        );
     })();
 
     //
@@ -295,8 +301,14 @@ function executeTest(db, isMongos) {
             t.find().maxTimeMS(NumberLong(-1)).itcount();
         });
         assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: -1}), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberInt(-1)}), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberLong(-1)}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(
+            db.runCommand({ping: 1, maxTimeMS: NumberInt(-1)}),
+            ErrorCodes.BadValue,
+        );
+        assert.commandFailedWithCode(
+            db.runCommand({ping: 1, maxTimeMS: NumberLong(-1)}),
+            ErrorCodes.BadValue,
+        );
 
         // Verify upper boundary for acceptable input (2^31-1 is acceptable, 2^31 isn't).
 
@@ -330,8 +342,14 @@ function executeTest(db, isMongos) {
                 .maxTimeMS(NumberLong(maxValue + 1))
                 .itcount();
         });
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: maxValue + 1}), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberInt(maxValue + 1)}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(
+            db.runCommand({ping: 1, maxTimeMS: maxValue + 1}),
+            ErrorCodes.BadValue,
+        );
+        assert.commandFailedWithCode(
+            db.runCommand({ping: 1, maxTimeMS: NumberInt(maxValue + 1)}),
+            ErrorCodes.BadValue,
+        );
         assert.commandFailedWithCode(
             db.runCommand({ping: 1, maxTimeMS: NumberLong(maxValue + 1)}),
             ErrorCodes.BadValue,
@@ -388,20 +406,33 @@ function executeTest(db, isMongos) {
         // maxTimeAlwaysTimeOut positive test for command.
         const t = db.max_time_ms_always_time_out_fp;
         try {
-            assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
-            assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 10 * 1000}), ErrorCodes.MaxTimeMSExpired);
+            assert.commandWorked(
+                db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}),
+            );
+            assert.commandFailedWithCode(
+                db.runCommand({ping: 1, maxTimeMS: 10 * 1000}),
+                ErrorCodes.MaxTimeMSExpired,
+            );
         } finally {
-            assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
+            assert.commandWorked(
+                db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}),
+            );
         }
 
         // maxTimeNeverTimeOut positive test for command. Don't run on mongos because there's no
         // sleep command.
         if (!isMongos) {
             try {
-                assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
-                assert.commandWorked(db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"}));
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
+                );
+                assert.commandWorked(
+                    db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"}),
+                );
             } finally {
-                assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
+                );
             }
         }
 
@@ -530,14 +561,19 @@ function executeTest(db, isMongos) {
         assert.commandWorked(t.insert({x: 1}));
 
         // "aggregate" command.
-        assert.commandWorked(t.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}));
+        assert.commandWorked(
+            t.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
+        );
 
         // "collMod" command.
         assert.commandWorked(t.runCommand("collMod", {maxTimeMS: 60 * 1000}));
 
         // "createIndexes" command.
         assert.commandWorked(
-            t.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}], maxTimeMS: 60 * 1000}),
+            t.runCommand("createIndexes", {
+                indexes: [{key: {x: 1}, name: "x_1"}],
+                maxTimeMS: 60 * 1000,
+            }),
         );
     })();
 
@@ -579,7 +615,10 @@ const enableTestCmd = {
 
 (function runSharded() {
     const enableTestCmd = {setParameter: {enableTestCommands: 1}};
-    const st = new ShardingTest({shards: 2, other: {rsOptions: enableTestCmd, mongosOptions: enableTestCmd}});
+    const st = new ShardingTest({
+        shards: 2,
+        other: {rsOptions: enableTestCmd, mongosOptions: enableTestCmd},
+    });
     try {
         executeTest(st.s.getDB("test"), true);
     } finally {

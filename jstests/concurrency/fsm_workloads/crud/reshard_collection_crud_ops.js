@@ -54,7 +54,9 @@ export const $config = (function () {
         } else {
             assert.commandWorked(db.adminCommand(reshardCollectionCmd));
         }
-        print(`Finished Resharding Collection ${coll.getFullName()}. New Shard Key ${tojson(newShardKey)}`);
+        print(
+            `Finished Resharding Collection ${coll.getFullName()}. New Shard Key ${tojson(newShardKey)}`,
+        );
     }
 
     const states = {

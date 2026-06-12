@@ -14,7 +14,14 @@ const coll = db.covered_negative_1;
 coll.drop();
 for (let i = 0; i < 100; i++) {
     assert.commandWorked(
-        coll.insert({a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10), d: i * 10, e: [i, i % 10], f: i}),
+        coll.insert({
+            a: i,
+            b: "strvar_" + (i % 13),
+            c: NumberInt(i % 10),
+            d: i * 10,
+            e: [i, i % 10],
+            f: i,
+        }),
     );
 }
 assert.commandWorked(coll.createIndex({a: 1, b: -1, c: 1}));
@@ -23,7 +30,10 @@ assert.commandWorked(coll.createIndex({d: 1}));
 assert.commandWorked(coll.createIndex({f: "hashed"}));
 
 // Test no projection
-let plan = coll.find({a: 10, b: "strvar_10", c: 0}).hint({a: 1, b: -1, c: 1}).explain("executionStats");
+let plan = coll
+    .find({a: 10, b: "strvar_10", c: 0})
+    .hint({a: 1, b: -1, c: 1})
+    .explain("executionStats");
 assert(
     !isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "negative.1.1 - indexOnly should be false on a non covered query",
@@ -35,7 +45,10 @@ assert.neq(
 );
 
 // Test projection and not excluding _id
-plan = coll.find({a: 10, b: "strvar_10", c: 0}, {a: 1, b: 1, c: 1}).hint({a: 1, b: -1, c: 1}).explain("executionStats");
+plan = coll
+    .find({a: 10, b: "strvar_10", c: 0}, {a: 1, b: 1, c: 1})
+    .hint({a: 1, b: -1, c: 1})
+    .explain("executionStats");
 assert(
     !isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "negative.1.2 - indexOnly should be false on a non covered query",

@@ -88,7 +88,9 @@ reshardingTest.withReshardingInBackground(
             return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
-        jsTest.log("Check size estimate on resharding coordinator document:\n" + tojson(coordinatorDoc));
+        jsTest.log(
+            "Check size estimate on resharding coordinator document:\n" + tojson(coordinatorDoc),
+        );
 
         const s0Estimate = getShardEstimate(coordinatorDoc, donorShardNames[0]);
         const s1Estimate = getShardEstimate(coordinatorDoc, "shard1");
@@ -104,7 +106,10 @@ reshardingTest.withReshardingInBackground(
 
         const verifyApproximateCopySizeForRecipients = (doc, s0Estimate, s1Estimate) => {
             const {approxBytesToCopy, approxDocumentsToCopy} = doc;
-            assert(approxBytesToCopy !== undefined, "Unable to find 'approxBytesToCopy' in the coordinator document");
+            assert(
+                approxBytesToCopy !== undefined,
+                "Unable to find 'approxBytesToCopy' in the coordinator document",
+            );
             assert(
                 approxDocumentsToCopy !== undefined,
                 "Unable to find 'approxDocumentsToCopy' in the coordinator document",
@@ -121,7 +126,8 @@ reshardingTest.withReshardingInBackground(
                 "Unexpected value for 'approxDocumentsToCopy' in the coordinator document",
             );
 
-            const expectedApproxBytesToCopy = (s0Estimate.bytesToClone + s1Estimate.bytesToClone) / numRecipients;
+            const expectedApproxBytesToCopy =
+                (s0Estimate.bytesToClone + s1Estimate.bytesToClone) / numRecipients;
             assert.eq(
                 approxBytesToCopy,
                 expectedApproxBytesToCopy,

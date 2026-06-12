@@ -15,7 +15,9 @@ const collName = "restart_transactions";
 function runTest(routerDB, directDB) {
     // Set up the underlying collection.
     const routerColl = routerDB[collName];
-    assert.commandWorked(routerDB.createCollection(routerColl.getName(), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        routerDB.createCollection(routerColl.getName(), {writeConcern: {w: "majority"}}),
+    );
 
     // Read from the mongoS to ensure the shard has refreshed its filtering information.
     assert.eq(0, routerDB.getCollection(collName).countDocuments({}));
@@ -34,7 +36,11 @@ function runTest(routerDB, directDB) {
         }),
     );
     assert.commandWorked(
-        directDB.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        directDB.adminCommand({
+            abortTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     );
 
     assert.commandWorked(
@@ -76,7 +82,11 @@ function runTest(routerDB, directDB) {
 
     txnNumber++;
     assert.commandWorked(
-        directDB.runCommand({insert: collName, documents: [{x: txnNumber}], txnNumber: NumberLong(txnNumber)}),
+        directDB.runCommand({
+            insert: collName,
+            documents: [{x: txnNumber}],
+            txnNumber: NumberLong(txnNumber),
+        }),
     );
 
     assert.commandFailedWithCode(
@@ -135,7 +145,11 @@ function runTest(routerDB, directDB) {
         }),
     );
     assert.commandWorked(
-        directDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        directDB.adminCommand({
+            prepareTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     );
 
     assert.commandFailedWithCode(
@@ -149,7 +163,11 @@ function runTest(routerDB, directDB) {
     );
 
     assert.commandWorked(
-        directDB.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        directDB.adminCommand({
+            abortTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     );
 
     //
@@ -166,10 +184,18 @@ function runTest(routerDB, directDB) {
         }),
     );
     assert.commandWorked(
-        directDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        directDB.adminCommand({
+            prepareTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     );
     assert.commandWorked(
-        directDB.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        directDB.adminCommand({
+            abortTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     );
 
     assert.commandFailedWithCode(

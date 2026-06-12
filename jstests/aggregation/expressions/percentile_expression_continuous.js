@@ -5,7 +5,11 @@
  *   featureFlagAccuratePercentiles,
  * ]
  */
-import {testLargeInput, testLargeNonNumericInput, testWithProject} from "jstests/aggregation/libs/percentiles_util.js";
+import {
+    testLargeInput,
+    testLargeNonNumericInput,
+    testWithProject,
+} from "jstests/aggregation/libs/percentiles_util.js";
 
 const coll = db[jsTestName()];
 
@@ -74,7 +78,9 @@ testWithProject({
 testWithProject({
     coll: coll,
     doc: {x: 0, x1: "non-numeric", x2: 1, x3: 2, x4: [2, 2, 2]},
-    percentileSpec: {$percentile: {p: [0.5], input: ["$x", "$x1", "$x2", "$x3", "$x4"], method: "continuous"}},
+    percentileSpec: {
+        $percentile: {p: [0.5], input: ["$x", "$x1", "$x2", "$x3", "$x4"], method: "continuous"},
+    },
     expectedResult: [1],
     msg: "Non-numeric data in input field passed in as an array should be ignored",
 });
@@ -90,7 +96,9 @@ testWithProject({
 testWithProject({
     coll: coll,
     doc: {x: "non-numeric", x1: "also non-numeric", x2: [1, 2, 3]},
-    percentileSpec: {$percentile: {p: [0.5, 0.9], input: ["$x", "$x1", "$x2"], method: "continuous"}},
+    percentileSpec: {
+        $percentile: {p: [0.5, 0.9], input: ["$x", "$x1", "$x2"], method: "continuous"},
+    },
     expectedResult: [null, null],
     msg: "Multiple percentiles of completely non-numeric data in input field passed as an array",
 });
@@ -106,7 +114,9 @@ testWithProject({
 testWithProject({
     coll: coll,
     doc: {x: 0, x1: 1, x2: 2},
-    percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: ["$x", "$x1", "$x2"], method: "continuous"}},
+    percentileSpec: {
+        $percentile: {p: [0.5, 0.9, 0.1], input: ["$x", "$x1", "$x2"], method: "continuous"},
+    },
     expectedResult: [1, 1.8, 0.2],
     msg: "Multiple percentiles when input field is passed as an array",
 });

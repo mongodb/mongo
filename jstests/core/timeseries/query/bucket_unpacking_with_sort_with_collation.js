@@ -14,7 +14,10 @@
  *     requires_timeseries,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {
     forwardIxscan,
     runDoesntRewriteTest,
@@ -55,8 +58,12 @@ for (const coll of [csStringColl, ciStringColl]) {
 //
 // When the collation of the query matches the index, an equality predicate in the query
 // becomes a 1-point interval in the index bounds.
-runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, csStringColl, true, [{$match: {m: "a"}}]);
-runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, ciStringColl, true, [{$match: {m: "a"}}]);
+runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, csStringColl, true, [
+    {$match: {m: "a"}},
+]);
+runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, ciStringColl, true, [
+    {$match: {m: "a"}},
+]);
 // When the collation doesn't match, then the equality predicate is not a 1-point interval
 // in the index.
 csStringColl.dropIndexes();

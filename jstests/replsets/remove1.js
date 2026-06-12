@@ -37,7 +37,11 @@ for (let i = 0; i < config.members.length; i++) {
 let nextVersion = replTest.getReplSetConfigFromNode().version + 1;
 config.version = nextVersion;
 
-assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok, 1, "we should be connected to the secondary");
+assert.eq(
+    secondary.getDB("admin").runCommand({ping: 1}).ok,
+    1,
+    "we should be connected to the secondary",
+);
 
 try {
     primary.getDB("admin").runCommand({replSetReconfig: config});
@@ -56,7 +60,11 @@ assert.soon(function () {
 });
 
 // Now we should successfully reconnect to the secondary.
-assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok, 1, "we aren't connected to the secondary");
+assert.eq(
+    secondary.getDB("admin").runCommand({ping: 1}).ok,
+    1,
+    "we aren't connected to the secondary",
+);
 
 reconnect(primary);
 

@@ -91,7 +91,14 @@ function commitPreparedTransaction(prepareTimestamp) {
 }
 
 function runMoveChunkAndCommitTransaction() {
-    const joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {_id: 1}, null, "test.user", st.shard1.shardName);
+    const joinMoveChunk = moveChunkParallel(
+        staticMongod,
+        st.s.host,
+        {_id: 1},
+        null,
+        "test.user",
+        st.shard1.shardName,
+    );
     pauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
     waitForMoveChunkStep(st.shard0, moveChunkStepNames.startedMoveChunk);
     commitPreparedTransaction(prepareTimestamp);
@@ -101,7 +108,10 @@ function runMoveChunkAndCommitTransaction() {
 
 setup();
 const prepareTimestamp = prepareTransactionAndTriggerFailover();
-const processingDeferredXferModsFp = configureFailPoint(st.rs0.getPrimary(), "hangAfterProcessingDeferredXferMods");
+const processingDeferredXferModsFp = configureFailPoint(
+    st.rs0.getPrimary(),
+    "hangAfterProcessingDeferredXferMods",
+);
 const pauseBeforeCriticalSectionFp = configureFailPoint(
     st.rs0.getPrimary(),
     "hangBeforeEnteringCriticalSection",

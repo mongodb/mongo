@@ -76,7 +76,9 @@ export const $config = (function () {
             otherKey: doc.otherKey,
             counter: 0,
         });
-        assert.commandWorked(db[collName + kCounterCollSuffix].update({_id: "maxKeyCount"}, {$inc: {count: 1}}));
+        assert.commandWorked(
+            db[collName + kCounterCollSuffix].update({_id: "maxKeyCount"}, {$inc: {count: 1}}),
+        );
     };
 
     states.updateMaxKeyDoc = function updateMaxKeyDoc(db, collName, connCache) {
@@ -140,22 +142,53 @@ export const $config = (function () {
                     " was lost during migration. Expected: " +
                     tojson(tracked),
             );
-            assert.eq(tojson(doc.skey), tojson(tracked.skey), "skey mismatch for doc " + tojson(doc));
-            assert.eq(tojson(doc.otherKey), tojson(tracked.otherKey), "otherKey mismatch for doc " + tojson(doc));
+            assert.eq(
+                tojson(doc.skey),
+                tojson(tracked.skey),
+                "skey mismatch for doc " + tojson(doc),
+            );
+            assert.eq(
+                tojson(doc.otherKey),
+                tojson(tracked.otherKey),
+                "otherKey mismatch for doc " + tojson(doc),
+            );
             assert.eq(
                 doc.counter,
                 tracked.counter,
-                "counter mismatch for doc " + tojson(doc) + ", expected counter: " + tracked.counter,
+                "counter mismatch for doc " +
+                    tojson(doc) +
+                    ", expected counter: " +
+                    tracked.counter,
             );
         }
     };
 
     const transitions = {
         init: {insertMaxKeyDoc: 0.3, updateMaxKeyDoc: 0.15, moveChunk: 0.2, verifyMaxKeyDocs: 0.35},
-        insertMaxKeyDoc: {insertMaxKeyDoc: 0.15, updateMaxKeyDoc: 0.2, moveChunk: 0.25, verifyMaxKeyDocs: 0.4},
-        updateMaxKeyDoc: {insertMaxKeyDoc: 0.15, updateMaxKeyDoc: 0.15, moveChunk: 0.25, verifyMaxKeyDocs: 0.45},
-        moveChunk: {insertMaxKeyDoc: 0.2, updateMaxKeyDoc: 0.15, moveChunk: 0.15, verifyMaxKeyDocs: 0.5},
-        verifyMaxKeyDocs: {insertMaxKeyDoc: 0.2, updateMaxKeyDoc: 0.2, moveChunk: 0.35, verifyMaxKeyDocs: 0.25},
+        insertMaxKeyDoc: {
+            insertMaxKeyDoc: 0.15,
+            updateMaxKeyDoc: 0.2,
+            moveChunk: 0.25,
+            verifyMaxKeyDocs: 0.4,
+        },
+        updateMaxKeyDoc: {
+            insertMaxKeyDoc: 0.15,
+            updateMaxKeyDoc: 0.15,
+            moveChunk: 0.25,
+            verifyMaxKeyDocs: 0.45,
+        },
+        moveChunk: {
+            insertMaxKeyDoc: 0.2,
+            updateMaxKeyDoc: 0.15,
+            moveChunk: 0.15,
+            verifyMaxKeyDocs: 0.5,
+        },
+        verifyMaxKeyDocs: {
+            insertMaxKeyDoc: 0.2,
+            updateMaxKeyDoc: 0.2,
+            moveChunk: 0.35,
+            verifyMaxKeyDocs: 0.25,
+        },
     };
 
     function setup(db, collName, cluster) {
@@ -193,12 +226,17 @@ export const $config = (function () {
         }
 
         assert.commandWorked(
-            db[collName + kCounterCollSuffix].insert({_id: "maxKeyCount", count: kNumInitialMaxKeyDocs}),
+            db[collName + kCounterCollSuffix].insert({
+                _id: "maxKeyCount",
+                count: kNumInitialMaxKeyDocs,
+            }),
         );
 
         const splitPoints = [25, 50, 75];
         for (const point of splitPoints) {
-            assert.commandWorked(db.adminCommand({split: ns, middle: {skey: point, otherKey: MinKey()}}));
+            assert.commandWorked(
+                db.adminCommand({split: ns, middle: {skey: point, otherKey: MinKey()}}),
+            );
         }
 
         const shardNames = Object.keys(cluster.getSerializedCluster().shards);
@@ -226,7 +264,9 @@ export const $config = (function () {
         assert.neq(counterDoc, null, "MaxKey counter document not found");
         const expectedCount = counterDoc.count;
 
-        const actualCount = db[collName].find({$or: [{skey: MaxKey()}, {otherKey: MaxKey()}]}).itcount();
+        const actualCount = db[collName]
+            .find({$or: [{skey: MaxKey()}, {otherKey: MaxKey()}]})
+            .itcount();
 
         assert.eq(
             expectedCount,

@@ -15,7 +15,11 @@ const db = conn.getDB(`${jsTestName()}_db`);
 
 joinTestWrapper(db, function runArraynessTest() {
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true, internalEnablePathArrayness: true}),
+        db.adminCommand({
+            setParameter: 1,
+            internalEnableJoinOptimization: true,
+            internalEnablePathArrayness: true,
+        }),
     );
 
     const c1 = db.c1;
@@ -249,8 +253,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -273,8 +287,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -298,8 +322,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -324,8 +358,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -348,8 +392,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -357,7 +411,8 @@ joinTestWrapper(db, function runArraynessTest() {
     // Same if trailing $match.
     runTestWithUnorderedComparison({
         db,
-        description: "No arrayness on foreign field => no joinopt ($expr, trailing $match, 2 node, suffix)",
+        description:
+            "No arrayness on foreign field => no joinopt ($expr, trailing $match, 2 node, suffix)",
         coll: c1,
         pipeline: [
             {
@@ -373,8 +428,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -488,7 +553,8 @@ joinTestWrapper(db, function runArraynessTest() {
     // Same if trailing $match.
     runTestWithUnorderedComparison({
         db,
-        description: "No arrayness on local field => no joinopt ($expr, trailing $match, 2 node, no suffix)",
+        description:
+            "No arrayness on local field => no joinopt ($expr, trailing $match, 2 node, no suffix)",
         coll: c1,
         pipeline: [
             {
@@ -549,8 +615,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: true,
         expectedNumJoinStages: 1,
@@ -574,8 +650,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: true,
         expectedNumJoinStages: 1,
@@ -600,8 +686,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: true,
         expectedNumJoinStages: 1,
@@ -702,15 +798,26 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "y": {"_id": 2, "a": 3}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "y": {"_id": 1, "a": 2}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "y": {"_id": 2, "a": 3}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "y": {"_id": 1, "a": 2},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "y": {"_id": 2, "a": 3},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
 
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey localField => no join opt ($expr, 2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey localField => no join opt ($expr, 2 node, suffix)",
         coll: c1,
         pipeline: [
             {
@@ -726,7 +833,12 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "y": {"_id": 2, "a": 3}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "y": {"_id": 1, "a": 2}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "y": {"_id": 1, "a": 2},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
@@ -734,7 +846,8 @@ joinTestWrapper(db, function runArraynessTest() {
     // Same if trailing $match.
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey localField => no join opt (trailing $match, 2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey localField => no join opt (trailing $match, 2 node, suffix)",
         coll: c1,
         pipeline: [
             {
@@ -750,14 +863,20 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "y": {"_id": 2, "a": 3}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "y": {"_id": 1, "a": 2}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "y": {"_id": 1, "a": 2},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
 
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey foreignField => no join opt (2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey foreignField => no join opt (2 node, suffix)",
         coll: c2,
         pipeline: [
             {
@@ -772,18 +891,34 @@ joinTestWrapper(db, function runArraynessTest() {
             {$project: {_id: 0, "y.obj": 0}},
         ],
         expectedResults: [
-            {"a": 1, "y": {"_id": 1, "alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1}},
-            {"a": 2, "y": {"_id": 1, "alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1}},
-            {"a": 2, "y": {"_id": 2, "alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1}},
-            {"a": 3, "y": {"_id": 1, "alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1}},
-            {"a": 3, "y": {"_id": 2, "alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1}},
+            {
+                "a": 1,
+                "y": {"_id": 1, "alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1},
+            },
+            {
+                "a": 2,
+                "y": {"_id": 1, "alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1},
+            },
+            {
+                "a": 2,
+                "y": {"_id": 2, "alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1},
+            },
+            {
+                "a": 3,
+                "y": {"_id": 1, "alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1},
+            },
+            {
+                "a": 3,
+                "y": {"_id": 2, "alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });
 
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey foreignField => no join opt ($expr, 2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey foreignField => no join opt ($expr, 2 node, suffix)",
         coll: c2,
         pipeline: [
             {
@@ -804,7 +939,8 @@ joinTestWrapper(db, function runArraynessTest() {
     // Same if trailing $match.
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey foreignField => no join opt (trailing $match, 2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey foreignField => no join opt (trailing $match, 2 node, suffix)",
         coll: c2,
         pipeline: [
             {
@@ -824,7 +960,8 @@ joinTestWrapper(db, function runArraynessTest() {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey foreignField/localField => no join opt (2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey foreignField/localField => no join opt (2 node, suffix)",
         coll: c1,
         pipeline: [
             {
@@ -881,7 +1018,8 @@ joinTestWrapper(db, function runArraynessTest() {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Arrayness on all fields, multikey foreignField/localField => no join opt ($expr, 2 node, suffix)",
+        description:
+            "Arrayness on all fields, multikey foreignField/localField => no join opt ($expr, 2 node, suffix)",
         coll: c1,
         pipeline: [
             {
@@ -925,7 +1063,8 @@ joinTestWrapper(db, function runArraynessTest() {
 
     runTestWithUnorderedComparison({
         db,
-        description: "As field has an array subfield, used in subsequent join => no join opt in suffix",
+        description:
+            "As field has an array subfield, used in subsequent join => no join opt in suffix",
         coll: c2,
         pipeline: [
             // This is ok, should use join opt.
@@ -1000,7 +1139,8 @@ joinTestWrapper(db, function runArraynessTest() {
 
     runTestWithUnorderedComparison({
         db,
-        description: "As field has scalar subfield, used in subsequent join => no join opt in suffix",
+        description:
+            "As field has scalar subfield, used in subsequent join => no join opt in suffix",
         coll: c2,
         pipeline: [
             // This is ok, should use join opt.
@@ -1241,8 +1381,18 @@ joinTestWrapper(db, function runArraynessTest() {
         ],
         expectedResults: [
             {"alwaysArray": [], "sometimesArray": 3, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [1, 2, 3], "sometimesArray": 2, "neverArray": 1, "x": {"_id": 0, "a": 1}},
-            {"alwaysArray": [2, 3], "sometimesArray": [3, 4], "neverArray": 1, "x": {"_id": 0, "a": 1}},
+            {
+                "alwaysArray": [1, 2, 3],
+                "sometimesArray": 2,
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
+            {
+                "alwaysArray": [2, 3],
+                "sometimesArray": [3, 4],
+                "neverArray": 1,
+                "x": {"_id": 0, "a": 1},
+            },
         ],
         expectedUsedJoinOptimization: false,
     });

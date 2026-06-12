@@ -68,7 +68,11 @@ function runStorageStatsTestFind(conn, coll) {
     const shape = {filter: {}};
     const expectedDocs = 7;
 
-    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
     clearPlanCacheAndQueryStatsStore(conn, coll);
 
     const queryStats = exhaustCursorAndGetQueryStats({
@@ -187,7 +191,11 @@ function runStorageStatsTestCount(conn, coll) {
  */
 function runTestMongod(setupConn, collName, callback) {
     const conn = MongoRunner.runMongod(
-        Object.assign(getQueryStatsServerParameters(), {restart: true, cleanData: false, dbpath: setupConn.dbpath}),
+        Object.assign(getQueryStatsServerParameters(), {
+            restart: true,
+            cleanData: false,
+            dbpath: setupConn.dbpath,
+        }),
     );
     const coll = conn.getDB("test")[collName];
     callback(conn, coll);
@@ -261,9 +269,14 @@ function runTestMongos(st, collName, callback) {
 }
 
 {
-    const st = new ShardingTest({shards: 2, other: {mongosOptions: getQueryStatsServerParameters()}});
+    const st = new ShardingTest({
+        shards: 2,
+        other: {mongosOptions: getQueryStatsServerParameters()},
+    });
     const testDB = st.s.getDB("test");
-    assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+    );
     const collName = makeShardedCollection(st).getName();
 
     runTestMongos(st, collName, runStorageStatsTestCount);

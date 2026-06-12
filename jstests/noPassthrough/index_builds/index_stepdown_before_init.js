@@ -45,7 +45,10 @@ const baselineMetrics = waitForIndexStatusMetrics(
 );
 
 const res = assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "alwaysOn"}),
+    primary.adminCommand({
+        configureFailPoint: "hangBeforeInitializingIndexBuild",
+        mode: "alwaysOn",
+    }),
 );
 const failpointTimesEntered = res.count;
 
@@ -74,7 +77,9 @@ try {
     // Step down the primary.
     assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "off"}),
+    );
 }
 
 // Wait for the index build to stop.

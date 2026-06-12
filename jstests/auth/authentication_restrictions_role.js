@@ -21,7 +21,9 @@ function testRestrictionCreationAndEnforcement(
     // Create a session for modifying user data during the life of the test
     const adminSession = new Mongo("127.0.0.1:" + conn.port);
     const admin = adminSession.getDB("admin");
-    assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}));
+    assert.commandWorked(
+        admin.runCommand({createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}),
+    );
     assert(admin.auth("admin", "admin"));
 
     // Create a strongly consistent session for consuming user data
@@ -47,7 +49,11 @@ function testRestrictionCreationAndEnforcement(
             authenticationRestrictions: [{clientSource: ["127.0.0.1/32"]}],
         }),
     );
-    assert(Object.keys(adminDB.system.roles.findOne({role: "role2"})).includes("authenticationRestrictions"));
+    assert(
+        Object.keys(adminDB.system.roles.findOne({role: "role2"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandWorked(adminDB.runCommand({createRole: "role3", roles: [], privileges: []}));
 
     print("=== Role creation tests");
@@ -66,24 +72,50 @@ function testRestrictionCreationAndEnforcement(
         "When a client creates roles with empty authenticationRestrictions, the operation succeeds, though it has no effect",
     );
     assert.commandWorked(
-        adminDB.runCommand({createRole: "role4", roles: [], privileges: [], authenticationRestrictions: []}),
+        adminDB.runCommand({
+            createRole: "role4",
+            roles: [],
+            privileges: [],
+            authenticationRestrictions: [],
+        }),
     );
-    assert(!Object.keys(adminDB.system.roles.findOne({role: "role4"})).includes("authenticationRestrictions"));
+    assert(
+        !Object.keys(adminDB.system.roles.findOne({role: "role4"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
 
     print(
         "When a client updates a role's authenticationRestrictions to be empty, the operation succeeds, and removes the authenticationRestrictions field",
     );
     assert.commandWorked(adminDB.runCommand({createRole: "role5", roles: [], privileges: []}));
     assert.commandWorked(adminDB.runCommand({updateRole: "role5", authenticationRestrictions: []}));
-    assert(!Object.keys(adminDB.system.roles.findOne({role: "role5"})).includes("authenticationRestrictions"));
-    assert.commandWorked(
-        adminDB.runCommand({updateRole: "role5", authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]}),
+    assert(
+        !Object.keys(adminDB.system.roles.findOne({role: "role5"})).includes(
+            "authenticationRestrictions",
+        ),
     );
-    assert(Object.keys(adminDB.system.roles.findOne({role: "role5"})).includes("authenticationRestrictions"));
+    assert.commandWorked(
+        adminDB.runCommand({
+            updateRole: "role5",
+            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}],
+        }),
+    );
+    assert(
+        Object.keys(adminDB.system.roles.findOne({role: "role5"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandWorked(adminDB.runCommand({updateRole: "role5", authenticationRestrictions: []}));
-    assert(!Object.keys(adminDB.system.roles.findOne({role: "role5"})).includes("authenticationRestrictions"));
+    assert(
+        !Object.keys(adminDB.system.roles.findOne({role: "role5"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
 
-    print("When a client creates roles, it may use clientSource and serverAddress authenticationRestrictions");
+    print(
+        "When a client creates roles, it may use clientSource and serverAddress authenticationRestrictions",
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createRole: "role6",
@@ -92,7 +124,11 @@ function testRestrictionCreationAndEnforcement(
             authenticationRestrictions: [{clientSource: ["127.0.0.1"]}],
         }),
     );
-    assert(Object.keys(adminDB.system.roles.findOne({role: "role6"})).includes("authenticationRestrictions"));
+    assert(
+        Object.keys(adminDB.system.roles.findOne({role: "role6"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createRole: "role7",
@@ -101,25 +137,42 @@ function testRestrictionCreationAndEnforcement(
             authenticationRestrictions: [{serverAddress: ["127.0.0.1"]}],
         }),
     );
-    assert(Object.keys(adminDB.system.roles.findOne({role: "role7"})).includes("authenticationRestrictions"));
+    assert(
+        Object.keys(adminDB.system.roles.findOne({role: "role7"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createRole: "role8",
             roles: [],
             privileges: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]}],
+            authenticationRestrictions: [
+                {clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]},
+            ],
         }),
     );
-    assert(Object.keys(adminDB.system.roles.findOne({role: "role8"})).includes("authenticationRestrictions"));
+    assert(
+        Object.keys(adminDB.system.roles.findOne({role: "role8"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createRole: "role9",
             roles: [],
             privileges: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}, {serverAddress: ["127.0.0.1"]}],
+            authenticationRestrictions: [
+                {clientSource: ["127.0.0.1"]},
+                {serverAddress: ["127.0.0.1"]},
+            ],
         }),
     );
-    assert(Object.keys(adminDB.system.roles.findOne({role: "role9"})).includes("authenticationRestrictions"));
+    assert(
+        Object.keys(adminDB.system.roles.findOne({role: "role9"})).includes(
+            "authenticationRestrictions",
+        ),
+    );
     assert.commandFailed(
         adminDB.runCommand({
             createRole: "role10",
@@ -130,12 +183,16 @@ function testRestrictionCreationAndEnforcement(
     );
 
     print("=== Localhost access tests");
-    print('When a client on the loopback authenticates to a user with {clientSource: "127.0.0.1"}, it will succeed');
+    print(
+        'When a client on the loopback authenticates to a user with {clientSource: "127.0.0.1"}, it will succeed',
+    );
     assert.commandWorked(adminDB.runCommand({createUser: "user6", pwd: "user", roles: ["role6"]}));
     assert(db.auth("user6", "user"));
     db.logout();
 
-    print('When a client on the loopback authenticates to a user with {serverAddress: "127.0.0.1"}, it will succeed');
+    print(
+        'When a client on the loopback authenticates to a user with {serverAddress: "127.0.0.1"}, it will succeed',
+    );
     assert.commandWorked(adminDB.runCommand({createUser: "user7", pwd: "user", roles: ["role7"]}));
     assert(db.auth("user7", "user"));
     db.logout();
@@ -164,22 +221,32 @@ function testRestrictionCreationAndEnforcement(
     assert(!externalDb.auth("user8", "user"));
 
     print("=== Invalidation tests");
-    print("When a client removes all authenticationRestrictions from a role, authentication will succeed");
+    print(
+        "When a client removes all authenticationRestrictions from a role, authentication will succeed",
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createRole: "role11",
             roles: [],
             privileges: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]}],
+            authenticationRestrictions: [
+                {clientSource: ["127.0.0.1"], serverAddress: ["127.0.0.1"]},
+            ],
         }),
     );
-    assert.commandWorked(adminDB.runCommand({createUser: "user11", pwd: "user", roles: ["role11"]}));
+    assert.commandWorked(
+        adminDB.runCommand({createUser: "user11", pwd: "user", roles: ["role11"]}),
+    );
     assert(!externalDb.auth("user11", "user"));
-    assert.commandWorked(adminDB.runCommand({updateRole: "role11", authenticationRestrictions: []}));
+    assert.commandWorked(
+        adminDB.runCommand({updateRole: "role11", authenticationRestrictions: []}),
+    );
     assert(externalDb.auth("user11", "user"));
     externalDb.logout();
 
-    print("When a client sets authenticationRestrictions on a role, authorization privileges are revoked");
+    print(
+        "When a client sets authenticationRestrictions on a role, authorization privileges are revoked",
+    );
     assert.commandWorked(
         adminDB.runCommand({
             createRole: "role12",
@@ -188,7 +255,9 @@ function testRestrictionCreationAndEnforcement(
             authenticationRestrictions: [{clientSource: ["127.0.0.1"]}],
         }),
     );
-    assert.commandWorked(adminDB.runCommand({createUser: "user12", pwd: "user", roles: ["role12"]}));
+    assert.commandWorked(
+        adminDB.runCommand({createUser: "user12", pwd: "user", roles: ["role12"]}),
+    );
     assert(db.auth("user12", "user"));
     assert.commandWorked(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
     db.logout();
@@ -198,7 +267,10 @@ function testRestrictionCreationAndEnforcement(
     assert(eventualDb.auth("user12", "user"));
     assert.commandWorked(eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
     assert.commandWorked(
-        adminDB.runCommand({updateRole: "role12", authenticationRestrictions: [{clientSource: ["192.168.2.0"]}]}),
+        adminDB.runCommand({
+            updateRole: "role12",
+            authenticationRestrictions: [{clientSource: ["192.168.2.0"]}],
+        }),
     );
     assert.commandFailed(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
     eventualDb.logout();
@@ -236,7 +308,11 @@ function testUsersInfoCommand(conn) {
         }),
     );
     assert.commandWorked(
-        admin.runCommand({createUser: "userWithRestrictedRole", pwd: "pwd", roles: ["restrictedRole"]}),
+        admin.runCommand({
+            createUser: "userWithRestrictedRole",
+            pwd: "pwd",
+            roles: ["restrictedRole"],
+        }),
     );
     assert.commandWorked(
         admin.runCommand({
@@ -247,24 +323,31 @@ function testUsersInfoCommand(conn) {
         }),
     );
 
-    print("Calling usersInfo for all users on a database with showAuthenticationRestrictions is an error");
+    print(
+        "Calling usersInfo for all users on a database with showAuthenticationRestrictions is an error",
+    );
     assert.commandFailed(admin.runCommand({usersInfo: 1, showAuthenticationRestrictions: true}));
 
     print(
         "Calling usersInfo for all users on a database with showAuthenticationRestrictions false or unset will succeed, and not produce authenticationRestriction fields",
     );
     [{}, {showAuthenticationRestrictions: false}].forEach(function (fragment) {
-        forEachUser(assert.commandWorked(admin.runCommand(Object.merge({usersInfo: 1}, fragment))), function (userDoc) {
-            assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
-            assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-        });
+        forEachUser(
+            assert.commandWorked(admin.runCommand(Object.merge({usersInfo: 1}, fragment))),
+            function (userDoc) {
+                assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
+                assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+            },
+        );
     });
 
     print(
         "If usersInfo is called with showAuthenticationRestrictions true, on a user without authenticationRestrictions, a document with empty authenticationRestrictions and inheritedAuthenticationRestrictions arrays is returned",
     );
     forEachUser(
-        assert.commandWorked(admin.runCommand({usersInfo: "user", showAuthenticationRestrictions: true})),
+        assert.commandWorked(
+            admin.runCommand({usersInfo: "user", showAuthenticationRestrictions: true}),
+        ),
         function (userDoc) {
             assert(userDoc.hasOwnProperty("authenticationRestrictions"));
             assert.eq(0, userDoc["authenticationRestrictions"].length);
@@ -277,23 +360,37 @@ function testUsersInfoCommand(conn) {
     print(
         "If usersInfo is called and showAuthenticationRestrictions is false or unset, return a document without an authenticationRestrictions or inheritedAuthenticationRestrictions field",
     );
-    ["user", "restrictedUser", "userWithRestrictedRole", "restrictedUserWithRestrictedRole"].forEach(function (user) {
+    [
+        "user",
+        "restrictedUser",
+        "userWithRestrictedRole",
+        "restrictedUserWithRestrictedRole",
+    ].forEach(function (user) {
         forEachUser(
-            assert.commandWorked(admin.runCommand({usersInfo: "user", showAuthenticationRestrictions: false})),
+            assert.commandWorked(
+                admin.runCommand({usersInfo: "user", showAuthenticationRestrictions: false}),
+            ),
             function (userDoc) {
                 assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
                 assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
             },
         );
-        forEachUser(assert.commandWorked(admin.runCommand({usersInfo: "user"})), function (userDoc) {
-            assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
-            assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-        });
+        forEachUser(
+            assert.commandWorked(admin.runCommand({usersInfo: "user"})),
+            function (userDoc) {
+                assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
+                assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+            },
+        );
     });
 
-    print("Authentication restrictions can be obtained through usersInfo for a single user with restrictions");
+    print(
+        "Authentication restrictions can be obtained through usersInfo for a single user with restrictions",
+    );
     forEachUser(
-        assert.commandWorked(admin.runCommand({usersInfo: "restrictedUser", showAuthenticationRestrictions: true})),
+        assert.commandWorked(
+            admin.runCommand({usersInfo: "restrictedUser", showAuthenticationRestrictions: true}),
+        ),
         function (userDoc) {
             assert(userDoc.hasOwnProperty("authenticationRestrictions"));
             assert.eq(1, userDoc["authenticationRestrictions"].length);
@@ -303,10 +400,15 @@ function testUsersInfoCommand(conn) {
         },
     );
 
-    print("Authentication restrictions can be obtained through usersInfo for a single user with restrictioned roles");
+    print(
+        "Authentication restrictions can be obtained through usersInfo for a single user with restrictioned roles",
+    );
     forEachUser(
         assert.commandWorked(
-            admin.runCommand({usersInfo: "userWithRestrictedRole", showAuthenticationRestrictions: true}),
+            admin.runCommand({
+                usersInfo: "userWithRestrictedRole",
+                showAuthenticationRestrictions: true,
+            }),
         ),
         function (userDoc) {
             assert(userDoc.hasOwnProperty("authenticationRestrictions"));
@@ -322,7 +424,10 @@ function testUsersInfoCommand(conn) {
     );
     forEachUser(
         assert.commandWorked(
-            admin.runCommand({usersInfo: "restrictedUserWithRestrictedRole", showAuthenticationRestrictions: true}),
+            admin.runCommand({
+                usersInfo: "restrictedUserWithRestrictedRole",
+                showAuthenticationRestrictions: true,
+            }),
         ),
         function (userDoc) {
             print("This doc: " + tojson(userDoc));
@@ -351,7 +456,11 @@ function testRolesInfoCommand(conn) {
     assert.commandWorked(admin.runCommand({createRole: "role", roles: [], privileges: []}));
     // restrictedRole already created
     assert.commandWorked(
-        admin.runCommand({createRole: "roleWithRestrictedRole", roles: ["restrictedRole"], privileges: []}),
+        admin.runCommand({
+            createRole: "roleWithRestrictedRole",
+            roles: ["restrictedRole"],
+            privileges: [],
+        }),
     );
     assert.commandWorked(
         admin.runCommand({
@@ -362,7 +471,12 @@ function testRolesInfoCommand(conn) {
         }),
     );
 
-    ["role", "restrictedRole", "roleWithRestrictedRole", "restrictedRoleWithRestrictedRole"].forEach(function (role) {
+    [
+        "role",
+        "restrictedRole",
+        "roleWithRestrictedRole",
+        "restrictedRoleWithRestrictedRole",
+    ].forEach(function (role) {
         forEachRole(assert.commandWorked(admin.runCommand({rolesInfo: role})), function (roleDoc) {
             assert(!roleDoc.hasOwnProperty("authenticationRestrictions"));
             assert(!roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
@@ -370,7 +484,9 @@ function testRolesInfoCommand(conn) {
     });
 
     forEachRole(
-        assert.commandWorked(admin.runCommand({rolesInfo: "role", showAuthenticationRestrictions: true})),
+        assert.commandWorked(
+            admin.runCommand({rolesInfo: "role", showAuthenticationRestrictions: true}),
+        ),
         function (roleDoc) {
             assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
             assert.eq(0, roleDoc.authenticationRestrictions.length);
@@ -380,7 +496,9 @@ function testRolesInfoCommand(conn) {
     );
 
     forEachRole(
-        assert.commandWorked(admin.runCommand({rolesInfo: "restrictedRole", showAuthenticationRestrictions: true})),
+        assert.commandWorked(
+            admin.runCommand({rolesInfo: "restrictedRole", showAuthenticationRestrictions: true}),
+        ),
         function (roleDoc) {
             assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
             assert.eq(1, roleDoc.authenticationRestrictions.length);
@@ -391,7 +509,10 @@ function testRolesInfoCommand(conn) {
 
     forEachRole(
         assert.commandWorked(
-            admin.runCommand({rolesInfo: "roleWithRestrictedRole", showAuthenticationRestrictions: true}),
+            admin.runCommand({
+                rolesInfo: "roleWithRestrictedRole",
+                showAuthenticationRestrictions: true,
+            }),
         ),
         function (roleDoc) {
             assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
@@ -403,7 +524,10 @@ function testRolesInfoCommand(conn) {
 
     forEachRole(
         assert.commandWorked(
-            admin.runCommand({rolesInfo: "restrictedRoleWithRestrictedRole", showAuthenticationRestrictions: true}),
+            admin.runCommand({
+                rolesInfo: "restrictedRoleWithRestrictedRole",
+                showAuthenticationRestrictions: true,
+            }),
         ),
         function (roleDoc) {
             assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
@@ -431,7 +555,12 @@ testRolesInfoCommand(conn);
 MongoRunner.stopMongod(conn);
 
 print("Testing replicaset");
-const rst = new ReplSetTest({name: "testset", nodes: 2, nodeOptions: {bind_ip_all: "", auth: ""}, keyFile: keyfile});
+const rst = new ReplSetTest({
+    name: "testset",
+    nodes: 2,
+    nodeOptions: {bind_ip_all: "", auth: ""},
+    keyFile: keyfile,
+});
 const nodes = rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();
@@ -441,7 +570,12 @@ const awaitReplication = function () {
     });
 };
 
-testRestrictionCreationAndEnforcement(rst.getPrimary(), rst.getSecondary(), awaitReplication, awaitReplication);
+testRestrictionCreationAndEnforcement(
+    rst.getPrimary(),
+    rst.getSecondary(),
+    awaitReplication,
+    awaitReplication,
+);
 testUsersInfoCommand(rst.getPrimary());
 testRolesInfoCommand(rst.getPrimary());
 rst.stopSet();

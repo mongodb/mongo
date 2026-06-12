@@ -72,7 +72,8 @@ const atClusterTimeHashAfter = {
 assert.eq(
     atClusterTimeHashBefore,
     atClusterTimeHashAfter,
-    "primary returned different dbhash after " + 'second insert while using "snapshot" level read concern',
+    "primary returned different dbhash after " +
+        'second insert while using "snapshot" level read concern',
 );
 
 {

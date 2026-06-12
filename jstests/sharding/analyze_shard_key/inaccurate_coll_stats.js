@@ -98,7 +98,10 @@ function runTest(conn, {rst, st}) {
             readWriteDistribution: false,
         }),
     );
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore.keyCharacteristics, expectedMetricsX);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(
+        resXBefore.keyCharacteristics,
+        expectedMetricsX,
+    );
     assert.eq(resXBefore.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
     const resYBefore = assert.commandWorked(
@@ -110,7 +113,10 @@ function runTest(conn, {rst, st}) {
             readWriteDistribution: false,
         }),
     );
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYBefore.keyCharacteristics, expectedMetricsY);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(
+        resYBefore.keyCharacteristics,
+        expectedMetricsY,
+    );
     assert.eq(resYBefore.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
     let runAnalyzeShardKeyCmd = (host, ns, key) => {
@@ -209,7 +215,10 @@ function runTest(conn, {rst, st}) {
     } else {
         assert.gt(collStatsAfter.size, 0);
         assert.commandWorked(resXAfter);
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXAfter.keyCharacteristics, expectedMetricsX);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(
+            resXAfter.keyCharacteristics,
+            expectedMetricsX,
+        );
         assert.eq(resXAfter.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
         // Skip checking the key characteristics metrics for a unique shard key after an unclean
@@ -220,13 +229,19 @@ function runTest(conn, {rst, st}) {
 }
 
 {
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: setParameterOpts, syncdelay: 1}});
+    const st = new ShardingTest({
+        shards: 1,
+        rs: {nodes: 1, setParameter: setParameterOpts, syncdelay: 1},
+    });
     runTest(st.s, {st});
     st.stop();
 }
 
 {
-    const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: setParameterOpts, syncdelay: 1}});
+    const rst = new ReplSetTest({
+        nodes: 1,
+        nodeOptions: {setParameter: setParameterOpts, syncdelay: 1},
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

@@ -66,7 +66,9 @@ export class RollbackIndexBuildsTest {
             const collName = "coll_" + i;
             const indexSpec = {a: 1};
 
-            jsTestLog("iteration: " + i + " collection: " + collName + " schedule: " + tojson(schedule));
+            jsTestLog(
+                "iteration: " + i + " collection: " + collName + " schedule: " + tojson(schedule),
+            );
 
             const primary = self.rollbackTest.getPrimary();
             const primaryDB = primary.getDB("test");
@@ -81,7 +83,10 @@ export class RollbackIndexBuildsTest {
                 switch (op) {
                     case "holdStableTimestamp":
                         assert.commandWorked(
-                            primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+                            primary.adminCommand({
+                                configureFailPoint: "disableSnapshotting",
+                                mode: "alwaysOn",
+                            }),
                         );
                         break;
                     case "transitionToRollback": {
@@ -99,16 +104,22 @@ export class RollbackIndexBuildsTest {
                         self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 
                         // To speed up the test, defer data validation until the fixture shuts down.
-                        self.rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
+                        self.rollbackTest.transitionToSteadyStateOperations({
+                            skipDataConsistencyChecks: true,
+                        });
                         transitionedToSteadyState = true;
                         break;
                     case "createColl":
-                        assert.commandWorked(collection.insert({a: "created collection explicitly"}));
+                        assert.commandWorked(
+                            collection.insert({a: "created collection explicitly"}),
+                        );
                         createdColl = true;
                         break;
                     case "start":
                         if (!createdColl) {
-                            assert.commandWorked(collection.insert({a: "created collection with start"}));
+                            assert.commandWorked(
+                                collection.insert({a: "created collection with start"}),
+                            );
                             createdColl = true;
                         }
                         IndexBuildTest.pauseIndexBuilds(primary);
@@ -127,7 +138,11 @@ export class RollbackIndexBuildsTest {
                             ),
                         );
 
-                        IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, "a_1");
+                        IndexBuildTest.waitForIndexBuildToScanCollection(
+                            primaryDB,
+                            collName,
+                            "a_1",
+                        );
                         break;
                     case "commit":
                         IndexBuildTest.resumeIndexBuilds(primary);
@@ -157,10 +172,14 @@ export class RollbackIndexBuildsTest {
                 self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 
                 // To speed up the test, defer data validation until the fixture shuts down.
-                self.rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
+                self.rollbackTest.transitionToSteadyStateOperations({
+                    skipDataConsistencyChecks: true,
+                });
             }
 
-            assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+            assert.commandWorked(
+                primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}),
+            );
             i++;
         });
     }

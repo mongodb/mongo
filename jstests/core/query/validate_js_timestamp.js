@@ -136,13 +136,21 @@ function testPipeline(assignments, embedInObject) {
  */
 for (let {assignments, expectedErrorCode, errorShouldContain} of testCases) {
     let error = assert.commandFailedWithCode(
-        db.runCommand({aggregate: 1, pipeline: testPipeline(tojson(assignments), false), cursor: {}}),
+        db.runCommand({
+            aggregate: 1,
+            pipeline: testPipeline(tojson(assignments), false),
+            cursor: {},
+        }),
         expectedErrorCode,
     );
     assert(error.errmsg.indexOf(errorShouldContain) >= 0, error);
 
     error = assert.commandFailedWithCode(
-        db.runCommand({aggregate: 1, pipeline: testPipeline(tojson(assignments), true), cursor: {}}),
+        db.runCommand({
+            aggregate: 1,
+            pipeline: testPipeline(tojson(assignments), true),
+            cursor: {},
+        }),
         expectedErrorCode,
     );
     assert(error.errmsg.indexOf(errorShouldContain) >= 0, error);

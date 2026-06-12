@@ -31,7 +31,9 @@ export var defragmentationUtil = (function () {
             // retry those.
             const mongosSession = mongos.startSession({retryWrites: true});
             const sessionConfigDB = mongosSession.getDatabase("config");
-            assert.commandWorked(sessionConfigDB.collections.update({_id: ns}, {$set: {"noBalance": true}}));
+            assert.commandWorked(
+                sessionConfigDB.collections.update({_id: ns}, {$set: {"noBalance": true}}),
+            );
         }
 
         createAndDistributeChunks(mongos, ns, numChunks, chunkSpacing);
@@ -60,11 +62,19 @@ export var defragmentationUtil = (function () {
         if (numChunksToCreate <= 0) {
             return;
         }
-        for (let i = -Math.floor(numChunksToCreate / 2); i < Math.ceil(numChunksToCreate / 2); i++) {
+        for (
+            let i = -Math.floor(numChunksToCreate / 2);
+            i < Math.ceil(numChunksToCreate / 2);
+            i++
+        ) {
             assert.commandWorked(mongos.adminCommand({split: ns, middle: {key: i * chunkSpacing}}));
             assert.soon(() => {
                 let toShard = Random.randInt(shards.length);
-                let res = mongos.adminCommand({moveChunk: ns, find: {key: i * chunkSpacing}, to: shards[toShard]._id});
+                let res = mongos.adminCommand({
+                    moveChunk: ns,
+                    find: {key: i * chunkSpacing},
+                    to: shards[toShard]._id,
+                });
                 return res.ok;
             });
         }
@@ -76,7 +86,9 @@ export var defragmentationUtil = (function () {
         for (let i = 0; i < numZones; i++) {
             let zoneName = "Zone" + i;
             let shardForZone = existingChunks[i].shard;
-            assert.commandWorked(mongos.adminCommand({addShardToZone: shardForZone, zone: zoneName}));
+            assert.commandWorked(
+                mongos.adminCommand({addShardToZone: shardForZone, zone: zoneName}),
+            );
             assert.commandWorked(
                 mongos.adminCommand({
                     updateZoneKeyRange: ns,
@@ -95,7 +107,9 @@ export var defragmentationUtil = (function () {
         assert.gte(docSizeBytesRange[1], docSizeBytesRange[0]);
         chunks.forEach((chunk) => {
             let chunkSize = Random.randInt(maxChunkFillMB);
-            let docSizeBytes = Random.randInt(docSizeBytesRange[1] - docSizeBytesRange[0] + 1) + docSizeBytesRange[0];
+            let docSizeBytes =
+                Random.randInt(docSizeBytesRange[1] - docSizeBytesRange[0] + 1) +
+                docSizeBytesRange[0];
             docSizeBytes = docSizeBytes === 0 ? 1 : docSizeBytes;
             let bigString = "X".repeat(docSizeBytes);
             let docsPerChunk = (chunkSize * 1024 * 1024) / docSizeBytes;
@@ -146,7 +160,10 @@ export var defragmentationUtil = (function () {
                 let leftChunkZone = getZoneForRange(mongos, ns, leftChunk.min, leftChunk.max);
                 let rightChunkZone = getZoneForRange(mongos, ns, rightChunk.min, rightChunk.max);
                 if (bsonWoCompare(leftChunkZone, rightChunkZone) === 0) {
-                    assert(false, `Chunks ${tojson(leftChunk)} and ${tojson(rightChunk)} should have been merged`);
+                    assert(
+                        false,
+                        `Chunks ${tojson(leftChunk)} and ${tojson(rightChunk)} should have been merged`,
+                    );
                 }
             }
         }
@@ -167,9 +184,12 @@ export var defragmentationUtil = (function () {
     let waitForEndOfDefragmentation = function (mongos, ns) {
         jsTest.log("Waiting end of defragmentation for " + ns);
         assert.soon(function () {
-            let balancerStatus = assert.commandWorked(mongos.adminCommand({balancerCollectionStatus: ns}));
+            let balancerStatus = assert.commandWorked(
+                mongos.adminCommand({balancerCollectionStatus: ns}),
+            );
             return (
-                balancerStatus.balancerCompliant || balancerStatus.firstComplianceViolation !== "defragmentingChunks"
+                balancerStatus.balancerCompliant ||
+                balancerStatus.firstComplianceViolation !== "defragmentingChunks"
             );
         });
         jsTest.log("Defragmentation completed for " + ns);

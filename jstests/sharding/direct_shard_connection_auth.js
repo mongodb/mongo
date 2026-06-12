@@ -54,7 +54,9 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
     //
     // Direct writes with root privileges should always be authorized.
     assert.commandWorked(
-        shardAdminTestDB.getCollection("coll").update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+        shardAdminTestDB
+            .getCollection("coll")
+            .update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
     );
     assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
 
@@ -66,7 +68,9 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
     // in a 1 shard cluster but we should always emit a warning (excluding RSEndpoint).
     if (!shouldBlockDirectConnections) {
         assert.commandWorked(
-            userTestDB.getCollection("coll").update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+            userTestDB
+                .getCollection("coll")
+                .update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
         );
         // No warning will be emitted even if the parameter is set if RSEndpoint is enabled.
         if (st.isReplicaSetEndpointActive()) {
@@ -76,7 +80,9 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         }
     } else {
         assert.commandFailedWithCode(
-            userTestDB.getCollection("coll").update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+            userTestDB
+                .getCollection("coll")
+                .update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
             ErrorCodes.Unauthorized,
         );
         assertUnauthorizedCountIncreased();
@@ -85,29 +91,41 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
     // Test direct writes with only read/write privileges where
     // directConnectionChecksWithSingleShard is set to false. This should not emit a warning if
     // there is only one shard in the cluster.
-    assert.commandWorked(shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: false}));
+    assert.commandWorked(
+        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: false}),
+    );
     // Run the command and check warnings. The command should fail in a 2+ shard cluster and succeed
     // in a 1 shard cluster and we should only emit a warning in the 2+ shard scenario.
     if (!shouldBlockDirectConnections) {
         assert.commandWorked(
-            userTestDB.getCollection("coll").update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+            userTestDB
+                .getCollection("coll")
+                .update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
         );
         assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
     } else {
         assert.commandFailedWithCode(
-            userTestDB.getCollection("coll").update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
+            userTestDB
+                .getCollection("coll")
+                .update({x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
             ErrorCodes.Unauthorized,
         );
         assertUnauthorizedCountIncreased();
     }
     // Reset the parameter for future tests.
-    assert.commandWorked(shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: true}));
+    assert.commandWorked(
+        shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: true}),
+    );
     userTestDB.logout();
     assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
 
     // Direct writes with read/write plus the direct shard operations privileges should
     // always be authorized.
-    shardAdminDB.createUser({user: "user2", pwd: "z", roles: ["readWriteAnyDatabase", "directShardOperations"]});
+    shardAdminDB.createUser({
+        user: "user2",
+        pwd: "z",
+        roles: ["readWriteAnyDatabase", "directShardOperations"],
+    });
     let shardUserWithDirectWritesAdminDB = userConn.getDB("admin");
     let shardUserWithDirectWritesTestDB = userConn.getDB("test");
     assert(shardUserWithDirectWritesAdminDB.auth("user2", "z"), "Authentication failed");

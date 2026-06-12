@@ -47,7 +47,10 @@ withRetryOnTransientTxnError(
         assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
         jsTestLog("Start a transaction on the second session that modifies the same collection.");
-        session2.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+        session2.startTransaction({
+            readConcern: {level: "snapshot"},
+            writeConcern: {w: "majority"},
+        });
 
         assert.commandWorked(session2Coll.insert({_id: 3}));
         assert.commandWorked(session2Coll.update({_id: 1}, {$set: {a: 1}}));
@@ -62,11 +65,15 @@ withRetryOnTransientTxnError(
         jsTestLog("Committing the second transaction.");
         assert.commandWorked(session2.commitTransaction_forTesting());
 
-        jsTestLog("Committed changes from the second transaction should still not be visible to the first.");
+        jsTestLog(
+            "Committed changes from the second transaction should still not be visible to the first.",
+        );
 
         assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
-        jsTestLog("Writes that occur outside of a transaction should not be visible to a read only transaction.");
+        jsTestLog(
+            "Writes that occur outside of a transaction should not be visible to a read only transaction.",
+        );
 
         assert.commandWorked(testColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
 

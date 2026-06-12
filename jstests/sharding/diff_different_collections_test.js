@@ -40,9 +40,14 @@ const expectedMissingOnFirst = [
 
 assert.commandWorked(primaryDB[collName1].insert(expectedMissingOnSecond));
 assert.commandWorked(
-    primaryDB[collName1].remove({_id: {$in: expectedMissingOnFirst.map((doc) => doc._id)}}, {justOne: false}),
+    primaryDB[collName1].remove(
+        {_id: {$in: expectedMissingOnFirst.map((doc) => doc._id)}},
+        {justOne: false},
+    ),
 );
-assert.commandWorked(primaryDB[collName1].update({_id: {$in: [40, 90]}}, {$set: {extra: "yes"}}, {multi: true}));
+assert.commandWorked(
+    primaryDB[collName1].update({_id: {$in: [40, 90]}}, {$set: {extra: "yes"}}, {multi: true}),
+);
 
 // Type fidelity is expected to be preserved by replication so intentionally test comparisons of
 // distinct but equivalent BSON types.

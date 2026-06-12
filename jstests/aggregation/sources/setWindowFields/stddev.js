@@ -4,7 +4,10 @@
  *   requires_fcv_81,
  * ]
  */
-import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -27,7 +30,10 @@ let results = coll
                 sortBy: {ts: 1},
                 output: {
                     stdDevPop: {$stdDevPop: "$str", window: {documents: ["unbounded", "current"]}},
-                    stdDevSamp: {$stdDevSamp: "$str", window: {documents: ["unbounded", "current"]}},
+                    stdDevSamp: {
+                        $stdDevSamp: "$str",
+                        window: {documents: ["unbounded", "current"]},
+                    },
                 },
             },
         },

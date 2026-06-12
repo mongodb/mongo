@@ -27,7 +27,11 @@ const prefered = new TransportMode("preferSSL", "preferTLS");
 const required = new TransportMode("requireSSL", "requireTLS");
 
 function testTransportTransitionStandalone(scheme, oldMode, newMode, shouldSucceed) {
-    let conn = MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
+    let conn = MongoRunner.runMongod({
+        sslMode: oldMode,
+        sslPEMKeyFile: SERVER_CERT,
+        sslCAFile: CA_CERT,
+    });
 
     let adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});

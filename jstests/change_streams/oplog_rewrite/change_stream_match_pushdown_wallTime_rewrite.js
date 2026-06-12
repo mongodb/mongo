@@ -181,7 +181,10 @@ const txnEventCount = 10;
         maxAwaitTimeMS: 5000,
     });
     for (let i = 0; i < txnEventCount; ++i) {
-        assert.soon(() => cs.hasNext(), "Expected a transaction insert event with wallTime > epoch");
+        assert.soon(
+            () => cs.hasNext(),
+            "Expected a transaction insert event with wallTime > epoch",
+        );
         const event = cs.next();
         assert.eq(event.operationType, "insert", event);
         assert.eq(event.documentKey._id, 10 + i, event);

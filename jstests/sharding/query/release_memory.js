@@ -159,8 +159,12 @@ for (let useSession of [false, true]) {
     // Test single cursor.
     testReleaseMemory({
         func: function (mongosCursorIdArr) {
-            jsTest.log(`Running releaseMemory command for single cursor ${tojson({releaseMemory: mongosCursorIdArr})}`);
-            let cmdRes = assert.commandWorked(mongosDB.runCommand({releaseMemory: mongosCursorIdArr}));
+            jsTest.log(
+                `Running releaseMemory command for single cursor ${tojson({releaseMemory: mongosCursorIdArr})}`,
+            );
+            let cmdRes = assert.commandWorked(
+                mongosDB.runCommand({releaseMemory: mongosCursorIdArr}),
+            );
             assert.eq(cmdRes.cursorsReleased, mongosCursorIdArr);
             assert.eq(cmdRes.cursorsCurrentlyPinned, []);
             assert.eq(cmdRes.cursorsNotFound, []);
@@ -177,7 +181,9 @@ for (let useSession of [false, true]) {
             jsTest.log(
                 `Running releaseMemory command for multiple cursors ${tojson({releaseMemory: mongosCursorIdsArr})}`,
             );
-            let cmdRes = assert.commandWorked(mongosDB.runCommand({releaseMemory: mongosCursorIdsArr}));
+            let cmdRes = assert.commandWorked(
+                mongosDB.runCommand({releaseMemory: mongosCursorIdsArr}),
+            );
             assert.eq(cmdRes.cursorsReleased, mongosCursorIdsArr);
             assert.eq(cmdRes.cursorsCurrentlyPinned, []);
             assert.eq(cmdRes.cursorsNotFound, []);
@@ -194,7 +200,9 @@ for (let useSession of [false, true]) {
             jsTest.log(
                 `Running releaseMemory command for single unknown cursor ${tojson({releaseMemory: mongosCursorIdArr})}`,
             );
-            let cmdRes = assert.commandWorked(mongosDB.runCommand({releaseMemory: mongosCursorIdArr}));
+            let cmdRes = assert.commandWorked(
+                mongosDB.runCommand({releaseMemory: mongosCursorIdArr}),
+            );
             assert.eq(cmdRes.cursorsReleased, []);
             assert.eq(cmdRes.cursorsCurrentlyPinned, []);
             assert.eq(cmdRes.cursorsNotFound, mongosCursorIdArr);
@@ -211,7 +219,9 @@ for (let useSession of [false, true]) {
             jsTest.log(
                 `Running releaseMemory command for single cursor pinned ${tojson({releaseMemory: mongosCursorIdArr})}`,
             );
-            let cmdRes = assert.commandWorked(mongosDB.runCommand({releaseMemory: mongosCursorIdArr}));
+            let cmdRes = assert.commandWorked(
+                mongosDB.runCommand({releaseMemory: mongosCursorIdArr}),
+            );
             assert.eq(cmdRes.cursorsReleased, []);
             assert.eq(cmdRes.cursorsCurrentlyPinned, mongosCursorIdArr);
             assert.eq(cmdRes.cursorsNotFound, []);
@@ -228,7 +238,9 @@ for (let useSession of [false, true]) {
             jsTest.log(
                 `Running releaseMemory command for all types of cursors ${tojson({releaseMemory: mongosCursorIdArr})}`,
             );
-            let cmdRes = assert.commandWorked(mongosDB.runCommand({releaseMemory: mongosCursorIdArr}));
+            let cmdRes = assert.commandWorked(
+                mongosDB.runCommand({releaseMemory: mongosCursorIdArr}),
+            );
             assert.eq(cmdRes.cursorsReleased, [mongosCursorIdArr[2]]);
             assert.eq(cmdRes.cursorsCurrentlyPinned, [mongosCursorIdArr[0]]);
             assert.eq(cmdRes.cursorsNotFound, [mongosCursorIdArr[1]]);

@@ -33,7 +33,10 @@ describe("query stats insert command metrics (mongos)", function () {
         mongos = st.s;
         testDB = mongos.getDB("test");
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: st.shard1.shardName,
+            }),
         );
     });
 
@@ -55,10 +58,16 @@ describe("query stats insert command metrics (mongos)", function () {
             coll = testDB[collName];
             // shard1 is the primary (set in outer before). Shard on {_id: 1}, split at {_id: 0}:
             // negative _ids stay on shard1 (primary), non-negative move to shard0 (non-primary).
-            assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
             assert.commandWorked(
-                st.s.adminCommand({movechunk: coll.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
+                st.s.adminCommand({
+                    movechunk: coll.getFullName(),
+                    find: {_id: 0},
+                    to: st.shard0.shardName,
+                }),
             );
         });
 
@@ -187,7 +196,9 @@ describe("query stats insert command metrics (mongos)", function () {
 
         before(function () {
             coll = testDB[collName];
-            assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                testDB.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             shard1Primary = st.rs1.getPrimary();
         });
 
@@ -201,7 +212,12 @@ describe("query stats insert command metrics (mongos)", function () {
                 "Timed out waiting for range deletions on shard1 to complete",
             );
 
-            const fp = configureFailPoint(shard1Primary, "alwaysThrowStaleConfigInfo", {}, {times: 1});
+            const fp = configureFailPoint(
+                shard1Primary,
+                "alwaysThrowStaleConfigInfo",
+                {},
+                {times: 1},
+            );
 
             const result = assert.commandWorked(
                 testDB.runCommand({
@@ -211,10 +227,17 @@ describe("query stats insert command metrics (mongos)", function () {
             );
             assert.eq(result.n, 1);
 
-            assert(fp.waitWithTimeout(1000), "alwaysThrowStaleConfigInfo failpoint was never triggered");
+            assert(
+                fp.waitWithTimeout(1000),
+                "alwaysThrowStaleConfigInfo failpoint was never triggered",
+            );
 
             const mongosEntries = getQueryStatsInsertCmd(mongos, {collName: collName});
-            assert.eq(mongosEntries.length, 1, "Expected 1 mongos query stats entry: " + tojson(mongosEntries));
+            assert.eq(
+                mongosEntries.length,
+                1,
+                "Expected 1 mongos query stats entry: " + tojson(mongosEntries),
+            );
 
             const entry = getLatestQueryStatsEntry(mongos, {collName: coll.getName()});
             assert.eq(entry.key.queryShape.command, "insert");
@@ -262,10 +285,16 @@ describe("query stats insert command metrics (mongos)", function () {
         before(function () {
             coll = testDB[collName];
             // shard1 is the primary (set in outer before). Non-negative _ids go to shard0 (non-primary).
-            assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
             assert.commandWorked(
-                st.s.adminCommand({movechunk: coll.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
+                st.s.adminCommand({
+                    movechunk: coll.getFullName(),
+                    find: {_id: 0},
+                    to: st.shard0.shardName,
+                }),
             );
         });
 

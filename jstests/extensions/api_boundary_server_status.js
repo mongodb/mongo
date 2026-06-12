@@ -41,7 +41,10 @@ function getTotalExtensionMetrics(testDb, metric) {
 
     if (FixtureHelpers.isMongos(testDb)) {
         const primaries = FixtureHelpers.getPrimaries(testDb);
-        total += primaries.reduce((sum, primary) => sum + getExtensionMetricFromNode(primary, metric), 0);
+        total += primaries.reduce(
+            (sum, primary) => sum + getExtensionMetricFromNode(primary, metric),
+            0,
+        );
     }
 
     return total;
@@ -79,8 +82,16 @@ describe("Extension success and failure serverStatus metrics", function () {
 
     it("should have non-negative initial values", function () {
         const initialMetrics = getTotalMetrics(db);
-        assert.gte(initialMetrics.extensionSuccesses, 0, `extensionSuccesses should be non-negative.`);
-        assert.gte(initialMetrics.extensionFailures, 0, `extensionFailures should be non-negative.`);
+        assert.gte(
+            initialMetrics.extensionSuccesses,
+            0,
+            `extensionSuccesses should be non-negative.`,
+        );
+        assert.gte(
+            initialMetrics.extensionFailures,
+            0,
+            `extensionFailures should be non-negative.`,
+        );
         assert.gte(initialMetrics.hostSuccesses, 0, `hostSuccesses should be non-negative.`);
         assert.gte(initialMetrics.hostFailures, 0, `hostFailures should be non-negative.`);
     });
@@ -115,14 +126,19 @@ describe("Extension success and failure serverStatus metrics", function () {
             0,
             `hostSuccesses should not decrease after successful host work.`,
         );
-        assert.eq(result.metricDeltas.hostFailures, 0, `hostFailures should remain stable after successful host work.`);
+        assert.eq(
+            result.metricDeltas.hostFailures,
+            0,
+            `hostFailures should remain stable after successful host work.`,
+        );
     });
 
     it("should increase extensionSuccesses when $testFoo runs on mongos (after $sort)", function () {
         const result = observeExtensionMetricsChange(
             [
                 {
-                    operation: () => this.coll.aggregate([{$sort: {value: 1}}, {$testFoo: {}}]).toArray(),
+                    operation: () =>
+                        this.coll.aggregate([{$sort: {value: 1}}, {$testFoo: {}}]).toArray(),
                     expectSuccess: true,
                 },
             ],
@@ -141,8 +157,16 @@ describe("Extension success and failure serverStatus metrics", function () {
             0,
             `extensionFailures should remain stable after successful extension work.`,
         );
-        assert.gt(result.metricDeltas.hostSuccesses, 0, `hostSuccesses should increase after successful host work.`);
-        assert.eq(result.metricDeltas.hostFailures, 0, `hostFailures should remain stable after successful host work.`);
+        assert.gt(
+            result.metricDeltas.hostSuccesses,
+            0,
+            `hostSuccesses should increase after successful host work.`,
+        );
+        assert.eq(
+            result.metricDeltas.hostFailures,
+            0,
+            `hostFailures should remain stable after successful host work.`,
+        );
     });
 
     it("should accumulate extensionSuccesses across multiple queries", function () {
@@ -175,7 +199,11 @@ describe("Extension success and failure serverStatus metrics", function () {
         );
         // Note, hostSuccesses increases anytime the extension calls back into the host. This
         // can be an indeterminate number of times in the successful case.
-        assert.gte(result.metricDeltas.hostSuccesses, 0, `hostSuccesses should not decrease across multiple queries.`);
+        assert.gte(
+            result.metricDeltas.hostSuccesses,
+            0,
+            `hostSuccesses should not decrease across multiple queries.`,
+        );
         assert.eq(
             result.metricDeltas.hostFailures,
             0,
@@ -192,7 +220,11 @@ describe("Extension success and failure serverStatus metrics", function () {
                             aggregate: this.coll.getName(),
                             pipeline: [
                                 {
-                                    $assert: {errmsg: "test uassert failure", code: 11569609, assertionType: "uassert"},
+                                    $assert: {
+                                        errmsg: "test uassert failure",
+                                        code: 11569609,
+                                        assertionType: "uassert",
+                                    },
                                 },
                             ],
                             cursor: {},
@@ -306,7 +338,11 @@ describe("Extension success and failure serverStatus metrics", function () {
             0,
             `hostSuccesses should not decrease after successful host work.`,
         );
-        assert.eq(result.metricDeltas.hostFailures, 0, `hostFailures should remain stable after successful host work.`);
+        assert.eq(
+            result.metricDeltas.hostFailures,
+            0,
+            `hostFailures should remain stable after successful host work.`,
+        );
     });
 
     it("should NOT increase extensionSuccesses for queries without extension stages", function () {

@@ -79,7 +79,10 @@ withQueryStatsEnabled(collName, (coll) => {
 
     [true, false].forEach((areErrorsFatal) => {
         assert.commandWorked(
-            adminDB.runCommand({setParameter: 1, internalQueryStatsErrorsAreCommandFatal: areErrorsFatal}),
+            adminDB.runCommand({
+                setParameter: 1,
+                internalQueryStatsErrorsAreCommandFatal: areErrorsFatal,
+            }),
         );
         testQueryStatsRegisterRequest(testDB, coll, areErrorsFatal);
         testQueryStatsAggStage(testDB, coll, areErrorsFatal);

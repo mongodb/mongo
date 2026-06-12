@@ -17,7 +17,11 @@ function runTest(conn, keyFile = undefined) {
 
     // Localhost authbypass is disabled, and we haven't logged in,
     // so normal auth-required commands should fail.
-    assertError({usersInfo: 1}, "Command usersInfo requires authentication", ErrorCodes.Unauthorized);
+    assertError(
+        {usersInfo: 1},
+        "Command usersInfo requires authentication",
+        ErrorCodes.Unauthorized,
+    );
 
     // Hello command requires no auth, so it works fine.
     assert.commandWorked(admin.runCommand({hello: 1}));
@@ -39,13 +43,29 @@ function runTest(conn, keyFile = undefined) {
             "$impersonatedRoles": [],
         },
     };
-    assertError(kImpersonatedUserHello, "Unauthorized use of impersonation metadata", ErrorCodes.Unauthorized);
-    assertError(kImpersonatedClientHello, "Unauthorized use of impersonation metadata", ErrorCodes.Unauthorized);
+    assertError(
+        kImpersonatedUserHello,
+        "Unauthorized use of impersonation metadata",
+        ErrorCodes.Unauthorized,
+    );
+    assertError(
+        kImpersonatedClientHello,
+        "Unauthorized use of impersonation metadata",
+        ErrorCodes.Unauthorized,
+    );
 
     // Try as admin (root role), should still fail.
     admin.auth("admin", "admin");
-    assertError(kImpersonatedUserHello, "Unauthorized use of impersonation metadata", ErrorCodes.Unauthorized);
-    assertError(kImpersonatedClientHello, "Unauthorized use of impersonation metadata", ErrorCodes.Unauthorized);
+    assertError(
+        kImpersonatedUserHello,
+        "Unauthorized use of impersonation metadata",
+        ErrorCodes.Unauthorized,
+    );
+    assertError(
+        kImpersonatedClientHello,
+        "Unauthorized use of impersonation metadata",
+        ErrorCodes.Unauthorized,
+    );
     admin.logout();
 
     if (keyFile !== undefined) {

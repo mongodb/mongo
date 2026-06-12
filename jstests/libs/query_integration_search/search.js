@@ -52,7 +52,11 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
  * @param {Object} keys Name(s) and definitions of the desired search indexes.
  * @param {Object} blockUntilSearchIndexQueryable Object that represents how the
  */
-function _validateSearchIndexArguments(searchIndexCommandName, keys, blockUntilSearchIndexQueryable) {
+function _validateSearchIndexArguments(
+    searchIndexCommandName,
+    keys,
+    blockUntilSearchIndexQueryable,
+) {
     if (!keys.hasOwnProperty("definition")) {
         throw new Error(searchIndexCommandName + " must have a definition");
     }
@@ -63,7 +67,8 @@ function _validateSearchIndexArguments(searchIndexCommandName, keys, blockUntilS
         !blockUntilSearchIndexQueryable.hasOwnProperty("blockUntilSearchIndexQueryable")
     ) {
         throw new Error(
-            searchIndexCommandName + " only accepts index definition object and blockUntilSearchIndexQueryable object",
+            searchIndexCommandName +
+                " only accepts index definition object and blockUntilSearchIndexQueryable object",
         );
     }
 
@@ -141,7 +146,9 @@ function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefi
     let response = assert.commandWorked(coll.getDB().runCommand(userCmd));
     // Please see block comment at the top of this file to understand the sharded implementation.
     if (isShardedHelper(coll) || FixtureHelpers.isMongos(coll.getDB())) {
-        assert.commandWorked(coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}));
+        assert.commandWorked(
+            coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}),
+        );
     } else {
         if (Object.keys(userCmd)[0] != "dropSearchIndex") {
             _runListSearchIndexOnNode(coll, indexName, latestDefinition);
@@ -160,7 +167,11 @@ function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefi
 export function waitForSearchIndexQueryable(coll, indexName) {
     if (isShardedHelper(coll) || FixtureHelpers.isMongos(coll.getDB())) {
         const listCmd = {$listSearchIndexes: {name: indexName}};
-        assert.commandWorked(coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd: listCmd}));
+        assert.commandWorked(
+            coll
+                .getDB()
+                .runCommand({replicateSearchIndexCommand: coll.getName(), userCmd: listCmd}),
+        );
     } else {
         _runListSearchIndexOnNode(coll, indexName, null);
     }

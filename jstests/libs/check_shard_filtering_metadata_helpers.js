@@ -14,7 +14,9 @@ export var CheckShardFilteringMetadataHelpers = (function () {
                 }' of shard '${shardId}'`,
             );
 
-            const nodeMetadata = assert.commandWorked(nodeConn.adminCommand({getDatabaseVersion: dbName}));
+            const nodeMetadata = assert.commandWorked(
+                nodeConn.adminCommand({getDatabaseVersion: dbName}),
+            );
 
             // Skip this test if isPrimaryShardForDb is not present. Multiversion incompatible.
             if (nodeMetadata.dbVersion.isPrimaryShardForDb === undefined) {
@@ -41,7 +43,10 @@ export var CheckShardFilteringMetadataHelpers = (function () {
                     `Unexpected dbVersion.uuid for db '${dbName}' on node '${nodeConn.host}'`,
                 );
                 assert.eq(
-                    timestampCmp(nodeMetadata.dbVersion.timestamp, configDatabasesEntry.version.timestamp),
+                    timestampCmp(
+                        nodeMetadata.dbVersion.timestamp,
+                        configDatabasesEntry.version.timestamp,
+                    ),
                     0,
                     `Unexpected dbVersion timestamp for db '${dbName}' on node '${nodeConn.host}'. Found '${tojson(
                         nodeMetadata.dbVersion.timestamp,
@@ -54,7 +59,9 @@ export var CheckShardFilteringMetadataHelpers = (function () {
                 );
             }
 
-            jsTest.log.info(`CheckShardFilteringMetadata: Database '${dbName}' on '${nodeConn.host}' OK`);
+            jsTest.log.info(
+                `CheckShardFilteringMetadata: Database '${dbName}' on '${nodeConn.host}' OK`,
+            );
         }
 
         function getPrimaryShardForDB(dbName) {
@@ -118,7 +125,9 @@ export var CheckShardFilteringMetadataHelpers = (function () {
             );
 
             // Check that placement version is correct
-            const expectedShardVersion = highestChunkOnShard ? highestChunkOnShard.lastmod : Timestamp(0, 0);
+            const expectedShardVersion = highestChunkOnShard
+                ? highestChunkOnShard.lastmod
+                : Timestamp(0, 0);
 
             // Only check the major version because some operations (such as resharding or
             // setAllowMigrations) bump the minor version without the shards knowing. This does not

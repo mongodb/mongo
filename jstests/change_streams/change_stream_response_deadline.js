@@ -57,7 +57,12 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
     const collName = jsTestName();
 
     const runWithFailPoint = (conn, failPointName, data = {}, cb) => {
-        configureFailPointForAllShardsAndMongos({conn, failPointName, data, failPointMode: "alwaysOn"});
+        configureFailPointForAllShardsAndMongos({
+            conn,
+            failPointName,
+            data,
+            failPointMode: "alwaysOn",
+        });
         try {
             return cb();
         } finally {
@@ -106,7 +111,9 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
                 });
 
                 const initialPBRT = cursor.postBatchResumeToken;
-                assert(initialPBRT, "Expected a postBatchResumeToken in the aggregate response", {cursor});
+                assert(initialPBRT, "Expected a postBatchResumeToken in the aggregate response", {
+                    cursor,
+                });
 
                 let differentPBRTsReturned = 0;
                 let foundDoc = null;
@@ -123,16 +130,28 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
                     const pbrt = cursor.postBatchResumeToken;
 
                     // Every response must carry a postBatchResumeToken.
-                    assert(pbrt, `Expected a postBatchResumeToken in getMore response ${i}`, {cursor});
+                    assert(pbrt, `Expected a postBatchResumeToken in getMore response ${i}`, {
+                        cursor,
+                    });
 
                     const pbrtCompareResult = bsonWoCompare(lastPBRT, pbrt);
                     assert.lte(pbrtCompareResult, 0, `PBRT must be monotonically non-decreasing`);
                     if (batch.length === 0) {
-                        assert.neq(NumberLong(0), cursor.id, "Cursor must stay open after an empty batch", {cursor});
+                        assert.neq(
+                            NumberLong(0),
+                            cursor.id,
+                            "Cursor must stay open after an empty batch",
+                            {cursor},
+                        );
                     } else {
-                        assert.eq(1, batch.length, "Expected exactly one document when the scan finds a match", {
-                            cursor,
-                        });
+                        assert.eq(
+                            1,
+                            batch.length,
+                            "Expected exactly one document when the scan finds a match",
+                            {
+                                cursor,
+                            },
+                        );
                         foundDoc = batch[0];
                     }
                     if (pbrtCompareResult < 0) {
@@ -141,7 +160,10 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
                     }
                 }
 
-                assert(foundDoc !== null, "Did not receive the matching document within the iteration limit");
+                assert(
+                    foundDoc !== null,
+                    "Did not receive the matching document within the iteration limit",
+                );
                 assert.eq(
                     kNumDocs - 1,
                     foundDoc.fullDocument._id,

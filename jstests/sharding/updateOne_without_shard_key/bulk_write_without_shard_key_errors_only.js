@@ -64,17 +64,37 @@ const testCases = [
             {update: 0, multi: false, filter: {_id: 7}, updateMods: {x: 4, y: 6}, upsert: true},
         ],
         cursorSize: 0,
-        summaryFields: {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 2},
+        summaryFields: {
+            nErrors: 0,
+            nInserted: 0,
+            nDeleted: 0,
+            nMatched: 0,
+            nModified: 0,
+            nUpserted: 2,
+        },
     },
     {
         logMessage: "Running bulkWrite with errorsOnly: true, errors",
         errorsOnly: true,
         ops: [
-            {update: 0, multi: false, filter: {_id: 5}, updateMods: {x: 0, y: 2, _id: 2}, upsert: true},
+            {
+                update: 0,
+                multi: false,
+                filter: {_id: 5},
+                updateMods: {x: 0, y: 2, _id: 2},
+                upsert: true,
+            },
             {update: 0, multi: false, filter: {_id: 7}, updateMods: {x: 0, y: 2}, upsert: true},
         ],
         cursorSize: 1,
-        summaryFields: {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 1},
+        summaryFields: {
+            nErrors: 1,
+            nInserted: 0,
+            nDeleted: 0,
+            nMatched: 0,
+            nModified: 0,
+            nUpserted: 1,
+        },
     },
     {
         logMessage: "Running bulkWrite with errorsOnly: false, all success",
@@ -84,7 +104,14 @@ const testCases = [
             {update: 0, multi: false, filter: {_id: 7}, updateMods: {x: 4, y: 6}, upsert: true},
         ],
         cursorSize: 2,
-        summaryFields: {nErrors: 0, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 2},
+        summaryFields: {
+            nErrors: 0,
+            nInserted: 0,
+            nDeleted: 0,
+            nMatched: 0,
+            nModified: 0,
+            nUpserted: 2,
+        },
     },
 ];
 

@@ -538,7 +538,9 @@ AllCommandsTest.testAllCommands(secondary, allCommands, function (test) {
 
     if (test.expectFailure) {
         const expectedErrorCode = test.expectedErrorCode;
-        assertCommandOrWriteFailed(cmdDb.runCommand(test.command), expectedErrorCode, () => tojson(test.command));
+        assertCommandOrWriteFailed(cmdDb.runCommand(test.command), expectedErrorCode, () =>
+            tojson(test.command),
+        );
     } else {
         assert.commandWorked(cmdDb.runCommand(test.command), () => tojson(test.command));
     }

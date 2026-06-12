@@ -55,7 +55,9 @@ for (let j = 0; j < 50000; j++) doc.x.push("" + Math.random() + Math.random());
 
     assert(
         caughtTUerror,
-        "did not return the expected TemporarilyUnavailable error after " + (attempts - 1) + " attempts",
+        "did not return the expected TemporarilyUnavailable error after " +
+            (attempts - 1) +
+            " attempts",
     );
     const serverStatusAfter = db.serverStatus();
     assert.gt(
@@ -98,7 +100,10 @@ for (let j = 0; j < 50000; j++) doc.x.push("" + Math.random() + Math.random());
 
     assert(
         caughtWriteConflict,
-        "did not return the expected WriteConflict error after " + (attempts - 1) + " attempts. Result: " + tojson(ret),
+        "did not return the expected WriteConflict error after " +
+            (attempts - 1) +
+            " attempts. Result: " +
+            tojson(ret),
     );
 
     const serverStatusAfter = db.serverStatus();

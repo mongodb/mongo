@@ -19,12 +19,17 @@ const testDoc = {
 assert.commandWorked(coll.insertOne(testDoc));
 rst.awaitReplication();
 
-const getMajorityRCCount = () => db.runCommand({serverStatus: 1}).readConcernCounters.nonTransactionOps.majority;
+const getMajorityRCCount = () =>
+    db.runCommand({serverStatus: 1}).readConcernCounters.nonTransactionOps.majority;
 const getSnapshotRCCount = () =>
     db.runCommand({serverStatus: 1}).readConcernCounters.transactionOps.snapshot.withoutClusterTime;
 
 // Command-level
-assert.eq(coll.runCommand({"find": coll.getName(), readConcern: {level: "majority"}}).cursor.firstBatch.length, 1);
+assert.eq(
+    coll.runCommand({"find": coll.getName(), readConcern: {level: "majority"}}).cursor.firstBatch
+        .length,
+    1,
+);
 assert.eq(getMajorityRCCount(), 1);
 
 const session = primary.startSession({readConcern: {level: "majority"}});
@@ -36,7 +41,9 @@ assert.eq(coll.runCommand({"find": coll.getName()}).cursor.firstBatch.length, 1)
 assert.eq(getMajorityRCCount(), 3);
 
 // Check that the session read concern doesn't break explain.
-assert.commandWorked(coll.runCommand({explain: {count: collName, query: {"_id": 0}, readConcern: {level: "local"}}}));
+assert.commandWorked(
+    coll.runCommand({explain: {count: collName, query: {"_id": 0}, readConcern: {level: "local"}}}),
+);
 assert.commandWorked(coll.runCommand({explain: {count: collName, query: {"_id": 0}}}));
 
 // Transaction-level

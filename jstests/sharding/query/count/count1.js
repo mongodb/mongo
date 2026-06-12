@@ -162,7 +162,10 @@ assert.eq(
 // 7. Test invalid queries/values.
 
 // i. Make sure count command returns error for invalid queries.
-assert.commandFailedWithCode(db.runCommand({count: "foo", query: {$c: {$abc: 3}}}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({count: "foo", query: {$c: {$abc: 3}}}),
+    ErrorCodes.BadValue,
+);
 
 // ii. Negative skip values should return error.
 assert.commandFailedWithCode(db.runCommand({count: "foo", skip: -2}), [
@@ -179,9 +182,15 @@ assert.commandFailedWithCode(db.runCommand({count: "foo", skip: -2, limit: 1}), 
 ]); // getting BadValue when binary is > 7.1, else 51024
 
 // iv. Unknown options should return error.
-assert.commandFailedWithCode(db.runCommand({count: "foo", random: true}), ErrorCodes.IDLUnknownField);
+assert.commandFailedWithCode(
+    db.runCommand({count: "foo", random: true}),
+    ErrorCodes.IDLUnknownField,
+);
 
 // v. Unknown options should return error for explain.
-assert.commandFailedWithCode(db.runCommand({explain: {count: "foo", random: true}}), ErrorCodes.IDLUnknownField);
+assert.commandFailedWithCode(
+    db.runCommand({explain: {count: "foo", random: true}}),
+    ErrorCodes.IDLUnknownField,
+);
 
 s.stop();

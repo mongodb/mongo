@@ -89,10 +89,16 @@ const aggModel = fc
         fc.array(computationStageArb, {minLength: 1, maxLength: 2}),
         getMatchArb(),
     )
-    .map(([lookups, computations, match]) => ({pipeline: [...lookups, ...computations, match], options: {}}));
+    .map(([lookups, computations, match]) => ({
+        pipeline: [...lookups, ...computations, match],
+        options: {},
+    }));
 
 const knobToVal = {internalQueryTransformHoistPolicy: "forMatchPushdown"};
-const correctnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl, experimentColl);
+const correctnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(
+    controlColl,
+    experimentColl,
+);
 
 const workloadModel = makeWorkloadModel({
     collModel: getCollectionModel({isTS: false}),
@@ -112,7 +118,9 @@ if (!TestData.inEvergreen) {
         const matchIdx = prefix.findLastIndex((s) => "$match" in s);
         return (
             matchIdx !== -1 &&
-            prefix.slice(0, matchIdx).some((s) => "$project" in s || "$set" in s || "$addFields" in s)
+            prefix
+                .slice(0, matchIdx)
+                .some((s) => "$project" in s || "$set" in s || "$addFields" in s)
         );
     }
 
@@ -127,5 +135,7 @@ if (!TestData.inEvergreen) {
             }
         }
     });
-    jsTest.log.info(`Computation hoisting fired in ${(optimizationFiredRuns / samples.length) * 100}% of samples.`);
+    jsTest.log.info(
+        `Computation hoisting fired in ${(optimizationFiredRuns / samples.length) * 100}% of samples.`,
+    );
 }

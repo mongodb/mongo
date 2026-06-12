@@ -72,13 +72,23 @@ let createIndexesCmd = {
     apiVersion: "1",
     apiStrict: true,
 };
-assert.commandFailedWithCode(testDb.runCommand(createIndexesCmd), ErrorCodes.APIStrictError, createIndexesCmd);
+assert.commandFailedWithCode(
+    testDb.runCommand(createIndexesCmd),
+    ErrorCodes.APIStrictError,
+    createIndexesCmd,
+);
 
 createIndexesCmd["indexes"] = [{key: {a: "geoHaystack"}, name: "a_1"}];
-assert.commandFailedWithCode(testDb.runCommand(createIndexesCmd), ErrorCodes.CannotCreateIndex, createIndexesCmd);
+assert.commandFailedWithCode(
+    testDb.runCommand(createIndexesCmd),
+    ErrorCodes.CannotCreateIndex,
+    createIndexesCmd,
+);
 
 // Test that collMod command with an unstable field ('prepareUnique') in an inner struct throws when
 // 'apiStrict' is set to true.
-assert.commandWorked(testDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(
+    testDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
+);
 let collModCommand = {collMod: "col", apiVersion: "1", apiStrict: true};
 testCommandWithUnstableFields(collModCommand, {index: {name: "a_1", prepareUnique: true}});

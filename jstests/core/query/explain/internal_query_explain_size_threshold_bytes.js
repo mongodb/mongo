@@ -16,7 +16,12 @@
  *  assumes_stable_shard_list,
  * ]
  */
-import {getEngine, getQueryPlanner, getSingleNodeExplain, getWarnings} from "jstests/libs/query/analyze_plan.js";
+import {
+    getEngine,
+    getQueryPlanner,
+    getSingleNodeExplain,
+    getWarnings,
+} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -51,7 +56,9 @@ function fitsPlanSlotsStages(winningPlan) {
     );
 }
 
-const original = assert.commandWorked(db.adminCommand({getParameter: 1, "internalQueryExplainSizeThresholdBytes": 1}));
+const original = assert.commandWorked(
+    db.adminCommand({getParameter: 1, "internalQueryExplainSizeThresholdBytes": 1}),
+);
 
 try {
     // Increase explain threshold step-by-step.
@@ -60,7 +67,11 @@ try {
             // Test is SBE-only.
             break;
         }
-        setParameterOnAllNonConfigNodes(db.getMongo(), "internalQueryExplainSizeThresholdBytes", size);
+        setParameterOnAllNonConfigNodes(
+            db.getMongo(),
+            "internalQueryExplainSizeThresholdBytes",
+            size,
+        );
         const coll = db.internal_query_explain_size_threshold_bytes;
         coll.drop();
         assert.commandWorked(coll.insert({_id: 1, a: 1}));
@@ -70,7 +81,11 @@ try {
         }
         const explain = coll
             .explain()
-            .aggregate([{$match: {"$or": orClauses}}, {$group: {_id: "$_id"}}, {$project: {_id: 1, a: 0}}]);
+            .aggregate([
+                {$match: {"$or": orClauses}},
+                {$group: {_id: "$_id"}},
+                {$project: {_id: 1, a: 0}},
+            ]);
         // Test is SBE-only. Assert the query used SBE as expected.
         assert(getWarnings(explain).length > 0 || getEngine(explain) === "sbe");
         jsTest.log.info("Checking explain");
@@ -83,7 +98,9 @@ try {
             "winningPlan": winningPlan,
         });
         assert(
-            fitsPlanWarning(winningPlan) || fitsPlanSlotsStageWarning(winningPlan) || fitsPlanSlotsStages(winningPlan),
+            fitsPlanWarning(winningPlan) ||
+                fitsPlanSlotsStageWarning(winningPlan) ||
+                fitsPlanSlotsStages(winningPlan),
         );
         // At very small thresholds, the error messages can cause the explain's BSON size to
         // exceed the threshold. Give ourselves 32 bytes of leeway for the comparison here.

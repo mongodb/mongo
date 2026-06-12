@@ -76,7 +76,11 @@ function validateCollection(
                 for (let fieldName in expectedIndex) {
                     const actual = getDottedField(actualIndex, fieldName);
                     const expected = expectedIndex[fieldName];
-                    assert.eq(bsonUnorderedFieldsCompare(actual, expected), 0, {fieldName, actual, expected});
+                    assert.eq(bsonUnorderedFieldsCompare(actual, expected), 0, {
+                        fieldName,
+                        actual,
+                        expected,
+                    });
                 }
             }
             assert(found, {expectedIndex});
@@ -85,7 +89,11 @@ function validateCollection(
 
     // Validate config.collections doc.
     const ns =
-        dbName + "." + (listCollectionsDoc.type == "timeseries" ? getTimeseriesCollForDDLOps(db, collName) : collName);
+        dbName +
+        "." +
+        (listCollectionsDoc.type == "timeseries"
+            ? getTimeseriesCollForDDLOps(db, collName)
+            : collName);
     const collDoc = conn.getCollection("config.collections").findOne({_id: ns});
     if (expectNoShardingMetadata) {
         assert.eq(collDoc, null);
@@ -156,7 +164,9 @@ const testCases = [
         name: "cappedCount",
         createCollection: (conn, dbName, collName) => {
             assert.commandWorked(
-                conn.getDB(dbName).runCommand({create: collName, capped: true, max: maxCount, size: maxBytes}),
+                conn
+                    .getDB(dbName)
+                    .runCommand({create: collName, capped: true, max: maxCount, size: maxBytes}),
             );
             return dbName + "." + collName;
         },
@@ -217,7 +227,8 @@ const testCases = [
         validateCollection: (conn, dbName, collName, shardKey) => {
             validateCollection(conn, dbName, collName, shardKey, {
                 expectedCollOpts: {
-                    "storageEngine.wiredTiger.configString": "allocation_size=4KB,internal_page_max=4KB",
+                    "storageEngine.wiredTiger.configString":
+                        "allocation_size=4KB,internal_page_max=4KB",
                 },
             });
         },
@@ -244,14 +255,21 @@ const testCases = [
             });
             const coll = conn.getDB(dbName).getCollection(collName);
             const doc = coll.findOne({z: 1});
-            assert.commandFailedWithCode(coll.update(doc, {$set: {z: -1}}), ErrorCodes.DocumentValidationFailure);
+            assert.commandFailedWithCode(
+                coll.update(doc, {$set: {z: -1}}),
+                ErrorCodes.DocumentValidationFailure,
+            );
         },
     },
     {
         name: "validatorLevel",
         createCollection: (conn, dbName, collName) => {
             assert.commandWorked(
-                conn.getDB(dbName).runCommand({create: collName, validator: {z: {$gte: 0}}, validationLevel: "strict"}),
+                conn.getDB(dbName).runCommand({
+                    create: collName,
+                    validator: {z: {$gte: 0}},
+                    validationLevel: "strict",
+                }),
             );
             return dbName + "." + collName;
         },
@@ -267,7 +285,10 @@ const testCases = [
             });
             const coll = conn.getDB(dbName).getCollection(collName);
             const doc = coll.findOne({z: 1});
-            assert.commandFailedWithCode(coll.update(doc, {$set: {z: -1}}), ErrorCodes.DocumentValidationFailure);
+            assert.commandFailedWithCode(
+                coll.update(doc, {$set: {z: -1}}),
+                ErrorCodes.DocumentValidationFailure,
+            );
         },
     },
     {
@@ -277,7 +298,9 @@ const testCases = [
                 conn.getDB(dbName).runCommand({
                     create: collName,
                     indexOptionDefaults: {
-                        storageEngine: {wiredTiger: {configString: "allocation_size=4KB,internal_page_max=4KB"}},
+                        storageEngine: {
+                            wiredTiger: {configString: "allocation_size=4KB,internal_page_max=4KB"},
+                        },
                     },
                 }),
             );
@@ -344,7 +367,9 @@ const testCases = [
     {
         name: "simpleCollation",
         createCollection: (conn, dbName, collName) => {
-            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName, collation: {locale: "simple"}}));
+            assert.commandWorked(
+                conn.getDB(dbName).runCommand({create: collName, collation: {locale: "simple"}}),
+            );
             return dbName + "." + collName;
         },
         insertDocuments: (conn, dbName, collName) => {
@@ -358,9 +383,10 @@ const testCases = [
         name: "nonSimpleCollation",
         createCollection: (conn, dbName, collName) => {
             assert.commandWorked(
-                conn
-                    .getDB(dbName)
-                    .runCommand({create: collName, collation: {locale: "en_US", strength: 1, caseLevel: false}}),
+                conn.getDB(dbName).runCommand({
+                    create: collName,
+                    collation: {locale: "en_US", strength: 1, caseLevel: false},
+                }),
             );
             return dbName + "." + collName;
         },
@@ -393,7 +419,9 @@ const testCases = [
         name: "changeStreamPreAndPostImages",
         createCollection: (conn, dbName, collName) => {
             assert.commandWorked(
-                conn.getDB(dbName).runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}),
+                conn
+                    .getDB(dbName)
+                    .runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}),
             );
             return dbName + "." + collName;
         },
@@ -413,7 +441,9 @@ const testCases = [
         shouldSkip: (conn) => !FeatureFlagUtil.isEnabled(conn, "ReshardingForTimeseries"),
         createCollection: (conn, dbName, collName) => {
             assert.commandWorked(
-                conn.getDB(dbName).runCommand({create: collName, timeseries: {timeField: "x", metaField: "y"}}),
+                conn
+                    .getDB(dbName)
+                    .runCommand({create: collName, timeseries: {timeField: "x", metaField: "y"}}),
             );
             return dbName + "." + collName;
         },
@@ -421,14 +451,20 @@ const testCases = [
             insertDocuments(conn, dbName, collName);
         },
         validateCollection: (conn, dbName, collName, shardKey) => {
-            validateCollection(conn, dbName, collName, shardKey && shardKey.y ? {meta: 1} : shardKey, {
-                expectedCollOpts: {
-                    "timeseries.timeField": "x",
-                    "timeseries.metaField": "y",
-                    "timeseries.granularity": "seconds",
-                    "timeseries.bucketMaxSpanSeconds": 3600,
+            validateCollection(
+                conn,
+                dbName,
+                collName,
+                shardKey && shardKey.y ? {meta: 1} : shardKey,
+                {
+                    expectedCollOpts: {
+                        "timeseries.timeField": "x",
+                        "timeseries.metaField": "y",
+                        "timeseries.granularity": "seconds",
+                        "timeseries.bucketMaxSpanSeconds": 3600,
+                    },
                 },
-            });
+            );
         },
     },
     {
@@ -546,7 +582,9 @@ function runTest(configShard) {
         jsTest.log("Running test " + tojsononeline({testCase: testCase.name, configShard}));
         const dbName = "testDb-" + testCase.name;
         const collName = "testColl";
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
         const ns = testCase.createCollection(st.s, dbName, collName);
         testCase.insertDocuments(st.s, dbName, collName);
 
@@ -559,7 +597,9 @@ function runTest(configShard) {
         }
         testCase.validateCollection(st.s, dbName, collName, null /* shardKey */);
 
-        jsTest.log("Test reshardCollection " + tojsononeline({testCase: testCase.name, configShard}));
+        jsTest.log(
+            "Test reshardCollection " + tojsononeline({testCase: testCase.name, configShard}),
+        );
         const coll = st.s.getDB(dbName).getCollection(collName);
         assert.commandWorked(coll.createIndex(shardKey0));
         const shardRes = st.s.adminCommand({shardCollection: ns, key: shardKey0});
@@ -567,10 +607,19 @@ function runTest(configShard) {
             assert.commandFailedWithCode(shardRes, testCase.expectedShardCollectionError);
         } else {
             assert.commandWorked(shardRes);
-            const reshardRes = st.s.adminCommand({reshardCollection: ns, key: shardKey1, numInitialChunks: 1});
+            const reshardRes = st.s.adminCommand({
+                reshardCollection: ns,
+                key: shardKey1,
+                numInitialChunks: 1,
+            });
             assert.commandWorked(reshardRes);
         }
-        testCase.validateCollection(st.s, dbName, collName, testCase.expectedShardCollectionError ? null : shardKey1);
+        testCase.validateCollection(
+            st.s,
+            dbName,
+            collName,
+            testCase.expectedShardCollectionError ? null : shardKey1,
+        );
     });
     st.stop();
 }

@@ -11,7 +11,12 @@
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
 // ]
-import {aggPlanHasStage, getAggPlanStage, getQueryPlanner, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    aggPlanHasStage,
+    getAggPlanStage,
+    getQueryPlanner,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.countscan;
 coll.drop();
@@ -37,7 +42,9 @@ const getQueryPlan = function (explain) {
     return winningPlan.queryPlan ? winningPlan.queryPlan : winningPlan;
 };
 
-let explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
+let explained = coll
+    .explain()
+    .aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
 assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
@@ -75,7 +82,9 @@ assert.eq(true, countScan.indexBounds.endKeyInclusive, explained);
 
 // Test that the inclusivity/exclusivity of the index bounds for COUNT_SCAN are correct when
 // there is a $sort in the opposite direction of the index.
-explained = coll.explain().aggregate([{$match: {foo: {$gte: 0, $lt: 10}}}, {$sort: {foo: -1}}, {$count: "count"}]);
+explained = coll
+    .explain()
+    .aggregate([{$match: {foo: {$gte: 0, $lt: 10}}}, {$sort: {foo: -1}}, {$count: "count"}]);
 countScan = getAggPlanStage(explained, "COUNT_SCAN");
 assert.neq(null, countScan, explained);
 assert.eq({foo: 0}, countScan.indexBounds.startKey, explained);

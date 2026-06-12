@@ -47,7 +47,10 @@ function assertScanFilterEq({coll, pipeline, filter}) {
 
     assertScanFilterEq({
         coll,
-        pipeline: [{$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}}, {$match: {$sampleRate: 0.25}}],
+        pipeline: [
+            {$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}},
+            {$match: {$sampleRate: 0.25}},
+        ],
     });
 
     assertScanFilterEq({

@@ -19,7 +19,9 @@ const kCollName = "testColl";
 const mongosTestColl = st.s.getCollection(kDbName + "." + kCollName);
 // Reap all internal sessions to make sure the actual test case starts without anything added
 // implicitly from setting up the test collection.
-assert.commandWorked(st.rs0.getPrimary().adminCommand({setParameter: 1, internalSessionsReapThreshold: 1}));
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand({setParameter: 1, internalSessionsReapThreshold: 1}),
+);
 assert.commandWorked(mongosTestColl.insert({x: 1})); // Set up the collection.
 
 // Draining any sessions left in the test initialization, forcing the eviction before the test cases.
@@ -33,11 +35,18 @@ assertNumEntriesSoon(st.rs0.getPrimary(), {
     numTransactionsCollEntries: 1,
 });
 
-function assertNumEntries(conn, {sessionUUID, numImageCollectionEntries, numTransactionsCollEntries}) {
+function assertNumEntries(
+    conn,
+    {sessionUUID, numImageCollectionEntries, numTransactionsCollEntries},
+) {
     const filter = {"_id.id": sessionUUID};
 
     const imageColl = conn.getCollection("config.image_collection");
-    assert.eq(numImageCollectionEntries, imageColl.find(filter).itcount(), tojson(imageColl.find().toArray()));
+    assert.eq(
+        numImageCollectionEntries,
+        imageColl.find(filter).itcount(),
+        tojson(imageColl.find().toArray()),
+    );
 
     const transactionsColl = conn.getCollection("config.transactions");
     assert.eq(
@@ -70,12 +79,19 @@ function runInternalTxn(conn, lsid, txnNumber) {
     assert.commandWorked(conn.adminCommand(testInternalTxnCmdObj));
 }
 
-function assertNumEntriesSoon(shardConn, {sessionUUID, numImageCollectionEntries, numTransactionsCollEntries}) {
+function assertNumEntriesSoon(
+    shardConn,
+    {sessionUUID, numImageCollectionEntries, numTransactionsCollEntries},
+) {
     // Sleep a little so it's likely the reaping has finished and we can avoid spamming the logs.
     sleep(100);
     assert.soonNoExcept(
         () => {
-            assertNumEntries(shardConn, {sessionUUID, numImageCollectionEntries, numTransactionsCollEntries});
+            assertNumEntries(shardConn, {
+                sessionUUID,
+                numImageCollectionEntries,
+                numTransactionsCollEntries,
+            });
             return true;
         },
         "Expected internal transactions to be reaped eventually",
@@ -87,7 +103,9 @@ function assertNumEntriesSoon(shardConn, {sessionUUID, numImageCollectionEntries
 function runTest(conn, shardConn) {
     // Lower the threshold to speed up the test and verify it's respected.
     const reapThreshold = 100;
-    assert.commandWorked(shardConn.adminCommand({setParameter: 1, internalSessionsReapThreshold: reapThreshold}));
+    assert.commandWorked(
+        shardConn.adminCommand({setParameter: 1, internalSessionsReapThreshold: reapThreshold}),
+    );
 
     //
     // Reaping happens at the threshold.
@@ -108,7 +126,9 @@ function runTest(conn, shardConn) {
     }
     assertNumEntries(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : reapThreshold,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection
+            ? 0
+            : reapThreshold,
         numTransactionsCollEntries: reapThreshold,
     });
 
@@ -148,7 +168,9 @@ function runTest(conn, shardConn) {
     }
     assertNumEntries(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : numBeforeFailover,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection
+            ? 0
+            : numBeforeFailover,
         numTransactionsCollEntries: numBeforeFailover,
     });
 
@@ -160,7 +182,9 @@ function runTest(conn, shardConn) {
     // Step down and back up the new primary and verify it only reaps newly expired internal
     // sessions.
 
-    assert.commandWorked(shardConn.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        shardConn.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     assert.commandWorked(shardConn.adminCommand({replSetFreeze: 0}));
     st.rs0.stepUp(shardConn);
     shardConn = st.rs0.getPrimary();
@@ -186,7 +210,9 @@ function runTest(conn, shardConn) {
     }
     assertNumEntriesSoon(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : numBeforeFailover,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection
+            ? 0
+            : numBeforeFailover,
         numTransactionsCollEntries: numBeforeFailover,
     });
 
@@ -236,11 +262,17 @@ function runParameterTest(conn, shardConn) {
     );
 
     // Can be set to 0 or a positive value.
-    assert.commandWorked(shardConn.adminCommand({setParameter: 1, internalSessionsReapThreshold: 0}));
-    assert.commandWorked(shardConn.adminCommand({setParameter: 1, internalSessionsReapThreshold: 12345}));
+    assert.commandWorked(
+        shardConn.adminCommand({setParameter: 1, internalSessionsReapThreshold: 0}),
+    );
+    assert.commandWorked(
+        shardConn.adminCommand({setParameter: 1, internalSessionsReapThreshold: 12345}),
+    );
 
     // Doesn't exist on mongos. This fails with no error code so check the errmsg.
-    const res = assert.commandFailed(conn.adminCommand({setParameter: 1, internalSessionsReapThreshold: 222}));
+    const res = assert.commandFailed(
+        conn.adminCommand({setParameter: 1, internalSessionsReapThreshold: 222}),
+    );
     assert(res.errmsg.includes("unrecognized parameter"), tojson(res));
 }
 

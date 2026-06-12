@@ -20,7 +20,9 @@ const mongosColl = mongosDB[jsTestName()];
 
 // Enable sharding, shard on _id, and insert a test document which will be updated later.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}),
+);
 assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // Verify that the pipeline splits and merges on router despite only targeting a single shard.

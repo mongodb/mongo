@@ -10,7 +10,14 @@ if (!_isWindows()) {
     assert.eq(response, "false", "Expected 'false' in script mode");
     // now try interactive
     clearRawMongoProgramOutput();
-    rc = runProgram("mongo", "--nodb", "--quiet", "--shell", "--eval", "print(isInteractive()); quit()");
+    rc = runProgram(
+        "mongo",
+        "--nodb",
+        "--quiet",
+        "--shell",
+        "--eval",
+        "print(isInteractive()); quit()",
+    );
     assert.eq(rc, 0);
     output = rawMongoProgramOutput(".*");
     response = output.split("\n").slice(-2)[0].split(" ")[1];

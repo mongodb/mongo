@@ -39,9 +39,15 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             session.commitTransaction();
             assert.eq(sessionColl.find({}).itcount(), 1);
 
-            assert.commandFailedWithCode(secondSessionDB.runCommand({create: collName}), ErrorCodes.NamespaceExists);
+            assert.commandFailedWithCode(
+                secondSessionDB.runCommand({create: collName}),
+                ErrorCodes.NamespaceExists,
+            );
 
-            assert.commandFailedWithCode(secondSession.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+            assert.commandFailedWithCode(
+                secondSession.abortTransaction_forTesting(),
+                ErrorCodes.NoSuchTransaction,
+            );
         },
         () => {
             session.abortTransaction();
@@ -72,7 +78,10 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             // will succeed and we will instead throw WCE when trying to commit the transaction.
             assert.commandWorked(secondSessionDB.runCommand({create: collName}));
 
-            assert.commandFailedWithCode(secondSession.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(
+                secondSession.commitTransaction_forTesting(),
+                ErrorCodes.WriteConflict,
+            );
         },
         () => {
             session.abortTransaction();
@@ -100,7 +109,10 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
                 assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
                 jsTest.log("Committing transaction (SHOULD FAIL)");
-                assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+                assert.commandFailedWithCode(
+                    session.commitTransaction_forTesting(),
+                    ErrorCodes.WriteConflict,
+                );
                 assert.eq(sessionColl.find({}).itcount(), 1);
             },
             () => {
@@ -112,12 +124,19 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing duplicate createCollections in parallel, both attempt to commit, second to commit fails");
+    jsTest.log(
+        "Testing duplicate createCollections in parallel, both attempt to commit, second to commit fails",
+    );
 
     withRetryOnTransientTxnError(
         () => {
             secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
-            createCollAndCRUDInTxn(secondSession.getDatabase(dbName), collName, command, explicitCreate);
+            createCollAndCRUDInTxn(
+                secondSession.getDatabase(dbName),
+                collName,
+                command,
+                explicitCreate,
+            );
 
             session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
@@ -125,7 +144,10 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(
+                session.commitTransaction_forTesting(),
+                ErrorCodes.WriteConflict,
+            );
             assert.eq(sessionColl.find({}).itcount(), 1);
         },
         () => {
@@ -150,7 +172,12 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     withRetryOnTransientTxnError(
         () => {
             secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
-            createCollAndCRUDInTxn(secondSession.getDatabase(dbName), collName, command, explicitCreate);
+            createCollAndCRUDInTxn(
+                secondSession.getDatabase(dbName),
+                collName,
+                command,
+                explicitCreate,
+            );
 
             session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
@@ -158,7 +185,10 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(
+                session.commitTransaction_forTesting(),
+                ErrorCodes.WriteConflict,
+            );
             assert.eq(sessionColl.find({}).itcount(), 1);
         },
         () => {
@@ -182,7 +212,12 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     withRetryOnTransientTxnError(
         () => {
             secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
-            createCollAndCRUDInTxn(secondSession.getDatabase(dbName), collName, command, explicitCreate);
+            createCollAndCRUDInTxn(
+                secondSession.getDatabase(dbName),
+                collName,
+                command,
+                explicitCreate,
+            );
 
             session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createCollAndCRUDInTxn(sessionDB, distinctCollName, command, explicitCreate); // does not conflict
@@ -191,7 +226,10 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(
+                session.commitTransaction_forTesting(),
+                ErrorCodes.WriteConflict,
+            );
             assert.eq(sessionColl.find({}).itcount(), 1);
             assert.eq(distinctSessionColl.find({}).itcount(), 0);
         },

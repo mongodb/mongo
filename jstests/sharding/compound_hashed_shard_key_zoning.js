@@ -42,7 +42,12 @@ function testZoningAfterSharding(namespace, shardKey, NumberType) {
     if (shardKey.x === "hashed") {
         // Cannot assign with a non-NumberLong range value on a hashed shard key field.
         assert.commandFailedWithCode(
-            st.s.adminCommand({updateZoneKeyRange: namespace, min: {x: 0}, max: {x: 10}, zone: "zoneName"}),
+            st.s.adminCommand({
+                updateZoneKeyRange: namespace,
+                min: {x: 0},
+                max: {x: 10},
+                zone: "zoneName",
+            }),
             ErrorCodes.InvalidOptions,
         );
     }
@@ -141,12 +146,20 @@ function testZoningBeforeSharding({shardKey, zoneRange, failCode}) {
 
     // Update zone range and verify that the 'tags' collection is updated appropriately.
     assert.commandWorked(
-        st.s.adminCommand({updateZoneKeyRange: ns, min: zoneRange[0], max: zoneRange[1], zone: zoneName}),
+        st.s.adminCommand({
+            updateZoneKeyRange: ns,
+            min: zoneRange[0],
+            max: zoneRange[1],
+            zone: zoneName,
+        }),
     );
     assert.eq(1, configDB.tags.count({ns: ns, min: zoneRange[0], max: zoneRange[1]}));
 
     if (failCode) {
-        assert.commandFailedWithCode(mongos.adminCommand({shardCollection: ns, key: shardKey}), failCode);
+        assert.commandFailedWithCode(
+            mongos.adminCommand({shardCollection: ns, key: shardKey}),
+            failCode,
+        );
     } else {
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
     }
@@ -154,7 +167,11 @@ function testZoningBeforeSharding({shardKey, zoneRange, failCode}) {
 }
 
 // Fails when hashed field is not number long in 'zoneRange'.
-testZoningBeforeSharding({shardKey: {x: "hashed"}, zoneRange: [{x: -5}, {x: 5}], failCode: ErrorCodes.InvalidOptions});
+testZoningBeforeSharding({
+    shardKey: {x: "hashed"},
+    zoneRange: [{x: -5}, {x: 5}],
+    failCode: ErrorCodes.InvalidOptions,
+});
 testZoningBeforeSharding({
     shardKey: {x: "hashed"},
     zoneRange: [{x: NumberLong(-5)}, {x: 5}],
@@ -165,7 +182,10 @@ testZoningBeforeSharding({
     zoneRange: [{x: -5}, {x: NumberLong(5)}],
     failCode: ErrorCodes.InvalidOptions,
 });
-testZoningBeforeSharding({shardKey: {x: "hashed"}, zoneRange: [{x: NumberLong(-5)}, {x: NumberLong(5)}]});
+testZoningBeforeSharding({
+    shardKey: {x: "hashed"},
+    zoneRange: [{x: NumberLong(-5)}, {x: NumberLong(5)}],
+});
 testZoningBeforeSharding({
     shardKey: {x: "hashed", y: 1},
     zoneRange: [
@@ -229,7 +249,9 @@ function testChunkSplits({collectionExists, shardKey, zoneRanges, expectedNumChu
     // Create a new zone and assign each zone to the shards using round-robin. Then update each of
     // the zone's range to the range specified in 'zoneRanges'.
     for (let i = 0; i < zoneRanges.length; i++) {
-        assert.commandWorked(st.s.adminCommand({addShardToZone: shards[i % shards.length]._id, zone: zoneName + i}));
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: shards[i % shards.length]._id, zone: zoneName + i}),
+        );
         assert.commandWorked(
             st.s.adminCommand({
                 updateZoneKeyRange: ns,
@@ -361,9 +383,16 @@ function testNonemptyZonedCollection() {
     assert.commandWorked(testColl.createIndex(shardKey));
 
     for (let i = 0; i < shards.length; i++) {
-        assert.commandWorked(mongos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
         assert.commandWorked(
-            mongos.adminCommand({updateZoneKeyRange: ns, min: ranges[i].min, max: ranges[i].max, zone: zoneName + i}),
+            mongos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}),
+        );
+        assert.commandWorked(
+            mongos.adminCommand({
+                updateZoneKeyRange: ns,
+                min: ranges[i].min,
+                max: ranges[i].max,
+                zone: zoneName + i,
+            }),
         );
     }
 
@@ -375,7 +404,12 @@ function testNonemptyZonedCollection() {
     st.startBalancer();
 
     // Check that the chunks were moved properly.
-    assert.soon(() => findChunksUtil.countChunksForNs(configDB, ns) === 5, "balancer never ran", 5 * 60 * 1000, 1000);
+    assert.soon(
+        () => findChunksUtil.countChunksForNs(configDB, ns) === 5,
+        "balancer never ran",
+        5 * 60 * 1000,
+        1000,
+    );
 
     assert.commandWorked(testDB.runCommand({drop: kCollName}));
 }

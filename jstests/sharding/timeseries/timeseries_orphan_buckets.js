@@ -20,7 +20,9 @@ const metaField = "hostid";
 const st = new ShardingTest({shards: 2});
 const sDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);
 
@@ -43,7 +45,9 @@ const shardKey = {
     [timeField]: 1,
 };
 assert.commandWorked(
-    sDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField, granularity: "hours"}}),
+    sDB.createCollection(collName, {
+        timeseries: {timeField: timeField, metaField: metaField, granularity: "hours"},
+    }),
 );
 assert.commandWorked(
     sDB.adminCommand({
@@ -58,7 +62,10 @@ const coll = sDB.getCollection(collName);
 // chunk [2020-01-01, MaxKey].
 let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
 assert.commandWorked(
-    sDB.adminCommand({split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}),
+    sDB.adminCommand({
+        split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+        middle: splitPoint,
+    }),
 );
 
 let counts = st.chunkCounts(collName, dbName);

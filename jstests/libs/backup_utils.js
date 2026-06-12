@@ -9,7 +9,12 @@ export function backupData(mongo, destinationDirectory) {
     const backupCursorDB = getBackupCursorDB(mongo);
     let backupCursor = openBackupCursor(backupCursorDB);
     let metadata = getBackupCursorMetadata(backupCursor);
-    copyBackupCursorFiles(backupCursor, /*namespacesToSkip=*/ [], metadata.dbpath, destinationDirectory);
+    copyBackupCursorFiles(
+        backupCursor,
+        /*namespacesToSkip=*/ [],
+        metadata.dbpath,
+        destinationDirectory,
+    );
     backupCursor.close();
     return metadata;
 }
@@ -33,9 +38,12 @@ export function openBackupCursor(db, backupOptions, aggregateOptions) {
 
 export function extendBackupCursor(mongo, backupId, extendTo) {
     const backupCursorDB = getBackupCursorDB(mongo);
-    return backupCursorDB.aggregate([{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}], {
-        maxTimeMS: 180 * 1000,
-    });
+    return backupCursorDB.aggregate(
+        [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}],
+        {
+            maxTimeMS: 180 * 1000,
+        },
+    );
 }
 
 export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
@@ -60,7 +68,14 @@ export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
         }
     };
 
-    const heartbeater = new Thread(heartbeatBackupCursor, host, backupCursorDB.getName(), cursorId, lsid, stopCounter);
+    const heartbeater = new Thread(
+        heartbeatBackupCursor,
+        host,
+        backupCursorDB.getName(),
+        cursorId,
+        lsid,
+        stopCounter,
+    );
     heartbeater.start();
     return heartbeater;
 }
@@ -101,11 +116,22 @@ export function copyBackupCursorFiles(
     return copyThread;
 }
 
-export function copyBackupCursorFilesForIncremental(backupCursor, namespacesToSkip, dbpath, destinationDirectory) {
+export function copyBackupCursorFilesForIncremental(
+    backupCursor,
+    namespacesToSkip,
+    dbpath,
+    destinationDirectory,
+) {
     // Remove any existing journal files from previous incremental backups.
     resetDbpath(destinationDirectory + "/journal");
 
-    return copyBackupCursorExtendFiles(backupCursor, namespacesToSkip, dbpath, destinationDirectory, /*async=*/ true);
+    return copyBackupCursorExtendFiles(
+        backupCursor,
+        namespacesToSkip,
+        dbpath,
+        destinationDirectory,
+        /*async=*/ true,
+    );
 }
 
 export function copyBackupCursorExtendFiles(
@@ -204,7 +230,11 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
     if (!pathExists(destination)) {
         // If the file hasn't had an initial backup yet, then a full file copy is needed.
         copyFile(absoluteFilePath, destination);
-    } else if (file.fileSize == undefined || file.length == undefined || file.fileSize == file.length) {
+    } else if (
+        file.fileSize == undefined ||
+        file.length == undefined ||
+        file.fileSize == file.length
+    ) {
         // - $backupCursorExtend, which only returns journal files does not report a 'fileSize'.
         // - 'length' is only reported for incremental backups.
         // - When 'fileSize' == 'length', that's used as an indicator to do a full file copy. Mostly
@@ -215,7 +245,9 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
             // journal files we've already copied at an earlier time. We should remove these old
             // journal files so that we can copy them over again in the event that their contents
             // have changed over time.
-            jsTestLog(`Removing existing file ${destination} in preparation of copying a newer version of it`);
+            jsTestLog(
+                `Removing existing file ${destination} in preparation of copying a newer version of it`,
+            );
             removeFile(destination);
         }
 
@@ -224,7 +256,12 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
         assert(file.offset != undefined);
         assert(file.length != undefined);
         msg = "Range copy, offset: " + file.offset + ", length: " + file.length;
-        _copyFileRange(absoluteFilePath, destination, NumberLong(file.offset), NumberLong(file.length));
+        _copyFileRange(
+            absoluteFilePath,
+            destination,
+            NumberLong(file.offset),
+            NumberLong(file.length),
+        );
     }
 
     return {

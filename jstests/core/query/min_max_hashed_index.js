@@ -14,5 +14,9 @@ const minWithNormalIndex = coll.find({}, {_id: 0}).min({a: -Infinity}).hint({a: 
 assert.eq(minWithNormalIndex, [{a: "test"}]);
 
 assert.commandWorked(coll.createIndex({a: "hashed"}));
-const minWithHashedIndex = coll.find({}, {_id: 0}).min({a: -Infinity}).hint({a: "hashed"}).toArray();
+const minWithHashedIndex = coll
+    .find({}, {_id: 0})
+    .min({a: -Infinity})
+    .hint({a: "hashed"})
+    .toArray();
 assert.eq(minWithHashedIndex, [{a: "test"}]);

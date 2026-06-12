@@ -19,7 +19,12 @@ assert.commandWorked(
     ]),
 );
 
-assert.eq(0, coll.aggregate([{$group: {_id: "$group", total: {$sum: "$count"}}}, {$out: coll.getName()}]).itcount());
+assert.eq(
+    0,
+    coll
+        .aggregate([{$group: {_id: "$group", total: {$sum: "$count"}}}, {$out: coll.getName()}])
+        .itcount(),
+);
 assert.eq(coll.find().sort({_id: 1}).toArray(), [
     {_id: 1, total: 4},
     {_id: 2, total: 12},
@@ -49,7 +54,9 @@ assert.eq(coll.find().sort({_id: 1}).toArray(), [
     {_id: 1, total: 4, myConstant: 42},
     {_id: 2, total: 12, myConstant: 42},
 ]);
-const collMetadata = db.getCollectionInfos().find((collectionMetadata) => collectionMetadata.name === coll.getName());
+const collMetadata = db
+    .getCollectionInfos()
+    .find((collectionMetadata) => collectionMetadata.name === coll.getName());
 assert.eq(
     collMetadata.options.validator,
     {$jsonSchema: {bsonType: "object", required: ["_id", "total"]}},

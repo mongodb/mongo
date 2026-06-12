@@ -38,7 +38,10 @@ const errRes = assert.commandFailedWithCode(
     ErrorCodes.InvalidNamespace,
     "Created an illegal view named <db>.system.views",
 );
-assert(errRes.errmsg.indexOf("Cannot create a view called") > -1, "Unexpected errmsg: " + tojson(errRes));
+assert(
+    errRes.errmsg.indexOf("Cannot create a view called") > -1,
+    "Unexpected errmsg: " + tojson(errRes),
+);
 
 // Create a collection for test purposes.
 assert.commandWorked(viewsDB.runCommand({create: "collection"}));
@@ -73,7 +76,9 @@ assert(
 );
 
 // Create a view on a non-existent collection.
-assert.commandWorked(viewsDB.runCommand({create: "viewOnNonexistent", viewOn: "nonexistent", pipeline: pipe}));
+assert.commandWorked(
+    viewsDB.runCommand({create: "viewOnNonexistent", viewOn: "nonexistent", pipeline: pipe}),
+);
 
 // Create a view but don't specify a pipeline; this should default to something sane.
 assert.commandWorked(viewsDB.runCommand({create: "viewWithDefaultPipeline", viewOn: "collection"}));
@@ -172,9 +177,16 @@ assert.commandFailedWithCode(
 );
 
 // Test that creating a collection when there is already a view with the same name fails.
-assert.commandFailedWithCode(viewsDB.runCommand({create: "existingViewTest"}), ErrorCodes.NamespaceExists);
+assert.commandFailedWithCode(
+    viewsDB.runCommand({create: "existingViewTest"}),
+    ErrorCodes.NamespaceExists,
+);
 
 // Ensure we accept a view with a name of greater than 64 characters (the maximum dbname length).
 assert.commandWorked(
-    viewsDB.createView("longNamedView", "Queries_IdentityView_UnindexedLargeInMatching0_BackingCollection", []),
+    viewsDB.createView(
+        "longNamedView",
+        "Queries_IdentityView_UnindexedLargeInMatching0_BackingCollection",
+        [],
+    ),
 );

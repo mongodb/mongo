@@ -28,8 +28,9 @@ assert.commandWorked(primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majori
 rst.awaitReplication();
 
 // Open a cursor on primary.
-const cursorIdToBeReadAfterStepDown = assert.commandWorked(primaryDB.runCommand({"find": collName, batchSize: 0}))
-    .cursor.id;
+const cursorIdToBeReadAfterStepDown = assert.commandWorked(
+    primaryDB.runCommand({"find": collName, batchSize: 0}),
+).cursor.id;
 
 jsTestLog("2. Start blocking getMore cmd before step down");
 const joinGetMoreThread = startParallelShell(() => {
@@ -41,11 +42,17 @@ const joinGetMoreThread = startParallelShell(() => {
 
     // Enable the fail point for get more cmd.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}),
+        db.adminCommand({
+            configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
+            mode: "alwaysOn",
+        }),
     );
 
     getMoreRes = assert.commandWorked(
-        primaryDB.runCommand({"getMore": cursorIdToBeReadDuringStepDown, collection: TestData.collName}),
+        primaryDB.runCommand({
+            "getMore": cursorIdToBeReadDuringStepDown,
+            collection: TestData.collName,
+        }),
     );
     assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 }, primary.port);
@@ -58,9 +65,13 @@ const joinFindThread = startParallelShell(() => {
     // Enable the fail point for find cmd. We know this is a replica set, so enable
     // "shardWaitInFindBeforeMakingBatch" (helper function configureFailPoint() cannot be used
     // inside a parallel shell).
-    assert.commandWorked(db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}),
+    );
 
-    let findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+    let findRes = assert.commandWorked(
+        db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}),
+    );
     assert.docEq([{_id: 0}], findRes.cursor.firstBatch);
 }, primary.port);
 
@@ -77,10 +88,14 @@ checkLog.contains(primary, "Starting to kill user operations");
 
 // Enable "waitAfterCommandFinishesExecution" fail point to make sure the find and get more
 // commands on database 'test' does not complete before step down.
-const failPointAfterCommand = configureFailPoint(primaryAdmin, "waitAfterCommandFinishesExecution", {
-    ns: collNss,
-    commands: ["find", "getMore"],
-});
+const failPointAfterCommand = configureFailPoint(
+    primaryAdmin,
+    "waitAfterCommandFinishesExecution",
+    {
+        ns: collNss,
+        commands: ["find", "getMore"],
+    },
+);
 
 jsTestLog("4. Disable fail points");
 configureFailPoint(primaryAdmin, "waitInFindBeforeMakingBatch", {} /* data */, "off");
@@ -109,7 +124,11 @@ const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
 // Should account for find and getmore commands issued before step down.
 // TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
-assert.gte(replMetrics.stateTransition.totalOperationsRunning || replMetrics.stateTransition.userOperationsRunning, 2);
+assert.gte(
+    replMetrics.stateTransition.totalOperationsRunning ||
+        replMetrics.stateTransition.userOperationsRunning,
+    2,
+);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
 rst.stopSet();

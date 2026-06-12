@@ -60,10 +60,14 @@ const valid_options = {
 
 testRS(valid_options, valid_options, true);
 
-const wrong_cluster_file = Object.assign({}, valid_options, {tlsClusterFile: valid_options.tlsCertificateKeyFile});
+const wrong_cluster_file = Object.assign({}, valid_options, {
+    tlsClusterFile: valid_options.tlsCertificateKeyFile,
+});
 testRS(wrong_cluster_file, wrong_cluster_file, false);
 
-const wrong_key_file = Object.assign({}, valid_options, {tlsCertificateKeyFile: valid_options.tlsClusterFile});
+const wrong_key_file = Object.assign({}, valid_options, {
+    tlsCertificateKeyFile: valid_options.tlsClusterFile,
+});
 testRS(wrong_key_file, wrong_key_file, false);
 
 // Test self-signed clusterFile validated against peer's CAFile
@@ -74,7 +78,9 @@ const cafile_only_options = {
     tlsAllowInvalidHostnames: "",
     clusterAuthMode: "x509",
 };
-const selfsigned_cluster_file = Object.merge(cafile_only_options, {tlsClusterFile: getX509Path("smoke.pem")});
+const selfsigned_cluster_file = Object.merge(cafile_only_options, {
+    tlsClusterFile: getX509Path("smoke.pem"),
+});
 testRS(cafile_only_options, selfsigned_cluster_file, false);
 
 const mongod = MongoRunner.runMongod(valid_options);

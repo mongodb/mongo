@@ -90,7 +90,10 @@ function runTest(conn) {
         });
 
         // Try to update user that doesn't exist
-        assert.commandFailedWithCode(db.runCommand({updateUser: "fakeUser", roles: ["read"]}), ErrorCodes.UserNotFound);
+        assert.commandFailedWithCode(
+            db.runCommand({updateUser: "fakeUser", roles: ["read"]}),
+            ErrorCodes.UserNotFound,
+        );
 
         // Try to update user with invalid password
         assert.throws(function () {

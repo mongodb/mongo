@@ -40,7 +40,9 @@ const mongosDB = mongosConn.getDB(dbName);
 const shardDB = shardConn.getDB(dbName);
 
 // Ensure that the primary shard for the test database is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shardConn.name}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shardConn.name}),
+);
 
 // Drops and re-shards the test collection, then splits at {_id: 0} and moves the upper chunk to
 // the second shard.
@@ -58,13 +60,19 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
     dropAndRecreateTestCollection();
 
     // We either enable query stats on every query (rate limit -1) or no queries (rate limit 0).
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: enableQueryStats ? -1 : 0}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: enableQueryStats ? -1 : 0}),
+    );
 
     const coll = db.test;
 
     for (let i = 1; i <= 5; ++i) {
-        assert.commandWorked(coll.insert({_id: i, a: i, loc: {type: "Point", coordinates: [i, i]}}));
-        assert.commandWorked(coll.insert({_id: -i, a: -i, loc: {type: "Point", coordinates: [-i, -i]}}));
+        assert.commandWorked(
+            coll.insert({_id: i, a: i, loc: {type: "Point", coordinates: [i, i]}}),
+        );
+        assert.commandWorked(
+            coll.insert({_id: -i, a: -i, loc: {type: "Point", coordinates: [-i, -i]}}),
+        );
     }
     assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
@@ -73,13 +81,23 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
     // Build a string that identifies the parameters of this test run. Individual ops will
     // use this string as their comment where applicable, and we also print it to the logs.
     const logFormatTestComment =
-        (isMongos ? "mongos" : "mongod") + "_slowms:" + slowMs + "_logLevel:" + logLevel + "_sampleRate:" + sampleRate;
+        (isMongos ? "mongos" : "mongod") +
+        "_slowms:" +
+        slowMs +
+        "_logLevel:" +
+        logLevel +
+        "_sampleRate:" +
+        sampleRate;
     jsTestLog(logFormatTestComment);
 
     // Set all logging parameters. If slowMs is null, we set a high threshold here so that
     // logLevel can be tested in cases where operations should not otherwise be logged.
     assert.commandWorked(
-        db.adminCommand({profile: 0, slowms: slowMs == null ? 1000000 : slowMs, sampleRate: sampleRate}),
+        db.adminCommand({
+            profile: 0,
+            slowms: slowMs == null ? 1000000 : slowMs,
+            sampleRate: sampleRate,
+        }),
     );
     assert.commandWorked(db.setLogLevel(logLevel, "command"));
     assert.commandWorked(db.setLogLevel(logLevel, "write"));
@@ -156,7 +174,13 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
         },
         {
             test: function (db) {
-                assert.eq(db.test.find({a: 1, $comment: logFormatTestComment}).collation({locale: "fr"}).count(), 1);
+                assert.eq(
+                    db.test
+                        .find({a: 1, $comment: logFormatTestComment})
+                        .collation({locale: "fr"})
+                        .count(),
+                    1,
+                );
             },
             logFields: {
                 command: "count",
@@ -168,9 +192,14 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
         },
         {
             test: function (db) {
-                assert.eq(db.test.distinct("a", {a: 1, $comment: logFormatTestComment}, {collation: {locale: "fr"}}), [
-                    1,
-                ]);
+                assert.eq(
+                    db.test.distinct(
+                        "a",
+                        {a: 1, $comment: logFormatTestComment},
+                        {collation: {locale: "fr"}},
+                    ),
+                    [1],
+                );
             },
             logFields: {
                 command: "distinct",
@@ -211,13 +240,16 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
             // TODO SERVER-34208: display FAM update metrics in mongoS logs.
             // For mongos with query stats enabled, findAndModify doesn't roll up data-bearing node
             // metrics (keysExamined, docsExamined).
-            logFields: Object.assign(isMongos ? {} : {nMatched: 1, nModified: 1, keysExamined: 1, docsExamined: 1}, {
-                command: "findAndModify",
-                findandmodify: coll.getName(),
-                planSummary: "IXSCAN { _id: 1 }",
-                $comment: logFormatTestComment,
-                collation: {locale: "fr"},
-            }),
+            logFields: Object.assign(
+                isMongos ? {} : {nMatched: 1, nModified: 1, keysExamined: 1, docsExamined: 1},
+                {
+                    command: "findAndModify",
+                    findandmodify: coll.getName(),
+                    planSummary: "IXSCAN { _id: 1 }",
+                    $comment: logFormatTestComment,
+                    collation: {locale: "fr"},
+                },
+            ),
         },
         {
             test: function (db) {
@@ -245,7 +277,11 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
         {
             test: function (db) {
                 assert.commandWorked(
-                    db.test.update({a: 1, $comment: logFormatTestComment}, {$inc: {b: 1}}, {multi: true}),
+                    db.test.update(
+                        {a: 1, $comment: logFormatTestComment},
+                        {$inc: {b: 1}},
+                        {multi: true},
+                    ),
                 );
             },
             logFields: isMongos
@@ -342,9 +378,17 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
                 });
                 assert.commandWorked(originalSortBytes);
                 assert.commandWorked(
-                    db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 10}),
+                    db.adminCommand({
+                        setParameter: 1,
+                        internalQueryMaxBlockingSortMemoryUsageBytes: 10,
+                    }),
                 );
-                assert.eq(coll.aggregate([{$match: {a: 1}}, {$sort: {a: 1}}], {allowDiskUse: true}).itcount(), 1);
+                assert.eq(
+                    coll
+                        .aggregate([{$match: {a: 1}}, {$sort: {a: 1}}], {allowDiskUse: true})
+                        .itcount(),
+                    1,
+                );
                 assert.commandWorked(
                     db.adminCommand({
                         setParameter: 1,
@@ -443,7 +487,9 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
     }
 
     // Run each of the test in the array, recording the log line found for each.
-    const logLines = testList.map((testCase, arrIndex) => confirmLogContents(db, testCase, arrIndex));
+    const logLines = testList.map((testCase, arrIndex) =>
+        confirmLogContents(db, testCase, arrIndex),
+    );
 
     return [testList, logLines];
 }
@@ -464,7 +510,12 @@ function getUnloggedTests(testsRun, logLines) {
 for (let testDB of [shardDB, mongosDB]) {
     // Test that all operations are logged when slowMs is < 0 and sampleRate is 1 at the
     // default logLevel.
-    let [testsRun, logLines] = runLoggingTests({db: testDB, slowMs: -1, logLevel: 0, sampleRate: 1.0});
+    let [testsRun, logLines] = runLoggingTests({
+        db: testDB,
+        slowMs: -1,
+        logLevel: 0,
+        sampleRate: 1.0,
+    });
     let unlogged = getUnloggedTests(testsRun, logLines);
     assert.eq(unlogged.length, 0, unlogged);
 
@@ -476,7 +527,12 @@ for (let testDB of [shardDB, mongosDB]) {
     let sampleRateTestsRun = 0,
         sampleRateTestsLogged = 0;
     for (let i = 0; i < 5; i++) {
-        [testsRun, logLines] = runLoggingTests({db: testDB, slowMs: -1, logLevel: 0, sampleRate: 0.5});
+        [testsRun, logLines] = runLoggingTests({
+            db: testDB,
+            slowMs: -1,
+            logLevel: 0,
+            sampleRate: 0.5,
+        });
         unlogged = getUnloggedTests(testsRun, logLines);
         sampleRateTestsLogged += testsRun.length - unlogged.length;
         sampleRateTestsRun += testsRun.length;
@@ -486,7 +542,12 @@ for (let testDB of [shardDB, mongosDB]) {
     // Test that only operations which exceed slowMs are logged when slowMs > 0 and
     // sampleRate is 1, at the default logLevel. The given value of slowMs will be applied
     // to every second op in the test, so only half of the ops should be logged.
-    [testsRun, logLines] = runLoggingTests({db: testDB, slowMs: 1000000, logLevel: 0, sampleRate: 1.0});
+    [testsRun, logLines] = runLoggingTests({
+        db: testDB,
+        slowMs: 1000000,
+        logLevel: 0,
+        sampleRate: 1.0,
+    });
     unlogged = getUnloggedTests(testsRun, logLines);
     assert.eq(unlogged.length, Math.floor(testsRun.length / 2), unlogged);
 
@@ -495,7 +556,12 @@ for (let testDB of [shardDB, mongosDB]) {
     // (such that, at logLevel 0, no operations would be logged) and that this value should
     // be applied for all operations, rather than for every second op as in the case of the
     // slowMs test.
-    [testsRun, logLines] = runLoggingTests({db: testDB, slowMs: null, logLevel: 1, sampleRate: 0.5});
+    [testsRun, logLines] = runLoggingTests({
+        db: testDB,
+        slowMs: null,
+        logLevel: 1,
+        sampleRate: 0.5,
+    });
     unlogged = getUnloggedTests(testsRun, logLines);
     assert.eq(unlogged.length, 0, unlogged);
 

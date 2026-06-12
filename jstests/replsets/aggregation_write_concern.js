@@ -3,7 +3,10 @@
  * not wait for the writeConcern specified to be satisfied.
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const name = "aggregation_write_concern";
 
@@ -19,7 +22,9 @@ const collectionName = "test";
 // majority' reads if the read command waits on writeConcern.
 
 stopReplicationOnSecondaries(replTest);
-assert.commandWorked(testDB.runCommand({insert: collectionName, documents: [{_id: 1}], writeConcern: {w: 1}}));
+assert.commandWorked(
+    testDB.runCommand({insert: collectionName, documents: [{_id: 1}], writeConcern: {w: 1}}),
+);
 
 // A read-only aggregation accepts the writeConcern option but does not wait for it.
 let res = assert.commandWorked(

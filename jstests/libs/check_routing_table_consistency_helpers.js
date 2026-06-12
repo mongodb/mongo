@@ -81,7 +81,9 @@ export var RoutingTableConsistencyChecker = (function () {
         }
 
         if (bsonWoCompare(routingTable[routingTable.length - 1].max, expectedLastBound) !== 0) {
-            jsTest.log(`Incomplete range key detected in config.chunks for ${nss} (MaxKey missing)`);
+            jsTest.log(
+                `Incomplete range key detected in config.chunks for ${nss} (MaxKey missing)`,
+            );
             return false;
         }
 
@@ -215,7 +217,9 @@ export var RoutingTableConsistencyChecker = (function () {
             pipeline.unshift(tempReshardingCollectionsFilter);
         }
 
-        return mongos.getDB("config").collections.aggregate(pipeline, {readConcern: {level: "snapshot"}});
+        return mongos
+            .getDB("config")
+            .collections.aggregate(pipeline, {readConcern: {level: "snapshot"}});
     };
 
     const checkHistoricalPlacementMetadataConsistency = (mongos) => {
@@ -224,7 +228,10 @@ export var RoutingTableConsistencyChecker = (function () {
         if (
             isMultiversion ||
             !isStableFCVSuite() ||
-            !FeatureFlagUtil.isPresentAndEnabled(mongos.getDB("admin"), "ChangeStreamPreciseShardTargeting")
+            !FeatureFlagUtil.isPresentAndEnabled(
+                mongos.getDB("admin"),
+                "ChangeStreamPreciseShardTargeting",
+            )
         ) {
             jsTest.log.info("Skipping cross-consistency check of config.placementHistory");
             return;
@@ -235,7 +242,8 @@ export var RoutingTableConsistencyChecker = (function () {
         metadataByNamespace.forEach(function (namespaceMetadata) {
             // Invariant check.
             assert(
-                namespaceMetadata.placement.length === 1 || namespaceMetadata.placement.length === 2,
+                namespaceMetadata.placement.length === 1 ||
+                    namespaceMetadata.placement.length === 2,
                 `Unexpected output format from collectPlacementMetadataByNamespace(): ${tojson(namespaceMetadata)}`,
             );
             // Information missing from either the routing table or placement history.
@@ -287,7 +295,11 @@ export var RoutingTableConsistencyChecker = (function () {
                 );
 
                 assert(
-                    checkCollRoutingTable(collData.details[0]._id, collData.details[0].key, collData.routingTable),
+                    checkCollRoutingTable(
+                        collData.details[0]._id,
+                        collData.details[0].key,
+                        collData.routingTable,
+                    ),
                     `Corrupted routing table detected for ${collData._id}! Details: ${tojson(collData)}`,
                 );
             });

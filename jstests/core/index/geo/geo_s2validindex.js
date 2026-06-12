@@ -12,15 +12,21 @@ assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1}, add2dsphereVe
 
 // Valid index
 coll.drop();
-assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1, geo2: "2dsphere"}, add2dsphereVersionIfNeeded()));
+assert.commandWorked(
+    coll.createIndex({geo: "2dsphere", other: 1, geo2: "2dsphere"}, add2dsphereVersionIfNeeded()),
+);
 
 // Invalid index, using hash with 2dsphere
 coll.drop();
-assert.commandFailed(coll.createIndex({geo: "2dsphere", other: "hash"}, add2dsphereVersionIfNeeded()));
+assert.commandFailed(
+    coll.createIndex({geo: "2dsphere", other: "hash"}, add2dsphereVersionIfNeeded()),
+);
 
 // Invalid index, using 2d with 2dsphere
 coll.drop();
-assert.commandFailed(coll.createIndex({geo: "2dsphere", other: "2d"}, add2dsphereVersionIfNeeded()));
+assert.commandFailed(
+    coll.createIndex({geo: "2dsphere", other: "2d"}, add2dsphereVersionIfNeeded()),
+);
 
 jsTest.log.info("Success!");
 

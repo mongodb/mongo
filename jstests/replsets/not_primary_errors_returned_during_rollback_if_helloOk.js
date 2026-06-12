@@ -25,7 +25,10 @@ assert.commandWorked(rollbackTest.getPrimary().getDB(dbName)[collName].insert({}
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
-const failPointAfterTransition = configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
+const failPointAfterTransition = configureFailPoint(
+    rollbackNode,
+    "rollbackHangAfterTransitionToRollback",
+);
 
 // Start rollback.
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();

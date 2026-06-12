@@ -34,7 +34,9 @@ function assertLastUpdateOplogEntryIsReplacement() {
 [true, "hello", 0, 1, 2, 3].forEach(($v) => {
     const _id = assert.commandWorked(coll.insertOne({})).insertedId;
     assert.commandWorked(
-        coll.update({_id}, [{$replaceWith: {"$setField": {field: {$literal: "$v"}, input: "$$ROOT", value: $v}}}]),
+        coll.update({_id}, [
+            {$replaceWith: {"$setField": {field: {$literal: "$v"}, input: "$$ROOT", value: $v}}},
+        ]),
     );
     assertLastUpdateOplogEntryIsReplacement();
 });
@@ -43,7 +45,11 @@ function assertLastUpdateOplogEntryIsReplacement() {
     const _id = assert.commandWorked(coll.insertOne({})).insertedId;
     assert.commandWorked(
         coll.update({_id}, [
-            {$replaceWith: {"$setField": {field: {$literal: "$set"}, input: "$$ROOT", value: {a: 1}}}},
+            {
+                $replaceWith: {
+                    "$setField": {field: {$literal: "$set"}, input: "$$ROOT", value: {a: 1}},
+                },
+            },
         ]),
     );
     assertLastUpdateOplogEntryIsReplacement();

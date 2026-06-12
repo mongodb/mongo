@@ -7,7 +7,10 @@
  */
 
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForVectorSearchQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    mongotCommandForVectorSearchQuery,
+    MongotMock,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {prepCollection, prepMongotResponse} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Set up mongotmock and point the mongod to it.
@@ -44,7 +47,8 @@ function runTest(pipeline, expectedCommand) {
     }
     const mongotCursorLog = log.filter(containsMongotCursor);
     assert.eq(mongotCursorLog.length, 3, tojson(log));
-    const expectedRegex = /"mongot":{"cursorid":[0-9]+,"timeWaitingMillis":[0-9]+,"batchNum":([1-3])}/;
+    const expectedRegex =
+        /"mongot":{"cursorid":[0-9]+,"timeWaitingMillis":[0-9]+,"batchNum":([1-3])}/;
     let expectedBatchNum = 1;
     mongotCursorLog.forEach(function (element) {
         let regexMatch = expectedRegex.exec(element);
@@ -80,7 +84,12 @@ const searchQuery = {
     query: "cakes",
     path: "title",
 };
-runTest([{$search: searchQuery}], {search: collName, collectionUUID, query: searchQuery, $db: dbName});
+runTest([{$search: searchQuery}], {
+    search: collName,
+    collectionUUID,
+    query: searchQuery,
+    $db: dbName,
+});
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

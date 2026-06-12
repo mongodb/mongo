@@ -24,7 +24,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.secondaryDocField = "y";
     $config.data.idField = "_id";
     $config.data.tertiaryDocField = "tertiaryField";
-    $config.data.runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+    $config.data.runningWithStepdowns =
+        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
     /**
      * Returns a random integer between min (inclusive) and max (inclusive).
@@ -78,11 +79,17 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const queryType = this.generateRandomInt(0, 3);
         if (queryType === 0 /* Range query on shard key field. */) {
             return {
-                [this.defaultShardKeyField]: {$gte: this.partition.lower, $lte: this.partition.upper - 1},
+                [this.defaultShardKeyField]: {
+                    $gte: this.partition.lower,
+                    $lte: this.partition.upper - 1,
+                },
             };
         } else if (queryType === 1 /* Range query on non shard key field. */) {
             return {
-                [this.secondaryDocField]: {$gte: this.partition.lower, $lte: this.partition.upper - 1},
+                [this.secondaryDocField]: {
+                    $gte: this.partition.lower,
+                    $lte: this.partition.upper - 1,
+                },
             };
         } else if (queryType === 2 /* Equality query on a field that does not exist */) {
             return {[this.tertiaryDocField]: {$eq: this.generateRandomInt(0, 500)}, tid: this.tid};
@@ -96,7 +103,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Sorts documents by sortVal and returns an array of the _id fields of documents that are first
      * in the sort order.
      */
-    $config.data.returnDocsThatSortFirst = function returnDocsThatSortFirst(db, collName, query, options) {
+    $config.data.returnDocsThatSortFirst = function returnDocsThatSortFirst(
+        db,
+        collName,
+        query,
+        options,
+    ) {
         // If sorting, ensure that the correct document is modified. Save the _id values of the
         // documents that come first in the sort order, and validate that a document that comes
         // first in the sort order is correctly applied the update.
@@ -152,7 +164,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Randomly generates and runs an update operator document update, replacement update,
      * or an aggregation pipeline update.
      */
-    $config.data.generateAndRunRandomUpdateOp = function generateAndRunRandomUpdateOp(db, collName) {
+    $config.data.generateAndRunRandomUpdateOp = function generateAndRunRandomUpdateOp(
+        db,
+        collName,
+    ) {
         const query = this.generateRandomQuery();
         const newValue = this.generateRandomInt(this.partition.lower, this.partition.upper - 1);
         const updateType = this.generateRandomInt(0, 2);
@@ -201,7 +216,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         try {
             if (updateType === 0 /* Update operator document */) {
                 update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
+                        newValue,
                 };
                 res = db[collName].updateOne(query, {$set: update}, options);
             } else if (updateType === 1 /* Replacement Update */) {
@@ -219,7 +235,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             } else {
                 /* Aggregation pipeline update */
                 update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
+                        newValue,
                 };
 
                 // The $unset will result in a no-op since 'z' is not a field populated in any of
@@ -264,7 +281,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Randomly generates and runs an update operator document update without shard key with ID,
      * replacement update, or an aggregation pipeline update.
      */
-    $config.data.generateAndRunRandomUpdateOpWithId = function generateAndRunRandomUpdateOpWithId(db, collName) {
+    $config.data.generateAndRunRandomUpdateOpWithId = function generateAndRunRandomUpdateOpWithId(
+        db,
+        collName,
+    ) {
         const query = {
             _id: {
                 $eq: this.generateRandomInt(
@@ -337,7 +357,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Checks the response of a write. If we have a write error, return true if we should skip write
      * response validation for an acceptable error, false otherwise.
      */
-    $config.data.shouldSkipWriteResponseValidation = function shouldSkipWriteResponseValidation(res) {
+    $config.data.shouldSkipWriteResponseValidation = function shouldSkipWriteResponseValidation(
+        res,
+    ) {
         let acceptableErrors = [
             ErrorCodes.DuplicateKey,
             ErrorCodes.IllegalOperation,
@@ -363,9 +385,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         }
 
         const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
-        const wouldChangeOwningShardMsg = "Must run update to shard key field in a multi-statement transaction";
+        const wouldChangeOwningShardMsg =
+            "Must run update to shard key field in a multi-statement transaction";
         const otherErrorsInChangeShardKeyMsg = "was converted into a distributed transaction";
-        const failureInRetryableWriteToTxnConversionMsg = "Cannot retry a retryable write that has been converted";
+        const failureInRetryableWriteToTxnConversionMsg =
+            "Cannot retry a retryable write that has been converted";
 
         if (res.code && res.code !== ErrorCodes.OK) {
             if (acceptableErrors.includes(res.code)) {
@@ -431,7 +455,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     /**
      * Randomly generates and runs either a findAndModify update or a findAndModify remove.
      */
-    $config.data.generateAndRunRandomFindAndModifyOp = function generateAndRunRandomFindAndModifyOp(db, collName) {
+    $config.data.generateAndRunRandomFindAndModifyOp = function generateAndRunRandomFindAndModifyOp(
+        db,
+        collName,
+    ) {
         const query = this.generateRandomQuery();
 
         // Used for validation after running the write operation.
@@ -488,7 +515,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
             if (updateType === 0 /* Update operator document */) {
                 const update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
+                        newValue,
                 };
                 cmdObj.update = {$set: update};
                 res = db.runCommand(cmdObj);
@@ -504,7 +532,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             } else {
                 /* Aggregation pipeline update */
                 const update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
+                        newValue,
                 };
 
                 // The $unset will result in a no-op since 'z' is not a field populated in any

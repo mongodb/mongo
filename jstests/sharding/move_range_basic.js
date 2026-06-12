@@ -55,19 +55,29 @@ function testMoveRangeWithBigChunk(mongos, ns, skPattern, minBound) {
     // Get bounds and shard of the chunk owning `randomSK`
     const chunksBefore = findChunksUtil.findChunksByNs(mongos.getDB("config"), ns).toArray();
     const shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunksBefore);
-    const {shard, bounds} = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, randomSK);
+    const {shard, bounds} = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(
+        st,
+        shardChunkBounds,
+        randomSK,
+    );
 
     const donor = shard.shardName;
     const recipient = donor == shard0 ? shard1 : shard0;
 
     // Count chunks belonging to donor and recipient shards BEFORE moveRange
     const nChunksOnDonorBefore = chunksBefore.filter((chunk) => chunk.shard == donor).length;
-    const nChunksOnRecipientBefore = chunksBefore.filter((chunk) => chunk.shard == recipient).length;
+    const nChunksOnRecipientBefore = chunksBefore.filter(
+        (chunk) => chunk.shard == recipient,
+    ).length;
 
     if (minBound) {
-        assert.commandWorked(mongos.adminCommand({moveRange: ns, min: randomSK, toShard: recipient}));
+        assert.commandWorked(
+            mongos.adminCommand({moveRange: ns, min: randomSK, toShard: recipient}),
+        );
     } else {
-        assert.commandWorked(mongos.adminCommand({moveRange: ns, max: randomSK, toShard: recipient}));
+        assert.commandWorked(
+            mongos.adminCommand({moveRange: ns, max: randomSK, toShard: recipient}),
+        );
     }
 
     // Count chunks belonging to donor and recipient shards AFTER moveRange
@@ -88,7 +98,8 @@ function testMoveRangeWithBigChunk(mongos, ns, skPattern, minBound) {
         "The number of chunks on the recipient shard did not increase following a moveRange",
     );
     assert(
-        nChunksOnDonorAfter == nChunksOnDonorBefore || nChunksOnDonorAfter == nChunksOnDonorBefore + 1,
+        nChunksOnDonorAfter == nChunksOnDonorBefore ||
+            nChunksOnDonorAfter == nChunksOnDonorBefore + 1,
         "Unexpected number of chunks on the donor shard after triggering a split + move",
     );
 }
@@ -104,19 +115,31 @@ function test(collName, skPattern, splitpoint) {
     jsTest.log("Testing invalid commands");
     // Fail if one of the bounds is not a valid shard key
     assert.commandFailedWithCode(
-        mongos.adminCommand({moveRange: ns, min: aChunk.min, max: {invalidShardKey: 10}, toShard: shard1}),
+        mongos.adminCommand({
+            moveRange: ns,
+            min: aChunk.min,
+            max: {invalidShardKey: 10},
+            toShard: shard1,
+        }),
         ErrorCodes.InvalidOptions,
     );
 
     // Fail if the `to` shard does not exists
     assert.commandFailedWithCode(
-        mongos.adminCommand({moveRange: ns, min: aChunk.min, max: aChunk.max, toShard: "WrongShard"}),
+        mongos.adminCommand({
+            moveRange: ns,
+            min: aChunk.min,
+            max: aChunk.max,
+            toShard: "WrongShard",
+        }),
         ErrorCodes.ShardNotFound,
     );
 
     // Test that `moveRange` with min & max bounds works
     jsTest.log("Testing moveRange with both bounds");
-    assert.commandWorked(mongos.adminCommand({moveRange: ns, min: aChunk.min, max: aChunk.max, toShard: shard1}));
+    assert.commandWorked(
+        mongos.adminCommand({moveRange: ns, min: aChunk.min, max: aChunk.max, toShard: shard1}),
+    );
 
     assert.eq(0, mongos.getDB("config").chunks.countDocuments({_id: aChunk._id, shard: shard0}));
     assert.eq(1, mongos.getDB("config").chunks.countDocuments({_id: aChunk._id, shard: shard1}));
@@ -162,7 +185,9 @@ function test(collName, skPattern, splitpoint) {
     const ns = kDbName + "." + collName;
 
     jsTest.log("Testing on unsplittable namespace");
-    assert.commandWorked(mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}));
+    assert.commandWorked(
+        mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}),
+    );
     assert.commandFailedWithCode(
         mongos.adminCommand({moveRange: ns, min: {_id: 0}, toShard: shard0}),
         ErrorCodes.NamespaceNotSharded,

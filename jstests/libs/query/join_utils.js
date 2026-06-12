@@ -1,7 +1,11 @@
 /**
  * Utility functions for join optimization tests.
  */
-import {getQueryPlanner, getAllPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getQueryPlanner,
+    getAllPlanStages,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Runs the given test case with join optimization enabled and disabled, verifies that the results
@@ -18,9 +22,13 @@ export function runTestWithUnorderedComparison({
 }) {
     print(`Running test: ${description} with additional join params ${additionalJoinParams}`);
 
-    const originalResults = runWithParamsAllNonConfigNodes(db, {internalEnableJoinOptimization: false}, () => {
-        return coll.aggregate(pipeline).toArray();
-    });
+    const originalResults = runWithParamsAllNonConfigNodes(
+        db,
+        {internalEnableJoinOptimization: false},
+        () => {
+            return coll.aggregate(pipeline).toArray();
+        },
+    );
     assert.sameMembers(originalResults, expectedResults);
 
     const joinParams = {internalEnableJoinOptimization: true, ...additionalJoinParams};
@@ -40,9 +48,15 @@ export function runTestWithUnorderedComparison({
         : false;
     assert.eq(expectedUsedJoinOptimization, usedJoinOptimization, winningPlan);
 
-    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
+        plannerStageIsJoinOptNode,
+    );
     if (expectedUsedJoinOptimization) {
-        assert.gt(joinStages.length, 0, `Expected to find some join opt stages, found none: ` + tojson(explain));
+        assert.gt(
+            joinStages.length,
+            0,
+            `Expected to find some join opt stages, found none: ` + tojson(explain),
+        );
         if (expectedNumJoinStages > 0) {
             assert.eq(
                 joinStages.length,
@@ -126,7 +140,9 @@ export function joinOptUsed(explain) {
 export function assertAllJoinsUseMethod(explain, expectedMethod) {
     assert(joinOptUsed(explain), "Expected join optimization to be used: " + tojson(explain));
 
-    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
+        plannerStageIsJoinOptNode,
+    );
     assert.gt(joinStages.length, 0, "Expected at least one join stage: " + tojson(explain));
 
     for (const stage of joinStages) {

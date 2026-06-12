@@ -30,7 +30,16 @@ assert.commandWorked(
     }),
 );
 
-test({$reduce: {input: "$simple", initialValue: 0, in: {$add: [{$multiply: ["$$this", "$$IDX"]}, "$$value"]}}}, 8);
+test(
+    {
+        $reduce: {
+            input: "$simple",
+            initialValue: 0,
+            in: {$add: [{$multiply: ["$$this", "$$IDX"]}, "$$value"]},
+        },
+    },
+    8,
+);
 
 test(
     {
@@ -80,9 +89,18 @@ pipeline = {
 testError(pipeline, 17276);
 
 // Can't use non-user definable names on 'arrayIndexAs'.
-testError({$reduce: {input: "$simple", arrayIndexAs: "IDX", initialValue: [], in: []}}, ErrorCodes.FailedToParse);
-testError({$reduce: {input: "$simple", arrayIndexAs: "^", initialValue: [], in: []}}, ErrorCodes.FailedToParse);
-testError({$reduce: {input: "$simple", arrayIndexAs: "", initialValue: [], in: []}}, ErrorCodes.FailedToParse);
+testError(
+    {$reduce: {input: "$simple", arrayIndexAs: "IDX", initialValue: [], in: []}},
+    ErrorCodes.FailedToParse,
+);
+testError(
+    {$reduce: {input: "$simple", arrayIndexAs: "^", initialValue: [], in: []}},
+    ErrorCodes.FailedToParse,
+);
+testError(
+    {$reduce: {input: "$simple", arrayIndexAs: "", initialValue: [], in: []}},
+    ErrorCodes.FailedToParse,
+);
 
 // Can't use variable defined by 'arrayIndexAs' or $$IDX in the non-'in' arguments.
 testError({$reduce: {input: "$$i", initialValue: [], in: [], arrayIndexAs: "i"}}, 17276);
@@ -112,9 +130,26 @@ testError(pipeline, ErrorCodes.APIStrictError, {
 //
 
 test({$reduce: {input: "$simple", initialValue: 0, in: {$add: ["$$this", "$$value"]}}}, 6);
-test({$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$elem", "$$value"]}}}, 6);
-test({$reduce: {input: "$simple", initialValue: 0, as: "elem", valueAs: "acc", in: {$add: ["$$elem", "$$acc"]}}}, 6);
-test({$reduce: {input: "$simple", initialValue: 0, valueAs: "acc", in: {$add: ["$$this", "$$acc"]}}}, 6);
+test(
+    {$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$elem", "$$value"]}}},
+    6,
+);
+test(
+    {
+        $reduce: {
+            input: "$simple",
+            initialValue: 0,
+            as: "elem",
+            valueAs: "acc",
+            in: {$add: ["$$elem", "$$acc"]},
+        },
+    },
+    6,
+);
+test(
+    {$reduce: {input: "$simple", initialValue: 0, valueAs: "acc", in: {$add: ["$$this", "$$acc"]}}},
+    6,
+);
 
 // Check nested operators.
 pipeline = {
@@ -171,8 +206,21 @@ test(pipeline, 4374);
 //
 
 // Can't use defaults $$this/$$value if the new parameters are defined.
-testError({$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$this", "$$value"]}}}, 17276);
-testError({$reduce: {input: "$simple", initialValue: 0, valueAs: "elem", in: {$add: ["$$this", "$$value"]}}}, 17276);
+testError(
+    {$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$this", "$$value"]}}},
+    17276,
+);
+testError(
+    {
+        $reduce: {
+            input: "$simple",
+            initialValue: 0,
+            valueAs: "elem",
+            in: {$add: ["$$this", "$$value"]},
+        },
+    },
+    17276,
+);
 
 // Can't use non-user definable names on new parameters.
 testError(
@@ -184,7 +232,14 @@ testError(
     ErrorCodes.FailedToParse,
 );
 testError(
-    {$reduce: {input: "$simple", initialValue: 0, valueAs: "VALUE", in: {$add: ["$$this", "$$VALUE"]}}},
+    {
+        $reduce: {
+            input: "$simple",
+            initialValue: 0,
+            valueAs: "VALUE",
+            in: {$add: ["$$this", "$$VALUE"]},
+        },
+    },
     ErrorCodes.FailedToParse,
 );
 testError(
@@ -202,7 +257,15 @@ testError({$reduce: {input: "$simple", initialValue: ["$$i"], in: [], valueAs: "
 
 // Can't reuse same variable.
 testError(
-    {$reduce: {input: "$simple", initialValue: 0, as: "elem", valueAs: "elem", in: {$add: ["$$elem", "$$elem"]}}},
+    {
+        $reduce: {
+            input: "$simple",
+            initialValue: 0,
+            as: "elem",
+            valueAs: "elem",
+            in: {$add: ["$$elem", "$$elem"]},
+        },
+    },
     9298401,
 );
 testError(
@@ -231,12 +294,16 @@ testError(
 );
 
 // Can't use new parameters in API Version 1 with apiStrict.
-pipeline = {$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$elem", "$$value"]}}};
+pipeline = {
+    $reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$elem", "$$value"]}},
+};
 testError(pipeline, ErrorCodes.APIStrictError, {
     apiVersion: "1",
     apiStrict: true,
 });
-pipeline = {$reduce: {input: "$simple", initialValue: 0, valueAs: "acc", in: {$add: ["$$this", "$$acc"]}}};
+pipeline = {
+    $reduce: {input: "$simple", initialValue: 0, valueAs: "acc", in: {$add: ["$$this", "$$acc"]}},
+};
 testError(pipeline, ErrorCodes.APIStrictError, {
     apiVersion: "1",
     apiStrict: true,

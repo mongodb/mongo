@@ -49,8 +49,14 @@ export const logQueries = {
         "msg": "abandoning dbCheck extra index keys check because index no longer exists",
         "data.dbCheckParameters": {$exists: true},
     },
-    duringInitialSyncQuery: {severity: "warning", "msg": "cannot execute dbcheck due to ongoing initial sync"},
-    duringStableRecovery: {severity: "warning", "msg": "cannot execute dbcheck due to ongoing stable recovering"},
+    duringInitialSyncQuery: {
+        severity: "warning",
+        "msg": "cannot execute dbcheck due to ongoing initial sync",
+    },
+    duringStableRecovery: {
+        severity: "warning",
+        "msg": "cannot execute dbcheck due to ongoing stable recovering",
+    },
     errorQuery: {"severity": "error", "data.dbCheckParameters": {$exists: true}},
     warningQuery: {"severity": "warning", "data.dbCheckParameters": {$exists: true}},
     infoOrErrorQuery: {
@@ -112,7 +118,8 @@ export const logQueries = {
         severity: "warning",
         "msg": "skipping dbCheck extra index keys check on the _id index because the target collection is a clustered collection that doesn't have an _id index",
         "data.dbCheckParameters": {$exists: true},
-        "data.error": "DbCheckAttemptOnClusteredCollectionIdIndex: Clustered collection doesn't have an _id index.",
+        "data.error":
+            "DbCheckAttemptOnClusteredCollectionIdIndex: Clustered collection doesn't have an _id index.",
     },
     indexKeyOrderViolationQuery: {
         severity: "error",
@@ -139,14 +146,19 @@ export const forEachNonArbiterNode = (replSet, f) => {
 // Clear local.system.healthlog.
 export const clearHealthLog = (replSet) => {
     forEachNonArbiterNode(replSet, (conn) =>
-        assert(conn.getDB("local").system.healthlog.drop(), `clearing health log failed for node ${conn.host}`),
+        assert(
+            conn.getDB("local").system.healthlog.drop(),
+            `clearing health log failed for node ${conn.host}`,
+        ),
     );
     replSet.awaitReplication();
 };
 
 export const logEveryBatch = (replSet) => {
     forEachNonArbiterNode(replSet, (conn) => {
-        assert.commandWorked(conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1}));
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1}),
+        );
     });
 };
 
@@ -228,7 +240,14 @@ export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null, c
 };
 
 // Clear health log and insert nDocs documents with two fields `a` and `b`.
-export const resetAndInsertTwoFields = (replSet, db, collName, nDocs, docSuffix = null, collOpts = {}) => {
+export const resetAndInsertTwoFields = (
+    replSet,
+    db,
+    collName,
+    nDocs,
+    docSuffix = null,
+    collOpts = {},
+) => {
     db[collName].drop();
     clearHealthLog(replSet);
 
@@ -237,7 +256,10 @@ export const resetAndInsertTwoFields = (replSet, db, collName, nDocs, docSuffix 
     if (docSuffix) {
         assert.commandWorked(
             db[collName].insertMany(
-                [...Array(nDocs).keys()].map((x) => ({a: x.toString() + docSuffix, b: x.toString() + docSuffix})),
+                [...Array(nDocs).keys()].map((x) => ({
+                    a: x.toString() + docSuffix,
+                    b: x.toString() + docSuffix,
+                })),
                 {ordered: false},
             ),
         );
@@ -301,12 +323,18 @@ export const insertDocsWithMissingIndexKeys = (
     let skipIndexNewRecordsExceptIdPrimary;
     let skipIndexNewRecordsExceptIdSecondary;
     if (doPrimary) {
-        skipIndexNewRecordsExceptIdPrimary = configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
-    }
-    if (doSecondary) {
-        skipIndexNewRecordsExceptIdSecondary = configureFailPoint(secondaryDb, "skipIndexNewRecords", {
+        skipIndexNewRecordsExceptIdPrimary = configureFailPoint(primaryDb, "skipIndexNewRecords", {
             skipIdIndex: false,
         });
+    }
+    if (doSecondary) {
+        skipIndexNewRecordsExceptIdSecondary = configureFailPoint(
+            secondaryDb,
+            "skipIndexNewRecords",
+            {
+                skipIdIndex: false,
+            },
+        );
     }
     for (let i = 0; i < numDocs; i++) {
         assert.commandWorked(primaryDb[collName].insert(doc));
@@ -344,7 +372,10 @@ export const runDbCheck = (
         dbCheckCommand[parameter] = parameters[parameter];
     }
 
-    let res = assert.commandWorkedOrFailedWithCode(db.runCommand(dbCheckCommand), allowedErrorCodes);
+    let res = assert.commandWorkedOrFailedWithCode(
+        db.runCommand(dbCheckCommand),
+        allowedErrorCodes,
+    );
     if (res.ok && awaitCompletion) {
         awaitDbCheckCompletion(replSet, db, waitForHealthLogDbCheckStop);
     }
@@ -421,7 +452,10 @@ export const injectInconsistencyOnSecondary = (
 // Returns a list of all collections in a given database excluding views.
 function listCollectionsWithoutViews(database) {
     let failMsg = "'listCollections' command failed";
-    let res = assert.commandWorked(database.runCommand("listCollections", {filter: {type: {$ne: "view"}}}), failMsg);
+    let res = assert.commandWorked(
+        database.runCommand("listCollections", {filter: {type: {$ne: "view"}}}),
+        failMsg,
+    );
     return new DBCommandCursor(database, res).toArray();
 }
 
@@ -457,7 +491,9 @@ export const runDbCheckForDatabase = (
     awaitCompletionTimeoutMs = null,
     dbCheckParameters = {},
 ) => {
-    const secondaryIndexCheckEnabled = checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
+    const secondaryIndexCheckEnabled = checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(
+        replSet.getPrimary(),
+    );
     let collDbCheckParameters = dbCheckParameters;
     if (secondaryIndexCheckEnabled) {
         collDbCheckParameters = {
@@ -592,14 +628,24 @@ export const runDbCheckForDatabase = (
         });
 
     if (awaitCompletion) {
-        awaitDbCheckCompletion(replSet, db, false /*waitForHealthLogDbCheckStop*/, awaitCompletionTimeoutMs);
+        awaitDbCheckCompletion(
+            replSet,
+            db,
+            false /*waitForHealthLogDbCheckStop*/,
+            awaitCompletionTimeoutMs,
+        );
     }
 };
 
 // Assert no errors/warnings (i.e., found inconsistencies). Tolerate
 // SnapshotTooOld errors, as they can occur if the primary is slow enough processing a
 // batch that the secondary is unable to obtain the timestamp the primary used.
-export const assertForDbCheckErrors = (node, assertForErrors = true, assertForWarnings = false, errorsFound = []) => {
+export const assertForDbCheckErrors = (
+    node,
+    assertForErrors = true,
+    assertForWarnings = false,
+    errorsFound = [],
+) => {
     let severityValues = [];
     if (assertForErrors == true) {
         severityValues.push("error");
@@ -622,7 +668,10 @@ export const assertForDbCheckErrors = (node, assertForErrors = true, assertForWa
     assert.soon(
         () => {
             try {
-                let errs = healthlog.find({"severity": {$in: severityValues}, "data.error": regexString});
+                let errs = healthlog.find({
+                    "severity": {$in: severityValues},
+                    "data.error": regexString,
+                });
                 if (errs.hasNext()) {
                     const errMsg = "dbCheck found inconsistency on " + node.host;
                     jsTestLog(errMsg + ". Errors/Warnings: ");
@@ -652,8 +701,14 @@ export const assertForDbCheckErrors = (node, assertForErrors = true, assertForWa
 };
 
 // Check for dbcheck errors for all nodes in a replica set and ignoring arbiters.
-export const assertForDbCheckErrorsForAllNodes = (rst, assertForErrors = true, assertForWarnings = false) => {
-    forEachNonArbiterNode(rst, (node) => assertForDbCheckErrors(node, assertForErrors, assertForWarnings));
+export const assertForDbCheckErrorsForAllNodes = (
+    rst,
+    assertForErrors = true,
+    assertForWarnings = false,
+) => {
+    forEachNonArbiterNode(rst, (node) =>
+        assertForDbCheckErrors(node, assertForErrors, assertForWarnings),
+    );
 };
 
 /**
@@ -666,7 +721,9 @@ export function checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(conn) {
 export function checkNumSnapshots(debugBuild, expectedNumSnapshots) {
     if (debugBuild) {
         const actualNumSnapshots =
-            rawMongoProgramOutput("Catalog snapshot for reverse lookup check ending").split(/7844808/).length - 1;
+            rawMongoProgramOutput("Catalog snapshot for reverse lookup check ending").split(
+                /7844808/,
+            ).length - 1;
         assert.eq(
             actualNumSnapshots,
             expectedNumSnapshots,
@@ -681,7 +738,10 @@ export function checkNumSnapshots(debugBuild, expectedNumSnapshots) {
 export function setSnapshotSize(rst, snapshotSize) {
     forEachNonArbiterNode(rst, (conn) => {
         assert.commandWorked(
-            conn.adminCommand({"setParameter": 1, "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize}),
+            conn.adminCommand({
+                "setParameter": 1,
+                "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize,
+            }),
         );
     });
 }
@@ -694,7 +754,14 @@ export function resetSnapshotSize(rst) {
 // against.
 // TODO SERVER-92609: Currently this only works for extra index keys check. We should standardize
 // this for collection check as well.
-export function assertCompleteCoverage(healthlog, nDocs, indexName, docSuffix, start = null, end = null) {
+export function assertCompleteCoverage(
+    healthlog,
+    nDocs,
+    indexName,
+    docSuffix,
+    start = null,
+    end = null,
+) {
     // For non-empty docSuffix like 'aaa' for instance, if we insert over 10 docs, the lexicographic
     // sorting order would be '0aaa', '1aaa', '10aaa', instead of increasing numerical order. Skip
     // these checks as we have test coverage without needing to account for these specific cases.

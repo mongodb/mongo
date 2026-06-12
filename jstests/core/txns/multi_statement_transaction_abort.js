@@ -260,7 +260,9 @@ assert.eq({_id: "running-txn-2"}, testColl.findOne({_id: "running-txn-2"}));
 
 jsTest.log("Higher transaction number aborts existing running snapshot read.");
 assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(testColl.insert([{doc: 1}, {doc: 2}, {doc: 3}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testColl.insert([{doc: 1}, {doc: 2}, {doc: 3}], {writeConcern: {w: "majority"}}),
+);
 txnNumber++;
 // Perform a snapshot read under a new transaction.
 let runningReadResult = assert.commandWorked(

@@ -3,7 +3,10 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
-import {kDefaultQueryStatsHmacKey, getQueryStatsWithTransform} from "jstests/libs/query/query_stats_utils.js";
+import {
+    kDefaultQueryStatsHmacKey,
+    getQueryStatsWithTransform,
+} from "jstests/libs/query/query_stats_utils.js";
 
 // $queryStats is node-local, when multiple mongos are deployed in the cluster, each mongos will have its own
 // separate query stats store. To avoid test failures due to this, we pin the test to a single mongos.
@@ -165,7 +168,9 @@ function insertShapeWithTransformedIdentifiers4(coll) {
 
     coll.aggregate([{$shapify: identifiersShape4}]).toArray();
 
-    const expected = Object.assign({}, transformedIdentifiersShape, {ident_name: fetchHmac("Caroline")});
+    const expected = Object.assign({}, transformedIdentifiersShape, {
+        ident_name: fetchHmac("Caroline"),
+    });
     return [{$shapify: expected}];
 }
 
@@ -175,7 +180,9 @@ function insertShapeWithTransformedIdentifiers5(coll) {
     coll.aggregate([{$shapify: identifiersShape5}]).toArray();
 
     const hmacedFieldPath = fetchHmac("d") + "." + fetchHmac("e") + "." + fetchHmac("f");
-    const expected = Object.assign({}, transformedIdentifiersShape, {path_fieldPathA: hmacedFieldPath});
+    const expected = Object.assign({}, transformedIdentifiersShape, {
+        path_fieldPathA: hmacedFieldPath,
+    });
     return [{$shapify: expected}];
 }
 
@@ -185,7 +192,9 @@ function insertShapeWithTransformedIdentifiers6(coll) {
     coll.aggregate([{$shapify: identifiersShape5}]).toArray();
 
     const hmacedFieldPath = fetchHmac("g") + "." + fetchHmac("h") + "." + fetchHmac("1");
-    const expected = Object.assign({}, transformedIdentifiersShape, {path_fieldPathA: hmacedFieldPath});
+    const expected = Object.assign({}, transformedIdentifiersShape, {
+        path_fieldPathA: hmacedFieldPath,
+    });
     return [{$shapify: expected}];
 }
 
@@ -335,7 +344,9 @@ runQueryStatsTest({
 runQueryStatsTest({
     desc: "desugar extension stage in $unionWith subpipeline",
     pipeline: [{$unionWith: {coll: foreignCollName, pipeline: [{$shapifyDesugar: {a: 1, b: 2}}]}}],
-    expectedShape: [{$unionWith: {coll: foreignCollName, pipeline: [{$shapifyDesugar: {a: 1, b: 2}}]}}],
+    expectedShape: [
+        {$unionWith: {coll: foreignCollName, pipeline: [{$shapifyDesugar: {a: 1, b: 2}}]}},
+    ],
 });
 
 // Test extension stage with regular stages in $unionWith subpipeline.
@@ -347,7 +358,12 @@ runQueryStatsTest({
     ],
     expectedShape: [
         {$match: {x: {$eq: "?number"}}},
-        {$unionWith: {coll: foreignCollName, pipeline: [{$shapify: {val: "?number"}}, {$limit: "?number"}]}},
+        {
+            $unionWith: {
+                coll: foreignCollName,
+                pipeline: [{$shapify: {val: "?number"}}, {$limit: "?number"}],
+            },
+        },
     ],
 });
 

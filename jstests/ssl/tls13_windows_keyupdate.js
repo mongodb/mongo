@@ -53,7 +53,12 @@ describe("Windows TLS 1.3 server-side KeyUpdate handling", function () {
 
         // processPostHandshakeToken logs its result at debug level 2; raise network verbosity
         // so the entry is emitted into the global log for checkLog to read.
-        assert.commandWorked(mongod.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 2}}}));
+        assert.commandWorked(
+            mongod.adminCommand({
+                setParameter: 1,
+                logComponentVerbosity: {network: {verbosity: 2}},
+            }),
+        );
     });
 
     after(function () {
@@ -73,14 +78,19 @@ describe("Windows TLS 1.3 server-side KeyUpdate handling", function () {
         );
 
         if (rc === 2) {
-            jsTest.log.info("Skipping assertions: openssl CLI unavailable or too old to send a KeyUpdate.");
+            jsTest.log.info(
+                "Skipping assertions: openssl CLI unavailable or too old to send a KeyUpdate.",
+            );
             return;
         }
         assert.eq(0, rc, "TLS 1.3 KeyUpdate client exited with an unexpected code");
 
         // (1) The server-side post-handshake path (AcceptSecurityContext) must have run.
         assert.soon(
-            () => checkLog.checkContainsOnceJson(mongod, kPostHandshakeResultLogId, {isClient: false}),
+            () =>
+                checkLog.checkContainsOnceJson(mongod, kPostHandshakeResultLogId, {
+                    isClient: false,
+                }),
             "Expected server-side post-handshake (ASC) result log " +
                 kPostHandshakeResultLogId +
                 " with isClient:false — KeyUpdate was not processed by AcceptSecurityContext",
@@ -89,7 +99,9 @@ describe("Windows TLS 1.3 server-side KeyUpdate handling", function () {
         // (2) The KeyUpdate must not have corrupted the traffic keys: no decrypt failure.
         const globalLog = assert.commandWorked(mongod.adminCommand({getLog: "global"})).log;
         const sawDecryptFailure = globalLog.some(
-            (line) => line.includes('"id":' + kDecryptFailedLogId) && line.includes("" + kSecEDecryptFailure),
+            (line) =>
+                line.includes('"id":' + kDecryptFailedLogId) &&
+                line.includes("" + kSecEDecryptFailure),
         );
         assert(
             !sawDecryptFailure,

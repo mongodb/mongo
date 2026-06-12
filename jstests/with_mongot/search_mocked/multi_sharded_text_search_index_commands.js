@@ -178,7 +178,9 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
     };
     mongotMock.setMockSearchIndexCommandResponse(emptyResponse);
     const expectedDocs = emptyResponse["cursor"]["firstBatch"];
-    const result = testColl.aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}}).toArray();
+    const result = testColl
+        .aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}})
+        .toArray();
     assert.eq(result, expectedDocs);
 })();
 
@@ -246,7 +248,10 @@ const indexInformationTooLargeError = {
 
 (function listSearchIndexCommandError() {
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    let res = assert.commandFailedWithCode(testDB.runCommand({"listSearchIndexes": collName}), ErrorCodes.InvalidUUID);
+    let res = assert.commandFailedWithCode(
+        testDB.runCommand({"listSearchIndexes": collName}),
+        ErrorCodes.InvalidUUID,
+    );
     delete res.$clusterTime;
     delete res.operationTime;
     assert.eq(manageSearchIndexCommandResponse, res);

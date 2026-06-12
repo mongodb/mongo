@@ -33,7 +33,9 @@ checkLog.containsWithCount(st.s, "maxTimeMSForHedgedReads parameter has no effec
 checkLog.containsWithCount(st.s, "opportunisticSecondaryTargeting parameter has no effect", 1);
 
 assert.commandWorked(
-    st.s.getDB("test").runCommand({count: collName, $readPreference: {mode: "nearest", hedge: {enabled: true}}}),
+    st.s
+        .getDB("test")
+        .runCommand({count: collName, $readPreference: {mode: "nearest", hedge: {enabled: true}}}),
 );
 checkLog.containsWithCount(st.s, "Hedged reads have been deprecated", 1);
 

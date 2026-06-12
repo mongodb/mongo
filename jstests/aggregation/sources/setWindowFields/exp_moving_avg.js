@@ -86,7 +86,11 @@ results = coll
     .toArray();
 const simpleAlphaResult = movingAvgForDocs(0.5);
 for (let index = 0; index < results.length; index++) {
-    assert.close(simpleAlphaResult[index], results[index].doubleVal, "Disagreement at index " + index);
+    assert.close(
+        simpleAlphaResult[index],
+        results[index].doubleVal,
+        "Disagreement at index " + index,
+    );
 }
 
 // Succeed with more interesting alpha.
@@ -108,7 +112,11 @@ results = coll
     .toArray();
 const complexAlphaResult = movingAvgForDocs(0.279);
 for (let index = 0; index < results.length; index++) {
-    assert.close(complexAlphaResult[index], results[index].doubleVal, "Disagreement at index " + index);
+    assert.close(
+        complexAlphaResult[index],
+        results[index].doubleVal,
+        "Disagreement at index " + index,
+    );
 }
 
 // Fails if argument type or contents are incorrect.

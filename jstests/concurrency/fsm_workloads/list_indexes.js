@@ -29,7 +29,10 @@ export const $config = (function () {
 
         // List indexes, using a batchSize of 2 to ensure getmores happen.
         function listIndices(db, collName) {
-            let cursor = new DBCommandCursor(db, db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}));
+            let cursor = new DBCommandCursor(
+                db,
+                db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}),
+            );
             assert.gte(cursor.itcount(), 0);
         }
 

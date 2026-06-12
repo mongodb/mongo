@@ -48,7 +48,9 @@ const geoQuery = {
     geo: {$geoNear: point},
 };
 
-const failPoint = configureFailPoint(primary, "hangAfterCollectionInserts", {collectionNS: testColl.getFullName()});
+const failPoint = configureFailPoint(primary, "hangAfterCollectionInserts", {
+    collectionNS: testColl.getFullName(),
+});
 
 let awaitInsert;
 try {
@@ -71,7 +73,10 @@ try {
     // Since there is no other electable node, the replSetStepDown command will time out and the
     // node will be re-elected.
     jsTest.log("Step down primary temporarily to interrupt async insert.");
-    assert.commandFailedWithCode(primary.adminCommand({replSetStepDown: 10}), ErrorCodes.ExceededTimeLimit);
+    assert.commandFailedWithCode(
+        primary.adminCommand({replSetStepDown: 10}),
+        ErrorCodes.ExceededTimeLimit,
+    );
 } finally {
     // Turn off the failpoint before allowing the test to end, so nothing hangs while the server
     // shuts down or in post-test hooks.
@@ -88,7 +93,11 @@ assert.commandWorked(testColl.insert(geoDocToInsert));
 jsTestLog("Checking documents in collection before restart");
 let docs = testColl.find(geoQuery).sort({_id: 1}).toArray();
 assert.eq(1, docs.length, "too many docs in collection: " + tojson(docs));
-assert.eq(geoDocToInsert._id, docs[0]._id, "unexpected document content in collection: " + tojson(docs));
+assert.eq(
+    geoDocToInsert._id,
+    docs[0]._id,
+    "unexpected document content in collection: " + tojson(docs),
+);
 
 // For the purpose of reproducing the validation error in geo_2dsphere, it is important to skip
 // validation when restarting the primary node. Enabling validation here has an effect on the
@@ -100,7 +109,11 @@ jsTestLog("Checking documents in collection after restart");
 rst.awaitReplication();
 docs = testColl.find(geoQuery).sort({_id: 1}).toArray();
 assert.eq(1, docs.length, "too many docs in collection: " + tojson(docs));
-assert.eq(geoDocToInsert._id, docs[0]._id, "unexpected document content in collection: " + tojson(docs));
+assert.eq(
+    geoDocToInsert._id,
+    docs[0]._id,
+    "unexpected document content in collection: " + tojson(docs),
+);
 
 jsTestLog("Validating collection after restart");
 const result = assert.commandWorked(testColl.validate({full: true}));

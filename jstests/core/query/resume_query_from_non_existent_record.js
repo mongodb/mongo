@@ -93,7 +93,9 @@ const testCmd = function (cmdName, runQuery) {
     }
 
     {
-        jsTestLog(`[${cmdName}] startAt should successfully resume with a resume token pointing to a valid recordId.`);
+        jsTestLog(
+            `[${cmdName}] startAt should successfully resume with a resume token pointing to a valid recordId.`,
+        );
         res = runQuery({$_requestResumeToken: true, $_startAt: resumeToken});
         assert.commandWorked(res);
 
@@ -126,13 +128,19 @@ const testCmd = function (cmdName, runQuery) {
         // Try to resume the query using $_startAt from the same token and check between the already
         // returned documents and this batch we recover all the documents. We set 'batchSize' to
         // numDocs+1 to ensure we get all the remaining documents.
-        res = runQuery({$_requestResumeToken: true, batchSize: numDocs + 1, $_startAt: resumeToken});
+        res = runQuery({
+            $_requestResumeToken: true,
+            batchSize: numDocs + 1,
+            $_startAt: resumeToken,
+        });
         assert.commandWorked(res);
         assert.docEq(docsInRidOrder.slice(1), res.cursor.firstBatch);
     }
 
     {
-        jsTestLog(`[${cmdName}] resumeAfter should fail with a resume token pointing to a deleted recordId.`);
+        jsTestLog(
+            `[${cmdName}] resumeAfter should fail with a resume token pointing to a deleted recordId.`,
+        );
         // Try to resume the query using $_resumeAfter from the same token and check that it fails
         // to position the cursor to the record specified in the resume token.
         res = runQuery({$_requestResumeToken: true, batchSize: 1, $_resumeAfter: resumeToken});
@@ -152,7 +160,11 @@ const testCmd = function (cmdName, runQuery) {
     {
         jsTestLog(`[${cmdName}] resumeAfter should fail with a malformed resume token.`);
         res = assert.commandFailedWithCode(
-            runQuery({$_requestResumeToken: true, batchSize: 1, $_resumeAfter: malformedResumeToken}),
+            runQuery({
+                $_requestResumeToken: true,
+                batchSize: 1,
+                $_resumeAfter: malformedResumeToken,
+            }),
             ErrorCodes.BadValue,
         );
     }
@@ -160,14 +172,18 @@ const testCmd = function (cmdName, runQuery) {
     const invalidResumeToken = {$recordId: NumberLong(1), $initialSyncId: UUID()};
 
     {
-        jsTestLog(`[${cmdName}] startAt should fail with an invalid initialSyncId in resume token.`);
+        jsTestLog(
+            `[${cmdName}] startAt should fail with an invalid initialSyncId in resume token.`,
+        );
         res = assert.commandFailedWithCode(
             runQuery({$_requestResumeToken: true, batchSize: 1, $_startAt: invalidResumeToken}),
             8132701,
         );
     }
     {
-        jsTestLog(`[${cmdName}] resumeAfter should fail with an invalid initialSyncId in resume token.`);
+        jsTestLog(
+            `[${cmdName}] resumeAfter should fail with an invalid initialSyncId in resume token.`,
+        );
         res = assert.commandFailedWithCode(
             runQuery({$_requestResumeToken: true, batchSize: 1, $_resumeAfter: invalidResumeToken}),
             8132701,
@@ -230,7 +246,10 @@ function runAggQuery(extraFields) {
     const batchSize = extraFields.batchSize;
 
     delete extraFields.batchSize;
-    const obj = Object.assign({aggregate: collName, pipeline: [], hint: {$natural: 1}, cursor: {}}, extraFields);
+    const obj = Object.assign(
+        {aggregate: collName, pipeline: [], hint: {$natural: 1}, cursor: {}},
+        extraFields,
+    );
     if (batchSize) {
         obj.cursor.batchSize = batchSize;
     }

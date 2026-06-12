@@ -20,7 +20,9 @@ assert(!serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(serverStatusMetrics.document.hasOwnProperty("inserted"));
 
 // Exclude the "document.deleted" and "document.inserted" fields.
-serverStatusMetrics = db.serverStatus({metrics: {document: {deleted: false, inserted: false}}}).metrics;
+serverStatusMetrics = db.serverStatus({
+    metrics: {document: {deleted: false, inserted: false}},
+}).metrics;
 
 assert(!serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(!serverStatusMetrics.document.hasOwnProperty("inserted"));
@@ -40,7 +42,9 @@ assert(serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(serverStatusMetrics.document.hasOwnProperty("inserted"));
 
 // Attempt a non-boolean values which should be rejected (uassert).
-assert.commandFailedWithCode(db.serverStatus({metrics: {document: "Non-boolean"}}), [ErrorCodes.InvalidBSONType]);
+assert.commandFailedWithCode(db.serverStatus({metrics: {document: "Non-boolean"}}), [
+    ErrorCodes.InvalidBSONType,
+]);
 
 assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: "Non-boolean"}}}), [
     ErrorCodes.InvalidBSONType,
@@ -50,9 +54,10 @@ assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: ["No
     ErrorCodes.InvalidBSONType,
 ]);
 
-assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: {invalidObjectAtLeftLevel: 1}}}}), [
-    ErrorCodes.InvalidBSONType,
-]);
+assert.commandFailedWithCode(
+    db.serverStatus({metrics: {document: {deleted: {invalidObjectAtLeftLevel: 1}}}}),
+    [ErrorCodes.InvalidBSONType],
+);
 
 // Exclude the "document" subtree.
 serverStatusMetrics = db.serverStatus({metrics: {document: false}}).metrics;
@@ -61,7 +66,17 @@ assert(!serverStatusMetrics.hasOwnProperty("document"));
 
 // The {none: 1} specifier should reduce the result to minimal fields.
 let serverStatusOutput = db.serverStatus({none: 1});
-const baseKeys = ["host", "version", "process", "pid", "uptime", "uptimeMillis", "uptimeEstimate", "localTime", "ok"];
+const baseKeys = [
+    "host",
+    "version",
+    "process",
+    "pid",
+    "uptime",
+    "uptimeMillis",
+    "uptimeEstimate",
+    "localTime",
+    "ok",
+];
 let returnedKeys = Object.keys(serverStatusOutput);
 assert.eq(
     returnedKeys.length,
@@ -84,7 +99,9 @@ assert.eq(
 assert.sameMembers(returnedKeys, expectedKeys, JSON.stringify(returnedKeys));
 
 // Check explicit multi-field inclusions with {none: 1}.
-serverStatusOutput = assert.commandWorked(db.serverStatus({none: 1, wiredTiger: 1, connections: 1}));
+serverStatusOutput = assert.commandWorked(
+    db.serverStatus({none: 1, wiredTiger: 1, connections: 1}),
+);
 returnedKeys = Object.keys(serverStatusOutput);
 expectedKeys = baseKeys.concat("wiredTiger", "connections");
 assert.eq(

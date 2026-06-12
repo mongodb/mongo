@@ -37,10 +37,18 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
     const srcEncryptedErrmsg = "Cannot rename an encrypted collection";
     const tgtEncryptedErrmsg = "Cannot rename to an existing encrypted collection";
 
-    assert.commandWorked(srcDbClient.createEncryptionCollection("encrypted", {encryptedFields: sampleEncryptedFields}));
+    assert.commandWorked(
+        srcDbClient.createEncryptionCollection("encrypted", {
+            encryptedFields: sampleEncryptedFields,
+        }),
+    );
     assert.commandWorked(dbSrc.createCollection("unencrypted"));
 
-    assert.commandWorked(tgtDbClient.createEncryptionCollection("encrypted", {encryptedFields: sampleEncryptedFields}));
+    assert.commandWorked(
+        tgtDbClient.createEncryptionCollection("encrypted", {
+            encryptedFields: sampleEncryptedFields,
+        }),
+    );
 
     jsTestLog("Test renaming encrypted collection to another namespace is prohibited");
     verifyFunction(
@@ -51,7 +59,10 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
 
     if (!allowsRename) {
         verifyFunction(
-            dbSrc.adminCommand({renameCollection: dbSrc + ".encrypted", to: dbTgt + ".unencrypted"}),
+            dbSrc.adminCommand({
+                renameCollection: dbSrc + ".encrypted",
+                to: dbTgt + ".unencrypted",
+            }),
             "Renaming an encrypted collection across DBs passed",
             srcEncryptedErrmsg,
         );
@@ -59,7 +70,11 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
 
     jsTestLog("Test renaming unencrypted collection to an encrypted namespace is prohibited");
     verifyFunction(
-        dbSrc.adminCommand({renameCollection: dbSrc + ".unencrypted", to: dbSrc + ".encrypted", dropTarget: true}),
+        dbSrc.adminCommand({
+            renameCollection: dbSrc + ".unencrypted",
+            to: dbSrc + ".encrypted",
+            dropTarget: true,
+        }),
         "Renaming to an encrypted collection within same DB passed",
         tgtEncryptedErrmsg,
     );
@@ -85,7 +100,13 @@ function runTest(conn) {
     assert.eq(1, adminDB.auth("admin", "admin"));
 
     // Create a low priv user
-    assert.commandWorked(adminDB.runCommand({createUser: "lowpriv", pwd: "lowpriv", roles: ["readWriteAnyDatabase"]}));
+    assert.commandWorked(
+        adminDB.runCommand({
+            createUser: "lowpriv",
+            pwd: "lowpriv",
+            roles: ["readWriteAnyDatabase"],
+        }),
+    );
 
     // Run tests with a user that has restore/backup role and verify they can rename
     runTestWithAuth(conn, true, (cmdObj, assertMsg, errorMsg) => {

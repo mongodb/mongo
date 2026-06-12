@@ -4,7 +4,11 @@
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getAggPlanStages, getLookupStage, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getLookupStage,
+    getUnionWithStage,
+} from "jstests/libs/query/analyze_plan.js";
 import {
     prepareUnionWithExplain,
     validateMongotStageExplainExecutionStats,
@@ -53,7 +57,8 @@ function assertIdLookupContainsViewPipeline(explainOutput, viewPipeline) {
         const idLookupStage = {"$match": {"_id": {"$eq": "_id placeholder"}}};
         assert.eq(idLookupFullSubPipe[0], idLookupStage);
         // Make sure that idLookup subpipeline contains all of the view stages.
-        const idLookupViewStages = idLookupFullSubPipe.length > 1 ? idLookupFullSubPipe.slice(1) : [];
+        const idLookupViewStages =
+            idLookupFullSubPipe.length > 1 ? idLookupFullSubPipe.slice(1) : [];
         assertStagesInExpectedOrder(idLookupViewStages, viewPipeline);
     }
 }
@@ -70,7 +75,8 @@ function assertIdLookupContainsViewPipeline(explainOutput, viewPipeline) {
 export function assertViewAppliedCorrectly(explainOutput, userPipeline, viewPipeline) {
     if (
         userPipeline.length > 0 &&
-        (userPipeline[0].hasOwnProperty("$search") || userPipeline[0].hasOwnProperty("$vectorSearch"))
+        (userPipeline[0].hasOwnProperty("$search") ||
+            userPipeline[0].hasOwnProperty("$vectorSearch"))
     ) {
         // The view pipeline is pushed down to a desugared stage, $_internalSearchdLookup. Therefore
         // we inspect the stages (which represent the fully desugared pipeline from the user) to
@@ -115,7 +121,8 @@ export function assertViewNotApplied(explainOutput, userPipeline, viewPipeline) 
     // during optimization.
     if (
         userPipeline.length > 0 &&
-        (userPipeline[0].hasOwnProperty("$search") || userPipeline[0].hasOwnProperty("$vectorSearch"))
+        (userPipeline[0].hasOwnProperty("$search") ||
+            userPipeline[0].hasOwnProperty("$vectorSearch"))
     ) {
         assert.neq(explainOutput.command.pipeline.slice(0, viewPipeline.length), viewPipeline);
     }
@@ -154,7 +161,10 @@ export function assertUnionWithSearchSubPipelineAppliedViews(
             // In fully-sharded environments, check for the correct view name on the view object
             // inside the $search/$vectorSearch stage. The $unionWith.coll is resolved to the
             // underlying collection in all environments.
-            if (unionWithExplain.hasOwnProperty("splitPipeline") && unionWithExplain["splitPipeline"] !== null) {
+            if (
+                unionWithExplain.hasOwnProperty("splitPipeline") &&
+                unionWithExplain["splitPipeline"] !== null
+            ) {
                 const firstStage = unionWithExplain.splitPipeline.shardsPart[0];
 
                 // The first stage is either $search or $vectorSearch.
@@ -195,14 +205,20 @@ export function assertLookupInExplain(explainOutput, lookupStage) {
     // Find the lookup stage in the explain output and assert that it matches the lookup passed
     // to the function.
     const stage = getLookupStage(explainOutput);
-    assert(stage, "There should be one $lookup stage in the explain output. " + tojson(explainOutput));
+    assert(
+        stage,
+        "There should be one $lookup stage in the explain output. " + tojson(explainOutput),
+    );
 
     // The explain might add extra stages to the $lookup in its output which is why we can't
     // simply assert that the two BSON objects match each other.
     Object.keys(lookupStage["$lookup"]).forEach((lookupKey) => {
         assert(
             stage["$lookup"].hasOwnProperty(lookupKey),
-            'There should be a key "' + lookupKey + '" in the lookup stage from the explain output.' + tojson(stage),
+            'There should be a key "' +
+                lookupKey +
+                '" in the lookup stage from the explain output.' +
+                tojson(stage),
         );
 
         // On the "pipeline" key, the explain pipeline length should be at least the length of
@@ -243,7 +259,10 @@ export function assertLookupSearchSubPipelineAppliedViews(
     isStoredSource = false,
 ) {
     const stage = getLookupStage(explainOutput);
-    assert(stage, "There should be one $lookup stage in the explain output. " + tojson(explainOutput));
+    assert(
+        stage,
+        "There should be one $lookup stage in the explain output. " + tojson(explainOutput),
+    );
 
     const lookupSpec = stage["$lookup"];
     assert(
@@ -257,7 +276,8 @@ export function assertLookupSearchSubPipelineAppliedViews(
     assert.gte(
         explainPipeline.length,
         userPipeline.length,
-        "The $lookup explain pipeline should have at least as many stages as the user pipeline. " + tojson(stage),
+        "The $lookup explain pipeline should have at least as many stages as the user pipeline. " +
+            tojson(stage),
     );
 
     if (!isStoredSource) {
@@ -293,7 +313,12 @@ export function assertLookupSearchSubPipelineAppliedViews(
  * @param {NumberLong} nReturned Expected total nReturned across all $lookup stages (sum across
  *     shards). Not checked when verbosity is "queryPlanner" or when $lookup runs on the merger.
  */
-export function verifyE2ELookupSearchExplainOutput({explainOutput, searchStageType, verbosity, nReturned = null}) {
+export function verifyE2ELookupSearchExplainOutput({
+    explainOutput,
+    searchStageType,
+    verbosity,
+    nReturned = null,
+}) {
     // getAggPlanStages searches root.stages and root.shards[*].stages but not splitPipeline.
     // When $lookup runs on the merger (e.g. because its sub-pipeline contains $searchMeta),
     // it appears only in splitPipeline.mergerPart. Fall back to getLookupStage, which is
@@ -308,14 +333,22 @@ export function verifyE2ELookupSearchExplainOutput({explainOutput, searchStageTy
         }
     }
 
-    assert.gt(lookupStages.length, 0, "Expected at least one $lookup stage: " + tojson(explainOutput));
+    assert.gt(
+        lookupStages.length,
+        0,
+        "Expected at least one $lookup stage: " + tojson(explainOutput),
+    );
     for (let stage of lookupStages) {
         let stageSpec = stage["$lookup"];
         assert(
             stageSpec.hasOwnProperty("pipeline"),
             "$lookup explain should include resolved sub-pipeline: " + tojson(stage),
         );
-        assert.gt(stageSpec["pipeline"].length, 0, "$lookup sub-pipeline should not be empty: " + tojson(stage));
+        assert.gt(
+            stageSpec["pipeline"].length,
+            0,
+            "$lookup sub-pipeline should not be empty: " + tojson(stage),
+        );
         const firstStageKey = Object.keys(stageSpec["pipeline"][0])[0];
         assert.eq(
             firstStageKey,
@@ -351,7 +384,12 @@ export function verifyE2ELookupSearchExplainOutput({explainOutput, searchStageTy
  * @param {NumberLong} nReturned not needed if verbosity is 'queryPlanner'. For a sharded
  *     scenario, this should be the total returned across all shards.
  */
-export function verifyE2ESearchExplainOutput({explainOutput, stageType, verbosity, nReturned = null}) {
+export function verifyE2ESearchExplainOutput({
+    explainOutput,
+    stageType,
+    verbosity,
+    nReturned = null,
+}) {
     if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {
         // We check metadata and protocol version for sharded $search.
         verifyShardsPartExplainOutput({result: explainOutput, searchType: "$search"});
@@ -395,7 +433,11 @@ export function verifyE2ESearchExplainOutput({explainOutput, stageType, verbosit
  * @param {string} verbosity The verbosity of explain. "nReturned" and
  *     "executionTimeMillisEstimate" will not be checked for 'queryPlanner' verbosity "
  */
-export function verifyE2ESearchMetaExplainOutput({explainOutput, numFacetBucketsAndCount, verbosity}) {
+export function verifyE2ESearchMetaExplainOutput({
+    explainOutput,
+    numFacetBucketsAndCount,
+    verbosity,
+}) {
     // In an unsharded scenario, $searchMeta returns one document with all of the facet values.
     let nReturned = 1;
     if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {

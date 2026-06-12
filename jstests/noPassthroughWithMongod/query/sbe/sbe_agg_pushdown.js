@@ -40,13 +40,23 @@ assertPushdownQueryExecMode([{$project: {_id: 0, c: {kUnsupportedExpression}}}],
 // Test query that contains an expression unsupported by SBE that isn't pushed down. In this case,
 // we still expect SBE to be used if the unsupported expression isn't pushed down.
 assertPushdownQueryExecMode(
-    [{$match: {a: 2}}, {$_internalInhibitOptimization: {}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}],
+    [
+        {$match: {a: 2}},
+        {$_internalInhibitOptimization: {}},
+        {$project: {_id: 0, c: {kUnsupportedExpression}}},
+    ],
     "2",
 );
 
 // Test query with an unsupported expression in a $project stage that's pushed down executes with
 // the classic engine.
-assertPushdownQueryExecMode([{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}], "1");
+assertPushdownQueryExecMode(
+    [{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}],
+    "1",
+);
 
 // Test query with fully supported expressions are executed with SBE when pushed down.
-assertPushdownQueryExecMode([{$match: {$expr: {$eq: ["$b", {$dateFromParts: {year: 2021, month: 4, day: 28}}]}}}], "2");
+assertPushdownQueryExecMode(
+    [{$match: {$expr: {$eq: ["$b", {$dateFromParts: {year: 2021, month: 4, day: 28}}]}}}],
+    "2",
+);

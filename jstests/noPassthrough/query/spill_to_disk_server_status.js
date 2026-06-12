@@ -32,13 +32,27 @@ assert.commandWorked(setParameter(db, "internalDocumentSourceCursorBatchSizeByte
 assert.commandWorked(setParameter(db, "internalQueryMaxBlockingSortMemoryUsageBytes", 1));
 // Spilling memory threshold for $group
 assert.commandWorked(setParameter(db, "internalDocumentSourceGroupMaxMemoryBytes", 1));
-assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1));
+assert.commandWorked(
+    setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1),
+);
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", isSbeEnabled ? 129 : 424));
+assert.commandWorked(
+    setParameter(
+        db,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+        isSbeEnabled ? 129 : 424,
+    ),
+);
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
 // Spilling memory threshold for $lookup and $lookup-$unwind
-assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1));
+assert.commandWorked(
+    setParameter(
+        db,
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+        1,
+    ),
+);
 // Spilling memory threshold for $graphLookup
 assert.commandWorked(setParameter(db, "internalDocumentSourceGraphLookupMaxMemoryBytes", 1));
 // Spilling memory threshold for geo near
@@ -48,7 +62,9 @@ const nDocs = 10;
 for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({_id: i}));
     assert.commandWorked(foreignColl.insert({_id: i}));
-    assert.commandWorked(geoColl.insert({_id: i, geo: [(Math.cos(i) * i) / 10, (Math.sin(i) * i) / 10]}));
+    assert.commandWorked(
+        geoColl.insert({_id: i, geo: [(Math.cos(i) * i) / 10, (Math.sin(i) * i) / 10]}),
+    );
 }
 
 assert.commandWorked(geoColl.createIndex({geo: "2d"}));
@@ -178,7 +194,9 @@ function testSpillingMetrics({
     spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
     // Run an aggregation and hang at the fail point in the middle of the processing.
-    const failPointName = isSbePlan ? getSbeFailpointName(explain) : getClassicFailpointName(explain);
+    const failPointName = isSbePlan
+        ? getSbeFailpointName(explain)
+        : getClassicFailpointName(explain);
     const failPoint = configureFailPoint(db, failPointName, {} /* data */, {"skip": nDocs / 2});
     const awaitShell = startParallelShell(
         funWithArgs(
@@ -304,8 +322,12 @@ if (isSbeEnabled) {
 // Simulate available disk space to be more than `internalQuerySpillingMinAvailableDiskSpaceBytes`
 // but less than the minimum space requirement during `mergeSpills` phase of sorter so that it fails
 // with OutOfDiskSpace error during merge spills of the sort query.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySpillingMinAvailableDiskSpaceBytes: 10}));
-const simulateAvailableDiskSpaceFp = configureFailPoint(db, "simulateAvailableDiskSpace", {bytes: 20});
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySpillingMinAvailableDiskSpaceBytes: 10}),
+);
+const simulateAvailableDiskSpaceFp = configureFailPoint(db, "simulateAvailableDiskSpace", {
+    bytes: 20,
+});
 
 assert.commandFailedWithCode(
     db.runCommand({aggregate: collName, pipeline: pipelines["sort"], cursor: {}}),

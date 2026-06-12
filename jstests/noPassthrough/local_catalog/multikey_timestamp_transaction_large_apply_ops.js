@@ -127,8 +127,12 @@ const kTransactionWildcardCases = [
         ],
         txnWrites(sessionColl, caseName) {
             assert.commandWorked(sessionColl.insert({_id: 1, nested: {alpha: 100, beta: 201}}));
-            assert.commandWorked(sessionColl.updateOne({_id: 1}, {$set: {"nested.alpha": [1000, 1001]}}));
-            assert.commandWorked(sessionColl.updateOne({_id: 1}, {$set: {"nested.beta": [2010, 2011]}}));
+            assert.commandWorked(
+                sessionColl.updateOne({_id: 1}, {$set: {"nested.alpha": [1000, 1001]}}),
+            );
+            assert.commandWorked(
+                sessionColl.updateOne({_id: 1}, {$set: {"nested.beta": [2010, 2011]}}),
+            );
         },
     },
     {
@@ -147,7 +151,10 @@ const kTransactionWildcardCases = [
         txnWrites(sessionColl, caseName) {
             assert.commandWorked(sessionColl.insert({_id: 10, nested: {alpha: 200, beta: 301}}));
             assert.commandWorked(
-                sessionColl.updateOne({_id: 1}, {$set: {"nested.alpha": [1000, 1001], "nested.beta": [2010, 2011]}}),
+                sessionColl.updateOne(
+                    {_id: 1},
+                    {$set: {"nested.alpha": [1000, 1001], "nested.beta": [2010, 2011]}},
+                ),
             );
         },
     },
@@ -190,7 +197,9 @@ function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
     // Force a write to ensure the oplog fetcher is not idle and will observe stopReplProducer immediately.
     // In case there is nothing to replicate, the fetcher would wait 30s before discovering the failpoint.
     // Intentionally use {w:1} or we would block on the secondary hitting the failpoint.
-    assert.commandWorked(primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}));
+    assert.commandWorked(
+        primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}),
+    );
     stopReplProducerFailPoint.wait();
 }
 
@@ -215,7 +224,15 @@ function formatMultikeyTimestampMismatch(field, snapshotTs, transition, expected
     );
 }
 
-function assertPathAtTimestampForNode(node, txnCase, field, ts, expectedPath, transition, failureContext) {
+function assertPathAtTimestampForNode(
+    node,
+    txnCase,
+    field,
+    ts,
+    expectedPath,
+    transition,
+    failureContext,
+) {
     const actual = getIndexMultikeyPaths(node, txnCase.collName, txnCase.indexName, ts);
     const actualPath = actual[field.indexPath];
     assert(
@@ -226,7 +243,11 @@ function assertPathAtTimestampForNode(node, txnCase, field, ts, expectedPath, tr
 
 function assertCollectionMissingAtTimestamp(node, collName, ts, failureContext) {
     const catalogEntry = getCatalogEntry(node, collName, ts);
-    assert.eq(null, catalogEntry, `${collName} unexpectedly exists at ${tojson(ts)}; ${failureContext()}`);
+    assert.eq(
+        null,
+        catalogEntry,
+        `${collName} unexpectedly exists at ${tojson(ts)}; ${failureContext()}`,
+    );
 }
 
 function assertWildcardCollectionValid(node, collName) {
@@ -255,7 +276,14 @@ function findWithWildcardHintAtTimestampOrMissingCollection(node, collName, path
         readConcern: {level: "snapshot", atClusterTime: ts},
     });
     if (!result.ok) {
-        assert.eq(ErrorCodes.NamespaceNotFound, result.code, {host: node.host, collName, path, value, ts, result});
+        assert.eq(ErrorCodes.NamespaceNotFound, result.code, {
+            host: node.host,
+            collName,
+            path,
+            value,
+            ts,
+            result,
+        });
         return [];
     }
     return result.cursor.firstBatch;
@@ -278,10 +306,15 @@ function assertTransactionOplogChainSplit(primary, session, txnCase) {
     const txnNumber = session._serverSession.handle.getTxnNumber();
     const oplogEntries = getOplogEntriesForTxnOnNode(primary, lsid, txnNumber);
     const applyOpsEntries = oplogEntries.filter((entry) => entry.o.applyOps);
-    assert.gt(applyOpsEntries.length, 1, "expected large transaction to span multiple applyOps oplog entries", {
-        txnCase: txnCase.name,
-        oplogEntries,
-    });
+    assert.gt(
+        applyOpsEntries.length,
+        1,
+        "expected large transaction to span multiple applyOps oplog entries",
+        {
+            txnCase: txnCase.name,
+            oplogEntries,
+        },
+    );
 
     for (const [index, entry] of applyOpsEntries.entries()) {
         assert.eq("c", entry.op, {txnCase: txnCase.name, entry});
@@ -328,7 +361,9 @@ function findSetMultikeyMetadataTimestamp(primary, collName, indexName) {
 
 function findSetMultikeyMetadataTimestampForField(primary, txnCase, field) {
     const entries = findSetMultikeyMetadataEntries(primary, txnCase.collName, txnCase.indexName);
-    const matches = entries.filter((entry) => tojson(entry.o.paths[field.indexPath]) === tojson(field.multikeyPath));
+    const matches = entries.filter(
+        (entry) => tojson(entry.o.paths[field.indexPath]) === tojson(field.multikeyPath),
+    );
     assert.eq(1, matches.length, {txnCase: txnCase.name, field, entries});
     return matches[0].ts;
 }
@@ -340,7 +375,10 @@ function buildBtreeTransitions(primary, txnCase) {
             txnCase.expectedMultikeyTimestampSource === "commit"
                 ? findUnpreparedTransactionCommitTimestamp(primary, txnCase.collName, txnCase)
                 : findSetMultikeyMetadataTimestampForField(primary, txnCase, field);
-        transitions[field.indexPath] = {beforeTs: getPrecedingOplogTimestamp(primary, ts, txnCase.name), ts};
+        transitions[field.indexPath] = {
+            beforeTs: getPrecedingOplogTimestamp(primary, ts, txnCase.name),
+            ts,
+        };
     }
     return transitions;
 }
@@ -353,7 +391,12 @@ function assertTransactionBtreeCase(txnCase, primary, secondary) {
         for (const field of txnCase.fields) {
             const transition = transitions[field.indexPath];
             if (txnCase.createIndexInsideTxn) {
-                assertCollectionMissingAtTimestamp(node, txnCase.collName, transition.beforeTs, failureContext);
+                assertCollectionMissingAtTimestamp(
+                    node,
+                    txnCase.collName,
+                    transition.beforeTs,
+                    failureContext,
+                );
             } else {
                 assertPathAtTimestampForNode(
                     node,
@@ -378,7 +421,15 @@ function assertTransactionBtreeCase(txnCase, primary, secondary) {
     }
 }
 
-function assertWildcardTxnHintsAtTimestamps(node, collName, queryHints, docId, beforeTs, ts, allowMissingBefore) {
+function assertWildcardTxnHintsAtTimestamps(
+    node,
+    collName,
+    queryHints,
+    docId,
+    beforeTs,
+    ts,
+    allowMissingBefore,
+) {
     const findBeforeTs = allowMissingBefore
         ? findWithWildcardHintAtTimestampOrMissingCollection
         : findWithWildcardHintAtTimestamp;
@@ -391,7 +442,13 @@ function assertWildcardTxnHintsAtTimestamps(node, collName, queryHints, docId, b
         assert.eq(0, beforeNew.length, {host: node.host, path, afterValue, beforeTs});
 
         if (beforeValue !== undefined && !allowMissingBefore) {
-            const beforeOld = findWithWildcardHintAtTimestamp(node, collName, path, beforeValue, beforeTs);
+            const beforeOld = findWithWildcardHintAtTimestamp(
+                node,
+                collName,
+                path,
+                beforeValue,
+                beforeTs,
+            );
             assert.eq(1, beforeOld.length, {host: node.host, path, beforeValue, beforeTs});
             assert.eq(docId, beforeOld[0]._id, {host: node.host, path, beforeValue, beforeTs});
 
@@ -402,7 +459,11 @@ function assertWildcardTxnHintsAtTimestamps(node, collName, queryHints, docId, b
 }
 
 function assertTransactionWildcardCase(txnCase, primary, secondary) {
-    const visibilityTs = findUnpreparedTransactionCommitTimestamp(primary, txnCase.collName, txnCase);
+    const visibilityTs = findUnpreparedTransactionCommitTimestamp(
+        primary,
+        txnCase.collName,
+        txnCase,
+    );
     const beforeTs = getPrecedingOplogTimestamp(primary, visibilityTs, txnCase.name);
 
     for (const node of [primary, secondary]) {
@@ -430,10 +491,15 @@ function runLargeTransactionCase(txnCase, rst, primary, secondary) {
     if (!txnCase.createIndexInsideTxn) {
         const primaryColl = primaryDB.getCollection(txnCase.collName);
         if (isBtreeCase) {
-            assert.commandWorked(primaryColl.createIndex(txnCase.keyPattern, {name: txnCase.indexName}));
+            assert.commandWorked(
+                primaryColl.createIndex(txnCase.keyPattern, {name: txnCase.indexName}),
+            );
         } else {
             assert.commandWorked(
-                primaryColl.createIndex(txnCase.indexSpec, {name: "wildcard_all", ...txnCase.indexOptions}),
+                primaryColl.createIndex(txnCase.indexSpec, {
+                    name: "wildcard_all",
+                    ...txnCase.indexOptions,
+                }),
             );
         }
         assert.commandWorked(primaryColl.insert(txnCase.seedDocs, {writeConcern: {w: 2}}));
@@ -452,17 +518,24 @@ function runLargeTransactionCase(txnCase, rst, primary, secondary) {
             if (txnCase.createIndexInsideTxn) {
                 assert.commandWorked(sessionDB.createCollection(txnCase.collName));
                 if (isBtreeCase) {
-                    assert.commandWorked(sessionColl.createIndex(txnCase.keyPattern, {name: txnCase.indexName}));
+                    assert.commandWorked(
+                        sessionColl.createIndex(txnCase.keyPattern, {name: txnCase.indexName}),
+                    );
                 } else {
                     assert.commandWorked(
-                        sessionColl.createIndex(txnCase.indexSpec, {name: "wildcard_all", ...txnCase.indexOptions}),
+                        sessionColl.createIndex(txnCase.indexSpec, {
+                            name: "wildcard_all",
+                            ...txnCase.indexOptions,
+                        }),
                     );
                 }
             }
 
             txnCase.txnWrites(sessionColl, txnCase.name);
             appendLargeTxnFillerWrites(sessionColl, txnCase.name);
-            assert.commandWorked(sessionColl.updateOne({_id: `${txnCase.name}_filler_0`}, {$set: {tag: "updated"}}));
+            assert.commandWorked(
+                sessionColl.updateOne({_id: `${txnCase.name}_filler_0`}, {$set: {tag: "updated"}}),
+            );
             assert.commandWorked(sessionColl.deleteOne({_id: `${txnCase.name}_filler_1`}));
 
             if (txnCase.prepare) {

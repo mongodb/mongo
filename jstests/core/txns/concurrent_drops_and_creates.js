@@ -59,18 +59,29 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 
         // However, trying to perform a write will cause a write conflict.
         assert.commandFailedWithCode(
-            sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+            sessionDB2.runCommand({
+                findAndModify: sessionCollB.getName(),
+                update: {a: 1},
+                upsert: true,
+            }),
             ErrorCodes.WriteConflict,
         );
     } else {
         // TODO (SERVER-39704): See if we can match the replicaset behaviour.
         assert.commandFailedWithCode(
-            sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+            sessionDB2.runCommand({
+                findAndModify: sessionCollB.getName(),
+                update: {a: 1},
+                upsert: true,
+            }),
             ErrorCodes.StaleConfig,
         );
     }
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 });
 
 //
@@ -97,7 +108,9 @@ if (!db.getMongo().isCausalConsistency()) {
         // Start the transaction with a write to collection A. Use an explicit atClusterTime
         // with a timestamp at which collectionB existed and contained one document.
         sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-        session.startTransaction({readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp}});
+        session.startTransaction({
+            readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp},
+        });
 
         // Expect a conflict to be thrown, because the collection was dropped at a logical
         // timestamp greater than the one the transaction is reading at.
@@ -105,7 +118,10 @@ if (!db.getMongo().isCausalConsistency()) {
             sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}}),
             ErrorCodes.WriteConflict,
         );
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.abortTransaction_forTesting(),
+            ErrorCodes.NoSuchTransaction,
+        );
     });
 }
 
@@ -136,7 +152,10 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     // If collection A and collection B live on different shards, this transaction would
     // require two phase commit and would fail with a OperationNotSupportedInTransaction error
     // instead of a WriteConflict error.
-    const expectedErrorCodes = [ErrorCodes.WriteConflict, ErrorCodes.OperationNotSupportedInTransaction];
+    const expectedErrorCodes = [
+        ErrorCodes.WriteConflict,
+        ErrorCodes.OperationNotSupportedInTransaction,
+    ];
 
     assert.commandWorked(sessionCollB.insert({}));
     assert.commandFailedWithCode(session.commitTransaction_forTesting(), expectedErrorCodes);

@@ -52,7 +52,10 @@ function dropView(viewName) {
 
     const viewName = makeViewName("testBar_in_def");
     assert.commandWorked(
-        testDb.createView(viewName, collName, [{$testBar: {noop: true}}, {$addFields: {fromView: true}}]),
+        testDb.createView(viewName, collName, [
+            {$testBar: {noop: true}},
+            {$addFields: {fromView: true}},
+        ]),
     );
 
     const pipeline = [
@@ -98,7 +101,9 @@ function dropView(viewName) {
 
     const viewName = makeViewName("matchTopN_in_def");
     assert.commandWorked(
-        testDb.createView(viewName, collName, [{$matchTopN: {filter: {x: {$gte: 2}}, sort: {x: -1}, limit: 3}}]),
+        testDb.createView(viewName, collName, [
+            {$matchTopN: {filter: {x: {$gte: 2}}, sort: {x: -1}, limit: 3}},
+        ]),
     );
 
     const pipeline = [
@@ -156,7 +161,9 @@ function dropView(viewName) {
     jsTest.log.info("Testing $facet ON view with $extensionLimit (transform extension)");
 
     const viewName = makeViewName("extensionLimit_in_def");
-    assert.commandWorked(testDb.createView(viewName, collName, [{$sort: {_id: 1}}, {$extensionLimit: 4}]));
+    assert.commandWorked(
+        testDb.createView(viewName, collName, [{$sort: {_id: 1}}, {$extensionLimit: 4}]),
+    );
 
     const pipeline = [
         {
@@ -186,17 +193,25 @@ function dropView(viewName) {
     // Level 1: View with extension on base collection.
     const level1ViewName = makeViewName("chain_level1");
     assert.commandWorked(
-        testDb.createView(level1ViewName, collName, [{$testBar: {noop: true}}, {$addFields: {level1: true}}]),
+        testDb.createView(level1ViewName, collName, [
+            {$testBar: {noop: true}},
+            {$addFields: {level1: true}},
+        ]),
     );
 
     // Level 2: View on level 1 with no extension.
     const level2ViewName = makeViewName("chain_level2");
-    assert.commandWorked(testDb.createView(level2ViewName, level1ViewName, [{$addFields: {level2: true}}]));
+    assert.commandWorked(
+        testDb.createView(level2ViewName, level1ViewName, [{$addFields: {level2: true}}]),
+    );
 
     // Level 3: View on level 2 with extension.
     const level3ViewName = makeViewName("chain_level3");
     assert.commandWorked(
-        testDb.createView(level3ViewName, level2ViewName, [{$testBar: {noop: true}}, {$addFields: {level3: true}}]),
+        testDb.createView(level3ViewName, level2ViewName, [
+            {$testBar: {noop: true}},
+            {$addFields: {level3: true}},
+        ]),
     );
 
     const pipeline = [

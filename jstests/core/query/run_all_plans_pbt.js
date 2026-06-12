@@ -30,7 +30,10 @@ import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/co
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {runDeoptimized, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {
+    runDeoptimized,
+    testProperty,
+} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 if (isSlowBuild(db)) {
@@ -47,7 +50,9 @@ const experimentColl = db.run_all_plans_experiment;
 function runHintedAgg(query, index) {
     try {
         return {
-            docs: experimentColl.aggregate(query.pipeline, {...query.options, hint: index.name}).toArray(),
+            docs: experimentColl
+                .aggregate(query.pipeline, {...query.options, hint: index.name})
+                .toArray(),
         };
     } catch (e) {
         return {err: e.code};
@@ -82,7 +87,9 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
                         "Query results from hinted experiment collection did not match plain collection using collscan.",
                     query,
                     index,
-                    explain: experimentColl.explain().aggregate(query.pipeline, {...query.options, hint: index.name}),
+                    explain: experimentColl
+                        .explain()
+                        .aggregate(query.pipeline, {...query.options, hint: index.name}),
                     controlResults,
                     docsInCollection: controlColl.find().toArray(),
                     experimentalResults: res.docs,
@@ -106,6 +113,10 @@ testProperty(
     {controlColl, experimentColl},
     // Hinting a partial index can return incorrect results due to SERVER-26413.
     // TODO SERVER-26413 re-enable partial index coverage.
-    makeWorkloadModel({collModel: getCollectionModel({allowPartialIndexes: false}), aggModel, numQueriesPerRun}),
+    makeWorkloadModel({
+        collModel: getCollectionModel({allowPartialIndexes: false}),
+        aggModel,
+        numQueriesPerRun,
+    }),
     numRuns,
 );

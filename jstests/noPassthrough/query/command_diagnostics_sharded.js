@@ -42,19 +42,26 @@ function runTest({description, command, expectedDiagnosticInfo, redact = false})
     const mongosDb = mongosConn.getDB(dbName);
     const checkLogsDb = connToCheckLogs.getDB(dbName);
     if (hasEnterpriseModule) {
-        assert.commandWorked(connToCheckLogs.adminCommand({setParameter: 1, redactClientLogData: redact}));
+        assert.commandWorked(
+            connToCheckLogs.adminCommand({setParameter: 1, redactClientLogData: redact}),
+        );
     }
 
     // In addition to the particular diagnostic info expected per test case, all commands should
     // include the following.
-    expectedDiagnosticInfo = expectedDiagnosticInfo.concat(["millis:", "locks: {}", "flowControl: {}"]);
+    expectedDiagnosticInfo = expectedDiagnosticInfo.concat([
+        "millis:",
+        "locks: {}",
+        "flowControl: {}",
+    ]);
     const {failpointName, failpointOpts, errorCode} = getQueryPlannerAlwaysFailsWithNamespace(ns);
 
     // If the knob for diagnostic logging is disabled, ensure that we do not see any diagnostic
     // logging.
     setParameter(checkLogsDb, "enableDiagnosticLogging", false);
     jsTestLog(
-        "Running test case with knob disabled: " + tojson({description, command, expectedDiagnosticInfo, redact}),
+        "Running test case with knob disabled: " +
+            tojson({description, command, expectedDiagnosticInfo, redact}),
     );
     runWithFailpoint(checkLogsDb, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they would still generate the
@@ -78,7 +85,10 @@ function runTest({description, command, expectedDiagnosticInfo, redact = false})
 
     // Now enable the knob and ensure that we do see the expected logs.
     setParameter(checkLogsDb, "enableDiagnosticLogging", true);
-    jsTestLog("Running test case with knob enabled:" + tojson({description, command, expectedDiagnosticInfo, redact}));
+    jsTestLog(
+        "Running test case with knob enabled:" +
+            tojson({description, command, expectedDiagnosticInfo, redact}),
+    );
     runWithFailpoint(checkLogsDb, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they still generate the diagnostic log.
         if (!command.bulkWrite) {
@@ -266,7 +276,9 @@ function runTests(onMongos = false) {
             "filter: { a: 1.0, b: 1.0 }",
             "updateMods: { a: 1.0 }",
             onMongos ? `'test.${jsTestName()}': {${shardKeyLog}}` : shardKeyLog,
-            onMongos ? `'test.differentNamespace': {'shardKeyPattern': omitted: collection isn't sharded}` : "",
+            onMongos
+                ? `'test.differentNamespace': {'shardKeyPattern': omitted: collection isn't sharded}`
+                : "",
         ],
     });
 
@@ -284,7 +296,11 @@ function runTests(onMongos = false) {
     runTest({
         description: "explain aggregate",
         command: {
-            explain: {aggregate: collName, pipeline: [{$match: query}, {$unwind: "$arr"}], cursor: {}},
+            explain: {
+                aggregate: collName,
+                pipeline: [{$match: query}, {$unwind: "$arr"}],
+                cursor: {},
+            },
         },
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
@@ -318,7 +334,11 @@ function runTests(onMongos = false) {
 
 jsTestLog("Testing tassert log diagnostics on mongos");
 {
-    const st = new ShardingTest({mongos: 1, shards: 1, other: {mongosOptions: {useLogFiles: true}}});
+    const st = new ShardingTest({
+        mongos: 1,
+        shards: 1,
+        other: {mongosOptions: {useLogFiles: true}},
+    });
     const db = st.s.getDB(dbName);
     const coll = db[collName];
     coll.drop();

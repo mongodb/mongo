@@ -59,7 +59,8 @@ const checkBasicCRUD = function (withCollection, _id, isReplSetConnection) {
         additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
     }
 
-    const runWithRetries = (fn) => retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
+    const runWithRetries = (fn) =>
+        retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
     const runFindOneWithRetries = (coll, filter) => runWithRetries(() => coll.findOne(filter));
 
     withCollection((coll) => {
@@ -78,7 +79,9 @@ const checkBasicCRUD = function (withCollection, _id, isReplSetConnection) {
     });
 
     withCollection((coll) => {
-        assert.commandWorked(runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
+        assert.commandWorked(
+            runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})),
+        );
         assert.eq(_id, runFindOneWithRetries(coll, {_id: _id})._id);
     });
 };
@@ -164,7 +167,10 @@ const checkDDLOps = function (withDbs, isReplSetConnection) {
     withDbs((db, _) => {
         jsTestLog("Running collMod.");
         runDDLCommandWithRetries(db, {collMod: DDLCollection, validator: {x: {$lt: 10}}});
-        assert.commandFailedWithCode(db[DDLCollection].insert({x: 11}), ErrorCodes.DocumentValidationFailure);
+        assert.commandFailedWithCode(
+            db[DDLCollection].insert({x: 11}),
+            ErrorCodes.DocumentValidationFailure,
+        );
     });
 
     withDbs((db, _) => {
@@ -212,7 +218,15 @@ const checkDDLOps = function (withDbs, isReplSetConnection) {
     });
 };
 
-const checkCRUDThread = function (mongosHost, replSetHost, ns, _id, countdownLatch, stage, checkBasicCRUD) {
+const checkCRUDThread = function (
+    mongosHost,
+    replSetHost,
+    ns,
+    _id,
+    countdownLatch,
+    stage,
+    checkBasicCRUD,
+) {
     const [dbName, collName] = ns.split(".");
 
     const mongos = new Mongo(mongosHost);
@@ -348,7 +362,14 @@ jsTestLog("Stating background DDL operations.");
 // Used to signal to the threads whether to run operations on the replica set, mongos, or both.
 const ddlStage = new CountDownLatch(2);
 const ddlStopLatch = new CountDownLatch(1);
-let ddlThread = new Thread(checkDDLThread, st.s.host, replShard.getURL(), ddlStopLatch, ddlStage, checkDDLOps);
+let ddlThread = new Thread(
+    checkDDLThread,
+    st.s.host,
+    replShard.getURL(),
+    ddlStopLatch,
+    ddlStage,
+    checkDDLOps,
+);
 ddlThread.start();
 
 jsTestLog("Restarting secondaries with --shardsvr.");
@@ -366,7 +387,9 @@ replShard.awaitNodesAgreeOnPrimary();
 jsTestLog("Adding replica set as shard.");
 assert.commandWorked(st.s.adminCommand({addShard: replShard.getURL()}));
 
-jsTestLog("Simulating rolling connection string change by starting background CRUD and DDL ops on mongos.");
+jsTestLog(
+    "Simulating rolling connection string change by starting background CRUD and DDL ops on mongos.",
+);
 ddlStage.countDown();
 crudStage.countDown();
 sleep(3000); // Let the background CRUD and DDL operations run for a while.
@@ -384,14 +407,20 @@ ddlStage.countDown();
 crudStage.countDown();
 
 jsTestLog("Adding a second shard.");
-const newShard = new ReplSetTest({name: "toRemoveLater", nodes: NUM_NODES, nodeOptions: {shardsvr: ""}});
+const newShard = new ReplSetTest({
+    name: "toRemoveLater",
+    nodes: NUM_NODES,
+    nodeOptions: {shardsvr: ""},
+});
 newShard.startSet();
 newShard.initiate();
 assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: "toRemoveLater"}));
 
 jsTestLog("Moving chunks to second shard.");
 for (let x = 0; x < 2; x++) {
-    assert.commandWorked(st.s.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}),
+    );
 }
 
 jsTestLog("Removing second shard.");

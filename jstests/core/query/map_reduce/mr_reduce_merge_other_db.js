@@ -35,7 +35,9 @@ const reduceFn = function (k, vs) {
             {_id: 5, value: "existing"},
         ]),
     );
-    let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {merge: outCollStr, db: outDbStr}}));
+    let res = assert.commandWorked(
+        coll.mapReduce(mapFn, reduceFn, {out: {merge: outCollStr, db: outDbStr}}),
+    );
     const expected = [
         {_id: 1, value: 1},
         {_id: 2, value: 2},
@@ -55,7 +57,9 @@ const reduceFn = function (k, vs) {
             {_id: 5, value: 0},
         ]),
     );
-    let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {reduce: outCollStr, db: outDbStr}}));
+    let res = assert.commandWorked(
+        coll.mapReduce(mapFn, reduceFn, {out: {reduce: outCollStr, db: outDbStr}}),
+    );
     const expected = [
         {_id: 1, value: 101},
         {_id: 2, value: 2},

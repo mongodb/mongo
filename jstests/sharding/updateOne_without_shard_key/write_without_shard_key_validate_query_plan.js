@@ -50,7 +50,11 @@ function runTest(testCase, usingClusteredIndex) {
     if (usingClusteredIndex) {
         if (testCase.hasPositionalProjection) {
             assert.eq(profileDoc.execStats.stage, "PROJECTION_DEFAULT", profileDoc);
-            assert.eq(profileDoc.execStats.inputStage.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
+            assert.eq(
+                profileDoc.execStats.inputStage.inputStage.stage,
+                "CLUSTERED_IXSCAN",
+                profileDoc,
+            );
         } else {
             if (!profileDoc.execStats.inputStage) {
                 // for queries that use express, there is no inputStage
@@ -77,7 +81,11 @@ function runTest(testCase, usingClusteredIndex) {
         } else if (testCase.hasPositionalProjection) {
             assert.eq(profileDoc.execStats.stage, "PROJECTION_DEFAULT", profileDoc);
             assert.eq(profileDoc.execStats.inputStage.inputStage.stage, "FETCH", profileDoc);
-            assert.eq(profileDoc.execStats.inputStage.inputStage.inputStage.stage, "IXSCAN", profileDoc);
+            assert.eq(
+                profileDoc.execStats.inputStage.inputStage.inputStage.stage,
+                "IXSCAN",
+                profileDoc,
+            );
         } else {
             if (!profileDoc.execStats.inputStage) {
                 // for queries that use express, there is no inputStage
@@ -171,7 +179,9 @@ let testCases = [
         logMessage: "Running updateOne with positional update and non-default collation.",
         cmdObj: {
             update: collName,
-            updates: [{q: {y: 1, z: 1}, u: {$set: {"z.$": 3}}, collation: {locale: "en", strength: 2}}],
+            updates: [
+                {q: {y: 1, z: 1}, u: {$set: {"z.$": 3}}, collation: {locale: "en", strength: 2}},
+            ],
         },
         hasPositionalUpdate: true,
         profileDocToFind: {
@@ -193,7 +203,8 @@ let testCases = [
         profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
-        logMessage: "Running findAndModify update without positional update and non-default collation.",
+        logMessage:
+            "Running findAndModify update without positional update and non-default collation.",
         cmdObj: {
             findAndModify: collName,
             query: {y: 1},
@@ -213,7 +224,8 @@ let testCases = [
         profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
-        logMessage: "Running findAndModify update with positional update and non-default collation.",
+        logMessage:
+            "Running findAndModify update with positional update and non-default collation.",
         cmdObj: {
             findAndModify: collName,
             query: {y: 1, z: 1},

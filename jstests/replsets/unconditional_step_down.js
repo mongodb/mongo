@@ -54,7 +54,10 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     // Find command.
     configureFailPoint(primary, readFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
     // Insert command.
-    const writeFp = configureFailPoint(primary, writeFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
+    const writeFp = configureFailPoint(primary, writeFailPoint, {
+        nss: collNss,
+        shouldCheckForInterrupt: true,
+    });
 
     let startSafeParallelShell = (func, port) => {
         TestData.func = func;
@@ -69,7 +72,9 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
 
     const joinReadThread = startSafeParallelShell(() => {
         jsTestLog("Start blocking find cmd before step down");
-        let findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+        let findRes = assert.commandWorked(
+            db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}),
+        );
         assert.eq(findRes.cursor.firstBatch.length, 1);
     }, primary.port);
 
@@ -91,7 +96,9 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
         jsTestLog("Unblock step down");
         // Turn off fail point on find cmd to allow step down to continue. Hardcode the use of the
         // shard failpoint here since we are in a parallel shell.
-        assert.commandWorked(db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "off"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "off"}),
+        );
     }, primary.port);
 
     jsTestLog("Wait for find cmd to reach the fail point");

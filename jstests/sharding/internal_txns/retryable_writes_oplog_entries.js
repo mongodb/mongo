@@ -93,7 +93,9 @@ function verifyOplogEntries(
         if (isPreparedTransaction) {
             const shard0Primary = st.rs0.getPrimary();
             const prepareCmdObj = makePrepareTransactionCmdObj(lsid, txnNum);
-            const isPreparedTransactionRes = assert.commandWorked(shard0Primary.adminCommand(prepareCmdObj));
+            const isPreparedTransactionRes = assert.commandWorked(
+                shard0Primary.adminCommand(prepareCmdObj),
+            );
             commitCmdObj.commitTimestamp = isPreparedTransactionRes.prepareTimestamp;
             assert.commandWorked(shard0Primary.adminCommand(commitCmdObj));
         }
@@ -186,7 +188,9 @@ function testDeletes(lsid, testOptions) {
 }
 
 {
-    jsTest.log("Test that oplog entries for non-retryable internal transactions do not have stmtIds");
+    jsTest.log(
+        "Test that oplog entries for non-retryable internal transactions do not have stmtIds",
+    );
     const lsid = {id: UUID(), txnUUID: UUID()};
     const testOptions = {shouldStoreStmtIds: false};
     testInserts(lsid, testOptions);

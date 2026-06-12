@@ -1,6 +1,9 @@
 // @tags: [requires_profiling]
 
-import {testGetCmdLineOptsMongod, testGetCmdLineOptsMongos} from "jstests/libs/command_line/test_parsed_options.js";
+import {
+    testGetCmdLineOptsMongod,
+    testGetCmdLineOptsMongos,
+} from "jstests/libs/command_line/test_parsed_options.js";
 
 let baseName = "jstests_core_profile_options";
 
@@ -32,15 +35,26 @@ expectedResult = {
         "operationProfiling": {"filter": "{$expr: {$lt: [{$rand: {}}, 0.01]}}"},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling_filter.json"}, expectedResult);
-testGetCmdLineOptsMongos({config: "jstests/libs/config_files/set_profiling_filter.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/set_profiling_filter.json"},
+    expectedResult,
+);
+testGetCmdLineOptsMongos(
+    {config: "jstests/libs/config_files/set_profiling_filter.json"},
+    expectedResult,
+);
 
-jsTest.log('Testing "operationProfiling.filter" config with agg expressions that depend on lastLTS feature flag');
+jsTest.log(
+    'Testing "operationProfiling.filter" config with agg expressions that depend on lastLTS feature flag',
+);
 expectedResult = {
     "parsed": {
         "config": "jstests/libs/config_files/set_profiling_filter_ff.json",
         "operationProfiling": {"filter": "{$expr: {$lt: [{$_testFeatureFlagLastLTS: 1}, 0.01]}}"},
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling_filter_ff.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/set_profiling_filter_ff.json"},
+    expectedResult,
+);
 print(baseName + " succeeded.");

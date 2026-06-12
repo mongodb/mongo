@@ -24,7 +24,9 @@ function checkResults(resObj, expectedResult) {
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 const mongos = st.s;
 const dbName = jsTestName();
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const testDB = mongos.getDB(dbName);
 const shardedCollOne = testDB.shardedCollOne;
 shardedCollOne.drop();
@@ -40,8 +42,12 @@ for (let i = 0; i < 5; i++) {
     assert.commandWorked(unshardedCollOne.insert({val: i * 3}));
     assert.commandWorked(unshardedCollTwo.insert({val: i * 4}));
 }
-assert.commandWorked(mongos.adminCommand({shardCollection: shardedCollOne.getFullName(), key: {_id: 1}}));
-assert.commandWorked(mongos.adminCommand({shardCollection: shardedCollTwo.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    mongos.adminCommand({shardCollection: shardedCollOne.getFullName(), key: {_id: 1}}),
+);
+assert.commandWorked(
+    mongos.adminCommand({shardCollection: shardedCollTwo.getFullName(), key: {_id: 1}}),
+);
 
 // Run each test against both the primary and non-primary shards.
 // Make sure the primary is always shard0.
@@ -51,7 +57,9 @@ shardNames.forEach(function (shardName) {
     testDB.adminCommand({moveChunk: shardedCollOne.getFullName(), find: {_id: 0}, to: shardName});
     testDB.adminCommand({moveChunk: shardedCollTwo.getFullName(), find: {_id: 0}, to: shardName});
     // Test one sharded and one unsharded collection.
-    let resSet = getDocsFromCollection(shardedCollOne).concat(getDocsFromCollection(unshardedCollOne));
+    let resSet = getDocsFromCollection(shardedCollOne).concat(
+        getDocsFromCollection(unshardedCollOne),
+    );
     let resObj = assert.commandWorked(
         testDB.runCommand({
             aggregate: shardedCollOne.getName(),
@@ -156,25 +164,10 @@ jsTestLog("Testing $unionWith with cursorless sub-pipeline stages for local read
 // (to shard0 for unshardedCollOne, or shard1 for shardedCollOne), which creates a new operation
 // with proper shard versions and never exercises the local-read path.
 assert.commandWorked(
-    testDB.adminCommand({moveChunk: shardedCollOne.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
-);
-
-assert.commandWorked(
-    testDB.runCommand({
-        aggregate: shardedCollOne.getName(),
-        pipeline: [
-            {$match: {_id: -1}},
-            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$collStats: {count: {}, storageStats: {}}}]}},
-        ],
-        cursor: {},
-    }),
-);
-
-assert.commandWorked(
-    testDB.runCommand({
-        aggregate: shardedCollOne.getName(),
-        pipeline: [{$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}}],
-        cursor: {},
+    testDB.adminCommand({
+        moveChunk: shardedCollOne.getFullName(),
+        find: {_id: 0},
+        to: st.shard0.shardName,
     }),
 );
 
@@ -183,7 +176,12 @@ assert.commandWorked(
         aggregate: shardedCollOne.getName(),
         pipeline: [
             {$match: {_id: -1}},
-            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$collStats: {count: {}, storageStats: {}}}]}},
+            {
+                $unionWith: {
+                    coll: unshardedCollOne.getName(),
+                    pipeline: [{$collStats: {count: {}, storageStats: {}}}],
+                },
+            },
         ],
         cursor: {},
     }),
@@ -192,7 +190,35 @@ assert.commandWorked(
 assert.commandWorked(
     testDB.runCommand({
         aggregate: shardedCollOne.getName(),
-        pipeline: [{$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}}],
+        pipeline: [
+            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}},
+        ],
+        cursor: {},
+    }),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [
+            {$match: {_id: -1}},
+            {
+                $unionWith: {
+                    coll: unshardedCollOne.getName(),
+                    pipeline: [{$collStats: {count: {}, storageStats: {}}}],
+                },
+            },
+        ],
+        cursor: {},
+    }),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [
+            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}},
+        ],
         cursor: {},
     }),
 );
@@ -211,7 +237,12 @@ assert.commandWorked(
         aggregate: shardedCollOne.getName(),
         pipeline: [
             {$match: {_id: -1}},
-            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$collStats: {count: {}, storageStats: {}}}]}},
+            {
+                $unionWith: {
+                    coll: unshardedCollOne.getName(),
+                    pipeline: [{$collStats: {count: {}, storageStats: {}}}],
+                },
+            },
         ],
         cursor: {},
     }),
@@ -220,7 +251,9 @@ assert.commandWorked(
 assert.commandWorked(
     testDB.runCommand({
         aggregate: shardedCollOne.getName(),
-        pipeline: [{$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}}],
+        pipeline: [
+            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}},
+        ],
         cursor: {},
     }),
 );

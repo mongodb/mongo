@@ -58,7 +58,9 @@ for (let x = 0; x < 150; x += 10) {
     configDB.adminCommand({split: ns, middle: {_id: x}});
 }
 
-let shard0Chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
+let shard0Chunks = findChunksUtil
+    .findChunksByNs(configDB, ns, {shard: st.shard0.shardName})
+    .count();
 
 let startDate = new Date();
 let hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
@@ -80,7 +82,9 @@ st.startBalancer();
 
 st.awaitBalancerRound();
 
-let shard0ChunksAfter = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
+let shard0ChunksAfter = findChunksUtil
+    .findChunksByNs(configDB, ns, {shard: st.shard0.shardName})
+    .count();
 assert.eq(shard0Chunks, shard0ChunksAfter);
 
 assert.commandWorked(
@@ -88,7 +92,10 @@ assert.commandWorked(
         {_id: "balancer"},
         {
             $set: {
-                activeWindow: {start: hourMinStart.toString(), stop: hourMinStart.addHour(2).toString()},
+                activeWindow: {
+                    start: hourMinStart.toString(),
+                    stop: hourMinStart.addHour(2).toString(),
+                },
             },
         },
         true,
@@ -97,7 +104,9 @@ assert.commandWorked(
 
 st.awaitBalancerRound();
 
-shard0ChunksAfter = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
+shard0ChunksAfter = findChunksUtil
+    .findChunksByNs(configDB, ns, {shard: st.shard0.shardName})
+    .count();
 assert.neq(shard0Chunks, shard0ChunksAfter);
 
 st.stop();

@@ -16,7 +16,10 @@ let rollbackTest = new RollbackTest();
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
 assert.commandWorked(
-    rollbackNode.adminCommand({configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "alwaysOn"}),
+    rollbackNode.adminCommand({
+        configureFailPoint: "rollbackHangAfterTransitionToRollback",
+        mode: "alwaysOn",
+    }),
 );
 
 // Start rollback.
@@ -35,7 +38,10 @@ const result = assert.commandFailedWithCode(
 jsTestLog("Validation failed on rollback node as expected: " + tojson(result));
 
 assert.commandWorked(
-    rollbackNode.adminCommand({configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "off"}),
+    rollbackNode.adminCommand({
+        configureFailPoint: "rollbackHangAfterTransitionToRollback",
+        mode: "off",
+    }),
 );
 
 rollbackTest.transitionToSteadyStateOperations();

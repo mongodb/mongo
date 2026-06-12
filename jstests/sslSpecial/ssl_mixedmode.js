@@ -8,12 +8,16 @@ function testCombination(tlsMode, sslShell, shouldSucceed) {
         "TESTING: tlsMode = " +
             tlsMode +
             ", sslShell = " +
-            (sslShell ? "true" : "false" + " (should " + (shouldSucceed ? "" : "not ") + "succeed)"),
+            (sslShell
+                ? "true"
+                : "false" + " (should " + (shouldSucceed ? "" : "not ") + "succeed)"),
     );
 
     let serverOptionOverrides = {tlsMode: tlsMode};
 
-    let clientOptions = sslShell ? TLSTest.prototype.defaultTLSClientOptions : TLSTest.prototype.noTLSClientOptions;
+    let clientOptions = sslShell
+        ? TLSTest.prototype.defaultTLSClientOptions
+        : TLSTest.prototype.noTLSClientOptions;
 
     let fixture = new TLSTest(serverOptionOverrides, clientOptions);
 

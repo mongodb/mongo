@@ -50,7 +50,11 @@ function verifyCurrentOpFields(res, isActive) {
     ];
 
     assert.hasFields(transaction, expectedTransactionsFields, tojson(transaction));
-    assert.eq(expectedTransactionsFields.length, Object.keys(transaction).length, tojson(transaction));
+    assert.eq(
+        expectedTransactionsFields.length,
+        Object.keys(transaction).length,
+        tojson(transaction),
+    );
 
     // Verify transaction parameters sub object.
 
@@ -75,7 +79,11 @@ function verifyCurrentOpFields(res, isActive) {
         assert.hasFields(participant, expectedParticipantFields, tojson(participant));
         if (isActive) {
             // 'readOnly' should not be set.
-            assert.eq(expectedParticipantFields.length, Object.keys(participant).length, tojson(participant));
+            assert.eq(
+                expectedParticipantFields.length,
+                Object.keys(participant).length,
+                tojson(participant),
+            );
         } else {
             // 'readOnly' should always be set for the inactive transaction.
             assert.hasFields(participant, ["readOnly"], tojson(participant));
@@ -129,7 +137,9 @@ jsTest.log("Active transaction.");
 
             threadSession.startTransaction({readConcern: {level: "snapshot"}});
             assert.commandWorked(
-                threadSession.getDatabase(dbName).runCommand({find: collName, filter: {}, comment: "active_txn_find"}),
+                threadSession
+                    .getDatabase(dbName)
+                    .runCommand({find: collName, filter: {}, comment: "active_txn_find"}),
             );
 
             assert.commandWorked(threadSession.abortTransaction_forTesting());

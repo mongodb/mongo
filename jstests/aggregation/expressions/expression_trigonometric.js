@@ -188,8 +188,16 @@ testOpApprox("$atan", -Infinity, -Math.PI / 2);
 
 testOpApprox("$atan2", [NumberDecimal("Infinity"), 0], NumberDecimal(Math.PI / 2));
 testOpApprox("$atan2", [NumberDecimal("-Infinity"), 0], NumberDecimal(-Math.PI / 2));
-testOpApprox("$atan2", [NumberDecimal("-Infinity"), NumberDecimal("Infinity")], NumberDecimal(-Math.PI / 4));
-testOpApprox("$atan2", [NumberDecimal("-Infinity"), NumberDecimal("-Infinity")], NumberDecimal((-3 * Math.PI) / 4));
+testOpApprox(
+    "$atan2",
+    [NumberDecimal("-Infinity"), NumberDecimal("Infinity")],
+    NumberDecimal(-Math.PI / 4),
+);
+testOpApprox(
+    "$atan2",
+    [NumberDecimal("-Infinity"), NumberDecimal("-Infinity")],
+    NumberDecimal((-3 * Math.PI) / 4),
+);
 testOpApprox("$atan2", [NumberDecimal("0"), NumberDecimal("-Infinity")], NumberDecimal(Math.PI));
 testOpApprox("$atan2", [NumberDecimal("0"), NumberDecimal("Infinity")], NumberDecimal(0));
 

@@ -28,28 +28,53 @@ assert.commandWorked(
         {
             Species: "Blackbird (Turdus merula)",
             population_trends: [
-                {term: {start: 1970, end: 2014}, pct_change: -16, annual: -0.38, trend: "no change"},
+                {
+                    term: {start: 1970, end: 2014},
+                    pct_change: -16,
+                    annual: -0.38,
+                    trend: "no change",
+                },
                 {term: {start: 2009, end: 2014}, pct_change: -2, annual: -0.36, trend: "no change"},
             ],
         },
         {
             Species: "Bullfinch (Pyrrhula pyrrhula)",
             population_trends: [
-                {term: {start: 1970, end: 2014}, pct_change: -39, annual: -1.13, trend: "no change"},
-                {term: {start: 2009, end: 2014}, pct_change: 12, annual: 2.38, trend: "weak increase"},
+                {
+                    term: {start: 1970, end: 2014},
+                    pct_change: -39,
+                    annual: -1.13,
+                    trend: "no change",
+                },
+                {
+                    term: {start: 2009, end: 2014},
+                    pct_change: 12,
+                    annual: 2.38,
+                    trend: "weak increase",
+                },
             ],
         },
         {
             Species: "Chaffinch (Fringilla coelebs)",
             population_trends: [
                 {term: {start: 1970, end: 2014}, pct_change: 27, annual: 0.55, trend: "no change"},
-                {term: {start: 2009, end: 2014}, pct_change: -7, annual: -1.49, trend: "weak decline"},
+                {
+                    term: {start: 2009, end: 2014},
+                    pct_change: -7,
+                    annual: -1.49,
+                    trend: "weak decline",
+                },
             ],
         },
         {
             Species: "Song Thrush (Turdus philomelos)",
             population_trends: [
-                {term: {start: 1970, end: 2014}, pct_change: -53, annual: -1.7, trend: "weak decline"},
+                {
+                    term: {start: 1970, end: 2014},
+                    pct_change: -53,
+                    annual: -1.7,
+                    trend: "weak decline",
+                },
                 {term: {start: 2009, end: 2014}, pct_change: -4, annual: -0.88, trend: "no change"},
             ],
         },
@@ -96,7 +121,14 @@ prepMergeTargetColl();
 assert.commandWorked(
     db.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$merge: {into: targetColl.getName(), whenMatched: [{$addFields: {"var": "$$variable"}}]}}],
+        pipeline: [
+            {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: [{$addFields: {"var": "$$variable"}}],
+                },
+            },
+        ],
         cursor: {},
         let: {variable: "OUTER"},
     }),
@@ -125,7 +157,10 @@ assert.eq(
     targetColl
         .aggregate({
             $match: {
-                $and: [{$expr: {$eq: ["$innerVar", "INNER"]}}, {$expr: {$eq: ["$outerVar", "OUTER"]}}],
+                $and: [
+                    {$expr: {$eq: ["$innerVar", "INNER"]}},
+                    {$expr: {$eq: ["$outerVar", "OUTER"]}},
+                ],
             },
         })
         .toArray().length,
@@ -164,7 +199,11 @@ assert.commandWorked(
         cursor: {},
     }),
 );
-assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notAFieldPath"}]}}}).toArray().length, 4);
+assert.eq(
+    targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notAFieldPath"}]}}}).toArray()
+        .length,
+    4,
+);
 
 prepMergeTargetColl();
 assert.commandWorked(
@@ -182,4 +221,8 @@ assert.commandWorked(
         cursor: {},
     }),
 );
-assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notAFieldPath"}]}}}).toArray().length, 1);
+assert.eq(
+    targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notAFieldPath"}]}}}).toArray()
+        .length,
+    1,
+);

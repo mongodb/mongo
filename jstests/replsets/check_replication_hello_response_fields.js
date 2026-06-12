@@ -50,13 +50,17 @@ var checkResponseFields = function (memberInfo, cmd) {
         memberInfo.goodValues.isWritablePrimary = memberInfo.goodValues.ismaster;
         delete memberInfo.goodValues.ismaster;
         memberInfo.unwantedFields.push("ismaster");
-        memberInfo.unwantedFields = memberInfo.unwantedFields.filter((f) => f !== "isWritablePrimary");
+        memberInfo.unwantedFields = memberInfo.unwantedFields.filter(
+            (f) => f !== "isWritablePrimary",
+        );
 
         if (memberInfo.goodValues.hasOwnProperty("slaveDelay")) {
             memberInfo.goodValues.secondaryDelaySecs = memberInfo.goodValues.slaveDelay;
             delete memberInfo.goodValues.slaveDelay;
             memberInfo.unwantedFields.push("slaveDelay");
-            memberInfo.unwantedFields = memberInfo.unwantedFields.filter((f) => f !== "secondaryDelaySecs");
+            memberInfo.unwantedFields = memberInfo.unwantedFields.filter(
+                (f) => f !== "secondaryDelaySecs",
+            );
         }
     }
 
@@ -168,7 +172,15 @@ runHelloCmdAndAliases({
         secondary: false,
         ok: 1,
     },
-    wantedFields: ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
+    wantedFields: [
+        "hosts",
+        "passives",
+        "arbiters",
+        "primary",
+        "me",
+        "maxBsonObjectSize",
+        "localTime",
+    ],
     unwantedFields: [
         "isWritablePrimary",
         "arbiterOnly",
@@ -192,7 +204,15 @@ runHelloCmdAndAliases({
         passive: true,
         ok: 1,
     },
-    wantedFields: ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
+    wantedFields: [
+        "hosts",
+        "passives",
+        "arbiters",
+        "primary",
+        "me",
+        "maxBsonObjectSize",
+        "localTime",
+    ],
     unwantedFields: [
         "isWritablePrimary",
         "arbiterOnly",
@@ -217,7 +237,15 @@ runHelloCmdAndAliases({
         buildIndexes: false,
         ok: 1,
     },
-    wantedFields: ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
+    wantedFields: [
+        "hosts",
+        "passives",
+        "arbiters",
+        "primary",
+        "me",
+        "maxBsonObjectSize",
+        "localTime",
+    ],
     unwantedFields: ["isWritablePrimary", "arbiterOnly", "tags", "secondaryDelaySecs"],
 });
 
@@ -232,7 +260,15 @@ runHelloCmdAndAliases({
         arbiterOnly: true,
         ok: 1,
     },
-    wantedFields: ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
+    wantedFields: [
+        "hosts",
+        "passives",
+        "arbiters",
+        "primary",
+        "me",
+        "maxBsonObjectSize",
+        "localTime",
+    ],
     unwantedFields: [
         "isWritablePrimary",
         "slaveDelay",

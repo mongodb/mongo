@@ -29,14 +29,22 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(shardPrimary);
 
-const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(shardPrimary, coll.getFullName(), {b: 1}, {}, [
-    ErrorCodes.IndexBuildAborted,
-]);
+const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(
+    shardPrimary,
+    coll.getFullName(),
+    {b: 1},
+    {},
+    [ErrorCodes.IndexBuildAborted],
+);
 IndexBuildTest.waitForIndexBuildToScanCollection(shardDB, collName, "b_1");
 
-const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(shardPrimary, coll.getFullName(), {c: 1}, {}, [
-    ErrorCodes.IndexBuildAborted,
-]);
+const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
+    shardPrimary,
+    coll.getFullName(),
+    {c: 1},
+    {},
+    [ErrorCodes.IndexBuildAborted],
+);
 IndexBuildTest.waitForIndexBuildToScanCollection(shardDB, collName, "c_1");
 
 IndexBuildTest.assertIndexes(
@@ -91,7 +99,11 @@ assert.commandWorked(result, "Dry run for non-existent index should succeed");
 // Test 6: Dry run for multiple in-progress indexes (should fail)
 jsTest.log("Test 6: Dry run for multiple in-progress index names (['b_1', 'c_1'])");
 result = runDryRunCmd(["b_1", "c_1"]);
-assert.commandFailedWithCode(result, ErrorCodes.IndexNotFound, "Dry run for multiple in-progress indexes should fail");
+assert.commandFailedWithCode(
+    result,
+    ErrorCodes.IndexNotFound,
+    "Dry run for multiple in-progress indexes should fail",
+);
 
 IndexBuildTest.resumeIndexBuilds(shardPrimary);
 awaitFirstIndexBuild();

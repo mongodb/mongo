@@ -24,7 +24,11 @@ jsTest.log("Starting first set of mongoses in parallel...");
 
 let mongoses = [];
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos({binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
+    var mongos = MongoRunner.runMongos({
+        binVersion: "latest",
+        configdb: configRS.getURL(),
+        waitForConnect: false,
+    });
     mongoses.push(mongos);
 }
 
@@ -55,7 +59,11 @@ let version = mongosConn.getCollection("config.version").findOne();
 jsTest.log("Starting second set of mongoses...");
 
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos({binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
+    var mongos = MongoRunner.runMongos({
+        binVersion: "latest",
+        configdb: configRS.getURL(),
+        waitForConnect: false,
+    });
     mongoses.push(mongos);
 }
 

@@ -39,7 +39,9 @@ for (let i = 0; i < 10; i++) {
 }
 
 // Hang the collection scan phase of the index build when it's halfway finished.
-let fp = configureFailPoint(primary, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {fieldsToMatch: {a: 5}});
+let fp = configureFailPoint(primary, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {
+    fieldsToMatch: {a: 5},
+});
 
 const awaitCreateIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 fp.wait();

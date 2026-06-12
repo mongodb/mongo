@@ -26,7 +26,15 @@ import {
     tearDownShardedCluster,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
-const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
+const docs = [
+    doc1_a_nofields,
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc5_b_f104,
+    doc6_c_f105,
+    doc7_c_f106,
+];
 
 function verifyUpdateDeleteOneRes(res, nAffected) {
     assert.eq(nAffected, res.n, tojson(res));
@@ -96,7 +104,10 @@ function testWriteOneOnCollectionWithStaleShardingState({writeCmd, nAffected, re
     prepareCollection({dbToUse: mongos0DB, collName: collName, initialDocList: docs});
 
     // This write command will fail because mongos1 has a stale sharding state.
-    res = assert.commandFailedWithCode(mongos1DB[collName].runCommand(writeCmd), ErrorCodes.NamespaceNotSharded);
+    res = assert.commandFailedWithCode(
+        mongos1DB[collName].runCommand(writeCmd),
+        ErrorCodes.NamespaceNotSharded,
+    );
 
     // This write command should succeed since mongos1 should have refreshed its sharding state.
     res = assert.commandWorked(mongos1DB[collName].runCommand(writeCmd));

@@ -27,8 +27,12 @@ class Writer {
         const thread = new Thread(
             async function (host, config) {
                 for (const override of TestData.threadOverrides || []) await import(override);
-                const {Writer} = await import("jstests/libs/util/change_stream/change_stream_writer.js");
-                const {Connector} = await import("jstests/libs/util/change_stream/change_stream_connector.js");
+                const {Writer} = await import(
+                    "jstests/libs/util/change_stream/change_stream_writer.js"
+                );
+                const {Connector} = await import(
+                    "jstests/libs/util/change_stream/change_stream_connector.js"
+                );
                 const conn = new Mongo(host);
                 try {
                     Writer._execute(conn, config);
@@ -63,7 +67,9 @@ class Writer {
         }
         if (errors.length > 0) {
             jsTest.log.error("Writer threads failed", {errors});
-            throw new Error(`${errors.length} Writer thread(s) failed: ${errors.map((e) => e.toString()).join("; ")}`);
+            throw new Error(
+                `${errors.length} Writer thread(s) failed: ${errors.map((e) => e.toString()).join("; ")}`,
+            );
         }
     }
 
@@ -88,7 +94,9 @@ class Writer {
             Connector.heartbeat(conn, config.instanceName);
         }
 
-        jsTest.log.info(`Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`);
+        jsTest.log.info(
+            `Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`,
+        );
     }
 }
 

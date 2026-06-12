@@ -12,7 +12,10 @@
  * ]
  */
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -38,14 +41,19 @@ function makeSrcAndDstNames() {
 }
 
 function assertRecordIdsReplicated(coll) {
-    const collInfo = assert.commandWorked(coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}))
-        .cursor.firstBatch[0].info;
+    const collInfo = assert.commandWorked(
+        coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}),
+    ).cursor.firstBatch[0].info;
     assert(collInfo.recordIdsReplicated);
 }
 
 function validateRidsAcrossNodes(coll) {
     replSet.awaitReplication();
-    validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, coll.getDB().getName(), coll.getName());
+    validateShowRecordIdReplicatesAcrossNodes(
+        replSet.nodes,
+        coll.getDB().getName(),
+        coll.getName(),
+    );
 }
 
 // Returns the full set of documents in 'coll' with their $recordId sorted by $recordId.
@@ -84,7 +92,9 @@ function testRenameReplRidBehavior(srcDB, dstDB, dropTarget) {
     const docsBeforeWithRids = getDocsWithRids(src);
 
     assert.commandWorked(
-        primary.getDB("admin").runCommand({renameCollection: src.getFullName(), to: dst.getFullName(), dropTarget}),
+        primary
+            .getDB("admin")
+            .runCommand({renameCollection: src.getFullName(), to: dst.getFullName(), dropTarget}),
     );
 
     assertRecordIdsReplicated(dst);
@@ -160,8 +170,14 @@ testRenameDropTargetTrue(dbA, dbA, {});
 testRenameDropTargetTrue(dbA, dbB, {});
 testRenameDropTargetTrue(dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}});
 testRenameDropTargetTrue(dbA, dbB, {clusteredIndex: {key: {_id: 1}, unique: true}});
-testRenameDropTargetTrue(dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});
-testRenameDropTargetTrue(dbA, dbB, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});
+testRenameDropTargetTrue(dbA, dbA, {
+    clusteredIndex: {key: {_id: 1}, unique: true},
+    expireAfterSeconds: 1,
+});
+testRenameDropTargetTrue(dbA, dbB, {
+    clusteredIndex: {key: {_id: 1}, unique: true},
+    expireAfterSeconds: 1,
+});
 
 testRenameWithIndexesAndPostInsert(dbA, dbA);
 testRenameWithIndexesAndPostInsert(dbA, dbB);

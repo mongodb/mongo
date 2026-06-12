@@ -16,7 +16,9 @@ TimeseriesTest.run((insert) => {
     const collForCreate = testDB.getCollection("t");
     collForCreate.drop();
     const timeFieldName = "time";
-    assert.commandWorked(testDB.createCollection(collForCreate.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(collForCreate.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     session.startTransaction();
     const coll = testDB.getCollection(collForCreate.getName());
@@ -24,5 +26,8 @@ TimeseriesTest.run((insert) => {
         insert(coll, {_id: 0, [timeFieldName]: ISODate()}),
         ErrorCodes.OperationNotSupportedInTransaction,
     );
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 });

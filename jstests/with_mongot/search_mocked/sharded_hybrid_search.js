@@ -109,7 +109,11 @@ const searchMock = () => [
         expectedCommand: searchQueryExpectedByMock(searchColl),
         response: {
             ok: 1,
-            cursor: {firstBatch: mockedSearchResultIds, id: NumberLong(0), ns: searchColl.getFullName()},
+            cursor: {
+                firstBatch: mockedSearchResultIds,
+                id: NumberLong(0),
+                ns: searchColl.getFullName(),
+            },
         },
     },
 ];
@@ -152,7 +156,10 @@ const planShardedSearchMock = [
             ok: 1,
             protocolVersion: protocolVersion,
             // Sum counts in the shard metadata.
-            metaPipeline: [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}],
+            metaPipeline: [
+                {$group: {_id: null, count: {$sum: "$count"}}},
+                {$project: {_id: 0, count: 1}},
+            ],
         },
     },
 ];
@@ -217,7 +224,9 @@ function testLookupSearch() {
     // You might expect to need 'vectorCollDocs.length' mocked responses here, but
     // because the pipeline is uncorrelated, it can be cached and thus executed only once.
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: searchMock()});
-    const expectedResults = vectorCollDocs.map((res) => Object.merge(res, {lookup_results: mockedSearchResults}));
+    const expectedResults = vectorCollDocs.map((res) =>
+        Object.merge(res, {lookup_results: mockedSearchResults}),
+    );
     const actualResults = vectorColl.aggregate(pipeline).toArray();
     assert.sameMembers(actualResults, expectedResults);
 }

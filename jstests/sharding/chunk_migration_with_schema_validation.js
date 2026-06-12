@@ -13,7 +13,9 @@ const dbName = "test";
 const collName = "foo";
 const ns = "test.foo";
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const testColl = st.s.getCollection(ns);
 
 CreateShardedCollectionUtil.shardCollectionWithChunks(testColl, {x: 1}, [
@@ -34,7 +36,12 @@ const awaitResult = startParallelShell(
     funWithArgs(
         function (ns, toShardName) {
             assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {x: 50}, to: toShardName, _waitForDelete: true}),
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 50},
+                    to: toShardName,
+                    _waitForDelete: true,
+                }),
             );
         },
         ns,
@@ -47,7 +54,11 @@ failpoint.wait();
 
 for (let i = 100; i < 200; i++) {
     assert.commandWorked(
-        testColl.runCommand({insert: collName, documents: [{x: i, name: "B"}], bypassDocumentValidation: true}),
+        testColl.runCommand({
+            insert: collName,
+            documents: [{x: i, name: "B"}],
+            bypassDocumentValidation: true,
+        }),
     );
 }
 
@@ -61,7 +72,11 @@ awaitResult();
 
 const donor = st.shard0.rs.getPrimary().getDB(dbName);
 const recipient = st.shard1.rs.getPrimary().getDB(dbName);
-assert.eq(50, donor.foo.find().itcount(), "Number of documents on the donor shard after moveChunk is incorrect.");
+assert.eq(
+    50,
+    donor.foo.find().itcount(),
+    "Number of documents on the donor shard after moveChunk is incorrect.",
+);
 assert.eq(
     125,
     recipient.foo.find().itcount(),

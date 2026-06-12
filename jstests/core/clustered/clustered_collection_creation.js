@@ -20,7 +20,9 @@ import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 const validateCompoundSecondaryIndexes = function (db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
     db.runCommand({drop: coll.getName()});
-    assert.commandWorked(db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}),
+    );
     // Expect it's possible to create a compound secondary index that does not include the cluster
     // key.
     assert.commandWorked(coll.createIndex({secondaryKey0: 1, secondaryKey1: 1}));
@@ -60,13 +62,18 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     if (clusteredIndexSpec.collation) {
         delete clusteredIndexSpec.collation;
     }
-    assert.commandWorked(db[collName].runCommand({createIndexes: collName, indexes: [clusteredIndexSpec]}));
+    assert.commandWorked(
+        db[collName].runCommand({createIndexes: collName, indexes: [clusteredIndexSpec]}),
+    );
 
     // no-op without the 'clustered' option.
     assert.commandWorked(db[collName].createIndex(clusterKey));
 
     // 'clustered' is not a valid option for an index not on the cluster key.
-    assert.commandFailedWithCode(db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6243700);
+    assert.commandFailedWithCode(
+        db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}),
+        6243700,
+    );
 
     assert.commandFailedWithCode(
         db[collName].runCommand({
@@ -93,7 +100,10 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "hashed")));
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "2d")));
     assert.commandWorked(
-        db[collName].createIndex(overrideIndexType(clusterKey, "2dsphere"), add2dsphereVersionIfNeeded()),
+        db[collName].createIndex(
+            overrideIndexType(clusterKey, "2dsphere"),
+            add2dsphereVersionIfNeeded(),
+        ),
     );
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "text")));
 
@@ -111,7 +121,10 @@ const validateClusteredIndexUndroppable = function (db, collName, fullCreateOpti
 
     assert.commandFailedWithCode(db[collName].dropIndex(expectedIndexName), 5979800);
 
-    assert.commandFailedWithCode(db.runCommand({dropIndexes: collName, index: [expectedIndexName]}), 5979800);
+    assert.commandFailedWithCode(
+        db.runCommand({dropIndexes: collName, index: [expectedIndexName]}),
+        5979800,
+    );
 };
 
 const validateCreatedCollection = function (db, collName, createOptions) {
@@ -154,15 +167,25 @@ const validateClusteredCappedCollections = function (db, coll, clusterKey) {
         expireAfterSeconds: 10,
     });
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, size: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            size: 10,
+        }),
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, max: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            max: 10,
+        }),
         6049204,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, size: 10, max: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            size: 10,
+            max: 10,
+        }),
         6049200,
     );
     assert.commandFailedWithCode(
@@ -174,11 +197,19 @@ const validateClusteredCappedCollections = function (db, coll, clusterKey) {
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, capped: true, size: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            capped: true,
+            size: 10,
+        }),
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, capped: true, max: 10}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            capped: true,
+            max: 10,
+        }),
         6049204,
     );
     assert.commandFailedWithCode(
@@ -191,7 +222,10 @@ const validateClusteredCappedCollections = function (db, coll, clusterKey) {
         6049200,
     );
     assert.commandFailedWithCode(
-        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, capped: true}),
+        db.createCollection(coll.getName(), {
+            clusteredIndex: {key: clusterKey, unique: true},
+            capped: true,
+        }),
         6049201,
     );
 
@@ -219,7 +253,9 @@ runSuccessfulCreate(replicatedDB, replicatedColl, {
     expireAfterSeconds: 5,
 });
 
-runSuccessfulCreate(replicatedDB, replicatedColl, {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true}});
+runSuccessfulCreate(replicatedDB, replicatedColl, {
+    clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true},
+});
 
 runSuccessfulCreate(replicatedDB, replicatedColl, {
     clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true, v: 2},
@@ -237,7 +273,10 @@ if (hasTestCommandsEnabled && !isSharded) {
 
 // Validate that the arguments aren't conflicting.
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: false, expireAfterSeconds: 5}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: false,
+        expireAfterSeconds: 5,
+    }),
     ErrorCodes.InvalidOptions,
 );
 
@@ -256,22 +295,31 @@ assert.commandFailedWithCode(
     ErrorCodes.IDLFailedToParse,
 );
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: false}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {_id: 1}, unique: false},
+    }),
     5979700,
 );
 
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {randKey: 1}, unique: true}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {randKey: 1}, unique: true},
+    }),
     ErrorCodes.InvalidIndexSpecificationOption,
 );
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {ts: 1}, unique: true}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {ts: 1}, unique: true},
+    }),
     ErrorCodes.InvalidIndexSpecificationOption,
 );
 
 // Clustered index legacy format { clusteredIndex: <bool> } is only supported on certain internal
 // namespaces and for time-series collections.
-assert.commandFailedWithCode(replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: true}), 5979703);
+assert.commandFailedWithCode(
+    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: true}),
+    5979703,
+);
 
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(), {
@@ -281,7 +329,9 @@ assert.commandFailedWithCode(
 );
 
 assert.commandFailedWithCode(
-    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true, v: 12345}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {_id: 1}, unique: true, v: 12345},
+    }),
     5979704,
 );
 
@@ -331,7 +381,9 @@ runSuccessfulCreateNonClustered(nonReplicatedDB, nonReplicatedColl, {clusteredIn
 runSuccessfulCreateNonClustered(nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false});
 
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: 1}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {ts: 1}, unique: true},
+    }),
     ErrorCodes.InvalidIndexSpecificationOption,
 );
 runSuccessfulCreate(nonReplicatedDB, nonReplicatedColl, {
@@ -382,12 +434,16 @@ assert.commandFailedWithCode(
     ErrorCodes.IDLFailedToParse,
 );
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: 1}, unique: false}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {ts: 1}, unique: false},
+    }),
     5979700,
 );
 
 assert.commandFailedWithCode(
-    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {randKey: 1}, unique: true}}),
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {
+        clusteredIndex: {key: {randKey: 1}, unique: true},
+    }),
     ErrorCodes.InvalidIndexSpecificationOption,
 );
 nonReplicatedDB.runCommand({drop: nonReplicatedColl.getName()});

@@ -139,7 +139,9 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     let ddlOpThread = new Thread(
         (mongosConnString, db, coll, nss) => {
             let mongos = new Mongo(mongosConnString);
-            mongos.getCollection(nss).runCommand({createIndexes: coll, indexes: [{key: {c: 1}, name: "c_1"}]});
+            mongos
+                .getCollection(nss)
+                .runCommand({createIndexes: coll, indexes: [{key: {c: 1}, name: "c_1"}]});
             mongos.getDB(db).runCommand({collMod: coll, validator: {}});
         },
         st.s0.host,

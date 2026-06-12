@@ -16,7 +16,10 @@
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -69,11 +72,14 @@ TimeseriesTest.run((insert) => {
     );
 
     // Verify that the 2dsphereIndexVersion field is visible on the collection.
-    const created = timeseriescoll.getIndexes().filter((idx) => idx.name === twoDSphereTimeseriesIndexName)[0];
+    const created = timeseriescoll
+        .getIndexes()
+        .filter((idx) => idx.name === twoDSphereTimeseriesIndexName)[0];
 
     // Build set of allowed versions. Skip v3 if feature flag is enabled and we're in a stable FCV suite.
     const allowedVersions = new Set([4]);
-    const shouldSkipV3 = FeatureFlagUtil.isPresentAndEnabled(testdb, "2dsphereIndexVersion4") && isStableFCVSuite();
+    const shouldSkipV3 =
+        FeatureFlagUtil.isPresentAndEnabled(testdb, "2dsphereIndexVersion4") && isStableFCVSuite();
     if (!shouldSkipV3) {
         // TODO SERVER-118561 We can remove this when 9.0 becomes last LTS.
         allowedVersions.add(3);
@@ -193,21 +199,28 @@ TimeseriesTest.run((insert) => {
     });
 
     // Assert that geoWithin queries use the index.
-    const geoWithinPlan = timeseriescoll.find({location: {$geoWithin: {$centerSphere: [[40, -70], 0.0025]}}}).explain();
+    const geoWithinPlan = timeseriescoll
+        .find({location: {$geoWithin: {$centerSphere: [[40, -70], 0.0025]}}})
+        .explain();
     assert.neq(null, getAggPlanStage(geoWithinPlan, "IXSCAN"), geoWithinPlan);
     // And that their results are correct.
     assert.eq(
         2,
-        timeseriescoll.find({location: {$geoWithin: {$centerSphere: [[40, -70], 0.0025]}}}).toArray().length,
+        timeseriescoll
+            .find({location: {$geoWithin: {$centerSphere: [[40, -70], 0.0025]}}})
+            .toArray().length,
         geoWithinPlan,
     );
     // Assert 2d queries don't use the 2dsphere index.
-    const geoWithinPlan2d = timeseriescoll.find({location: {$geoWithin: {$center: [[40, -70], 0.15]}}}).explain();
+    const geoWithinPlan2d = timeseriescoll
+        .find({location: {$geoWithin: {$center: [[40, -70], 0.15]}}})
+        .explain();
     assert.neq(null, getAggPlanStage(geoWithinPlan2d, "COLLSCAN"), geoWithinPlan2d);
     // And that their results are correct.
     assert.eq(
         2,
-        timeseriescoll.find({location: {$geoWithin: {$center: [[40, -70], 0.15]}}}).toArray().length,
+        timeseriescoll.find({location: {$geoWithin: {$center: [[40, -70], 0.15]}}}).toArray()
+            .length,
         geoWithinPlan2d,
     );
 

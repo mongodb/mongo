@@ -20,11 +20,15 @@ try {
             // Reduce the frequency of the balancer as a best effort to avoid QueryPlanKilled errors
             // when aggregation and moveCollection run concurrently.
             // TODO (SERVER-88275): Remove this parameter change when the issue is resolved.
-            assert.commandWorked(testDB.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 500}));
+            assert.commandWorked(
+                testDB.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 500}),
+            );
         }
     }
 
-    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{_id: 1}], writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testDB.runCommand({insert: collName, documents: [{_id: 1}], writeConcern: {w: "majority"}}),
+    );
 
     // A read-only aggregation accepts writeConcern.
     assert.commandWorked(
@@ -53,7 +57,12 @@ try {
             } else if (TestData.runningWithBalancer && res.code == ErrorCodes.QueryPlanKilled) {
                 // sometimes the balancer will race with this agg and kill the query,
                 // so just retry.
-                print("Retrying aggregate() after being killed attempt " + attempt + " res: " + tojson(res));
+                print(
+                    "Retrying aggregate() after being killed attempt " +
+                        attempt +
+                        " res: " +
+                        tojson(res),
+                );
                 return false;
             } else {
                 doassert("command failed: " + tojson(res));
@@ -63,6 +72,9 @@ try {
     );
 } finally {
     if (origBalancerThrottlingMs !== undefined) {
-        testDB.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: origBalancerThrottlingMs});
+        testDB.adminCommand({
+            setParameter: 1,
+            balancerMigrationsThrottlingMs: origBalancerThrottlingMs,
+        });
     }
 }

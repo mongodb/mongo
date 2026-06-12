@@ -86,7 +86,10 @@ export var ShardingStateTest = (function () {
             return true;
         });
 
-        assert.eq(node, replSet.awaitNodesAgreeOnWriteablePrimary(node /* expected primary node */));
+        assert.eq(
+            node,
+            replSet.awaitNodesAgreeOnWriteablePrimary(node /* expected primary node */),
+        );
     }
 
     /**

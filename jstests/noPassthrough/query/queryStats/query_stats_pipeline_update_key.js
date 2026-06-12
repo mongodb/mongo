@@ -60,7 +60,11 @@ function runPipelineUpdateKeyTests(topologyName, setupFn, teardownFn) {
         });
 
         it("should validate complex pipeline update key fields", function () {
-            const queryShapePipelineUpdateFieldsComplex = [...queryShapeUpdateFieldsRequired, "collation", "c"];
+            const queryShapePipelineUpdateFieldsComplex = [
+                ...queryShapeUpdateFieldsRequired,
+                "collation",
+                "c",
+            ];
             const pipelineUpdateCommandObjComplex = {
                 update: collName,
                 updates: [

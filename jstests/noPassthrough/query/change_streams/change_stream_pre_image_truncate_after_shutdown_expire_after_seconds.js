@@ -17,7 +17,9 @@ const preImageTruncateAfterShutdownTest = new PreImageTruncateAfterShutdownTest(
 preImageTruncateAfterShutdownTest.setup();
 
 if (preImageTruncateAfterShutdownTest.isRunningReplicatedPreImageTruncation()) {
-    jsTest.log.info("This test is only relevant for unreplicated pre-image truncation. Skipping test.");
+    jsTest.log.info(
+        "This test is only relevant for unreplicated pre-image truncation. Skipping test.",
+    );
     preImageTruncateAfterShutdownTest.teardown();
     quit();
 }

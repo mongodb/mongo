@@ -24,7 +24,13 @@ assert.commandWorked(sourceColl.insert({_id: 0, a: 1}));
     sourceColl.aggregate(
         [
             {$addFields: {a: 3}},
-            {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+            {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                },
+            },
         ],
         {bypassDocumentValidation: true},
     );
@@ -57,7 +63,13 @@ assert.commandWorked(sourceColl.insert({_id: 0, a: 1}));
     sourceColl.aggregate(
         [
             {$addFields: {a: 2}},
-            {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+            {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                },
+            },
         ],
         {bypassDocumentValidation: false},
     );
@@ -141,7 +153,13 @@ assertFailsValidation({bypassDocumentValidation: false});
             aggregate: sourceColl.getName(),
             pipeline: [
                 {$addFields: {a: 3}},
-                {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+                {
+                    $merge: {
+                        into: targetColl.getName(),
+                        whenMatched: "replace",
+                        whenNotMatched: "insert",
+                    },
+                },
             ],
             bypassDocumentValidation: "false",
         }),

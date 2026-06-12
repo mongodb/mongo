@@ -83,7 +83,10 @@ jsTest.log.info(
     "Succeed when reshardCollection changes the shard key after rewriteCollection is run but before it locks",
 );
 
-const rewritePauseBeforeLock = configureFailPoint(mongos, "hangRewriteCollectionBeforeRunningReshardCollection");
+const rewritePauseBeforeLock = configureFailPoint(
+    mongos,
+    "hangRewriteCollectionBeforeRunningReshardCollection",
+);
 
 const awaitRewriteResult = startParallelShell(
     funWithArgs(function (ns) {
@@ -93,7 +96,9 @@ const awaitRewriteResult = startParallelShell(
 );
 rewritePauseBeforeLock.wait();
 
-assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}));
+assert.commandWorked(
+    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
+);
 
 // Verify that the shard key for the collection was changed to newKey
 let collCount = mongos

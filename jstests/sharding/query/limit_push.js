@@ -27,7 +27,11 @@ s.adminCommand({
 });
 
 // Check that the chunck have split correctly
-assert.eq(2, findChunksUtil.countChunksForNs(s.config, "test.limit_push"), "wrong number of chunks");
+assert.eq(
+    2,
+    findChunksUtil.countChunksForNs(s.config, "test.limit_push"),
+    "wrong number of chunks",
+);
 
 // The query is asking for the maximum value below a given value
 // db.limit_push.find( { x : { $lt : 60} } ).sort( { x:-1} ).limit(1)
@@ -49,7 +53,11 @@ assert.eq("SHARD_MERGE_SORT", execStages.stage, "Expected SHARD_MERGE_SORT as ro
 
 let k = 0;
 for (let j in execStages.shards) {
-    assert.eq(1, execStages.shards[j].executionStages.nReturned, "'n' is not 1 from shard000" + k.toString());
+    assert.eq(
+        1,
+        execStages.shards[j].executionStages.nReturned,
+        "'n' is not 1 from shard000" + k.toString(),
+    );
     k++;
 }
 

@@ -59,15 +59,26 @@ describe("$modifyForLog in system.profile", function () {
         );
 
         const modifyStage = profileEntry.command.pipeline[0].$modifyForLog;
-        assert(modifyStage !== undefined, "$modifyForLog should appear in profiled pipeline: " + tojson(profileEntry));
+        assert(
+            modifyStage !== undefined,
+            "$modifyForLog should appear in profiled pipeline: " + tojson(profileEntry),
+        );
 
         assert.eq(
             modifyStage.logNote,
             "Some fields were modified for logging",
             "logNote should indicate modifications: " + tojson(modifyStage),
         );
-        assert.lte(modifyStage.spec.largeArray.length, 5, "Large array should be truncated: " + tojson(modifyStage));
-        assert.eq(modifyStage.spec.smallArray.length, 3, "Small array should not be truncated: " + tojson(modifyStage));
+        assert.lte(
+            modifyStage.spec.largeArray.length,
+            5,
+            "Large array should be truncated: " + tojson(modifyStage),
+        );
+        assert.eq(
+            modifyStage.spec.smallArray.length,
+            3,
+            "Small array should not be truncated: " + tojson(modifyStage),
+        );
         assert.eq(
             modifyStage.spec.normalField,
             "unchanged",
@@ -97,7 +108,10 @@ describe("$modifyForLog in system.profile", function () {
         const profileEntry = getLatestProfilerEntry(db, {"command.comment": comment});
 
         const modifyStage = profileEntry.command.pipeline[0].$modifyForLog;
-        assert(modifyStage !== undefined, "$modifyForLog should appear in profiled pipeline: " + tojson(profileEntry));
+        assert(
+            modifyStage !== undefined,
+            "$modifyForLog should appear in profiled pipeline: " + tojson(profileEntry),
+        );
 
         assert(
             modifyStage.spec.largeNestedObject.summary !== undefined,

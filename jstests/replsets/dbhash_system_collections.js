@@ -24,7 +24,12 @@ function checkDbHash(mongo) {
 
     let replicatedSystemCollections = ["system.js", "system.users"];
 
-    let replicatedAdminSystemCollections = ["system.backup_users", "system.keys", "system.roles", "system.version"];
+    let replicatedAdminSystemCollections = [
+        "system.backup_users",
+        "system.keys",
+        "system.roles",
+        "system.version",
+    ];
 
     let res = testDB.runCommand("dbhash");
     assert.commandWorked(res);

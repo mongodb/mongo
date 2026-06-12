@@ -7,7 +7,10 @@
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {assertCacheUsage} from "jstests/libs/query/plan_cache_utils.js";
-import {sbePlanCacheEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    sbePlanCacheEnabled,
+    checkSbeRestrictedOrFullyEnabled,
+} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -58,7 +61,10 @@ function assertOneResult(cursor) {
 // First make sure there's no matching entries in the plan cache.
 {
     const planCacheEntries = coll
-        .aggregate([{$planCacheStats: {}}, {$match: {planCacheShapeHash: queryPlanner.planCacheShapeHash}}])
+        .aggregate([
+            {$planCacheStats: {}},
+            {$match: {planCacheShapeHash: queryPlanner.planCacheShapeHash}},
+        ])
         .toArray();
     assert.eq(planCacheEntries.length, 0);
 }
@@ -235,7 +241,10 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
         // plan cannot be added to the plan cache.
         assert.soon(() => {
             runQuery();
-            profileObj = getLatestProfilerEntry(db, {op: {$in: ["command", "query"]}, ns: coll.getFullName()});
+            profileObj = getLatestProfilerEntry(db, {
+                op: {$in: ["command", "query"]},
+                ns: coll.getFullName(),
+            });
             return !fromPlanCache || !!profileObj.fromPlanCache;
         });
 
@@ -256,7 +265,10 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
         const engineUsed = profileObj.queryFramework;
 
         const cacheEntries = coll
-            .aggregate([{$planCacheStats: {}}, {$match: {planCacheShapeHash: profileObj.planCacheShapeHash}}])
+            .aggregate([
+                {$planCacheStats: {}},
+                {$match: {planCacheShapeHash: profileObj.planCacheShapeHash}},
+            ])
             .toArray();
         assert.eq(cacheEntries.length, 1);
         const cacheEntry = cacheEntries[0];

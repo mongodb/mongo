@@ -17,7 +17,9 @@ export const $config = extendWorkload($baseConfig, ($config, $super) => {
         const collections = [];
         for (let i = 0; i < nsCount; ++i) {
             for (let j = 0; j < nsCount; ++j) {
-                collections.push(db.getSiblingDB(db.getName() + "_" + i).getCollection(collName + "_" + j));
+                collections.push(
+                    db.getSiblingDB(db.getName() + "_" + i).getCollection(collName + "_" + j),
+                );
             }
         }
         return collections;

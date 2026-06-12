@@ -9,7 +9,12 @@ in jstests/auth/lib/commands_lib.js.
 
 */
 
-import {adminDbName, authCommandsLib, authErrCode, commandNotSupportedCode} from "jstests/auth/lib/commands_lib.js";
+import {
+    adminDbName,
+    authCommandsLib,
+    authErrCode,
+    commandNotSupportedCode,
+} from "jstests/auth/lib/commands_lib.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
@@ -267,7 +272,11 @@ function createUsers(conn) {
 
     assert.commandWorked(adminDb.runCommand({createRole: testRole, privileges: [], roles: []}));
     assert.commandWorked(
-        adminDb.runCommand({createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}),
+        adminDb.runCommand({
+            createUser: testUser,
+            pwd: "password",
+            roles: [{role: testRole, db: adminDbName}],
+        }),
     );
 
     adminDb.logout();

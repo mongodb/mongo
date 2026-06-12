@@ -30,13 +30,25 @@ assert.commandWorked(t.createIndex({locs: "2d"}));
 // $geoNear tests
 // uniqueDocs option is ignored.
 assert.eq(2, t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis"}}).toArray().length);
-assert.eq(2, t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: false}}).toArray().length);
-assert.eq(2, t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: true}}).toArray().length);
-let results = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis"}}, {$limit: 2}]).toArray();
+assert.eq(
+    2,
+    t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: false}}).toArray()
+        .length,
+);
+assert.eq(
+    2,
+    t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: true}}).toArray()
+        .length,
+);
+let results = t
+    .aggregate([{$geoNear: {near: [0, 0], distanceField: "dis"}}, {$limit: 2}])
+    .toArray();
 assert.eq(2, results.length);
 assert.close(2, results[0].dis);
 assert.close(10, results[1].dis);
-results = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: true}}, {$limit: 2}]).toArray();
+results = t
+    .aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: true}}, {$limit: 2}])
+    .toArray();
 assert.eq(2, results.length);
 assert.close(2, results[0].dis);
 assert.close(10, results[1].dis);

@@ -11,7 +11,10 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {finishAndValidate, reInitiateSetWithSecondary} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
+import {
+    finishAndValidate,
+    reInitiateSetWithSecondary,
+} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -36,7 +39,9 @@ jsTestLog("Allow initial sync to finish cloning collections");
 
 let failPoint = configureFailPoint(secondary, "initialSyncHangAfterDataCloning");
 assert.commandWorked(
-    secondary.getDB("admin").runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondary
+        .getDB("admin")
+        .runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
 );
 failPoint.wait();
 
@@ -51,7 +56,9 @@ numDocuments++;
 
 function applyOps({documentId}) {
     let command = {
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$v: 2, diff: {u: {x: 1}}}}],
+        applyOps: [
+            {op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$v: 2, diff: {u: {x: 1}}}},
+        ],
     };
 
     assert.commandWorked(primary.getDB(dbName).runCommand(command));

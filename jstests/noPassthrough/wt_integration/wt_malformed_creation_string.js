@@ -35,7 +35,9 @@ function runTest() {
     // Collection creation with malformed string should fail
     for (var i = 0; i < malformedStrings.length; i++) {
         assert.commandFailedWithCode(
-            testDB.createCollection("coll", {storageEngine: {[engine]: {configString: malformedStrings[i]}}}),
+            testDB.createCollection("coll", {
+                storageEngine: {[engine]: {configString: malformedStrings[i]}},
+            }),
             ErrorCodes.FailedToParse,
         );
     }

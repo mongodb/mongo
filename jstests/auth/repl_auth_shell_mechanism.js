@@ -68,7 +68,12 @@ const uriShell = runMongoProgram("mongo", uriString, "--eval", ";");
 assert.eq(uriShell, 0, "Failed to connect using URI");
 
 // Connect with shell using URI and explcit mechanism.
-const uriShellMech = runMongoProgram("mongo", uriString + "&authMechanism=SCRAM-SHA-256", "--eval", ";");
+const uriShellMech = runMongoProgram(
+    "mongo",
+    uriString + "&authMechanism=SCRAM-SHA-256",
+    "--eval",
+    ";",
+);
 assert.eq(uriShellMech, 0, "Failed to connect using URI");
 
 rsTest.stopSet();

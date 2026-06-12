@@ -53,7 +53,9 @@ const cursorId = NumberLong(17);
             },
         },
     ];
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+    );
 
     let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
     const expectedMeta = [{value: 42}];
@@ -86,7 +88,9 @@ const cursorId = NumberLong(17);
             },
         },
     ];
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+    );
 
     let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
     const expectedMeta = [{value: 42}];
@@ -108,7 +112,9 @@ const cursorId = NumberLong(17);
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+    );
 
     const explain = coll.explain("queryPlanner").aggregate([{$searchMeta: searchQuery}]);
 
@@ -162,7 +168,9 @@ const cursorId = NumberLong(17);
             },
         },
     ];
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}),
+    );
 
     // Make sure we capture all queries in slow logs.
     testDB.runCommand({profile: 0, slowms: -1});

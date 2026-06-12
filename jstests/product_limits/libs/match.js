@@ -118,7 +118,10 @@ export class WorkloadOrPlusAndOverManyFields extends PipelineWorkload {
 
         // This condition evaluates to True
         match.push({
-            $and: [{[`f${this.scale() - 1}`]: {$lt: this.scale()}}, {[`f${this.scale() - 1}`]: {$gte: 0}}],
+            $and: [
+                {[`f${this.scale() - 1}`]: {$lt: this.scale()}},
+                {[`f${this.scale() - 1}`]: {$gte: 0}},
+            ],
         });
 
         return [{$match: {$or: match}}, {$unset: "_id"}];

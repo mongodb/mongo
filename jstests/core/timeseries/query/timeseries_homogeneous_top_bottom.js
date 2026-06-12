@@ -61,7 +61,9 @@ TimeseriesTest.run((insert) => {
                     x: NumberLong(200 * metaIdx * metaOffsetSign + doc * docOffsetSign),
                     y: dbl,
                     z: NumberInt(id++),
-                    t: new Date(datePrefix + 10000 * metaIdx * metaOffsetSign + doc * docOffsetSign),
+                    t: new Date(
+                        datePrefix + 10000 * metaIdx * metaOffsetSign + doc * docOffsetSign,
+                    ),
                 });
                 currentDate += 500;
                 doc++;
@@ -98,7 +100,18 @@ TimeseriesTest.run((insert) => {
     const nVals = [NumberInt(1), NumberInt(10)];
 
     // Since we're only sorting on single fields, every sort field must be unique.
-    const sortBys = [{time: 1}, {time: -1}, {x: 1}, {x: -1}, {y: 1}, {y: -1}, {z: 1}, {z: -1}, {t: 1}, {t: -1}];
+    const sortBys = [
+        {time: 1},
+        {time: -1},
+        {x: 1},
+        {x: -1},
+        {y: 1},
+        {y: -1},
+        {z: 1},
+        {z: -1},
+        {t: 1},
+        {t: -1},
+    ];
 
     const groupBys = [
         {time: {"$dateTrunc": {"date": "$time", "unit": "second", binSize: 3}}},

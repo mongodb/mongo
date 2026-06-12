@@ -40,7 +40,11 @@ const paddingStr = "XXXXXXXXX";
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Pre-load some documents.
@@ -103,7 +107,9 @@ for (let id = 1; id <= nExtraDocs; id++) {
 }
 bulk.execute();
 
-const penultimateOpTime = assert.commandWorked(db.runCommand({find: collName, limit: 1})).operationTime;
+const penultimateOpTime = assert.commandWorked(
+    db.runCommand({find: collName, limit: 1}),
+).operationTime;
 
 const sentinel2Timestamp = assert.commandWorked(
     db.runCommand({insert: sentinelCollName, documents: [{_id: "s2"}]}),
@@ -190,7 +196,9 @@ const restoreNodeSessionDb = restoreNodeSession.getDatabase(dbName);
 jsTestLog(
     "Checking restore node top-of-oplog minus 1 read, which should fail, because the restore node does not have that history.",
 );
-restoreNodeSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: penultimateOpTime}});
+restoreNodeSession.startTransaction({
+    readConcern: {level: "snapshot", atClusterTime: penultimateOpTime},
+});
 assert.commandFailedWithCode(
     restoreNodeSessionDb.runCommand({find: collName, filter: {"_id": lastId}}),
     ErrorCodes.SnapshotTooOld,

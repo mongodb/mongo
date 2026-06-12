@@ -25,10 +25,16 @@ function runBalancer() {
 }
 
 // only fully quilified namespaces are allowed on the command
-assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: "db"}), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(
+    st.s0.adminCommand({balancerCollectionStatus: "db"}),
+    ErrorCodes.InvalidNamespace,
+);
 
 // only sharded databases are allowed
-assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: "db.col"}), ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(
+    st.s0.adminCommand({balancerCollectionStatus: "db.col"}),
+    ErrorCodes.NamespaceNotSharded,
+);
 
 // setup the collection for the test
 assert.commandWorked(st.s0.adminCommand({enableSharding: "db"}));
@@ -36,7 +42,10 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: "db.col", key: {key: 1
 
 // only sharded collections are allowed
 assert.commandWorked(st.s0.getDB("db").runCommand({create: "col2"}));
-assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: "db.col2"}), ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(
+    st.s0.adminCommand({balancerCollectionStatus: "db.col2"}),
+    ErrorCodes.NamespaceNotSharded,
+);
 
 let result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: "db.col"}));
 
@@ -74,11 +83,23 @@ assert.commandWorked(st.s0.adminCommand({moveChunk: "db.col", find: {key: 10}, t
 // create zones on first two shards only
 assert.commandWorked(st.s0.adminCommand({addShardToZone: shards[0]._id, zone: "zone0"}));
 assert.commandWorked(
-    st.s0.adminCommand({updateZoneKeyRange: "db.col", min: {key: MinKey}, max: {key: 10}, zone: "zone0"}),
+    st.s0.adminCommand({
+        updateZoneKeyRange: "db.col",
+        min: {key: MinKey},
+        max: {key: 10},
+        zone: "zone0",
+    }),
 );
 
 assert.commandWorked(st.s0.adminCommand({addShardToZone: shards[1]._id, zone: "zone1"}));
-assert.commandWorked(st.s0.adminCommand({updateZoneKeyRange: "db.col", min: {key: 10}, max: {key: 20}, zone: "zone1"}));
+assert.commandWorked(
+    st.s0.adminCommand({
+        updateZoneKeyRange: "db.col",
+        min: {key: 10},
+        max: {key: 20},
+        zone: "zone1",
+    }),
+);
 
 result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: "db.col"}));
 

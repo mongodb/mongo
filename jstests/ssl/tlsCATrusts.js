@@ -63,7 +63,9 @@ requireSSLProvider("openssl", function () {
         testDB.createRole({role: "role2", privileges: [], roles: []});
 
         // Sorting JS arrays of objects with arbitrary order is... complex.
-        const serverTrusts = assert.commandWorked(admin.runCommand({getParameter: 1, tlsCATrusts: 1})).tlsCATrusts;
+        const serverTrusts = assert.commandWorked(
+            admin.runCommand({getParameter: 1, tlsCATrusts: 1}),
+        ).tlsCATrusts;
         function sortAndNormalizeRoles(roles) {
             return roles
                 .map((r) => r.role + "." + r.db)

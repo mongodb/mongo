@@ -32,7 +32,9 @@ assert.commandWorked(testDB.createView(newViewName, bucketsCollName, []));
 const existingViewName = "existingView";
 assert.commandWorked(testDB.runCommand({drop: existingViewName}));
 assert.commandWorked(testDB.createView(existingViewName, "otherColl", []));
-assert.commandWorked(testDB.runCommand({collMod: existingViewName, viewOn: bucketsCollName, pipeline: []}));
+assert.commandWorked(
+    testDB.runCommand({collMod: existingViewName, viewOn: bucketsCollName, pipeline: []}),
+);
 
 // Clean up the inconsistent timeseries views to avoid them causing validation failures
 assert.commandWorked(testDB.runCommand({drop: existingViewName}));

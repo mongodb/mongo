@@ -36,7 +36,9 @@ const st = new ShardingTest({
 
 // create a database and a change stream on it
 jsTest.log("Creating a change stream on " + dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 let changeStream = st.s.getDB("db").watch();
 
 // setFeatureCompatibilityVersion might cause dropping of deprecated collections
@@ -49,7 +51,9 @@ jsTest.log(
     configureFailPoint(st.shard0, "failAtCommitCreateCollectionCoordinator", {}, {times: 1});
 
     let collectionName = dbName + ".coll";
-    assert.commandWorked(st.s.adminCommand({shardCollection: collectionName, key: {_id: "hashed"}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: collectionName, key: {_id: "hashed"}}),
+    );
 
     assertNoDrop(changeStream);
 }

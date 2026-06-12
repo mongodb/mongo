@@ -26,9 +26,13 @@ const secondaryColl = secondaryDB.getCollection(collName);
 
 const hangFp = configureFailPoint(primary, "hangAfterRegisteringIndexBuild");
 
-let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+let awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    primaryColl.getFullName(),
+    {a: 1},
+    null,
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 
 // Wait for the primary to register the index build. Nothing is replicated to the secondaries at
 // this point yet.

@@ -19,7 +19,12 @@ for (let i = 0; i < N; i++) {
     coll.insert({_id: i, s: "asdasdasdasdasdasdasd"});
 }
 
-let dataSizeCommand = {"dataSize": "test.foo", "keyPattern": {"_id": 1}, "min": {"_id": 0}, "max": {"_id": N}};
+let dataSizeCommand = {
+    "dataSize": "test.foo",
+    "keyPattern": {"_id": 1},
+    "min": {"_id": 0},
+    "max": {"_id": N},
+};
 
 assert.eq(
     N,

@@ -101,7 +101,10 @@ let bigPoly = {
 };
 
 // 2dsphere index required
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()), "2dsphere index");
+assert.commandWorked(
+    coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()),
+    "2dsphere index",
+);
 
 // $nearSphere on big polygon should fail
 assert.throws(
@@ -212,15 +215,27 @@ let poly = {
     crs: strictCRS,
 };
 
-assert.eq(0, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "ignore objects with strictCRS within");
-assert.eq(0, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "ignore objects with strictCRS intersects");
+assert.eq(
+    0,
+    coll.count({geo: {$geoWithin: {$geometry: poly}}}),
+    "ignore objects with strictCRS within",
+);
+assert.eq(
+    0,
+    coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
+    "ignore objects with strictCRS intersects",
+);
 
 // Now remove the strictCRS and find all the objects
 coll.update({}, {$unset: {"geo.crs": ""}}, {multi: true});
 let totalDocs = coll.count();
 
 assert.eq(totalDocs, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "no strictCRS within");
-assert.eq(totalDocs, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "no strictCRS intersects");
+assert.eq(
+    totalDocs,
+    coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
+    "no strictCRS intersects",
+);
 
 // Clear collection
 coll.remove({});
@@ -292,11 +307,22 @@ objects.forEach(function (o) {
 // Make sure stored crs84CRS & epsg4326CRS documents can be found
 totalDocs = coll.count();
 
-assert.eq(totalDocs, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "crs84CRS or epsg4326CRS within");
-assert.eq(totalDocs, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "crs84CRS or epsg4326CRS intersects");
+assert.eq(
+    totalDocs,
+    coll.count({geo: {$geoWithin: {$geometry: poly}}}),
+    "crs84CRS or epsg4326CRS within",
+);
+assert.eq(
+    totalDocs,
+    coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
+    "crs84CRS or epsg4326CRS intersects",
+);
 
 // Add index and look again for stored point & spherical CRS documents
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()), "2dsphere index");
+assert.commandWorked(
+    coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()),
+    "2dsphere index",
+);
 
 assert.eq(
     totalDocs,

@@ -3,7 +3,10 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 import {
     assertOnlyTheseMetricsChanged,
     setupExtensionMetricsTest,
@@ -22,7 +25,10 @@ const adminDB = conn.getDB("admin");
     // Verify the extension.vectorSearch section exists (section name with dot appears as top-level field).
     assert(serverStatus.hasOwnProperty("metrics"));
     assert(serverStatus.metrics.hasOwnProperty("extension"), serverStatus.metrics);
-    assert(serverStatus.metrics.extension.hasOwnProperty("vectorSearch"), serverStatus.metrics.extension);
+    assert(
+        serverStatus.metrics.extension.hasOwnProperty("vectorSearch"),
+        serverStatus.metrics.extension,
+    );
     assert(serverStatus.metrics.extension.vectorSearch != null, serverStatus.metrics.extension);
 
     const vectorSearchSection = serverStatus.metrics.extension.vectorSearch;
@@ -33,7 +39,10 @@ const adminDB = conn.getDB("admin");
 })();
 
 (function VectorSearchServerStatusMetricsCanBeRequested() {
-    const explicitServerStatus = adminDB.runCommand({serverStatus: 1, "metrics.extension.vectorSearch": 1});
+    const explicitServerStatus = adminDB.runCommand({
+        serverStatus: 1,
+        "metrics.extension.vectorSearch": 1,
+    });
     assert.commandWorked(explicitServerStatus);
 
     // Make sure the chain metrics -> extension -> vectorSearch exists.
@@ -61,7 +70,9 @@ MongoRunner.stopMongod(conn);
             assert.eq(result.length, testData.length, "Vector search should return all documents");
             const finalMetrics = getMetrics();
 
-            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionVectorSearchUsed"]);
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, [
+                "extensionVectorSearchUsed",
+            ]);
         },
         ["standalone"],
     );

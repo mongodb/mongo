@@ -65,7 +65,11 @@ export class PreImageTruncateAfterShutdownTest {
     }
 
     setup() {
-        this._rst = new ReplSetTest({nodes: 2, nodeOptions: this._getDefaultNodeOptions(), oplogSize: 1 /** 1MB */});
+        this._rst = new ReplSetTest({
+            nodes: 2,
+            nodeOptions: this._getDefaultNodeOptions(),
+            oplogSize: 1 /** 1MB */,
+        });
         this._rst.startSet();
 
         // Allow test cases to have complete control over which node is primary.
@@ -96,7 +100,10 @@ export class PreImageTruncateAfterShutdownTest {
     _oplogIsRolledOver(lastOplogEntryTsToBeRemoved) {
         return this._rst.nodes.every(
             (node) =>
-                timestampCmp(lastOplogEntryTsToBeRemoved, getFirstOplogEntry(node, {readConcern: "majority"}).ts) <= 0,
+                timestampCmp(
+                    lastOplogEntryTsToBeRemoved,
+                    getFirstOplogEntry(node, {readConcern: "majority"}).ts,
+                ) <= 0,
         );
     }
 
@@ -113,11 +120,15 @@ export class PreImageTruncateAfterShutdownTest {
 
         // Insert a base amount of documents to speed things up.
         for (let i = 0; i < 200; i++) {
-            assert.commandWorked(testDB.tmp.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                testDB.tmp.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}),
+            );
         }
 
         while (!this._oplogIsRolledOver(lastOplogEntryToBeRemoved.ts)) {
-            assert.commandWorked(testDB.tmp.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                testDB.tmp.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}),
+            );
         }
     }
 
@@ -141,7 +152,12 @@ export class PreImageTruncateAfterShutdownTest {
     // 'expiryFn' is responsible simulating the expiration of all pre-images inserted at the time of
     // it's execution.
     /** @private */
-    _prePopulatePreImageCollections({conn, numExpiredPreImages, numUnexpiredPreImages, expiryFn = () => {}}) {
+    _prePopulatePreImageCollections({
+        conn,
+        numExpiredPreImages,
+        numUnexpiredPreImages,
+        expiryFn = () => {},
+    }) {
         const collInfos = [
             {
                 name: "collA",
@@ -158,10 +174,14 @@ export class PreImageTruncateAfterShutdownTest {
         const testDB = this._rst.getPrimary().getDB(this.testName);
         for (const collInfo of collInfos) {
             const collName = collInfo.name;
-            assertDropAndRecreateCollection(testDB, collName, {changeStreamPreAndPostImages: {enabled: true}});
+            assertDropAndRecreateCollection(testDB, collName, {
+                changeStreamPreAndPostImages: {enabled: true},
+            });
 
             const coll = testDB[collName];
-            assert.commandWorked(coll.insert({_id: 0, version: 1}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                coll.insert({_id: 0, version: 1}, {writeConcern: {w: "majority"}}),
+            );
             for (let i = 0; i < collInfo.nExpired; i++) {
                 // Do initial insert, then update to create a pre-image.
                 assert.commandWorked(coll.update({_id: 0}, {$inc: {version: 1}}));
@@ -303,7 +323,9 @@ export class PreImageTruncateAfterShutdownTest {
                 .getPrimary()
                 .getDB("admin")
                 .runCommand({
-                    setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds}}},
+                    setClusterParameter: {
+                        changeStreamOptions: {preAndPostImages: {expireAfterSeconds}},
+                    },
                 }),
         );
     }
@@ -315,12 +337,17 @@ export class PreImageTruncateAfterShutdownTest {
                 .getPrimary()
                 .getDB("admin")
                 .runCommand({
-                    setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}}},
+                    setClusterParameter: {
+                        changeStreamOptions: {preAndPostImages: {expireAfterSeconds: "off"}},
+                    },
                 }),
         );
 
         assert.commandWorked(
-            conn.adminCommand({"configureFailPoint": "changeStreamPreImageRemoverCurrentTime", "mode": "off"}),
+            conn.adminCommand({
+                "configureFailPoint": "changeStreamPreImageRemoverCurrentTime",
+                "mode": "off",
+            }),
         );
     }
 
@@ -329,7 +356,12 @@ export class PreImageTruncateAfterShutdownTest {
     //
     // 'runAsPrimary': Whether to test truncate behavior on the primary or the secondary.
     // 'cleanShutdown': Whether the truncate behavior is tested after a clean or unclean shutdown.
-    testTruncateByExpireAfterSeconds({runAsPrimary, numExpiredPreImages, numUnexpiredPreImages, cleanShutdown}) {
+    testTruncateByExpireAfterSeconds({
+        runAsPrimary,
+        numExpiredPreImages,
+        numUnexpiredPreImages,
+        cleanShutdown,
+    }) {
         jsTest.log(
             `Running testTruncateByExpireAfterSeconds with ${tojson({
                 runAsPrimary,
@@ -384,7 +416,8 @@ export class PreImageTruncateAfterShutdownTest {
             // Fix the 'currentTimeToUseAfterStartup' so the current pre-images fall into the
             // truncate range of startup after an unclean shutdown.
             currentTimeToUseAfterRestart = new Date(
-                mostRecentOperationTime - (truncateAfterUncleanShutdownBufferSecs - expireAfterSeconds) * 1000,
+                mostRecentOperationTime -
+                    (truncateAfterUncleanShutdownBufferSecs - expireAfterSeconds) * 1000,
             );
 
             // Sleep 2 seconds to ensure any rounding done to convert the expiration date to a
@@ -403,7 +436,9 @@ export class PreImageTruncateAfterShutdownTest {
 
         const nodeOptions = this._getDefaultNodeOptions();
         nodeOptions.setParameter["failpoint.changeStreamPreImageRemoverCurrentTime"] = tojson({
-            "data": {"currentTimeForTimeBasedExpiration": currentTimeToUseAfterRestart.toISOString()},
+            "data": {
+                "currentTimeForTimeBasedExpiration": currentTimeToUseAfterRestart.toISOString(),
+            },
             "mode": "alwaysOn",
         });
         conn = this._rst.start(conn, nodeOptions, true /* restart */);
@@ -421,7 +456,12 @@ export class PreImageTruncateAfterShutdownTest {
 
     // Tests pre-image truncate behavior when pre-images expire according to the oldest oplog entry
     // timestamp and a node is both shutdown and brought back up as a member of the replica set.
-    testTruncateByOldestOplogTS({runAsPrimary, numExpiredPreImages, numUnexpiredPreImages, cleanShutdown}) {
+    testTruncateByOldestOplogTS({
+        runAsPrimary,
+        numExpiredPreImages,
+        numUnexpiredPreImages,
+        cleanShutdown,
+    }) {
         jsTest.log(
             `Running testTruncateByOldestOplogTS with ${tojson({
                 runAsPrimary,
@@ -456,7 +496,8 @@ export class PreImageTruncateAfterShutdownTest {
     }) {
         // 'recoverToOplogTimestamp' is only compatible when 'queryableBackupMode' is set.
         assert(
-            !restartWithRecoverToOplogTimestamp || (restartWithRecoverToOplogTimestamp && restartWithQueryableBackup),
+            !restartWithRecoverToOplogTimestamp ||
+                (restartWithRecoverToOplogTimestamp && restartWithQueryableBackup),
         );
         // 'queryableBackupMode' isn't compatible with 'recoverFromOplogAsStandalone'.
         assert(!restartWithRecoverFromOplogAsStandalone || !restartWithQueryableBackup);
@@ -491,7 +532,9 @@ export class PreImageTruncateAfterShutdownTest {
             const recoveryTimestamp = assert.commandWorked(
                 conn.getDB(this.testName).runCommand({ping: 1}),
             ).operationTime;
-            standaloneStartupOpts.setParameter.recoverToOplogTimestamp = tojson({timestamp: recoveryTimestamp});
+            standaloneStartupOpts.setParameter.recoverToOplogTimestamp = tojson({
+                timestamp: recoveryTimestamp,
+            });
         }
         if (restartWithRecoverFromOplogAsStandalone) {
             standaloneStartupOpts.setParameter.recoverFromOplogAsStandalone = true;
@@ -554,7 +597,9 @@ export class PreImageTruncateAfterShutdownTest {
             this._shutdownNode(conn, cleanShutdown);
 
             // Start node up in standalone.
-            jsTest.log(`Starting node as standalone with startup options ${tojson(standaloneStartupOpts)}`);
+            jsTest.log(
+                `Starting node as standalone with startup options ${tojson(standaloneStartupOpts)}`,
+            );
             clearRawMongoProgramOutput();
             let standaloneConn = MongoRunner.runMongod(standaloneStartupOpts);
             // --repair will shutdown the server after starting up. As a result, start it again but

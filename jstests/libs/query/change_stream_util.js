@@ -201,7 +201,11 @@ function runInFixture(callback) {
  * the resume token, clusterTime, and other unknowable fields unless they are explicitly listed in
  * the expected event.
  */
-function isChangeStreamEventEq(actualEvent, expectedEvent, eventModifier = canonicalizeEventForTesting) {
+function isChangeStreamEventEq(
+    actualEvent,
+    expectedEvent,
+    eventModifier = canonicalizeEventForTesting,
+) {
     const testEvent = eventModifier(Object.assign({}, actualEvent), expectedEvent);
     return friendlyEqual(sortDoc(testEvent), sortDoc(expectedEvent));
 }
@@ -284,7 +288,8 @@ export function ChangeStreamTest(_db, options) {
         const cursorInfo = _cursorData.get(cursorId);
 
         if (changeEvents && changeEvents.length > 0) {
-            cursorInfo.resumeToken = changeEvents[changeEvents.length - 1]._id || cursor.postBatchResumeToken;
+            cursorInfo.resumeToken =
+                changeEvents[changeEvents.length - 1]._id || cursor.postBatchResumeToken;
         } else if (cursor.postBatchResumeToken) {
             cursorInfo.resumeToken = cursor.postBatchResumeToken;
         }
@@ -311,13 +316,22 @@ export function ChangeStreamTest(_db, options) {
      *
      * Returns the cursor returned by the 'aggregate' command.
      */
-    self.startWatchingChanges = function ({pipeline, collection, aggregateOptions, doNotModifyInPassthroughs}) {
+    self.startWatchingChanges = function ({
+        pipeline,
+        collection,
+        aggregateOptions,
+        doNotModifyInPassthroughs,
+    }) {
         aggregateOptions = aggregateOptions || {};
         aggregateOptions.cursor = aggregateOptions.cursor || {batchSize: 1};
 
         // The 'collection' argument may be a collection name, DBCollection object, or '1' which
         // indicates all collections in _db.
-        assert(collection instanceof DBCollection || typeof collection === "string" || collection === 1);
+        assert(
+            collection instanceof DBCollection ||
+                typeof collection === "string" ||
+                collection === 1,
+        );
         const collName = collection instanceof DBCollection ? collection.getName() : collection;
 
         return runInFixture(() => {
@@ -366,7 +380,9 @@ export function ChangeStreamTest(_db, options) {
     self.startWatchingAllChangesForCluster = function (aggregateOptions, changeStreamOptions = {}) {
         assert.eq(_db.getName(), "admin");
         return self.startWatchingChanges({
-            pipeline: [{$changeStream: Object.assign({allChangesForCluster: true}, changeStreamOptions)}],
+            pipeline: [
+                {$changeStream: Object.assign({allChangesForCluster: true}, changeStreamOptions)},
+            ],
             collection: 1,
             aggregateOptions: aggregateOptions,
         });
@@ -391,7 +407,9 @@ export function ChangeStreamTest(_db, options) {
         const newCursor = self.startWatchingChanges({
             pipeline: pipeline,
             collection: cursorInfo.collName,
-            aggregateOptions: Object.merge(cursorInfo.aggregateOptions || {}, {cursor: {batchSize: 0}}),
+            aggregateOptions: Object.merge(cursorInfo.aggregateOptions || {}, {
+                cursor: {batchSize: 0},
+            }),
             doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs,
         });
         Object.assign(cursor, newCursor);
@@ -478,7 +496,11 @@ export function ChangeStreamTest(_db, options) {
         if (nextBatch.length === 0) {
             return null;
         }
-        assert.eq(nextBatch.length, 1, "Batch length wasn't 0 or 1: " + tojsonMaybeTruncate(cursor));
+        assert.eq(
+            nextBatch.length,
+            1,
+            "Batch length wasn't 0 or 1: " + tojsonMaybeTruncate(cursor),
+        );
 
         // Reset the nextBatch, as the document is consumed.
         delete cursor.firstBatch;
@@ -533,9 +555,18 @@ export function ChangeStreamTest(_db, options) {
      * unless the expected change explicitly lists an '_id' or 'clusterTime' field to compare
      * against.
      */
-    function assertChangeIsExpected(expectedChanges, numChangesSeen, observedChanges, expectInvalidate) {
+    function assertChangeIsExpected(
+        expectedChanges,
+        numChangesSeen,
+        observedChanges,
+        expectInvalidate,
+    ) {
         if (expectedChanges) {
-            assertChangeStreamEventEq(observedChanges[numChangesSeen], expectedChanges[numChangesSeen], eventModifier);
+            assertChangeStreamEventEq(
+                observedChanges[numChangesSeen],
+                expectedChanges[numChangesSeen],
+                eventModifier,
+            );
         } else if (!expectInvalidate) {
             assert(
                 !isInvalidated(observedChanges[numChangesSeen]),
@@ -622,12 +653,17 @@ export function ChangeStreamTest(_db, options) {
         if (expectInvalidate) {
             assert(
                 isInvalidated(changes[changes.length - 1]),
-                "Last change was not invalidated when it was expected: " + tojsonMaybeTruncate(changes),
+                "Last change was not invalidated when it was expected: " +
+                    tojsonMaybeTruncate(changes),
             );
 
             // We make sure that the next batch kills the cursor after an invalidation entry.
             let finalCursor = self.getNextBatch(cursor);
-            assert.eq(finalCursor.id, 0, "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
+            assert.eq(
+                finalCursor.id,
+                0,
+                "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor),
+            );
         }
 
         return changes;
@@ -676,7 +712,11 @@ export function ChangeStreamTest(_db, options) {
      */
     self.assertNoChange = function (cursor) {
         cursor = self.getNextBatch(cursor);
-        assert.eq(0, cursor.nextBatch.length, () => "Cursor had changes: " + tojsonMaybeTruncate(cursor));
+        assert.eq(
+            0,
+            cursor.nextBatch.length,
+            () => "Cursor had changes: " + tojsonMaybeTruncate(cursor),
+        );
         return cursor;
     };
 
@@ -690,12 +730,17 @@ export function ChangeStreamTest(_db, options) {
         if (expectInvalidate) {
             assert(
                 isInvalidated(changes[changes.length - 1]),
-                "Last change was not invalidated when it was expected: " + tojsonMaybeTruncate(changes),
+                "Last change was not invalidated when it was expected: " +
+                    tojsonMaybeTruncate(changes),
             );
 
             // We make sure that the next batch kills the cursor after an invalidation entry.
             let finalCursor = self.getNextBatch(cursor);
-            assert.eq(finalCursor.id, 0, "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
+            assert.eq(
+                finalCursor.id,
+                0,
+                "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor),
+            );
         }
 
         return changes[0];
@@ -815,7 +860,11 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
             assert(false, `Unexpected result from cursor: ${tojsonMaybeTruncate(csCursor.next())}`);
         });
     } catch (error) {
-        assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojsonMaybeTruncate(error)}`);
+        assert.eq(
+            error.code,
+            expectedCode,
+            `Caught unexpected error: ${tojsonMaybeTruncate(error)}`,
+        );
         if (typeof validateExceptionDetails === "function") {
             validateExceptionDetails(error);
         }
@@ -852,9 +901,10 @@ export function assertChangeStreamNssBehaviour(dbName, collName = "test", option
 export function assertValidChangeStreamNss(dbName, collName = "test", options) {
     const res = assertChangeStreamNssBehaviour(dbName, collName, options, assert.commandWorked);
     assert.commandWorked(
-        db
-            .getSiblingDB(dbName)
-            .runCommand({killCursors: collName == 1 ? "$cmd.aggregate" : collName, cursors: [res.cursor.id]}),
+        db.getSiblingDB(dbName).runCommand({
+            killCursors: collName == 1 ? "$cmd.aggregate" : collName,
+            cursors: [res.cursor.id],
+        }),
     );
 }
 
@@ -902,16 +952,26 @@ export function preImagesForOps(db, writeOps) {
     // Determine the id of the last pre-image document written to be able to determine the pre-image
     // documents written by 'writeOps()'. The pre-image purging job may concurrently remove some
     // pre-image documents while this function is executing.
-    const preImageIdsBefore = preImagesColl.find({}, {}).sort(preImagesCollSortSpec).allowDiskUse().toArray();
+    const preImageIdsBefore = preImagesColl
+        .find({}, {})
+        .sort(preImagesCollSortSpec)
+        .allowDiskUse()
+        .toArray();
     const lastPreImageId =
-        preImageIdsBefore.length > 0 ? preImageIdsBefore[preImageIdsBefore.length - 1]._id : undefined;
+        preImageIdsBefore.length > 0
+            ? preImageIdsBefore[preImageIdsBefore.length - 1]._id
+            : undefined;
 
     // Perform the write operations.
     writeOps();
 
     // Return only newly written pre-images.
     const preImageFilter = lastPreImageId ? {"_id.ts": {$gt: lastPreImageId.ts}} : {};
-    const result = preImagesColl.find(preImageFilter).sort(preImagesCollSortSpec).allowDiskUse().toArray();
+    const result = preImagesColl
+        .find(preImageFilter)
+        .sort(preImagesCollSortSpec)
+        .allowDiskUse()
+        .toArray();
 
     // Verify that the result is correct by checking if the last pre-image still exists. However, if
     // no pre-image document existed before 'writeOps()' invocation, the result may be incorrect.
@@ -958,8 +1018,14 @@ export function assertPreImagesCollectionExists(db) {
     assert.eq(preImagesCollectionDescription.name, "system.preimages");
 
     // Verifies that the pre-images collection is clustered by _id.
-    assert(preImagesCollectionDescription.hasOwnProperty("options"), preImagesCollectionDescription);
-    assert(preImagesCollectionDescription.options.hasOwnProperty("clusteredIndex"), preImagesCollectionDescription);
+    assert(
+        preImagesCollectionDescription.hasOwnProperty("options"),
+        preImagesCollectionDescription,
+    );
+    assert(
+        preImagesCollectionDescription.options.hasOwnProperty("clusteredIndex"),
+        preImagesCollectionDescription,
+    );
     const clusteredIndexDescription = preImagesCollectionDescription.options.clusteredIndex;
     assert(clusteredIndexDescription, preImagesCollectionDescription);
 }
@@ -984,7 +1050,11 @@ export function assertValidChangeStreamPreImageDocument(preImage, db) {
         const applyOpsOplogEntry = oplogEntry;
         assert.lt(preImage._id.applyOpsIndex, applyOpsOplogEntry.o.applyOps.length);
         const applyOpsEntry = applyOpsOplogEntry.o.applyOps[preImage._id.applyOpsIndex.toNumber()];
-        assertChangeStreamPreImageDocumentMatchesOplogEntry(applyOpsEntry, preImage, applyOpsOplogEntry.wall);
+        assertChangeStreamPreImageDocumentMatchesOplogEntry(
+            applyOpsEntry,
+            preImage,
+            applyOpsOplogEntry.wall,
+        );
     } else {
         assert.eq(
             preImage._id.applyOpsIndex,
@@ -1120,7 +1190,11 @@ export function withBalancerEnabled(conn, cb) {
  * Helper function to add a new ReplSetTest shard into the cluster.
  */
 export function addShardToCluster(st, shardName, numNodes, rsNodeOptions) {
-    const replTest = new ReplSetTest({name: shardName, nodes: numNodes, nodeOptions: rsNodeOptions});
+    const replTest = new ReplSetTest({
+        name: shardName,
+        nodes: numNodes,
+        nodeOptions: rsNodeOptions,
+    });
     replTest.startSet({shardsvr: ""});
     replTest.initiate();
     assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: shardName}));
@@ -1208,7 +1282,9 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
             if (!isConfigShard) {
                 const configCursors = listIdleCursors(configAdminDB, filter, {localOps: true});
                 jsTest.log.debug("Open config cursors", {configCursors});
-                const configMatch = expectedConfigCursor ? configCursors.length > 0 : configCursors.length == 0;
+                const configMatch = expectedConfigCursor
+                    ? configCursors.length > 0
+                    : configCursors.length == 0;
                 return configMatch;
             } else {
                 // In config-shard mode the config server is one of the data shards. When the
@@ -1222,7 +1298,9 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
         },
         () => {
             const dataCursors = listIdleCursors(adminDB, filter);
-            const configCursorCount = listIdleCursors(configAdminDB, filter, {localOps: true}).length;
+            const configCursorCount = listIdleCursors(configAdminDB, filter, {
+                localOps: true,
+            }).length;
             return (
                 `Expected data cursors on ${tojsononeline(expectedDataShards)}, ` +
                 `Actual data shards: ${tojsononeline(dataCursors.map((c) => c.shard))}, ` +
@@ -1323,7 +1401,9 @@ function collectV2StageStateTransitions(conn, logOffset) {
         .getGlobalLog(conn)
         .slice(logOffset)
         .map(tryParseJson)
-        .filter((e) => e !== null && e.id === V2TargeterLogCodes.kTopologyHandlerStageStateTransition)
+        .filter(
+            (e) => e !== null && e.id === V2TargeterLogCodes.kTopologyHandlerStageStateTransition,
+        )
         .map((e) => ({from: e.attr.previous, to: e.attr.new}));
 }
 

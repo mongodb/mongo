@@ -25,7 +25,9 @@ assert.commandWorked(coll.insert({i: 2, j: 1}));
 assert.commandWorked(coll.insert({i: 2, j: 2}));
 
 // Set fail point to make sure operations with "maxTimeMS" set will time out.
-assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}),
+);
 
 for (const verbosity of ["executionStats", "allPlansExecution"]) {
     // Expect explain to time out if "maxTimeMS" is set on the aggregate command.

@@ -35,7 +35,9 @@ const db = replSetConn.getDB(dbName);
 let expectedResults = [];
 // Insert some documents which our pipeline will eventually read from.
 for (let i = 0; i < nDocs; i++) {
-    assert.commandWorked(readColl.insert({_id: i, groupKey: i % 10, num: i}, {writeConcern: {w: 2}}));
+    assert.commandWorked(
+        readColl.insert({_id: i, groupKey: i % 10, num: i}, {writeConcern: {w: 2}}),
+    );
     if (i < 10) {
         expectedResults.push({_id: i, sum: i});
     } else {

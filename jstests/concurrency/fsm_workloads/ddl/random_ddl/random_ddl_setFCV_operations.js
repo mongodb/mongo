@@ -26,7 +26,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const targetFCV = fcvValues[Random.randInt(3)];
         jsTestLog("Executing FCV state, setting to:" + targetFCV);
         try {
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+            );
         } catch (e) {
             if (handleRandomSetFCVErrors(e, targetFCV)) return;
             throw e;
@@ -38,7 +40,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.transitions = uniformDistTransitions($config.states);
 
     $config.teardown = function (db, collName, cluster) {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
 
     return $config;

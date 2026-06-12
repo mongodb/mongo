@@ -16,7 +16,8 @@ const collName = "collTest";
 const coll = testDb.getCollection(collName);
 
 // Detect if collections are implicitly sharded
-const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+const isImplicitlyShardedCollection =
+    typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
 function getCollectionsFromListCollections(dbObj, filter = {}) {
     const db = dbObj || testDb;
@@ -29,12 +30,14 @@ function findCollectionByName(collections, name) {
 
 function dropCollection(coll) {
     if (isImplicitlyShardedCollection) {
-        const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+        const originalImplicitlyShardOnCreateCollectionOnly =
+            TestData.implicitlyShardOnCreateCollectionOnly;
         try {
             TestData.implicitlyShardOnCreateCollectionOnly = true;
             assert(coll.drop());
         } finally {
-            TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+            TestData.implicitlyShardOnCreateCollectionOnly =
+                originalImplicitlyShardOnCreateCollectionOnly;
         }
     } else {
         assert(coll.drop());
@@ -63,12 +66,18 @@ describe("ListCollectionsCorrectness", function () {
             collInfo.name,
             `Collection name should match. Expected: ${collName}, Actual: ${collInfo.name}`,
         );
-        assert.eq("collection", collInfo.type, `Type should be 'collection'. Actual: ${collInfo.type}`);
+        assert.eq(
+            "collection",
+            collInfo.type,
+            `Type should be 'collection'. Actual: ${collInfo.type}`,
+        );
     });
 
     it("should list collection with options after createCollection with options", () => {
         // Create collection with validator
-        const validator = {$jsonSchema: {required: ["name"], properties: {name: {bsonType: "string"}}}};
+        const validator = {
+            $jsonSchema: {required: ["name"], properties: {name: {bsonType: "string"}}},
+        };
         assert.commandWorked(
             testDb.createCollection(collName, {
                 validator: validator,
@@ -79,7 +88,11 @@ describe("ListCollectionsCorrectness", function () {
 
         // Verify collection exists with correct options
         const collections = getCollectionsFromListCollections(testDb, {name: collName});
-        assert.eq(1, collections.length, `Collection should exist. Found ${collections.length} collections`);
+        assert.eq(
+            1,
+            collections.length,
+            `Collection should exist. Found ${collections.length} collections`,
+        );
         const collInfo = collections[0];
         assert.eq(
             collName,
@@ -124,14 +137,22 @@ describe("ListCollectionsCorrectness", function () {
 
         // Verify collection exists with capped options
         const collections = getCollectionsFromListCollections(testDb, {name: collName});
-        assert.eq(1, collections.length, `Collection should exist. Found ${collections.length} collections`);
+        assert.eq(
+            1,
+            collections.length,
+            `Collection should exist. Found ${collections.length} collections`,
+        );
         const collInfo = collections[0];
         assert.eq(
             collName,
             collInfo.name,
             `Collection name should match. Expected: ${collName}, Actual: ${collInfo.name}`,
         );
-        assert.eq(true, collInfo.options.capped, `Collection should be capped. Actual: ${collInfo.options.capped}`);
+        assert.eq(
+            true,
+            collInfo.options.capped,
+            `Collection should be capped. Actual: ${collInfo.options.capped}`,
+        );
         assert.eq(
             cappedSize,
             collInfo.options.size,
@@ -170,7 +191,9 @@ describe("ListCollectionsCorrectness", function () {
 
     it("should update collection options after collMod changes validator", () => {
         // Create collection with initial validator
-        const initialValidator = {$jsonSchema: {required: ["x"], properties: {x: {bsonType: "int"}}}};
+        const initialValidator = {
+            $jsonSchema: {required: ["x"], properties: {x: {bsonType: "int"}}},
+        };
         assert.commandWorked(testDb.createCollection(collName, {validator: initialValidator}));
 
         // Verify initial validator
@@ -188,7 +211,9 @@ describe("ListCollectionsCorrectness", function () {
         );
 
         // Use collMod to change validator
-        const newValidator = {$jsonSchema: {required: ["y"], properties: {y: {bsonType: "string"}}}};
+        const newValidator = {
+            $jsonSchema: {required: ["y"], properties: {y: {bsonType: "string"}}},
+        };
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,
@@ -297,7 +322,9 @@ describe("ListCollectionsCorrectness", function () {
         assert.commandWorked(testDb.createCollection(coll.getName()));
 
         // Add validator for testing that options are preserved
-        const validator = {$jsonSchema: {required: ["field"], properties: {field: {bsonType: "int"}}}};
+        const validator = {
+            $jsonSchema: {required: ["field"], properties: {field: {bsonType: "int"}}},
+        };
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,
@@ -371,7 +398,9 @@ describe("ListCollectionsCorrectness", function () {
 
         // Create source collection with validator
         assert.commandWorked(testDb.createCollection(collName));
-        const sourceValidator = {$jsonSchema: {required: ["source"], properties: {source: {bsonType: "string"}}}};
+        const sourceValidator = {
+            $jsonSchema: {required: ["source"], properties: {source: {bsonType: "string"}}},
+        };
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,
@@ -393,7 +422,9 @@ describe("ListCollectionsCorrectness", function () {
         const targetName = "collTarget";
         const targetColl = testDb.getCollection(targetName);
         assert.commandWorked(testDb.createCollection(targetName));
-        const targetValidator = {$jsonSchema: {required: ["target"], properties: {target: {bsonType: "int"}}}};
+        const targetValidator = {
+            $jsonSchema: {required: ["target"], properties: {target: {bsonType: "int"}}},
+        };
         assert.commandWorked(
             testDb.runCommand({
                 collMod: targetName,
@@ -416,7 +447,9 @@ describe("ListCollectionsCorrectness", function () {
             db.getSiblingDB("config").tags.findOne({ns: targetColl.getFullName()})
         ) {
             // There are suites that implicitly shard collections and then add tags to them.
-            jsTest.log.info("Skipping rename because the target collection is sharded and has tags");
+            jsTest.log.info(
+                "Skipping rename because the target collection is sharded and has tags",
+            );
             return;
         }
 
@@ -562,7 +595,9 @@ describe("ListCollectionsCorrectness", function () {
         assert.commandWorked(testDb.createCollection("normalColl"));
         const collation = {locale: "fr", strength: 1};
         assert.commandWorked(testDb.createCollection("collatedColl", {collation: collation}));
-        const validator = {$jsonSchema: {required: ["validated"], properties: {validated: {bsonType: "bool"}}}};
+        const validator = {
+            $jsonSchema: {required: ["validated"], properties: {validated: {bsonType: "bool"}}},
+        };
         assert.commandWorked(testDb.createCollection("validatedColl", {validator: validator}));
 
         // Test filter by name
@@ -618,7 +653,11 @@ describe("ListCollectionsCorrectness", function () {
 
         // Verify collection has collation
         const collections = getCollectionsFromListCollections(testDb, {name: collName});
-        assert.eq(1, collections.length, `Collection should exist. Found ${collections.length} collections`);
+        assert.eq(
+            1,
+            collections.length,
+            `Collection should exist. Found ${collections.length} collections`,
+        );
         const collInfo = collections[0];
         assert.neq(
             undefined,
@@ -681,7 +720,11 @@ describe("ListCollectionsCorrectness", function () {
 
         // Verify options are correct
         const coll2Info = findCollectionByName(collections, "coll2");
-        assert.eq(true, coll2Info.options.capped, `coll2 should be capped. Actual: ${coll2Info.options.capped}`);
+        assert.eq(
+            true,
+            coll2Info.options.capped,
+            `coll2 should be capped. Actual: ${coll2Info.options.capped}`,
+        );
 
         const coll3Info = findCollectionByName(collections, "coll3");
         assert.neq(
@@ -711,7 +754,11 @@ describe("ListCollectionsCorrectness", function () {
         let collections = getCollectionsFromListCollections(testDb);
         let collInfo = findCollectionByName(collections, collName);
         assert.neq(undefined, collInfo, `Collection '${collName}' should exist`);
-        assert.eq("collection", collInfo.type, `Type should be 'collection'. Actual: ${collInfo.type}`);
+        assert.eq(
+            "collection",
+            collInfo.type,
+            `Type should be 'collection'. Actual: ${collInfo.type}`,
+        );
 
         // Create a view
         const viewName = "viewTest";
@@ -737,8 +784,16 @@ describe("ListCollectionsCorrectness", function () {
             viewInfo.options.pipeline,
             `Pipeline should match. Expected: ${tojson(pipeline)}, Actual: ${tojson(viewInfo.options.pipeline)}`,
         );
-        assert.eq(true, viewInfo.info.readOnly, `View should be readOnly. Actual: ${viewInfo.info.readOnly}`);
-        assert.eq(undefined, viewInfo.idIndex, `View should not have idIndex. Actual: ${tojson(viewInfo.idIndex)}`);
+        assert.eq(
+            true,
+            viewInfo.info.readOnly,
+            `View should be readOnly. Actual: ${viewInfo.info.readOnly}`,
+        );
+        assert.eq(
+            undefined,
+            viewInfo.idIndex,
+            `View should not have idIndex. Actual: ${tojson(viewInfo.idIndex)}`,
+        );
 
         // Drop the view
         assert.commandWorked(testDb.runCommand({drop: viewName}));
@@ -906,12 +961,24 @@ describe("ListCollectionsCorrectness", function () {
         const views = allItems.filter((item) => item.type === "view");
 
         // Verify we have the correct counts
-        assert.gte(collections.length, 2, `Should have at least 2 collections. Found: ${collections.length}`);
+        assert.gte(
+            collections.length,
+            2,
+            `Should have at least 2 collections. Found: ${collections.length}`,
+        );
         assert.gte(views.length, 2, `Should have at least 2 views. Found: ${views.length}`);
 
         // Verify specific collections exist
-        assert.neq(undefined, findCollectionByName(collections, "regularColl1"), `regularColl1 should be a collection`);
-        assert.neq(undefined, findCollectionByName(collections, "regularColl2"), `regularColl2 should be a collection`);
+        assert.neq(
+            undefined,
+            findCollectionByName(collections, "regularColl1"),
+            `regularColl1 should be a collection`,
+        );
+        assert.neq(
+            undefined,
+            findCollectionByName(collections, "regularColl2"),
+            `regularColl2 should be a collection`,
+        );
 
         // Verify specific views exist
         assert.neq(undefined, findCollectionByName(views, "view1"), `view1 should be a view`);
@@ -976,14 +1043,22 @@ describe("ListCollectionsCorrectness", function () {
 
         // Verify timeseries collection exists with correct options
         const collections = getCollectionsFromListCollections(testDb, {name: collName});
-        assert.eq(1, collections.length, `Timeseries collection should exist. Found ${collections.length} collections`);
+        assert.eq(
+            1,
+            collections.length,
+            `Timeseries collection should exist. Found ${collections.length} collections`,
+        );
         const tsCollInfo = collections[0];
         assert.eq(
             collName,
             tsCollInfo.name,
             `Collection name should match. Expected: ${collName}, Actual: ${tsCollInfo.name}`,
         );
-        assert.eq("timeseries", tsCollInfo.type, `Type should be 'timeseries'. Actual: ${tsCollInfo.type}`);
+        assert.eq(
+            "timeseries",
+            tsCollInfo.type,
+            `Type should be 'timeseries'. Actual: ${tsCollInfo.type}`,
+        );
         assert.neq(
             undefined,
             tsCollInfo.options.timeseries,
@@ -1017,9 +1092,17 @@ describe("ListCollectionsCorrectness", function () {
 
         // Verify timeseries collection exists
         let collections = getCollectionsFromListCollections(testDb, {name: collName});
-        assert.eq(1, collections.length, `Timeseries collection should exist. Found ${collections.length} collections`);
+        assert.eq(
+            1,
+            collections.length,
+            `Timeseries collection should exist. Found ${collections.length} collections`,
+        );
         const tsCollInfo = collections[0];
-        assert.eq("timeseries", tsCollInfo.type, `Type should be 'timeseries'. Actual: ${tsCollInfo.type}`);
+        assert.eq(
+            "timeseries",
+            tsCollInfo.type,
+            `Type should be 'timeseries'. Actual: ${tsCollInfo.type}`,
+        );
         assert.eq(
             "ts",
             tsCollInfo.options.timeseries.timeField,
@@ -1078,7 +1161,11 @@ describe("ListCollectionsCorrectness", function () {
         // Verify granularity has been updated
         collections = getCollectionsFromListCollections(testDb, {name: collName});
         tsCollInfo = findCollectionByName(collections, collName);
-        assert.neq(undefined, tsCollInfo, `Timeseries collection '${collName}' should exist after collMod`);
+        assert.neq(
+            undefined,
+            tsCollInfo,
+            `Timeseries collection '${collName}' should exist after collMod`,
+        );
         assert.eq(
             "minutes",
             tsCollInfo.options.timeseries.granularity,
@@ -1132,7 +1219,11 @@ describe("ListCollectionsCorrectness", function () {
         // Verify both values have been updated
         collections = getCollectionsFromListCollections(testDb, {name: collName});
         tsCollInfo = findCollectionByName(collections, collName);
-        assert.neq(undefined, tsCollInfo, `Timeseries collection '${collName}' should exist after collMod`);
+        assert.neq(
+            undefined,
+            tsCollInfo,
+            `Timeseries collection '${collName}' should exist after collMod`,
+        );
         assert.eq(
             newBucketMaxSpan,
             tsCollInfo.options.timeseries.bucketMaxSpanSeconds,
@@ -1177,7 +1268,11 @@ describe("ListCollectionsCorrectness", function () {
         // Verify expireAfterSeconds has been updated
         collections = getCollectionsFromListCollections(testDb, {name: collName});
         tsCollInfo = findCollectionByName(collections, collName);
-        assert.neq(undefined, tsCollInfo, `Timeseries collection '${collName}' should exist after collMod`);
+        assert.neq(
+            undefined,
+            tsCollInfo,
+            `Timeseries collection '${collName}' should exist after collMod`,
+        );
         assert.eq(
             newExpire,
             tsCollInfo.options.expireAfterSeconds,
@@ -1210,7 +1305,11 @@ describe("ListCollectionsCorrectness", function () {
         // Verify timeseries collection exists
         const tsCollInfo = findCollectionByName(allCollections, collName);
         assert.neq(undefined, tsCollInfo, `Timeseries collection '${collName}' should exist`);
-        assert.eq("timeseries", tsCollInfo.type, `Type should be 'timeseries'. Actual: ${tsCollInfo.type}`);
+        assert.eq(
+            "timeseries",
+            tsCollInfo.type,
+            `Type should be 'timeseries'. Actual: ${tsCollInfo.type}`,
+        );
 
         // The underlying bucket collection (system.buckets.<collName>) should exist
         const bucketCollName = `system.buckets.${collName}`;

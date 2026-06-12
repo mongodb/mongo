@@ -60,5 +60,7 @@ for (let i = 0; i < 3; i++) {
 }
 
 // Make sure that we can serialize the plan cache entry.
-const planCacheEntries = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}]).toArray();
+const planCacheEntries = coll
+    .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}])
+    .toArray();
 assert.eq(planCacheEntries.length, 1);

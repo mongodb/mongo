@@ -23,13 +23,21 @@ const isResumableError = (e) => {
 
 // Function which generates a write workload on the specified collection, including all events that
 // a change stream may consume. Assumes that the specified collection does not already exist.
-export function generateChangeStreamWriteWorkload(db, collName, numDocs, includeInvalidatingEvents = true) {
+export function generateChangeStreamWriteWorkload(
+    db,
+    collName,
+    numDocs,
+    includeInvalidatingEvents = true,
+) {
     // If this is a sharded passthrough, make sure we shard on something other than _id so that a
     // non-id field appears in the documentKey. This will generate 'create' and 'shardCollection'.
     if (FixtureHelpers.isMongos(db)) {
         assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
         assert.commandWorked(
-            db.adminCommand({shardCollection: `${db.getName()}.${collName}`, key: {shardKey: "hashed"}}),
+            db.adminCommand({
+                shardCollection: `${db.getName()}.${collName}`,
+                key: {shardKey: "hashed"},
+            }),
         );
     }
 
@@ -69,7 +77,13 @@ export function generateChangeStreamWriteWorkload(db, collName, numDocs, include
     // Insert some documents.
     for (let i = 0; i < numDocs; ++i) {
         assert.commandWorked(
-            testColl.insert({_id: i, shardKey: i, a: [1, [2], {b: 3}], f1: {subField: true}, f2: false}),
+            testColl.insert({
+                _id: i,
+                shardKey: i,
+                a: [1, [2], {b: 3}],
+                f1: {subField: true},
+                f2: false,
+            }),
         );
     }
 
@@ -82,7 +96,9 @@ export function generateChangeStreamWriteWorkload(db, collName, numDocs, include
         [{$set: {a: [1, [2]], f2: true}}, {$unset: ["f1"]}], // populates all fields
     ];
     for (let i = 0; i < numDocs / 2; ++i) {
-        assert.commandWorked(testColl.update({_id: i, shardKey: i}, updateSpecs[i % updateSpecs.length]));
+        assert.commandWorked(
+            testColl.update({_id: i, shardKey: i}, updateSpecs[i % updateSpecs.length]),
+        );
     }
 
     // Replace the other half.
@@ -121,7 +137,13 @@ export function generateChangeStreamWriteWorkload(db, collName, numDocs, include
 }
 
 // Helper function to fully exhaust a change stream from the specified point and return all events.
-export function getAllChangeStreamEvents(db, extraPipelineStages = [], csOptions = {}, startTime, endTime) {
+export function getAllChangeStreamEvents(
+    db,
+    extraPipelineStages = [],
+    csOptions = {},
+    startTime,
+    endTime,
+) {
     // Retrieve current cluster time. We need to read all change events from the specified start
     // time until this end time is reached over exceeded.
     if (!endTime) {
@@ -131,7 +153,10 @@ export function getAllChangeStreamEvents(db, extraPipelineStages = [], csOptions
     // Open a whole-cluster stream based on the supplied arguments.
     const csCursor = db
         .getMongo()
-        .watch(extraPipelineStages, Object.assign({startAtOperationTime: startTime, maxAwaitTimeMS: 1}, csOptions));
+        .watch(
+            extraPipelineStages,
+            Object.assign({startAtOperationTime: startTime, maxAwaitTimeMS: 1}, csOptions),
+        );
 
     // Run getMore until the post-batch resume token advances. In a sharded passthrough, this will
     // guarantee that all shards have returned results.
@@ -250,7 +275,12 @@ export function assertNumMatchingOplogEventsForShard(
 
 // Returns a newly created sharded collection sharded by caller provided shard key.
 export function createShardedCollection(shardingTest, shardKey, dbName, collName, splitAt) {
-    assert.commandWorked(shardingTest.s.adminCommand({enableSharding: dbName, primaryShard: shardingTest.shard0.name}));
+    assert.commandWorked(
+        shardingTest.s.adminCommand({
+            enableSharding: dbName,
+            primaryShard: shardingTest.shard0.name,
+        }),
+    );
 
     const db = shardingTest.s.getDB(dbName);
     assertDropAndRecreateCollection(db, collName);
@@ -299,7 +329,9 @@ export function verifyChangeStreamOnWholeCluster({
                 assert.eq(
                     event.operationType,
                     op,
-                    () => `Expected "${op}" but got "${event.operationType}". Full event: ` + `${tojson(event)}`,
+                    () =>
+                        `Expected "${op}" but got "${event.operationType}". Full event: ` +
+                        `${tojson(event)}`,
                 );
 
                 if (op == "dropDatabase") {

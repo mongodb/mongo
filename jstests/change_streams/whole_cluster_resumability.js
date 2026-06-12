@@ -1,5 +1,8 @@
 // Basic tests for resuming a $changeStream that is open against all databases in a cluster.
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
@@ -18,7 +21,9 @@ assert.docEq({_id: 1}, firstInsertChangeDoc.fullDocument);
 
 // Test resume after the first insert.
 resumeCursor = cst.startWatchingChanges({
-    pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id, allChangesForCluster: true}}],
+    pipeline: [
+        {$changeStream: {resumeAfter: firstInsertChangeDoc._id, allChangesForCluster: true}},
+    ],
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
@@ -35,7 +40,9 @@ assert.docEq({_id: 3}, thirdInsertChangeDoc.fullDocument);
 
 // Test resuming after the first insert again.
 resumeCursor = cst.startWatchingChanges({
-    pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id, allChangesForCluster: true}}],
+    pipeline: [
+        {$changeStream: {resumeAfter: firstInsertChangeDoc._id, allChangesForCluster: true}},
+    ],
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
@@ -44,7 +51,9 @@ assert.docEq(thirdInsertChangeDoc, cst.getOneChange(resumeCursor));
 
 // Test resume after second insert.
 resumeCursor = cst.startWatchingChanges({
-    pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id, allChangesForCluster: true}}],
+    pipeline: [
+        {$changeStream: {resumeAfter: secondInsertChangeDoc._id, allChangesForCluster: true}},
+    ],
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });

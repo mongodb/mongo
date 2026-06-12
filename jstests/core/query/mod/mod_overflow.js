@@ -27,7 +27,12 @@ for (let divisor of [-1.0, NumberInt("-1"), NumberLong("-1"), NumberDecimal("-1"
     );
     assert.docEq(
         insertedDocs,
-        testColl.aggregate([{$match: {$expr: {$eq: [0, {$mod: ["$val", divisor]}]}}}, {$sort: {_id: 1}}]).toArray(),
+        testColl
+            .aggregate([
+                {$match: {$expr: {$eq: [0, {$mod: ["$val", divisor]}]}}},
+                {$sort: {_id: 1}},
+            ])
+            .toArray(),
     );
 
     // Confirm that overflow does not occur during agg expression evaluation. Also confirm that the
@@ -47,6 +52,8 @@ for (let divisor of [-1.0, NumberInt("-1"), NumberLong("-1"), NumberDecimal("-1"
     ];
     assert.docEq(
         expectedResults,
-        testColl.aggregate([{$project: {val: 1, modVal: {$mod: ["$val", divisor]}}}, {$sort: {_id: 1}}]).toArray(),
+        testColl
+            .aggregate([{$project: {val: 1, modVal: {$mod: ["$val", divisor]}}}, {$sort: {_id: 1}}])
+            .toArray(),
     );
 }

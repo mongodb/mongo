@@ -10,7 +10,9 @@ const testDB = st.s.getDB("test");
 const testColl = testDB.coll;
 const unshardedColl = testDB.unsharded;
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Shard testColl on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1.
 st.shardColl(testColl, {x: 1}, {x: 0}, {x: 1});
@@ -20,7 +22,8 @@ let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 let initialUpdateOneUnshardedCount = mongosServerStatus.metrics.query.updateOneUnshardedCount;
 let inititalUpdateOneOpStyleBroadcastWithExactIDCount =
     mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount;
-let initialUpdateOneNonTargetedShardedCount = mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount;
+let initialUpdateOneNonTargetedShardedCount =
+    mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount;
 
 // Insert one document on each shard.
 assert.commandWorked(testColl.insert({x: 1, _id: 1}));
@@ -94,7 +97,8 @@ try {
         updateRes
             .getWriteError()
             .errmsg.includes(
-                "Must run update to shard key field in a multi-statement transaction or with " + "retryWrites: true",
+                "Must run update to shard key field in a multi-statement transaction or with " +
+                    "retryWrites: true",
             ),
     );
 }
@@ -114,8 +118,12 @@ mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 // Verifying metrics for updateOnes commands.
 assert.eq(
     5,
-    mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount - initialUpdateOneNonTargetedShardedCount,
+    mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount -
+        initialUpdateOneNonTargetedShardedCount,
 );
-assert.eq(2, mongosServerStatus.metrics.query.updateOneUnshardedCount - initialUpdateOneUnshardedCount);
+assert.eq(
+    2,
+    mongosServerStatus.metrics.query.updateOneUnshardedCount - initialUpdateOneUnshardedCount,
+);
 
 st.stop();

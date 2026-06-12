@@ -10,7 +10,11 @@ import {
 
 print("Testing relative path imports...");
 assert.eq(TOP_LEVEL_VALUE, "top_level_import_success", "Relative path import failed");
-assert.eq(getTopLevelValue(), "top_level_function_works", "Function from relative import doesn't work");
+assert.eq(
+    getTopLevelValue(),
+    "top_level_function_works",
+    "Function from relative import doesn't work",
+);
 print("SUCCESS: relative path import worked");
 
 // Load using relative path
@@ -20,9 +24,19 @@ assert.eq(getCommonValue(), "common_value_from_load", "Function from relative lo
 print("SUCCESS: relative path load() worked");
 
 // Dynamic import using relative path
-const esModule = await import("buildscripts/tests/resmoke_end2end/mongo_shell/modules/es_module.js");
-assert.eq(esModule.ES_MODULE_VALUE, "imported_from_mongo_path", "Dynamic import with relative path failed");
-assert.eq(esModule.getModuleValue(), "module_value_from_import", "Function from relative dynamic import doesn't work");
+const esModule = await import(
+    "buildscripts/tests/resmoke_end2end/mongo_shell/modules/es_module.js"
+);
+assert.eq(
+    esModule.ES_MODULE_VALUE,
+    "imported_from_mongo_path",
+    "Dynamic import with relative path failed",
+);
+assert.eq(
+    esModule.getModuleValue(),
+    "module_value_from_import",
+    "Function from relative dynamic import doesn't work",
+);
 print("SUCCESS: relative path dynamic import() worked");
 
 print("All relative path tests passed!");

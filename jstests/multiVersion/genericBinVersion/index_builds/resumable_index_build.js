@@ -20,7 +20,9 @@ for (let i = 0; i < docCount; ++i) {
     docs.push({a: i, b: -i, padding: bigStr});
 }
 
-const failPoint = [{name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386}];
+const failPoint = [
+    {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386},
+];
 const failPointIterations = docCount - 5;
 
 function runTest(initialBinVersion, binVersionAfterRestart, fcv) {

@@ -53,7 +53,8 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // Check how many sessions have been reaped by the logical session cache on the
 // secondary before calling reapLogicalSessionCacheNow.
 let serverStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
-const numSessionsReapedBefore = serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
+const numSessionsReapedBefore =
+    serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
 const numReaperJobCountBefore = serverStatus.logicalSessionRecordCache.transactionReaperJobCount;
 
 // Refreshing the logical session cache on the secondary. This will try to reap
@@ -65,7 +66,8 @@ assert.commandWorked(secondary.adminCommand({reapLogicalSessionCacheNow: 1}));
 
 // Check that no sessions were reaped.
 serverStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
-const numSessionsReapedAfter = serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
+const numSessionsReapedAfter =
+    serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
 const numReaperJobCountAfter = serverStatus.logicalSessionRecordCache.transactionReaperJobCount;
 
 // Make sure that the reaper actually ran.

@@ -48,7 +48,13 @@ testGRPCConnect(
 );
 testGRPCConnect(false, "--tlsFIPSMode");
 
-assertConnectFailsWithErrorCode(`mongodb://user:password@${host}/?gRPC=true&tls=true`, ErrorCodes.InvalidOptions);
-assertConnectFailsWithErrorCode(`mongodb://${host}/?gRPC=true&tls=true&replicaSet=blah`, ErrorCodes.InvalidOptions);
+assertConnectFailsWithErrorCode(
+    `mongodb://user:password@${host}/?gRPC=true&tls=true`,
+    ErrorCodes.InvalidOptions,
+);
+assertConnectFailsWithErrorCode(
+    `mongodb://${host}/?gRPC=true&tls=true&replicaSet=blah`,
+    ErrorCodes.InvalidOptions,
+);
 
 MongoRunner.stopMongod(mongod);

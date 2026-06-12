@@ -42,7 +42,9 @@ const collectEventsUntilSentinel = (coll, csTest, cursor) => {
     assert.commandWorked(coll.insert({_id: sentinelId}));
 
     const isSentinel = (e) =>
-        e.operationType === "insert" && e.ns.coll === coll.getName() && e.documentKey._id === sentinelId;
+        e.operationType === "insert" &&
+        e.ns.coll === coll.getName() &&
+        e.documentKey._id === sentinelId;
 
     const events = [];
     while (true) {
@@ -50,7 +52,10 @@ const collectEventsUntilSentinel = (coll, csTest, cursor) => {
         events.push(event);
         if (isSentinel(event)) {
             // The sentinel itself must not carry 'fromMigrate'.
-            assert(!event.hasOwnProperty("fromMigrate"), `Sentinel must not have 'fromMigrate': ${tojson(event)}`);
+            assert(
+                !event.hasOwnProperty("fromMigrate"),
+                `Sentinel must not have 'fromMigrate': ${tojson(event)}`,
+            );
             return events;
         }
     }
@@ -64,7 +69,9 @@ const openRecipientStream = (st, dbName, showExpandedEvents = false) => {
     const db = mongos.getDB(dbName);
 
     // Ensure the database is initialized on shard1 before the change stream is opened.
-    assert.commandWorked(db.runCommand({createUnsplittableCollection: "_warmup", dataShard: st.shard1.shardName}));
+    assert.commandWorked(
+        db.runCommand({createUnsplittableCollection: "_warmup", dataShard: st.shard1.shardName}),
+    );
     assert.commandWorked(db.runCommand({drop: "_warmup"}));
 
     const shard1Primary = st.rs1.getPrimary();
@@ -97,17 +104,22 @@ const assertMigrationInserts = (allEvents) => {
     assert.gt(
         migrationInserts.length,
         0,
-        `Expected at least one migration insert from resharding machinery; ` + `all events: ${tojson(allEvents)}`,
+        `Expected at least one migration insert from resharding machinery; ` +
+            `all events: ${tojson(allEvents)}`,
     );
 
     migrationInserts.forEach((e) => {
-        assert(!e.hasOwnProperty("fromMigrate"), `Expected no fromMigrate field on migration insert: ${tojson(e)}`);
+        assert(
+            !e.hasOwnProperty("fromMigrate"),
+            `Expected no fromMigrate field on migration insert: ${tojson(e)}`,
+        );
     });
 };
 
 const assertReshardingDoneCatchUpAndRenameEvents = (allEvents, collName, emitFromMigrate) => {
     const catchUpEvents = allEvents.filter(
-        (e) => e.operationType === "reshardDoneCatchUp" && e.ns.coll.startsWith("system.resharding."),
+        (e) =>
+            e.operationType === "reshardDoneCatchUp" && e.ns.coll.startsWith("system.resharding."),
     );
     assert.eq(
         catchUpEvents.length,
@@ -166,62 +178,80 @@ describe("$changeStream showMigrationEvents", () => {
             const mongos = st.s;
             const mongosColl = mongos.getCollection(`${dbName}.${collName}`);
 
-            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-            assert.commandWorked(mongos.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}));
+            assert.commandWorked(
+                mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
+            assert.commandWorked(
+                mongos.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}),
+            );
             assert.commandWorked(mongosColl.insert({_id: 0}));
             assert.commandWorked(mongosColl.insert({_id: 20}));
-            assert.commandWorked(mongos.adminCommand({split: `${dbName}.${collName}`, middle: {_id: 10}}));
+            assert.commandWorked(
+                mongos.adminCommand({split: `${dbName}.${collName}`, middle: {_id: 10}}),
+            );
 
-            runWithParamsAllNonConfigNodes(st.s.getDB(dbName), {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
-                // Open change streams on both shard primaries after the initial inserts.
-                // The streams start from 'now' so they will not see the pre-migration inserts;
-                // the first events they observe will be the migration events from moveChunk.
-                const csTestShard0 = new ChangeStreamTest(st.shard0.getDB(dbName));
-                const cursorShard0 = csTestShard0.startWatchingChanges({
-                    pipeline: [{$changeStream: {showMigrationEvents: true}}],
-                    collection: st.shard0.getCollection(`${dbName}.${collName}`),
-                });
-                const csTestShard1 = new ChangeStreamTest(st.shard1.getDB(dbName));
-                const cursorShard1 = csTestShard1.startWatchingChanges({
-                    pipeline: [{$changeStream: {showMigrationEvents: true}}],
-                    collection: st.shard1.getCollection(`${dbName}.${collName}`),
-                });
+            runWithParamsAllNonConfigNodes(
+                st.s.getDB(dbName),
+                {changeStreamsEmitFromMigrate: emitFromMigrate},
+                () => {
+                    // Open change streams on both shard primaries after the initial inserts.
+                    // The streams start from 'now' so they will not see the pre-migration inserts;
+                    // the first events they observe will be the migration events from moveChunk.
+                    const csTestShard0 = new ChangeStreamTest(st.shard0.getDB(dbName));
+                    const cursorShard0 = csTestShard0.startWatchingChanges({
+                        pipeline: [{$changeStream: {showMigrationEvents: true}}],
+                        collection: st.shard0.getCollection(`${dbName}.${collName}`),
+                    });
+                    const csTestShard1 = new ChangeStreamTest(st.shard1.getDB(dbName));
+                    const cursorShard1 = csTestShard1.startWatchingChanges({
+                        pipeline: [{$changeStream: {showMigrationEvents: true}}],
+                        collection: st.shard1.getCollection(`${dbName}.${collName}`),
+                    });
 
-                assert.commandWorked(
-                    mongos.adminCommand({
-                        moveChunk: `${dbName}.${collName}`,
-                        find: {_id: 20},
-                        to: st.shard1.shardName,
-                        _waitForDelete: true,
-                    }),
-                );
+                    assert.commandWorked(
+                        mongos.adminCommand({
+                            moveChunk: `${dbName}.${collName}`,
+                            find: {_id: 20},
+                            to: st.shard1.shardName,
+                            _waitForDelete: true,
+                        }),
+                    );
 
-                // Donor shard (shard0) should see a delete for '{_id: 20}'.
-                const donorDeleteEvent = csTestShard0.getOneChange(cursorShard0);
-                assert.eq(donorDeleteEvent.operationType, "delete", tojson(donorDeleteEvent));
-                assert.eq(donorDeleteEvent.documentKey, {_id: 20}, tojson(donorDeleteEvent));
-                assert.eq(
-                    emitFromMigrate,
-                    donorDeleteEvent.hasOwnProperty("fromMigrate"),
-                    `Invalid fromMigrate field value on donor delete: ${tojson(donorDeleteEvent)}`,
-                );
+                    // Donor shard (shard0) should see a delete for '{_id: 20}'.
+                    const donorDeleteEvent = csTestShard0.getOneChange(cursorShard0);
+                    assert.eq(donorDeleteEvent.operationType, "delete", tojson(donorDeleteEvent));
+                    assert.eq(donorDeleteEvent.documentKey, {_id: 20}, tojson(donorDeleteEvent));
+                    assert.eq(
+                        emitFromMigrate,
+                        donorDeleteEvent.hasOwnProperty("fromMigrate"),
+                        `Invalid fromMigrate field value on donor delete: ${tojson(donorDeleteEvent)}`,
+                    );
 
-                // Recipient shard (shard1) should see an insert for '{_id: 20}'.
-                const recipientInsertEvent = csTestShard1.getOneChange(cursorShard1);
-                assert.eq(recipientInsertEvent.operationType, "insert", tojson(recipientInsertEvent));
-                assert.eq(recipientInsertEvent.documentKey, {_id: 20}, tojson(recipientInsertEvent));
-                assert.eq(
-                    emitFromMigrate,
-                    recipientInsertEvent.hasOwnProperty("fromMigrate"),
-                    `Invalid fromMigrate field value on recipient insert: ${tojson(recipientInsertEvent)}`,
-                );
+                    // Recipient shard (shard1) should see an insert for '{_id: 20}'.
+                    const recipientInsertEvent = csTestShard1.getOneChange(cursorShard1);
+                    assert.eq(
+                        recipientInsertEvent.operationType,
+                        "insert",
+                        tojson(recipientInsertEvent),
+                    );
+                    assert.eq(
+                        recipientInsertEvent.documentKey,
+                        {_id: 20},
+                        tojson(recipientInsertEvent),
+                    );
+                    assert.eq(
+                        emitFromMigrate,
+                        recipientInsertEvent.hasOwnProperty("fromMigrate"),
+                        `Invalid fromMigrate field value on recipient insert: ${tojson(recipientInsertEvent)}`,
+                    );
 
-                csTestShard0.assertNoChange(cursorShard0);
-                csTestShard1.assertNoChange(cursorShard1);
+                    csTestShard0.assertNoChange(cursorShard0);
+                    csTestShard1.assertNoChange(cursorShard1);
 
-                csTestShard0.cleanUp();
-                csTestShard1.cleanUp();
-            });
+                    csTestShard0.cleanUp();
+                    csTestShard1.cleanUp();
+                },
+            );
         }
 
         it("moveChunk: migration events visible with fromMigrate:true", () => {
@@ -242,11 +272,16 @@ describe("$changeStream showMigrationEvents", () => {
             const db = mongos.getDB(dbName);
             const coll = db[collName];
 
-            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
 
             // Create an unsplittable (tracked, single-shard) collection on shard0.
             assert.commandWorked(
-                db.runCommand({createUnsplittableCollection: collName, dataShard: st.shard0.shardName}),
+                db.runCommand({
+                    createUnsplittableCollection: collName,
+                    dataShard: st.shard0.shardName,
+                }),
             );
             for (let i = 0; i < 3; ++i) {
                 assert.commandWorked(coll.insert({_id: i}));
@@ -254,24 +289,35 @@ describe("$changeStream showMigrationEvents", () => {
 
             // 'changeStreamsEmitFromMigrate' is evaluated when a change stream is opened, so the
             // parameter must be set before openRecipientStream is called.
-            runWithParamsAllNonConfigNodes(db, {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
-                // Watch shard1 (the recipient) at the DB level before the move.
-                const {csTest, cursor} = openRecipientStream(st, dbName, true /* showExpandedEvents */);
+            runWithParamsAllNonConfigNodes(
+                db,
+                {changeStreamsEmitFromMigrate: emitFromMigrate},
+                () => {
+                    // Watch shard1 (the recipient) at the DB level before the move.
+                    const {csTest, cursor} = openRecipientStream(
+                        st,
+                        dbName,
+                        true /* showExpandedEvents */,
+                    );
 
-                // Move the collection to shard1.
-                assert.commandWorked(
-                    mongos.adminCommand({moveCollection: `${dbName}.${collName}`, toShard: st.shard1.shardName}),
-                );
+                    // Move the collection to shard1.
+                    assert.commandWorked(
+                        mongos.adminCommand({
+                            moveCollection: `${dbName}.${collName}`,
+                            toShard: st.shard1.shardName,
+                        }),
+                    );
 
-                // After the move, inserts go to shard1.
-                const events = collectEventsUntilSentinel(coll, csTest, cursor);
+                    // After the move, inserts go to shard1.
+                    const events = collectEventsUntilSentinel(coll, csTest, cursor);
 
-                // Migration inserts land in the temporary resharding namespace on shard1.
-                assertMigrationInserts(events);
+                    // Migration inserts land in the temporary resharding namespace on shard1.
+                    assertMigrationInserts(events);
 
-                assertReshardingDoneCatchUpAndRenameEvents(events, collName, emitFromMigrate);
-                csTest.cleanUp();
-            });
+                    assertReshardingDoneCatchUpAndRenameEvents(events, collName, emitFromMigrate);
+                    csTest.cleanUp();
+                },
+            );
 
             db.dropDatabase();
         }
@@ -298,51 +344,65 @@ describe("$changeStream showMigrationEvents", () => {
             const db = mongos.getDB(dbName);
             const coll = db[collName];
 
-            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
 
             // Shard the collection with all chunks initially on shard0.
-            assert.commandWorked(mongos.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}));
+            assert.commandWorked(
+                mongos.adminCommand({shardCollection: `${dbName}.${collName}`, key: {_id: 1}}),
+            );
             for (let i = 0; i < 3; ++i) {
                 assert.commandWorked(coll.insert({_id: i}));
             }
 
-            runWithParamsAllNonConfigNodes(db, {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
-                // Watch shard1 (the recipient) at the DB level before the unshard.
-                const {csTest, cursor} = openRecipientStream(st, dbName, true /* showExpandedEvents */);
-
-                // Unshard the collection onto shard1.
-                assert.commandWorked(
-                    mongos.adminCommand({
-                        unshardCollection: `${dbName}.${collName}`,
-                        toShard: st.shard1.shardName,
-                    }),
-                );
-
-                // After the unshard, inserts go to shard1.
-                const events = collectEventsUntilSentinel(coll, csTest, cursor);
-                const createEvents = events.filter(
-                    (e) => e.operationType === "create" && e.ns.coll.startsWith("system.resharding."),
-                );
-                assert.eq(
-                    createEvents.length,
-                    1,
-                    `Expected at least one 'create' event for '${collName}'; all events: ${tojson(events)}`,
-                );
-                createEvents.forEach((e) => {
-                    assert.eq(
-                        emitFromMigrate,
-                        e.hasOwnProperty("fromMigrate"),
-                        `Invalid fromMigrate on create event: ${tojson(e)}`,
+            runWithParamsAllNonConfigNodes(
+                db,
+                {changeStreamsEmitFromMigrate: emitFromMigrate},
+                () => {
+                    // Watch shard1 (the recipient) at the DB level before the unshard.
+                    const {csTest, cursor} = openRecipientStream(
+                        st,
+                        dbName,
+                        true /* showExpandedEvents */,
                     );
-                });
 
-                // Migration inserts land in the temporary resharding namespace on shard1.
-                assertMigrationInserts(events);
+                    // Unshard the collection onto shard1.
+                    assert.commandWorked(
+                        mongos.adminCommand({
+                            unshardCollection: `${dbName}.${collName}`,
+                            toShard: st.shard1.shardName,
+                        }),
+                    );
 
-                assertReshardingDoneCatchUpAndRenameEvents(events, collName, emitFromMigrate);
+                    // After the unshard, inserts go to shard1.
+                    const events = collectEventsUntilSentinel(coll, csTest, cursor);
+                    const createEvents = events.filter(
+                        (e) =>
+                            e.operationType === "create" &&
+                            e.ns.coll.startsWith("system.resharding."),
+                    );
+                    assert.eq(
+                        createEvents.length,
+                        1,
+                        `Expected at least one 'create' event for '${collName}'; all events: ${tojson(events)}`,
+                    );
+                    createEvents.forEach((e) => {
+                        assert.eq(
+                            emitFromMigrate,
+                            e.hasOwnProperty("fromMigrate"),
+                            `Invalid fromMigrate on create event: ${tojson(e)}`,
+                        );
+                    });
 
-                csTest.cleanUp();
-            });
+                    // Migration inserts land in the temporary resharding namespace on shard1.
+                    assertMigrationInserts(events);
+
+                    assertReshardingDoneCatchUpAndRenameEvents(events, collName, emitFromMigrate);
+
+                    csTest.cleanUp();
+                },
+            );
 
             db.dropDatabase();
         }
@@ -374,7 +434,9 @@ describe("$changeStream showMigrationEvents", () => {
             const ns = `${dbName}.${collName}`;
             const zoneName = `zone_${dbName}`;
 
-            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
             // Insert documents with both old and new shard key fields.
@@ -385,38 +447,50 @@ describe("$changeStream showMigrationEvents", () => {
 
             // Tag shard1 with a zone so that the 'zones' field in 'reshardCollection' forces all
             // chunks of the new key {a:1} onto shard1.
-            assert.commandWorked(mongos.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName}));
+            assert.commandWorked(
+                mongos.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName}),
+            );
 
-            runWithParamsAllNonConfigNodes(db, {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
-                // Watch shard1 (the recipient) at the DB level before the reshard.
-                const {csTest, cursor} = openRecipientStream(st, dbName, true /* showExpandedEvents */);
+            runWithParamsAllNonConfigNodes(
+                db,
+                {changeStreamsEmitFromMigrate: emitFromMigrate},
+                () => {
+                    // Watch shard1 (the recipient) at the DB level before the reshard.
+                    const {csTest, cursor} = openRecipientStream(
+                        st,
+                        dbName,
+                        true /* showExpandedEvents */,
+                    );
 
-                // Reshard to the new key {a:1}; the zone forces all chunks onto shard1.
-                assert.commandWorked(
-                    mongos.adminCommand({
-                        reshardCollection: ns,
-                        key: {a: 1},
-                        numInitialChunks: 1,
-                        zones: [{min: {a: MinKey}, max: {a: MaxKey}, zone: zoneName}],
-                    }),
-                );
+                    // Reshard to the new key {a:1}; the zone forces all chunks onto shard1.
+                    assert.commandWorked(
+                        mongos.adminCommand({
+                            reshardCollection: ns,
+                            key: {a: 1},
+                            numInitialChunks: 1,
+                            zones: [{min: {a: MinKey}, max: {a: MaxKey}, zone: zoneName}],
+                        }),
+                    );
 
-                // After resharding, inserts go to shard1.
-                const events = collectEventsUntilSentinel(coll, csTest, cursor);
+                    // After resharding, inserts go to shard1.
+                    const events = collectEventsUntilSentinel(coll, csTest, cursor);
 
-                // Migration inserts land in the temporary resharding namespace on shard1.
-                assertMigrationInserts(events);
+                    // Migration inserts land in the temporary resharding namespace on shard1.
+                    assertMigrationInserts(events);
 
-                assertReshardingDoneCatchUpAndRenameEvents(events, collName, emitFromMigrate);
+                    assertReshardingDoneCatchUpAndRenameEvents(events, collName, emitFromMigrate);
 
-                csTest.cleanUp();
-            });
+                    csTest.cleanUp();
+                },
+            );
 
             db.dropDatabase();
 
             // Remove the zone tag from shard1 (zone key ranges on the collection will be removed
             // when the database is dropped implicitly between tests).
-            assert.commandWorked(mongos.adminCommand({removeShardFromZone: st.shard1.shardName, zone: zoneName}));
+            assert.commandWorked(
+                mongos.adminCommand({removeShardFromZone: st.shard1.shardName, zone: zoneName}),
+            );
         }
 
         it("reshardCollection: recipient does not sees migration inserts with fromMigrate:true", () => {
@@ -443,7 +517,9 @@ describe("$changeStream showMigrationEvents", () => {
             const db = mongos.getDB(dbName);
 
             // Create the database with shard0 as primary.
-            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
 
             // Create an untracked collection directly on shard0 (bypassing mongos so it is not
             // registered in the sharding catalog, making it eligible for relocation by movePrimary).
@@ -453,54 +529,66 @@ describe("$changeStream showMigrationEvents", () => {
             }
             assert.commandWorked(db[collName].createIndexes([{a: 1}]));
 
-            runWithParamsAllNonConfigNodes(db, {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
-                // Watch shard1 (the recipient) at the DB level before the move.
-                const {csTest, cursor} = openRecipientStream(st, dbName, true /* showExpandedEvents */);
-
-                // Move the primary shard from shard0 to shard1.
-                assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
-
-                // After the move the collection lives on shard1 (inserts through mongos now route
-                // to shard1 as the new primary).
-                const events = collectEventsUntilSentinel(db[collName], csTest, cursor);
-
-                // movePrimary clones the collection onto the recipient shard, which must emit a
-                // 'create' event. The event must carry 'fromMigrate: true' iff emitFromMigrate is
-                // enabled.
-                const createEvents = events.filter((e) => e.operationType === "create" && e.ns.coll === collName);
-                assert.gt(
-                    createEvents.length,
-                    0,
-                    `Expected at least one 'create' event for '${collName}'; all events: ${tojson(events)}`,
-                );
-                createEvents.forEach((e) => {
-                    assert.eq(
-                        emitFromMigrate,
-                        e.hasOwnProperty("fromMigrate"),
-                        `Invalid fromMigrate on create event: ${tojson(e)}`,
+            runWithParamsAllNonConfigNodes(
+                db,
+                {changeStreamsEmitFromMigrate: emitFromMigrate},
+                () => {
+                    // Watch shard1 (the recipient) at the DB level before the move.
+                    const {csTest, cursor} = openRecipientStream(
+                        st,
+                        dbName,
+                        true /* showExpandedEvents */,
                     );
-                });
 
-                // movePrimary also creates the collection's indexes on the recipient shard, which
-                // must emit a 'createIndexes' event with the same fromMigrate semantics.
-                const createIndexesEvents = events.filter(
-                    (e) => e.operationType === "createIndexes" && e.ns.coll === collName,
-                );
-                assert.gt(
-                    createIndexesEvents.length,
-                    0,
-                    `Expected at least one 'createIndexes' event for '${collName}'; all events: ${tojson(events)}`,
-                );
-                createIndexesEvents.forEach((e) => {
-                    assert.eq(
-                        emitFromMigrate,
-                        e.hasOwnProperty("fromMigrate"),
-                        `Invalid fromMigrate on createIndexes event: ${tojson(e)}`,
+                    // Move the primary shard from shard0 to shard1.
+                    assert.commandWorked(
+                        mongos.adminCommand({movePrimary: dbName, to: st.shard1.shardName}),
                     );
-                });
 
-                csTest.cleanUp();
-            });
+                    // After the move the collection lives on shard1 (inserts through mongos now route
+                    // to shard1 as the new primary).
+                    const events = collectEventsUntilSentinel(db[collName], csTest, cursor);
+
+                    // movePrimary clones the collection onto the recipient shard, which must emit a
+                    // 'create' event. The event must carry 'fromMigrate: true' iff emitFromMigrate is
+                    // enabled.
+                    const createEvents = events.filter(
+                        (e) => e.operationType === "create" && e.ns.coll === collName,
+                    );
+                    assert.gt(
+                        createEvents.length,
+                        0,
+                        `Expected at least one 'create' event for '${collName}'; all events: ${tojson(events)}`,
+                    );
+                    createEvents.forEach((e) => {
+                        assert.eq(
+                            emitFromMigrate,
+                            e.hasOwnProperty("fromMigrate"),
+                            `Invalid fromMigrate on create event: ${tojson(e)}`,
+                        );
+                    });
+
+                    // movePrimary also creates the collection's indexes on the recipient shard, which
+                    // must emit a 'createIndexes' event with the same fromMigrate semantics.
+                    const createIndexesEvents = events.filter(
+                        (e) => e.operationType === "createIndexes" && e.ns.coll === collName,
+                    );
+                    assert.gt(
+                        createIndexesEvents.length,
+                        0,
+                        `Expected at least one 'createIndexes' event for '${collName}'; all events: ${tojson(events)}`,
+                    );
+                    createIndexesEvents.forEach((e) => {
+                        assert.eq(
+                            emitFromMigrate,
+                            e.hasOwnProperty("fromMigrate"),
+                            `Invalid fromMigrate on createIndexes event: ${tojson(e)}`,
+                        );
+                    });
+
+                    csTest.cleanUp();
+                },
+            );
 
             db.dropDatabase();
         }
@@ -521,46 +609,58 @@ describe("$changeStream showMigrationEvents", () => {
             const mongos = st.s;
             const db = mongos.getDB(dbName);
 
-            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(
+                mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+            );
             assert.commandWorked(db.createCollection(collName));
             assert.commandWorked(
-                mongos.adminCommand({moveCollection: `${dbName}.${collName}`, toShard: st.shard1.shardName}),
+                mongos.adminCommand({
+                    moveCollection: `${dbName}.${collName}`,
+                    toShard: st.shard1.shardName,
+                }),
             );
 
-            runWithParamsAllNonConfigNodes(db, {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
-                const {csTest, cursor} = openRecipientStream(st, dbName);
+            runWithParamsAllNonConfigNodes(
+                db,
+                {changeStreamsEmitFromMigrate: emitFromMigrate},
+                () => {
+                    const {csTest, cursor} = openRecipientStream(st, dbName);
 
-                const targetDb = `${dbName}_${collName}_target`;
-                assert.commandWorked(
-                    mongos.adminCommand({enableSharding: targetDb, primaryShard: st.shard0.shardName}),
-                );
-                assert.commandWorked(
-                    mongos.adminCommand({
-                        renameCollection: `${dbName}.${collName}`,
-                        to: `${targetDb}.${collName}`,
-                    }),
-                );
+                    const targetDb = `${dbName}_${collName}_target`;
+                    assert.commandWorked(
+                        mongos.adminCommand({
+                            enableSharding: targetDb,
+                            primaryShard: st.shard0.shardName,
+                        }),
+                    );
+                    assert.commandWorked(
+                        mongos.adminCommand({
+                            renameCollection: `${dbName}.${collName}`,
+                            to: `${targetDb}.${collName}`,
+                        }),
+                    );
 
-                // Drain events until the drop for 'coll' arrives.
-                let dropEvent = null;
-                while (!dropEvent) {
-                    const e = csTest.getOneChange(cursor);
-                    if (e.operationType === "drop" && e.ns.coll === collName) {
-                        dropEvent = e;
+                    // Drain events until the drop for 'coll' arrives.
+                    let dropEvent = null;
+                    while (!dropEvent) {
+                        const e = csTest.getOneChange(cursor);
+                        if (e.operationType === "drop" && e.ns.coll === collName) {
+                            dropEvent = e;
+                        }
                     }
-                }
 
-                // The notifier shard (data-bearing after moveCollection) always emits a
-                // user-visible drop with no 'fromMigrate' field, regardless of
-                // changeStreamsEmitFromMigrate, because the coordinator explicitly sets
-                // fromMigrate=false on the notifier shard.
-                assert(
-                    !dropEvent.hasOwnProperty("fromMigrate"),
-                    `Invalid fromMigrate on drop event: ${tojson(dropEvent)}`,
-                );
+                    // The notifier shard (data-bearing after moveCollection) always emits a
+                    // user-visible drop with no 'fromMigrate' field, regardless of
+                    // changeStreamsEmitFromMigrate, because the coordinator explicitly sets
+                    // fromMigrate=false on the notifier shard.
+                    assert(
+                        !dropEvent.hasOwnProperty("fromMigrate"),
+                        `Invalid fromMigrate on drop event: ${tojson(dropEvent)}`,
+                    );
 
-                csTest.cleanUp();
-            });
+                    csTest.cleanUp();
+                },
+            );
 
             db.dropDatabase();
             mongos.getDB(`${dbName}_${collName}_target`).dropDatabase();

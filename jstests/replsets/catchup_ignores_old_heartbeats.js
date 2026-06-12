@@ -36,7 +36,11 @@ let primaryColl = primary.getDB("test").coll;
 
 // The default WC is majority and this test can't test catchup properly if it used majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 assert(primary.host == rst.nodes[0].host);
@@ -54,7 +58,9 @@ primary.disconnect(rst.nodes[2]);
 // Get a heartbeat from the original primary "stuck" in the new primary.
 const newPrimary = rst.nodes[1];
 assert.commandWorked(newPrimary.adminCommand({clearLog: "global"}));
-let hbfp = configureFailPoint(newPrimary, "pauseInHandleHeartbeatResponse", {"target": primary.host});
+let hbfp = configureFailPoint(newPrimary, "pauseInHandleHeartbeatResponse", {
+    "target": primary.host,
+});
 hbfp.wait();
 // Put the original primary ahead of the secondaries.
 assert.commandWorked(primaryColl.insert({_id: 1}));
@@ -72,7 +78,12 @@ assert.eq(newPrimary.host, rst.getPrimary().host);
 // Check if the new primary has any logs with "Member is now in state DOWN". This indicates that it
 // failed to connect to a secondary during catchup. If so, it is possible that catchup did not fully
 // succeed due to network flakiness.
-const newPrimaryFailedToConnect = checkLog.checkContainsWithAtLeastCountJson(newPrimary, 21216, {}, 1);
+const newPrimaryFailedToConnect = checkLog.checkContainsWithAtLeastCountJson(
+    newPrimary,
+    21216,
+    {},
+    1,
+);
 const RBIDAfterStepUp = assert.commandWorked(primary.adminCommand({replSetGetRBID: 1}));
 
 if (newPrimaryFailedToConnect) {

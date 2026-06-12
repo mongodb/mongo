@@ -10,16 +10,25 @@
  *   featureFlagBlockReplicaSetWrites,
  * ]
  */
-import {disableReplicaSetWriteBlock, enableReplicaSetWriteBlock} from "jstests/libs/block_replica_set_writes_utils.js";
+import {
+    disableReplicaSetWriteBlock,
+    enableReplicaSetWriteBlock,
+} from "jstests/libs/block_replica_set_writes_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 function isBlockReplicaSetWritesRunning(adminDB) {
     return (
         adminDB
-            .aggregate([{$currentOp: {allUsers: true}}, {$match: {"command.blockReplicaSetWrites": {$exists: true}}}])
+            .aggregate([
+                {$currentOp: {allUsers: true}},
+                {$match: {"command.blockReplicaSetWrites": {$exists: true}}},
+            ])
             .itcount() > 0
     );
 }
@@ -36,7 +45,10 @@ describe("Test that blockReplicaSetWrites waits for majority write concern", fun
         restartReplicationOnSecondaries(this.rst);
         // Use getPrimary() rather than this.primaryAdminDB so that cleanup targets the current
         // primary even if a stepdown occurred during the test.
-        disableReplicaSetWriteBlock(this.rst.getPrimary().getDB("admin"), "InsufficientDiskSpace" /* reason */);
+        disableReplicaSetWriteBlock(
+            this.rst.getPrimary().getDB("admin"),
+            "InsufficientDiskSpace" /* reason */,
+        );
     });
 
     after(function () {
@@ -93,7 +105,11 @@ describe("Test that blockReplicaSetWrites waits for majority write concern", fun
         const primaryAdminDB = primary.getDB("admin");
 
         // Enable the write block on the current primary and confirm that user writes are rejected before the stepdown.
-        enableReplicaSetWriteBlock(primaryAdminDB, false /* allowDeletions */, "InsufficientDiskSpace" /* reason */);
+        enableReplicaSetWriteBlock(
+            primaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
         assert.commandFailedWithCode(
             primaryAdminDB.getSiblingDB("testDB").testColl.insert({x: 1}),
             ErrorCodes.ReplicaSetWritesBlocked,

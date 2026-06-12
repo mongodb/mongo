@@ -28,5 +28,9 @@ const explain = assert.commandWorked(
         .sort({num: 1})
         .explain("executionStats"),
 );
-assert.gt(getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "SORT_MERGE").length, 0, tojson(explain));
+assert.gt(
+    getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "SORT_MERGE").length,
+    0,
+    tojson(explain),
+);
 assert.eq(1, explain.executionStats.nReturned, tojson(explain));

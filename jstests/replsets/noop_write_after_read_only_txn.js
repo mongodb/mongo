@@ -46,7 +46,9 @@ function runTest({readConcernLevel, shouldWrite, provokeWriteConcernError}) {
 
     if (provokeWriteConcernError) stopReplicationOnSecondaries(rst);
 
-    const commitResult = assert.commandWorkedIgnoringWriteConcernErrors(session.commitTransaction_forTesting());
+    const commitResult = assert.commandWorkedIgnoringWriteConcernErrors(
+        session.commitTransaction_forTesting(),
+    );
 
     jsTestLog(`commitResult ${tojson(commitResult)}`);
     if (provokeWriteConcernError) {

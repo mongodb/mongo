@@ -36,7 +36,9 @@ const numQueriesPerRun = 10;
 function makeLookupUnwindAggModel(baseCollectionName, foreignCollectionName) {
     // Allow both self-lookups and lookups to a different collection.
     const foreignCollectionNameArb = fc.constantFrom(baseCollectionName, foreignCollectionName);
-    let pipelineArb = getEqLookupUnwindAggPipelineArb(foreignCollectionNameArb, {deterministicBag: true});
+    let pipelineArb = getEqLookupUnwindAggPipelineArb(foreignCollectionNameArb, {
+        deterministicBag: true,
+    });
     if (!is83orAbove) {
         function hasElemMatch(pipeline) {
             return getNestedProperties(pipeline, "$elemMatch").length > 0;
@@ -61,7 +63,10 @@ function rewriteLookupFrom(pipeline, rewrites) {
 
         const lookup = Object.assign({}, stage["$lookup"]);
         const result = rewrites[lookup.from];
-        assert(result, `Unexpected lookup.from value. "${lookup.from}" doesn't match any rewrite rules.`);
+        assert(
+            result,
+            `Unexpected lookup.from value. "${lookup.from}" doesn't match any rewrite rules.`,
+        );
         lookup.from = result;
         return {$lookup: lookup};
     }
@@ -75,7 +80,10 @@ describe("$lookup-$unwind", function () {
         const foreignControlColl = db[`${jsTestName()}_foreign_control`];
         const experimentColl = db[`${jsTestName()}_experiment`];
         const foreignExperimentColl = db[`${jsTestName()}_foreign_experiment`];
-        const aggModel = makeLookupUnwindAggModel(controlColl.getName(), foreignControlColl.getName());
+        const aggModel = makeLookupUnwindAggModel(
+            controlColl.getName(),
+            foreignControlColl.getName(),
+        );
         const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {
             modifyExperimentQueryFn: (query) => {
                 // Re-write the lookups to point to the experiment collections.

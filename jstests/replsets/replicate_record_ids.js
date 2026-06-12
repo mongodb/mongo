@@ -55,7 +55,9 @@ let docA = {"a": 1};
 
 // Create a collection with the param set. The recordId should show up in the oplog.
 primDB.runCommand({create: replRidCollName});
-const docAInsertOpTime = assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [docA]})).opTime;
+const docAInsertOpTime = assert.commandWorked(
+    primDB.runCommand({insert: replRidCollName, documents: [docA]}),
+).opTime;
 replSet.awaitReplication();
 const docAReplRid = getRidForDoc(primDB, replRidCollName, docA);
 assert.eq(docAReplRid, getRidForDoc(secDB, replRidCollName, docA));

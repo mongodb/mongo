@@ -8,7 +8,10 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let name = "priority_takeover_two_nodes_equal_priority";
-let replTest = new ReplSetTest({name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}]});
+let replTest = new ReplSetTest({
+    name: name,
+    nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}],
+});
 replTest.startSet();
 // We use the default electionTimeoutMillis to allow a priority takeover to occur in
 // case a lower priority node gets elected.
@@ -36,7 +39,9 @@ assert.soon(
 );
 
 jsTestLog("Stepping down the current primary.");
-assert.commandWorked(primary.adminCommand({replSetStepDown: 10 * 60 * 3, secondaryCatchUpPeriodSecs: 10 * 60}));
+assert.commandWorked(
+    primary.adminCommand({replSetStepDown: 10 * 60 * 3, secondaryCatchUpPeriodSecs: 10 * 60}),
+);
 
 // Make sure the primary has stepped down.
 assert.neq(primary, replTest.getPrimary());

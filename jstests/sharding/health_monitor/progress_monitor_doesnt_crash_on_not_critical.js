@@ -13,7 +13,10 @@ const params = {
             values: [{type: "test", intensity: "non-critical"}],
         }),
         healthMonitoringIntervals: tojson({values: [{type: "test", interval: NumberInt(500)}]}),
-        progressMonitor: tojson({interval: PROGRESS_TIMEOUT_SECONDS * 1000, deadline: PROGRESS_TIMEOUT_SECONDS}),
+        progressMonitor: tojson({
+            interval: PROGRESS_TIMEOUT_SECONDS * 1000,
+            deadline: PROGRESS_TIMEOUT_SECONDS,
+        }),
     },
 };
 let st = new ShardingTest({
@@ -23,7 +26,9 @@ let st = new ShardingTest({
 
 function changeObserverIntensity(conn, observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
-    assert.commandWorked(conn.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}));
+    assert.commandWorked(
+        conn.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}),
+    );
 }
 
 // After cluster startup, make sure both mongos's are available.
@@ -34,10 +39,14 @@ let pingServers = (servers) => {
 };
 
 pingServers([st.s0, st.s1]);
-assert.commandWorked(st.s1.adminCommand({"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 2}}}));
+assert.commandWorked(
+    st.s1.adminCommand({"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 2}}}),
+);
 
 jsTestLog("Block test health observer on " + st.s1.host);
-assert.commandWorked(st.s1.adminCommand({"configureFailPoint": "hangTestHealthObserver", "mode": "alwaysOn"}));
+assert.commandWorked(
+    st.s1.adminCommand({"configureFailPoint": "hangTestHealthObserver", "mode": "alwaysOn"}),
+);
 
 // Wait for the progress monitor timeout to elapse.
 sleep(2.1 * PROGRESS_TIMEOUT_SECONDS * 1000);

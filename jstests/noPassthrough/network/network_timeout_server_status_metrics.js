@@ -43,7 +43,8 @@ function testConnectionTimeoutMetric(fpName, expectedNumOps, errorCode, networkT
         if (networkTimeoutLog) {
             checkLog.containsJson(st.s, networkTimeoutLogID);
         }
-        const opMetrics = assert.commandWorked(st.s.getDB("admin").serverStatus()).metrics.operation;
+        const opMetrics = assert.commandWorked(st.s.getDB("admin").serverStatus()).metrics
+            .operation;
         let curTime = opMetrics.totalTimeWaitingBeforeConnectionTimeoutMillis;
         assert.gte(curTime, prevTime);
         prevTime = curTime;

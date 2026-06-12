@@ -86,7 +86,10 @@ export class WorkloadConcatArrays extends PipelineWorkload {
 
 export class WorkloadFilter extends PipelineWorkload {
     pipeline() {
-        return [{$project: {"f0": {$filter: {input: "$f0", as: "f0", cond: {$gte: ["$$f0", 0]}}}}}, {$count: "cnt"}];
+        return [
+            {$project: {"f0": {$filter: {input: "$f0", as: "f0", cond: {$gte: ["$$f0", 0]}}}}},
+            {$count: "cnt"},
+        ];
     }
 
     result() {
@@ -107,7 +110,10 @@ export class WorkloadElemMatchGte extends PipelineWorkload {
 
 export class WorkloadIndexOfArray extends PipelineWorkload {
     pipeline() {
-        return [{$project: {"indexOfArray": {$indexOfArray: ["$f0", this.scale() - 1]}}}, {$unset: "_id"}];
+        return [
+            {$project: {"indexOfArray": {$indexOfArray: ["$f0", this.scale() - 1]}}},
+            {$unset: "_id"},
+        ];
     }
 
     result() {
@@ -137,7 +143,10 @@ export class WorkloadSetDifference extends PipelineWorkload {
 
 export class WorkloadSetIntersection extends PipelineWorkload {
     pipeline() {
-        return [{$project: {"setIntersection": {$size: {$setIntersection: ["$f0", "$f0"]}}}}, {$unset: "_id"}];
+        return [
+            {$project: {"setIntersection": {$size: {$setIntersection: ["$f0", "$f0"]}}}},
+            {$unset: "_id"},
+        ];
     }
 
     result() {
@@ -157,7 +166,10 @@ export class WorkloadSetEquals extends PipelineWorkload {
 
 export class WorkloadZipArrayFields extends PipelineWorkload {
     pipeline() {
-        return [{"$project": {"zip": {"$size": {"$zip": {"inputs": ["$f0", "$f0"]}}}}}, {$unset: "_id"}];
+        return [
+            {"$project": {"zip": {"$size": {"$zip": {"inputs": ["$f0", "$f0"]}}}}},
+            {$unset: "_id"},
+        ];
     }
 
     result() {
@@ -169,7 +181,9 @@ export class WorkloadMap extends PipelineWorkload {
     pipeline() {
         return [
             {
-                "$project": {"map": {"$size": {"$map": {input: "$f0", as: "f", in: {$add: ["$$f", 1]}}}}},
+                "$project": {
+                    "map": {"$size": {"$map": {input: "$f0", as: "f", in: {$add: ["$$f", 1]}}}},
+                },
             },
             {$unset: "_id"},
         ];
@@ -186,7 +200,11 @@ export class WorkloadReduce extends PipelineWorkload {
             {
                 "$project": {
                     "reduce": {
-                        "$reduce": {input: "$f0", initialValue: 0, in: {$max: ["$$value", "$$this"]}},
+                        "$reduce": {
+                            input: "$f0",
+                            initialValue: 0,
+                            in: {$max: ["$$value", "$$this"]},
+                        },
                     },
                 },
             },

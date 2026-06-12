@@ -43,7 +43,9 @@ assert.commandWorked(
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {"meta.y": 1},
-        newChunks: [{min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]}],
+        newChunks: [
+            {min: {"meta.y": MinKey}, max: {"meta.y": MaxKey}, shard: recipientShardNames[0]},
+        ],
     },
     () => {
         const mongos = coll.getMongo();
@@ -56,7 +58,9 @@ reshardingTest.withReshardingInBackground(
 
         // Change bucket2's _id to match bucket1's _id.
         const newId = getTimeseriesCollForRawOps(db, coll).findOneWithRawData({"meta.x": -2})._id;
-        const replacementBucket = getTimeseriesCollForRawOps(db, coll).findOneWithRawData({"meta.x": 2});
+        const replacementBucket = getTimeseriesCollForRawOps(db, coll).findOneWithRawData({
+            "meta.x": 2,
+        });
         const oldId = replacementBucket._id;
         replacementBucket._id = newId;
         getTimeseriesCollForRawOps(db, coll).remove({_id: oldId}, getRawOperationSpec(db));

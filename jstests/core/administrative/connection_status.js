@@ -24,7 +24,10 @@ db.logout(); // logout from the current db - anecodtally "test_autocomplete" - t
  * Test that the output of connectionStatus makes sense.
  */
 function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
-    let connectionStatus = myDB.runCommand({"connectionStatus": 1, "showPrivileges": showPrivileges});
+    let connectionStatus = myDB.runCommand({
+        "connectionStatus": 1,
+        "showPrivileges": showPrivileges,
+    });
     assert.commandWorked(connectionStatus);
     let authInfo = connectionStatus.authInfo;
 
@@ -36,7 +39,11 @@ function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
 
     const parsedUUID = JSON.parse(JSON.stringify(uuid));
     const kUUIDSubtype = 4;
-    assert.eq(NumberInt(parsedUUID["$type"]), kUUIDSubtype, "UUID field should be a BinDataUUID, got: " + tojson(uuid));
+    assert.eq(
+        NumberInt(parsedUUID["$type"]),
+        kUUIDSubtype,
+        "UUID field should be a BinDataUUID, got: " + tojson(uuid),
+    );
     assert(parsedUUID["$binary"], "Missing payload for client UUID: " + tojson(uuid));
 
     // Test that authenticated users are properly returned.
@@ -78,12 +85,19 @@ function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
             );
             let actions = privileges[i].actions;
             for (let j = 0; j < actions.length; j++) {
-                assert(isString(actions[j]), "each authenticatedUserPrivilege action should be a string:" + infoStr);
+                assert(
+                    isString(actions[j]),
+                    "each authenticatedUserPrivilege action should be a string:" + infoStr,
+                );
             }
         }
     } else {
         // Test that privileges are not returned without asking
-        assert.eq(privileges, undefined, "authenticatedUserPrivileges should not be returned by default:" + infoStr);
+        assert.eq(
+            privileges,
+            undefined,
+            "authenticatedUserPrivileges should not be returned by default:" + infoStr,
+        );
     }
 }
 

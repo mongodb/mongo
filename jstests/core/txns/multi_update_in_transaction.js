@@ -111,7 +111,9 @@ withTxnAndAutoRetryOnMongos(
     session,
     () => {
         // Upsert 1 doc.
-        let res = assert.commandWorked(sessionColl.update({_id: 3}, {$set: {d: 1}}, {multi: true, upsert: true}));
+        let res = assert.commandWorked(
+            sessionColl.update({_id: 3}, {$set: {d: 1}}, {multi: true, upsert: true}),
+        );
         assert.eq(1, res.nUpserted);
         res = sessionColl.find({});
         assert.sameMembers(res.toArray(), [

@@ -17,7 +17,9 @@ assert.commandWorked(coll.insert(docsToInsert));
 
 // Verify that explain reports execution stats for the MULTI_ITERATOR stage. This is designed to
 // reproduce SERVER-35973.
-const explain = assert.commandWorked(coll.explain("allPlansExecution").aggregate([{$sample: {size: 10}}]));
+const explain = assert.commandWorked(
+    coll.explain("allPlansExecution").aggregate([{$sample: {size: 10}}]),
+);
 const multiIteratorStages = getAggPlanStages(explain, "MULTI_ITERATOR");
 assert.gt(multiIteratorStages.length, 0, tojson(explain));
 assert.gt(

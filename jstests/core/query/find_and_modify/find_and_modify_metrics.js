@@ -35,7 +35,11 @@ assert.eq(1, result.key);
 let serverStatusBeforeTest = testDB.serverStatus();
 
 // Verify that the metrics.commands.findAndModify.pipeline counter is present.
-assert.gte(serverStatusBeforeTest.metrics.commands.findAndModify.pipeline, 0, tojson(serverStatusBeforeTest));
+assert.gte(
+    serverStatusBeforeTest.metrics.commands.findAndModify.pipeline,
+    0,
+    tojson(serverStatusBeforeTest),
+);
 
 // Verify that that findAndModify command without aggregation pipeline-style update does not
 // increment the counter.
@@ -62,7 +66,11 @@ assert.eq(
 serverStatusBeforeTest = testDB.serverStatus();
 
 // Verify that the metrics.commands.findAndModify.arrayFilters counter is present.
-assert.gte(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters, 0, tojson(serverStatusBeforeTest));
+assert.gte(
+    serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters,
+    0,
+    tojson(serverStatusBeforeTest),
+);
 
 // Verify that that findAndModify command without arrayFilters does not increment the counter.
 result = coll.findAndModify({query: {key: 1}, update: {$set: {value: 5}}});

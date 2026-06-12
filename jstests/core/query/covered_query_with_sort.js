@@ -11,7 +11,11 @@
 //   exclude_from_timeseries_crud_passthrough,
 // ]
 
-import {getPlanStage, getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getWinningPlanFromExplain,
+    isIndexOnly,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.covered_query_with_sort;
 coll.drop();

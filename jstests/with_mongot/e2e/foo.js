@@ -15,7 +15,9 @@ assert.eq(result.length, 2);
 // Confirm that mongod was launched with a connection string to mongot on localhost.
 let paramOne = assert.commandWorked(db.adminCommand({getParameter: 1, "mongotHost": -1}));
 assert(paramOne["mongotHost"].startsWith("localhost:"));
-let paramTwo = assert.commandWorked(db.adminCommand({getParameter: 1, "searchIndexManagementHostAndPort": -1}));
+let paramTwo = assert.commandWorked(
+    db.adminCommand({getParameter: 1, "searchIndexManagementHostAndPort": -1}),
+);
 assert.eq(paramOne["mongotHost"], paramTwo["searchIndexManagementHostAndPort"]);
 
 // If a name is not specified during search index creation, mongot will name it default.

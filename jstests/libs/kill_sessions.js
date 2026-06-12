@@ -187,7 +187,9 @@ export var _kill_sessions_api_module = (function () {
             let db = client.getDB("admin");
             db.setSecondaryOk();
             assert.soon(() => {
-                let cursors = db.aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}]).toArray();
+                let cursors = db
+                    .aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}])
+                    .toArray();
                 return cursors.every((cursor) => !cursor.lsid);
             });
         });
@@ -207,7 +209,10 @@ export var _kill_sessions_api_module = (function () {
             let db = client.getDB("admin");
             db.setSecondaryOk();
             let cursors = db
-                .aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}, {"$match": {type: "idleCursor"}}])
+                .aggregate([
+                    {"$currentOp": {"idleCursors": true, "allUsers": true}},
+                    {"$match": {type: "idleCursor"}},
+                ])
                 .toArray();
             cursors.forEach(function (cursor) {
                 if (cursor.lsid) {
@@ -228,7 +233,9 @@ export var _kill_sessions_api_module = (function () {
     };
 
     Fixture.prototype.assertCursorKillLogMessages = function (cursorHandles) {
-        cursorHandles.forEach((cursorHandle) => cursorHandle.assertCursorKillLogMessages(this._clientsToVerifyVia));
+        cursorHandles.forEach((cursorHandle) =>
+            cursorHandle.assertCursorKillLogMessages(this._clientsToVerifyVia),
+        );
     };
 
     function CursorHandle(session, cursors) {
@@ -470,7 +477,11 @@ export var _kill_sessions_api_module = (function () {
         noAuth = noAuth.concat(makeNoAuthArgKill.apply({}, cmd));
     });
 
-    KillSessionsTestHelper.runNoAuth = function (clientToExecuteVia, clientToKillVia, clientsToVerifyVia) {
+    KillSessionsTestHelper.runNoAuth = function (
+        clientToExecuteVia,
+        clientToKillVia,
+        clientsToVerifyVia,
+    ) {
         let fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
 
         for (let i = 0; i < noAuth.length; ++i) {
@@ -754,7 +765,11 @@ export var _kill_sessions_api_module = (function () {
         auth = auth.concat(makeAuthArgKillFailure.apply({}, cmd));
     });
 
-    KillSessionsTestHelper.runAuth = function (clientToExecuteVia, clientToKillVia, clientsToVerifyVia) {
+    KillSessionsTestHelper.runAuth = function (
+        clientToExecuteVia,
+        clientToKillVia,
+        clientsToVerifyVia,
+    ) {
         let fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
 
         for (let i = 0; i < auth.length; ++i) {
@@ -786,7 +801,11 @@ export var _kill_sessions_api_module = (function () {
         admin.createUser({user: "simple", pwd: "password", roles: ["forSimpleTest"]});
         admin.createUser({user: "simple2", pwd: "password", roles: ["forSimpleTest"]});
         admin.createUser({user: "killAny", pwd: "password", roles: ["killAnySession"]});
-        admin.createUser({user: "impersonate", pwd: "password", roles: ["forImpersonate", "killAnySession"]});
+        admin.createUser({
+            user: "impersonate",
+            pwd: "password",
+            roles: ["forImpersonate", "killAnySession"],
+        });
     };
 
     let module = {};

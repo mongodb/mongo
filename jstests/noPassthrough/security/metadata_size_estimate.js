@@ -34,10 +34,14 @@ function runTest(conn) {
             }
             roleRoles.push({db: db, role: "read"});
         }
-        assert.commandWorked(admin.runCommand({createRole: "groupRole_" + i, roles: roleRoles, privileges: []}));
+        assert.commandWorked(
+            admin.runCommand({createRole: "groupRole_" + i, roles: roleRoles, privileges: []}),
+        );
         userRoles.push({db: "admin", role: "groupRole_" + i});
     }
-    assert.commandWorked(admin.runCommand({createRole: "bigRole", roles: userRoles, privileges: []}));
+    assert.commandWorked(
+        admin.runCommand({createRole: "bigRole", roles: userRoles, privileges: []}),
+    );
     assert.commandWorked(admin.runCommand({createUser: "user", pwd: "pwd", roles: ["bigRole"]}));
 
     const db = conn.getDB(firstDB);

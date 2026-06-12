@@ -42,7 +42,10 @@ assert.soon(() => {
         assert.commandFailedWithCode(result, ErrorCodes.TransactionTooLargeForCache);
         return true;
     } catch (e) {
-        assert.commandFailedWithCode(result, [ErrorCodes.WriteConflict, ErrorCodes.TemporarilyUnavailable]);
+        assert.commandFailedWithCode(result, [
+            ErrorCodes.WriteConflict,
+            ErrorCodes.TemporarilyUnavailable,
+        ]);
         return false;
     }
 }, "Expected operation to eventually fail with TransactionTooLargeForCache error.");

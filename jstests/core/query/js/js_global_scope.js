@@ -188,7 +188,8 @@ assert.lte(
 assert.lte(
     props.length,
     expectedGlobalVars.length,
-    () => `Found extra global properties during JS execution: ${tojson(props.slice(expectedGlobalVars.length))}`,
+    () =>
+        `Found extra global properties during JS execution: ${tojson(props.slice(expectedGlobalVars.length))}`,
 );
 
 // Now test the same properties appear in a $where. We have two additional expected properties which

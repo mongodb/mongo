@@ -15,7 +15,9 @@ const baseName = jsTestName();
 
 const timeseriesSource = db[`${baseName}_source`];
 timeseriesSource.drop();
-assert.commandWorked(db.createCollection(timeseriesSource.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(timeseriesSource.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 assert.commandWorked(timeseriesSource.insert({t: ISODate(), m: {tag: 1}, value: 100}));
 
 const targetName = `${jsTestName()}_out`;
@@ -30,6 +32,11 @@ function reduceFunc(key, values) {
 // TODO SERVER-101595 Remove ErrorCodes.CommandNotSupportedOnView from error codes.
 // Test that mapReduce fails when run against timeseries.
 assert.commandFailedWithCode(
-    db.runCommand({mapReduce: timeseriesSource.getName(), map: mapFunc, reduce: reduceFunc, out: targetName}),
+    db.runCommand({
+        mapReduce: timeseriesSource.getName(),
+        map: mapFunc,
+        reduce: reduceFunc,
+        out: targetName,
+    }),
     [ErrorCodes.CommandNotSupportedOnView, 11574100, 11574101],
 );

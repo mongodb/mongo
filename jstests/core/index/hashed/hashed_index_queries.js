@@ -88,7 +88,11 @@ assert.commandWorked(coll.insert(docs));
 
 // Verify $in query can use point interval bounds on hashed fields and non-hashed fields.
 validateFindCmdOutputAndPlan({
-    filter: {a: {$in: [38, 37]}, b: {$in: [{subObj: "str_12"}, {subObj: "str_11"}]}, c: {$in: [7, 8]}},
+    filter: {
+        a: {$in: [38, 37]},
+        b: {$in: [{subObj: "str_12"}, {subObj: "str_11"}]},
+        c: {$in: [7, 8]},
+    },
     expectedOutput: [
         {a: 37, b: {subObj: "str_11"}, c: 7},
         {a: 38, b: {subObj: "str_12"}, c: 8},
@@ -112,7 +116,11 @@ assert.commandWorked(coll.createIndex({b: "hashed", a: 1}));
 assert.commandWorked(coll.insert(docs));
 
 // Verify that index is not used for a range query on a hashed field.
-validateCountCmdOutputAndPlan({filter: {b: {$gt: 10, $lt: 12}}, expectedOutput: 7, expectedStages: ["COLLSCAN"]});
+validateCountCmdOutputAndPlan({
+    filter: {b: {$gt: 10, $lt: 12}},
+    expectedOutput: 7,
+    expectedStages: ["COLLSCAN"],
+});
 
 // Verify that index is used for a query on a hashed field.
 validateCountCmdOutputAndPlan({

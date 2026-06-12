@@ -46,7 +46,10 @@ assert.soon(
         return t.count() === 6 && t.find({x: {$lt: new Date(now - 20000000)}}).count() === 0;
     },
     function () {
-        return "TTL index did not successfully delete expired documents, all documents: " + tojson(t.find().toArray());
+        return (
+            "TTL index did not successfully delete expired documents, all documents: " +
+            tojson(t.find().toArray())
+        );
     },
     70 * 1000,
 );

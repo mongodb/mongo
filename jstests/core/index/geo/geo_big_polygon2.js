@@ -785,7 +785,10 @@ const nsidedPolys = [
 ];
 
 // Populate with 2dsphere index
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()), "create 2dsphere index");
+assert.commandWorked(
+    coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()),
+    "create 2dsphere index",
+);
 
 // Insert objects into collection
 objects.forEach(function (o) {
@@ -798,7 +801,10 @@ objects.forEach(function (o) {
 });
 
 // Try creating other index types
-assert.commandWorked(coll.createIndex({geo: "2dsphere", a: 1}, add2dsphereVersionIfNeeded()), "compound index, geo");
+assert.commandWorked(
+    coll.createIndex({geo: "2dsphere", a: 1}, add2dsphereVersionIfNeeded()),
+    "compound index, geo",
+);
 // These other index types will fail because of the GeoJSON documents
 assert.commandFailed(
     coll.createIndex({geo: "2dsphere", a: "text"}, add2dsphereVersionIfNeeded()),
@@ -880,6 +886,10 @@ indexes.forEach(function (index) {
         assert.eq(p.nW, coll.count({geo: {$geoWithin: {$geometry: p}}}), "within " + p.name);
 
         // intersects
-        assert.eq(p.nI, coll.count({geo: {$geoIntersects: {$geometry: p}}}), "intersection " + p.name);
+        assert.eq(
+            p.nI,
+            coll.count({geo: {$geoIntersects: {$geometry: p}}}),
+            "intersection " + p.name,
+        );
     });
 });

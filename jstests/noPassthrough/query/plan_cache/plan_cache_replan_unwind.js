@@ -39,7 +39,13 @@ function getAssertCount(count) {
     };
 }
 
-function testFn(aIndexPipeline, aExpectedResultCount, bIndexPipeline, bExpectedResultCount, cacheEntryVersion) {
+function testFn(
+    aIndexPipeline,
+    aExpectedResultCount,
+    bIndexPipeline,
+    bExpectedResultCount,
+    cacheEntryVersion,
+) {
     setUpActiveCacheEntry(
         coll,
         aIndexPipeline,
@@ -105,7 +111,14 @@ if (sbeEnabled) {
     assert.commandWorked(coll.updateMany({}, {$set: {lookupId: 0}}));
 
     const lookupUnwind = [
-        {$lookup: {from: foreignColl.getName(), localField: "lookupId", foreignField: "lookupId", as: "data"}},
+        {
+            $lookup: {
+                from: foreignColl.getName(),
+                localField: "lookupId",
+                foreignField: "lookupId",
+                as: "data",
+            },
+        },
         {$unwind: "$data"},
     ];
 

@@ -41,7 +41,8 @@ function validateTestCase(testCase) {
     // Check for each entry in result, the output field value is as expected
     for (let result of results) {
         assert(
-            result.relativeXValue.toFixed(2) == testCase.docIdToOutputFieldValue[result._id].toFixed(2),
+            result.relativeXValue.toFixed(2) ==
+                testCase.docIdToOutputFieldValue[result._id].toFixed(2),
             `'relativeXValue' of '${result.relativeXValue.toFixed(2)}' does not match
                     expected value of '${testCase.docIdToOutputFieldValue[result._id].toFixed(2)}'
                     for doc '_id': '${result._id}', for test with setWindowFieldsArgs =
@@ -74,7 +75,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -95,7 +99,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -106,7 +113,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -117,7 +127,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -127,7 +140,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "current"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "current"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -144,7 +160,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", 1]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -161,7 +180,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", 1]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -186,7 +208,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", 1]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -228,7 +253,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "current"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "current"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -246,7 +274,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", 1]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -314,7 +345,10 @@ function testDocumentBasedNonRemovableQueries() {
             partitionBy: "$partition",
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -332,7 +366,10 @@ function testDocumentBasedNonRemovableQueries() {
             partitionBy: "$partition",
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["unbounded", 1]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -355,7 +392,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {range: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -366,7 +406,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {range: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -377,7 +420,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "current"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {range: ["unbounded", "current"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -412,7 +458,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {range: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -423,7 +472,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {range: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
@@ -457,7 +509,10 @@ function testRangeBasedNonRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "current"]}},
+                    "relativeXValue": {
+                        $minMaxScaler: {input: "$x"},
+                        window: {range: ["unbounded", "current"]},
+                    },
                 },
             },
             docIdToOutputFieldValue: {
@@ -477,7 +532,10 @@ function testRangeBasedNonRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 5]}},
+                    "relativeXValue": {
+                        $minMaxScaler: {input: "$x"},
+                        window: {range: ["unbounded", 5]},
+                    },
                 },
             },
             docIdToOutputFieldValue: {
@@ -500,7 +558,10 @@ function testRangeBasedNonRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue": {$minMaxScaler: {input: {$const: 1}}, window: {range: ["unbounded", 1]}},
+                    "relativeXValue": {
+                        $minMaxScaler: {input: {$const: 1}},
+                        window: {range: ["unbounded", 1]},
+                    },
                 },
             },
             docIdToOutputFieldValue: {
@@ -543,7 +604,10 @@ function testRangeBasedNonRemovableQueries() {
             partitionBy: "$partition",
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {range: ["unbounded", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -587,7 +651,10 @@ function testDocumentBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {_id: 1},
                 output: {
-                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                    "relativeXValue": {
+                        $minMaxScaler: {input: "$x"},
+                        window: {documents: ["current", "current"]},
+                    },
                 },
             },
             docIdToOutputFieldValue: {
@@ -608,7 +675,10 @@ function testDocumentBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {_id: -1},
                 output: {
-                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                    "relativeXValue": {
+                        $minMaxScaler: {input: "$x"},
+                        window: {documents: ["current", "current"]},
+                    },
                 },
             },
             docIdToOutputFieldValue: {
@@ -629,7 +699,10 @@ function testDocumentBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: -1},
                 output: {
-                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                    "relativeXValue": {
+                        $minMaxScaler: {input: "$x"},
+                        window: {documents: ["current", "current"]},
+                    },
                 },
             },
             docIdToOutputFieldValue: {
@@ -647,7 +720,10 @@ function testDocumentBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["current", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -664,7 +740,10 @@ function testDocumentBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["current", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -681,7 +760,10 @@ function testDocumentBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-1, "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: [-1, "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: {
@@ -706,7 +788,10 @@ function testDocumentBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: -1},
             output: {
-                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+                "relativeXValue": {
+                    $minMaxScaler: {input: "$x"},
+                    window: {documents: ["current", "unbounded"]},
+                },
             },
         },
         docIdToOutputFieldValue: {

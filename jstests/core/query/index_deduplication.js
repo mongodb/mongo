@@ -124,10 +124,14 @@ function getExplain(query, hint) {
 
 // Run the given query with index pruning disabled and then enabled, and returns the explains.
 function getExplainBeforeAfterPruning(query) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 0}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 0}),
+    );
     const explainNoPruning = getExplain(query);
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 1}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 1}),
+    );
     const explainWithPruning = getExplain(query);
     return {before: explainNoPruning, after: explainWithPruning};
 }

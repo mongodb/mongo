@@ -40,7 +40,11 @@ function configureQueryAnalyzer({db, collName}) {
 
     let result;
     try {
-        result = db.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: kSamplesPerSecond});
+        result = db.adminCommand({
+            configureQueryAnalyzer: ns,
+            mode: "full",
+            samplesPerSecond: kSamplesPerSecond,
+        });
     } catch (e) {
         jsTest.log.info("Failed to configure query analyzer", {ns, error: e});
         if (!isNetworkError(e)) {

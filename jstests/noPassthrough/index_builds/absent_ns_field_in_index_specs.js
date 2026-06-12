@@ -27,8 +27,10 @@ assert.commandWorked(primaryColl.createIndex({x: 1}));
 
 replSet.awaitReplication();
 
-let specPrimary = assert.commandWorked(primaryDB.runCommand({listIndexes: collName})).cursor.firstBatch[1];
-let specSecondary = assert.commandWorked(secondaryDB.runCommand({listIndexes: collName})).cursor.firstBatch[1];
+let specPrimary = assert.commandWorked(primaryDB.runCommand({listIndexes: collName})).cursor
+    .firstBatch[1];
+let specSecondary = assert.commandWorked(secondaryDB.runCommand({listIndexes: collName})).cursor
+    .firstBatch[1];
 
 assert.eq(false, specPrimary.hasOwnProperty("ns"));
 assert.eq(false, specSecondary.hasOwnProperty("ns"));

@@ -24,7 +24,9 @@ const ns = dbName + "." + collName;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 function waitForFsyncLockToWaitForLock(st, numThreads) {
@@ -46,7 +48,9 @@ function waitForFsyncLockToWaitForLock(st, numThreads) {
 }
 
 let runTxn = async function (mongosHost, dbName, collName) {
-    const {withTxnAndAutoRetryOnMongos} = await import("jstests/libs/auto_retry_transaction_in_sharding.js");
+    const {withTxnAndAutoRetryOnMongos} = await import(
+        "jstests/libs/auto_retry_transaction_in_sharding.js"
+    );
 
     const mongosConn = new Mongo(mongosHost);
     jsTest.log(

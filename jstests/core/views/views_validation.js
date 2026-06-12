@@ -15,7 +15,11 @@ function makeView(viewName, viewOn, pipeline, expectedErrorCode) {
     }
     let res = viewsDb.runCommand(options);
     if (expectedErrorCode !== undefined) {
-        assert.commandFailedWithCode(res, expectedErrorCode, "Invalid view created " + tojson(options));
+        assert.commandFailedWithCode(
+            res,
+            expectedErrorCode,
+            "Invalid view created " + tojson(options),
+        );
     } else {
         assert.commandWorked(res, "Could not create view " + tojson(options));
     }
@@ -93,7 +97,12 @@ makeView("b", "c", [makeUnion("a")], ErrorCodes.GraphContainsCycle);
 clear();
 
 // Test that $unionWith checks for cycles within a nested $unionWith.
-makeView("a", "b", [{$unionWith: {coll: "c", pipeline: [{$unionWith: "a"}]}}], ErrorCodes.GraphContainsCycle);
+makeView(
+    "a",
+    "b",
+    [{$unionWith: {coll: "c", pipeline: [{$unionWith: "a"}]}}],
+    ErrorCodes.GraphContainsCycle,
+);
 
 /*
  * Check that view validation does not naively recurse on already visited views.
@@ -145,13 +154,19 @@ function detectViewError(aggStage) {
     let detectedViewError = false;
     for (let i = 0; i < kMaxRetries; ++i) {
         const res = viewsDb.runCommand({aggregate: "v10", pipeline: [aggStage], cursor: {}});
-        assert.commandFailedWithCode(res, [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.StaleConfig]);
+        assert.commandFailedWithCode(res, [
+            ErrorCodes.ViewDepthLimitExceeded,
+            ErrorCodes.StaleConfig,
+        ]);
         if (res.code === ErrorCodes.ViewDepthLimitExceeded) {
             detectedViewError = true;
             break;
         }
     }
-    assert(detectedViewError, "Did not detect view error after " + kMaxRetries + " retries of the aggregation");
+    assert(
+        detectedViewError,
+        "Did not detect view error after " + kMaxRetries + " retries of the aggregation",
+    );
 }
 
 detectViewError(makeUnion("v1"));
@@ -185,7 +200,10 @@ clear();
 
 // Check that collMod disallows the 'expireAfterSeconds' option over a view.
 makeView("a", "b");
-assert.commandFailedWithCode(viewsDb.runCommand({collMod: "a", expireAfterSeconds: 1}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    viewsDb.runCommand({collMod: "a", expireAfterSeconds: 1}),
+    ErrorCodes.InvalidOptions,
+);
 clear();
 
 // For the assert below with multiple error codes, SERVER-93055 changes the parse error codes to an

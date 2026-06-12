@@ -11,7 +11,8 @@
  * Concurrency adjustment algorithm names.
  */
 export const kFixedConcurrentTransactionsAlgorithm = "fixedConcurrentTransactions";
-export const kFixedConcurrentTransactionsWithPrioritizationAlgorithm = "fixedConcurrentTransactionsWithPrioritization";
+export const kFixedConcurrentTransactionsWithPrioritizationAlgorithm =
+    "fixedConcurrentTransactionsWithPrioritization";
 export const kThroughputProbingAlgorithm = "throughputProbing";
 
 /**
@@ -75,7 +76,11 @@ export function setHeuristicDeprioritization(node, enabled) {
  * Sets the heuristic deprioritization threshold for long-running operations.
  */
 export function setHeuristicDeprioritizationThreshold(node, threshold) {
-    setExecutionControlParameter(node, "executionControlHeuristicNumAdmissionsDeprioritizeThreshold", threshold);
+    setExecutionControlParameter(
+        node,
+        "executionControlHeuristicNumAdmissionsDeprioritizeThreshold",
+        threshold,
+    );
 }
 
 /**
@@ -96,14 +101,16 @@ export function getExecutionControlStats(node) {
  * Gets the count of finished low-priority read operations.
  */
 export function getLowPriorityReadCount(node) {
-    return node.adminCommand({serverStatus: 1}).queues.execution.read.lowPriority.finishedProcessing;
+    return node.adminCommand({serverStatus: 1}).queues.execution.read.lowPriority
+        .finishedProcessing;
 }
 
 /**
  * Gets the count of finished low-priority write operations.
  */
 export function getLowPriorityWriteCount(node) {
-    return node.adminCommand({serverStatus: 1}).queues.execution.write.lowPriority.finishedProcessing;
+    return node.adminCommand({serverStatus: 1}).queues.execution.write.lowPriority
+        .finishedProcessing;
 }
 
 /**
@@ -123,7 +130,8 @@ export function getTotalMarkedNonDeprioritizableCount(node) {
 export function getNormalPriorityFinishedCount(node) {
     const stats = getExecutionControlStats(node);
     return (
-        (stats.read?.normalPriority?.finishedProcessing || 0) + (stats.write?.normalPriority?.finishedProcessing || 0)
+        (stats.read?.normalPriority?.finishedProcessing || 0) +
+        (stats.write?.normalPriority?.finishedProcessing || 0)
     );
 }
 
@@ -202,7 +210,10 @@ export function setExecutionControlDeprioritizationExemptions(node, appNames) {
 
 export function getExecutionControlDeprioritizationExemptions(node) {
     const result = assert.commandWorked(
-        node.adminCommand({getParameter: 1, executionControlApplicationDeprioritizationExemptions: 1}),
+        node.adminCommand({
+            getParameter: 1,
+            executionControlApplicationDeprioritizationExemptions: 1,
+        }),
     );
     return result.executionControlApplicationDeprioritizationExemptions;
 }

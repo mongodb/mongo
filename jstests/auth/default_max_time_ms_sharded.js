@@ -17,7 +17,9 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMs(db, newValue) {
-    assert.commandWorked(adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(
+        adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}),
+    );
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -74,7 +76,10 @@ const expectedErrorsDueToMaxTimeMS = [ErrorCodes.Interrupted, ErrorCodes.MaxTime
 assert.commandWorked(testDB.runCommand(aggCommand));
 
 // No defaultMaxTimeMS is configured, but the query explicitly sets one, and fails.
-assert.commandFailedWithCode(testDB.runCommand({...aggCommand, maxTimeMS: 100}), expectedErrorsDueToMaxTimeMS);
+assert.commandFailedWithCode(
+    testDB.runCommand({...aggCommand, maxTimeMS: 100}),
+    expectedErrorsDueToMaxTimeMS,
+);
 
 // Set defaultMaxTimeMS to small value.
 setDefaultReadMaxTimeMs(adminDB, 500);

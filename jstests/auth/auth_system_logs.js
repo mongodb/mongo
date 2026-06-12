@@ -1,7 +1,9 @@
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const mongod = MongoRunner.runMongod({auth: ""});
-mongod.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-1"]});
+mongod
+    .getDB("admin")
+    .createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-1"]});
 assert(mongod.getDB("admin").auth("admin", "pwd"));
 // `mongod` is authenticated as a super user and stays that way.
 
@@ -50,7 +52,11 @@ function runTest(speculations, performNormalAuth, expectedNumFailures) {
 
     runAuths();
 
-    checkLog.containsWithCount(mongod, kFailedToAuthMsg, failuresAlreadyObserved + expectedNumFailures);
+    checkLog.containsWithCount(
+        mongod,
+        kFailedToAuthMsg,
+        failuresAlreadyObserved + expectedNumFailures,
+    );
     failuresAlreadyObserved += expectedNumFailures;
 }
 

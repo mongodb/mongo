@@ -33,7 +33,10 @@ withQueryStatsEnabled(collName, (coll) => {
     assert.eq(kHashedFieldName, queryStats[1].key.queryShape.key);
     assert.eq(
         {
-            "$or": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$eq": "?number"}}],
+            "$or": [
+                {[kHashedFieldName]: {"$gt": "?number"}},
+                {[kHashedFieldName]: {"$eq": "?number"}},
+            ],
         },
         queryStats[1].key.queryShape.query,
     );

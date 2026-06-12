@@ -22,7 +22,10 @@ let sleepFunction = function (myDbName, myCollName) {
     );
 };
 
-let sleepCommand = startParallelShell(funWithArgs(sleepFunction, dbName, collName), testDB.getMongo().port);
+let sleepCommand = startParallelShell(
+    funWithArgs(sleepFunction, dbName, collName),
+    testDB.getMongo().port,
+);
 
 const sleepID = waitForCommand(
     "sleepCmd",

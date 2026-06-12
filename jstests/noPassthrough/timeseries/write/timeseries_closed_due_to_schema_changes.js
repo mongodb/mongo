@@ -16,7 +16,9 @@ const timeFieldName = "t";
 const metaFieldName = "m";
 
 assert.commandWorked(
-    db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    db.createCollection(jsTestName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 const coll = db.getCollection(jsTestName());

@@ -10,7 +10,12 @@ let newUUID = UUID();
 
 // Create new collection, insert new FCV document and then delete the
 // original collection.
-let createNewAdminSystemVersionCollection = {op: "c", ns: "admin.$cmd", ui: newUUID, o: {create: "system.version"}};
+let createNewAdminSystemVersionCollection = {
+    op: "c",
+    ns: "admin.$cmd",
+    ui: newUUID,
+    o: {create: "system.version"},
+};
 let insertFCVDocument = {
     op: "i",
     ns: "admin.system.version",
@@ -23,7 +28,11 @@ let dropOriginalAdminSystemVersionCollection = {
     o: {drop: "admin.tmp_system_version"},
 };
 let cmd = {
-    applyOps: [createNewAdminSystemVersionCollection, insertFCVDocument, dropOriginalAdminSystemVersionCollection],
+    applyOps: [
+        createNewAdminSystemVersionCollection,
+        insertFCVDocument,
+        dropOriginalAdminSystemVersionCollection,
+    ],
 };
 assert.commandWorked(adminDB.runCommand(cmd), "failed command " + tojson(cmd));
 

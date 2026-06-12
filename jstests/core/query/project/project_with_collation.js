@@ -26,7 +26,11 @@ function setupCollection(withCollation) {
 
     const insertColl = db[insertCollName];
     assert.commandWorked(
-        insertColl.insert({_id: 0, str: "a", array: [{str: "b"}, {str: "A"}, {str: "B"}, {str: "a"}]}),
+        insertColl.insert({
+            _id: 0,
+            str: "a",
+            array: [{str: "b"}, {str: "A"}, {str: "B"}, {str: "a"}],
+        }),
     );
     assert.commandWorked(insertColl.insert({_id: 1, str: "a", elemMatch: [{str: "A"}, "ignored"]}));
     assert.commandWorked(insertColl.insert({_id: 2, str: "A", elemMatch: ["ignored", {str: "a"}]}));
@@ -36,7 +40,10 @@ function setupCollection(withCollation) {
 }
 
 function runQueryWithCollation(testColl, collationToUse) {
-    let findCmd = testColl.find({str: "A", elemMatch: {$elemMatch: {str: "a"}}}, {_id: 1, "elemMatch.$": 1});
+    let findCmd = testColl.find(
+        {str: "A", elemMatch: {$elemMatch: {str: "a"}}},
+        {_id: 1, "elemMatch.$": 1},
+    );
     if (collationToUse) {
         findCmd = findCmd.collation(collationToUse);
     }
@@ -46,7 +53,10 @@ function runQueryWithCollation(testColl, collationToUse) {
         {_id: 2, elemMatch: [{str: "a"}]},
     ]);
 
-    findCmd = testColl.find({str: "A"}, {sortedArray: {$sortArray: {input: "$array", sortBy: {str: 1}}}});
+    findCmd = testColl.find(
+        {str: "A"},
+        {sortedArray: {$sortArray: {input: "$array", sortBy: {str: 1}}}},
+    );
     if (collationToUse) {
         findCmd = findCmd.collation(collationToUse);
     }
@@ -183,7 +193,9 @@ queryWithSimpleCollation(collWithCollation);
 (function viewWithCollation() {
     collWithCollation = setupCollection(collation);
     db[jsTestName() + "_view"].drop();
-    assert.commandWorked(db.createView(jsTestName() + "_view", withCollationCollName, [], {collation: collation}));
+    assert.commandWorked(
+        db.createView(jsTestName() + "_view", withCollationCollName, [], {collation: collation}),
+    );
     const viewColl = db[jsTestName() + "_view"];
 
     const sortArrayOutput = viewColl

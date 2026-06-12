@@ -27,7 +27,9 @@ const testDB = st.s.getDB(dbName);
 const coll = testDB[collName];
 
 // Create sharded timeseries in viewful format.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 assert.commandWorked(
     st.s.adminCommand({
         shardCollection: coll.getFullName(),
@@ -53,7 +55,9 @@ const aggThread = new Thread(
         );
 
         // Upon a retry, the aggregation will work correctly.
-        const result = conn.getDB(dbName).runCommand({aggregate: collName, pipeline: [], cursor: {}});
+        const result = conn
+            .getDB(dbName)
+            .runCommand({aggregate: collName, pipeline: [], cursor: {}});
         assert.commandWorked(result);
         assert.eq(1, result.cursor.firstBatch.length);
     },
@@ -66,7 +70,9 @@ aggThread.start();
 fp.wait();
 
 // Upgrade FCV while aggregation is paused - converts viewful to viewless.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 // Release aggregation. We expect non-empty results.
 fp.off();

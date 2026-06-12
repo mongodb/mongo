@@ -8,7 +8,10 @@ import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
-import {assertBelowBsonSizeLimit, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {
+    assertBelowBsonSizeLimit,
+    assertCollectionsMatch,
+} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 import {getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 
 const fcAssertArgs = getFcAssertArgs();
@@ -47,7 +50,9 @@ export class Fixture {
         this.db[this.tsCollName].drop();
 
         this.db.createCollection(this.ctrlCollName);
-        this.db.createCollection(this.tsCollName, {timeseries: {timeField: this.timeField, metaField: this.metaField}});
+        this.db.createCollection(this.tsCollName, {
+            timeseries: {timeField: this.timeField, metaField: this.metaField},
+        });
 
         this.ctrlColl = this.db.getCollection(this.ctrlCollName);
         this.tsColl = this.db.getCollection(this.tsCollName);
@@ -102,7 +107,8 @@ export class Fixture {
             const bsonSize = Object.bsonsize(doc);
             const totalDocSize = accumulatedStats.documentSizeMean * accumulatedStats.documentCount;
             accumulatedStats.documentCount += 1;
-            accumulatedStats.documentSizeMean = (totalDocSize + bsonSize) / accumulatedStats.documentCount;
+            accumulatedStats.documentSizeMean =
+                (totalDocSize + bsonSize) / accumulatedStats.documentCount;
             accumulatedStats.documentSizeMax = Math.max(bsonSize, accumulatedStats.documentSizeMax);
         };
         switch (commandName) {
@@ -130,10 +136,16 @@ export class Fixture {
                         .property(programArb, (cmds) => {
                             const model = makeEmptyModel();
                             fc.modelRun(
-                                () => ({model: model, real: {tsColl: this.tsColl, ctrlColl: this.ctrlColl}}),
+                                () => ({
+                                    model: model,
+                                    real: {tsColl: this.tsColl, ctrlColl: this.ctrlColl},
+                                }),
                                 cmds,
                             );
-                            this.stats = cmds.commands.reduce(this.commandMeasurementStatsReducer, this.stats);
+                            this.stats = cmds.commands.reduce(
+                                this.commandMeasurementStatsReducer,
+                                this.stats,
+                            );
                             assertCollectionsMatch(this.tsColl, this.ctrlColl);
                             assertBelowBsonSizeLimit(this.tsColl);
                         })

@@ -15,7 +15,10 @@ import {
     prettyPrintRejectedPlans,
     getWinningJoinOrderOneLine,
 } from "jstests/query_golden/libs/pretty_plan.js";
-import {getJoinTestResultsAndExplain, verifyExplainOutput} from "jstests/query_golden/libs/join_opt.js";
+import {
+    getJoinTestResultsAndExplain,
+    verifyExplainOutput,
+} from "jstests/query_golden/libs/join_opt.js";
 import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName()];

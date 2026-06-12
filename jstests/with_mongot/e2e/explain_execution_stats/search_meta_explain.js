@@ -86,12 +86,20 @@ const facetQuery = {
 function runExplainTest(verbosity) {
     // Count Query Test.
     let result = coll.explain(verbosity).aggregate([countQuery]);
-    verifyE2ESearchMetaExplainOutput({explainOutput: result, numFacetBucketsAndCount: 1, verbosity: verbosity});
+    verifyE2ESearchMetaExplainOutput({
+        explainOutput: result,
+        numFacetBucketsAndCount: 1,
+        verbosity: verbosity,
+    });
 
     // Facet Query Test.
     result = coll.explain(verbosity).aggregate([facetQuery]);
     // numFacetBucketsAndCount is 15, 14 from facet buckets (10 genre, 4 year) and 1 from count
-    verifyE2ESearchMetaExplainOutput({explainOutput: result, numFacetBucketsAndCount: 15, verbosity: verbosity});
+    verifyE2ESearchMetaExplainOutput({
+        explainOutput: result,
+        numFacetBucketsAndCount: 15,
+        verbosity: verbosity,
+    });
 }
 
 runExplainTest("queryPlanner");

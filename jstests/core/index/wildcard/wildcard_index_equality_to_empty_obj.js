@@ -26,7 +26,10 @@ assert.commandWorked(
     ]),
 );
 
-const wildcardIndexes = [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}}];
+const wildcardIndexes = [
+    {keyPattern: {"$**": 1}},
+    {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}},
+];
 for (const indexSpec of wildcardIndexes) {
     const option = {};
     if (indexSpec.wildcardProjection) {

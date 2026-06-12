@@ -43,7 +43,11 @@ function runShardingTestExists(shardDistribution) {
     let startChunk = curr;
 
     for (let i = 0; i < length; i++) {
-        for (startChunk = curr; shardDistribution[i] != null && curr < startChunk + shardDistribution[i]; curr++) {
+        for (
+            startChunk = curr;
+            shardDistribution[i] != null && curr < startChunk + shardDistribution[i];
+            curr++
+        ) {
             /* Insert shardDistribution[i] documents into the current chunk.*/
             assert.commandWorked(coll.insert({a: curr}));
         }
@@ -61,13 +65,19 @@ function runShardingTestExists(shardDistribution) {
 
         /* Move the "next" chunk to the next shard */
         assert.commandWorked(
-            admin.runCommand({moveChunk: namespace, find: {a: curr + 1}, to: shards[(i + 1) % length]._id}),
+            admin.runCommand({
+                moveChunk: namespace,
+                find: {a: curr + 1},
+                to: shards[(i + 1) % length]._id,
+            }),
         );
     }
 
     /* Move the remaining chunk to the first shard which is supposed to have documents. */
     for (let j = 0; shardDistribution[j] == null && j < length; j++)
-        assert.commandWorked(admin.runCommand({moveChunk: namespace, find: {a: curr + 1}, to: shards[j + 1]._id}));
+        assert.commandWorked(
+            admin.runCommand({moveChunk: namespace, find: {a: curr + 1}, to: shards[j + 1]._id}),
+        );
 
     const counts = coll.aggregate([{"$collStats": {"count": {}}}]).toArray();
 
@@ -164,12 +174,20 @@ const mongos = st.s0;
 const stDb = mongos.getDB(dbName);
 
 assert.commandFailedWithCode(
-    stDb.runCommand({aggregate: doesNotExistName, pipeline: [{"$collStats": {"count": {}}}], cursor: {}}),
+    stDb.runCommand({
+        aggregate: doesNotExistName,
+        pipeline: [{"$collStats": {"count": {}}}],
+        cursor: {},
+    }),
     ErrorCodes.NamespaceNotFound,
 );
 
 assert.commandFailedWithCode(
-    stDb.runCommand({aggregate: doesNotExistName, pipeline: [{"$collStats": {"unknown": {}}}], cursor: {}}),
+    stDb.runCommand({
+        aggregate: doesNotExistName,
+        pipeline: [{"$collStats": {"unknown": {}}}],
+        cursor: {},
+    }),
     ErrorCodes.IDLUnknownField,
 );
 
@@ -190,7 +208,11 @@ rst.initiate();
 const rstDb = rst.getPrimary().getDB(dbName);
 
 assert.commandFailedWithCode(
-    rstDb.runCommand({aggregate: doesNotExistName, pipeline: [{"$collStats": {"count": {}}}], cursor: {}}),
+    rstDb.runCommand({
+        aggregate: doesNotExistName,
+        pipeline: [{"$collStats": {"count": {}}}],
+        cursor: {},
+    }),
     ErrorCodes.NamespaceNotFound,
 );
 
@@ -200,12 +222,20 @@ const conn = MongoRunner.runMongod({});
 const standaloneDb = conn.getDB(dbName);
 
 assert.commandFailedWithCode(
-    standaloneDb.runCommand({aggregate: doesNotExistName, pipeline: [{"$collStats": {"count": {}}}], cursor: {}}),
+    standaloneDb.runCommand({
+        aggregate: doesNotExistName,
+        pipeline: [{"$collStats": {"count": {}}}],
+        cursor: {},
+    }),
     ErrorCodes.NamespaceNotFound,
 );
 
 assert.commandFailedWithCode(
-    standaloneDb.runCommand({aggregate: doesNotExistName, pipeline: [{"$collStats": {"unknown": {}}}], cursor: {}}),
+    standaloneDb.runCommand({
+        aggregate: doesNotExistName,
+        pipeline: [{"$collStats": {"unknown": {}}}],
+        cursor: {},
+    }),
     ErrorCodes.IDLUnknownField,
 );
 

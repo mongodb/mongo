@@ -29,7 +29,9 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 let shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}));
+assert.commandWorked(
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}),
+);
 
 const kTestMode = {
     kNonRecovery: 1,
@@ -48,7 +50,9 @@ function setUpTestMode(mode) {
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     } else if (mode == kTestMode.kFailover) {
         const oldPrimary = st.rs0.getPrimary();
-        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     }
@@ -86,13 +90,17 @@ function testTxnNumberValidationOnRetryingOldTxnNumber(makeOrderedSessionOptsFun
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 0}], sessionOpts0)));
     if (sessionOpts0.isTransaction) {
         assert.commandWorked(
-            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+            shard0TestDB.adminCommand(
+                makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+            ),
         );
     }
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 1}], sessionOpts1)));
     if (sessionOpts1.isTransaction) {
         assert.commandWorked(
-            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber)),
+            shard0TestDB.adminCommand(
+                makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber),
+            ),
         );
     }
     assert.eq(mongosTestColl.count(), 2);
@@ -125,7 +133,9 @@ function testTxnNumberValidationOnStartingOldTxnNumber(makeOrderedSessionOptsFun
         // Only transactions that have been prepared or committed are expected to survive failover
         // and restart.
         assert.commandWorked(
-            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+            shard0TestDB.adminCommand(
+                makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+            ),
         );
     }
 
@@ -138,7 +148,9 @@ function testTxnNumberValidationOnStartingOldTxnNumber(makeOrderedSessionOptsFun
 
     if (sessionOpts0.isTransaction) {
         assert.commandWorked(
-            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+            shard0TestDB.adminCommand(
+                makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+            ),
         );
     }
 
@@ -276,12 +288,16 @@ function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
 
     if (sessionOpts0.isTransaction) {
         assert.commandWorked(
-            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+            shard0TestDB.adminCommand(
+                makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+            ),
         );
     }
     if (sessionOpts1.isTransaction) {
         assert.commandWorked(
-            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber)),
+            shard0TestDB.adminCommand(
+                makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber),
+            ),
         );
     }
 

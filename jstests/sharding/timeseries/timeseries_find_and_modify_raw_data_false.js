@@ -27,14 +27,23 @@ describe("findAndModify rawData: false should not enter raw-data mode", function
         mongosDB = st.s.getDB(jsTestName());
         mongosColl = mongosDB.getCollection("testColl");
 
-        assert.commandWorked(mongosDB.createCollection(mongosColl.getName(), {timeseries: {timeField, metaField}}));
+        assert.commandWorked(
+            mongosDB.createCollection(mongosColl.getName(), {timeseries: {timeField, metaField}}),
+        );
         assert.commandWorked(st.s.adminCommand({enableSharding: mongosDB.getName()}));
         assert.commandWorked(mongosColl.createIndex({[metaField]: 1}));
-        assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {[metaField]: 1}}));
+        assert.commandWorked(
+            mongosDB.adminCommand({
+                shardCollection: mongosColl.getFullName(),
+                key: {[metaField]: 1},
+            }),
+        );
 
         // Split and distribute chunks across two shards.
         const bucketsColl = getTimeseriesCollForDDLOps(mongosDB, mongosColl);
-        assert.commandWorked(mongosDB.adminCommand({split: bucketsColl.getFullName(), middle: {[metaField]: 50}}));
+        assert.commandWorked(
+            mongosDB.adminCommand({split: bucketsColl.getFullName(), middle: {[metaField]: 50}}),
+        );
         assert.commandWorked(
             mongosDB.adminCommand({
                 moveChunk: bucketsColl.getFullName(),
@@ -120,7 +129,12 @@ describe("findAndModify rawData: false should not enter raw-data mode", function
                 rawData: false,
             }),
         );
-        assert.neq(result.value, null, "Expected findAndModify to find and return the measurement document", {result});
+        assert.neq(
+            result.value,
+            null,
+            "Expected findAndModify to find and return the measurement document",
+            {result},
+        );
         assert(
             result.value.hasOwnProperty(timeField),
             "Returned document should have the time field (measurement, not bucket)",

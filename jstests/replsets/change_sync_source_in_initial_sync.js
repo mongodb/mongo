@@ -31,7 +31,10 @@ const initialSyncNode = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
         "failpoint.initialSyncHangBeforeSplittingControlFlow": tojson({mode: "alwaysOn"}),
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: primary.name}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: primary.name},
+        }),
     },
 });
 rst.reInitiate();
@@ -44,10 +47,14 @@ assert.soon(function () {
     const res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
     // failedInitialSyncAttempts can be > 0 due to transient network errors in our testing
     // environment.
-    failedInitialSyncAttempts = res.initialSyncStatus ? res.initialSyncStatus.failedInitialSyncAttempts : 0;
+    failedInitialSyncAttempts = res.initialSyncStatus
+        ? res.initialSyncStatus.failedInitialSyncAttempts
+        : 0;
     return primary.name === res.syncSourceHost;
 });
-assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: "forceSyncSourceCandidate", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "forceSyncSourceCandidate", mode: "off"}),
+);
 
 jsTestLog("Setting the initial sync source from secondary to primary.");
 let syncHost = TestData.usePriorityPorts ? secondary.priorityHost : secondary.host;
@@ -55,9 +62,15 @@ assert.commandWorked(initialSyncNode.adminCommand({replSetSyncFrom: syncHost}));
 
 // Turning off the 'initialSyncHangBeforeSplittingControlFlow' failpoint should cause initial sync
 // to restart with the secondary as the sync source.
-let hangBeforeFinishInitialSync = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
+let hangBeforeFinishInitialSync = configureFailPoint(
+    initialSyncNode,
+    "initialSyncHangBeforeFinish",
+);
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeSplittingControlFlow", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeSplittingControlFlow",
+        mode: "off",
+    }),
 );
 hangBeforeFinishInitialSync.wait();
 let res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));

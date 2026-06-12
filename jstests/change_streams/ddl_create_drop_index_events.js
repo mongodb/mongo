@@ -59,12 +59,24 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
 
         assert.commandWorked(testDB[collName].createIndex(key, options));
         if (insertDataBeforeCreateIndex && pipeline[0].$changeStream.showSystemEvents) {
-            assertNextChangeEvent(cursor, {operationType: "startIndexBuild", ns: ns, operationDescription: opDesc});
+            assertNextChangeEvent(cursor, {
+                operationType: "startIndexBuild",
+                ns: ns,
+                operationDescription: opDesc,
+            });
         }
-        assertNextChangeEvent(cursor, {operationType: "createIndexes", ns: ns, operationDescription: opDesc});
+        assertNextChangeEvent(cursor, {
+            operationType: "createIndexes",
+            ns: ns,
+            operationDescription: opDesc,
+        });
 
         assert.commandWorked(testDB[collName].dropIndexes([dropKey]));
-        assertNextChangeEvent(cursor, {operationType: "dropIndexes", ns: ns, operationDescription: opDesc});
+        assertNextChangeEvent(cursor, {
+            operationType: "dropIndexes",
+            ns: ns,
+            operationDescription: opDesc,
+        });
     }
 
     // Test createIndex() with various option followed by dropIndexes("*").
@@ -118,7 +130,9 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
     // - If enabled: defaults to version 4, which is included in change stream events.
     // - If disabled: defaults to version 3, which is included in change stream events.
     options = {name: "2dsphere"};
-    var twoDSphereIndexVersion = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3;
+    var twoDSphereIndexVersion = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4")
+        ? 4
+        : 3;
     if (!isStableFCVSuite()) {
         // If we are upgrading/downgrading the FCV, avoid having to drop any v4 indexes by pinning the version to 3
         // TODO SERVER-118561 Remove this when 9.0 is last LTS.
@@ -135,7 +149,9 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
     if (!insertDataBeforeCreateIndex) {
         // If the collection was empty before calling createIndexes(), then there will be a separate
         // change stream event for each index.
-        assert.commandWorked(testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
+        assert.commandWorked(
+            testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}),
+        );
         cst.assertNextChangesEqualUnordered({
             cursor: cursor,
             expectedChanges: [
@@ -146,7 +162,9 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
     } else {
         // If the collection was not empty before calling createIndexes(), then there will be a
         // single change stream event that covers both indexes.
-        assert.commandWorked(testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
+        assert.commandWorked(
+            testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}),
+        );
         if (pipeline[0].$changeStream.showSystemEvents) {
             assertNextChangeEvent(cursor, {
                 operationType: "startIndexBuild",

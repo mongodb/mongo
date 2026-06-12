@@ -172,7 +172,9 @@ function testUpdates({shardKeyTimeField, shardKeyMetaFieldPath, timeseriesOption
                     shardKey,
                     insert,
                     timeseries: timeseriesOptions,
-                    updatesMetaFieldInShardKey: checkUpdatesMetaFieldInShardKey(inputs.pathToMetaFieldBeingUpdated),
+                    updatesMetaFieldInShardKey: checkUpdatesMetaFieldInShardKey(
+                        inputs.pathToMetaFieldBeingUpdated,
+                    ),
                 }),
             );
         };
@@ -252,7 +254,10 @@ function testCaseReplacementAndPipelineUpdateFails({testUpdate}) {
             updates: [
                 {
                     q: {},
-                    u: [{$addFields: {[metaField + ".c"]: "C", [metaField + ".e"]: "E"}}, {$unset: metaField + ".e"}],
+                    u: [
+                        {$addFields: {[metaField + ".c"]: "C", [metaField + ".e"]: "E"}},
+                        {$unset: metaField + ".e"},
+                    ],
                     multi: true,
                 },
             ],
@@ -711,7 +716,9 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
     // Remove the metaField.
     testUpdate({
         initialDocList: [doc1],
-        updates: [{q: {[metaField]: {a: "A", b: "B"}}, u: {$unset: {[metaField]: ""}}, multi: true}],
+        updates: [
+            {q: {[metaField]: {a: "A", b: "B"}}, u: {$unset: {[metaField]: ""}}, multi: true},
+        ],
         resultDocList: [{_id: 1, [timeField]: dateTime1}],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
@@ -786,7 +793,11 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             expectFailedUpdate([doc1, doc2, doc3]),
         );
 
-        const nestedMetaObj = {_id: 6, [timeField]: dateTime1, [metaField]: {[metaField]: "A", a: 1}};
+        const nestedMetaObj = {
+            _id: 6,
+            [timeField]: dateTime1,
+            [metaField]: {[metaField]: "A", a: 1},
+        };
 
         // Query for documents using $jsonSchema with the metaField required and a required subfield
         // of the metaField with the same name as the metaField.
@@ -987,7 +998,11 @@ function testCaseCollationUpdates({testUpdate}) {
                 collation: {locale: "fr"},
             },
         ],
-        resultDocList: [collationDoc1, {_id: 2, [timeField]: dateTime1, [metaField]: "Updated"}, collationDoc3],
+        resultDocList: [
+            collationDoc1,
+            {_id: 2, [timeField]: dateTime1, [metaField]: "Updated"},
+            collationDoc3,
+        ],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -1038,7 +1053,12 @@ if (!arbitraryUpdatesEnabled) {
     testUpdates({shardKeyTimeField: timeField, timeseriesOptions: {timeField}, tests});
 }
 testUpdates({shardKeyMetaFieldPath: metaField, timeseriesOptions, tests});
-testUpdates({shardKeyTimeField: timeField, shardKeyMetaFieldPath: metaField, timeseriesOptions, tests});
+testUpdates({
+    shardKeyTimeField: timeField,
+    shardKeyMetaFieldPath: metaField,
+    timeseriesOptions,
+    tests,
+});
 
 // Run a relevant subset of tests in the case when meta.a is the shard key.
 const testsForMetaSubfieldShardKey = [

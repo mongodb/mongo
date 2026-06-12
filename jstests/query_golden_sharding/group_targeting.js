@@ -37,10 +37,18 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
     ]);
 
     // Move "shard_1*" chunk to otherShard.
-    assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
-    assert.commandWorked(shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: "shard1"}}));
     assert.commandWorked(
-        shardingTest.s.adminCommand({moveChunk: coll.getFullName(), find: {shardKey: "shard1_1"}, to: otherShard}),
+        shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}),
+    );
+    assert.commandWorked(
+        shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: "shard1"}}),
+    );
+    assert.commandWorked(
+        shardingTest.s.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {shardKey: "shard1_1"},
+            to: otherShard,
+        }),
     );
 
     // Insert these docs after moving the chunk to avoid orphans.
@@ -113,7 +121,9 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
         {$sort: {_id: 1}},
     ]);
 
-    subSection("Only partial pushdown of $group on key derived from shard-key, dependency on other field");
+    subSection(
+        "Only partial pushdown of $group on key derived from shard-key, dependency on other field",
+    );
     outputAggregationPlanAndResults(coll, [{$group: {_id: {"$min": ["$shardKey", "$_id"]}}}]);
 
     subSection("With multiple $groups, pushdown first group when on shard key");
@@ -136,13 +146,22 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
 
     subSection("Don't fully pushdown $group on non-shard-key");
     outputAggregationPlanAndResults(coll, [{$group: {_id: "$otherField"}}]);
-    outputAggregationPlanAndResults(coll, [{$project: {shardKey: "$otherField"}}, {$group: {_id: "$shardKey"}}]);
+    outputAggregationPlanAndResults(coll, [
+        {$project: {shardKey: "$otherField"}},
+        {$group: {_id: "$shardKey"}},
+    ]);
 
     subSection("Don't fully pushdown $group when the shard key is not preserved");
-    outputAggregationPlanAndResults(coll, [{$project: {otherField: 1}}, {$group: {_id: "$shardKey"}}]);
+    outputAggregationPlanAndResults(coll, [
+        {$project: {otherField: 1}},
+        {$group: {_id: "$shardKey"}},
+    ]);
 
     subSection("Don't fully pushdown $group when the shard key is overwritten by $addFields");
-    outputAggregationPlanAndResults(coll, [{$addFields: {shardKey: "$otherField"}}, {$group: {_id: "$shardKey"}}]);
+    outputAggregationPlanAndResults(coll, [
+        {$addFields: {shardKey: "$otherField"}},
+        {$group: {_id: "$shardKey"}},
+    ]);
 
     subSection("Don't fully pushdown $group for _id on $$ROOT");
     outputAggregationPlanAndResults(coll, [{$group: {_id: "$$ROOT"}}]);
@@ -181,10 +200,16 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
     coll.createIndex({sk0: 1, sk1: 1, sk2: 1});
     // Move a chunk to otherShard.
     assert.commandWorked(
-        shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {sk0: 1, sk1: 1, sk2: 1}}),
+        shardingTest.s0.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: {sk0: 1, sk1: 1, sk2: 1},
+        }),
     );
     assert.commandWorked(
-        shardingTest.s.adminCommand({split: coll.getFullName(), middle: {sk0: "s0/1", sk1: 1, sk2: "h"}}),
+        shardingTest.s.adminCommand({
+            split: coll.getFullName(),
+            middle: {sk0: "s0/1", sk1: 1, sk2: "h"},
+        }),
     );
     assert.commandWorked(
         shardingTest.s.adminCommand({
@@ -209,7 +234,9 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
     ]);
 
     subSection("Pushdown works for simple $group where _id == shard key");
-    outputAggregationPlanAndResults(coll, [{$group: {_id: {sk0: "$sk0", sk1: "$sk1", sk2: "$sk2"}}}]);
+    outputAggregationPlanAndResults(coll, [
+        {$group: {_id: {sk0: "$sk0", sk1: "$sk1", sk2: "$sk2"}}},
+    ]);
 
     subSection("Pushdown works for simple $group where _id == shard key + accumulators");
     outputAggregationPlanAndResults(coll, [
@@ -238,10 +265,17 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
         {$group: {_id: {sk0: "$sk0Renamed", sk1: "$sk1Renamed", sk2: "$sk2Renamed"}}},
     ]);
 
-    subSection("Only partial pushdown for simple $group where _id == shard key with a non-simple rename");
+    subSection(
+        "Only partial pushdown for simple $group where _id == shard key with a non-simple rename",
+    );
     outputAggregationPlanAndResults(coll, [
         {
-            $project: {sk0Renamed: "$sk0", sk1Renamed: {$add: [1, "$sk1"]}, sk2Renamed: "$sk2", _id: 0},
+            $project: {
+                sk0Renamed: "$sk0",
+                sk1Renamed: {$add: [1, "$sk1"]},
+                sk2Renamed: "$sk2",
+                _id: 0,
+            },
         },
         {$group: {_id: {sk0: "$sk0Renamed", sk1: "$sk1Renamed", sk2: "$sk2Renamed"}}},
     ]);
@@ -249,10 +283,18 @@ assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(),
     subSection("Only partial pushdown for simple $group where _id is a subset of the shard key");
     outputAggregationPlanAndResults(coll, [{$group: {_id: {sk0: "$sk0", sk2: "$sk2"}}}]);
 
-    subSection("Pushdown works for simple $group where _id is a superset of the shard key with a simple rename");
+    subSection(
+        "Pushdown works for simple $group where _id is a superset of the shard key with a simple rename",
+    );
     outputAggregationPlanAndResults(coll, [
         {
-            $project: {sk0Renamed: "$sk0", sk1Renamed: "$sk1", sk2Renamed: "$sk2", _id: 0, otherField: 1},
+            $project: {
+                sk0Renamed: "$sk0",
+                sk1Renamed: "$sk1",
+                sk2Renamed: "$sk2",
+                _id: 0,
+                otherField: 1,
+            },
         },
         {
             $group: {

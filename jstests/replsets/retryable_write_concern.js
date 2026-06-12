@@ -17,7 +17,9 @@ let secConn = replTest.getSecondary();
 
 // Stopping replication on secondaries can take up to 5 seconds normally. Set a small oplog
 // getMore timeout so the test runs faster.
-assert.commandWorked(secConn.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
+assert.commandWorked(
+    secConn.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}),
+);
 
 let lsid = UUID();
 

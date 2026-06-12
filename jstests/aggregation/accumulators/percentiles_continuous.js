@@ -89,7 +89,11 @@ testWithSingleGroup({
     coll: coll,
     docs: [{x: 0}, {x: 1}, {x: 2}],
     percentileSpec: {
-        $percentile: {p: {$concatArrays: [[0.1, 0.5], ["$$p90"]]}, input: "$x", method: "continuous"},
+        $percentile: {
+            p: {$concatArrays: [[0.1, 0.5], ["$$p90"]]},
+            input: "$x",
+            method: "continuous",
+        },
     },
     letSpec: {p90: 0.9},
     expectedResult: [0.2, 1, 1.8],
@@ -138,7 +142,14 @@ const p = [0.0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 
 
 testLargeUniformDataset(coll, samples, sortedSamples, p, accuracyError, "continuous");
 
-testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, "continuous");
+testLargeUniformDataset_WithInfinities(
+    coll,
+    samples,
+    sortedSamples,
+    p,
+    accuracyError,
+    "continuous",
+);
 
 // TODO SERVER-91956: Improve precision so that this test succeeds.
 // // Same dataset but using Decimal128 type.

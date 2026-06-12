@@ -40,7 +40,10 @@ function preAndPostImageTest({
             assert(!changeStreamDoc.hasOwnProperty("fullDocumentBeforeChange"), changeStreamDoc);
         }
 
-        if (!changeStreamOptions.hasOwnProperty("fullDocument") && changeStreamDoc.operationType == "update") {
+        if (
+            !changeStreamOptions.hasOwnProperty("fullDocument") &&
+            changeStreamDoc.operationType == "update"
+        ) {
             assert(!changeStreamDoc.hasOwnProperty("fullDocument"), changeStreamDoc);
         }
     }
@@ -64,13 +67,18 @@ function preAndPostImageTest({
     // Change stream should throw an exception while trying to fetch the next document if
     // pre-/post-image is required.
     const shouldThrow =
-        changeStreamOptions.fullDocument === "required" || changeStreamOptions.fullDocumentBeforeChange === "required";
+        changeStreamOptions.fullDocument === "required" ||
+        changeStreamOptions.fullDocumentBeforeChange === "required";
     if (shouldThrow) {
         try {
             assert.soon(() => changeStreamCursor.hasNext());
             assert(false, `Unexpected result from cursor: ${tojson(changeStreamCursor.next())}`);
         } catch (error) {
-            assert.eq(error.code, ErrorCodes.NoMatchingDocument, `Caught unexpected error: ${tojson(error)}`);
+            assert.eq(
+                error.code,
+                ErrorCodes.NoMatchingDocument,
+                `Caught unexpected error: ${tojson(error)}`,
+            );
         }
 
         // Reopen the failed change stream.
@@ -82,12 +90,17 @@ function preAndPostImageTest({
             changeStreamDoc.fullDocumentBeforeChange,
             expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.preImage,
         );
-        assert.eq(changeStreamDoc.fullDocument, expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.postImage);
+        assert.eq(
+            changeStreamDoc.fullDocument,
+            expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.postImage,
+        );
         assertChangeStreamInternalFieldsNotPresent(changeStreamDoc);
     }
 
     // Enable changeStreamPreAndPostImages for pre-images recording.
-    assert.commandWorked(testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}),
+    );
 
     // Perform an update modification.
     assert.commandWorked(coll.update(updatedDoc, {$inc: {x: 2}}));

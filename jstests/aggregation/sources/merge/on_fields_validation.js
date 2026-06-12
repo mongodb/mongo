@@ -22,7 +22,12 @@ assert.commandWorked(source.insert({_id: 0}));
 //
 function assertOnFieldsIsInvalid(onFields, expectedErrorCode) {
     const stage = {
-        $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onFields},
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replace",
+            whenNotMatched: "insert",
+            on: onFields,
+        },
     };
     assertErrorCode(source, stage, expectedErrorCode);
 }
@@ -129,7 +134,9 @@ const pipelineAddressDotStreet = [
 ];
 
 // "address.street" is an array.
-assert.commandWorked(source.update({_id: 0}, {_id: 0, address: {street: ["West 43rd St", "1633 Broadway"]}}));
+assert.commandWorked(
+    source.update({_id: 0}, {_id: 0, address: {street: ["West 43rd St", "1633 Broadway"]}}),
+);
 assertErrorCode(source, pipelineAddressDotStreet, 51185);
 
 // "address" is an array (a prefix of an "on" field).
@@ -161,7 +168,12 @@ assert.eq(target.find().toArray(), [{_id: 0, address: {street: "1633 Broadway"}}
     assert.doesNotThrow(() =>
         source.aggregate([
             {
-                $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onField},
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                    on: onField,
+                },
             },
         ]),
     );

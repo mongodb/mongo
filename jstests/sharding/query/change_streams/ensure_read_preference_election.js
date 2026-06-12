@@ -14,7 +14,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {describe, it, before, after, afterEach} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest, isResumableChangeStreamError} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    isResumableChangeStreamError,
+} from "jstests/libs/query/change_stream_util.js";
 
 /**
  * Polls getMore until the predicate matches, failing immediately on any error. Use this (not
@@ -71,9 +74,14 @@ describe("change stream readPreference enforcement on sharded cluster elections"
         coll = mongosDb[collName];
 
         assert.commandWorked(
-            mongosDb.adminCommand({enableSharding: mongosDb.getName(), primaryShard: st.rs0.getURL()}),
+            mongosDb.adminCommand({
+                enableSharding: mongosDb.getName(),
+                primaryShard: st.rs0.getURL(),
+            }),
         );
-        assert.commandWorked(mongosDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            mongosDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+        );
     });
 
     afterEach(function () {

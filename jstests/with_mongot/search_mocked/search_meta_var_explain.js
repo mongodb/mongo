@@ -31,7 +31,10 @@ coll.drop();
 const collName = coll.getName();
 const explainObject = getDefaultLastExplainContents();
 
-if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
+if (
+    checkSbeRestrictedOrFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")
+) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     MongoRunner.stopMongod(conn);
     mongotmock.stop();
@@ -78,16 +81,28 @@ function testUnionWith(searchCmd, verbosity) {
 
         // This response is for the first $search in the top level pipeline.
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}),
+            mongotConn.adminCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(123),
+                history: history,
+            }),
         );
         // This response is for $search in $unionWith when the query is being executed.
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(124), history: history}),
+            mongotConn.adminCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(124),
+                history: history,
+            }),
         );
         // $unionWith will run its subpipeline again for explain execution stats so we need to mock
         // another response.
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(125), history: history}),
+            mongotConn.adminCommand({
+                setMockResponses: 1,
+                cursorId: NumberLong(125),
+                history: history,
+            }),
         );
     }
     const result = coll.explain(verbosity).aggregate([
@@ -96,7 +111,10 @@ function testUnionWith(searchCmd, verbosity) {
         {
             $unionWith: {
                 coll: coll.getName(),
-                pipeline: [{$search: searchQuery}, {$project: {_id: {$add: [100, "$_id"]}, meta: "$$SEARCH_META"}}],
+                pipeline: [
+                    {$search: searchQuery},
+                    {$project: {_id: {$add: [100, "$_id"]}, meta: "$$SEARCH_META"}},
+                ],
             },
         },
     ]);

@@ -33,16 +33,32 @@ assert.commandWorked(firstColl.insert({_id: 2, a: 5, b: 3, c: 2}));
 // Testing operations on the same sharded collection.
 let explainResult = sourceCollection
     .explain()
-    .aggregate([{$merge: {into: firstColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]);
-assert.setEq(new Set(["_id", "a", "b", "c"]), new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
+    .aggregate([
+        {$merge: {into: firstColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+    ]);
+assert.setEq(
+    new Set(["_id", "a", "b", "c"]),
+    new Set(getAggPlanStage(explainResult, "$merge").$merge.on),
+);
 
 explainResult = sourceCollection
     .explain()
-    .aggregate([{$merge: {into: firstColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
-assert.setEq(new Set(["_id", "a", "b", "c"]), new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
+    .aggregate([
+        {$merge: {into: firstColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+    ]);
+assert.setEq(
+    new Set(["_id", "a", "b", "c"]),
+    new Set(getAggPlanStage(explainResult, "$merge").$merge.on),
+);
 
 // Test it with a different collection and shard key pattern.
-st.shardColl(secondColl.getName(), {a: 1, b: 1}, {a: 1, b: 1}, {a: 1, b: MinKey}, mongosDB.getName());
+st.shardColl(
+    secondColl.getName(),
+    {a: 1, b: 1},
+    {a: 1, b: 1},
+    {a: 1, b: MinKey},
+    mongosDB.getName(),
+);
 
 // Write a document to each chunk.
 assert.commandWorked(secondColl.insert({_id: 3, a: -1, b: -3, c: 5}));
@@ -50,13 +66,23 @@ assert.commandWorked(secondColl.insert({_id: 4, a: 4, b: 5, c: 6}));
 
 explainResult = sourceCollection
     .explain()
-    .aggregate([{$merge: {into: secondColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]);
-assert.setEq(new Set(["_id", "a", "b"]), new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
+    .aggregate([
+        {$merge: {into: secondColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+    ]);
+assert.setEq(
+    new Set(["_id", "a", "b"]),
+    new Set(getAggPlanStage(explainResult, "$merge").$merge.on),
+);
 
 explainResult = sourceCollection
     .explain()
-    .aggregate([{$merge: {into: firstColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
-assert.setEq(new Set(["_id", "a", "b", "c"]), new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
+    .aggregate([
+        {$merge: {into: firstColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+    ]);
+assert.setEq(
+    new Set(["_id", "a", "b", "c"]),
+    new Set(getAggPlanStage(explainResult, "$merge").$merge.on),
+);
 
 // Test that the "on" field is defaulted to _id for a collection which does not exist.
 const doesNotExist = mongosDB.doesNotExist;

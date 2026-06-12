@@ -21,7 +21,9 @@ const st = new ShardingTest({
     },
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 const mongosDB = st.s0.getDB("test");
 const mongosColl = mongosDB[testName];
 
@@ -128,7 +130,10 @@ function testUnshardedBecomesSharded(collToWatch) {
 
     // Verify that we see both of the insertions which occurred after the collection was
     // sharded.
-    cst.assertNextChangesEqual({cursor: resumedCursor, expectedChanges: postShardCollectionChanges});
+    cst.assertNextChangesEqual({
+        cursor: resumedCursor,
+        expectedChanges: postShardCollectionChanges,
+    });
 
     // Test the behavior of a change stream when a sharded collection is dropped and recreated.
     cursor = cst.startWatchingChanges({

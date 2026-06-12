@@ -32,8 +32,12 @@ assert.commandWorked(db.adminCommand({shardCollection: ns, key: {"_id": 1}}));
 // These commands sometimes conflict with the balancer,
 // so we retry on ConflictingOperationInProgress errors.
 assert.soonRetryOnAcceptableErrors(() => {
-    assert.commandWorked(db.adminCommand({moveRange: ns, min: {_id: 0}, max: {_id: 5}, toShard: shardName0}));
-    assert.commandWorked(db.adminCommand({moveRange: ns, min: {_id: 5}, max: {_id: 10}, toShard: shardName1}));
+    assert.commandWorked(
+        db.adminCommand({moveRange: ns, min: {_id: 0}, max: {_id: 5}, toShard: shardName0}),
+    );
+    assert.commandWorked(
+        db.adminCommand({moveRange: ns, min: {_id: 5}, max: {_id: 10}, toShard: shardName1}),
+    );
     return true;
 }, ErrorCodes.ConflictingOperationInProgress);
 

@@ -88,7 +88,11 @@ cursor = testColl.aggregate([
                         all: [
                             {
                                 $redact: {
-                                    $cond: {if: {$eq: ["$$id", "user_1"]}, then: "$$KEEP", else: "$$PRUNE"},
+                                    $cond: {
+                                        if: {$eq: ["$$id", "user_1"]},
+                                        then: "$$KEEP",
+                                        else: "$$PRUNE",
+                                    },
                                 },
                             },
                         ],

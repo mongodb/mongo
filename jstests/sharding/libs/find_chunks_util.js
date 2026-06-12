@@ -12,8 +12,13 @@ export var findChunksUtil = (function () {
         let collection = configDB.collections.findOne({_id: ns});
 
         // TODO SERVER-101609 remove once 9.0 becomes last LTS
-        if (!collection && configDB.getMongo().getCollection(ns).getMetadata().type === "timeseries") {
-            collection = findTimeseriesConfigCollectionsDocument(configDB.getMongo().getCollection(ns));
+        if (
+            !collection &&
+            configDB.getMongo().getCollection(ns).getMetadata().type === "timeseries"
+        ) {
+            collection = findTimeseriesConfigCollectionsDocument(
+                configDB.getMongo().getCollection(ns),
+            );
         }
 
         assert.neq(collection.uuid, null);

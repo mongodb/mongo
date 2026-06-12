@@ -3,7 +3,10 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 import {
     assertOnlyTheseMetricsChanged,
     getMetricsSection,
@@ -36,7 +39,10 @@ const adminDB = conn.getDB("admin");
 })();
 
 (function SearchServerStatusMetricsCanBeRequested() {
-    const explicitServerStatus = adminDB.runCommand({serverStatus: 1, "metrics.extension.search": 1});
+    const explicitServerStatus = adminDB.runCommand({
+        serverStatus: 1,
+        "metrics.extension.search": 1,
+    });
     assert.commandWorked(explicitServerStatus);
 
     // Make sure the chain metrics -> extension -> search exists.
@@ -57,10 +63,16 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}},
         (testConn) => {
-            const {coll, testData, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, testData, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
 
             const initialMetrics = getMetrics();
-            assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$search: {}}], cursor: {}}));
+            assert.commandWorked(
+                coll.runCommand("aggregate", {pipeline: [{$search: {}}], cursor: {}}),
+            );
             const finalMetrics = getMetrics();
 
             assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionSearchUsed"]);
@@ -73,7 +85,11 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}},
         (testConn) => {
-            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
 
             const initialMetrics = getMetrics();
             coll.aggregate([{$searchMeta: {}}]).toArray();
@@ -89,7 +105,11 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}},
         (testConn) => {
-            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
 
             const initialMetrics = getMetrics();
             coll.aggregate([{$match: {a: 1}}]).toArray();
@@ -105,7 +125,11 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}},
         (testConn) => {
-            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
 
             const initialMetrics = getMetrics();
             coll.explain().aggregate([{$search: {}}]);
@@ -121,9 +145,15 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}, "libvector_search_extension.so": {}},
         (testConn) => {
-            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
             assert.commandWorked(
-                testConn.getDB("admin").runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+                testConn
+                    .getDB("admin")
+                    .runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
             );
 
             const initialMetrics = getMetrics();
@@ -140,7 +170,11 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}},
         (testConn, shardingTest) => {
-            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
 
             const shardPrimary = shardingTest.rs0.getPrimary();
             const initialShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
@@ -149,7 +183,9 @@ checkPlatformCompatibleWithExtensions();
             coll.aggregate([{$search: {}}]).toArray();
 
             const finalShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
-            assertOnlyTheseMetricsChanged(initialShardMetrics, finalShardMetrics, ["extensionSearchUsed"]);
+            assertOnlyTheseMetricsChanged(initialShardMetrics, finalShardMetrics, [
+                "extensionSearchUsed",
+            ]);
             // Mongos does not execute stages, so its counters should not change.
             const finalMongosMetrics = getMetrics();
             assertOnlyTheseMetricsChanged(initialMongosMetrics, finalMongosMetrics, []);
@@ -162,7 +198,11 @@ checkPlatformCompatibleWithExtensions();
     withExtensions(
         {[kExtensionLib]: {}},
         (testConn, shardingTest) => {
-            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            const {coll, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                kFeatureFlag,
+                kMetricsPath,
+            );
 
             const shardPrimary = shardingTest.rs0.getPrimary();
             const initialShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
@@ -171,7 +211,9 @@ checkPlatformCompatibleWithExtensions();
             coll.explain().aggregate([{$search: {}}]);
 
             const finalShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
-            assertOnlyTheseMetricsChanged(initialShardMetrics, finalShardMetrics, ["extensionSearchUsed"]);
+            assertOnlyTheseMetricsChanged(initialShardMetrics, finalShardMetrics, [
+                "extensionSearchUsed",
+            ]);
             // Mongos does not execute stages, so its counters should not change.
             const finalMongosMetrics = getMetrics();
             assertOnlyTheseMetricsChanged(initialMongosMetrics, finalMongosMetrics, []);

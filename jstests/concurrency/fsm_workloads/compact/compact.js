@@ -45,7 +45,8 @@ export const $config = (function () {
 
     let states = (function () {
         function insertDocuments(db, collName) {
-            let nDocumentsToInsert = this.targetDocuments - db[this.threadCollName].find().itcount();
+            let nDocumentsToInsert =
+                this.targetDocuments - db[this.threadCollName].find().itcount();
             let bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (let i = 0; i < nDocumentsToInsert; ++i) {
                 bulk.insert({a: Random.randInt(2), b: "b".repeat(100000), c: "c".repeat(100000)});
@@ -94,7 +95,12 @@ export const $config = (function () {
 
         function dryCompact(db, collName) {
             if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompactOptions")) return;
-            const config = {compact: this.threadCollName, force: true, dryRun: true, freeSpaceTargetMB: 1};
+            const config = {
+                compact: this.threadCollName,
+                force: true,
+                dryRun: true,
+                freeSpaceTargetMB: 1,
+            };
             runCompact(db, config);
         }
 

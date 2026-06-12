@@ -25,7 +25,9 @@ const coll = testDB.getCollection(collName);
 coll.drop();
 
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 assert.commandWorked(coll.insert(docs[0]));

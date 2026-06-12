@@ -13,7 +13,10 @@ import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 export function assertCollectionValid(tsColl) {
     const result = tsColl.validate();
     assert(result.valid, () => ({message: "tsColl failed validation", result: result}));
-    assert.eq(result.warnings.length, 0, () => ({message: "tsColl validation produced warnings", result: result}));
+    assert.eq(result.warnings.length, 0, () => ({
+        message: "tsColl validation produced warnings",
+        result: result,
+    }));
 }
 
 /**

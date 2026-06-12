@@ -27,7 +27,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         }
 
         // Turns on the classical engine.
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        );
 
         const pipeline = [{$group: {_id: "$k", o: accSpec}}, {$group: {_id: "$o"}}];
 
@@ -42,7 +44,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
         // Makes sure that the document source group will spill.
         assert.commandFailedWithCode(
-            coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: false}),
+            coll.runCommand({
+                aggregate: coll.getName(),
+                pipeline: pipeline,
+                cursor: {},
+                allowDiskUse: false,
+            }),
             ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
             testDesc,
         );
@@ -53,9 +60,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         MongoRunner.stopMongod(conn);
     };
 
-    verifyAccumulatorSpillingResult("Verifying $sum spilling bug is fixed on the classic engine", {$sum: "$n"});
+    verifyAccumulatorSpillingResult("Verifying $sum spilling bug is fixed on the classic engine", {
+        $sum: "$n",
+    });
 
-    verifyAccumulatorSpillingResult("Verifying $avg spilling bug is fixed on the classic engine", {$avg: "$n"});
+    verifyAccumulatorSpillingResult("Verifying $avg spilling bug is fixed on the classic engine", {
+        $avg: "$n",
+    });
 })();
 
 (function testOverTheWireDataFormatOnBothEngines() {
@@ -85,12 +96,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         };
 
         // Turns on the classical engine.
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        );
         const classicRes = assert.commandWorked(internalDB.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(classicRes, expectedRes, testDesc);
 
         // Turns off the classical engine.
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+        );
         const sbeRes = assert.commandWorked(internalDB.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(sbeRes, expectedRes, testDesc);
     };
@@ -118,12 +133,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             2.0, // sum
             0.0, // addend
         ];
-        verifyOverTheWireDataFormatOnBothEngines("Partial sum of an int and a long", pipelineWithSum, [
-            {_id: null, o: expectedPartialSum},
-        ]);
-        verifyOverTheWireDataFormatOnBothEngines("Partial avg of an int and a long", pipelineWithAvg, [
-            {_id: null, o: {count: NumberLong(2), ps: expectedPartialSum}},
-        ]);
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial sum of an int and a long",
+            pipelineWithSum,
+            [{_id: null, o: expectedPartialSum}],
+        );
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial avg of an int and a long",
+            pipelineWithAvg,
+            [{_id: null, o: {count: NumberLong(2), ps: expectedPartialSum}}],
+        );
 
         assert.commandWorked(coll.insert({n: NumberLong("9223372036854775807")}));
         expectedPartialSum = [
@@ -131,12 +150,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             9223372036854775808.0, // sum
             1.0, // addend
         ];
-        verifyOverTheWireDataFormatOnBothEngines("Partial sum of an int/a long/the long max", pipelineWithSum, [
-            {_id: null, o: expectedPartialSum},
-        ]);
-        verifyOverTheWireDataFormatOnBothEngines("Partial avg of an int/a long/the long max", pipelineWithAvg, [
-            {_id: null, o: {count: NumberLong(3), ps: expectedPartialSum}},
-        ]);
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial sum of an int/a long/the long max",
+            pipelineWithSum,
+            [{_id: null, o: expectedPartialSum}],
+        );
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial avg of an int/a long/the long max",
+            pipelineWithAvg,
+            [{_id: null, o: {count: NumberLong(3), ps: expectedPartialSum}}],
+        );
 
         // A double can always expresses 15 digits precisely. So, 1.0 + 0.00000000000001 is
         // precisely expressed by the 'addend' element.
@@ -164,12 +187,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             1.00000000000001, // addend
             NumberDecimal("1.0"),
         ];
-        verifyOverTheWireDataFormatOnBothEngines("Partial sum of mixed data which has a decimal", pipelineWithSum, [
-            {_id: null, o: expectedPartialSum},
-        ]);
-        verifyOverTheWireDataFormatOnBothEngines("Partial avg of mixed data which has a decimal", pipelineWithAvg, [
-            {_id: null, o: {count: NumberLong(5), ps: expectedPartialSum}},
-        ]);
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial sum of mixed data which has a decimal",
+            pipelineWithSum,
+            [{_id: null, o: expectedPartialSum}],
+        );
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial avg of mixed data which has a decimal",
+            pipelineWithAvg,
+            [{_id: null, o: {count: NumberLong(5), ps: expectedPartialSum}}],
+        );
 
         assert(coll.drop());
 
@@ -195,12 +222,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             0.0, // addend
             NumberDecimal("1.0"),
         ];
-        verifyOverTheWireDataFormatOnBothEngines("Partial sum of a decimal and a double", pipelineWithSum, [
-            {_id: null, o: expectedPartialSum},
-        ]);
-        verifyOverTheWireDataFormatOnBothEngines("Partial avg of a decimal and a double", pipelineWithAvg, [
-            {_id: null, o: {count: NumberLong(2), ps: expectedPartialSum}},
-        ]);
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial sum of a decimal and a double",
+            pipelineWithSum,
+            [{_id: null, o: expectedPartialSum}],
+        );
+        verifyOverTheWireDataFormatOnBothEngines(
+            "Partial avg of a decimal and a double",
+            pipelineWithAvg,
+            [{_id: null, o: {count: NumberLong(2), ps: expectedPartialSum}}],
+        );
     })();
 
     MongoRunner.stopMongod(conn);
@@ -219,10 +250,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     let verifyShardedAccumulatorResultsOnBothEngine = (testDesc, coll, pipeline, expectedRes) => {
         // Turns to the classic engine at the shards.
         assert.commandWorked(
-            dbAtShard0.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+            dbAtShard0.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: "forceClassicEngine",
+            }),
         );
         assert.commandWorked(
-            dbAtShard1.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+            dbAtShard1.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: "forceClassicEngine",
+            }),
         );
 
         // Verifies that the classic engine's results are same as the expected results.
@@ -230,8 +267,18 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         assert.eq(classicRes, expectedRes, testDesc);
 
         // Turns to the SBE engine at the shards.
-        assert.commandWorked(dbAtShard0.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
-        assert.commandWorked(dbAtShard1.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+        assert.commandWorked(
+            dbAtShard0.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: "trySbeEngine",
+            }),
+        );
+        assert.commandWorked(
+            dbAtShard1.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: "trySbeEngine",
+            }),
+        );
 
         // Verifies that the SBE engine's results are same as the expected results.
         const sbeRes = coll.aggregate(pipeline).toArray();
@@ -242,7 +289,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         coll.drop();
 
         // Makes sure that the collection is sharded.
-        assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+        assert.commandWorked(
+            st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
+        );
 
         return coll;
     };
@@ -392,7 +441,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             expectedRes: [{_id: null, o: NumberDecimal("1000000000000000000000000000000001")}],
         },
         {
-            testDesc: "The double closest to the long max and a very small decimal resulting in 34 digits",
+            testDesc:
+                "The double closest to the long max and a very small decimal resulting in 34 digits",
             inputs: [{n: doubleClosestToLongMax}, {n: verySmallDecimal}],
             expectedRes: [{_id: null, o: NumberDecimal("9223372036854775808.000000000000001")}],
         },
@@ -568,7 +618,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         },
         {
             testDesc: "Averaging two decimals",
-            inputs: [{n: NumberDecimal("-1234567890.1234567889")}, {n: NumberDecimal("-1234567890.1234567891")}],
+            inputs: [
+                {n: NumberDecimal("-1234567890.1234567889")},
+                {n: NumberDecimal("-1234567890.1234567891")},
+            ],
             expectedRes: [{_id: null, o: NumberDecimal("-1234567890.1234567890")}],
         },
         {

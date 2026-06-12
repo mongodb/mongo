@@ -22,8 +22,12 @@ assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {_i
 assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey) chunks to st.shard1.shardName.
-assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}),
+);
 
 // Write one document into each of the chunks.
 assert.commandWorked(coll.insert({_id: -150, a: 1}));

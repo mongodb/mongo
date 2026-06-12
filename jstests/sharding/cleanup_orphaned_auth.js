@@ -8,7 +8,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.disableImplicitSessions = true;
 
 function assertUnauthorized(res, msg) {
-    if (res.ok == 0 && (res.errmsg.startsWith("not authorized") || res.errmsg.match(/requires authentication/))) return;
+    if (
+        res.ok == 0 &&
+        (res.errmsg.startsWith("not authorized") || res.errmsg.match(/requires authentication/))
+    )
+        return;
 
     let finalMsg = "command worked when it should have been unauthorized: " + tojson(res);
     if (msg) {
@@ -44,7 +48,9 @@ mongosAdmin.auth("admin", "x");
 
 assert.commandWorked(mongosAdmin.runCommand({enableSharding: coll.getDB().getName()}));
 
-assert.commandWorked(mongosAdmin.runCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(
+    mongosAdmin.runCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
+);
 
 // cleanupOrphaned requires auth as admin user.
 if (!TestData.configShard) {

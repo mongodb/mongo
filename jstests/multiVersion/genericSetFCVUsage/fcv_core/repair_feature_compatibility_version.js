@@ -36,7 +36,11 @@ let doStartupFailTests = function (version, dbpath) {
  */
 let setupMissingFCVDoc = function (version, dbpath) {
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version});
-    assert.neq(null, conn, "mongod was unable to start up with version=" + version + " and no data files");
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable to start up with version=" + version + " and no data files",
+    );
     adminDB = conn.getDB("admin");
     removeFCVDocument(adminDB);
     MongoRunner.stopMongod(conn);
@@ -51,11 +55,26 @@ doStartupFailTests(latest, dbpath);
 // admin database, as long as all collections have UUIDs. The FCV should be initialized to
 // lastLTSFCV / downgraded FCV.
 connection = setupMissingFCVDoc(latest, dbpath);
-let returnCode = runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
-assert.eq(returnCode, 0, "expected mongod --repair to execute successfully when restoring a missing FCV document.");
+let returnCode = runMongoProgram(
+    "mongod",
+    "--port",
+    connection.port,
+    "--repair",
+    "--dbpath",
+    dbpath,
+);
+assert.eq(
+    returnCode,
+    0,
+    "expected mongod --repair to execute successfully when restoring a missing FCV document.",
+);
 
 connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-assert.neq(null, connection, "mongod was unable to start up with version=" + latest + " and existing data files");
+assert.neq(
+    null,
+    connection,
+    "mongod was unable to start up with version=" + latest + " and existing data files",
+);
 adminDB = connection.getDB("admin");
 const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
 assert.eq(fcvDoc.version, lastLTSFCV);
@@ -65,7 +84,11 @@ MongoRunner.stopMongod(connection);
 
 // If the featureCompatibilityVersion document is present, --repair should just return success.
 connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
-assert.neq(null, connection, "mongod was unable to start up with version=" + latest + " and no data files");
+assert.neq(
+    null,
+    connection,
+    "mongod was unable to start up with version=" + latest + " and no data files",
+);
 MongoRunner.stopMongod(connection);
 
 returnCode = runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);

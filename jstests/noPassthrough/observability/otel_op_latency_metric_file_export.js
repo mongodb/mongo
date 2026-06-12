@@ -41,7 +41,12 @@ describe("OTel serverStatus.opLatencies.latency histogram file export", function
 
         assert.commandWorked(this.coll.insert({x: 1}));
 
-        assert.soon(() => getLatestMetrics(metricsDir) !== null, "No initial metrics export", 30000, 500);
+        assert.soon(
+            () => getLatestMetrics(metricsDir) !== null,
+            "No initial metrics export",
+            30000,
+            500,
+        );
     });
 
     after(function () {
@@ -53,10 +58,14 @@ describe("OTel serverStatus.opLatencies.latency histogram file export", function
     });
 
     it("increments on write operations", function () {
-        assertOpLatencyIncreases(this.metricsDir, "write", () => assert.commandWorked(this.coll.insert({y: 2})));
+        assertOpLatencyIncreases(this.metricsDir, "write", () =>
+            assert.commandWorked(this.coll.insert({y: 2})),
+        );
     });
 
     it("increments on command operations", function () {
-        assertOpLatencyIncreases(this.metricsDir, "command", () => assert.commandWorked(this.db.runCommand({ping: 1})));
+        assertOpLatencyIncreases(this.metricsDir, "command", () =>
+            assert.commandWorked(this.db.runCommand({ping: 1})),
+        );
     });
 });

@@ -24,7 +24,10 @@ const mongos = inputCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donorPrimary = new Mongo(topology.shards[donorShardNames[0]].primary);
 
-const failpoint = configureFailPoint(donorPrimary, "reshardingInterruptAfterInsertStateMachineDocument");
+const failpoint = configureFailPoint(
+    donorPrimary,
+    "reshardingInterruptAfterInsertStateMachineDocument",
+);
 
 reshardingTest.withReshardingInBackground(
     {

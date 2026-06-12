@@ -57,9 +57,12 @@ function insertLargeDocsInTransaction(collection, docIds, shardKey) {
         }
 
         assert.commandWorked(
-            collection
-                .getDB()
-                .adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(txnNum), autocommit: false}),
+            collection.getDB().adminCommand({
+                commitTransaction: 1,
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+            }),
         );
     });
 }
@@ -85,7 +88,9 @@ const joinMoveChunk = moveChunkParallel(
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 insertLargeDocsInTransaction(collection, [{_id: 3}, {_id: 4}], {x: -1000});
-assert.commandWorked(collection.insert({_id: 5, x: 1, note: "inserted into range after large _transferMods"}));
+assert.commandWorked(
+    collection.insert({_id: 5, x: 1, note: "inserted into range after large _transferMods"}),
+);
 
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -134,7 +139,12 @@ const diff = ((diff) => {
         docsExtraAfterMigration: diff.docsMissingOnFirst,
         docsMissingAfterMigration: diff.docsMissingOnSecond,
     };
-})(DataConsistencyChecker.getDiff(expected, collection.find({}, {_id: 1, x: 1, note: 1}).sort({_id: 1, x: 1})));
+})(
+    DataConsistencyChecker.getDiff(
+        expected,
+        collection.find({}, {_id: 1, x: 1, note: 1}).sort({_id: 1, x: 1}),
+    ),
+);
 
 assert.eq(diff, {
     docsWithDifferentContents: [],

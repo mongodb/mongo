@@ -281,4 +281,10 @@ const invalidArgumentValueDocs = [
     {_id: 6, input: 123, target: -2, expectedCode: ErrorCodes.FailedToParse},
 ];
 
-runConvertTests({coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
+runConvertTests({
+    coll,
+    requiresFCV80,
+    conversionTestDocs,
+    illegalConversionTestDocs,
+    invalidArgumentValueDocs,
+});

@@ -424,7 +424,9 @@ let viewsCommandTests = {
     dropRole: {
         command: {dropRole: "testrole"},
         setup: function (conn) {
-            assert.commandWorked(conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
+            assert.commandWorked(
+                conn.runCommand({createRole: "testrole", privileges: [], roles: []}),
+            );
         },
         teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
@@ -468,14 +470,22 @@ let viewsCommandTests = {
                 let res = conn.runCommand(cmd);
                 assert.commandWorked(res, tojson(cmd));
                 let cursor = res.cursor;
-                assert.eq(cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+                assert.eq(
+                    cursor.ns,
+                    "test.view",
+                    "expected view namespace in cursor: " + tojson(cursor),
+                );
                 let expectedFirstBatch = [{_id: 1}, {_id: 2}];
                 assert.eq(cursor.firstBatch, expectedFirstBatch, "returned wrong firstBatch");
                 let getmoreCmd = {getMore: cursor.id, collection: "view"};
                 res = conn.runCommand(getmoreCmd);
 
                 assert.commandWorked(res, tojson(getmoreCmd));
-                assert.eq("test.view", res.cursor.ns, "expected view namespace in cursor: " + tojson(res));
+                assert.eq(
+                    "test.view",
+                    res.cursor.ns,
+                    "expected view namespace in cursor: " + tojson(res),
+                );
             }
             // find command.
             let findCmd = {find: "view", filter: {_id: {$gt: 0}}, batchSize: 2};
@@ -530,7 +540,11 @@ let viewsCommandTests = {
             let res = conn.runCommand(aggCmd);
             assert.commandWorked(res, tojson(aggCmd));
             let cursor = res.cursor;
-            assert.eq(cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+            assert.eq(
+                cursor.ns,
+                "test.view",
+                "expected view namespace in cursor: " + tojson(cursor),
+            );
             let expectedFirstBatch = [{_id: 1}, {_id: 2}];
             assert.eq(cursor.firstBatch, expectedFirstBatch, "aggregate returned wrong firstBatch");
 
@@ -568,7 +582,12 @@ let viewsCommandTests = {
     logout: {skip: isUnrelated},
     makeSnapshot: {skip: isAnInternalCommand},
     mapReduce: {
-        command: {mapReduce: "view", map: function () {}, reduce: function (key, vals) {}, out: "out"},
+        command: {
+            mapReduce: "view",
+            map: function () {},
+            reduce: function (key, vals) {},
+            out: "out",
+        },
         expectFailure: true,
     },
     mergeAllChunksOnShard: {skip: isUnrelated},
@@ -636,7 +655,11 @@ let viewsCommandTests = {
             let res = conn.runCommand(aggCmd);
             assert.commandWorked(res, tojson(aggCmd));
             let cursor = res.cursor;
-            assert.eq(cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+            assert.eq(
+                cursor.ns,
+                "test.view",
+                "expected view namespace in cursor: " + tojson(cursor),
+            );
             let expectedFirstBatch = [{_id: 1}, {_id: 2}];
             assert.eq(cursor.firstBatch, expectedFirstBatch, "aggregate returned wrong firstBatch");
 
@@ -712,7 +735,9 @@ let viewsCommandTests = {
             privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}],
         },
         setup: function (conn) {
-            assert.commandWorked(conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
+            assert.commandWorked(
+                conn.runCommand({createRole: "testrole", privileges: [], roles: []}),
+            );
         },
         teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
@@ -820,7 +845,9 @@ let viewsCommandTests = {
             privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}],
         },
         setup: function (conn) {
-            assert.commandWorked(conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
+            assert.commandWorked(
+                conn.runCommand({createRole: "testrole", privileges: [], roles: []}),
+            );
         },
         teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
@@ -831,7 +858,9 @@ let viewsCommandTests = {
     updateZoneKeyRange: {skip: isUnrelated},
     usersInfo: {skip: isUnrelated},
     validate: {command: {validate: "view"}, expectFailure: true},
-    validateDBMetadata: {command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}}},
+    validateDBMetadata: {
+        command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}},
+    },
     voteAbortIndexBuild: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},
@@ -874,7 +903,10 @@ assert.commandWorked(res);
 let commands = Object.keys(res.commands);
 for (let command of commands) {
     let test = viewsCommandTests[command];
-    assert(test !== undefined, "Coverage failure: must explicitly define a views test for " + command);
+    assert(
+        test !== undefined,
+        "Coverage failure: must explicitly define a views test for " + command,
+    );
 
     if (!(test instanceof Array)) test = [test];
     let subtest_nr = 0;
@@ -916,7 +948,8 @@ for (let command of commands) {
 
         if (subtest.expectFailure) {
             let expectedErrorCode = subtest.expectedErrorCode;
-            if (expectedErrorCode === undefined) expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
+            if (expectedErrorCode === undefined)
+                expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
 
             assertCommandOrWriteFailed(
                 commandHandle.runCommand(subtest.command),
@@ -924,7 +957,11 @@ for (let command of commands) {
                 tojson(subtest.command),
             );
         } else if (subtest.command instanceof Function) subtest.command(commandHandle);
-        else assert.commandWorked(commandHandle.runCommand(subtest.command), tojson(subtest.command));
+        else
+            assert.commandWorked(
+                commandHandle.runCommand(subtest.command),
+                tojson(subtest.command),
+            );
 
         if (subtest.teardown !== undefined) subtest.teardown(dbHandle);
     }

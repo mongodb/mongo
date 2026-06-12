@@ -81,7 +81,9 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
 
 assert.commandFailedWithCode(
-    testDB.runCommand(Object.assign({}, updateCmdObj, {lsid: parentLsid, txnNumber: parentTxnNumber})),
+    testDB.runCommand(
+        Object.assign({}, updateCmdObj, {lsid: parentLsid, txnNumber: parentTxnNumber}),
+    ),
     ErrorCodes.IncompleteTransactionHistory,
 );
 

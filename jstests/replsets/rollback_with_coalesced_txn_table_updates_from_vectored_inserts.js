@@ -34,7 +34,11 @@ const ns = "test.retryable_write_coalesced_txn_updates";
 assert.commandWorked(primary.getCollection(ns).insert({_id: -1}, {writeConcern: {w: 3}}));
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 
@@ -50,7 +54,9 @@ let insertBatchTotal = 40;
 // in pairs like [0, 1], [2, 3], etc.
 let insertBatchMajorityCommitted = insertBatchTotal - 5;
 let stopReplProducerOnDocumentFailpoints = [secondary1, secondary2].map((conn) =>
-    configureFailPoint(conn, "stopReplProducerOnDocument", {document: {"_id": insertBatchMajorityCommitted + 1}}),
+    configureFailPoint(conn, "stopReplProducerOnDocument", {
+        document: {"_id": insertBatchMajorityCommitted + 1},
+    }),
 );
 let oplogFilterForMajority;
 
@@ -73,15 +79,20 @@ assert.commandWorked(
     }),
 );
 
-const stmtMajorityCommitted = primary.getCollection("local.oplog.rs").findOne(oplogFilterForMajority);
+const stmtMajorityCommitted = primary
+    .getCollection("local.oplog.rs")
+    .findOne(oplogFilterForMajority);
 assert.neq(null, stmtMajorityCommitted);
 
 // Wait for the primary to have advanced its stable_timestamp.
 assert.soon(() => {
-    const {lastStableRecoveryTimestamp} = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+    const {lastStableRecoveryTimestamp} = assert.commandWorked(
+        primary.adminCommand({replSetGetStatus: 1}),
+    );
 
     const wtStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1})).wiredTiger;
-    const latestMajority = wtStatus["snapshot-window-settings"]["latest majority snapshot timestamp available"];
+    const latestMajority =
+        wtStatus["snapshot-window-settings"]["latest majority snapshot timestamp available"];
 
     print(
         `${primary.host}: ${tojsononeline({

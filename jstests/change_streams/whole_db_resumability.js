@@ -2,7 +2,10 @@
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
 // @tags: [do_not_run_in_whole_cluster_passthrough]
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
@@ -145,7 +148,10 @@ const resumeTokenInvalidate = cst.assertNextChangesEqual({
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     cst.assertDatabaseDrop({cursor: resumeCursor, db: testDB});
-    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+    cst.assertNextChangesEqual({
+        cursor: resumeCursor,
+        expectedChanges: [{operationType: "invalidate"}],
+    });
 });
 
 // Recreate the test collection.
@@ -157,7 +163,10 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+cst.assertNextChangesEqual({
+    cursor: resumeCursor,
+    expectedChanges: [{operationType: "invalidate"}],
+});
 
 // Test resuming from the 'invalidate' entry using 'resumeAfter'.
 assert.commandFailedWithCode(
@@ -176,7 +185,10 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+cst.assertNextChangesEqual({
+    cursor: resumeCursor,
+    expectedChanges: [{operationType: "invalidate"}],
+});
 
 // Test resuming from the 'invalidate' entry using 'startAfter' and verifies it picks up the
 // insert after recreating the db/collection.

@@ -8,7 +8,9 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 const st = new ShardingTest({shards: 4, other: {chunkSize: 1}});
 let config = st.s0.getDB("config");
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}),
+);
 
 function prepareCollectionForBalance(collName) {
     assert.commandWorked(st.s0.adminCommand({shardCollection: collName, key: {Key: 1}}));
@@ -35,8 +37,14 @@ function prepareCollectionForBalance(collName) {
     assert.commandWorked(st.moveChunk(collName, {Key: 40}, st.shard1.shardName));
     assert.commandWorked(st.moveChunk(collName, {Key: 50}, st.shard1.shardName));
 
-    assert.eq(3, findChunksUtil.findChunksByNs(config, collName, {shard: st.shard0.shardName}).itcount());
-    assert.eq(3, findChunksUtil.findChunksByNs(config, collName, {shard: st.shard1.shardName}).itcount());
+    assert.eq(
+        3,
+        findChunksUtil.findChunksByNs(config, collName, {shard: st.shard0.shardName}).itcount(),
+    );
+    assert.eq(
+        3,
+        findChunksUtil.findChunksByNs(config, collName, {shard: st.shard1.shardName}).itcount(),
+    );
 }
 
 function checkCollectionBalanced(collName) {

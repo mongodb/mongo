@@ -21,7 +21,10 @@ function tryFindOpid(conn, cmdFilter) {
         .toArray();
     assert(
         matchingOps.length <= 1,
-        "Ambiguous match for command matching " + tojsononeline(cmdFilter) + ", found: " + tojson(matchingOps),
+        "Ambiguous match for command matching " +
+            tojsononeline(cmdFilter) +
+            ", found: " +
+            tojson(matchingOps),
     );
     return matchingOps.length === 1 && matchingOps[0].opid != null ? matchingOps[0].opid : null;
 }
@@ -36,7 +39,12 @@ function findOpid(conn, cmdFilter) {
  * Runs a command and checks that when it is killed while hung at fail point `hangFailPointName`,
  * it gets interrupted before it reaches fail point `deadlineFailPointName`.
  */
-function assertCommandInterruptsBetweenFailPoints(conn, {dbName, command}, hangFailPointName, deadlineFailPointName) {
+function assertCommandInterruptsBetweenFailPoints(
+    conn,
+    {dbName, command},
+    hangFailPointName,
+    deadlineFailPointName,
+) {
     jsTestLog(
         "Checking that " +
             tojsononeline(command) +
@@ -128,7 +136,9 @@ const st = new ShardingTest({shards: 2});
 
 const kDbName = jsTestName(),
     kCollName = "coll";
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 st.shardColl(st.s.getDB(kDbName).getCollection(kCollName), {skey: 1});
 
 // Run tests for checkMetadataConsistency on a cluster/DB/collection level.

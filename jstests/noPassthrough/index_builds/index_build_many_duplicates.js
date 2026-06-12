@@ -34,7 +34,10 @@ bulk.execute();
 coll.createIndex({arr: 1, a: 1});
 
 const serverStatus = testDB.serverStatus();
-assert(serverStatus.hasOwnProperty("indexBulkBuilder"), "indexBuildBuilder section missing: " + tojson(serverStatus));
+assert(
+    serverStatus.hasOwnProperty("indexBulkBuilder"),
+    "indexBuildBuilder section missing: " + tojson(serverStatus),
+);
 
 const section = serverStatus.indexBulkBuilder;
 print("Index build stats", tojson(section));
@@ -43,6 +46,11 @@ const numSpills = section.spilledRanges;
 assert.gt(numSpills, 0, tojson(section));
 
 // Ensure the uncompressed memory usage per spill does not exceed the limit.
-assert.between(0, section.bytesSpilledUncompressed / numSpills, maxMemUsageMB * 1024 * 1024, tojson(section));
+assert.between(
+    0,
+    section.bytesSpilledUncompressed / numSpills,
+    maxMemUsageMB * 1024 * 1024,
+    tojson(section),
+);
 
 replSet.stopSet();

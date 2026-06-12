@@ -1,7 +1,11 @@
 // Ensure that the shell may connect to servers running supporting restricted subsets of TLS
 // protocols.
 
-import {clientSupportsTLS1_2, clientSupportsTLS1_3, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
+import {
+    clientSupportsTLS1_2,
+    clientSupportsTLS1_3,
+    determineSSLProvider,
+} from "jstests/ssl/libs/ssl_helpers.js";
 
 let SERVER_CERT = getX509Path("server.pem");
 let CLIENT_CERT = getX509Path("client.pem");

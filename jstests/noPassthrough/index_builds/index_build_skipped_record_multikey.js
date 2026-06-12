@@ -114,6 +114,9 @@ awaitCreateIndex();
 
 // The skipped document is resolved, and causes the index to flip to multikey.
 // "Index set to multi key ..."
-checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
+checkLog.containsJson(secondary, 4718705, {
+    namespace: coll.getFullName(),
+    keyPattern: indexKeyPattern,
+});
 
 replTest.stopSet();

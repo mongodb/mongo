@@ -65,7 +65,10 @@ export class CommandSequenceWithRetries {
                 if (!attemptReconnect(this.conn)) {
                     return {
                         ok: 0,
-                        msg: "giving up after " + this.steps[i].phase + " because attempting to reconnect failed",
+                        msg:
+                            "giving up after " +
+                            this.steps[i].phase +
+                            " because attempting to reconnect failed",
                     };
                 }
 

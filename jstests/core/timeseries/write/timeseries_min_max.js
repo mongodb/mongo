@@ -32,7 +32,9 @@ TimeseriesTest.run((insert) => {
 
         const timeFieldName = "time";
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
     };
     clearColl();
@@ -64,8 +66,16 @@ TimeseriesTest.run((insert) => {
         const bucketDoc = bucketDocs[0];
         jsTestLog("Bucket document: " + tojson(bucketDoc));
 
-        assert.docEq(expectedMin, bucketDoc.control.min, "invalid min in bucket: " + tojson(bucketDoc));
-        assert.docEq(expectedMax, bucketDoc.control.max, "invalid max in bucket: " + tojson(bucketDoc));
+        assert.docEq(
+            expectedMin,
+            bucketDoc.control.min,
+            "invalid min in bucket: " + tojson(bucketDoc),
+        );
+        assert.docEq(
+            expectedMax,
+            bucketDoc.control.max,
+            "invalid max in bucket: " + tojson(bucketDoc),
+        );
     };
 
     // Empty objects are considered.
@@ -80,8 +90,16 @@ TimeseriesTest.run((insert) => {
     clearColl();
 
     // Objects and arrays are updated element-wise.
-    runTest({a: {x: 1, y: 2}, b: [1, 2]}, {a: {x: 1, y: 2}, b: [1, 2]}, {a: {x: 1, y: 2}, b: [1, 2]});
-    runTest({a: {x: 2, y: 1}, b: [2, 1]}, {a: {x: 1, y: 1}, b: [1, 1]}, {a: {x: 2, y: 2}, b: [2, 2]});
+    runTest(
+        {a: {x: 1, y: 2}, b: [1, 2]},
+        {a: {x: 1, y: 2}, b: [1, 2]},
+        {a: {x: 1, y: 2}, b: [1, 2]},
+    );
+    runTest(
+        {a: {x: 2, y: 1}, b: [2, 1]},
+        {a: {x: 1, y: 1}, b: [1, 1]},
+        {a: {x: 2, y: 2}, b: [2, 2]},
+    );
 
     clearColl();
     // Multiple levels of nesting are also updated element-wise.

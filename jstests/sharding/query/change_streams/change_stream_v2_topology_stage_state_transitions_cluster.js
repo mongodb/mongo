@@ -27,7 +27,10 @@ import {
     awaitV2StageStateTransitions,
     waitForClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
-import {CreateDatabaseCommand, ShardCollectionCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {
+    CreateDatabaseCommand,
+    ShardCollectionCommand,
+} from "jstests/libs/util/change_stream/change_stream_commands.js";
 
 // String names produced by stateToString() and recorded in log attr.previous / attr.new.
 const S = Object.freeze({
@@ -215,7 +218,10 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 [
                     {from: S.Uninitialized, to: S.FetchingInitialization},
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );

@@ -18,7 +18,9 @@ let config = st.s.getDB("config");
 let admin = st.s.getDB("admin");
 let coll = st.s.getCollection("foo.bar");
 
-assert.commandWorked(insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
+assert.commandWorked(
+    insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}),
+);
 
 let shards = [st.shard0, st.shard1];
 
@@ -28,7 +30,9 @@ let shards = [st.shard0, st.shard1];
 
 jsTest.log("Enabling sharding for the first time...");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 assert.commandWorked(coll.insert({hello: "world"}));
@@ -71,7 +75,9 @@ jsTest.log("Rebuilding sharded collection with different split...");
 
 coll.drop();
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 let bulk = coll.initializeUnorderedBulkOp();
@@ -102,7 +108,9 @@ assert.neq(null, readMongos.getCollection(coll + "").findOne({_id: 1}));
 
 jsTest.log("Checking update...");
 // Ensure that updating an element finds the right location
-assert.commandWorked(updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
+assert.commandWorked(
+    updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}),
+);
 assert.neq(null, coll.findOne({updated: true}));
 
 jsTest.log("Checking insert...");

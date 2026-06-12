@@ -60,7 +60,10 @@ let validateTestCase = function (test) {
     if ("setUp" in test) {
         assert(typeof test.setUp === "function");
     }
-    assert("command" in test && (typeof test.command === "object" || typeof test.command === "function"));
+    assert(
+        "command" in test &&
+            (typeof test.command === "object" || typeof test.command === "function"),
+    );
     assert("checkReadConcern" in test && typeof test.checkReadConcern === "boolean");
     assert("checkWriteConcern" in test && typeof test.checkWriteConcern === "boolean");
     if ("db" in test) {
@@ -249,10 +252,15 @@ let testCases = {
     abortRewriteCollection: {skip: "does not accept read or write concern"},
     abortTransaction: {
         setUp: function (conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({create: coll, writeConcern: {w: "majority"}}),
+            );
             // Ensure that the dbVersion is known.
             assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
-            assert.eq(1, conn.getCollection(nss).find({x: 1}).readConcern("local").limit(1).next().x);
+            assert.eq(
+                1,
+                conn.getCollection(nss).find({x: 1}).readConcern("local").limit(1).next().x,
+            );
             // Start the transaction.
             assert.commandWorked(
                 conn.getDB(db).runCommand({
@@ -266,7 +274,12 @@ let testCases = {
                 }),
             );
         },
-        command: () => ({abortTransaction: 1, txnNumber: NumberLong(0), autocommit: false, lsid: getLSID()}),
+        command: () => ({
+            abortTransaction: 1,
+            txnNumber: NumberLong(0),
+            autocommit: false,
+            lsid: getLSID(),
+        }),
         db: "admin",
         checkReadConcern: false,
         checkWriteConcern: true,
@@ -361,10 +374,15 @@ let testCases = {
     commitShardRemoval: {skip: "does not accept read or write concern"},
     commitTransaction: {
         setUp: function (conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({create: coll, writeConcern: {w: "majority"}}),
+            );
             // Ensure that the dbVersion is known.
             assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
-            assert.eq(1, conn.getCollection(nss).find({x: 1}).readConcern("local").limit(1).next().x);
+            assert.eq(
+                1,
+                conn.getCollection(nss).find({x: 1}).readConcern("local").limit(1).next().x,
+            );
             // Start the transaction.
             assert.commandWorked(
                 conn.getDB(db).runCommand({
@@ -378,7 +396,12 @@ let testCases = {
                 }),
             );
         },
-        command: () => ({commitTransaction: 1, txnNumber: NumberLong(0), autocommit: false, lsid: getLSID()}),
+        command: () => ({
+            commitTransaction: 1,
+            txnNumber: NumberLong(0),
+            autocommit: false,
+            lsid: getLSID(),
+        }),
         db: "admin",
         checkReadConcern: false,
         checkWriteConcern: true,
@@ -480,7 +503,12 @@ let testCases = {
     dropAllRolesFromDatabase: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
         },
         command: {dropAllRolesFromDatabase: 1},
@@ -492,7 +520,9 @@ let testCases = {
     dropAllUsersFromDatabase: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
+                conn
+                    .getDB(db)
+                    .runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
             );
         },
         command: {dropAllUsersFromDatabase: 1},
@@ -521,7 +551,12 @@ let testCases = {
     dropRole: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
         },
         command: {dropRole: "foo"},
@@ -534,7 +569,9 @@ let testCases = {
     dropUser: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
+                conn
+                    .getDB(db)
+                    .runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
             );
         },
         command: {dropUser: "foo"},
@@ -591,7 +628,12 @@ let testCases = {
     grantPrivilegesToRole: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
         },
         command: {
@@ -606,10 +648,20 @@ let testCases = {
     grantRolesToRole: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "bar", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "bar",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
         },
         command: {grantRolesToRole: "foo", roles: [{role: "bar", db: db}]},
@@ -621,10 +673,17 @@ let testCases = {
     grantRolesToUser: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
             assert.commandWorked(
-                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
+                conn
+                    .getDB(db)
+                    .runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
             );
         },
         command: {grantRolesToUser: "foo", roles: [{role: "foo", db: db}]},
@@ -765,7 +824,12 @@ let testCases = {
     revokeRolesFromRole: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "bar", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "bar",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
             assert.commandWorked(
                 conn.getDB(db).runCommand({
@@ -785,7 +849,12 @@ let testCases = {
     revokeRolesFromUser: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
             assert.commandWorked(
                 conn.getDB(db).runCommand({
@@ -872,7 +941,12 @@ let testCases = {
     updateRole: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}),
+                conn.getDB(db).runCommand({
+                    createRole: "foo",
+                    privileges: [],
+                    roles: [],
+                    writeConcern: {w: 1},
+                }),
             );
         },
         command: {updateRole: "foo", privileges: []},
@@ -885,7 +959,9 @@ let testCases = {
     updateUser: {
         setUp: function (conn) {
             assert.commandWorked(
-                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
+                conn
+                    .getDB(db)
+                    .runCommand({createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}),
             );
         },
         command: {updateUser: "foo", pwd: "bar2"},
@@ -928,7 +1004,10 @@ let setDefaultRWConcernActualTestCase = {
         if ("defaultWriteConcern" in currentDefaults) {
             res = Object.extend(res, {defaultWriteConcern: currentDefaults.defaultWriteConcern});
         }
-        if (!("defaultReadConcern" in currentDefaults) && !("defaultWriteConcern" in currentDefaults)) {
+        if (
+            !("defaultReadConcern" in currentDefaults) &&
+            !("defaultWriteConcern" in currentDefaults)
+        ) {
             res = Object.extend(res, {defaultWriteConcern: {w: 1}});
         }
         return res;
@@ -1016,7 +1095,13 @@ function createProfileFilterForTestCase(test, targetId, explicitRWC) {
     return commandProfile;
 }
 
-function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, {explicitRWC, explicitProvenance = false}) {
+function runScenario(
+    desc,
+    conn,
+    regularCheckConn,
+    configSvrCheckConn,
+    {explicitRWC, explicitProvenance = false},
+) {
     let runCommandTest = function (cmdName, test) {
         // The emptycapped command was removed but breaks this test in multiversion. The same
         // applies for captrunc.
@@ -1026,7 +1111,10 @@ function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, {explicit
             return;
         }
 
-        assert(test !== undefined, "coverage failure: must define a RWC defaults application test for " + cmdName);
+        assert(
+            test !== undefined,
+            "coverage failure: must define a RWC defaults application test for " + cmdName,
+        );
 
         if (test.skip !== undefined) {
             print("skipping " + cmdName + ": " + test.skip);
@@ -1083,7 +1171,10 @@ function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, {explicit
         }
 
         // Get the command from the test case.
-        let actualCmd = typeof test.command === "function" ? test.command(conn) : Object.assign({}, test.command, {});
+        let actualCmd =
+            typeof test.command === "function"
+                ? test.command(conn)
+                : Object.assign({}, test.command, {});
         assert.eq("undefined", typeof actualCmd.readConcern);
         assert.eq("undefined", typeof actualCmd.writeConcern);
 
@@ -1132,7 +1223,12 @@ function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, {explicit
                 let re = createLogLineRegularExpressionForTestCase(test, targetId, explicitRWC);
                 assert(
                     checkLog.checkContainsOnce(checkConn, re),
-                    "unable to find pattern " + re + " in logs on " + checkConn + " for test " + thisTestDesc,
+                    "unable to find pattern " +
+                        re +
+                        " in logs on " +
+                        checkConn +
+                        " for test " +
+                        thisTestDesc,
                 );
             } else {
                 profilerHasSingleMatchingEntryOrThrow({
@@ -1189,9 +1285,15 @@ function runTests(conn, regularCheckConn, configSvrCheckConn) {
             defaultWriteConcern: {w: "majority", wtimeout: 1234567},
         }),
     );
-    runScenario("Scenario: RWC defaults set, explicit RWC absent", conn, regularCheckConn, configSvrCheckConn, {
-        explicitRWC: false,
-    });
+    runScenario(
+        "Scenario: RWC defaults set, explicit RWC absent",
+        conn,
+        regularCheckConn,
+        configSvrCheckConn,
+        {
+            explicitRWC: false,
+        },
+    );
 
     assert.commandWorked(
         conn.adminCommand({

@@ -33,21 +33,27 @@ coll.insert({a: 1});
 
 assert.commandFailedWithCode(
     testDB.adminCommand({
-        applyOps: [{op: "c", ns: cmdNs, o: {startIndexBuild: coll.getName(), key: {a: 1}, name: "a_1"}}],
+        applyOps: [
+            {op: "c", ns: cmdNs, o: {startIndexBuild: coll.getName(), key: {a: 1}, name: "a_1"}},
+        ],
     }),
     [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse],
 );
 
 assert.commandFailedWithCode(
     testDB.adminCommand({
-        applyOps: [{op: "c", ns: cmdNs, o: {commitIndexBuild: coll.getName(), key: {a: 1}, name: "a_1"}}],
+        applyOps: [
+            {op: "c", ns: cmdNs, o: {commitIndexBuild: coll.getName(), key: {a: 1}, name: "a_1"}},
+        ],
     }),
     [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse],
 );
 
 assert.commandFailedWithCode(
     testDB.adminCommand({
-        applyOps: [{op: "c", ns: cmdNs, o: {abortIndexBuild: coll.getName(), key: {a: 1}, name: "a_1"}}],
+        applyOps: [
+            {op: "c", ns: cmdNs, o: {abortIndexBuild: coll.getName(), key: {a: 1}, name: "a_1"}},
+        ],
     }),
     [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse],
 );

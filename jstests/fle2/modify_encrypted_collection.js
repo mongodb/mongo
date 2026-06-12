@@ -24,10 +24,21 @@ const sampleEncryptedFields = {
 
 assert.commandWorked(dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields}));
 
-assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationAction: "warn"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    dbTest.runCommand({collMod: "basic", validationAction: "warn"}),
+    ErrorCodes.BadValue,
+);
 
-assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLevel: "off"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    dbTest.runCommand({collMod: "basic", validationLevel: "off"}),
+    ErrorCodes.BadValue,
+);
 
-assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLevel: "moderate"}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    dbTest.runCommand({collMod: "basic", validationLevel: "moderate"}),
+    ErrorCodes.BadValue,
+);
 
-assert.commandWorked(dbTest.runCommand({collMod: "basic", validationLevel: "strict", validationAction: "error"}));
+assert.commandWorked(
+    dbTest.runCommand({collMod: "basic", validationLevel: "strict", validationAction: "error"}),
+);

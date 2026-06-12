@@ -24,7 +24,10 @@ assert.commandFailedWithCode(
                     "pipeline": [
                         {"$limit": 1},
                         {
-                            "$geoNear": {"near": {"type": "Point", "coordinates": [0, 0]}, "distanceField": "dist"},
+                            "$geoNear": {
+                                "near": {"type": "Point", "coordinates": [0, 0]},
+                                "distanceField": "dist",
+                            },
                         },
                     ],
                 },

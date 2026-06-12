@@ -42,7 +42,10 @@ function getOpCountersDiff(cmdFn) {
     const secondaryOpCountersReplAfter = getOpCountersRepl(secondary);
 
     assert(!primaryOpCountersAfter.hasOwnProperty("constraintsRelaxed"), primaryOpCountersAfter);
-    assert(!secondaryOpCountersReplAfter.hasOwnProperty("constraintsRelaxed"), secondaryOpCountersReplAfter);
+    assert(
+        !secondaryOpCountersReplAfter.hasOwnProperty("constraintsRelaxed"),
+        secondaryOpCountersReplAfter,
+    );
 
     // Calculate the diff
     let primaryDiff = {};
@@ -90,7 +93,10 @@ assert.eq(diff.secondary.delete, 1);
 // 5. Insert operation via applyOps cmd.
 diff = getOpCountersDiff(() => {
     assert.commandWorked(
-        primaryColl.runCommand({applyOps: [{op: "i", ns: collNs, o: {_id: 1}}], writeConcern: {w: 2}}),
+        primaryColl.runCommand({
+            applyOps: [{op: "i", ns: collNs, o: {_id: 1}}],
+            writeConcern: {w: 2},
+        }),
     );
 });
 // On primary, the command counter accounts for applyOps command and for other internal

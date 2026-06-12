@@ -33,7 +33,9 @@ assert.commandWorked(testDB.runCommand({create: collName}));
 const runSuccessfulIndexBuild = function (dbName, collName, indexSpec, requestNumber) {
     jsTest.log("Index build request " + requestNumber + " starting...");
     const res = db.getSiblingDB(dbName).runCommand({createIndexes: collName, indexes: [indexSpec]});
-    jsTest.log("Index build request " + requestNumber + ", expected to succeed, result: " + tojson(res));
+    jsTest.log(
+        "Index build request " + requestNumber + ", expected to succeed, result: " + tojson(res),
+    );
     assert.commandWorked(res);
 };
 
@@ -45,9 +47,14 @@ const runFailedIndexBuildInTxn = function (dbName, collName, indexSpec, requestN
     jsTest.log("Index build request " + requestNumber + " starting in a transaction...");
     session.startTransaction();
     const res = sessionColl.runCommand({createIndexes: collName, indexes: [indexSpec]});
-    jsTest.log("Index build request " + requestNumber + ", expected to fail, result: " + tojson(res));
+    jsTest.log(
+        "Index build request " + requestNumber + ", expected to fail, result: " + tojson(res),
+    );
     assert.commandFailedWithCode(res, ErrorCodes.IndexBuildAlreadyInProgress);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 };
 
 // Insert document into collection to avoid optimization for index creation on an empty collection.
@@ -67,7 +74,9 @@ try {
     jsTest.log("Waiting for first index build to get started...");
     failPoint.wait();
 
-    jsTest.log("Starting a parallel shell to run a transaction with a second index build request...");
+    jsTest.log(
+        "Starting a parallel shell to run a transaction with a second index build request...",
+    );
     joinSecondIndexBuild = startParallelShell(
         funWithArgs(runFailedIndexBuildInTxn, dbName, collName, indexSpecB, 2),
         primary.port,

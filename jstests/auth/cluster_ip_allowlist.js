@@ -4,13 +4,23 @@
 
 print("When allowlist is empty, the server does not start.");
 assert.throws(
-    () => MongoRunner.runMongod({auth: null, keyFile: "jstests/libs/key1", clusterIpSourceAllowlist: ""}),
+    () =>
+        MongoRunner.runMongod({
+            auth: null,
+            keyFile: "jstests/libs/key1",
+            clusterIpSourceAllowlist: "",
+        }),
     [],
     "The server unexpectedly started",
 );
 // Check that the same behavior is seen with the deprecated 'clusterIpSourceWhiteList' flag.
 assert.throws(
-    () => MongoRunner.runMongod({auth: null, keyFile: "jstests/libs/key1", clusterIpSourceWhitelist: ""}),
+    () =>
+        MongoRunner.runMongod({
+            auth: null,
+            keyFile: "jstests/libs/key1",
+            clusterIpSourceWhitelist: "",
+        }),
     [],
     "The server unexpectedly started",
 );
@@ -34,7 +44,11 @@ function testIpAllowlistStartup(description, allowlistString, authResult) {
     MongoRunner.stopMongod(conn);
 
     // Verify that the deprecated 'clusterIpSourceWhitelist' flag still exhibits the same behavior.
-    conn = MongoRunner.runMongod({auth: null, keyFile: "jstests/libs/key1", clusterIpSourceWhitelist: allowlistString});
+    conn = MongoRunner.runMongod({
+        auth: null,
+        keyFile: "jstests/libs/key1",
+        clusterIpSourceWhitelist: allowlistString,
+    });
     assert.eq(authResult, conn.getDB("local").auth("__system", "foopdedoop"));
     emitWarningAuthErrorIsExpected(authResult);
     MongoRunner.stopMongod(conn);
@@ -53,7 +67,9 @@ function testIpAllowlistRuntime(description, allowlistString, authResult) {
     assert(local.auth("__system", "foopdedoop"));
 
     print("Testing whether __system can login after set to: " + allowlistString);
-    assert.commandWorked(admin.runCommand({setParameter: 1, "clusterIpSourceAllowlist": allowlistString.split(",")}));
+    assert.commandWorked(
+        admin.runCommand({setParameter: 1, "clusterIpSourceAllowlist": allowlistString.split(",")}),
+    );
     if (!authResult) {
         // At this time we have no valid authentication, and existing session should reset.
         // We should expect admin commands to fail.

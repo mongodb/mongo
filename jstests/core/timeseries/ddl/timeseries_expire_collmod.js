@@ -33,7 +33,10 @@ assert.commandFailedWithCode(
     db.runCommand({collMod: coll.getName(), expireAfterSeconds: "10"}),
     ErrorCodes.InvalidOptions,
 );
-assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: {}}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    db.runCommand({collMod: coll.getName(), expireAfterSeconds: {}}),
+    ErrorCodes.TypeMismatch,
+);
 assert.commandFailedWithCode(
     db.runCommand({collMod: coll.getName(), expireAfterSeconds: -10}),
     ErrorCodes.InvalidOptions,

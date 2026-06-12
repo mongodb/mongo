@@ -56,9 +56,16 @@ function _getErrorWithCode(codeOrObj, message) {
 
         if (codeOrObj.hasOwnProperty("writeConcernError")) {
             e.writeConcernError = codeOrObj.writeConcernError;
-        } else if (codeOrObj.hasOwnProperty("writeConcernErrors") && codeOrObj.writeConcernErrors.length > 0) {
-            e.writeConcernError = codeOrObj.writeConcernErrors[codeOrObj.writeConcernErrors.length - 1];
-        } else if (codeOrObj.hasOwnProperty("hasWriteConcernError") && codeOrObj.hasWriteConcernError()) {
+        } else if (
+            codeOrObj.hasOwnProperty("writeConcernErrors") &&
+            codeOrObj.writeConcernErrors.length > 0
+        ) {
+            e.writeConcernError =
+                codeOrObj.writeConcernErrors[codeOrObj.writeConcernErrors.length - 1];
+        } else if (
+            codeOrObj.hasOwnProperty("hasWriteConcernError") &&
+            codeOrObj.hasWriteConcernError()
+        ) {
             e.writeConcernError = codeOrObj.getWriteConcernError();
         }
     } else if (typeof codeOrObj === "number") {
@@ -92,9 +99,13 @@ function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry
         try {
             return func();
         } catch (e) {
-            if ((isRetryableError(e) || hasErrorCode(e, additionalCodesToRetry)) && numRetries > 0) {
+            if (
+                (isRetryableError(e) || hasErrorCode(e, additionalCodesToRetry)) &&
+                numRetries > 0
+            ) {
                 print(
-                    "An error occurred and the call will be retried: " + tojson({error: e.toString(), stack: e.stack}),
+                    "An error occurred and the call will be retried: " +
+                        tojson({error: e.toString(), stack: e.stack}),
                 );
                 numRetries--;
                 sleep(sleepMs);
@@ -166,7 +177,11 @@ function isNetworkError(errorOrResponse) {
     // Then check if it's an Error, if so see if any of the known network error strings appear
     // in the given message.
     if (errorOrResponse.message) {
-        if (networkErrsPlusShellGeneratedNetworkErrs.some((err) => errorOrResponse.message.includes(err))) {
+        if (
+            networkErrsPlusShellGeneratedNetworkErrs.some((err) =>
+                errorOrResponse.message.includes(err),
+            )
+        ) {
             return true;
         }
     }
@@ -216,7 +231,11 @@ function isRetryableError(errorOrResponse) {
     // Then check if it's an Error, if so determine retryability by checking the error message
     if (errorOrResponse.message) {
         // See if any of the known network error strings appear in the given message.
-        if (retryableErrsPlusShellGeneratedNetworkErrs.some((err) => errorOrResponse.message.includes(err))) {
+        if (
+            retryableErrsPlusShellGeneratedNetworkErrs.some((err) =>
+                errorOrResponse.message.includes(err),
+            )
+        ) {
             return true;
         }
     }
@@ -381,13 +400,17 @@ let _jsTestOptions = {};
 function jsTestOptions() {
     if (TestData) {
         const isMultiversion =
-            TestData.useRandomBinVersionsWithinReplicaSet || TestData.mixedBinVersions || TestData.mongosBinVersion;
+            TestData.useRandomBinVersionsWithinReplicaSet ||
+            TestData.mixedBinVersions ||
+            TestData.mongosBinVersion;
         const enableOTELTracing = TestData.enableOTELTracing ?? !isMultiversion;
 
         return Object.merge(_jsTestOptions, {
             // Test commands should be enabled by default if no enableTestCommands were present in
             // TestData
-            enableTestCommands: TestData.hasOwnProperty("enableTestCommands") ? TestData.enableTestCommands : true,
+            enableTestCommands: TestData.hasOwnProperty("enableTestCommands")
+                ? TestData.enableTestCommands
+                : true,
             // Testing diagnostics should be enabled by default if no testingDiagnosticsEnabled was
             // present in TestData
             testingDiagnosticsEnabled: TestData.hasOwnProperty("testingDiagnosticsEnabled")
@@ -435,17 +458,22 @@ function jsTestOptions() {
             networkMessageCompressors: TestData.networkMessageCompressors,
             skipRetryOnNetworkError: TestData.skipRetryOnNetworkError,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
-            forceValidationWithFeatureCompatibilityVersion: TestData.forceValidationWithFeatureCompatibilityVersion,
+            forceValidationWithFeatureCompatibilityVersion:
+                TestData.forceValidationWithFeatureCompatibilityVersion,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
             // We default skipValidationOnNamespaceNotFound to true because mongod can end up
             // dropping a collection after calling listCollections (e.g. if a secondary applies an
             // oplog entry).
-            skipValidationOnNamespaceNotFound: TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
+            skipValidationOnNamespaceNotFound: TestData.hasOwnProperty(
+                "skipValidationOnNamespaceNotFound",
+            )
                 ? TestData.skipValidationOnNamespaceNotFound
                 : true,
             skipValidationNamespaces: TestData.skipValidationNamespaces || [],
-            skipCheckingUUIDsConsistentAcrossCluster: TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
-            skipCheckingIndexesConsistentAcrossCluster: TestData.skipCheckingIndexesConsistentAcrossCluster || false,
+            skipCheckingUUIDsConsistentAcrossCluster:
+                TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
+            skipCheckingIndexesConsistentAcrossCluster:
+                TestData.skipCheckingIndexesConsistentAcrossCluster || false,
             skipCheckingCatalogCacheConsistencyWithShardingCatalog:
                 TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
             skipAwaitingReplicationOnShardsBeforeCheckingUUIDs:
@@ -459,7 +487,9 @@ function jsTestOptions() {
             logRetryAttempts: TestData.logRetryAttempts || false,
             connectionString: TestData.connectionString || "",
             skipCheckDBHashes: TestData.skipCheckDBHashes || false,
-            traceExceptions: TestData.hasOwnProperty("traceExceptions") ? TestData.traceExceptions : true,
+            traceExceptions: TestData.hasOwnProperty("traceExceptions")
+                ? TestData.traceExceptions
+                : true,
             transactionLifetimeLimitSeconds: TestData.transactionLifetimeLimitSeconds,
             mqlTestFile: TestData.mqlTestFile,
             mqlRootPath: TestData.mqlRootPath,
@@ -472,7 +502,8 @@ function jsTestOptions() {
             // versions of each node in the replica set to 'latest' or 'last-lts'.
             // This flag is currently a placeholder and only sets the replica set to last-lts
             // FCV.
-            useRandomBinVersionsWithinReplicaSet: TestData.useRandomBinVersionsWithinReplicaSet || false,
+            useRandomBinVersionsWithinReplicaSet:
+                TestData.useRandomBinVersionsWithinReplicaSet || false,
             // Set a specific random seed to be used when useRandomBinVersionsWithinReplicaSet is
             // true.
             seed: TestData.seed || undefined,
@@ -524,7 +555,12 @@ function jsTestLog(msg, attr, {severity = "I"} = {}) {
     const severityMap = {E: 1, W: 2, I: 3, D: 4};
     const severityLevel = severityMap[severity];
     const logLevel = TestData?.logLevel ?? severityMap["I"]; // The default log level is 'INFO'.
-    if (!logLevel || typeof logLevel !== "number" || ![1, 2, 3, 4].includes(logLevel) || !severityLevel) {
+    if (
+        !logLevel ||
+        typeof logLevel !== "number" ||
+        ![1, 2, 3, 4].includes(logLevel) ||
+        !severityLevel
+    ) {
         throw new Error(`invalid log severity (${severity}) and/or log level (${logLevel})`);
     }
 
@@ -602,7 +638,8 @@ jsTest.log.error = function (msg, attr) {
 
 jsTest.authenticate = function (conn) {
     const connOptions = conn.fullOptions || {};
-    const authMode = connOptions.clusterAuthMode || conn.clusterAuthMode || jsTest.options().clusterAuthMode;
+    const authMode =
+        connOptions.clusterAuthMode || conn.clusterAuthMode || jsTest.options().clusterAuthMode;
 
     if (!jsTest.options().auth && !jsTest.options().keyFile && authMode !== "x509") {
         conn.authenticated = true;
@@ -663,7 +700,9 @@ jsTest.authenticateNodes = function (nodes) {
                 // Don't try to authenticate to arbiters
                 let res = {};
                 try {
-                    res = nodes[i].getDB("admin")._runCommandWithoutApiStrict({replSetGetStatus: 1});
+                    res = nodes[i]
+                        .getDB("admin")
+                        ._runCommandWithoutApiStrict({replSetGetStatus: 1});
                 } catch (e) {
                     // ReplicaSet tests which don't use auth are allowed to have nodes crash during
                     // startup. To allow tests which use to behavior to work with auth,
@@ -771,7 +810,9 @@ function defaultPrompt() {
 
 function replSetMemberStatePrompt() {
     let state = "";
-    let stateInfo = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict({replSetGetStatus: 1, forShell: 1});
+    let stateInfo = globalThis.db
+        .getSiblingDB("admin")
+        ._runCommandWithoutApiStrict({replSetGetStatus: 1, forShell: 1});
     if (stateInfo.ok) {
         // Report the self member's stateStr if it's present.
         stateInfo.members.forEach(function (member) {
@@ -866,7 +907,9 @@ function shellPrintHelper(x) {
 let shellAutocomplete = (function () /*prefix*/ {
     // outer scope function called on init. Actual function at end
     let universalMethods =
-        "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split(" ");
+        "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split(
+            " ",
+        );
 
     let builtinMethods = {}; // uses constructor objects as keys
     builtinMethods[Array] =
@@ -887,8 +930,12 @@ let shellAutocomplete = (function () /*prefix*/ {
             " ",
         );
     builtinMethods[Number] =
-        "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split(" ");
-    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split(" ");
+        "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split(
+            " ",
+        );
+    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split(
+        " ",
+    );
     builtinMethods[String] =
         "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase trim trimLeft trimRight".split(
             " ",
@@ -972,7 +1019,8 @@ let shellAutocomplete = (function () /*prefix*/ {
             if (p.substr(0, lastPrefix.length).toLowerCase() != lastPrefixLowercase) continue;
 
             let completion = beginning + p;
-            if (curObj[p] && curObj[p].constructor == Function && p != "constructor") completion += "(";
+            if (curObj[p] && curObj[p].constructor == Function && p != "constructor")
+                completion += "(";
 
             noDuplicates[completion] = 0;
         }
@@ -1068,7 +1116,16 @@ shellHelper.show = function (what) {
                 .sort({$natural: -1})
                 .limit(5)
                 .forEach(function (x) {
-                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " + String(x.ts).substring(0, 24));
+                    print(
+                        "" +
+                            x.op +
+                            "\t" +
+                            x.ns +
+                            " " +
+                            x.millis +
+                            "ms " +
+                            String(x.ts).substring(0, 24),
+                    );
                     let l = "";
                     for (let z in x) {
                         if (z == "op" || z == "ns" || z == "millis" || z == "ts") continue;
@@ -1194,7 +1251,9 @@ shellHelper.show = function (what) {
             dbDeclared = false;
         }
         if (dbDeclared) {
-            let res = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict({getLog: "startupWarnings"});
+            let res = globalThis.db
+                .getSiblingDB("admin")
+                ._runCommandWithoutApiStrict({getLog: "startupWarnings"});
             if (res.ok) {
                 if (res.log.length == 0) {
                     return "";
@@ -1209,7 +1268,13 @@ shellHelper.show = function (what) {
                         logOut = linePrefix + parsedLog.msg + "\n";
                         if (parsedLog.attr) {
                             for (let attr in parsedLog.attr) {
-                                logOut += linePrefix + messageIndent + attr + ": " + parsedLog.attr[attr] + "\n";
+                                logOut +=
+                                    linePrefix +
+                                    messageIndent +
+                                    attr +
+                                    ": " +
+                                    parsedLog.attr[attr] +
+                                    "\n";
                             }
                         }
                     } catch (err) {
@@ -1258,8 +1323,14 @@ shellHelper.show = function (what) {
             }
 
             if (res.hasOwnProperty("automationServiceDescriptor")) {
-                print("Note: This server is managed by automation service '" + res.automationServiceDescriptor + "'.");
-                print("Note: Many administrative actions are inappropriate, and may be automatically reverted.");
+                print(
+                    "Note: This server is managed by automation service '" +
+                        res.automationServiceDescriptor +
+                        "'.",
+                );
+                print(
+                    "Note: Many administrative actions are inappropriate, and may be automatically reverted.",
+                );
                 return "";
             }
 
@@ -1289,7 +1360,10 @@ shellHelper.show = function (what) {
         if (!matchesKnownImposterSignature) {
             try {
                 const cmdLineOpts = globalThis.db.adminCommand({getCmdLineOpts: 1});
-                if (cmdLineOpts.hasOwnProperty("errmsg") && cmdLineOpts.errmsg.indexOf("not supported") !== -1) {
+                if (
+                    cmdLineOpts.hasOwnProperty("errmsg") &&
+                    cmdLineOpts.errmsg.indexOf("not supported") !== -1
+                ) {
                     matchesKnownImposterSignature = true;
                 }
             } catch (e) {
@@ -1350,7 +1424,8 @@ Math.sigFig = function (x, N) {
 
 let Random = (function () {
     let initialized = false;
-    let errorMsg = "The random number generator hasn't been seeded yet; " + "call Random.setRandomSeed()";
+    let errorMsg =
+        "The random number generator hasn't been seeded yet; " + "call Random.setRandomSeed()";
 
     function isInitialized() {
         return initialized;
@@ -1512,7 +1587,8 @@ Geo.sphereDistance = function (a, b) {
     let sin_y2 = Math.sin(by),
         cos_y2 = Math.cos(by);
 
-    let cross_prod = cos_y1 * cos_x1 * cos_y2 * cos_x2 + cos_y1 * sin_x1 * cos_y2 * sin_x2 + sin_y1 * sin_y2;
+    let cross_prod =
+        cos_y1 * cos_x1 * cos_y2 * cos_x2 + cos_y1 * sin_x1 * cos_y2 * sin_x2 + sin_y1 * sin_y2;
 
     if (cross_prod >= 1 || cross_prod <= -1) {
         // fun with floats
@@ -1576,13 +1652,18 @@ function _awaitRSHostViaRSMonitor(hostAddr, desiredState, rsName, timeout) {
             }
             return false;
         },
-        "timed out waiting for replica set member: " + hostAddr + " to reach state: " + tojson(desiredState),
+        "timed out waiting for replica set member: " +
+            hostAddr +
+            " to reach state: " +
+            tojson(desiredState),
         timeout,
     );
 }
 
 rs.help = function () {
-    print("\trs.status()                                     { replSetGetStatus : 1 } checks repl set status");
+    print(
+        "\trs.status()                                     { replSetGetStatus : 1 } checks repl set status",
+    );
     print(
         "\trs.initiate()                                   { replSetInitiate : null } initiates set with default settings",
     );
@@ -1601,7 +1682,9 @@ rs.help = function () {
     print(
         "\t                                                    memberIndex: index of the node being updated; cfg: the desired new config; opts: options passed in with the reconfig",
     );
-    print("\t                                                    Not to be used with every configuration");
+    print(
+        "\t                                                    Not to be used with every configuration",
+    );
     print(
         "\t                                                    For more information, visit: https://docs.mongodb.com/manual/reference/method/rs.reconfigForPSASet/",
     );
@@ -1611,17 +1694,25 @@ rs.help = function () {
     print(
         "\trs.add(membercfgobj)                            add a new member to the set with extra attributes (disconnects)",
     );
-    print("\trs.addArb(hostportstr)                          add a new member which is arbiterOnly:true (disconnects)");
+    print(
+        "\trs.addArb(hostportstr)                          add a new member which is arbiterOnly:true (disconnects)",
+    );
     print("\trs.stepDown([stepdownSecs, catchUpSecs])        step down as primary (disconnects)");
-    print("\trs.syncFrom(hostportstr)                        make a secondary sync from the given member");
+    print(
+        "\trs.syncFrom(hostportstr)                        make a secondary sync from the given member",
+    );
     print(
         "\trs.freeze(secs)                                 make a node ineligible to become primary for the time specified",
     );
-    print("\trs.remove(hostportstr)                          remove a host from the replica set (disconnects)");
+    print(
+        "\trs.remove(hostportstr)                          remove a host from the replica set (disconnects)",
+    );
     print("\trs.secondaryOk()                                allow queries on secondary nodes");
     print();
     print("\trs.printReplicationInfo()                       check oplog size and time range");
-    print("\trs.printSecondaryReplicationInfo()              check replica set members and replication lag");
+    print(
+        "\trs.printSecondaryReplicationInfo()              check replica set members and replication lag",
+    );
     print("\tdb.isMaster()                                   check who is primary");
     print("\tdb.hello()                                      check who is primary");
     print();
@@ -1677,7 +1768,9 @@ rs._runCmd = function (c) {
             }
         } else {
             print("shell got exception during repl set operation: " + e);
-            print("in some circumstances, the primary steps down and closes connections on a reconfig");
+            print(
+                "in some circumstances, the primary steps down and closes connections on a reconfig",
+            );
         }
         return "";
     }
@@ -1695,7 +1788,11 @@ rs.reconfig = function (cfg, options) {
 function _validateMemberIndex(memberIndex, newConfig) {
     const newMemberConfig = newConfig.members[memberIndex];
     assert(newMemberConfig, `Node at index ${memberIndex} does not exist in the new config`);
-    assert.eq(1, newMemberConfig.votes, `Node at index ${memberIndex} must have {votes: 1} in the new config`);
+    assert.eq(
+        1,
+        newMemberConfig.votes,
+        `Node at index ${memberIndex} must have {votes: 1} in the new config`,
+    );
 
     // Use memberId to compare nodes across configs.
     const memberId = newMemberConfig._id;
@@ -1708,14 +1805,19 @@ function _validateMemberIndex(memberIndex, newConfig) {
         return;
     }
 
-    assert(!oldMemberConfig.votes, `Node at index ${memberIndex} must have {votes: 0} in the old config`);
+    assert(
+        !oldMemberConfig.votes,
+        `Node at index ${memberIndex} must have {votes: 0} in the old config`,
+    );
 }
 
 rs.reconfigForPSASet = function (memberIndex, cfg, options) {
     _validateMemberIndex(memberIndex, cfg);
 
     const memberPriority = cfg.members[memberIndex].priority;
-    print(`Running first reconfig to give member at index ${memberIndex} { votes: 1, priority: 0 }`);
+    print(
+        `Running first reconfig to give member at index ${memberIndex} { votes: 1, priority: 0 }`,
+    );
     cfg.members[memberIndex].votes = 1;
     cfg.members[memberIndex].priority = 0;
     let res = rs.reconfig(cfg, options);
@@ -1723,7 +1825,9 @@ rs.reconfigForPSASet = function (memberIndex, cfg, options) {
         return res;
     }
 
-    print(`Running second reconfig to give member at index ${memberIndex} { priority: ${memberPriority} }`);
+    print(
+        `Running second reconfig to give member at index ${memberIndex} { priority: ${memberPriority} }`,
+    );
     cfg.members[memberIndex].priority = memberPriority;
 
     // If the first reconfig added a new node, the second config will not succeed until the
@@ -1744,7 +1848,10 @@ rs.add = function (hostport, arb) {
             let cfg = hostport;
 
             let local = globalThis.db.getSiblingDB("local");
-            assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
+            assert(
+                local.system.replset.count() <= 1,
+                "error: local.system.replset has unexpected contents",
+            );
             let c = local.system.replset.findOne();
             assert(c, "no config object retrievable from local.system.replset");
 
@@ -1761,7 +1868,8 @@ rs.add = function (hostport, arb) {
                 if (arb) cfg.arbiterOnly = true;
             } else if (arb == true) {
                 throw Error(
-                    "Expected first parameter to be a host-and-port string of arbiter, but got " + tojson(hostport),
+                    "Expected first parameter to be a host-and-port string of arbiter, but got " +
+                        tojson(hostport),
                 );
             }
 
@@ -1829,7 +1937,10 @@ rs.config = rs.conf;
 
 rs.remove = function (hn) {
     let local = globalThis.db.getSiblingDB("local");
-    assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
+    assert(
+        local.system.replset.count() <= 1,
+        "error: local.system.replset has unexpected contents",
+    );
     let c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
     c.version++;
@@ -1957,19 +2068,29 @@ function help(x) {
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
         print();
-        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print(
+            "\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string",
+        );
         print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
         print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
-        print('\t"hexstr"                            string, sequence of hex characters (no 0x prefix)');
+        print(
+            '\t"hexstr"                            string, sequence of hex characters (no 0x prefix)',
+        );
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
-        print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
+        print(
+            "\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID",
+        );
         print("\to.isObjectId");
         print("\to.toString()");
         print("\to.equals(otherid)");
         print();
-        print("\td = ISODate()                       like Date() but behaves more intuitively when used");
-        print("\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction");
+        print(
+            "\td = ISODate()                       like Date() but behaves more intuitively when used",
+        );
+        print(
+            "\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction",
+        );
         return;
     } else if (x == "admin") {
         print("\tls([path])                      list files");
@@ -2002,14 +2123,25 @@ function help(x) {
         print("\t" + "show dbs                     show database names");
         print("\t" + "show collections             show collections in current database");
         print("\t" + "show users                   show users in current database");
-        print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+        print(
+            "\t" +
+                "show profile                 show most recent system.profile entries with time >= 1ms",
+        );
         print("\t" + "show logs                    show the accessible logger names");
-        print("\t" + "show log [name]              prints out the last segment of log in memory, 'global' is default");
+        print(
+            "\t" +
+                "show log [name]              prints out the last segment of log in memory, 'global' is default",
+        );
         print("\t" + "use <db_name>                set current database");
         print("\t" + "db.mycoll.find()             list objects in collection mycoll");
         print("\t" + "db.mycoll.find( { a : 1 } )  list objects in mycoll where a == 1");
-        print("\t" + "it                           result of the last line evaluated; use to further iterate");
-        print("\t" + "DBQuery.shellBatchSize = x   set default number of items to display on shell");
+        print(
+            "\t" +
+                "it                           result of the last line evaluated; use to further iterate",
+        );
+        print(
+            "\t" + "DBQuery.shellBatchSize = x   set default number of items to display on shell",
+        );
         print("\t" + "exit                         quit the mongo shell");
     } else print("unknown help option");
 }

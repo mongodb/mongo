@@ -70,7 +70,9 @@ runPinnedCursorKillTest(testParameters);
     // Force yield to occur on every PlanExecutor iteration, so that the getMore is guaranteed
     // to check for interrupts.
     assert.commandWorked(
-        testParameters.conn.getDB("admin").runCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+        testParameters.conn
+            .getDB("admin")
+            .runCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
     );
     runPinnedCursorKillTest(testParameters);
 })();

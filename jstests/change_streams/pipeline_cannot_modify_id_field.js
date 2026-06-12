@@ -23,7 +23,11 @@ const idModifyingTransformations = [
     {$project: {"_id._data": "$otherField"}},
     {$project: {"_id.otherField": 1}},
     {$project: {"_id._typeBits": 0}},
-    [{$project: {otherField: "$_id"}}, {$project: {otherField: 0}}, {$project: {_id: "$otherField"}}],
+    [
+        {$project: {otherField: "$_id"}},
+        {$project: {otherField: 0}},
+        {$project: {_id: "$otherField"}},
+    ],
     {$project: {_id: {data: "$_id._data", typeBits: "$_id._typeBits"}}}, // Fields renamed.
     {$project: {_id: {_typeBits: "$_id._typeBits", _data: "$_id._data"}}}, // Fields reordered.
     {$project: {_id: {_data: "$_id._typeBits", _typeBits: "$_id._data"}}}, // Fields swapped.
@@ -32,7 +36,11 @@ const idModifyingTransformations = [
     {$set: {"_id._data": "newValue"}},
     {$set: {"_id._data": "$otherField"}},
     {$set: {"_id.otherField": "newValue"}}, // New subfield added to _id.
-    [{$addFields: {otherField: "$_id"}}, {$set: {otherField: "newValue"}}, {$set: {_id: "$otherField"}}],
+    [
+        {$addFields: {otherField: "$_id"}},
+        {$set: {otherField: "newValue"}},
+        {$set: {_id: "$otherField"}},
+    ],
     [
         // Fields renamed.
         {$addFields: {newId: {data: "$_id._data", typeBits: "$_id._typeBits"}}},
@@ -65,14 +73,21 @@ const idPreservingTransformations = [
     {$project: {otherField: 1}},
     {$project: {otherField: 0}},
     {$project: {otherField: "$_id"}},
-    [{$project: {otherField: "$_id"}}, {$project: {otherField: 1}}, {$project: {_id: "$otherField"}}],
+    [
+        {$project: {otherField: "$_id"}},
+        {$project: {otherField: 1}},
+        {$project: {_id: "$otherField"}},
+    ],
     {$project: {"_id._data": 1, "_id._typeBits": 1}},
     {$project: {_id: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
     {$set: {_id: "$_id"}},
     {$addFields: {otherField: "newValue"}},
     {$set: {_id: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
     [{$addFields: {otherField: "$_id"}}, {$set: {_id: "$otherField"}}],
-    [{$addFields: {newId: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}}, {$set: {_id: "$newId"}}],
+    [
+        {$addFields: {newId: {_data: "$_id._data", _typeBits: "$_id._typeBits"}}},
+        {$set: {_id: "$newId"}},
+    ],
     {$replaceRoot: {newRoot: {_id: "$_id"}}},
     {$replaceWith: {_id: "$_id"}},
     {
@@ -99,7 +114,11 @@ let docId = 0;
 // Verify that each of the allowlisted transformations above succeeds.
 for (let transform of idPreservingTransformations) {
     const cmdRes = assert.commandWorked(
-        db.runCommand({aggregate: coll.getName(), pipeline: changeStream.concat(transform), cursor: {}}),
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: changeStream.concat(transform),
+            cursor: {},
+        }),
         transform,
     );
     assert.commandWorked(coll.insert({_id: docId++}));
@@ -115,7 +134,11 @@ for (let transform of idPreservingTransformations) {
 // Verify that each of the denylisted transformations above are rejected.
 for (let transform of idModifyingTransformations) {
     const cmdRes = assert.commandWorked(
-        db.runCommand({aggregate: coll.getName(), pipeline: changeStream.concat(transform), cursor: {}}),
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: changeStream.concat(transform),
+            cursor: {},
+        }),
         transform,
     );
     assert.commandWorked(coll.insert({_id: docId++}));

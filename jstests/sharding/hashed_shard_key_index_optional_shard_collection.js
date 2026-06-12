@@ -64,7 +64,10 @@ function checkIfIndexExists(st, dbName, collName, indexKey) {
 function testFindCommand(st, dbName, collName, doc, testCase) {
     const coll = st.s.getDB(dbName).getCollection(collName);
 
-    const shardKeyValue = AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, testCase.shardKey);
+    const shardKeyValue = AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+        doc,
+        testCase.shardKey,
+    );
     const explain = coll.find(shardKeyValue).explain();
     const winningPlan = getWinningPlanFromExplain(explain);
 
@@ -82,7 +85,10 @@ function testFindCommand(st, dbName, collName, doc, testCase) {
         assert.eq(winningPlan.stage, "FETCH", winningPlan);
         assert.eq(winningPlan.inputStage.stage, "IXSCAN", winningPlan);
         if (testCase.skipHashedShardKeyIndexCreation) {
-            assert(bsonWoCompare(winningPlan.inputStage.keyPattern, testCase.indexKey) == 0, winningPlan);
+            assert(
+                bsonWoCompare(winningPlan.inputStage.keyPattern, testCase.indexKey) == 0,
+                winningPlan,
+            );
         } else {
             assert(
                 bsonWoCompare(winningPlan.inputStage.keyPattern, testCase.shardKey) == 0 ||
@@ -99,7 +105,10 @@ function testFindCommand(st, dbName, collName, doc, testCase) {
  */
 function testMoveChunkCommand(st, dbName, collName, doc, testCase) {
     const ns = dbName + "." + collName;
-    const shardKeyValue = AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, testCase.shardKey);
+    const shardKeyValue = AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
+        doc,
+        testCase.shardKey,
+    );
     let failed = false;
     for (let shardName of shardNames) {
         const res = st.s.adminCommand({moveChunk: ns, find: shardKeyValue, to: shardName});
@@ -131,11 +140,19 @@ function testNonExistentCollection(st, testCase) {
     if (testCase.expectErrorCode) {
         assert.commandFailedWithCode(res, testCase.expectErrorCode);
         const expectedIndexExists = false;
-        assert.eq(checkIfIndexExists(st, dbName, collName1, testCase.shardKey), expectedIndexExists, {testCase});
+        assert.eq(
+            checkIfIndexExists(st, dbName, collName1, testCase.shardKey),
+            expectedIndexExists,
+            {testCase},
+        );
     } else {
         assert.commandWorked(res);
         const expectedIndexExists = !testCase.skipHashedShardKeyIndexCreation;
-        assert.eq(checkIfIndexExists(st, dbName, collName1, testCase.shardKey), expectedIndexExists, {testCase});
+        assert.eq(
+            checkIfIndexExists(st, dbName, collName1, testCase.shardKey),
+            expectedIndexExists,
+            {testCase},
+        );
 
         const doc = makeDocument(testCase.shardKey, testCase.indexKey, 1);
         assert.commandWorked(coll.insert(doc));
@@ -172,11 +189,19 @@ function testExistentCollection(st, testCase) {
     if (testCase.expectErrorCode) {
         assert.commandFailedWithCode(res, testCase.expectErrorCode);
         const expectedIndexExists = false;
-        assert.eq(checkIfIndexExists(st, dbName, collName2, testCase.shardKey), expectedIndexExists, {testCase});
+        assert.eq(
+            checkIfIndexExists(st, dbName, collName2, testCase.shardKey),
+            expectedIndexExists,
+            {testCase},
+        );
     } else {
         assert.commandWorked(res);
         const expectedIndexExists = !testCase.skipHashedShardKeyIndexCreation;
-        assert.eq(checkIfIndexExists(st, dbName, collName2, testCase.shardKey), expectedIndexExists, {testCase});
+        assert.eq(
+            checkIfIndexExists(st, dbName, collName2, testCase.shardKey),
+            expectedIndexExists,
+            {testCase},
+        );
 
         if (testCase.isEmptyCollection) {
             doc = makeDocument(testCase.shardKey, testCase.indexKey, 2);
@@ -271,14 +296,17 @@ function runTest(hashedShardKeyIndexOptionalUponShardingCollection) {
     shardNames.push(st.shard0.shardName);
     shardNames.push(st.shard1.shardName);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     for (let shardKeyTestCase of shardKeyTestCases) {
         const isHashedShardKey = AnalyzeShardKeyUtil.isHashedKeyPattern(shardKeyTestCase.shardKey);
         jsTest.log("Testing " + tojson({shardKeyTestCase}));
 
         for (let skipHashedShardKeyIndexCreation of [true, false]) {
-            const expectValidationError = !hashedShardKeyIndexOptionalUponShardingCollection || !isHashedShardKey;
+            const expectValidationError =
+                !hashedShardKeyIndexOptionalUponShardingCollection || !isHashedShardKey;
             testNonExistentCollection(st, {
                 shardKey: shardKeyTestCase.shardKey,
                 skipHashedShardKeyIndexCreation,

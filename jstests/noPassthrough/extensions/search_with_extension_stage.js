@@ -85,7 +85,10 @@ withExtensionsAndMongot(
             assert.commandWorked(
                 db.runCommand({
                     aggregate: coll.getName(),
-                    pipeline: [{$vectorSearch: {queryVector: [1.0], path: "v", limit: 1}}, {$loaf: {numSlices: 1}}],
+                    pipeline: [
+                        {$vectorSearch: {queryVector: [1.0], path: "v", limit: 1}},
+                        {$loaf: {numSlices: 1}},
+                    ],
                     cursor: {},
                 }),
             );

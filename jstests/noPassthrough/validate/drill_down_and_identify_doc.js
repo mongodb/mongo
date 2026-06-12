@@ -42,8 +42,12 @@ function testDrillDown(multi) {
     let count = -1;
     do {
         jsTest.log.info(`Drilling down with prefixes: '${tojson(prefixes)}'`);
-        let partial1 = assert.commandWorked(db1.coll.validate({collHash: true, hashPrefixes: prefixes})).partial;
-        let partial2 = assert.commandWorked(db2.coll.validate({collHash: true, hashPrefixes: prefixes})).partial;
+        let partial1 = assert.commandWorked(
+            db1.coll.validate({collHash: true, hashPrefixes: prefixes}),
+        ).partial;
+        let partial2 = assert.commandWorked(
+            db2.coll.validate({collHash: true, hashPrefixes: prefixes}),
+        ).partial;
         jsTest.log.info("Partial1: " + tojson(partial1));
         jsTest.log.info("Partial2: " + tojson(partial2));
         assert.eq(Object.keys(partial1).length, Object.keys(partial2).length);

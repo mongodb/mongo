@@ -42,12 +42,20 @@ const recipientConn = new Mongo(topology.shards[recipientShardNames[0]].primary)
 
 // Verifies that expected documents are present in the pre-image collection at the specified shard.
 function verifyPreImages(conn, expectedPreImageDocuments) {
-    const preImageDocuments = conn.getDB("config").getCollection("system.preimages").find().toArray();
+    const preImageDocuments = conn
+        .getDB("config")
+        .getCollection("system.preimages")
+        .find()
+        .toArray();
 
     assert.eq(preImageDocuments.length, expectedPreImageDocuments.length, preImageDocuments);
 
     for (let idx = 0; idx < preImageDocuments.length; idx++) {
-        assert.eq(preImageDocuments[idx].preImage, expectedPreImageDocuments[idx], preImageDocuments[idx].preImage);
+        assert.eq(
+            preImageDocuments[idx].preImage,
+            expectedPreImageDocuments[idx],
+            preImageDocuments[idx].preImage,
+        );
     }
 }
 
@@ -69,7 +77,9 @@ function verifyChangeStreamEvents(csCursor, events) {
 
 // Enable recording of pre-images in the collection.
 assert.commandWorked(
-    coll.getDB().runCommand({collMod: "whileResharding", changeStreamPreAndPostImages: {enabled: true}}),
+    coll
+        .getDB()
+        .runCommand({collMod: "whileResharding", changeStreamPreAndPostImages: {enabled: true}}),
 );
 
 // Insert some documents before resharding the collection so that there is data to clone.
@@ -104,15 +114,21 @@ verifyPreImages(recipientConn, []);
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newShardKey: 1},
-        newChunks: [{min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}, shard: recipientShardNames[0]}],
+        newChunks: [
+            {min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}, shard: recipientShardNames[0]},
+        ],
     },
     () => {
         // We wait until cloneTimestamp has been chosen to guarantee that any subsequent writes will
         // be applied by the ReshardingOplogApplier.
         reshardingTest.awaitCloneTimestampChosen();
 
-        assert.commandWorked(coll.update({_id: 0}, {$set: {annotation: "during-resharding-update"}}));
-        assert.commandWorked(coll.update({_id: 1}, {$set: {annotation: "during-resharding-update"}}));
+        assert.commandWorked(
+            coll.update({_id: 0}, {$set: {annotation: "during-resharding-update"}}),
+        );
+        assert.commandWorked(
+            coll.update({_id: 1}, {$set: {annotation: "during-resharding-update"}}),
+        );
         assert.commandWorked(coll.remove({_id: 1}, {justOne: true}));
 
         // Perform some operations in a transaction.
@@ -123,7 +139,10 @@ reshardingTest.withReshardingInBackground(
                 const sessionColl = sessionDB.getCollection(coll.getName());
                 withTxnAndAutoRetryOnMongos(session, () => {
                     assert.commandWorked(
-                        sessionColl.update({_id: 2}, {$set: {annotation: "during-resharding-txn-update"}}),
+                        sessionColl.update(
+                            {_id: 2},
+                            {$set: {annotation: "during-resharding-txn-update"}},
+                        ),
                     );
                     assert.commandWorked(sessionColl.remove({_id: 3}, {justOne: true}));
                 });
@@ -138,7 +157,9 @@ reshardingTest.withReshardingInBackground(
 
 // Verify that after the resharding is complete, the pre-image collection exists on the recipient
 // shard with clustered-index enabled.
-const preImageCollInfo = recipientConn.getDB("config").getCollectionInfos({name: "system.preimages"});
+const preImageCollInfo = recipientConn
+    .getDB("config")
+    .getCollectionInfos({name: "system.preimages"});
 assert.eq(preImageCollInfo.length, 1, preImageCollInfo);
 assert(preImageCollInfo[0].options.hasOwnProperty("clusteredIndex"), preImageCollInfo[0]);
 
@@ -158,7 +179,9 @@ verifyPreImages(donorConn, [
     {_id: 2, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
     {_id: 3, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
 ]);
-verifyPreImages(recipientConn, [{_id: 0, annotation: "during-resharding-update", oldShardKey: 0, newShardKey: 2}]);
+verifyPreImages(recipientConn, [
+    {_id: 0, annotation: "during-resharding-update", oldShardKey: 0, newShardKey: 2},
+]);
 
 // Verify that the change stream observes the change events with required pre-images.
 verifyChangeStreamEvents(csCursor, [

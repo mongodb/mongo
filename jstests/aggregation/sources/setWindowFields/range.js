@@ -4,7 +4,9 @@
 const coll = db.setWindowFields_range;
 coll.drop();
 
-assert.commandWorked(coll.insert([{x: 0}, {x: 1}, {x: 1.5}, {x: 2}, {x: 3}, {x: 100}, {x: 100}, {x: 101}]));
+assert.commandWorked(
+    coll.insert([{x: 0}, {x: 1}, {x: 1.5}, {x: 2}, {x: 3}, {x: 100}, {x: 100}, {x: 101}]),
+);
 
 // Make a setWindowFields stage with the given bounds.
 function range(lower, upper) {

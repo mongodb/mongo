@@ -5,7 +5,9 @@ function cleanupHelloFailInjection(connection) {
     jsTestLog(`Cleanup Hello fail injection in ${connection}`);
     let adminDB = connection.getDB("admin");
     assert.commandWorked(adminDB.runCommand({configureFailPoint: "shardWaitInHello", mode: "off"}));
-    const res = assert.commandWorked(adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1}));
+    const res = assert.commandWorked(
+        adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1}),
+    );
     assert.eq(res[`failpoint.shardWaitInHello`].mode, 0);
 }
 

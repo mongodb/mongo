@@ -26,7 +26,9 @@ describe("getShardVersion and getDatabaseVersion latestCached", function () {
 
     describe("mongos", function () {
         it("with latestCached: true returns timeInStore and same version", function () {
-            const latestCachedRes = assert.commandWorked(st.s.adminCommand({getShardVersion: ns, latestCached: true}));
+            const latestCachedRes = assert.commandWorked(
+                st.s.adminCommand({getShardVersion: ns, latestCached: true}),
+            );
             assert.neq(undefined, latestCachedRes.timeInStore);
             assert.eq(undefined, latestCachedRes.chunks);
         });
@@ -42,7 +44,9 @@ describe("getShardVersion and getDatabaseVersion latestCached", function () {
         });
 
         it("with latestCached for database returns primaryShard, dbVersion, timeInStore", function () {
-            const dbOnlyRes = assert.commandWorked(st.s.adminCommand({getDatabaseVersion: dbName, latestCached: true}));
+            const dbOnlyRes = assert.commandWorked(
+                st.s.adminCommand({getDatabaseVersion: dbName, latestCached: true}),
+            );
             assert.neq(undefined, dbOnlyRes.primaryShard);
             assert.neq(undefined, dbOnlyRes.dbVersion);
             assert.neq(undefined, dbOnlyRes.timeInStore);
@@ -51,7 +55,9 @@ describe("getShardVersion and getDatabaseVersion latestCached", function () {
 
     describe("mongod", function () {
         it("with latestCached: true returns routing info with timeInStore", function () {
-            const shardRes = assert.commandWorked(shardConn.adminCommand({getShardVersion: ns, latestCached: true}));
+            const shardRes = assert.commandWorked(
+                shardConn.adminCommand({getShardVersion: ns, latestCached: true}),
+            );
             assert.neq(undefined, shardRes.version);
             assert.neq(undefined, shardRes.versionEpoch);
             assert.neq(undefined, shardRes.timeInStore);

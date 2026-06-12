@@ -29,14 +29,19 @@ function testPartialIndex(conn) {
 
     // Ensure first branch of $or has multiple indexed plans and must run the multiplanner. This ensures
     // we yield the collection acquisition.
-    assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {b: 1}, name: "a_partial"}));
+    assert.commandWorked(
+        coll.createIndex({a: 1}, {partialFilterExpression: {b: 1}, name: "a_partial"}),
+    );
     assert.commandWorked(coll.createIndex({b: 1}));
 
     // Ensure we yield the collection acquisition.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
     // Configure the fail point to pause after the query planner has taken pointers to the catalog owned objects.
-    let pauseAfterFillingOutIndexEntries = configureFailPoint(conn, "pauseAfterFillingOutIndexEntries");
+    let pauseAfterFillingOutIndexEntries = configureFailPoint(
+        conn,
+        "pauseAfterFillingOutIndexEntries",
+    );
 
     const awaitQuery = startParallelShell(function () {
         const coll = db[jsTestName()];
@@ -58,8 +63,12 @@ function testPartialIndex(conn) {
     pauseAfterFillingOutIndexEntries.wait();
 
     // Perform a collMod which forces the catalog to destroy its in-memory cache of the 'a_partial' index.
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: "a_partial", hidden: true}}));
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: "a_partial", hidden: false}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: "a_partial", hidden: true}}),
+    );
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: "a_partial", hidden: false}}),
+    );
 
     // Begin subplanning and multiplanning of the first branch. This results in a yield which releases the one and only reference
     // to the initial copy of the 'a_partial' IndexCatalogEntryImpl which owns the partial filter MatchExpression. On restore,
@@ -84,7 +93,10 @@ function testWildcardIndex(conn) {
     assert.commandWorked(coll.createIndex({"a.$**": 1}, {name: "a_wildcard"}));
     assert.commandWorked(coll.createIndex({b: 1}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    let pauseAfterFillingOutIndexEntries = configureFailPoint(conn, "pauseAfterFillingOutIndexEntries");
+    let pauseAfterFillingOutIndexEntries = configureFailPoint(
+        conn,
+        "pauseAfterFillingOutIndexEntries",
+    );
     const awaitQuery = startParallelShell(function () {
         const coll = db[jsTestName()];
         const res = coll
@@ -96,8 +108,12 @@ function testWildcardIndex(conn) {
     }, db.getMongo().port);
 
     pauseAfterFillingOutIndexEntries.wait();
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: "a_wildcard", hidden: true}}));
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: "a_wildcard", hidden: false}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: "a_wildcard", hidden: true}}),
+    );
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: "a_wildcard", hidden: false}}),
+    );
     pauseAfterFillingOutIndexEntries.off();
     awaitQuery();
 }
@@ -118,7 +134,10 @@ function testCollation(conn) {
     assert.commandWorked(coll.createIndex({a: 1}, {name: "a_collation", collation: collation}));
     assert.commandWorked(coll.createIndex({b: 1}, {collation: collation}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    let pauseAfterFillingOutIndexEntries = configureFailPoint(conn, "pauseAfterFillingOutIndexEntries");
+    let pauseAfterFillingOutIndexEntries = configureFailPoint(
+        conn,
+        "pauseAfterFillingOutIndexEntries",
+    );
     const awaitQuery = startParallelShell(function () {
         const coll = db[jsTestName()];
         const res = coll
@@ -132,8 +151,12 @@ function testCollation(conn) {
     }, db.getMongo().port);
 
     pauseAfterFillingOutIndexEntries.wait();
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: "a_collation", hidden: true}}));
-    assert.commandWorked(db.runCommand({collMod: collName, index: {name: "a_collation", hidden: false}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: "a_collation", hidden: true}}),
+    );
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: "a_collation", hidden: false}}),
+    );
     pauseAfterFillingOutIndexEntries.off();
     awaitQuery();
 }

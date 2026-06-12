@@ -32,7 +32,9 @@ function verifyShardedDataDistributionFor(nss, expectedDistribution) {
         nss = getTimeseriesCollForDDLOps(st.s.getDB(dbName), st.s.getCollection(nss)).getFullName();
     }
 
-    const aggregationResponse = adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).toArray();
+    const aggregationResponse = adminDb
+        .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}])
+        .toArray();
     assert.eq(1, aggregationResponse.length);
     const dataDistribution = aggregationResponse[0];
     assert.eq(dataDistribution.ns, nss);
@@ -56,8 +58,16 @@ st.adminCommand({enablesharding: dbName, primaryShard: primaryShard});
 st.adminCommand({shardcollection: emptyNss, key: {skey: 1}});
 st.adminCommand({shardcollection: nssWithDocs, key: {skey: 1}});
 
-st.adminCommand({shardcollection: emptyTimeseriesNss, key: {time: 1}, timeseries: {timeField: "time"}});
-st.adminCommand({shardcollection: timeseriesNssWithDocs, key: {time: 1}, timeseries: {timeField: "time"}});
+st.adminCommand({
+    shardcollection: emptyTimeseriesNss,
+    key: {time: 1},
+    timeseries: {timeField: "time"},
+});
+st.adminCommand({
+    shardcollection: timeseriesNssWithDocs,
+    key: {time: 1},
+    timeseries: {timeField: "time"},
+});
 
 // Insert data to validate the aggregation stage
 for (let i = 0; i < numDocs; i++) {
@@ -66,19 +76,26 @@ for (let i = 0; i < numDocs; i++) {
 
 for (let i = 0; i < numDocs; i++) {
     assert.commandWorked(
-        st.s.getCollection(timeseriesNssWithDocs).insertOne({"time": ISODate("2021-05-18T00:00:00.000Z"), "temp": i}),
+        st.s
+            .getCollection(timeseriesNssWithDocs)
+            .insertOne({"time": ISODate("2021-05-18T00:00:00.000Z"), "temp": i}),
     );
 }
 
 // Move the chunk of each collection twice, so that it visits each shard of the cluster.
 for (let destinationShardId of [temporaryDataShard, finalDataShard]) {
     for (let nss of [emptyNss, nssWithDocs]) {
-        assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {skey: 1}, to: destinationShardId}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: nss, find: {skey: 1}, to: destinationShardId}),
+        );
     }
     for (let nss of [timeseriesNssWithDocs, emptyTimeseriesNss]) {
         assert.commandWorked(
             st.s.adminCommand({
-                moveChunk: getTimeseriesCollForDDLOps(st.s.getDB(dbName), st.s.getCollection(nss)).getFullName(),
+                moveChunk: getTimeseriesCollForDDLOps(
+                    st.s.getDB(dbName),
+                    st.s.getCollection(nss),
+                ).getFullName(),
                 find: {"control.min.time": 1},
                 to: destinationShardId,
             }),
@@ -89,7 +106,9 @@ for (let destinationShardId of [temporaryDataShard, finalDataShard]) {
 // The empty collection will have transitioned through the shards of the cluster without leaving
 // orphans; verify that $shardedDataDistribution only returns information about the current data
 // shard.
-verifyShardedDataDistributionFor(emptyNss, [{shardName: finalDataShard, numOwnedDocuments: 0, numOrphanedDocs: 0}]);
+verifyShardedDataDistributionFor(emptyNss, [
+    {shardName: finalDataShard, numOwnedDocuments: 0, numOrphanedDocs: 0},
+]);
 
 // The non-empty collection, on the other hand, will have left orphan documents on each previous
 // data shard - and all the docs should be present on the current one.

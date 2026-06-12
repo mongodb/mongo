@@ -26,9 +26,15 @@ describe("$vectorSearch on non-existent collection", function () {
         ];
 
         // Non-explain query should succeed but return no documents
-        const res = assert.commandWorked(testDb.runCommand({aggregate: nonExistentCollName, pipeline, cursor: {}}));
+        const res = assert.commandWorked(
+            testDb.runCommand({aggregate: nonExistentCollName, pipeline, cursor: {}}),
+        );
 
-        assert.eq(res.cursor.firstBatch, [], "Expected empty result set for vector search on non-existent collection");
+        assert.eq(
+            res.cursor.firstBatch,
+            [],
+            "Expected empty result set for vector search on non-existent collection",
+        );
         assert.eq(res.cursor.id, 0, "Expected cursor to be exhausted");
     });
 
@@ -45,7 +51,12 @@ describe("$vectorSearch on non-existent collection", function () {
             },
         ];
 
-        const res = testDb.runCommand({aggregate: nonExistentCollName, pipeline, cursor: {}, explain: true});
+        const res = testDb.runCommand({
+            aggregate: nonExistentCollName,
+            pipeline,
+            cursor: {},
+            explain: true,
+        });
 
         if (FixtureHelpers.isMongos(testDb)) {
             // Sharded: returns EOF explain for non-existent namespace.

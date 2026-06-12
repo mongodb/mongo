@@ -79,7 +79,10 @@ assert.neq(null, collscan, tojson(explain));
 
 // Test that we do NOT swap a $match before a $project with $map that puts the values of a
 // non-dotted array path into a new dotted path.
-pipeline = [{$project: {x: {$map: {input: "$a", as: "iter", in: {y: "$$iter"}}}}}, {$match: {"x.y": [1]}}];
+pipeline = [
+    {$project: {x: {$map: {input: "$a", as: "iter", in: {y: "$$iter"}}}}},
+    {$match: {"x.y": [1]}},
+];
 assert.sameMembers([{_id: 0, x: [{y: [1]}]}], coll.aggregate(pipeline).toArray());
 explain = coll.explain().aggregate(pipeline);
 collscan = getAggPlanStage(explain, "COLLSCAN");
@@ -275,7 +278,10 @@ assert.neq(null, collscan, tojson(explain));
 // follows an "a" to "x" rename. When we move the match stage in front of the rename, the match
 // should also get rewritten to use "a.b.c" as its filter.
 pipeline = [{$project: {x: "$a"}}, {$match: {"x.b.c": 1}}];
-assert.eq([{_id: 0, x: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]}], coll.aggregate(pipeline).toArray());
+assert.eq(
+    [{_id: 0, x: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]}],
+    coll.aggregate(pipeline).toArray(),
+);
 explain = coll.explain().aggregate(pipeline);
 let ixscan = getAggPlanStage(explain, "IXSCAN");
 assert.neq(null, ixscan, tojson(explain));
@@ -284,7 +290,10 @@ assert.eq({"a.b.c": 1}, ixscan.keyPattern, tojson(ixscan));
 // Test that we do NOT move a $match on the subfield of a new path created by a $project with $map
 // that extracts sub-fields from an array path. The $map is not considered a rename because it can
 // change the shape of a document when the document contains arrays of arrays.
-pipeline = [{$project: {d: {$map: {input: "$a", as: "iter", in: {e: "$$iter.b"}}}}}, {$match: {"d.e.c": 7}}];
+pipeline = [
+    {$project: {d: {$map: {input: "$a", as: "iter", in: {e: "$$iter.b"}}}}},
+    {$match: {"d.e.c": 7}},
+];
 assert.sameMembers(
     [
         {_id: 1, d: [{e: [{c: 5}, {c: 6}]}, {e: [{c: 7}, {c: 8}]}]},

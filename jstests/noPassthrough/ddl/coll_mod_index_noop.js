@@ -56,7 +56,9 @@ assert.commandWorked(primaryColl.createIndex({c: 1}));
 assert.commandWorked(primaryColl.createIndex({d: 1}, {unique: true}));
 assert.commandWorked(primaryColl.createIndex({e: 1}, {hidden: true, unique: true}));
 assert.commandWorked(primaryColl.createIndex({f: 1}, {unique: true, expireAfterSeconds: 15}));
-assert.commandWorked(primaryColl.createIndex({g: 1}, {hidden: true, unique: true, expireAfterSeconds: 25}));
+assert.commandWorked(
+    primaryColl.createIndex({g: 1}, {hidden: true, unique: true, expireAfterSeconds: 25}),
+);
 assert.commandWorked(primaryColl.createIndex({h: 1}, {prepareUnique: true}));
 
 // Hiding a non-hidden index will generate the oplog entry with a 'hidden_old: false'.
@@ -107,7 +109,9 @@ assert.eq(idxSpec.expireAfterSeconds, 10);
 // Validate that if both 'unique' and 'hidden' options are specified but the 'hidden'
 // option is a no-op, the operation as a whole will NOT be a no-op - instead, it will generate an
 // oplog entry with only 'unique'. Ditto for the command result returned to the user.
-assert.commandWorked(primaryDB.runCommand({collMod: collName, index: {keyPattern: {c: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    primaryDB.runCommand({collMod: collName, index: {keyPattern: {c: 1}, prepareUnique: true}}),
+);
 assert.commandFailedWithCode(
     primaryDB.runCommand({
         "collMod": primaryColl.getName(),

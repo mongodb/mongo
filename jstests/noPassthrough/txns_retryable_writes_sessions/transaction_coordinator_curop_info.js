@@ -34,7 +34,9 @@ function commitTxn(st, lsid, txnNumber, expectedError = null) {
 }
 
 function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
-    jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to be entered ${timesEntered} time(s).`);
+    jsTest.log(
+        `waiting for failpoint '${failPoint.failPointName}' to be entered ${timesEntered} time(s).`,
+    );
     if (timesEntered > 1) {
         const expectedLog = "Hit " + failPoint.failPointName + " failpoint";
         waitForFailpoint(expectedLog, timesEntered);
@@ -43,9 +45,13 @@ function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
     }
 
     jsTest.log(`Running curOp operation after '${failPoint.failPointName}' failpoint.`);
-    let result = adminDB.aggregate([{$currentOp: {"idleConnections": true}}, {$match: filter}]).toArray();
+    let result = adminDB
+        .aggregate([{$currentOp: {"idleConnections": true}}, {$match: filter}])
+        .toArray();
 
-    jsTest.log(`${result.length} matching curOp entries after '${failPoint.failPointName}':\n${tojson(result)}`);
+    jsTest.log(
+        `${result.length} matching curOp entries after '${failPoint.failPointName}':\n${tojson(result)}`,
+    );
 
     jsTest.log(`disable '${failPoint.failPointName}' failpoint.`);
     failPoint.off();
@@ -61,7 +67,9 @@ function makeWorkerFilterWithAction(session, action, txnNumber, txnRetryCounter)
         "twoPhaseCommitCoordinator.startTime": {$exists: true},
     };
 
-    Object.assign(filter, {"twoPhaseCommitCoordinator.txnRetryCounter": NumberInt(txnRetryCounter)});
+    Object.assign(filter, {
+        "twoPhaseCommitCoordinator.txnRetryCounter": NumberInt(txnRetryCounter),
+    });
 
     return filter;
 }
@@ -111,7 +119,9 @@ const failPointNames = [
     "hangBeforeSendingAbort",
 ];
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant.shardName}));
@@ -157,16 +167,42 @@ jsTest.log("Testing that coordinator threads show up in currentOp for a commit d
     );
     assert.eq(1, writeParticipantOp.length);
 
-    const sendPrepareFilter = makeWorkerFilterWithAction(session, "sendingPrepare", txnNumber, txnRetryCounter);
-    let sendPrepareOp = curOpAfterFailpoint(failPoints["hangBeforeSendingPrepare"], sendPrepareFilter, numShards);
+    const sendPrepareFilter = makeWorkerFilterWithAction(
+        session,
+        "sendingPrepare",
+        txnNumber,
+        txnRetryCounter,
+    );
+    let sendPrepareOp = curOpAfterFailpoint(
+        failPoints["hangBeforeSendingPrepare"],
+        sendPrepareFilter,
+        numShards,
+    );
     assert.eq(numShards, sendPrepareOp.length);
 
-    const writingDecisionFilter = makeWorkerFilterWithAction(session, "writingDecision", txnNumber, txnRetryCounter);
-    let writeDecisionOp = curOpAfterFailpoint(failPoints["hangBeforeWritingDecision"], writingDecisionFilter);
+    const writingDecisionFilter = makeWorkerFilterWithAction(
+        session,
+        "writingDecision",
+        txnNumber,
+        txnRetryCounter,
+    );
+    let writeDecisionOp = curOpAfterFailpoint(
+        failPoints["hangBeforeWritingDecision"],
+        writingDecisionFilter,
+    );
     assert.eq(1, writeDecisionOp.length);
 
-    const sendCommitFilter = makeWorkerFilterWithAction(session, "sendingCommit", txnNumber, txnRetryCounter);
-    let sendCommitOp = curOpAfterFailpoint(failPoints["hangBeforeSendingCommit"], sendCommitFilter, numShards);
+    const sendCommitFilter = makeWorkerFilterWithAction(
+        session,
+        "sendingCommit",
+        txnNumber,
+        txnRetryCounter,
+    );
+    let sendCommitOp = curOpAfterFailpoint(
+        failPoints["hangBeforeSendingCommit"],
+        sendCommitFilter,
+        numShards,
+    );
     assert.eq(numShards, sendCommitOp.length);
 
     const deletingCoordinatorFilter = makeWorkerFilterWithAction(
@@ -205,8 +241,17 @@ jsTest.log("Testing that coordinator threads show up in currentOp for an abort d
 
     let commitJoin = commitTxn(st, lsid, txnNumber, ErrorCodes.NoSuchTransaction);
 
-    const sendAbortFilter = makeWorkerFilterWithAction(session, "sendingAbort", txnNumber, txnRetryCounter);
-    let sendingAbortOp = curOpAfterFailpoint(failPoints["hangBeforeSendingAbort"], sendAbortFilter, numShards);
+    const sendAbortFilter = makeWorkerFilterWithAction(
+        session,
+        "sendingAbort",
+        txnNumber,
+        txnRetryCounter,
+    );
+    let sendingAbortOp = curOpAfterFailpoint(
+        failPoints["hangBeforeSendingAbort"],
+        sendAbortFilter,
+        numShards,
+    );
     assert.eq(numShards, sendingAbortOp.length);
 
     commitJoin();

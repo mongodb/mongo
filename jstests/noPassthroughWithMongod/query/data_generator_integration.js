@@ -116,19 +116,29 @@ try {
     const true_with_bool = db[collName]
         .find({"field1": {"$eq": true}, "field2": {"$type": "bool"}}, {"_id": 0})
         .toArray();
-    assert(true_with_bool.every((item) => item.field2) || true_with_bool.every((item) => !item.field2), true_with_bool);
-
-    const false_with_bool = db[collName].find({"field1": {"$eq": false}, "field2": {"$type": "bool"}}).toArray();
     assert(
-        false_with_bool.every((item) => item.field2) || false_with_bool.every((item) => !item.field2),
+        true_with_bool.every((item) => item.field2) || true_with_bool.every((item) => !item.field2),
+        true_with_bool,
+    );
+
+    const false_with_bool = db[collName]
+        .find({"field1": {"$eq": false}, "field2": {"$type": "bool"}})
+        .toArray();
+    assert(
+        false_with_bool.every((item) => item.field2) ||
+            false_with_bool.every((item) => !item.field2),
         false_with_bool,
     );
 
     // If the field2's value is an int, it is not correlated with field1, and thus among documents were
     // field1 has value x, 1 and 2 are both expected to be present in field2.
 
-    const true_with_int = db[collName].find({"field1": {"$eq": true}, "field2": {"$type": "int"}}).toArray();
-    const false_with_int = db[collName].find({"field1": {"$eq": false}, "field2": {"$type": "int"}}).toArray();
+    const true_with_int = db[collName]
+        .find({"field1": {"$eq": true}, "field2": {"$type": "int"}})
+        .toArray();
+    const false_with_int = db[collName]
+        .find({"field1": {"$eq": false}, "field2": {"$type": "int"}})
+        .toArray();
 
     assert(
         true_with_int.some((item) => item.field2 === 1),
@@ -164,15 +174,21 @@ try {
     // False values in gXfield2 should still exist if gYfield2 has a lower value.
     // Omit documents where the gXfield1 is on the boundary between when true values become false
     // because the corresponding value of gXfield2 is arbitrary.
-    const data = db[collName].find({"g1field1": {"$ne": 5}, "g2field1": {"$ne": 6}}, {"_id": 0}).toArray();
+    const data = db[collName]
+        .find({"g1field1": {"$ne": 5}, "g2field1": {"$ne": 6}}, {"_id": 0})
+        .toArray();
 
     assert(
-        data.every((item) => (item.g1field1 < 5 ? item.g1field2 === true : item.g1field2 === false)),
+        data.every((item) =>
+            item.g1field1 < 5 ? item.g1field2 === true : item.g1field2 === false,
+        ),
         data,
     );
 
     assert(
-        data.every((item) => (item.g2field1 < 6 ? item.g2field2 === true : item.g2field2 === false)),
+        data.every((item) =>
+            item.g2field1 < 6 ? item.g2field2 === true : item.g2field2 === false,
+        ),
         data,
     );
 

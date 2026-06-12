@@ -44,12 +44,21 @@ assert.eq(
 );
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
-    filter: {op: "query", ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}},
+    filter: {
+        op: "query",
+        ns: collNS,
+        "command.comment": "TEST",
+        "command.filter.$comment": {b: "TEST"},
+    },
 });
 
 // TEST CASE: Verify that find command with a non-string comment parameter gets propagated.
 assert.commandWorked(
-    mongosDB.runCommand({"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST_BSONOBJ"}}),
+    mongosDB.runCommand({
+        "find": mongosColl.getName(),
+        "filter": {a: 1},
+        "comment": {b: "TEST_BSONOBJ"},
+    }),
 );
 
 profilerHasSingleMatchingEntryOrThrow({

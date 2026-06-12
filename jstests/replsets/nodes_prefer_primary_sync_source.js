@@ -19,7 +19,11 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {DataCenter, delayMessagesBetweenDataCenters, forceSyncSource} from "jstests/replsets/libs/sync_source.js";
+import {
+    DataCenter,
+    delayMessagesBetweenDataCenters,
+    forceSyncSource,
+} from "jstests/replsets/libs/sync_source.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 const changeSyncSourceThresholdMillis = 50;
@@ -57,7 +61,11 @@ const [testNode, secondary, farSecondary] = rst.getSecondaries();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 
@@ -154,7 +162,8 @@ assert.soon(() => {
     // ping time to that node is at least 'changeSyncSourceThresholdMillis' less than the ping time
     // to our current sync source.
     const primaryPingTime = replSetGetStatus.members[0].pingMs;
-    const exceedsChangeSyncSourceThreshold = syncSourcePingTime - primaryPingTime > changeSyncSourceThresholdMillis;
+    const exceedsChangeSyncSourceThreshold =
+        syncSourcePingTime - primaryPingTime > changeSyncSourceThresholdMillis;
 
     if (!exceedsChangeSyncSourceThreshold) {
         jsTestLog(

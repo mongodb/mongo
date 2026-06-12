@@ -63,7 +63,8 @@ function check(client, pre, post, {appName, expectCleanUp, expectedNumKilled}) {
 
     // Measure 'killedDueToClientDisconnect' before and after.
     const getNumKilled = () =>
-        client.getDB("admin").runCommand({serverStatus: 1}).metrics.operation.killedDueToClientDisconnect;
+        client.getDB("admin").runCommand({serverStatus: 1}).metrics.operation
+            .killedDueToClientDisconnect;
     const numKilledBefore = getNumKilled();
 
     try {
@@ -152,7 +153,9 @@ function testUnsendableCompletedResponsesCounted(client) {
     assert.commandWorked(conn.adminCommand({ping: 1}));
 
     // Ensure that after the next command completes, the server fails to send the response.
-    let fp = configureFailPoint(client, "sessionWorkflowDelayOrFailSendMessage", {appName: kTestName + id});
+    let fp = configureFailPoint(client, "sessionWorkflowDelayOrFailSendMessage", {
+        appName: kTestName + id,
+    });
 
     // Should fail because the server will close the connection after receiving a simulated network
     // error sinking the response to the client.
@@ -171,7 +174,9 @@ function runTests(client) {
 
     // set timeout for js function execution to 100 ms to speed up tests that run inf loop.
     assert.commandWorked(
-        client.getDB(kTestName).adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}),
+        client
+            .getDB(kTestName)
+            .adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}),
     );
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 1}));
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 2}));
@@ -231,8 +236,12 @@ function runTests(client) {
             expectedNumKilled: 1,
             command: (client) => {
                 const testDB = client.getDB(kTestName);
-                const result = assert.commandWorked(testDB.runCommand({find: "test", filter: {}, batchSize: 0}));
-                assert.commandWorked(testDB.runCommand({getMore: result.cursor.id, collection: "test"}));
+                const result = assert.commandWorked(
+                    testDB.runCommand({find: "test", filter: {}, batchSize: 0}),
+                );
+                assert.commandWorked(
+                    testDB.runCommand({getMore: result.cursor.id, collection: "test"}),
+                );
             },
         });
     }

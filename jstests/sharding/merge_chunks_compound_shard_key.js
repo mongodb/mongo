@@ -18,7 +18,9 @@ let checkMergeWorked = function (lowerBound, upperBound) {
     let oldVersion = getShardVersion();
     let numChunksBefore = chunks.find().itcount();
 
-    assert.commandWorked(admin.runCommand({mergeChunks: coll + "", bounds: [lowerBound, upperBound]}));
+    assert.commandWorked(
+        admin.runCommand({mergeChunks: coll + "", bounds: [lowerBound, upperBound]}),
+    );
 
     assert.eq(numChunksBefore - 1, chunks.find().itcount());
     assert.eq(1, chunks.find({min: lowerBound, max: upperBound}).itcount());
@@ -37,7 +39,9 @@ var chunks = mongos.getCollection("config.chunks");
 var coll = mongos.getCollection("foo.bar");
 
 jsTest.log("Create a sharded collection with a compound shard key.");
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {x: 1, y: 1}}));
 
 // Chunks after splits:

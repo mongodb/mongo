@@ -118,7 +118,9 @@ function setupSearchQuery(
             response,
         };
 
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: [history]}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: [history]}),
+        );
     }
     return searchQuery;
 }
@@ -193,7 +195,9 @@ function searchWithLookup({localField, times}) {
         1,
     );
 
-    const lookupCursor = collBase.aggregate(makeLookupSearchPipeline(coll.getName(), lookupSearchQuery, localField));
+    const lookupCursor = collBase.aggregate(
+        makeLookupSearchPipeline(coll.getName(), lookupSearchQuery, localField),
+    );
 
     const lookupExpected = [
         {"localField": "cakes", "weird": false, "cake_data": [{"ref_id": 1}]},
@@ -203,10 +207,14 @@ function searchWithLookup({localField, times}) {
 }
 
 // Testing $lookup without cache optimization.
-assert.commandWorked(db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}),
+);
 searchWithLookup({localField: false, times: 2});
 searchWithLookup({localField: true, times: 2});
-assert.commandWorked(db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "off"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "off"}),
+);
 
 // Testing $lookup with optimizations on. $lookup executes $search once.
 searchWithLookup({localField: false, times: 1});
@@ -546,7 +554,10 @@ setupSearchQuery(
 );
 // Assert multiple search-type stages are allowed.
 const union2Result = coll
-    .aggregate([{$search: cookiesQuery}, {$unionWith: {coll: coll.getName(), pipeline: [{$search: unionSearchQuery}]}}])
+    .aggregate([
+        {$search: cookiesQuery},
+        {$unionWith: {coll: coll.getName(), pipeline: [{$search: unionSearchQuery}]}},
+    ])
     .toArray();
 const union2SearchExpected = [
     {
@@ -619,13 +630,22 @@ result = assert.commandWorked(
         pipeline: [
             {$search: searchMetaTestGenericQuery},
             {$project: {_id: 1, meta: "$$SEARCH_META"}},
-            {$unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: searchMetaTestGenericQuery}]}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: searchMetaTestGenericQuery}],
+                },
+            },
         ],
         cursor: {},
     }),
 );
 
-const searchMetaTestExpected1 = [{_id: 1, meta: {value: "outer"}}, {_id: 2, meta: {value: "outer"}}, {value: "inner"}];
+const searchMetaTestExpected1 = [
+    {_id: 1, meta: {value: "outer"}},
+    {_id: 2, meta: {value: "outer"}},
+    {value: "inner"},
+];
 assert.sameMembers(result.cursor.firstBatch, searchMetaTestExpected1);
 
 // Same query as last test.
@@ -645,7 +665,12 @@ result = assert.commandWorked(
         aggregate: coll.getName(),
         pipeline: [
             {$searchMeta: searchMetaTestGenericQuery},
-            {$unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: searchMetaTestGenericQuery}]}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: searchMetaTestGenericQuery}],
+                },
+            },
         ],
         cursor: {},
     }),
@@ -672,14 +697,28 @@ result = assert.commandWorked(
             {$search: searchMetaTestGenericQuery},
             {$match: {_id: 1}},
             {$project: {_id: 1, title: 1, meta: "$$SEARCH_META"}},
-            {$unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: searchMetaTestGenericQuery}]}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: searchMetaTestGenericQuery}],
+                },
+            },
             {$sort: {_id: 1}}, // Arbitrary unrelated stage.
-            {$unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: searchMetaTestGenericQuery}]}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: searchMetaTestGenericQuery}],
+                },
+            },
         ],
         cursor: {},
     }),
 );
-const searchMetaTestExpected3 = [{_id: 1, title: "cakes", meta: {value: "outer"}}, {value: "first"}, {value: "second"}];
+const searchMetaTestExpected3 = [
+    {_id: 1, title: "cakes", meta: {value: "outer"}},
+    {value: "first"},
+    {value: "second"},
+];
 assert.sameMembers(result.cursor.firstBatch, searchMetaTestExpected3);
 
 // Top level $$SEARCH_META is out of scope after $unionWith.
@@ -689,10 +728,20 @@ assert.commandFailedWithCode(
         pipeline: [
             {$search: searchMetaTestGenericQuery},
             {$match: {_id: 1}},
-            {$unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: searchMetaTestGenericQuery}]}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: searchMetaTestGenericQuery}],
+                },
+            },
             {$project: {_id: 1, title: 1, meta: "$$SEARCH_META"}},
             {$sort: {_id: 1}}, // Arbitrary unrelated stage.
-            {$unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: searchMetaTestGenericQuery}]}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: searchMetaTestGenericQuery}],
+                },
+            },
         ],
         cursor: {},
     }),
@@ -748,7 +797,9 @@ const viewSearchQuery2 = setupSearchQuery(
 view1.drop();
 assert.commandWorked(db.createView(view1.getName(), coll.getName(), [{$search: viewSearchQuery2}]));
 
-const lookupViewSearchCursor = collBase.aggregate(makeLookupPipeline(view1.getName(), {$project: {_id: 1, title: 1}}));
+const lookupViewSearchCursor = collBase.aggregate(
+    makeLookupPipeline(view1.getName(), {$project: {_id: 1, title: 1}}),
+);
 
 const lookupViewSearchExpected = [
     {"localField": "cakes", "weird": false, "cake_data": [{"ref_id": 1}]},
@@ -771,7 +822,10 @@ const nestedLookupQuery = setupSearchQuery(
 );
 
 const nestedInternalPipeline = makeLookupSearchPipeline(coll.getName(), nestedLookupQuery);
-nestedInternalPipeline.push({$unwind: "$cake_data"}, {$match: {$expr: {$eq: ["$cake_data.ref_id", "$$local_ref_id"]}}});
+nestedInternalPipeline.push(
+    {$unwind: "$cake_data"},
+    {$match: {$expr: {$eq: ["$cake_data.ref_id", "$$local_ref_id"]}}},
+);
 const nestedLookupPipeline = [
     {
         $lookup: {
@@ -812,7 +866,9 @@ const lookupSearchViewQuery = setupSearchQuery(
     ],
     1,
     false,
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "MongotIndexedViews") ? view1.getName() : null, // view object is only included in the request to mongot if the feature flag to
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "MongotIndexedViews")
+        ? view1.getName()
+        : null, // view object is only included in the request to mongot if the feature flag to
     // enable mongot indexing on views is enabled
 );
 view1.drop();
@@ -916,7 +972,8 @@ assert.commandWorked(
 
 // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
 if (
-    (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) ||
+    (checkSbeRestrictedOrFullyEnabled(db) &&
+        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) ||
     !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchExplainExecutionStats")
 ) {
     jsTestLog(
@@ -968,12 +1025,15 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
             explainObj,
         );
 
-        const explainResult = collBase
-            .explain(currentVerbosity)
-            .aggregate([
-                {$project: {"localField": 1, "_id": 0}},
-                {$unionWith: {coll: coll.getName(), pipeline: [{$search: unionSearchQueryExplain}]}},
-            ]);
+        const explainResult = collBase.explain(currentVerbosity).aggregate([
+            {$project: {"localField": 1, "_id": 0}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$search: unionSearchQueryExplain}],
+                },
+            },
+        ]);
         const unionWithStage = getAggPlanStage(explainResult, "$unionWith");
         assert.neq(unionWithStage, null, explainResult);
         assert(unionWithStage.hasOwnProperty("nReturned"));
@@ -1027,7 +1087,10 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
         const explainResult = coll.explain(currentVerbosity).aggregate([
             {$match: {_id: 1}},
             {
-                $unionWith: {coll: coll.getName(), pipeline: [{$searchMeta: unionSubSearchMetaExplain}]},
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$searchMeta: unionSubSearchMetaExplain}],
+                },
             },
         ]);
 
@@ -1066,7 +1129,13 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
 
         const explainResult = collBase
             .explain(currentVerbosity)
-            .aggregate(makeLookupSearchPipeline(coll.getName(), lookupSearchQueryExplain, false /*localField*/));
+            .aggregate(
+                makeLookupSearchPipeline(
+                    coll.getName(),
+                    lookupSearchQueryExplain,
+                    false /*localField*/,
+                ),
+            );
         // $lookup doesn't include the stats of the stages in its subpipeline, so the search
         // explain results cannot be checked. We check that the lookup stage returned results.
         const lookupStage = getAggPlanStage(explainResult, "$lookup");

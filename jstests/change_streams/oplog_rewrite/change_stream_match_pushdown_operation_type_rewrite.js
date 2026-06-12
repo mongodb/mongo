@@ -61,7 +61,9 @@ assert.commandWorked(coll.deleteOne({_id: 1}));
 assert.commandWorked(coll.deleteOne({_id: 2}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.runCommand({collMod: coll.getName(), index: {keyPattern: {a: 1}, hidden: true}}));
+assert.commandWorked(
+    coll.runCommand({collMod: coll.getName(), index: {keyPattern: {a: 1}, hidden: true}}),
+);
 assert.commandWorked(coll.dropIndex({a: 1}));
 assert(coll.drop());
 
@@ -97,7 +99,11 @@ verifyOnWholeCluster(
 verifyOnWholeCluster({$match: {operationType: 1}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on the operation type unknown is rewritten correctly.
-verifyOnWholeCluster({$match: {operationType: "unknown"}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    {$match: {operationType: "unknown"}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 
 // Ensure that the '$match' on an empty string operation type is rewritten correctly.
 verifyOnWholeCluster({$match: {operationType: ""}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
@@ -157,10 +163,18 @@ verifyOnWholeCluster(
 );
 
 // Ensure that the '$match' with '$in' on an unknown operation type is rewritten correctly.
-verifyOnWholeCluster({$match: {operationType: {$in: ["unknown"]}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    {$match: {operationType: {$in: ["unknown"]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 
 // Ensure that the '$match' with '$in' with operation type as number is rewritten correctly.
-verifyOnWholeCluster({$match: {operationType: {$in: [1]}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    {$match: {operationType: {$in: [1]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */,
+);
 
 // Ensure that the '$match' with '$in' with operation type as a string and a regex cannot be
 // rewritten. The oplog cursor should return '4' documents for each shard.

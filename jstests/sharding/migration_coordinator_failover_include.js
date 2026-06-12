@@ -51,7 +51,10 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
         // on each node in case configsvr is also acting as the donor in this test.
         st.configRS.nodes.forEach((node) => {
             assert.commandWorked(
-                node.adminCommand({configureFailPoint: "migrationCommitVersionError", mode: "alwaysOn"}),
+                node.adminCommand({
+                    configureFailPoint: "migrationCommitVersionError",
+                    mode: "alwaysOn",
+                }),
             );
         });
     }
@@ -68,7 +71,9 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
                             expectAbortDecisionWithCode,
                         );
                     } else {
-                        assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+                        assert.commandWorked(
+                            db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                        );
                     }
                     return true;
                 }, ErrorCodes.FailedToSatisfyReadPreference);
@@ -94,12 +99,16 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
     if (expectAbortDecisionWithCode) {
         jsTest.log("Expect abort decision, so wait for recipient range deletion to complete.");
         assert.soon(() => {
-            return 0 === st.rs1.getPrimary().getDB("config").getCollection("rangeDeletions").count();
+            return (
+                0 === st.rs1.getPrimary().getDB("config").getCollection("rangeDeletions").count()
+            );
         });
     } else {
         jsTest.log("Expect commit decision, so wait for donor range deletion to complete.");
         assert.soon(() => {
-            return 0 === st.rs0.getPrimary().getDB("config").getCollection("rangeDeletions").count();
+            return (
+                0 === st.rs0.getPrimary().getDB("config").getCollection("rangeDeletions").count()
+            );
         });
     }
 
@@ -114,13 +123,17 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
 
     jsTest.log("Wait for the donor to delete the migration coordinator doc");
     assert.soon(() => {
-        return 0 === st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").count();
+        return (
+            0 === st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").count()
+        );
     });
 
     if (shouldMakeMigrationFailToCommitOnConfig) {
         // Turn off the failpoint on the config server before returning.
         st.configRS.nodes.forEach((node) => {
-            assert.commandWorked(node.adminCommand({configureFailPoint: "migrationCommitVersionError", mode: "off"}));
+            assert.commandWorked(
+                node.adminCommand({configureFailPoint: "migrationCommitVersionError", mode: "off"}),
+            );
         });
     }
 }

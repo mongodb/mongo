@@ -17,7 +17,10 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/ki
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.listCollections = function listCollections(unusedDB, _) {
         const db = unusedDB.getSiblingDB(this.uniqueDBName);
-        const cmdRes = db.runCommand({listCollections: 1, cursor: {batchSize: $config.data.batchSize}});
+        const cmdRes = db.runCommand({
+            listCollections: 1,
+            cursor: {batchSize: $config.data.batchSize},
+        });
         assert.commandWorked(cmdRes);
         this.cursor = new DBCommandCursor(db, cmdRes);
     };
@@ -25,7 +28,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.listIndexes = function listIndexes(unusedDB, _) {
         const db = unusedDB.getSiblingDB(this.uniqueDBName);
         const targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
-        const cmdRes = db.runCommand({listIndexes: targetCollName, cursor: {batchSize: $config.data.batchSize}});
+        const cmdRes = db.runCommand({
+            listIndexes: targetCollName,
+            cursor: {batchSize: $config.data.batchSize},
+        });
         // We expect this might fail if the namespace does not exist, otherwise it should always
         // succeed.
         if (cmdRes.code != ErrorCodes.NamespaceNotFound) {

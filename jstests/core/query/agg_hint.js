@@ -21,7 +21,12 @@ const coll = testDB.getCollection(collName);
 const viewName = jsTestName() + "_view";
 const view = testDB.getCollection(viewName);
 
-function confirmWinningPlanUsesExpectedIndex(explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
+function confirmWinningPlanUsesExpectedIndex(
+    explainResult,
+    expectedKeyPattern,
+    stageName,
+    pipelineOptimizedAway,
+) {
     const planStages = pipelineOptimizedAway
         ? getPlanStages(explainResult, stageName)
         : getAggPlanStages(explainResult, stageName);
@@ -45,7 +50,9 @@ function confirmCommandUsesIndex({
     if (hintKeyPattern) {
         command["hint"] = hintKeyPattern;
     }
-    const res = assert.commandWorked(testDB.runCommand({explain: command, verbosity: "queryPlanner"}));
+    const res = assert.commandWorked(
+        testDB.runCommand({explain: command, verbosity: "queryPlanner"}),
+    );
     confirmWinningPlanUsesExpectedIndex(res, expectedKeyPattern, stageName, pipelineOptimizedAway);
 }
 

@@ -60,7 +60,10 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     const insertSessionCollection = insertSession
         .getDatabase(sourceCollection.getDB().getName())
         .getCollection(sourceCollection.getName());
-    const insertDuringReshardingSession = mongos.startSession({causalConsistency: false, retryWrites: false});
+    const insertDuringReshardingSession = mongos.startSession({
+        causalConsistency: false,
+        retryWrites: false,
+    });
     const insertDuringReshardingSessionCollection = insertDuringReshardingSession
         .getDatabase(sourceCollection.getDB().getName())
         .getCollection(sourceCollection.getName());
@@ -109,7 +112,11 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         expectedUpdateErrorCode = ErrorCodes.OK,
         expectedInsertErrorCode = ErrorCodes.OK,
     ) {
-        RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, expectedUpdateErrorCode);
+        RetryableWritesUtil.runRetryableWrite(
+            sessionCollection,
+            updateCommand,
+            expectedUpdateErrorCode,
+        );
 
         const updateDocs = sourceCollection.find({counter: {$exists: true}}).toArray();
         assert.eq(2, updateDocs.length, {updateDocs});
@@ -123,7 +130,11 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         }
 
         // If an insert runs more than once, we'll get a DuplicateKeyError.
-        RetryableWritesUtil.runRetryableWrite(insertSessionCollection, insertCommand, expectedInsertErrorCode);
+        RetryableWritesUtil.runRetryableWrite(
+            insertSessionCollection,
+            insertCommand,
+            expectedInsertErrorCode,
+        );
         const insertDocs = sourceCollection.find({tag: "before"}).toArray();
         assert.eq(8, insertDocs.length, {insertDocs});
 
@@ -201,12 +212,19 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             const elapsed = Date.now() - startTime;
             assert.gt(elapsed, minimumOperationDurationMS - epsilon);
 
-            const updateExpectedCode = !uweEnabled ? ErrorCodes.OK : ErrorCodes.IncompleteTransactionHistory;
-            runRetryableWrites("during resharding after collection cloning had finished", updateExpectedCode);
+            const updateExpectedCode = !uweEnabled
+                ? ErrorCodes.OK
+                : ErrorCodes.IncompleteTransactionHistory;
+            runRetryableWrites(
+                "during resharding after collection cloning had finished",
+                updateExpectedCode,
+            );
         },
     );
 
-    const updateExpectedCode = !uweEnabled ? ErrorCodes.OK : ErrorCodes.IncompleteTransactionHistory;
+    const updateExpectedCode = !uweEnabled
+        ? ErrorCodes.OK
+        : ErrorCodes.IncompleteTransactionHistory;
     const insertExpectedCode = ErrorCodes.IncompleteTransactionHistory;
     runRetryableWrites("after resharding", updateExpectedCode, insertExpectedCode);
 

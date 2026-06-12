@@ -28,7 +28,9 @@ function testLogStage({
     assert.commandWorked(db.adminCommand({clearLog: "global"}));
 
     // Run the aggregation with the $log stage.
-    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+    );
 
     // First check the correct number of info log lines were printed.
     let infoLogs = checkLog.getFilteredLogMessages(db, 11134004, {}, "I");

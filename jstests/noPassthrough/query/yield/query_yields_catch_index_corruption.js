@@ -79,7 +79,10 @@ function createDanglingIndexEntry(doc) {
     // prepare conflicts by default and that exempts them from checking this assertion. Only writes
     // and reads in multi-document transactions enforce prepare conflicts and should encounter this
     // assertion.
-    assert.commandFailedWithCode(coll.update(doc, {$set: {c: 1}}), ErrorCodes.DataCorruptionDetected);
+    assert.commandFailedWithCode(
+        coll.update(doc, {$set: {c: 1}}),
+        ErrorCodes.DataCorruptionDetected,
+    );
 
     const session = db.getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);

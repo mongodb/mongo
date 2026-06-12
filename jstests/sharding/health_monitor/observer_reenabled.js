@@ -40,7 +40,9 @@ function waitForState(state) {
 
 function changeObserverIntensity(observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
-    assert.commandWorked(st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}));
+    assert.commandWorked(
+        st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}),
+    );
 }
 
 jsTestLog("Wait for initial health checks to complete.");

@@ -213,11 +213,15 @@ function commandInfosRetryableFindAndModify(collection) {
     ];
 }
 
-jsTest.log("Insert documents without a session into a sharded cluster, using internal transactions test command.");
+jsTest.log(
+    "Insert documents without a session into a sharded cluster, using internal transactions test command.",
+);
 runTxn(st.s, commandInfosSingleInsert, stColl);
 runTxn(st.s, commandInfosBatchInsert, stColl);
 
-jsTest.log("Insert documents without a session into a replica set, using internal transactions test command.");
+jsTest.log(
+    "Insert documents without a session into a replica set, using internal transactions test command.",
+);
 runTxn(primary, commandInfosSingleInsert, rstColl);
 runTxn(primary, commandInfosBatchInsert, rstColl);
 

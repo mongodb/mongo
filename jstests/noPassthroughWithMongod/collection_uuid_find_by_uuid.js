@@ -10,4 +10,7 @@ const uuid = assert
     .commandWorked(db.runCommand({listCollections: 1}))
     .cursor.firstBatch.find((c) => c.name === coll.getName()).info.uuid;
 
-assert.commandFailedWithCode(db.runCommand({find: uuid, collectionUUID: uuid}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({find: uuid, collectionUUID: uuid}),
+    ErrorCodes.InvalidOptions,
+);

@@ -50,7 +50,9 @@ assert.commandWorked(db.coll.insertMany(docs));
 
 // Collection with a clustered index.
 db.clusteredColl.drop();
-db.createCollection("clusteredColl", {clusteredIndex: {key: {stringIndex: 1}, unique: true, name: "clustered_index"}});
+db.createCollection("clusteredColl", {
+    clusteredIndex: {key: {stringIndex: 1}, unique: true, name: "clustered_index"},
+});
 db.clusteredColl.insertMany(docs);
 
 //*********************************************************

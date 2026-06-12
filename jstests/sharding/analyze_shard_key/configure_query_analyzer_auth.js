@@ -18,7 +18,9 @@ function testConfigureQueryAnalyzer(conn) {
     const otherDbName = "otherTestDb";
 
     const adminDb = conn.getDB("admin");
-    assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}),
+    );
     assert(adminDb.auth("super", "super"));
     QuerySamplingUtil.awaitHMACKeys(conn);
     const testDb = adminDb.getSiblingDB(dbName);
@@ -51,7 +53,12 @@ function testConfigureQueryAnalyzer(conn) {
         adminDb.runCommand({
             createRole: "role_ns0_priv",
             roles: [],
-            privileges: [{resource: {db: dbName, collection: collName0}, actions: ["configureQueryAnalyzer"]}],
+            privileges: [
+                {
+                    resource: {db: dbName, collection: collName0},
+                    actions: ["configureQueryAnalyzer"],
+                },
+            ],
         }),
     );
     assert.commandWorked(
@@ -65,7 +72,9 @@ function testConfigureQueryAnalyzer(conn) {
     // Verify that the user is authorized to run the configureQueryAnalyzer command against ns0
     // but not ns1.
     assert(adminDb.auth("user_with_explicit_ns0_priv", "pwd"));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}),
+    );
     assert.commandFailedWithCode(
         adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
         ErrorCodes.Unauthorized,
@@ -85,23 +94,39 @@ function testConfigureQueryAnalyzer(conn) {
     // Verify that the user is authorized to run the configureQueryAnalyzer command against both
     // ns0 and ns1.
     assert(adminDb.auth("user_cluster_mgr", "pwd"));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}),
+    );
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
+    );
     assert(adminDb.logout());
 
     // Set up a user with the 'dbAdmin' role.
     assert(adminDb.auth("super", "super"));
     assert.commandWorked(
-        adminDb.runCommand({createUser: "user_db_admin", pwd: "pwd", roles: [{role: "dbAdmin", db: dbName}]}),
+        adminDb.runCommand({
+            createUser: "user_db_admin",
+            pwd: "pwd",
+            roles: [{role: "dbAdmin", db: dbName}],
+        }),
     );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the configureQueryAnalyzer command against both
     // ns0 and ns1 but not against a ns in some other database.
     assert(adminDb.auth("user_db_admin", "pwd"));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}),
+    );
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
+    );
     assert.commandFailedWithCode(
-        adminDb.runCommand({"configureQueryAnalyzer": otherDbName + collName0, mode, samplesPerSecond}),
+        adminDb.runCommand({
+            "configureQueryAnalyzer": otherDbName + collName0,
+            mode,
+            samplesPerSecond,
+        }),
         ErrorCodes.Unauthorized,
     );
     assert(adminDb.logout());
@@ -116,7 +141,11 @@ function testRefreshQueryAnalyzerConfiguration(conn) {
     assert(adminDb.auth("super", "super"));
     QuerySamplingUtil.awaitHMACKeys(conn);
     assert.commandWorked(
-        adminDb.runCommand({_refreshQueryAnalyzerConfiguration: 1, name: conn.host, numQueriesExecutedPerSecond: 1}),
+        adminDb.runCommand({
+            _refreshQueryAnalyzerConfiguration: 1,
+            name: conn.host,
+            numQueriesExecutedPerSecond: 1,
+        }),
     );
     assert(adminDb.logout());
 

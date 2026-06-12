@@ -14,7 +14,8 @@ describe("listShards correct functionality test", function () {
         // "pending", therefore preventing orphans from being cleaned up.
         TestData.skipCheckOrphans = true;
         this.isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+            Boolean(TestData.multiversionBinVersion);
 
         this.checkShardName = function (shardName, shardsArray) {
             let found = false;
@@ -27,13 +28,28 @@ describe("listShards correct functionality test", function () {
             return found;
         };
 
-        this.st = new ShardingTest({name: "listShardsTest", shards: 1, mongos: 1, other: {useHostname: true}});
+        this.st = new ShardingTest({
+            name: "listShardsTest",
+            shards: 1,
+            mongos: 1,
+            other: {useHostname: true},
+        });
 
         // add replica set named 'repl1'
-        this.rs1 = new ReplSetTest({name: "repl1", nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
+        this.rs1 = new ReplSetTest({
+            name: "repl1",
+            nodes: 1,
+            useHostName: true,
+            nodeOptions: {shardsvr: ""},
+        });
 
         // add replica set named 'repl2'
-        this.rs2 = new ReplSetTest({name: "repl2", nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
+        this.rs2 = new ReplSetTest({
+            name: "repl2",
+            nodes: 1,
+            useHostName: true,
+            nodeOptions: {shardsvr: ""},
+        });
 
         this.mongos = this.st.s0;
     });

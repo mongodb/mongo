@@ -38,7 +38,9 @@ function assertDocsInColl(node, nums) {
 }
 
 jsTestLog("Test that an empty standalone fails trying to recover.");
-assert.throws(() => rst.start(0, {noReplSet: true, setParameter: {recoverFromOplogAsStandalone: true}}));
+assert.throws(() =>
+    rst.start(0, {noReplSet: true, setParameter: {recoverFromOplogAsStandalone: true}}),
+);
 
 jsTestLog("Initiating as a replica set.");
 // Restart as a replica set node without the flag so we can add operations to the oplog.
@@ -59,15 +61,20 @@ rst.initiate(
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Create the collection with w:majority and then perform a clean restart to ensure that
 // the collection is in a stable checkpoint.
 assert.commandWorked(
-    node
-        .getDB(dbName)
-        .runCommand({create: collName, writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+    node.getDB(dbName).runCommand({
+        create: collName,
+        writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS},
+    }),
 );
 assertDocsInColl(node, []);
 node = rst.restart(node, {"noReplSet": false});
@@ -91,7 +98,9 @@ assertDocsInColl(node, [3, 4, 5]);
 
 jsTestLog("Test that a replica set node cannot start up with the parameter set.");
 assert.throws(() =>
-    rst.restart(0, {setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}}),
+    rst.restart(0, {
+        setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
+    }),
 );
 
 jsTestLog("Test that on restart as a standalone we only see committed writes by default.");

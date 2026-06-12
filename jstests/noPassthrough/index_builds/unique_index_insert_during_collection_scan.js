@@ -26,7 +26,12 @@ awaitCreateIndex();
 
 // Ensure that the second document was seen by both the collection scan and the side writes table.
 checkLog.containsJson(conn, 20685, {namespace: coll.getFullName(), index: "a_1", keysInserted: 2});
-checkLog.containsJson(conn, 20689, {namespace: coll.getFullName(), index: "a_1", numApplied: 1, totalInserted: 1});
+checkLog.containsJson(conn, 20689, {
+    namespace: coll.getFullName(),
+    index: "a_1",
+    numApplied: 1,
+    totalInserted: 1,
+});
 
 // Ensure that there were no duplicates to resolve.
 assert(!checkLog.checkContainsOnceJson(conn, 20677, {indexName: "a_1"}));

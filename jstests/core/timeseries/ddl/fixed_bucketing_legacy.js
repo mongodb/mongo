@@ -27,7 +27,8 @@ assert.commandWorked(
 
 // Reads the `fixedBucketing` value visible via `listCollections` for the test collection.
 function getStoredFixedBucketing() {
-    const colls = db.runCommand({listCollections: 1, filter: {type: "timeseries", name: collName}}).cursor.firstBatch;
+    const colls = db.runCommand({listCollections: 1, filter: {type: "timeseries", name: collName}})
+        .cursor.firstBatch;
     assert.eq(colls.length, 1, "expected exactly one timeseries collection", {colls});
     return colls[0].options.timeseries.fixedBucketing;
 }

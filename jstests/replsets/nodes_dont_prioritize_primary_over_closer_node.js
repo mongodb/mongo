@@ -14,7 +14,11 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {DataCenter, delayMessagesBetweenDataCenters, forceSyncSource} from "jstests/replsets/libs/sync_source.js";
+import {
+    DataCenter,
+    delayMessagesBetweenDataCenters,
+    forceSyncSource,
+} from "jstests/replsets/libs/sync_source.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
@@ -44,7 +48,11 @@ const [testNode, targetSecondary, secondary] = rst.getSecondaries();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 

@@ -26,7 +26,15 @@ assert.commandFailedWithCode(
                     coll: collB.getName(),
                     pipeline: [
                         {
-                            $project: {newVal: {$function: {args: ["$val"], body: sleepAndIncrement, lang: "js"}}},
+                            $project: {
+                                newVal: {
+                                    $function: {
+                                        args: ["$val"],
+                                        body: sleepAndIncrement,
+                                        lang: "js",
+                                    },
+                                },
+                            },
                         },
                     ],
                 },

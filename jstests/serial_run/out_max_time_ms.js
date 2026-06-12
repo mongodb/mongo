@@ -23,7 +23,9 @@ const padding = "X".repeat(paddingSize);
  */
 function insertDocs(coll) {
     for (let i = 0; i < nDocs; i++) {
-        assert.commandWorked(coll.insert({_id: i, padding: padding}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            coll.insert({_id: i, padding: padding}, {writeConcern: {w: "majority"}}),
+        );
     }
 }
 
@@ -37,7 +39,9 @@ let connsToAllNodes = [];
 function prohibitMaxTimeExpiration() {
     for (const conn of connsToAllNodes) {
         assert.commandWorked(
-            conn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
+            conn
+                .getDB("admin")
+                .runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
         );
     }
 }
@@ -47,7 +51,12 @@ function prohibitMaxTimeExpiration() {
  * the node specified by 'failPointConn' in order to hang during the aggregate. Ensure that the $out
  * maxTimeMS expires on the node specified by 'maxTimeMsConn'.
  */
-function forceAggregationToHangAndCheckMaxTimeMsExpires(failPointName, conn, failPointConn, maxTimeMsConn) {
+function forceAggregationToHangAndCheckMaxTimeMsExpires(
+    failPointName,
+    conn,
+    failPointConn,
+    maxTimeMsConn,
+) {
     // Use a short maxTimeMS so that the test completes in a reasonable amount of time. We will
     // use the 'maxTimeNeverTimeOut' failpoint to ensure that the operation does not prematurely
     // time out.
@@ -73,7 +82,11 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(failPointName, conn, fai
     const runAggregate = function () {
         const pipeline = [{$out: destColl.getName()}];
         assert.throwsWithCode(
-            () => sourceColl.aggregate(pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}),
+            () =>
+                sourceColl.aggregate(pipeline, {
+                    maxTimeMS: maxTimeMS,
+                    $readPreference: {mode: "secondary"},
+                }),
             [ErrorCodes.MaxTimeMSExpired],
         );
     };
@@ -86,12 +99,16 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(failPointName, conn, fai
     });
 
     assert.commandWorked(
-        maxTimeMsConn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
+        maxTimeMsConn
+            .getDB("admin")
+            .runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
     );
 
     // Now drop the failpoint, allowing the aggregation to proceed. It should hit an
     // interrupt check and terminate immediately.
-    assert.commandWorked(failPointConn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: "off"}));
+    assert.commandWorked(
+        failPointConn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: "off"}),
+    );
 
     // Wait for the parallel shell to finish.
     assert.eq(awaitShell(), 0);
@@ -124,12 +141,22 @@ function runUnshardedTest(conn, primaryConn, maxTimeMsConn) {
 
     // Force the aggregation to hang while the batch is being written.
     const kFailPointName = "hangDuringBatchInsert";
-    forceAggregationToHangAndCheckMaxTimeMsExpires(kFailPointName, conn, primaryConn, maxTimeMsConn);
+    forceAggregationToHangAndCheckMaxTimeMsExpires(
+        kFailPointName,
+        conn,
+        primaryConn,
+        maxTimeMsConn,
+    );
 
     assert.commandWorked(destColl.remove({}));
 
     // Force the aggregation to hang while the batch is being built.
-    forceAggregationToHangAndCheckMaxTimeMsExpires("hangWhileBuildingDocumentSourceOutBatch", conn, conn, conn);
+    forceAggregationToHangAndCheckMaxTimeMsExpires(
+        "hangWhileBuildingDocumentSourceOutBatch",
+        conn,
+        conn,
+        conn,
+    );
 }
 
 // Run on a standalone.

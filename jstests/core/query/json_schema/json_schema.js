@@ -121,7 +121,10 @@ assert.eq(
 assert.eq(
     [{_id: 1}, {_id: 3}, {_id: 5}, {_id: 9}],
     coll
-        .find({$jsonSchema: {type: "object", properties: {num: {type: "number", maximum: -1}}}}, {_id: 1})
+        .find(
+            {$jsonSchema: {type: "object", properties: {num: {type: "number", maximum: -1}}}},
+            {_id: 1},
+        )
         .sort({_id: 1})
         .toArray(),
 );
@@ -218,11 +221,26 @@ assert.eq(
 
 // Test that $jsonSchema doesn't allow field names that contain null bytes.
 ["\x00a", "a\x00", "\x00", "\x00\x00\x00", "a\x00\x01\x08a", "\x00.."].forEach((fieldName) => {
-    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: [fieldName]}}).itcount(), 9867600);
-    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: ["$" + fieldName]}}).itcount(), 9867600);
-    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: ["foo." + fieldName]}}).itcount(), 9867600);
-    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: ["$foo." + fieldName]}}).itcount(), 9867600);
-    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: [".." + fieldName]}}).itcount(), 9867600);
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: [fieldName]}}).itcount(),
+        9867600,
+    );
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: ["$" + fieldName]}}).itcount(),
+        9867600,
+    );
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: ["foo." + fieldName]}}).itcount(),
+        9867600,
+    );
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: ["$foo." + fieldName]}}).itcount(),
+        9867600,
+    );
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: [".." + fieldName]}}).itcount(),
+        9867600,
+    );
 });
 
 coll.drop();
@@ -318,7 +336,10 @@ assert.eq(
 let res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {default: {_id: 0}}}});
 assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
 
-res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {definitions: {numberField: {type: "number"}}}}});
+res = coll.runCommand({
+    find: coll.getName(),
+    query: {$jsonSchema: {definitions: {numberField: {type: "number"}}}},
+});
 assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
 
 res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {format: "email"}}});
@@ -391,7 +412,10 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1, a: 1, b: 1}));
 assert.commandWorked(coll.insert({_id: 2, a: 2, b: 2}));
 
-assert.eq(1, coll.find({$jsonSchema: {properties: {a: {type: "number"}}, required: ["a"]}, b: 1}).itcount());
+assert.eq(
+    1,
+    coll.find({$jsonSchema: {properties: {a: {type: "number"}}, required: ["a"]}, b: 1}).itcount(),
+);
 assert.eq(1, coll.find({$or: [{$jsonSchema: {}, a: 1}, {b: 1}]}).itcount());
 assert.eq(1, coll.find({$and: [{$jsonSchema: {}, a: 1}, {b: 1}]}).itcount());
 

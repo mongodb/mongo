@@ -66,7 +66,10 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
         for (let i = 0; i < this.nShards; ++i) {
             let primary = this.st["rs" + i].getPrimary();
             shardIdentities.push(
-                primary.getDB("admin").getCollection("system.version").findOne({_id: "shardIdentity"}),
+                primary
+                    .getDB("admin")
+                    .getCollection("system.version")
+                    .findOne({_id: "shardIdentity"}),
             );
             assert.neq(null, shardIdentities[i]);
             assert.commandWorked(
@@ -87,10 +90,19 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
             jsTestLog("Renaming local.system collection on shard " + i);
 
-            let tempMongod = MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
+            let tempMongod = MongoRunner.runMongod({
+                port: port,
+                dbpath: dbPath,
+                noReplSet: true,
+                noCleanData: true,
+            });
             // Rename the local.system collection to prevent problems with replset configurations.
             tempMongod.getDB("local").getCollection("system").renameCollection("_system");
-            MongoRunner.stopMongod(tempMongod, null, {noCleanData: true, skipValidation: true, wait: true});
+            MongoRunner.stopMongod(tempMongod, null, {
+                noCleanData: true,
+                skipValidation: true,
+                wait: true,
+            });
 
             let shardIdentity = shardIdentities[i];
             let host = this.hosts[i];
@@ -101,7 +113,9 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
             // Restart the shard as standalone on read only mode.
             let configFileStr =
-                "sharding:\n _overrideShardIdentity: '" + tojson(shardIdentity).replace(/\s+/g, " ") + "'";
+                "sharding:\n _overrideShardIdentity: '" +
+                tojson(shardIdentity).replace(/\s+/g, " ") +
+                "'";
             // Use the os-specific path delimiter.
             jsTestLog("Seting up shard " + i + " with new shard identity " + tojson(shardIdentity));
             let delim = _isWindows() ? "\\" : "/";
@@ -136,12 +150,25 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
             let port = this.ports[i];
 
             // Stop the read only shards.
-            MongoRunner.stopMongod(readOnlyShards[i], null, {noCleanData: true, skipValidation: true, wait: true});
+            MongoRunner.stopMongod(readOnlyShards[i], null, {
+                noCleanData: true,
+                skipValidation: true,
+                wait: true,
+            });
 
             // Run a temporary mongod to rename the local.system collection.
-            let tempMongod = MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
+            let tempMongod = MongoRunner.runMongod({
+                port: port,
+                dbpath: dbPath,
+                noReplSet: true,
+                noCleanData: true,
+            });
             tempMongod.getDB("local").getCollection("_system").renameCollection("system", true);
-            MongoRunner.stopMongod(tempMongod, null, {noCleanData: true, skipValidation: true, wait: true});
+            MongoRunner.stopMongod(tempMongod, null, {
+                noCleanData: true,
+                skipValidation: true,
+                wait: true,
+            });
 
             let shardIdentity = shardIdentities[i];
             let host = this.hosts[i];

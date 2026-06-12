@@ -30,7 +30,9 @@ const coll = createShardedCollection(st, "shard" /* shardKey */, dbName, collNam
 const testDB = st.s.getDB(dbName);
 
 // Enable change stream pre-images on the test collection.
-assert.commandWorked(testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}),
+);
 
 // Open a change stream and store the resume token. This resume token will be used to replay the
 // stream after this point.
@@ -52,7 +54,10 @@ function verifyOnWholeCluster(
 ) {
     verifyChangeStreamOnWholeCluster({
         st: st,
-        changeStreamSpec: {resumeAfter: resumeAfterToken, fullDocumentBeforeChange: "whenAvailable"},
+        changeStreamSpec: {
+            resumeAfter: resumeAfterToken,
+            fullDocumentBeforeChange: "whenAvailable",
+        },
         userMatchExpr: userMatchExpr,
         expectedResult: expectedResult,
         expectedOplogNReturnedPerShard: expectedOplogRetDocsForEachShard,
@@ -166,7 +171,10 @@ const runVerifyOpsTestcases = (op) => {
             // Test that negated {$type: 'null'} on the 'fullDocumentBeforeChange' field matches.
             verifyOnWholeCluster(
                 {
-                    $match: {operationType: op, [fullDocumentBeforeChangePath]: {$not: {$type: "null"}}},
+                    $match: {
+                        operationType: op,
+                        [fullDocumentBeforeChangePath]: {$not: {$type: "null"}},
+                    },
                 },
                 {[collName]: {[op]: [2, 3, 2, 3]}},
                 [2, 2] /* expectedOplogRetDocsForEachShard */,
@@ -206,7 +214,12 @@ const runVerifyOpsTestcases = (op) => {
     }
 
     // Test out a predicate on the full 'fullDocumentBeforeChange' field.
-    jsTestLog("Testing 'fullDocumentBeforeChange' for op: " + op + ", expected pre-image: " + tojsononeline(doc));
+    jsTestLog(
+        "Testing 'fullDocumentBeforeChange' for op: " +
+            op +
+            ", expected pre-image: " +
+            tojsononeline(doc),
+    );
     verifyOnWholeCluster(
         {$match: {operationType: op, fullDocumentBeforeChange: doc}},
         {[collName]: {[op]: [2]}},

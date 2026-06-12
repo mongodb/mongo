@@ -82,7 +82,10 @@ export const $config = (function () {
 
             if (res.ok === 1) {
                 let doc = res.value;
-                assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
+                assert(
+                    doc !== null,
+                    "query spec should have matched a document, returned " + tojson(res),
+                );
 
                 assert.eq(this.tid, doc.tid);
                 assert(Array.isArray(doc.values), "expected values to be an array");

@@ -70,11 +70,20 @@ withRetryOnTransientTxnError(
         };
 
         // Insert both documents, with and without initialized stmtIds.
-        assert.commandWorked(st.s.getDB(dbName).runCommand(retryableInsertCommandObjUninitializedStmtId));
         assert.commandWorked(
-            st.s.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+            st.s.getDB(dbName).runCommand(retryableInsertCommandObjUninitializedStmtId),
         );
-        assert.commandWorked(st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId));
+        assert.commandWorked(
+            st.s.adminCommand({
+                commitTransaction: 1,
+                lsid: lsid,
+                txnNumber: txnNumber,
+                autocommit: false,
+            }),
+        );
+        assert.commandWorked(
+            st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId),
+        );
         assert.commandWorked(
             st.s.adminCommand({
                 commitTransaction: 1,
@@ -112,11 +121,18 @@ withRetryOnTransientTxnError(
 
         // Retry insert command with stmtId = 1. Insert should be successful with the retriedStmtIds
         // field populated.
-        res = assert.commandWorked(st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId));
+        res = assert.commandWorked(
+            st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId),
+        );
         assert.eq(initializedStmtId, res.retriedStmtIds[0]);
     },
     () => {
-        st.s.adminCommand({abortTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false});
+        st.s.adminCommand({
+            abortTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumber,
+            autocommit: false,
+        });
         st.s.adminCommand({
             abortTransaction: 1,
             lsid: lsidWithStmtId,

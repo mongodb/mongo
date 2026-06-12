@@ -24,7 +24,13 @@ const testDoc = {
 assert.commandWorked(coll.insert(testDoc, {writeConcern: {w: "majority"}}));
 
 // Create an identity view on the data-bearing collection.
-assert.commandWorked(view.runCommand("create", {viewOn: coll.getName(), pipeline: [], writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    view.runCommand("create", {
+        viewOn: coll.getName(),
+        pipeline: [],
+        writeConcern: {w: "majority"},
+    }),
+);
 
 // Run a dummy find to start the transaction.
 jsTestLog("Starting transaction.");

@@ -47,7 +47,9 @@ journalFlusherFP.wait();
 
 try {
     jsTest.log("Do a write with majority write concern that should time out.");
-    assertWriteConcernTimeout(testColl.insert({_id: 0}, {writeConcern: {w: "majority", wtimeout: 2 * 1000}}));
+    assertWriteConcernTimeout(
+        testColl.insert({_id: 0}, {writeConcern: {w: "majority", wtimeout: 2 * 1000}}),
+    );
 } finally {
     journalFlusherFP.off();
 }

@@ -30,14 +30,27 @@ assert.commandWorked(session.commitTransaction_forTesting());
 const opTime = session.getOperationTime();
 const txnNum = session.getTxnNumber_forTesting();
 jsTestLog(
-    "Successfully committed transaction at operation time " + tojson(opTime) + "with transaction number " + txnNum,
+    "Successfully committed transaction at operation time " +
+        tojson(opTime) +
+        "with transaction number " +
+        txnNum,
 );
 
 // After replication, assert the secondary's transaction table has been updated.
 replTest.awaitReplication();
 jsTestLog("Checking transaction tables on both primary and secondary.");
-jsTestLog("Primary " + primary.host + ": " + tojson(primary.getDB("config").transactions.find().toArray()));
-jsTestLog("Secondary " + secondary.host + ": " + tojson(secondary.getDB("config").transactions.find().toArray()));
+jsTestLog(
+    "Primary " +
+        primary.host +
+        ": " +
+        tojson(primary.getDB("config").transactions.find().toArray()),
+);
+jsTestLog(
+    "Secondary " +
+        secondary.host +
+        ": " +
+        tojson(secondary.getDB("config").transactions.find().toArray()),
+);
 RetryableWritesUtil.checkTransactionTable(primary, sessionId, txnNum, opTime);
 RetryableWritesUtil.assertSameRecordOnBothConnections(primary, secondary, sessionId);
 

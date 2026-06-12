@@ -58,10 +58,16 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         assert.commandWorked(collection.insert(docs));
     };
 
-    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(defaultDb, txnDb, collName) {
+    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(
+        defaultDb,
+        txnDb,
+        collName,
+    ) {
         assert(isMongos(defaultDb));
         assert(!isMongos(txnDb));
-        print(tojsononeline({defaultHost: defaultDb.getMongo().host, txnHost: txnDb.getMongo().host}));
+        print(
+            tojsononeline({defaultHost: defaultDb.getMongo().host, txnHost: txnDb.getMongo().host}),
+        );
         // Bump the clusterTime on the mongos so that when causal consistency is required, the reads
         // performed by the document checks will have afterClusterTime greater than the timestamp of
         // the writes done by the transaction.
@@ -121,7 +127,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             $super.data.runInternalTransaction.apply(this, arguments);
         } catch (e) {
             if (isNetworkError(e) || isRetryableError(e)) {
-                print("Starting new sessions after internal transaction error: " + tojsononeline(e));
+                print(
+                    "Starting new sessions after internal transaction error: " + tojsononeline(e),
+                );
                 this.startSessions(defaultDb);
                 return;
             }

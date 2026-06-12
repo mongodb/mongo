@@ -21,7 +21,10 @@ import {
 
 const overrideInternalWriteConcernTimeout = {
     setParameter: {
-        "failpoint.overrideInternalWriteConcernTimeout": tojson({mode: "alwaysOn", data: {wtimeoutMillis: 5000}}),
+        "failpoint.overrideInternalWriteConcernTimeout": tojson({
+            mode: "alwaysOn",
+            data: {wtimeoutMillis: 5000},
+        }),
     },
 };
 const stOtherOptions = {
@@ -33,7 +36,9 @@ const stOtherOptions = {
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
 
-assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}),
+);
 
 const precmdShardKeyTimeseriesSubFieldX = function (conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);
@@ -42,7 +47,11 @@ const precmdShardKeyTimeseriesSubFieldX = function (conn, cluster, dbName, collN
     const shardKey = {"meta.x": 1};
     assert.commandWorked(db.adminCommand({enableSharding: dbName}));
     assert.commandWorked(
-        db.adminCommand({shardCollection: nss, key: shardKey, timeseries: {timeField: "time", metaField: "meta"}}),
+        db.adminCommand({
+            shardCollection: nss,
+            key: shardKey,
+            timeseries: {timeField: "time", metaField: "meta"},
+        }),
     );
 };
 
@@ -53,13 +62,19 @@ const precmdShardKeyTimeseriesSubFieldZ = function (conn, cluster, dbName, collN
     const shardKey = {"meta.z": 1};
     assert.commandWorked(db.adminCommand({enableSharding: dbName}));
     assert.commandWorked(
-        db.adminCommand({shardCollection: nss, key: shardKey, timeseries: {timeField: "time", metaField: "meta"}}),
+        db.adminCommand({
+            shardCollection: nss,
+            key: shardKey,
+            timeseries: {timeField: "time", metaField: "meta"},
+        }),
     );
 };
 
 const precmdUnshardedTimeseries = function (conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);
-    assert.commandWorked(db.runCommand({create: collName, timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        db.runCommand({create: collName, timeseries: {timeField: "time", metaField: "meta"}}),
+    );
 };
 
 jsTest.log("Testing all commands on a sharded timeseries collection with meta.x shard key.");

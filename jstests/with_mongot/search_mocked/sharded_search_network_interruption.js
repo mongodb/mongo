@@ -31,11 +31,15 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 
 assert.commandWorked(
-    mongos.getDB("admin").runCommand({configureFailPoint: "shardedSearchOpCtxDisconnect", mode: "alwaysOn"}),
+    mongos
+        .getDB("admin")
+        .runCommand({configureFailPoint: "shardedSearchOpCtxDisconnect", mode: "alwaysOn"}),
 );
 const mongotQuery = {
     $search: {},

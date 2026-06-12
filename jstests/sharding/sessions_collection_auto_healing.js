@@ -16,7 +16,9 @@ TestData.disableImplicitSessions = true;
 let st = new ShardingTest({
     shards: 0,
     other: {
-        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+        mongosOptions: {
+            setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        },
     },
 });
 let configSvr = st.configRS.getPrimary();

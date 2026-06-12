@@ -8,13 +8,21 @@
 
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {isMemberNewlyAdded, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
+import {
+    isMemberNewlyAdded,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({name: testName, nodes: [{}], settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: [{}],
+    settings: {chainingAllowed: false},
+    useBridge: true,
+});
 rst.startSet();
 rst.initiate();
 
@@ -46,7 +54,9 @@ assert(isMemberNewlyAdded(primary, 1));
 
 jsTestLog("Allowing primary to initiate the 'newlyAdded' field removal");
 let hangDuringAutomaticReconfigFP = configureFailPoint(primaryDb, "hangDuringAutomaticReconfig");
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 rst.awaitSecondaryNodes(null, [secondary]);
 
 hangDuringAutomaticReconfigFP.wait();

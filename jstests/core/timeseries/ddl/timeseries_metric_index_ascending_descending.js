@@ -34,21 +34,32 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collName);
         coll.drop();
 
-        jsTestLog("Setting up collection: " + coll.getFullName() + " with index: " + tojson(keyForCreate));
+        jsTestLog(
+            "Setting up collection: " + coll.getFullName() + " with index: " + tojson(keyForCreate),
+        );
 
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         const numUserIndexesBefore = coll.getIndexes().length;
-        const numBucketIndexesBefore = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length;
+        const numBucketIndexesBefore =
+            getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length;
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
-        assert.commandWorked(coll.createIndex(keyForCreate), "failed to create index: " + tojson(keyForCreate));
+        assert.commandWorked(
+            coll.createIndex(keyForCreate),
+            "failed to create index: " + tojson(keyForCreate),
+        );
 
         assert.eq(numUserIndexesBefore + 1, coll.getIndexes().length);
-        assert.eq(numBucketIndexesBefore + 1, getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length);
+        assert.eq(
+            numBucketIndexesBefore + 1,
+            getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length,
+        );
     };
 
     const coll = db.getCollection(collName);
@@ -86,21 +97,37 @@ TimeseriesTest.run((insert) => {
     // Create raw indexes over the bucket documents that do not map to any user indexes.
     // The server must not crash when handling the reverse mapping of these.
     assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.x.y": 1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.x.y": 1, "control.min.y.x": 1}));
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.min.x.y": 1, "control.min.y.x": 1}),
+    );
     assert.commandWorked(createRawTimeseriesIndex(coll, {"control.max.x.y": 1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.max.x.y": 1, "control.max.y.x": 1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.max.x.y": 1, "control.min.x.y": 1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.x.y": -1, "control.max.x.y": 1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.x.y": -1, "control.max.x.y": -1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.max.x.y": 1, "control.min.x.y": -1}));
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.max.x.y": 1, "control.max.y.x": 1}),
+    );
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.max.x.y": 1, "control.min.x.y": 1}),
+    );
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.min.x.y": -1, "control.max.x.y": 1}),
+    );
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.min.x.y": -1, "control.max.x.y": -1}),
+    );
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.max.x.y": 1, "control.min.x.y": -1}),
+    );
 
     assert.commandWorked(createRawTimeseriesIndex(coll, {"data.x": 1}));
     assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.x.y": 1, "data.x": 1}));
     assert.commandWorked(createRawTimeseriesIndex(coll, {"data.x": 1, "control.min.x.y": 1}));
 
     // The first two-thirds of the below compound indexes represent {"x.y" : 1} and {"x.y" : -1}.
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.x.y": 1, "control.max.x.y": 1, "data.x": 1}));
-    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.max.x.y": -1, "control.min.x.y": -1, "data.x": 1}));
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.min.x.y": 1, "control.max.x.y": 1, "data.x": 1}),
+    );
+    assert.commandWorked(
+        createRawTimeseriesIndex(coll, {"control.max.x.y": -1, "control.min.x.y": -1, "data.x": 1}),
+    );
 
     // An index on {metaField, timeField} gets built by default on time-series collections.
     // There are more indexes for sharded collections because it also includes the shard key index.

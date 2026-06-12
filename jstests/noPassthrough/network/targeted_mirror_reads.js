@@ -19,15 +19,25 @@ const kCollName = "coll";
 // much time as possible to increment.
 const kLargeMaxTimeMS = 100000000;
 
-function verifyParameterOptions(parameterOptions, expectedStandardMirroringOptions, expectedTargetedMirroringOptions) {
+function verifyParameterOptions(
+    parameterOptions,
+    expectedStandardMirroringOptions,
+    expectedTargetedMirroringOptions,
+) {
     assert.hasFields(parameterOptions, ["samplingRate", "maxTimeMS", "targetedMirroring"]);
 
     assert.eq(parameterOptions.samplingRate, expectedStandardMirroringOptions.samplingRate);
     assert.eq(parameterOptions.maxTimeMS, expectedStandardMirroringOptions.maxTimeMS);
 
     assert.hasFields(parameterOptions.targetedMirroring, ["samplingRate", "maxTimeMS", "tag"]);
-    assert.eq(parameterOptions.targetedMirroring.samplingRate, expectedTargetedMirroringOptions.samplingRate);
-    assert.eq(parameterOptions.targetedMirroring.maxTimeMS, expectedTargetedMirroringOptions.maxTimeMS);
+    assert.eq(
+        parameterOptions.targetedMirroring.samplingRate,
+        expectedTargetedMirroringOptions.samplingRate,
+    );
+    assert.eq(
+        parameterOptions.targetedMirroring.maxTimeMS,
+        expectedTargetedMirroringOptions.maxTimeMS,
+    );
     assert.eq(parameterOptions.targetedMirroring.tag, expectedTargetedMirroringOptions.tag);
 }
 
@@ -39,7 +49,11 @@ assert.commandWorked(
         mirrorReads: {
             "samplingRate": 0.05,
             "maxTimeMS": 5234,
-            "targetedMirroring": {"samplingRate": 0.07, "maxTimeMS": 7234, "tag": {"hello": "world"}},
+            "targetedMirroring": {
+                "samplingRate": 0.07,
+                "maxTimeMS": 7234,
+                "tag": {"hello": "world"},
+            },
         },
     }),
 );
@@ -60,16 +74,28 @@ rst.initiate();
 
 jsTestLog(`Attempting invalid targetedMirrorReads options`);
 assert.commandFailed(
-    MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {targetedMirroring: 1}}),
+    MirrorReadsHelpers.setParameter({
+        nodeToReadFrom: rst.getPrimary(),
+        value: {targetedMirroring: 1},
+    }),
 );
 assert.commandFailed(
-    MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {targetedMirroring: {samplingRate: ""}}}),
+    MirrorReadsHelpers.setParameter({
+        nodeToReadFrom: rst.getPrimary(),
+        value: {targetedMirroring: {samplingRate: ""}},
+    }),
 );
 assert.commandFailed(
-    MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {targetedMirroring: {maxTimeMS: ""}}}),
+    MirrorReadsHelpers.setParameter({
+        nodeToReadFrom: rst.getPrimary(),
+        value: {targetedMirroring: {maxTimeMS: ""}},
+    }),
 );
 assert.commandFailed(
-    MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {targetedMirroring: {tag: ""}}}),
+    MirrorReadsHelpers.setParameter({
+        nodeToReadFrom: rst.getPrimary(),
+        value: {targetedMirroring: {tag: ""}},
+    }),
 );
 assert.commandFailed(
     MirrorReadsHelpers.setParameter({
@@ -81,10 +107,17 @@ assert.commandFailed(
 jsTestLog(`Correctly set targetedMirrorReads options`);
 let targetedOptions = {samplingRate: 0.5, maxTimeMS: 3000, tag: {"foo": "bar"}};
 assert.commandWorked(
-    MirrorReadsHelpers.setParameter({nodeToReadFrom: rst.getPrimary(), value: {targetedMirroring: targetedOptions}}),
+    MirrorReadsHelpers.setParameter({
+        nodeToReadFrom: rst.getPrimary(),
+        value: {targetedMirroring: targetedOptions},
+    }),
 );
 let parameterOptions = rst.getPrimary().adminCommand({getParameter: 1, mirrorReads: 1}).mirrorReads;
-verifyParameterOptions(parameterOptions, {samplingRate: 0.01, maxTimeMS: 1000} /* default options */, targetedOptions);
+verifyParameterOptions(
+    parameterOptions,
+    {samplingRate: 0.01, maxTimeMS: 1000} /* default options */,
+    targetedOptions,
+);
 
 targetedOptions = {
     samplingRate: 1.0,
@@ -109,7 +142,10 @@ verifyParameterOptions(
 // assertions made later more predictable.
 rst.nodes.forEach(function (node) {
     assert.commandWorked(
-        MirrorReadsHelpers.setParameter({nodeToReadFrom: node, value: {targetedMirroring: {samplingRate: 0.0}}}),
+        MirrorReadsHelpers.setParameter({
+            nodeToReadFrom: node,
+            value: {targetedMirroring: {samplingRate: 0.0}},
+        }),
     );
 });
 
@@ -221,7 +257,10 @@ rsConfig.members.forEach(function (member) {
     jsTestLog(`Doing reconfig to change the set of nodes tagged with targetedMirroredReads tag`);
     let samplingRate = 1.0;
     let nodeToReadFrom = rst.getSecondaries()[0];
-    let secondariesWithTag = MirrorReadsHelpers.getSecondariesWithTargetedTag(nodeToReadFrom, tagTwo);
+    let secondariesWithTag = MirrorReadsHelpers.getSecondariesWithTargetedTag(
+        nodeToReadFrom,
+        tagTwo,
+    );
     // Execute setParameter before the reconfig so that we can be sure the reconfig is the thing
     // that triggers the hosts list to be updated.
     assert.commandWorked(
@@ -261,7 +300,9 @@ rsConfig.members.forEach(function (member) {
             "tag": {"tag": "one"},
         },
     };
-    assert.commandWorked(MirrorReadsHelpers.setParameter({nodeToReadFrom: primary, value: options}));
+    assert.commandWorked(
+        MirrorReadsHelpers.setParameter({nodeToReadFrom: primary, value: options}),
+    );
 
     // Insert data to be read
     const db = primary.getDB(kDbName);
@@ -271,7 +312,10 @@ rsConfig.members.forEach(function (member) {
     let before = MirrorReadsHelpers.getMirroredReadsStats(primary, kDbName);
     let initialStatsOnSecondaries = {};
     for (const secondary of rst.getSecondaries()) {
-        initialStatsOnSecondaries[secondary.nodeId] = MirrorReadsHelpers.getMirroredReadsStats(secondary, kDbName);
+        initialStatsOnSecondaries[secondary.nodeId] = MirrorReadsHelpers.getMirroredReadsStats(
+            secondary,
+            kDbName,
+        );
     }
     db.runCommand({find: kCollName, filter: {}});
 
@@ -304,6 +348,12 @@ assert.commandWorked(
 );
 
 jsTestLog("Verifying erroredDuringSend field for 'find' commands failing to send");
-MirrorReadsHelpers.verifyErroredDuringSend(rst, MirrorReadsHelpers.kTargetedMode, kDbName, kCollName, tagTwo);
+MirrorReadsHelpers.verifyErroredDuringSend(
+    rst,
+    MirrorReadsHelpers.kTargetedMode,
+    kDbName,
+    kCollName,
+    tagTwo,
+);
 
 rst.stopSet();

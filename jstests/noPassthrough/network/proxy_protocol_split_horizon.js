@@ -135,8 +135,14 @@ jsTest.log.info("Test 1: No SNI through proxy → default horizon");
     jsTest.log.info("hello response (no SNI): " + tojson(result));
 
     // With no SNI, the server should return the default horizon hostnames.
-    assert(result.hosts.includes(node0Host), `Expected hosts to contain ${node0Host}, got: ${tojson(result.hosts)}`);
-    assert(result.hosts.includes(node1Host), `Expected hosts to contain ${node1Host}, got: ${tojson(result.hosts)}`);
+    assert(
+        result.hosts.includes(node0Host),
+        `Expected hosts to contain ${node0Host}, got: ${tojson(result.hosts)}`,
+    );
+    assert(
+        result.hosts.includes(node1Host),
+        `Expected hosts to contain ${node1Host}, got: ${tojson(result.hosts)}`,
+    );
 
     // 'me' should be the default (localhost) hostname for node 0.
     assert.eq(result.me, node0Host, `Expected 'me' to be ${node0Host}, got: ${result.me}`);
@@ -161,7 +167,11 @@ jsTest.log.info("Test 2: SNI matching horizon through proxy → horizon hostname
     );
 
     // 'me' should be the horizon hostname for node 0.
-    assert.eq(result.me, node0HorizonHost, `Expected 'me' to be ${node0HorizonHost}, got: ${result.me}`);
+    assert.eq(
+        result.me,
+        node0HorizonHost,
+        `Expected 'me' to be ${node0HorizonHost}, got: ${result.me}`,
+    );
 }
 
 // =============================================================================
@@ -182,7 +192,11 @@ jsTest.log.info("Test 3: SNI matching horizon on node 1 → horizon hostnames, m
     );
 
     // 'me' should be the horizon hostname for node 1.
-    assert.eq(result.me, node1HorizonHost, `Expected 'me' to be ${node1HorizonHost}, got: ${result.me}`);
+    assert.eq(
+        result.me,
+        node1HorizonHost,
+        `Expected 'me' to be ${node1HorizonHost}, got: ${result.me}`,
+    );
 }
 
 // =============================================================================
@@ -194,8 +208,14 @@ jsTest.log.info("Test 4: Unknown SNI through proxy → default horizon (fallback
     jsTest.log.info("hello response (unknown SNI): " + tojson(result));
 
     // An SNI that doesn't match any horizon should fall back to the default.
-    assert(result.hosts.includes(node0Host), `Expected hosts to contain ${node0Host}, got: ${tojson(result.hosts)}`);
-    assert(result.hosts.includes(node1Host), `Expected hosts to contain ${node1Host}, got: ${tojson(result.hosts)}`);
+    assert(
+        result.hosts.includes(node0Host),
+        `Expected hosts to contain ${node0Host}, got: ${tojson(result.hosts)}`,
+    );
+    assert(
+        result.hosts.includes(node1Host),
+        `Expected hosts to contain ${node1Host}, got: ${tojson(result.hosts)}`,
+    );
 
     assert.eq(result.me, node0Host, `Expected 'me' to be ${node0Host}, got: ${result.me}`);
 }
@@ -253,7 +273,11 @@ jsTest.log.info("Test 5: Reconfigure horizons, verify proxy SNI uses new config"
         result3.hosts.includes(node0Host),
         `After reconfig: expected hosts to contain ${node0Host}, got: ${tojson(result3.hosts)}`,
     );
-    assert.eq(result3.me, node0Host, `After reconfig: expected 'me' to be ${node0Host}, got: ${result3.me}`);
+    assert.eq(
+        result3.me,
+        node0Host,
+        `After reconfig: expected 'me' to be ${node0Host}, got: ${result3.me}`,
+    );
 }
 
 // --- Cleanup ---

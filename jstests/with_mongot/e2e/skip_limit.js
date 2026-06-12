@@ -30,7 +30,12 @@ function verifyNReturned(explainOutput, stageType, nReturned) {
 }
 
 function runTest({mongotStage, mongotStageLimit = null, skip, limit}) {
-    const pipeline = [mongotStage, {$skip: skip}, {$limit: limit}, {$project: {embedding: 0, plot_embedding: 0}}];
+    const pipeline = [
+        mongotStage,
+        {$skip: skip},
+        {$limit: limit},
+        {$project: {embedding: 0, plot_embedding: 0}},
+    ];
 
     // First, check that the query returns the expected number of results.
     const numExpectedResults = mongotStageLimit ? Math.min(mongotStageLimit - skip, limit) : limit;
@@ -69,7 +74,12 @@ function runVectorSearchTest({vectorSearchLimit, skip = 0, limit}) {
             limit: vectorSearchLimit,
         },
     };
-    runTest({mongotStage: tarzanVectorSearchQuery, mongotStageLimit: vectorSearchLimit, skip, limit});
+    runTest({
+        mongotStage: tarzanVectorSearchQuery,
+        mongotStageLimit: vectorSearchLimit,
+        skip,
+        limit,
+    });
 }
 
 runVectorSearchTest({vectorSearchLimit: lowLimit, limit: highLimit});

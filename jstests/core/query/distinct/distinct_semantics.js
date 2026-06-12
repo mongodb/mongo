@@ -238,7 +238,10 @@ const coll = db.distinct_semantics;
                 testCase.filter,
             )}) over ${tojson(testCase.docs)}`;
 
-            result = assert.commandWorked(coll.runCommand("distinct", distinctSpec), `Attempted ${testDescription}`);
+            result = assert.commandWorked(
+                coll.runCommand("distinct", distinctSpec),
+                `Attempted ${testDescription}`,
+            );
 
             assertArrayEq({
                 expected: testCase.result,

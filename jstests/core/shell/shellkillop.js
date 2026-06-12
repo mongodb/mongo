@@ -24,11 +24,21 @@ function testShellAutokillop() {
             baseName +
             ".count();";
         print("shellkillop.js evalStr:" + evalStr);
-        let spawn = startMongoProgramNoConnect("mongo", "--autokillop", "--port", myPort(), "--eval", evalStr);
+        let spawn = startMongoProgramNoConnect(
+            "mongo",
+            "--autokillop",
+            "--port",
+            myPort(),
+            "--eval",
+            evalStr,
+        );
 
         sleep(100);
         retry = true;
-        assert(db[baseName].find({i: "abcdefghijkl"}).count() < 100_000, "update ran too fast, test won't be valid");
+        assert(
+            db[baseName].find({i: "abcdefghijkl"}).count() < 100_000,
+            "update ran too fast, test won't be valid",
+        );
         retry = false;
 
         stopMongoProgramByPid(spawn);
@@ -44,7 +54,10 @@ function testShellAutokillop() {
         }
 
         retry = true;
-        assert(db[baseName].find({i: "abcdefghijkl"}).count() < 100_000, "update ran too fast, test was not valid");
+        assert(
+            db[baseName].find({i: "abcdefghijkl"}).count() < 100_000,
+            "update ran too fast, test was not valid",
+        );
         retry = false;
     }
 }

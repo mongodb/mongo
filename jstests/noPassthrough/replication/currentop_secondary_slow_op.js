@@ -49,7 +49,9 @@ try {
     jsTestLog("Configured profiling to always log slow ops: " + tojson(profileResult));
     const currentOpResult = assert.commandWorked(secondaryAdminDB.currentOp());
     jsTestLog("currentOp() with slow operation logging: " + tojson(currentOpResult));
-    assert.commandWorked(secondaryAdminDB.setProfilingLevel(profileResult.was, {slowms: profileResult.slowms}));
+    assert.commandWorked(
+        secondaryAdminDB.setProfilingLevel(profileResult.was, {slowms: profileResult.slowms}),
+    );
     jsTestLog("Completed currentOp() with slow operation logging.");
 } finally {
     failPoint.off();

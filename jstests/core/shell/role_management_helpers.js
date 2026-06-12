@@ -39,7 +39,13 @@ function assertHasPrivilege(privilegeArray, privilege) {
             return;
         }
     }
-    assert(false, "Privilege " + tojson(privilege) + " not found in privilege array: " + tojson(privilegeArray));
+    assert(
+        false,
+        "Privilege " +
+            tojson(privilege) +
+            " not found in privilege array: " +
+            tojson(privilegeArray),
+    );
 }
 
 var db = db.getSiblingDB("role_management_helpers");
@@ -60,10 +66,16 @@ assert.eq(0, roleObj.roles.length);
 assert.eq(null, roleObj.privileges);
 roleObj = db.getRole("roleA", {showPrivileges: true});
 assert.eq(1, roleObj.privileges.length);
-assertHasPrivilege(roleObj.privileges, {resource: {db: db.getName(), collection: "foo"}, actions: ["find"]});
+assertHasPrivilege(roleObj.privileges, {
+    resource: {db: db.getName(), collection: "foo"},
+    actions: ["find"],
+});
 roleObj = db.getRole("roleB", {showPrivileges: true});
 assert.eq(1, roleObj.inheritedPrivileges.length); // inherited from roleA
-assertHasPrivilege(roleObj.inheritedPrivileges, {resource: {db: db.getName(), collection: "foo"}, actions: ["find"]});
+assertHasPrivilege(roleObj.inheritedPrivileges, {
+    resource: {db: db.getName(), collection: "foo"},
+    actions: ["find"],
+});
 assert.eq(1, roleObj.roles.length);
 assertHasRole(roleObj.roles, "roleA", db.getName());
 
@@ -121,8 +133,14 @@ db.grantPrivilegesToRole("roleA", [
 roleObj = db.getRole("roleA", {showPrivileges: true});
 assert.eq(0, roleObj.roles.length);
 assert.eq(2, roleObj.privileges.length);
-assertHasPrivilege(roleObj.privileges, {resource: {db: db.getName(), collection: "foo"}, actions: ["find", "insert"]});
-assertHasPrivilege(roleObj.privileges, {resource: {db: db.getName(), collection: ""}, actions: ["dropDatabase"]});
+assertHasPrivilege(roleObj.privileges, {
+    resource: {db: db.getName(), collection: "foo"},
+    actions: ["find", "insert"],
+});
+assertHasPrivilege(roleObj.privileges, {
+    resource: {db: db.getName(), collection: ""},
+    actions: ["dropDatabase"],
+});
 
 // Update role
 db.updateRole("roleA", {
@@ -133,7 +151,10 @@ roleObj = db.getRole("roleA", {showPrivileges: true});
 assert.eq(1, roleObj.roles.length);
 assertHasRole(roleObj.roles, "roleB", db.getName());
 assert.eq(1, roleObj.privileges.length);
-assertHasPrivilege(roleObj.privileges, {resource: {db: db.getName(), collection: "foo"}, actions: ["find"]});
+assertHasPrivilege(roleObj.privileges, {
+    resource: {db: db.getName(), collection: "foo"},
+    actions: ["find"],
+});
 
 // Test dropRole
 db.dropRole("roleC");

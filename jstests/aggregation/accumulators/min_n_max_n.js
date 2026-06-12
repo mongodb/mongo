@@ -80,7 +80,10 @@ assert.commandWorked(coll.insert(docs));
 // expected groups (we cannot perform unordered comparison because order matters for $minN/$maxN).
 function runAndCompareMinMaxN(nFunction, n, expectedResults) {
     const actualResults = coll
-        .aggregate([{$group: {_id: "$state", sales: {[nFunction]: {input: "$sales", n: n}}}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$group: {_id: "$state", sales: {[nFunction]: {input: "$sales", n: n}}}},
+            {$sort: {_id: 1}},
+        ])
         .toArray();
     assert.eq(expectedResults, actualResults);
 
@@ -174,7 +177,9 @@ assert.commandFailedWithCode(
 // Reject non-integral/negative values of n.
 assert.commandFailedWithCode(
     coll.runCommand("aggregate", {
-        pipeline: [{$group: {_id: {"st": "$state"}, minSales: {$minN: {input: "$sales", n: "string"}}}}],
+        pipeline: [
+            {$group: {_id: {"st": "$state"}, minSales: {$minN: {input: "$sales", n: "string"}}}},
+        ],
         cursor: {},
     }),
     5787902,
@@ -206,7 +211,14 @@ assert.commandFailedWithCode(
 
 assert.commandFailedWithCode(
     coll.runCommand("aggregate", {
-        pipeline: [{$group: {_id: {"st": "$state"}, minSales: {$minN: {input: "$sales", n: largestIntPlus1}}}}],
+        pipeline: [
+            {
+                $group: {
+                    _id: {"st": "$state"},
+                    minSales: {$minN: {input: "$sales", n: largestIntPlus1}},
+                },
+            },
+        ],
         cursor: {},
     }),
     5787903,

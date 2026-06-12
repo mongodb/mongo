@@ -56,14 +56,21 @@ function runTests(docs) {
         assert.eq(
             result,
             expectedDocs,
-            "sort returned wrong order with sort pattern " + tojson(sortOrder) + " and collation " + tojson(collation),
+            "sort returned wrong order with sort pattern " +
+                tojson(sortOrder) +
+                " and collation " +
+                tojson(collation),
         );
 
         // Run the same aggregation, but in a sharded cluster, force the merging to be performed
         // on a shard instead of on mongos.
         result = coll
             .aggregate(
-                [{$_internalSplitPipeline: {mergeType: "anyShard"}}, {$sort: sortOrder}, {$project: {_id: 0, val: 1}}],
+                [
+                    {$_internalSplitPipeline: {mergeType: "anyShard"}},
+                    {$sort: sortOrder},
+                    {$project: {_id: 0, val: 1}},
+                ],
                 {collation: collation},
             )
             .toArray();
@@ -144,8 +151,12 @@ runTests(
 assert(coll.drop());
 assert.commandWorked(coll.createIndex({kana: 1}, {name: "k1_jaStr3", collation: jaCollationStr3}));
 assert.commandWorked(coll.createIndex({kana: 1}, {name: "k1_jaStr4", collation: jaCollationStr4}));
-assert.commandWorked(coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr3", collation: jaCollationStr3}));
-assert.commandWorked(coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr4", collation: jaCollationStr4}));
+assert.commandWorked(
+    coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr3", collation: jaCollationStr3}),
+);
+assert.commandWorked(
+    coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr4", collation: jaCollationStr4}),
+);
 runTests(
     data.map((doc) => {
         let copy = Object.extend({}, doc);

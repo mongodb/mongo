@@ -47,7 +47,9 @@ assert.commandWorked(
 );
 
 // Force the classic engine so CBR applies.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 // Insert enough documents for sampling to work.
 const kNumDocs = 1000;
@@ -139,7 +141,9 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
         // Planning should have been invoked once for the explain.
         assertOnePlanningInvocation(planningBefore, planningAfter);
     } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalWorks}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalWorks}),
+        );
     }
 }
 
@@ -191,7 +195,9 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
         // Planning should have been invoked once for the explain (capped trials then CBR).
         assertOnePlanningInvocation(planningBefore, planningAfter);
     } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalKnobValue}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalKnobValue}),
+        );
     }
 }
 
@@ -249,7 +255,9 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
         // Planning was invoked once for the explain.
         assertOnePlanningInvocation(planningBefore, planningAfter);
     } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalWorks}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalWorks}),
+        );
     }
 }
 

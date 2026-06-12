@@ -66,7 +66,10 @@ for (let i = 0; i < 10; i++) {
 let cursors = [];
 for (let i = 0; i < 5; i++) {
     let session = db.getMongo().startSession({});
-    assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}), "initialize the session");
+    assert.commandWorked(
+        session.getDatabase("admin").runCommand({usersInfo: 1}),
+        "initialize the session",
+    );
     cursors.push(session.getDatabase(dbName)[testCollName].find({b: 1}).batchSize(1));
     assert(cursors[i].hasNext());
 }
@@ -130,7 +133,9 @@ withPinnedCursor({
     },
     sessionId: pinnedCursorSession,
     runGetMoreFunc: (collName, cursorId, sessionId) => {
-        assert.commandFailed(db.runCommand({getMore: cursorId, collection: collName, lsid: sessionId}));
+        assert.commandFailed(
+            db.runCommand({getMore: cursorId, collection: collName, lsid: sessionId}),
+        );
     },
     failPointName: failPointName,
     assertEndCounts: false,

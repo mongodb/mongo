@@ -27,7 +27,10 @@ const session = testDB.getMongo().startSession();
 const sessionColl = session.getDatabase(jsTestName()).getCollection(collectionName);
 session.startTransaction();
 // Time-series delete in a multi-document transaction should fail.
-assert.commandFailedWithCode(sessionColl.remove({[metaFieldName]: "a"}), ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    sessionColl.remove({[metaFieldName]: "a"}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction();

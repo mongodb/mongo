@@ -54,9 +54,13 @@ admin.runCommand({setParameter: 1, ShardingTaskExecutorPoolMaxQueueDepth: kMaxQu
 admin.runCommand({setParameter: 1, ShardingTaskExecutorPoolMaxSize: kMaxPoolSize});
 
 // Make sure both connections are checked out and blocked, so new requests have to enqueue.
-const primaryFP = configureFailPoint(st.rs0.getPrimary().getDB("admin"), "waitAfterCommandFinishesExecution", {
-    commands: ["bulkWrite"],
-});
+const primaryFP = configureFailPoint(
+    st.rs0.getPrimary().getDB("admin"),
+    "waitAfterCommandFinishesExecution",
+    {
+        commands: ["bulkWrite"],
+    },
+);
 
 let blockedThreads = [];
 for (let i = 0; i < kMaxPoolSize; ++i) {

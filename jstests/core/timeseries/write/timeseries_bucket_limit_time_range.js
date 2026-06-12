@@ -56,11 +56,19 @@ TimeseriesTest.run((insert) => {
             const viewDoc = userDocs[i];
             assert.eq(i, viewDoc._id, "unexpected _id in doc: " + i + ": " + tojson(viewDoc));
             assert.eq(i, viewDoc.x, "unexpected field x in doc: " + i + ": " + tojson(viewDoc));
-            assert.eq(docTimes[i], viewDoc[timeFieldName], "unexpected time in doc: " + i + ": " + tojson(viewDoc));
+            assert.eq(
+                docTimes[i],
+                viewDoc[timeFieldName],
+                "unexpected time in doc: " + i + ": " + tojson(viewDoc),
+            );
         }
 
         // Check buckets.
-        const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
+            .find()
+            .rawData()
+            .sort({"control.min._id": 1})
+            .toArray();
 
         // Check both buckets.
         // First bucket should be not contain both documents because the time of the second
@@ -143,7 +151,8 @@ TimeseriesTest.run((insert) => {
             // However, we should still guarantee the time limit range for buckets.
             assert.lte(2, bucketDocs.length, bucketDocs);
             bucketDocs.forEach((bucketDoc) => {
-                let bucketRangeMillis = bucketDoc.control.max[timeFieldName] - bucketDoc.control.min[timeFieldName];
+                let bucketRangeMillis =
+                    bucketDoc.control.max[timeFieldName] - bucketDoc.control.min[timeFieldName];
                 assert.gte(1000 * 60 * 60, bucketRangeMillis);
                 assert(
                     TimeseriesTest.isBucketCompressed(bucketDoc.control.version),

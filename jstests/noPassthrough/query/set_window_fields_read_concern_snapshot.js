@@ -26,10 +26,14 @@ function checkProfilerForDiskWrite(dbToCheck) {
     // Verify that this was a $setWindowFields stage as expected.
     if (profileObj.hasOwnProperty("originatingCommand")) {
         const firstStage = profileObj.originatingCommand.pipeline[0];
-        assert(firstStage.hasOwnProperty("$setWindowFields") || firstStage.hasOwnProperty("$lookup"));
+        assert(
+            firstStage.hasOwnProperty("$setWindowFields") || firstStage.hasOwnProperty("$lookup"),
+        );
     } else if (profileObj.hasOwnProperty("command")) {
         const firstStage = profileObj.command.pipeline[0];
-        assert(firstStage.hasOwnProperty("$setWindowFields") || firstStage.hasOwnProperty("$lookup"));
+        assert(
+            firstStage.hasOwnProperty("$setWindowFields") || firstStage.hasOwnProperty("$lookup"),
+        );
     } else {
         assert(false, "Profiler should have had command field", profileObj);
     }
@@ -41,7 +45,11 @@ for (let i = 0; i < 30; i++) {
 }
 assert.commandWorked(coll.insert(documents));
 
-setParameterOnAllNonConfigNodes(testDB.getMongo(), "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 1500);
+setParameterOnAllNonConfigNodes(
+    testDB.getMongo(),
+    "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+    1500,
+);
 const rsStatus = rst.status();
 const lastClusterTime = rsStatus.optimes.lastCommittedOpTime.ts;
 const lowerBound = -21;

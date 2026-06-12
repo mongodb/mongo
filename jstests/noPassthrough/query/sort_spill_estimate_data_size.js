@@ -40,7 +40,9 @@ for (let i = 0; i < numDocs; ++i) {
     totalSize += Object.bsonsize(doc);
 }
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 5000}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 5000}),
+);
 assert.commandWorked(coll.insert(docs));
 
 function createPipeline(collection) {

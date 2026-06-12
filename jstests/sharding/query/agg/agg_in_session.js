@@ -33,7 +33,10 @@ assert.commandWorked(mongosColl.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
 assert.eq(
     [{_id: 0}, {_id: 1}, {_id: 2}],
     mongosColl
-        .aggregate([{$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}},
+            {$sort: {_id: 1}},
+        ])
         .toArray(),
 );
 
@@ -41,7 +44,10 @@ assert.eq(
 assert.eq(
     [{_id: 0}, {_id: 1}, {_id: 2}],
     mongosColl
-        .aggregate([{$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}}, {$sort: {_id: 1}}])
+        .aggregate([
+            {$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}},
+            {$sort: {_id: 1}},
+        ])
         .toArray(),
 );
 assert.eq(mongosColl.aggregate([{$sort: {_id: 1}}, {$out: "testing"}]).itcount(), 0);

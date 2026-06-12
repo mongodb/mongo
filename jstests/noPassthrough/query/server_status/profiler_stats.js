@@ -37,7 +37,13 @@ assert.eq(0, profilerStats.tailable);
 
 // Test a tailable collection scan.
 assert.commandWorked(
-    db.runCommand({find: "system.profile", filter: {}, tailable: true, awaitData: true, batchSize: 0}),
+    db.runCommand({
+        find: "system.profile",
+        filter: {},
+        tailable: true,
+        awaitData: true,
+        batchSize: 0,
+    }),
 );
 profilerStats = getProfilerCollectionScansStats();
 assert.eq(2, profilerStats.total);

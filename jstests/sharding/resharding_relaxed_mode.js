@@ -30,7 +30,9 @@ const shardKey = {
 };
 
 // shard collection such that shard0 is the primary and shard0 and shard1 both own some documents
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 CreateShardedCollectionUtil.shardCollectionWithChunks(coll, shardKey, [
     {min: {key: MinKey}, max: {key: 5}, shard: st.shard0.shardName},
     {min: {key: 5}, max: {key: MaxKey}, shard: st.shard1.shardName},

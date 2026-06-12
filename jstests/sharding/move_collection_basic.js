@@ -35,7 +35,10 @@ const unsplittableCollNs = dbName + "." + unsplittableCollName;
 assert.commandWorked(st.s.getDB(dbName).runCommand({create: unsplittableCollName}));
 
 // Fail if missing required field toShard.
-assert.commandFailedWithCode(mongos.adminCommand({moveCollection: unsplittableCollNs}), ErrorCodes.IDLFailedToParse);
+assert.commandFailedWithCode(
+    mongos.adminCommand({moveCollection: unsplittableCollNs}),
+    ErrorCodes.IDLFailedToParse,
+);
 
 // Fail if command called on shard.
 assert.commandFailedWithCode(

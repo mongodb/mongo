@@ -88,7 +88,9 @@ TimeseriesTest.run((insert) => {
     {
         coll.drop();
         assert.commandWorked(
-            testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            testDB.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         // Create a TTL index on time, with a partial filter expression on the metaField.

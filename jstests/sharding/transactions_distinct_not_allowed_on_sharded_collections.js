@@ -37,7 +37,9 @@ flushRoutersAndRefreshShardMetadata(st, {ns: shardedNs, dbNames: [unshardedDbNam
 
 // Can run distinct on an unsharded collection.
 withTxnAndAutoRetryOnMongos(session, () => {
-    assert.eq(unshardedCollDB.runCommand({distinct: unshardedCollName, key: "_id"}).values, ["jack"]);
+    assert.eq(unshardedCollDB.runCommand({distinct: unshardedCollName, key: "_id"}).values, [
+        "jack",
+    ]);
 });
 
 // Cannot run distinct on a sharded collection.
@@ -47,7 +49,10 @@ withAbortAndRetryOnTransientTxnError(session, () => {
         shardedCollDB.runCommand({distinct: shardedCollName, key: "_id"}),
         ErrorCodes.OperationNotSupportedInTransaction,
     );
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 });
 
 session.endSession();

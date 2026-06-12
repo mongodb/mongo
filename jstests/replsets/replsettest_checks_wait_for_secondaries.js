@@ -38,7 +38,10 @@ assert.commandWorked(
 
 // Turn off the failpoint and immediately proceeed with checking db hashes.
 assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 // stopSet() will call checkReplicatedDBHashes

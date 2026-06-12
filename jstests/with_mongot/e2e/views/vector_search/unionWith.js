@@ -53,9 +53,20 @@ let pipeline = [
     {$unionWith: {coll: actionMovies.getName(), pipeline: [actionMoviesQuery]}},
 ];
 
-validateSearchExplain(moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
-    assertUnionWithSearchSubPipelineAppliedViews(explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
-});
+validateSearchExplain(
+    moviesWithEnrichedTitle,
+    pipeline,
+    false,
+    enrichedTitleViewPipeline,
+    (explain) => {
+        assertUnionWithSearchSubPipelineAppliedViews(
+            explain,
+            moviesColl,
+            actionMovies.getName(),
+            actionMoviesViewPipeline,
+        );
+    },
+);
 
 let outerExpected = buildExpectedResults([6, 4, 8, 9, 10], datasets.MOVIES_WITH_ENRICHED_TITLE);
 let innerExpected = buildExpectedResults([11, 5], datasets.MOVIES);
@@ -65,7 +76,10 @@ assertDocArrExpectedFuzzy([...outerExpected, ...innerExpected], results);
 // ===============================================================================
 // Case 2: $unionWith on an outer view and inner collection.
 // ===============================================================================
-pipeline = [moviesWithEnrichedTitleQuery, {$unionWith: {coll: moviesColl.getName(), pipeline: [moviesCollQuery]}}];
+pipeline = [
+    moviesWithEnrichedTitleQuery,
+    {$unionWith: {coll: moviesColl.getName(), pipeline: [moviesCollQuery]}},
+];
 
 validateSearchExplain(moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline);
 
@@ -81,7 +95,10 @@ assertDocArrExpectedFuzzy([...outerExpected, ...innerExpected], results);
 pipeline = [
     moviesCollQuery,
     {
-        $unionWith: {coll: moviesWithEnrichedTitle.getName(), pipeline: [moviesWithEnrichedTitleQuery]},
+        $unionWith: {
+            coll: moviesWithEnrichedTitle.getName(),
+            pipeline: [moviesWithEnrichedTitleQuery],
+        },
     },
 ];
 

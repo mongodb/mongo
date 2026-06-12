@@ -14,7 +14,9 @@ const coll = testDB[jsTestName()];
 coll.drop();
 
 const timeFieldName = "time";
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+);
 
 const getLatencyStats = () => {
     const stats = coll.aggregate([{$collStats: {latencyStats: {}}}]).next();

@@ -48,7 +48,11 @@ describe("Extension stage read concern restrictions", function () {
         const result = assert.commandWorked(
             testDB.runCommand({aggregate: collName, pipeline: extensionPipeline, cursor: {}}),
         );
-        assert.eq(result.cursor.firstBatch.length, 3, "Expected 3 documents with default read concern");
+        assert.eq(
+            result.cursor.firstBatch.length,
+            3,
+            "Expected 3 documents with default read concern",
+        );
     });
 
     it("should succeed with explicit local read concern", function () {
@@ -59,7 +63,11 @@ describe("Extension stage read concern restrictions", function () {
             readConcern: {level: "local"},
         };
         const result = assert.commandWorked(testDB.runCommand(cmd));
-        assert.eq(result.cursor.firstBatch.length, 3, "Expected 3 documents with local read concern");
+        assert.eq(
+            result.cursor.firstBatch.length,
+            3,
+            "Expected 3 documents with local read concern",
+        );
     });
 
     it("should fail with snapshot read concern", function () {

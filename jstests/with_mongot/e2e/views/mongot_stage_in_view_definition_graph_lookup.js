@@ -30,7 +30,11 @@ function runGraphLookup(fromViewName, fromViewPipeline) {
 
     // Sanity check to make sure the view returns what we expect.
     const internationalAirportsView = db[fromViewName];
-    assert.eq(internationalAirports, internationalAirportsView.count(), internationalAirportsView.find().toArray());
+    assert.eq(
+        internationalAirports,
+        internationalAirportsView.count(),
+        internationalAirportsView.find().toArray(),
+    );
 
     const results = coll
         .aggregate([

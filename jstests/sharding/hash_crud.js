@@ -12,7 +12,9 @@ let ns = dbName + "." + collName;
 let configDB = st.s.getDB("config");
 let testDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: "hashed"}}));
 
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
@@ -45,7 +47,9 @@ assert.eq(0, shards[1].getCollection(ns).count({updated: true}));
 assert.eq(0, shards[2].getCollection(ns).count({updated: true}));
 
 jsTest.log("Test 'findAndModify'");
-assert.commandWorked(testDB.runCommand({findAndModify: collName, query: {x: -1}, update: {$set: {y: 1}}}));
+assert.commandWorked(
+    testDB.runCommand({findAndModify: collName, query: {x: -1}, update: {$set: {y: 1}}}),
+);
 assert.eq(1, testDB.user.find({x: -1, y: 1}).count());
 assert.eq(0, shards[0].getCollection(ns).count({y: 1}));
 assert.eq(1, shards[1].getCollection(ns).count({y: 1}));

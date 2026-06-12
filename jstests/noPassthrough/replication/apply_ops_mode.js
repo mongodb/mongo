@@ -12,7 +12,10 @@ var db = standalone.getDB("test");
 // over a collection with recordIdsReplicated and there is no `rid` field on the
 // operation. We cannot add `rid` field as they are stripped from applyOps commands.
 assert.commandWorked(
-    standalone.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "alwaysOn"}),
+    standalone.adminCommand({
+        configureFailPoint: "overrideRecordIdsReplicatedFalse",
+        mode: "alwaysOn",
+    }),
 );
 
 let coll = db.getCollection("apply_ops_mode1");
@@ -34,7 +37,9 @@ for (let updateOp of [
     assert.eq(coll.count({x: 1}), 0);
 
     // Test that 'InitialSync' does not override (default) 'alwaysUpsert: false'.
-    assert.commandFailed(db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "InitialSync"}));
+    assert.commandFailed(
+        db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "InitialSync"}),
+    );
     assert.eq(coll.count({x: 1}), 0);
 
     // Test parsing failure.

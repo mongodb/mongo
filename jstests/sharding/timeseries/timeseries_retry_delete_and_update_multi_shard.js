@@ -20,18 +20,34 @@ const st = new ShardingTest({
 runTimeseriesRetryDeleteAndUpdateTest(
     st.s,
     function (db, coll, metaFieldName) {
-        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
-        assert.commandWorked(st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "B"}));
         assert.commandWorked(
-            st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "A"}, st.shard0.shardName),
+            db.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}),
         );
         assert.commandWorked(
-            st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "C"}, st.shard1.shardName),
+            st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "B"}),
+        );
+        assert.commandWorked(
+            st.moveChunk(
+                getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                {meta: "A"},
+                st.shard0.shardName,
+            ),
+        );
+        assert.commandWorked(
+            st.moveChunk(
+                getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                {meta: "C"},
+                st.shard1.shardName,
+            ),
         );
     },
     function (db, retriedCommandsCount, statementsRetried) {
-        const transactionsServerStatusShard0 = st.shard0.getDB(db.getName()).serverStatus().transactions;
-        const transactionsServerStatusShard1 = st.shard1.getDB(db.getName()).serverStatus().transactions;
+        const transactionsServerStatusShard0 = st.shard0
+            .getDB(db.getName())
+            .serverStatus().transactions;
+        const transactionsServerStatusShard1 = st.shard1
+            .getDB(db.getName())
+            .serverStatus().transactions;
 
         // On sharded clusters, retriedCommandsCount is the same as retriedStatementsCount because
         // each statement is executed on the shard individually as its own command.
@@ -40,7 +56,8 @@ runTimeseriesRetryDeleteAndUpdateTest(
         // transactions outside of the ones we simulate in this test.
         assert.lte(
             retriedCommandsCount + statementsRetried,
-            transactionsServerStatusShard0.retriedCommandsCount + transactionsServerStatusShard1.retriedCommandsCount,
+            transactionsServerStatusShard0.retriedCommandsCount +
+                transactionsServerStatusShard1.retriedCommandsCount,
             "Incorrect value for retriedCommandsCount in serverStatus, shard0: " +
                 tojson(transactionsServerStatusShard0) +
                 ", shard1: " +
@@ -50,8 +67,12 @@ runTimeseriesRetryDeleteAndUpdateTest(
         return statementsRetried;
     },
     function (db, retriedStatementsCount, statementsRetried) {
-        const transactionsServerStatusShard0 = st.shard0.getDB(db.getName()).serverStatus().transactions;
-        const transactionsServerStatusShard1 = st.shard1.getDB(db.getName()).serverStatus().transactions;
+        const transactionsServerStatusShard0 = st.shard0
+            .getDB(db.getName())
+            .serverStatus().transactions;
+        const transactionsServerStatusShard1 = st.shard1
+            .getDB(db.getName())
+            .serverStatus().transactions;
 
         assert.lte(
             retriedStatementsCount + statementsRetried,

@@ -23,7 +23,9 @@ const timeField = "tm";
 const metaField = "mt";
 
 // Create a timeseries collection.
-assert.commandWorked(mongosDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    mongosDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 // Create an index over a time-series measurement field.
 assert.commandWorked(mongosColl.createIndex({[metaField]: 1}));
 // Create an index directly over the raw buckets.
@@ -58,7 +60,11 @@ function checkIndexStats(coll, keys, sharded, rawOpSpec = {}) {
     );
     indices.forEach((index, i) => {
         assert(index.hasOwnProperty("shard"), tojson(index));
-        assert.docEq(keys[i], index.key, `Index should have key spec ${tojson(keys[i])}.\n${tojson(index)}`);
+        assert.docEq(
+            keys[i],
+            index.key,
+            `Index should have key spec ${tojson(keys[i])}.\n${tojson(index)}`,
+        );
     });
 }
 
@@ -86,7 +92,10 @@ const splitPoint = {
     meta: numberDoc / 2,
 };
 assert.commandWorked(
-    st.s.adminCommand({split: getTimeseriesCollForDDLOps(mongosDB, mongosColl).getFullName(), middle: splitPoint}),
+    st.s.adminCommand({
+        split: getTimeseriesCollForDDLOps(mongosDB, mongosColl).getFullName(),
+        middle: splitPoint,
+    }),
 );
 // Ensure that currently both chunks reside on the primary shard.
 let counts = st.chunkCounts(collName, dbName);

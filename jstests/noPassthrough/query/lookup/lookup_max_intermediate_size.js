@@ -21,7 +21,10 @@ function compareId(a, b) {
 
 // Helper for testing that pipeline returns correct set of results.
 function testPipeline(pipeline, expectedResult, collection) {
-    assert.eq(collection.aggregate(pipeline).toArray().sort(compareId), expectedResult.sort(compareId));
+    assert.eq(
+        collection.aggregate(pipeline).toArray().sort(compareId),
+        expectedResult.sort(compareId),
+    );
 }
 
 function runTest(coll, from, expectedErrorCode) {
@@ -88,7 +91,9 @@ const standalone = MongoRunner.runMongod({
 const db = standalone.getDB("test");
 
 db.lookUp.drop();
-const expectedErrorCode = checkSbeRestrictedOrFullyEnabled(db) ? ErrorCodes.ExceededMemoryLimit : 4568;
+const expectedErrorCode = checkSbeRestrictedOrFullyEnabled(db)
+    ? ErrorCodes.ExceededMemoryLimit
+    : 4568;
 runTest(db.lookUp, db.from, expectedErrorCode);
 
 MongoRunner.stopMongod(standalone);

@@ -153,9 +153,14 @@ let profileFilters = {
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline: [{$lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"}}],
+    pipeline: [
+        {$lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"}},
+    ],
     targetCollName: kShardedColl1Name,
-    explainAssertionObj: {expectedMergingShard: shard1, expectedMergingStages: ["$mergeCursors", "$lookup"]},
+    explainAssertionObj: {
+        expectedMergingShard: shard1,
+        expectedMergingStages: ["$mergeCursors", "$lookup"],
+    },
     expectedResults: expectedResults,
     comment: "outer_sharded_inner_unsplittable",
     profileFilters: profileFilters,
@@ -196,7 +201,9 @@ profileFilters = {
 // Both collections are unsplittable and are located on different shards. We should merge on the
 // shard which owns the inner collection in each case.
 shardTargetingTest.assertShardTargeting({
-    pipeline: [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}],
+    pipeline: [
+        {$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}},
+    ],
     targetCollName: kUnsplittable1CollName,
     explainAssertionObj: {
         expectedMergingShard: shard2,
@@ -218,7 +225,9 @@ profileFilters = {
     [shard2]: [{ns: kUnsplittable2CollName, expectedStages: []}],
 };
 shardTargetingTest.assertShardTargeting({
-    pipeline: [{$lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"}}],
+    pipeline: [
+        {$lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"}},
+    ],
     targetCollName: kUnsplittable2CollName,
     explainAssertionObj: {
         expectedMergingShard: shard1,
@@ -240,7 +249,9 @@ shardTargetingTest.assertShardTargeting({
 // side (by which point we've already created a distributed plan for this aggregation). Fix this so
 // that we pick shard2 as the merging node.
 const kViewName = "view_over_unsplittable_2";
-assert.commandWorked(db.createView(kViewName /* viewName */, kUnsplittable2CollName /* viewOn */, [] /* pipeline */));
+assert.commandWorked(
+    db.createView(kViewName /* viewName */, kUnsplittable2CollName /* viewOn */, [] /* pipeline */),
+);
 
 expectedResults = [
     {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1, unsplittable: 2}]},
@@ -302,19 +313,32 @@ shardTargetingTest.assertShardTargeting({
             $facet: {
                 pipe1: [
                     {
-                        $lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out_1"},
+                        $lookup: {
+                            from: kUnsplittable1CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_1",
+                        },
                     },
                 ],
                 pipe2: [
                     {
-                        $lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out_2"},
+                        $lookup: {
+                            from: kUnsplittable2CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_2",
+                        },
                     },
                 ],
             },
         },
     ],
     targetCollName: kShardedColl1Name,
-    explainAssertionObj: {expectedMergingShard: shard1, expectedMergingStages: ["$mergeCursors", "$facet"]},
+    explainAssertionObj: {
+        expectedMergingShard: shard1,
+        expectedMergingStages: ["$mergeCursors", "$facet"],
+    },
     expectedResults: expectedResults,
     comment: "facet_lookup_pipeline_merge_on_shard_1",
     profileFilters: profileFilters,
@@ -352,19 +376,32 @@ shardTargetingTest.assertShardTargeting({
             $facet: {
                 pipe1: [
                     {
-                        $lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out_2"},
+                        $lookup: {
+                            from: kUnsplittable2CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_2",
+                        },
                     },
                 ],
                 pipe2: [
                     {
-                        $lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out_1"},
+                        $lookup: {
+                            from: kUnsplittable1CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_1",
+                        },
                     },
                 ],
             },
         },
     ],
     targetCollName: kShardedColl1Name,
-    explainAssertionObj: {expectedMergingShard: shard2, expectedMergingStages: ["$mergeCursors", "$facet"]},
+    explainAssertionObj: {
+        expectedMergingShard: shard2,
+        expectedMergingStages: ["$mergeCursors", "$facet"],
+    },
     expectedResults: expectedResults,
     comment: "facet_lookup_pipeline_merge_on_shard_2",
     profileFilters: profileFilters,
@@ -391,12 +428,22 @@ shardTargetingTest.assertShardTargeting({
             $facet: {
                 pipe1: [
                     {
-                        $lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out_1"},
+                        $lookup: {
+                            from: kUnsplittable1CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_1",
+                        },
                     },
                 ],
                 pipe2: [
                     {
-                        $lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out_2"},
+                        $lookup: {
+                            from: kUnsplittable2CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_2",
+                        },
                     },
                 ],
             },
@@ -529,7 +576,12 @@ expectedResults = [
         pipeline: [
             {$lookup: {from: kShardedColl2Name, localField: "a", foreignField: "b", as: "out"}},
             {
-                $lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out_2"},
+                $lookup: {
+                    from: kUnsplittable1CollName,
+                    localField: "a",
+                    foreignField: "a",
+                    as: "out_2",
+                },
             },
         ],
         targetCollName: kShardedColl1Name,
@@ -681,7 +733,16 @@ shardTargetingTest.assertShardTargeting({
                 localField: "a",
                 foreignField: "a",
                 as: "out",
-                pipeline: [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: kUnsplittable2CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out",
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -728,12 +789,24 @@ shardTargetingTest.assertShardTargeting({
                 localField: "a",
                 foreignField: "a",
                 as: "out",
-                pipeline: [{$lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: kUnsplittable1CollName,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out",
+                        },
+                    },
+                ],
             },
         },
     ],
     targetCollName: kShardedColl1Name,
-    explainAssertionObj: {expectedMergingShard: shard2, expectedMergingStages: ["$mergeCursors", "$lookup"]},
+    explainAssertionObj: {
+        expectedMergingShard: shard2,
+        expectedMergingStages: ["$mergeCursors", "$lookup"],
+    },
     expectedResults: expectedResults,
     comment: "nested_lookup_inner_unsplittable_2_innermost_unsplittable_1",
     profileFilters: profileFilters,
@@ -769,7 +842,16 @@ shardTargetingTest.assertShardTargeting({
                 localField: "a",
                 foreignField: "a",
                 as: "out",
-                pipeline: [{$lookup: {from: kShardedColl2Name, localField: "a", foreignField: "b", as: "out"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: kShardedColl2Name,
+                            localField: "a",
+                            foreignField: "b",
+                            as: "out",
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -823,7 +905,16 @@ shardTargetingTest.assertShardTargeting({
                 localField: "a",
                 foreignField: "b",
                 as: "out",
-                pipeline: [{$lookup: {from: kUnsplittable1CollName, localField: "b", foreignField: "a", as: "out"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: kUnsplittable1CollName,
+                            localField: "b",
+                            foreignField: "a",
+                            as: "out",
+                        },
+                    },
+                ],
             },
         },
     ],
@@ -836,7 +927,9 @@ shardTargetingTest.assertShardTargeting({
 // Issue an aggregate featuring three levels of nested $lookups. All involved collections are
 // unsplittable, and all live on different shards. However, we expect to merge on the shard which
 // owns the top-level inner collection (in this case, shard1).
-assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable3CollFullName, toShard: shard0}));
+assert.commandWorked(
+    db.adminCommand({moveCollection: kUnsplittable3CollFullName, toShard: shard0}),
+);
 expectedResults = [
     {
         _id: 0,
@@ -931,9 +1024,15 @@ shardTargetingTest.assertShardTargeting({
 if (checkSbeRestrictedOrFullyEnabled(db)) {
     // Set up the unsplittable collections as originally set up: unsplittable 1 goes to shard1 while
     // unspittable 2 and 3 go to shard 2.
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable1CollFullName, toShard: shard1}));
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard2}));
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable3CollFullName, toShard: shard2}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable1CollFullName, toShard: shard1}),
+    );
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard2}),
+    );
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable3CollFullName, toShard: shard2}),
+    );
 
     // Both collections are unsplittable and are collocated on the same shard. Test that we can do
     // SBE $lookup pushdown, regardless of which collection is on the inner side.
@@ -943,7 +1042,16 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         {_id: 2, a: 101, unsplittable: 3, out: [{_id: 2, a: 101, unsplittable: 2}]},
     ];
     shardTargetingTest.assertShardTargeting({
-        pipeline: [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}],
+        pipeline: [
+            {
+                $lookup: {
+                    from: kUnsplittable2CollName,
+                    localField: "a",
+                    foreignField: "a",
+                    as: "out",
+                },
+            },
+        ],
         targetCollName: kUnsplittable3CollName,
         explainAssertionObj: {
             expectedShard: shard2,
@@ -959,7 +1067,16 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         {_id: 2, a: 101, unsplittable: 2, out: [{_id: 2, a: 101, unsplittable: 3}]},
     ];
     shardTargetingTest.assertShardTargeting({
-        pipeline: [{$lookup: {from: kUnsplittable3CollName, localField: "a", foreignField: "a", as: "out"}}],
+        pipeline: [
+            {
+                $lookup: {
+                    from: kUnsplittable3CollName,
+                    localField: "a",
+                    foreignField: "a",
+                    as: "out",
+                },
+            },
+        ],
         targetCollName: kUnsplittable2CollName,
         explainAssertionObj: {
             expectedShard: shard2,
@@ -993,7 +1110,9 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     });
 
     // If the two collections are co-located, we should use SBE.
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}),
+    );
 
     // Run the aggregation one first time to let the router gossip in the new placement for the
     // inner collection. Expect correct results, but sub-optimal pipeline splitting choice (no push
@@ -1026,7 +1145,9 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     // suboptimal plan, because it will still target the same shard instead of the new owner of the
     // unsplittable collection (i.e. shard0). However, it will correctly detect that the inner
     // collection is no longer collocated and not use SBE).
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard0}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard0}),
+    );
 
     shardTargetingTest.assertShardTargeting({
         pipeline: sbeLookupPipeline,
@@ -1050,13 +1171,17 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     // Utilities which modify sharding state.
     const moveCollectionFn = () => {
         jsTestLog("Moving" + kUnsplittable2CollFullName);
-        assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard0}));
+        assert.commandWorked(
+            db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard0}),
+        );
     };
 
     const shardCollectionFn = () => {
         jsTestLog("Sharding " + kUnsplittable2CollFullName);
         assert.commandWorked(db.getCollection(kUnsplittable2CollName).createIndex({a: 1}));
-        assert.commandWorked(db.adminCommand({shardCollection: kUnsplittable2CollFullName, key: {a: 1}}));
+        assert.commandWorked(
+            db.adminCommand({shardCollection: kUnsplittable2CollFullName, key: {a: 1}}),
+        );
         assert.commandWorked(st.splitAt(kUnsplittable2CollFullName, {a: 0}));
         assert.commandWorked(
             db.adminCommand({
@@ -1080,7 +1205,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     // Function which runs our $lookup and asserts the expected results. Used to gossip the updated
     // routing information of the inner collection.
     const runAggregateToRefresh = () => {
-        assert.eq(db[kUnsplittable1CollName].aggregate(sbeLookupPipeline).toArray(), expectedResults);
+        assert.eq(
+            db[kUnsplittable1CollName].aggregate(sbeLookupPipeline).toArray(),
+            expectedResults,
+        );
     };
 
     // Function which verifies that SBE $lookup fails with a 'QueryPlanKilled' error when a
@@ -1150,7 +1278,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         let sbeLookup = startParallelShell(
             funWithArgs(
                 function (dbName, collName, pipeline, expectedResults) {
-                    assert.eq(expectedResults, db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray());
+                    assert.eq(
+                        expectedResults,
+                        db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray(),
+                    );
                 },
                 kDbName,
                 kUnsplittable1CollName,
@@ -1172,14 +1303,18 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     };
 
     // Make sure 'kUnsplittable2Coll' is colocated with 'kUnsplittable1Coll'.
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}),
+    );
 
     runAggregateToRefresh();
     moveCollectionAcrossCommandsFn();
 
     // Test sharding the collection.
     // Make sure 'kUnsplittable2Coll' is colocated with 'kUnsplittable1Coll'.
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}),
+    );
     runAggregateToRefresh();
     shardCollectionAcrossCommandsFn();
 
@@ -1200,13 +1335,17 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         internalQueryExecYieldPeriodMS: 1,
     });
     assert.commandWorked(
-        st.rs1
-            .getPrimary()
-            .adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1, internalQueryExecYieldPeriodMS: 1}),
+        st.rs1.getPrimary().adminCommand({
+            setParameter: 1,
+            internalQueryExecYieldIterations: 1,
+            internalQueryExecYieldPeriodMS: 1,
+        }),
     );
 
     // Make sure 'kUnsplittable2Coll' is colocated with 'kUnsplittable1Coll'.
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}),
+    );
 
     // Refresh the routing table after 'kUnsplittable2Coll' moves.
     runAggregateToRefresh();
@@ -1215,7 +1354,9 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
 
     // Shard collection case.
     // Make sure 'kUnsplittable2Coll' is colocated with 'kUnsplittable1Coll'.
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard1}),
+    );
 
     // Refresh the routing table after 'kUnsplittable2Coll' moves.
     runAggregateToRefresh();
@@ -1237,7 +1378,9 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
             internalQueryExecYieldPeriodMS: originalYieldVals.internalQueryExecYieldPeriodMS,
         }),
     );
-    assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard2}));
+    assert.commandWorked(
+        db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard2}),
+    );
 }
 
 // ----------------------------------------
@@ -1254,10 +1397,15 @@ db[kShardedColl2Name].find().itcount();
     // Move kUnsplittable2CollName from shard2 to shard1. Use a mongos1 so that mongos0 is left
     // stale.
     assert.commandWorked(
-        st.s1.adminCommand({moveCollection: db[kUnsplittable2CollName].getFullName(), toShard: st.shard1.shardName}),
+        st.s1.adminCommand({
+            moveCollection: db[kUnsplittable2CollName].getFullName(),
+            toShard: st.shard1.shardName,
+        }),
     );
 
-    let pipeline = [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}];
+    let pipeline = [
+        {$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}},
+    ];
 
     let expectedResults = [
         {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1, unsplittable: 2}]},
@@ -1301,10 +1449,15 @@ db[kShardedColl2Name].find().itcount();
 {
     // Return kUnsplittable2CollName to shard2. Use mongos1 so that mongos0 is left stale.
     assert.commandWorked(
-        st.s1.adminCommand({moveCollection: db[kUnsplittable2CollName].getFullName(), toShard: st.shard2.shardName}),
+        st.s1.adminCommand({
+            moveCollection: db[kUnsplittable2CollName].getFullName(),
+            toShard: st.shard2.shardName,
+        }),
     );
 
-    let pipeline = [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}];
+    let pipeline = [
+        {$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}},
+    ];
 
     let expectedResults = [
         {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1, unsplittable: 2}]},
@@ -1346,10 +1499,15 @@ db[kShardedColl2Name].find().itcount();
 {
     // Unshard kShardedColl1Name and place it on shard2. Use mongos1 so that mongos0 is left stale.
     assert.commandWorked(
-        st.s1.adminCommand({unshardCollection: db[kShardedColl1Name].getFullName(), toShard: st.shard2.shardName}),
+        st.s1.adminCommand({
+            unshardCollection: db[kShardedColl1Name].getFullName(),
+            toShard: st.shard2.shardName,
+        }),
     );
 
-    let pipeline = [{$lookup: {from: kShardedColl1Name, localField: "a", foreignField: "a", as: "out"}}];
+    let pipeline = [
+        {$lookup: {from: kShardedColl1Name, localField: "a", foreignField: "a", as: "out"}},
+    ];
 
     let expectedResults = [
         {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1}]},
@@ -1367,7 +1525,8 @@ db[kShardedColl2Name].find().itcount();
             expectedShard: shard1,
         },
         expectedResults: expectedResults,
-        comment: "outer_unsplittable_1_inner_unsplittable_not_collocated_but_stale_router_believes_inner_is_sharded",
+        comment:
+            "outer_unsplittable_1_inner_unsplittable_not_collocated_but_stale_router_believes_inner_is_sharded",
     });
 
     // Check that router now routes optimally for the new placement (uses shard2 as merging shard).
@@ -1379,7 +1538,8 @@ db[kShardedColl2Name].find().itcount();
             expectedMergingStages: ["$mergeCursors", "$lookup"],
         },
         expectedResults: expectedResults,
-        comment: "outer_unsplittable_1_inner_unsplittable_not_collocated_but_stale_router_believes_inner_is_sharded",
+        comment:
+            "outer_unsplittable_1_inner_unsplittable_not_collocated_but_stale_router_believes_inner_is_sharded",
         profileFilters: {
             [shard0]: [],
             [shard1]: [{ns: kUnsplittable1CollName, expectedStages: []}],
@@ -1404,7 +1564,10 @@ db[kShardedColl2Name].find().itcount();
 {
     // Unshard kShardedColl2Name and place it on shard2. Use mongos1 so that mongos0 is left stale.
     assert.commandWorked(
-        st.s1.adminCommand({unshardCollection: db[kShardedColl2Name].getFullName(), toShard: st.shard2.shardName}),
+        st.s1.adminCommand({
+            unshardCollection: db[kShardedColl2Name].getFullName(),
+            toShard: st.shard2.shardName,
+        }),
     );
 
     let pipeline = [
@@ -1412,12 +1575,22 @@ db[kShardedColl2Name].find().itcount();
             $facet: {
                 pipe1: [
                     {
-                        $lookup: {from: kShardedColl1Name, localField: "a", foreignField: "a", as: "out_1"},
+                        $lookup: {
+                            from: kShardedColl1Name,
+                            localField: "a",
+                            foreignField: "a",
+                            as: "out_1",
+                        },
                     },
                 ],
                 pipe2: [
                     {
-                        $lookup: {from: kShardedColl2Name, localField: "a", foreignField: "b", as: "out_2"},
+                        $lookup: {
+                            from: kShardedColl2Name,
+                            localField: "a",
+                            foreignField: "b",
+                            as: "out_2",
+                        },
                     },
                 ],
             },
@@ -1507,7 +1680,9 @@ let cursor = coll.aggregate(pipeline, {batchSize: 1});
 assert(cursor.hasNext());
 
 // Move the outer collection to a different shard.
-assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable1CollFullName, toShard: shard0}));
+assert.commandWorked(
+    db.adminCommand({moveCollection: kUnsplittable1CollFullName, toShard: shard0}),
+);
 
 function iterateCursor(c) {
     while (c.hasNext()) {
@@ -1520,14 +1695,18 @@ function iterateCursor(c) {
 assert.throwsWithCode(() => iterateCursor(cursor), ErrorCodes.QueryPlanKilled);
 
 // Move the outer collection back to its original shard.
-assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable1CollFullName, toShard: shard1}));
+assert.commandWorked(
+    db.adminCommand({moveCollection: kUnsplittable1CollFullName, toShard: shard1}),
+);
 
 // Test moving the inner collection to another shard during $lookup execution. Because the
 // move happens in between executions of the inner pipeline, the query plan should not be
 // killed. Rather, we should be able to target the inner side to the new owning shard.
 cursor = coll.aggregate(pipeline, {batchSize: 1});
 assert(cursor.hasNext());
-assert.commandWorked(db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard0}));
+assert.commandWorked(
+    db.adminCommand({moveCollection: kUnsplittable2CollFullName, toShard: shard0}),
+);
 assert.doesNotThrow(() => iterateCursor(cursor));
 
 st.stop();

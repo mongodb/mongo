@@ -34,7 +34,11 @@ let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const dbName = "test";
@@ -94,7 +98,12 @@ assert.commandWorked(testColl.insert({_id: 2}));
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "initialSyncHangDuringCollectionClone",
+        mode: "off",
+    }),
+);
 
 // Wait for failpoint to be reached so we know that first attempt is finishing and is about to
 // fail.
@@ -114,7 +123,9 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 
 jsTestLog("Resuming initial sync for the second attempt");
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "failAndHangInitialSync", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "failAndHangInitialSync", mode: "off"}),
+);
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();

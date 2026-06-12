@@ -44,7 +44,9 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
             {min: {oldShardKey: 0}, max: {oldShardKey: MaxKey}, shard: donorShardNames[1]},
         ],
         newShardKeyPattern: {newShardKey: 1},
-        newShardKeyChunks: [{min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}, shard: recipientShardNames[0]}],
+        newShardKeyChunks: [
+            {min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}, shard: recipientShardNames[0]},
+        ],
     };
 
     const kInternalTxnType = {kRetryable: 1, kNonRetryable: 2};
@@ -90,7 +92,11 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
 
     // Helpers for defining transaction test cases.
 
-    function makeTransactionOptionsForInsertUpdateDeleteTest({isPreparedTxn, isLargeTxn, abortOnInitialTry}) {
+    function makeTransactionOptionsForInsertUpdateDeleteTest({
+        isPreparedTxn,
+        isLargeTxn,
+        abortOnInitialTry,
+    }) {
         const testId = ++lastTestId;
 
         const testCase = makeSessionOptionsForTest(testId);
@@ -144,7 +150,10 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
 
         // If testing a prepared and/or large transaction, define additional insert statements to
         // make the transaction a prepared and/or large transaction.
-        const additionalDocsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(testId, testCase);
+        const additionalDocsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(
+            testId,
+            testCase,
+        );
 
         testCase.setUpFunc = () => {
             const coll = mongosConn.getCollection(kNs);
@@ -169,7 +178,12 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         return testCase;
     }
 
-    function makeTransactionOptionsForFindAndModifyTest({imageType, isPreparedTxn, isLargeTxn, abortOnInitialTry}) {
+    function makeTransactionOptionsForFindAndModifyTest({
+        imageType,
+        isPreparedTxn,
+        isLargeTxn,
+        abortOnInitialTry,
+    }) {
         const testId = ++lastTestId;
 
         const testCase = makeSessionOptionsForTest(testId);
@@ -203,7 +217,10 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
                 } else {
                     assert.eq(res.lastErrorObject.updatedExisting, true);
                     delete res.value._id;
-                    assert.eq(res.value, imageType == kImageType.kPreImage ? docToUpdate : updatedDoc);
+                    assert.eq(
+                        res.value,
+                        imageType == kImageType.kPreImage ? docToUpdate : updatedDoc,
+                    );
                 }
             },
         });
@@ -215,7 +232,10 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
 
         // If testing a prepared and/or large transaction, define additional insert statements to
         // make the transaction a prepared and/or large transaction.
-        const docsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(testId, testCase);
+        const docsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(
+            testId,
+            testCase,
+        );
 
         testCase.setUpFunc = () => {
             const coll = mongosConn.getCollection(kNs);
@@ -279,8 +299,12 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
     function abortTransaction(lsid, txnNumber, isPreparedTxn) {
         if (isPreparedTxn) {
             const topology = DiscoverTopology.findConnectedNodes(mongosConn);
-            const donor0Conn = new Mongo(topology.shards[reshardingTest.donorShardNames[0]].primary);
-            assert.commandWorked(donor0Conn.adminCommand(makePrepareTransactionCmdObj(lsid, txnNumber)));
+            const donor0Conn = new Mongo(
+                topology.shards[reshardingTest.donorShardNames[0]].primary,
+            );
+            assert.commandWorked(
+                donor0Conn.adminCommand(makePrepareTransactionCmdObj(lsid, txnNumber)),
+            );
         }
         assert.commandWorked(mongosConn.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)));
     }
@@ -324,7 +348,11 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
 
             for (let i = 0; i < testCase.commands.length; i++) {
                 const command = testCase.commands[i];
-                const cmdObj = Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                const cmdObj = Object.assign({}, command.cmdObj, {
+                    lsid,
+                    txnNumber,
+                    autocommit: false,
+                });
                 if (i == 0) {
                     cmdObj.startTransaction = true;
                 }
@@ -346,7 +374,12 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
      * type. If this retry is expected to fail, asserts that the command to start the transaction
      * fails with an IncompleteTransactionHistory error.
      */
-    function runInternalTransactionOnRetry(txnType, testCase, isRetryAfterAbort, expectRetryToSucceed) {
+    function runInternalTransactionOnRetry(
+        txnType,
+        testCase,
+        isRetryAfterAbort,
+        expectRetryToSucceed,
+    ) {
         jsTest.log(
             `Retrying write statements executed in an internal transaction with options ${tojson({
                 id: testCase.id,
@@ -374,7 +407,11 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
                     continue;
                 }
 
-                const cmdObj = Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                const cmdObj = Object.assign({}, command.cmdObj, {
+                    lsid,
+                    txnNumber,
+                    autocommit: false,
+                });
                 if (i == 0) {
                     cmdObj.startTransaction = true;
                 }
@@ -431,7 +468,9 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
             }
         }
 
-        testCase.checkDocsFunc(!testCase.abortOnInitialTry || expectRetryToSucceed /* isTxnCommitted */);
+        testCase.checkDocsFunc(
+            !testCase.abortOnInitialTry || expectRetryToSucceed /* isTxnCommitted */,
+        );
     }
 
     /*
@@ -453,7 +492,9 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
                 // The cloneTimestamp is the boundary for whether a retryable write statement will
                 // be retryable after the resharding operation completes.
                 assert.soon(() => {
-                    const coordinatorDoc = mongosConn.getCollection("config.reshardingOperations").findOne({ns: kNs});
+                    const coordinatorDoc = mongosConn
+                        .getCollection("config.reshardingOperations")
+                        .findOne({ns: kNs});
 
                     return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
                 });
@@ -504,7 +545,12 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
 
         jsTest.log("Start retrying retryable internal transactions after restarting the recipient");
         for (let testCase of testCases) {
-            runInternalTransactionOnRetry(txnType, testCase, false /* isRetryAfterAbort */, expectRetryToSucceed);
+            runInternalTransactionOnRetry(
+                txnType,
+                testCase,
+                false /* isRetryAfterAbort */,
+                expectRetryToSucceed,
+            );
             // Also retry the write statements as retryable writes.
             runRetryableWriteOnRetry(testCase, expectRetryToSucceed);
         }
@@ -555,7 +601,8 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         // transaction that it finds. Therefore, a transaction that does not have a
         // config.transactions entry (i.e. an aborted unprepared transaction) is expected to be
         // retryable after resharding.
-        let expectRetryForTestCaseToSucceed = (testCase) => !testCase.isPreparedTxn && testCase.abortOnInitialTry;
+        let expectRetryForTestCaseToSucceed = (testCase) =>
+            !testCase.isPreparedTxn && testCase.abortOnInitialTry;
 
         jsTest.log("Start retrying retryable internal transactions after resharding");
         for (let testCase of testCases) {
@@ -578,11 +625,18 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         jsTest.log("Start retrying retryable internal transactions after restarting the recipient");
         for (let testCase of testCases) {
             const expectRetryToSucceed = expectRetryForTestCaseToSucceed(testCase);
-            runInternalTransactionOnRetry(txnType, testCase, false /* isRetryAfterAbort */, expectRetryToSucceed);
+            runInternalTransactionOnRetry(
+                txnType,
+                testCase,
+                false /* isRetryAfterAbort */,
+                expectRetryToSucceed,
+            );
             // Also retry the write statements as retryable writes.
             runRetryableWriteOnRetry(testCase, expectRetryToSucceed);
         }
-        jsTest.log("Finished retrying retryable internal transactions after restarting the recipient");
+        jsTest.log(
+            "Finished retrying retryable internal transactions after restarting the recipient",
+        );
     }
 
     this.InternalTxnType = kInternalTxnType;
@@ -596,7 +650,11 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         for (let isPreparedTxn of [true, false]) {
             for (let isLargeTxn of [true, false]) {
                 testCases.push(
-                    makeTransactionOptionsForInsertUpdateDeleteTest({isPreparedTxn, isLargeTxn, abortOnInitialTry}),
+                    makeTransactionOptionsForInsertUpdateDeleteTest({
+                        isPreparedTxn,
+                        isLargeTxn,
+                        abortOnInitialTry,
+                    }),
                 );
             }
         }
@@ -608,7 +666,11 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         for (let isPreparedTxn of [true, false]) {
             for (let isLargeTxn of [true, false]) {
                 testCases.push(
-                    makeTransactionOptionsForInsertUpdateDeleteTest({isPreparedTxn, isLargeTxn, abortOnInitialTry}),
+                    makeTransactionOptionsForInsertUpdateDeleteTest({
+                        isPreparedTxn,
+                        isLargeTxn,
+                        abortOnInitialTry,
+                    }),
                 );
             }
         }

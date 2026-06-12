@@ -109,7 +109,11 @@ function validateMoveChunkAfterRefine(ns, newField) {
         .toArray();
     chunksToMove.forEach((chunk) => {
         assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: {x: 0, [newField]: chunk.min[newField]}, to: secondaryShard}),
+            st.s.adminCommand({
+                moveChunk: ns,
+                find: {x: 0, [newField]: chunk.min[newField]},
+                to: secondaryShard,
+            }),
         );
     });
 
@@ -145,7 +149,12 @@ generateJumboChunk(kNsName, false /* isForNestedCase */);
 // to move the jumbo chunk.
 assert.commandWorked(st.s.adminCommand({addShardToZone: secondaryShard, zone: kZoneName}));
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: kNsName, min: {x: MinKey}, max: {x: MaxKey}, zone: kZoneName}),
+    st.s.adminCommand({
+        updateZoneKeyRange: kNsName,
+        min: {x: MinKey},
+        max: {x: MaxKey},
+        zone: kZoneName,
+    }),
 );
 
 validateBalancerBeforeRefine(kNsName);
@@ -170,13 +179,20 @@ generateJumboChunk(kNestedNsName, true /* isForNestedCase */);
 // to move the jumbo chunk.
 assert.commandWorked(st.s.adminCommand({addShardToZone: secondaryShard, zone: kZoneName}));
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: kNestedNsName, min: {x: MinKey}, max: {x: MaxKey}, zone: kZoneName}),
+    st.s.adminCommand({
+        updateZoneKeyRange: kNestedNsName,
+        min: {x: MinKey},
+        max: {x: MaxKey},
+        zone: kZoneName,
+    }),
 );
 
 validateBalancerBeforeRefine(kNestedNsName);
 
 assert.commandWorked(st.s.getCollection(kNestedNsName).createIndex({x: 1, "y.z": 1}));
-assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: kNestedNsName, key: {x: 1, "y.z": 1}}));
+assert.commandWorked(
+    st.s.adminCommand({refineCollectionShardKey: kNestedNsName, key: {x: 1, "y.z": 1}}),
+);
 
 validateBalancerAfterRefine(kNestedNsName, "y.z");
 
@@ -215,7 +231,9 @@ generateJumboChunk(kNestedNsName, true /* isForNestedCase */);
 validateMoveChunkBeforeRefine(kNestedNsName);
 
 assert.commandWorked(st.s.getCollection(kNestedNsName).createIndex({x: 1, "y.z": 1}));
-assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: kNestedNsName, key: {x: 1, "y.z": 1}}));
+assert.commandWorked(
+    st.s.adminCommand({refineCollectionShardKey: kNestedNsName, key: {x: 1, "y.z": 1}}),
+);
 
 validateMoveChunkAfterRefine(kNestedNsName, "y.z");
 

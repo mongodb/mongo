@@ -39,6 +39,9 @@ for (let i = 0; i < numSessions; i++) {
 assert.commandWorked(admin.runCommand(refresh), "failed to refresh");
 
 // Make sure we actually flushed the sessions
-assert.eq(numSessions, config.system.sessions.aggregate([{"$listSessions": {}}, {"$count": "count"}]).next().count);
+assert.eq(
+    numSessions,
+    config.system.sessions.aggregate([{"$listSessions": {}}, {"$count": "count"}]).next().count,
+);
 
 MongoRunner.stopMongod(mongod);

@@ -35,9 +35,8 @@ assert(admin.auth("admin", "pwd"));
 const external = st.s.getDB("$external");
 external.createUser({user: CLIENT_NAME, roles: [{role: "__system", db: "admin"}]});
 
-const initialStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms[
-    "MONGODB-X509"
-];
+const initialStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+    .authentication.mechanisms["MONGODB-X509"];
 jsTest.log("Initial stats: " + tojson(initialStats));
 
 const uri = "mongodb://" + st.s.host + "/admin?authMechanism=MONGODB-X509";
@@ -73,9 +72,8 @@ assert.eq(
     0,
 );
 
-const authStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms[
-    "MONGODB-X509"
-];
+const authStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
+    .mechanisms["MONGODB-X509"];
 jsTest.log("Authenticated stats: " + tojson(authStats));
 
 // Got and succeeded an additional speculation.

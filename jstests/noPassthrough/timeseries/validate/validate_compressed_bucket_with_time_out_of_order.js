@@ -38,12 +38,17 @@ const tsRecord = {
         "a": BinData(7, "EAAAAAAAgC4AAAAAAAAAAA=="),
     },
 };
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, tsColl).insertOne(tsRecord, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, tsColl).insertOne(tsRecord, getRawOperationSpec(testDB)),
+);
 
 let res = assert.commandWorked(tsColl.validate({checkBSONConformance: true}));
 assert(!res.valid);
 assert.eq(res.errors.length, 1);
 
-TimeseriesTest.checkForDocumentValidationFailureLog(getTimeseriesCollForRawOps(testDB, tsColl), tsRecord);
+TimeseriesTest.checkForDocumentValidationFailureLog(
+    getTimeseriesCollForRawOps(testDB, tsColl),
+    tsRecord,
+);
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});

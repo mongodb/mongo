@@ -111,7 +111,10 @@ let AuthReplTest = function (spec) {
     let cleanup = function () {
         let res = adminPri.runCommand({dropUser: testUser, writeConcern: {w: 2, wtimeout: 15000}});
         assert.commandWorked(res);
-        res = adminPri.runCommand({dropAllRolesFromDatabase: 1, writeConcern: {w: 2, wtimeout: 15000}});
+        res = adminPri.runCommand({
+            dropAllRolesFromDatabase: 1,
+            writeConcern: {w: 2, wtimeout: 15000},
+        });
         assert.commandWorked(res);
     };
 

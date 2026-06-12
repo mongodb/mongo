@@ -38,7 +38,9 @@ function makeCorrectCommand(sourceColl, destColl) {
         internalRenameIfOptionsAndIndexesMatch: 1,
         from: sourceColl.getFullName(),
         to: destColl.getFullName(),
-        indexes: IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(destColl.getIndexes()),
+        indexes: IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(
+            destColl.getIndexes(),
+        ),
         collectionOptions: collectionOptions,
         databaseVersion: dbVersion,
     };
@@ -61,7 +63,10 @@ function makeCorrectCommand(sourceColl, destColl) {
 // If source collection does not exist, command fails.
 {
     let cmd = makeCorrectCommand(inexistentColl, destColl);
-    assert.commandFailedWithCode(dbPrimaryShardConn.adminCommand(cmd), ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(
+        dbPrimaryShardConn.adminCommand(cmd),
+        ErrorCodes.NamespaceNotFound,
+    );
 }
 
 // If expected indexes don't match, command fails.
@@ -100,7 +105,9 @@ setupCollections();
 // If target collection is sharded, fails
 {
     let shardedColl = testDB["sharded"];
-    assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {x: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {x: 1}}),
+    );
     let cmd = makeCorrectCommand(sourceColl, shardedColl);
     assert.commandFailedWithCode(dbPrimaryShardConn.adminCommand(cmd), ErrorCodes.IllegalOperation);
 }

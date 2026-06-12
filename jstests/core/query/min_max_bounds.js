@@ -109,7 +109,11 @@ const testBoundsInclusivity = (indexDirection) => {
         assert.eq(count, coll.find(query).count(), {query, indexDirection});
 
         // Test with forward and backward sorts.
-        assert.eq(count, coll.find(query).sort({i: indexDirection}).count(), {query, sort: 1, indexDirection});
+        assert.eq(count, coll.find(query).sort({i: indexDirection}).count(), {
+            query,
+            sort: 1,
+            indexDirection,
+        });
         assert.eq(count, coll.find(query).sort({i: -1}).count(), {query, sort: -1, indexDirection});
     });
 };
@@ -143,8 +147,13 @@ const testBoundsInclusivityCompound = (lIndexDirection, nIndexDirection) => {
                     query["n"][ngt] = 2;
 
                     // Calculate the count of documents based on operators used.
-                    const count = (1 + opExtra[llt] + opExtra[lgt]) * (1 + opExtra[nlt] + opExtra[ngt]);
-                    assert.eq(count, coll.find(query).count(), {query, lIndexDirection, nIndexDirection});
+                    const count =
+                        (1 + opExtra[llt] + opExtra[lgt]) * (1 + opExtra[nlt] + opExtra[ngt]);
+                    assert.eq(count, coll.find(query).count(), {
+                        query,
+                        lIndexDirection,
+                        nIndexDirection,
+                    });
 
                     // Also check with all posible sort combinations.
                     const withSort = (lSort, nSort) => {

@@ -31,7 +31,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.remove = function remove(db, collName) {
         let res = db[collName].remove({
             // Server-side JS does not support Random.randInt, so use Math.floor/random instead
-            $where: "this.x === Math.floor(Math.random() * " + this.randomBound + ") " + "&& this.tid === " + this.tid,
+            $where:
+                "this.x === Math.floor(Math.random() * " +
+                this.randomBound +
+                ") " +
+                "&& this.tid === " +
+                this.tid,
         });
         assert.gte(res.nRemoved, 0);
         assert.lte(res.nRemoved, this.insertedDocuments);

@@ -19,7 +19,9 @@ const coll = db[collName];
 coll.drop();
 
 // Explain of delete against a non-existent collection returns an EOF plan.
-let explain = assert.commandWorked(db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit: 0}]}}));
+let explain = assert.commandWorked(
+    db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit: 0}]}}),
+);
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
 let eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
 eofStages.forEach((stage) => assert.eq(stage.type, "nonExistentNamespace"));
@@ -29,7 +31,9 @@ assertCollectionDoesNotExist(collName);
 
 // Explain of an update with upsert:false returns an EOF plan.
 explain = assert.commandWorked(
-    db.runCommand({explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]}}),
+    db.runCommand({
+        explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]},
+    }),
 );
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
 eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
@@ -39,7 +43,9 @@ assertCollectionDoesNotExist(collName);
 
 // Explain of an update with upsert:true returns an EOF plan, and does not create a collection.
 explain = assert.commandWorked(
-    db.runCommand({explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]}}),
+    db.runCommand({
+        explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]},
+    }),
 );
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
 eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");

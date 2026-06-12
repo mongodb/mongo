@@ -77,7 +77,11 @@ function testAddWithSnapshot(secondariesDown) {
         rst.awaitSecondaryNodes(null, [primary]);
     }
     // Atlas always adds nodes with 0 votes and priority
-    const newNode = rst.add({rsConfig: {votes: 0, priority: 0}, noCleanData: true, dbpath: newdbpath});
+    const newNode = rst.add({
+        rsConfig: {votes: 0, priority: 0},
+        noCleanData: true,
+        dbpath: newdbpath,
+    });
     // The second disconnect ensures we can't reach the new node from the 'down' nodes.
     disconnectSecondaries(secondariesDown);
     const newConfig = rst.getReplSetConfig();
@@ -85,7 +89,11 @@ function testAddWithSnapshot(secondariesDown) {
     config.version += 1;
     jsTestLog("Reconfiguring set to add node.");
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: useForce}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: useForce,
+        }),
     );
 
     jsTestLog("Waiting for node to sync.");
@@ -96,7 +104,11 @@ function testAddWithSnapshot(secondariesDown) {
     config.version += 1;
     config.members[3].votes = 1;
     assert.commandWorked(
-        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: useForce}),
+        primary.adminCommand({
+            replSetReconfig: config,
+            maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+            force: useForce,
+        }),
     );
     if (!useForce) {
         // Make sure we can replicate to it.  This only works if the set was healthy, otherwise we
@@ -118,7 +130,9 @@ function testAddWithSnapshot(secondariesDown) {
     rst.checkReplicatedDataHashes();
 
     // Stabilize the cluster before removing the new node.
-    assert.commandWorked(testDb[testName].insert({addWithSnapshot: secondariesDown, msg: "Reconnected secondaries"}));
+    assert.commandWorked(
+        testDb[testName].insert({addWithSnapshot: secondariesDown, msg: "Reconnected secondaries"}),
+    );
     rst.awaitReplication();
 
     // Remove our extra node.
@@ -137,7 +151,9 @@ function testReplaceWithSnapshot(node, secondariesDown) {
     jsTestLog("Backing up the primary node");
     backupData(primary, backupdbpath);
     // Add some data after the backup.
-    assert.commandWorked(testDb[testName].insert({replaceWithSnapshot: secondariesDown}, {writeConcern: {w: 1}}));
+    assert.commandWorked(
+        testDb[testName].insert({replaceWithSnapshot: secondariesDown}, {writeConcern: {w: 1}}),
+    );
     disconnectSecondaries(secondariesDown);
     if (useForce) {
         // Wait for the set to become unhealthy.

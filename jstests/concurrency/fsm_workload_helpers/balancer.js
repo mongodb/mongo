@@ -7,12 +7,16 @@
 export var BalancerHelper = (function () {
     // Disables balancing for a given collection.
     function disableBalancerForCollection(db, ns) {
-        assert.commandWorked(db.getSiblingDB("config").collections.update({_id: ns}, {$set: {"noBalance": true}}));
+        assert.commandWorked(
+            db.getSiblingDB("config").collections.update({_id: ns}, {$set: {"noBalance": true}}),
+        );
     }
 
     // Enables balancing for a given collection.
     function enableBalancerForCollection(db, ns) {
-        assert.commandWorked(db.getSiblingDB("config").collections.update({_id: ns}, {$unset: {"noBalance": 1}}));
+        assert.commandWorked(
+            db.getSiblingDB("config").collections.update({_id: ns}, {$unset: {"noBalance": 1}}),
+        );
     }
 
     // Joins the ongoing balancer round (if enabled at all).

@@ -65,7 +65,9 @@ describe("Test create collection from stale mongos", function () {
     });
 
     it("Shard collection after dropping database via different router", () => {
-        assert.commandWorked(this.staleMongos.adminCommand({shardCollection: dbName + "." + collName, key: {x: 1}}));
+        assert.commandWorked(
+            this.staleMongos.adminCommand({shardCollection: dbName + "." + collName, key: {x: 1}}),
+        );
 
         // Verify that `collName` exists.
         assert.eq(

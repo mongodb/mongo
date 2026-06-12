@@ -37,7 +37,8 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
     assert.eq(
         undefined,
         op.connectionId,
-        "Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: " + tojson(op),
+        "Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: " +
+            tojson(op),
     );
     assert.eq(
         coll.getFullName(),
@@ -47,11 +48,18 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
 });
 
 // Index build should be present in the config.system.indexBuilds collection.
-const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
 const indexBuildUUID = indexMap["a_1"].buildUUID;
 assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
 
-assert.commandWorked(primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({
+        configureFailPoint: "hangIndexBuildBeforeAbortCleanUp",
+        mode: "alwaysOn",
+    }),
+);
 
 // Signal the index builder thread to exit.
 assert.commandWorked(testDB.killOp(opId));
@@ -71,7 +79,9 @@ assert.commandWorked(testDB.adminCommand({replSetStepDown: 10, secondaryCatchUpP
 rst.awaitSecondaryNodes(null, [primary]);
 
 // Resume the abort.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "off"}),
+);
 
 awaitIndexBuild();
 

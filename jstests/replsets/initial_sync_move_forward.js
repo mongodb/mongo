@@ -45,7 +45,10 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(primaryColl.createIndex({x: 1}, {unique: true}));
 
 // Add a secondary.
-let secondary = rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
+let secondary = rst.add({
+    setParameter: "numInitialSyncAttempts=1",
+    rsConfig: {votes: 0, priority: 0},
+});
 secondary.setSecondaryOk();
 let secondaryColl = secondary.getDB("test").coll;
 

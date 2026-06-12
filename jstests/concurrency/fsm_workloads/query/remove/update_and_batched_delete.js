@@ -33,7 +33,9 @@ export const $config = (function () {
         },
         delete: function doDelete(db, collName) {
             assert.commandWorked(
-                db[collName].deleteMany({updateTime: {$lt: new Date(Date.now() - timeToLiveSeconds * 1000)}}),
+                db[collName].deleteMany({
+                    updateTime: {$lt: new Date(Date.now() - timeToLiveSeconds * 1000)},
+                }),
             );
         },
     };

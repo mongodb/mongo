@@ -59,7 +59,10 @@ runJoinsExistingOperationTest(reshardingTest, {
         newChunks: newChunks,
     },
     makeJoiningThreadFn: makeReshardCollectionThread,
-    joiningThreadExtraArgs: {newShardKey: {newKey: 1}, presetReshardedChunks: presetReshardedChunks},
+    joiningThreadExtraArgs: {
+        newShardKey: {newKey: 1},
+        presetReshardedChunks: presetReshardedChunks,
+    },
 });
 
 reshardingTest.teardown();

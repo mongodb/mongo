@@ -24,7 +24,10 @@
  * ]
  */
 
-import {getPlanCacheKeyFromExplain, getPlanCacheShapeHashFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanCacheKeyFromExplain,
+    getPlanCacheShapeHashFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 
@@ -41,20 +44,29 @@ function runAndGetResultsAndPlanCacheStats(args) {
         explain = coll.explain().aggregate(args.pipeline);
     }
     const planCacheShapeHash = getPlanCacheShapeHashFromExplain(explain);
-    return [results, coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheShapeHash}}]).toArray()];
+    return [
+        results,
+        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheShapeHash}}]).toArray(),
+    ];
 }
 
 function assertDistinctUsesPlanCacheCorrectly(distinct, filter) {
     coll.getPlanCache().clear();
     assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).toArray().length);
-    let [resultsA, statsA] = runAndGetResultsAndPlanCacheStats({distinct: distinct, filter: filter});
+    let [resultsA, statsA] = runAndGetResultsAndPlanCacheStats({
+        distinct: distinct,
+        filter: filter,
+    });
     assert.eq(1, statsA.length);
     assert.eq(false, statsA[0].isActive);
     assert.eq(filter, statsA[0].createdFromQuery.query, statsA);
     assert.eq({}, statsA[0].createdFromQuery.sort, statsA);
     assert.eq({}, statsA[0].createdFromQuery.projection, statsA);
 
-    let [resultsB, statsB] = runAndGetResultsAndPlanCacheStats({distinct: distinct, filter: filter});
+    let [resultsB, statsB] = runAndGetResultsAndPlanCacheStats({
+        distinct: distinct,
+        filter: filter,
+    });
     assert.eq(1, statsB.length);
     assert.eq(true, statsB[0].isActive);
 
@@ -126,7 +138,10 @@ function confirmDifferentPlanCacheEntries(pipelineA, pipelineB) {
     assertDistinctUsesPlanCacheCorrectly("x", {x: {$gt: 3}, y: 5});
 
     // Confirm that a different predicate with a matching shape uses the same plan cache entry.
-    const stats = runAndGetResultsAndPlanCacheStats({distinct: "x", filter: {x: {$gt: 5}, y: 5}})[1];
+    const stats = runAndGetResultsAndPlanCacheStats({
+        distinct: "x",
+        filter: {x: {$gt: 5}, y: 5},
+    })[1];
     assert.eq(1, stats.length);
     assert.eq(true, stats[0].isActive);
 }
@@ -187,7 +202,10 @@ function confirmDifferentPlanCacheEntries(pipelineA, pipelineB) {
     ]);
 
     // Choose DISTINCT_SCAN from plan cache.
-    assertAggDistinctUsesPlanCacheCorrectly([{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
+    assertAggDistinctUsesPlanCacheCorrectly([
+        {$sort: {a: 1, b: 1}},
+        {$group: {_id: "$a", accum: {$first: "$b"}}},
+    ]);
 
     // $group with $top/$bottom uses plan cache
     assertAggDistinctUsesPlanCacheCorrectly([
@@ -204,7 +222,10 @@ function confirmDifferentPlanCacheEntries(pipelineA, pipelineB) {
 
     // Confirm that a different pipeline with a matching shape uses plan cache.
     const stats = runAndGetResultsAndPlanCacheStats({
-        pipeline: [{$match: {a: {$ne: 5}}}, {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}],
+        pipeline: [
+            {$match: {a: {$ne: 5}}},
+            {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}},
+        ],
     })[1];
     assert.eq(1, stats.length);
     assert.eq(true, stats[0].isActive);
@@ -216,7 +237,10 @@ function confirmDifferentPlanCacheEntries(pipelineA, pipelineB) {
     ]);
 
     // Choose DISTINCT_SCAN from plan cache over IXSCAN.
-    assertAggDistinctUsesPlanCacheCorrectly([{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
+    assertAggDistinctUsesPlanCacheCorrectly([
+        {$sort: {a: -1, b: -1}},
+        {$group: {_id: "$a", accum: {$last: "$b"}}},
+    ]);
 }
 
 {
@@ -289,13 +313,24 @@ function confirmDifferentPlanCacheEntries(pipelineA, pipelineB) {
     );
 
     confirmDifferentPlanCacheEntries(
-        [{$match: {a: {$gt: 0}, b: {$ne: 3}}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$c"}}}],
-        [{$match: {a: {$gt: 0}, b: {$ne: 3}}}, {$sort: {a: 1}}, {$group: {_id: "$a", accum: {$first: "$c"}}}],
+        [
+            {$match: {a: {$gt: 0}, b: {$ne: 3}}},
+            {$sort: {a: 1, b: 1}},
+            {$group: {_id: "$a", accum: {$first: "$c"}}},
+        ],
+        [
+            {$match: {a: {$gt: 0}, b: {$ne: 3}}},
+            {$sort: {a: 1}},
+            {$group: {_id: "$a", accum: {$first: "$c"}}},
+        ],
     );
 
     // Confirm that equivalent distincts and aggregations have different plan cache entries.
     const filter = {a: {$gte: 4}, b: {$lt: 5}};
     const distinctExplain = coll.explain().distinct("a", filter);
     const pipelineExplain = coll.explain().aggregate([{$match: filter}, {$group: {_id: "$a"}}]);
-    assert.neq(getPlanCacheKeyFromExplain(distinctExplain), getPlanCacheKeyFromExplain(pipelineExplain));
+    assert.neq(
+        getPlanCacheKeyFromExplain(distinctExplain),
+        getPlanCacheKeyFromExplain(pipelineExplain),
+    );
 }

@@ -34,12 +34,16 @@ let arbiter = replTest.getArbiter();
 
 const dbName = jsTestName();
 const collName = "test";
-const reapErrorMsgRegex = new RegExp("Sessions collection is not set up.*waiting until next sessions reap interval");
+const reapErrorMsgRegex = new RegExp(
+    "Sessions collection is not set up.*waiting until next sessions reap interval",
+);
 
 // Set up a session with a retryable insert and findAndModify.
 let session = primary.startSession({retryWrites: 1});
 assert.commandWorked(session.getDatabase(dbName)[collName].save({x: 1}));
-let result = session.getDatabase(dbName)[collName].findAndModify({query: {x: 1}, update: {$set: {y: 1}}});
+let result = session
+    .getDatabase(dbName)
+    [collName].findAndModify({query: {x: 1}, update: {$set: {y: 1}}});
 // The findAndModify helper returns the document and not the whole response. Assert on the value of
 // `x`. Though it's expected a command error would become an exception that fails the test.
 assert.eq(1, result["x"], "Whole result: " + result);

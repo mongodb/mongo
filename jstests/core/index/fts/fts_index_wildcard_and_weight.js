@@ -4,7 +4,10 @@ let coll = db.getCollection(jsTestName());
 coll.drop();
 
 assert.commandWorked(
-    coll.createIndex({"$**": "text"}, {name: "fullTextIndex", weights: {name: 500}, default_language: "english"}),
+    coll.createIndex(
+        {"$**": "text"},
+        {name: "fullTextIndex", weights: {name: 500}, default_language: "english"},
+    ),
 );
 assert.commandWorked(coll.insert({name: "Spot", guardian: "Kevin"}));
 assert.commandWorked(coll.insert({name: "Kevin", guardian: "Spot"}));
@@ -27,8 +30,12 @@ assert.commandWorked(
 );
 assert.commandWorked(coll.insert({name: "Spot", guardian: "Kevin", special: "Dog", tag: "Nice"}));
 assert.commandWorked(coll.insert({name: "Kevin", guardian: "Spot", special: "Human", tag: "Mean"}));
-assert.commandWorked(coll.insert({name: "Whiskers", guardian: "Carl", special: "Cat", tag: "Kevin"}));
-assert.commandWorked(coll.insert({name: "McFlufferson", guardian: "Steve", special: "Kevin", tag: "Fluffy"}));
+assert.commandWorked(
+    coll.insert({name: "Whiskers", guardian: "Carl", special: "Cat", tag: "Kevin"}),
+);
+assert.commandWorked(
+    coll.insert({name: "McFlufferson", guardian: "Steve", special: "Kevin", tag: "Fluffy"}),
+);
 
 results = coll
     .aggregate([

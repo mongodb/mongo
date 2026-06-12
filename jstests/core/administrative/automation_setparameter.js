@@ -23,13 +23,16 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.adminCommand({
         setParameter: 1,
-        automationServiceDescriptor: "1234567812345678123456781234567812345678123456781234567812345678X",
+        automationServiceDescriptor:
+            "1234567812345678123456781234567812345678123456781234567812345678X",
     }),
     ErrorCodes.Overflow,
 );
 
 // Short strings are okay.
-res = assert.commandWorked(db.adminCommand({setParameter: 1, automationServiceDescriptor: "some_service"}));
+res = assert.commandWorked(
+    db.adminCommand({setParameter: 1, automationServiceDescriptor: "some_service"}),
+);
 
 // Verify that the setParameter 'was' field contains what we expected.
 if (original) assert.eq(original, res.was);

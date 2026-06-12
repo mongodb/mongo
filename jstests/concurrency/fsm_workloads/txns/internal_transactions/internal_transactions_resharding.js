@@ -46,7 +46,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // The aggregate command is expected to involve running getMore commands which are not
         // retryable after a collection rename (done by resharding).
         return (
-            $baseConfig.data.isAcceptableAggregateCmdError(res) || (res && interruptedQueryErrors.includes(res.code))
+            $baseConfig.data.isAcceptableAggregateCmdError(res) ||
+            (res && interruptedQueryErrors.includes(res.code))
         );
     };
 
@@ -72,7 +73,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         executeReshardCollection(this, db, collName, connCache, false /*sameKeyResharding*/);
     };
 
-    $config.states.reshardCollectionSameKey = function reshardCollectionSameKey(db, collName, connCache) {
+    $config.states.reshardCollectionSameKey = function reshardCollectionSameKey(
+        db,
+        collName,
+        connCache,
+    ) {
         executeReshardCollection(this, db, collName, connCache, this._allowSameKeyResharding);
     };
 

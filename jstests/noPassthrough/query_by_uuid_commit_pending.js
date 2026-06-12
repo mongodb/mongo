@@ -31,7 +31,8 @@ const nDocs = 5;
 assert.commandWorked(db.createCollection(dummyCollName));
 
 function listCollectionsEntryWithFilter(db, collName) {
-    return assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}})).cursor.firstBatch[0];
+    return assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}))
+        .cursor.firstBatch[0];
 }
 
 function listCollectionsEntryWithoutFilter(db, collName) {
@@ -42,7 +43,14 @@ function listCollectionsEntryWithoutFilter(db, collName) {
 
 const listCollectionVariants = [listCollectionsEntryWithFilter, listCollectionsEntryWithoutFilter];
 
-function runTestCase(dbName, collName, parallelShellCommand, getUUIDBeforeCommand, fpName, getListCollectionsEntryFn) {
+function runTestCase(
+    dbName,
+    collName,
+    parallelShellCommand,
+    getUUIDBeforeCommand,
+    fpName,
+    getListCollectionsEntryFn,
+) {
     jsTest.log(`Test case with: ${getListCollectionsEntryFn.name}`);
 
     let uuid;
@@ -101,7 +109,9 @@ function testDurableCommitPendingCreate(getListCollectionsEntryFn) {
     assert.eq(nssTransactionCount, 0);
     sessionConnection.commitTransaction();
     sessionConnection.startTransaction();
-    const uuidTransactionRes = assert.commandWorked(sessionConnection.getDatabase(dbName).runCommand({find: res.uuid}));
+    const uuidTransactionRes = assert.commandWorked(
+        sessionConnection.getDatabase(dbName).runCommand({find: res.uuid}),
+    );
     const uuidTransactionCount = new DBCommandCursor(db, uuidTransactionRes).itcount();
     assert.eq(nssTransactionCount, uuidTransactionCount);
     sessionConnection.commitTransaction();

@@ -22,7 +22,11 @@ const secondary = secondaries[0];
 const primaryDB = primary.getDB(dbName);
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Create capped collection on primary and allow it to be committed.
@@ -59,7 +63,12 @@ let waitForGetMoreToFinish = startParallelShell(async () => {
 
     // Create awaitData cursor and get all data written so that a following getMore will have to
     // wait for more data.
-    let cmdRes = awaitDataDB.runCommand({find: collName, batchSize: 2, awaitData: true, tailable: true});
+    let cmdRes = awaitDataDB.runCommand({
+        find: collName,
+        batchSize: 2,
+        awaitData: true,
+        tailable: true,
+    });
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, dbName + "." + collName);
@@ -97,7 +106,10 @@ let waitForGetMoreToFinish = startParallelShell(async () => {
 }, secondary.port);
 
 // Ensure that we've hit the failpoint before moving on.
-checkLog.contains(secondary, "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point enabled");
+checkLog.contains(
+    secondary,
+    "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point enabled",
+);
 
 // Restart replication on the other nodes.
 jsTestLog("Restarting replication");
@@ -117,7 +129,10 @@ jsTestLog("All nodes caught up");
 
 // Disable failpoint.
 assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "planExecutorHangBeforeShouldWaitForInserts", mode: "off"}),
+    secondary.adminCommand({
+        configureFailPoint: "planExecutorHangBeforeShouldWaitForInserts",
+        mode: "off",
+    }),
 );
 
 waitForGetMoreToFinish();

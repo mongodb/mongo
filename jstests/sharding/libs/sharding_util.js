@@ -97,7 +97,8 @@ export function isSlowBuild(conn) {
         buildInfo.isAddressSanitizerActive() ||
         buildInfo.isThreadSanitizerActive() ||
         buildInfo.isDebug() ||
-        (rawBuildInfo.hasOwnProperty("buildEnvironment") && rawBuildInfo.buildEnvironment.target_os == "windows")
+        (rawBuildInfo.hasOwnProperty("buildEnvironment") &&
+            rawBuildInfo.buildEnvironment.target_os == "windows")
     );
 }
 

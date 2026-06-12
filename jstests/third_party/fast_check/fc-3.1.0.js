@@ -11,7 +11,9 @@ export var fc = (function () {
                   : {};
 
     function getDefaultExportFromCjs(x) {
-        return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
+        return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default")
+            ? x["default"]
+            : x;
     }
 
     var fastCheckDefault$1 = {};
@@ -241,7 +243,8 @@ export var fc = (function () {
         constructor(value_, context, customGetValue = undefined) {
             this.value_ = value_;
             this.context = context;
-            this.hasToBeCloned = customGetValue !== undefined || (0, symbols_1$c.hasCloneMethod)(value_);
+            this.hasToBeCloned =
+                customGetValue !== undefined || (0, symbols_1$c.hasCloneMethod)(value_);
             this.readOnce = false;
             if (this.hasToBeCloned) {
                 Object.defineProperty(this, "value", {
@@ -381,7 +384,9 @@ export var fc = (function () {
         }
         shrink(value, context) {
             if (this.isSafeContext(context)) {
-                return this.arb.shrink(context.originalValue, context.originalContext).map(this.bindValueMapper);
+                return this.arb
+                    .shrink(context.originalValue, context.originalContext)
+                    .map(this.bindValueMapper);
             }
             if (this.unmapper !== undefined) {
                 const unmapped = this.unmapper(value);
@@ -394,7 +399,8 @@ export var fc = (function () {
             const mappedValue = this.mapper(sourceValue);
             if (
                 v.hasToBeCloned &&
-                ((typeof mappedValue === "object" && mappedValue !== null) || typeof mappedValue === "function") &&
+                ((typeof mappedValue === "object" && mappedValue !== null) ||
+                    typeof mappedValue === "function") &&
                 Object.isExtensible(mappedValue) &&
                 !(0, symbols_1$b.hasCloneMethod)(mappedValue)
             ) {
@@ -513,7 +519,9 @@ export var fc = (function () {
             for (let idx = 0; idx !== arbs.length; ++idx) {
                 const arb = arbs[idx];
                 if (arb == null || arb.generate == null)
-                    throw new Error(`Invalid parameter encountered at index ${idx}: expecting an Arbitrary`);
+                    throw new Error(
+                        `Invalid parameter encountered at index ${idx}: expecting an Arbitrary`,
+                    );
             }
         }
         static makeItCloneable(vs, values) {
@@ -565,7 +573,11 @@ export var fc = (function () {
                     .shrink(value[idx], safeContext[idx])
                     .map((v) => {
                         const nextValues = value.map(
-                            (v, idx) => new Value_1$i.Value((0, symbols_1$a.cloneIfNeeded)(v), safeContext[idx]),
+                            (v, idx) =>
+                                new Value_1$i.Value(
+                                    (0, symbols_1$a.cloneIfNeeded)(v),
+                                    safeContext[idx],
+                                ),
                         );
                         return nextValues
                             .slice(0, idx)
@@ -630,7 +642,11 @@ export var fc = (function () {
                 return value;
             }
             if (value.hasToBeCloned) {
-                return new Value_1.Value(value.value_, exports.UndefinedContextPlaceholder, () => value.value);
+                return new Value_1.Value(
+                    value.value_,
+                    exports.UndefinedContextPlaceholder,
+                    () => value.value,
+                );
             }
             return new Value_1.Value(value.value_, exports.UndefinedContextPlaceholder);
         }
@@ -678,8 +694,12 @@ export var fc = (function () {
                 return Stream_1$j.Stream.nil();
             }
             const safeContext =
-                value.context !== NoUndefinedAsContext_1$2.UndefinedContextPlaceholder ? value.context : undefined;
-            return this.arb.shrink(value.value_, safeContext).map(NoUndefinedAsContext_1$2.noUndefinedAsContext);
+                value.context !== NoUndefinedAsContext_1$2.UndefinedContextPlaceholder
+                    ? value.context
+                    : undefined;
+            return this.arb
+                .shrink(value.value_, safeContext)
+                .map(NoUndefinedAsContext_1$2.noUndefinedAsContext);
         }
         async run(v) {
             await this.beforeEachHook();
@@ -735,8 +755,13 @@ export var fc = (function () {
             if (context === undefined && !this.arb.canShrinkWithoutContext(value)) {
                 return Stream_1$i.Stream.nil();
             }
-            const safeContext = context !== NoUndefinedAsContext_1$1.UndefinedContextPlaceholder ? context : undefined;
-            return this.arb.shrink(value, safeContext).map(NoUndefinedAsContext_1$1.noUndefinedAsContext);
+            const safeContext =
+                context !== NoUndefinedAsContext_1$1.UndefinedContextPlaceholder
+                    ? context
+                    : undefined;
+            return this.arb
+                .shrink(value, safeContext)
+                .map(NoUndefinedAsContext_1$1.noUndefinedAsContext);
         }
     }
     AlwaysShrinkableArbitrary$1.AlwaysShrinkableArbitrary = AlwaysShrinkableArbitrary;
@@ -754,8 +779,12 @@ export var fc = (function () {
         const arbs = args.slice(0, args.length - 1);
         const p = args[args.length - 1];
         arbs.forEach(Arbitrary_1$h.assertIsArbitrary);
-        const mappedArbs = arbs.map((arb) => new AlwaysShrinkableArbitrary_1$1.AlwaysShrinkableArbitrary(arb));
-        return new AsyncProperty_generic_1.AsyncProperty((0, tuple_1$h.tuple)(...mappedArbs), (t) => p(...t));
+        const mappedArbs = arbs.map(
+            (arb) => new AlwaysShrinkableArbitrary_1$1.AlwaysShrinkableArbitrary(arb),
+        );
+        return new AsyncProperty_generic_1.AsyncProperty((0, tuple_1$h.tuple)(...mappedArbs), (t) =>
+            p(...t),
+        );
     }
     AsyncProperty$1.asyncProperty = asyncProperty;
 
@@ -804,8 +833,12 @@ export var fc = (function () {
                 return Stream_1$h.Stream.nil();
             }
             const safeContext =
-                value.context !== NoUndefinedAsContext_1.UndefinedContextPlaceholder ? value.context : undefined;
-            return this.arb.shrink(value.value_, safeContext).map(NoUndefinedAsContext_1.noUndefinedAsContext);
+                value.context !== NoUndefinedAsContext_1.UndefinedContextPlaceholder
+                    ? value.context
+                    : undefined;
+            return this.arb
+                .shrink(value.value_, safeContext)
+                .map(NoUndefinedAsContext_1.noUndefinedAsContext);
         }
         run(v) {
             this.beforeEachHook();
@@ -851,8 +884,12 @@ export var fc = (function () {
         const arbs = args.slice(0, args.length - 1);
         const p = args[args.length - 1];
         arbs.forEach(Arbitrary_1$g.assertIsArbitrary);
-        const mappedArbs = arbs.map((arb) => new AlwaysShrinkableArbitrary_1.AlwaysShrinkableArbitrary(arb));
-        return new Property_generic_1$1.Property((0, tuple_1$g.tuple)(...mappedArbs), (t) => p(...t));
+        const mappedArbs = arbs.map(
+            (arb) => new AlwaysShrinkableArbitrary_1.AlwaysShrinkableArbitrary(arb),
+        );
+        return new Property_generic_1$1.Property((0, tuple_1$g.tuple)(...mappedArbs), (t) =>
+            p(...t),
+        );
     }
     Property$1.property = property;
 
@@ -992,18 +1029,32 @@ export var fc = (function () {
             MersenneTwister.twist = function (prev) {
                 var mt = prev.slice();
                 for (var idx = 0; idx !== MersenneTwister.N - MersenneTwister.M; ++idx) {
-                    var y_1 = (mt[idx] & MersenneTwister.MASK_UPPER) + (mt[idx + 1] & MersenneTwister.MASK_LOWER);
-                    mt[idx] = mt[idx + MersenneTwister.M] ^ (y_1 >>> 1) ^ (-(y_1 & 1) & MersenneTwister.A);
+                    var y_1 =
+                        (mt[idx] & MersenneTwister.MASK_UPPER) +
+                        (mt[idx + 1] & MersenneTwister.MASK_LOWER);
+                    mt[idx] =
+                        mt[idx + MersenneTwister.M] ^
+                        (y_1 >>> 1) ^
+                        (-(y_1 & 1) & MersenneTwister.A);
                 }
-                for (var idx = MersenneTwister.N - MersenneTwister.M; idx !== MersenneTwister.N - 1; ++idx) {
-                    var y_2 = (mt[idx] & MersenneTwister.MASK_UPPER) + (mt[idx + 1] & MersenneTwister.MASK_LOWER);
+                for (
+                    var idx = MersenneTwister.N - MersenneTwister.M;
+                    idx !== MersenneTwister.N - 1;
+                    ++idx
+                ) {
+                    var y_2 =
+                        (mt[idx] & MersenneTwister.MASK_UPPER) +
+                        (mt[idx + 1] & MersenneTwister.MASK_LOWER);
                     mt[idx] =
                         mt[idx + MersenneTwister.M - MersenneTwister.N] ^
                         (y_2 >>> 1) ^
                         (-(y_2 & 1) & MersenneTwister.A);
                 }
-                var y = (mt[MersenneTwister.N - 1] & MersenneTwister.MASK_UPPER) + (mt[0] & MersenneTwister.MASK_LOWER);
-                mt[MersenneTwister.N - 1] = mt[MersenneTwister.M - 1] ^ (y >>> 1) ^ (-(y & 1) & MersenneTwister.A);
+                var y =
+                    (mt[MersenneTwister.N - 1] & MersenneTwister.MASK_UPPER) +
+                    (mt[0] & MersenneTwister.MASK_LOWER);
+                mt[MersenneTwister.N - 1] =
+                    mt[MersenneTwister.M - 1] ^ (y >>> 1) ^ (-(y & 1) & MersenneTwister.A);
                 return mt;
             };
             MersenneTwister.seeded = function (seed) {
@@ -1095,7 +1146,8 @@ export var fc = (function () {
         XorShift128Plus.prototype.unsafeNext = function () {
             var a0 = this.s00 ^ (this.s00 << 23);
             var a1 = this.s01 ^ ((this.s01 << 23) | (this.s00 >>> 9));
-            var b0 = a0 ^ this.s10 ^ ((a0 >>> 18) | (a1 << 14)) ^ ((this.s10 >>> 5) | (this.s11 << 27));
+            var b0 =
+                a0 ^ this.s10 ^ ((a0 >>> 18) | (a1 << 14)) ^ ((this.s10 >>> 5) | (this.s11 << 27));
             var b1 = a1 ^ this.s11 ^ (a1 >>> 18) ^ (this.s11 >>> 5);
             var out = (this.s00 + this.s10) | 0;
             this.s01 = this.s11;
@@ -1231,7 +1283,11 @@ export var fc = (function () {
         var reminder = 0;
         var dataA = arrayIntA.data;
         var dataB = arrayIntB.data;
-        for (var indexA = dataA.length - 1, indexB = dataB.length - 1; indexA >= 0 || indexB >= 0; --indexA, --indexB) {
+        for (
+            var indexA = dataA.length - 1, indexB = dataB.length - 1;
+            indexA >= 0 || indexB >= 0;
+            --indexA, --indexB
+        ) {
             var vA = indexA >= 0 ? dataA[indexA] : 0;
             var vB = indexB >= 0 ? dataB[indexB] : 0;
             var current = vA + vB + reminder;
@@ -1284,7 +1340,11 @@ export var fc = (function () {
         }
         var data = [];
         var reminder = 0;
-        for (var indexA = dataA.length - 1, indexB = dataB.length - 1; indexA >= 0 || indexB >= 0; --indexA, --indexB) {
+        for (
+            var indexA = dataA.length - 1, indexB = dataB.length - 1;
+            indexA >= 0 || indexB >= 0;
+            --indexA, --indexB
+        ) {
             var vA = indexA >= 0 ? dataA[indexA] : 0;
             var vB = indexB >= 0 ? dataB[indexB] : 0;
             var current = vA - vB - reminder;
@@ -1398,7 +1458,8 @@ export var fc = (function () {
             }
         }
     }
-    UnsafeUniformIntDistributionInternal.unsafeUniformIntDistributionInternal = unsafeUniformIntDistributionInternal;
+    UnsafeUniformIntDistributionInternal.unsafeUniformIntDistributionInternal =
+        unsafeUniformIntDistributionInternal;
 
     UnsafeUniformArrayIntDistributionInternal.__esModule = true;
     UnsafeUniformArrayIntDistributionInternal.unsafeUniformArrayIntDistributionInternal = void 0;
@@ -1408,7 +1469,8 @@ export var fc = (function () {
         while (true) {
             for (var index = 0; index !== rangeLength; ++index) {
                 var indexRangeSize = index === 0 ? rangeSize[0] + 1 : 0x100000000;
-                var g = (0, UnsafeUniformIntDistributionInternal_1$1.unsafeUniformIntDistributionInternal)(
+                var g = (0,
+                UnsafeUniformIntDistributionInternal_1$1.unsafeUniformIntDistributionInternal)(
                     indexRangeSize,
                     rng,
                 );
@@ -1434,17 +1496,23 @@ export var fc = (function () {
     var UnsafeUniformArrayIntDistributionInternal_1$1 = UnsafeUniformArrayIntDistributionInternal;
     function unsafeUniformArrayIntDistribution(from, to, rng) {
         var rangeSize = (0, ArrayInt_1$1.trimArrayIntInplace)(
-            (0, ArrayInt_1$1.addOneToPositiveArrayInt)((0, ArrayInt_1$1.substractArrayIntToNew)(to, from)),
+            (0, ArrayInt_1$1.addOneToPositiveArrayInt)(
+                (0, ArrayInt_1$1.substractArrayIntToNew)(to, from),
+            ),
         );
         var emptyArrayIntData = rangeSize.data.slice(0);
-        var g = (0, UnsafeUniformArrayIntDistributionInternal_1$1.unsafeUniformArrayIntDistributionInternal)(
+        var g = (0,
+        UnsafeUniformArrayIntDistributionInternal_1$1.unsafeUniformArrayIntDistributionInternal)(
             emptyArrayIntData,
             rangeSize.data,
             rng,
         );
-        return (0, ArrayInt_1$1.trimArrayIntInplace)((0, ArrayInt_1$1.addArrayIntToNew)({sign: 1, data: g}, from));
+        return (0, ArrayInt_1$1.trimArrayIntInplace)(
+            (0, ArrayInt_1$1.addArrayIntToNew)({sign: 1, data: g}, from),
+        );
     }
-    UnsafeUniformArrayIntDistribution.unsafeUniformArrayIntDistribution = unsafeUniformArrayIntDistribution;
+    UnsafeUniformArrayIntDistribution.unsafeUniformArrayIntDistribution =
+        unsafeUniformArrayIntDistribution;
 
     UniformArrayIntDistribution.__esModule = true;
     UniformArrayIntDistribution.uniformArrayIntDistribution = void 0;
@@ -1453,14 +1521,22 @@ export var fc = (function () {
         if (rng != null) {
             var nextRng = rng.clone();
             return [
-                (0, UnsafeUniformArrayIntDistribution_1$1.unsafeUniformArrayIntDistribution)(from, to, nextRng),
+                (0, UnsafeUniformArrayIntDistribution_1$1.unsafeUniformArrayIntDistribution)(
+                    from,
+                    to,
+                    nextRng,
+                ),
                 nextRng,
             ];
         }
         return function (rng) {
             var nextRng = rng.clone();
             return [
-                (0, UnsafeUniformArrayIntDistribution_1$1.unsafeUniformArrayIntDistribution)(from, to, nextRng),
+                (0, UnsafeUniformArrayIntDistribution_1$1.unsafeUniformArrayIntDistribution)(
+                    from,
+                    to,
+                    nextRng,
+                ),
                 nextRng,
             ];
         };
@@ -1496,7 +1572,8 @@ export var fc = (function () {
             }
         }
     }
-    UnsafeUniformBigIntDistribution.unsafeUniformBigIntDistribution = unsafeUniformBigIntDistribution;
+    UnsafeUniformBigIntDistribution.unsafeUniformBigIntDistribution =
+        unsafeUniformBigIntDistribution;
 
     UniformBigIntDistribution.__esModule = true;
     UniformBigIntDistribution.uniformBigIntDistribution = void 0;
@@ -1505,14 +1582,22 @@ export var fc = (function () {
         if (rng != null) {
             var nextRng = rng.clone();
             return [
-                (0, UnsafeUniformBigIntDistribution_1$1.unsafeUniformBigIntDistribution)(from, to, nextRng),
+                (0, UnsafeUniformBigIntDistribution_1$1.unsafeUniformBigIntDistribution)(
+                    from,
+                    to,
+                    nextRng,
+                ),
                 nextRng,
             ];
         }
         return function (rng) {
             var nextRng = rng.clone();
             return [
-                (0, UnsafeUniformBigIntDistribution_1$1.unsafeUniformBigIntDistribution)(from, to, nextRng),
+                (0, UnsafeUniformBigIntDistribution_1$1.unsafeUniformBigIntDistribution)(
+                    from,
+                    to,
+                    nextRng,
+                ),
                 nextRng,
             ];
         };
@@ -1557,7 +1642,8 @@ export var fc = (function () {
     function unsafeUniformIntDistribution(from, to, rng) {
         var rangeSize = to - from;
         if (rangeSize <= 0xffffffff) {
-            var g = (0, UnsafeUniformIntDistributionInternal_1.unsafeUniformIntDistributionInternal)(
+            var g = (0,
+            UnsafeUniformIntDistributionInternal_1.unsafeUniformIntDistributionInternal)(
                 rangeSize + 1,
                 rng,
             );
@@ -1573,11 +1659,25 @@ export var fc = (function () {
     function uniformIntDistribution(from, to, rng) {
         if (rng != null) {
             var nextRng = rng.clone();
-            return [(0, UnsafeUniformIntDistribution_1$1.unsafeUniformIntDistribution)(from, to, nextRng), nextRng];
+            return [
+                (0, UnsafeUniformIntDistribution_1$1.unsafeUniformIntDistribution)(
+                    from,
+                    to,
+                    nextRng,
+                ),
+                nextRng,
+            ];
         }
         return function (rng) {
             var nextRng = rng.clone();
-            return [(0, UnsafeUniformIntDistribution_1$1.unsafeUniformIntDistribution)(from, to, nextRng), nextRng];
+            return [
+                (0, UnsafeUniformIntDistribution_1$1.unsafeUniformIntDistribution)(
+                    from,
+                    to,
+                    nextRng,
+                ),
+                nextRng,
+            ];
         };
     }
     UniformIntDistribution.uniformIntDistribution = uniformIntDistribution;
@@ -1617,18 +1717,22 @@ export var fc = (function () {
     var XoroShiro_1 = XoroShiro;
     pureRandDefault.xoroshiro128plus = XoroShiro_1.xoroshiro128plus;
     var UniformArrayIntDistribution_1 = UniformArrayIntDistribution;
-    pureRandDefault.uniformArrayIntDistribution = UniformArrayIntDistribution_1.uniformArrayIntDistribution;
+    pureRandDefault.uniformArrayIntDistribution =
+        UniformArrayIntDistribution_1.uniformArrayIntDistribution;
     var UniformBigIntDistribution_1 = UniformBigIntDistribution;
-    pureRandDefault.uniformBigIntDistribution = UniformBigIntDistribution_1.uniformBigIntDistribution;
+    pureRandDefault.uniformBigIntDistribution =
+        UniformBigIntDistribution_1.uniformBigIntDistribution;
     var UniformIntDistribution_1 = UniformIntDistribution;
     pureRandDefault.uniformIntDistribution = UniformIntDistribution_1.uniformIntDistribution;
     var UnsafeUniformArrayIntDistribution_1 = UnsafeUniformArrayIntDistribution;
     pureRandDefault.unsafeUniformArrayIntDistribution =
         UnsafeUniformArrayIntDistribution_1.unsafeUniformArrayIntDistribution;
     var UnsafeUniformBigIntDistribution_1 = UnsafeUniformBigIntDistribution;
-    pureRandDefault.unsafeUniformBigIntDistribution = UnsafeUniformBigIntDistribution_1.unsafeUniformBigIntDistribution;
+    pureRandDefault.unsafeUniformBigIntDistribution =
+        UnsafeUniformBigIntDistribution_1.unsafeUniformBigIntDistribution;
     var UnsafeUniformIntDistribution_1 = UnsafeUniformIntDistribution;
-    pureRandDefault.unsafeUniformIntDistribution = UnsafeUniformIntDistribution_1.unsafeUniformIntDistribution;
+    pureRandDefault.unsafeUniformIntDistribution =
+        UnsafeUniformIntDistribution_1.unsafeUniformIntDistribution;
     var __type = "commonjs";
     pureRandDefault.__type = __type;
     var __version = "5.0.1";
@@ -1691,9 +1795,20 @@ export var fc = (function () {
             this.verbose = QualifiedParameters.readVerbose(p);
             this.maxSkipsPerRun = QualifiedParameters.readOrDefault(p, "maxSkipsPerRun", 100);
             this.timeout = QualifiedParameters.readOrDefault(p, "timeout", null);
-            this.skipAllAfterTimeLimit = QualifiedParameters.readOrDefault(p, "skipAllAfterTimeLimit", null);
-            this.interruptAfterTimeLimit = QualifiedParameters.readOrDefault(p, "interruptAfterTimeLimit", null);
-            this.markInterruptAsFailure = QualifiedParameters.readBoolean(p, "markInterruptAsFailure");
+            this.skipAllAfterTimeLimit = QualifiedParameters.readOrDefault(
+                p,
+                "skipAllAfterTimeLimit",
+                null,
+            );
+            this.interruptAfterTimeLimit = QualifiedParameters.readOrDefault(
+                p,
+                "interruptAfterTimeLimit",
+                null,
+            );
+            this.markInterruptAsFailure = QualifiedParameters.readBoolean(
+                p,
+                "markInterruptAsFailure",
+            );
             this.skipEqualValues = QualifiedParameters.readBoolean(p, "skipEqualValues");
             this.ignoreEqualValues = QualifiedParameters.readBoolean(p, "ignoreEqualValues");
             this.logger = QualifiedParameters.readOrDefault(p, "logger", (v) => {
@@ -1813,7 +1928,9 @@ export var fc = (function () {
         }
         run(v) {
             if (this.getTime() >= this.skipAfterTime) {
-                const preconditionFailure = new PreconditionFailure_1$2.PreconditionFailure(this.interruptExecution);
+                const preconditionFailure = new PreconditionFailure_1$2.PreconditionFailure(
+                    this.interruptExecution,
+                );
                 if (this.isAsync()) {
                     return Promise.resolve(preconditionFailure);
                 } else {
@@ -1995,10 +2112,14 @@ export var fc = (function () {
                 case "[object BigInt]":
                     return `${value}n`;
                 case "[object Boolean]":
-                    return typeof value === "boolean" ? JSON.stringify(value) : `new Boolean(${JSON.stringify(value)})`;
+                    return typeof value === "boolean"
+                        ? JSON.stringify(value)
+                        : `new Boolean(${JSON.stringify(value)})`;
                 case "[object Date]": {
                     const d = value;
-                    return Number.isNaN(d.getTime()) ? `new Date(NaN)` : `new Date(${JSON.stringify(d.toISOString())})`;
+                    return Number.isNaN(d.getTime())
+                        ? `new Date(NaN)`
+                        : `new Date(${JSON.stringify(d.toISOString())})`;
                 }
                 case "[object Map]":
                     return `new Map(${stringifyInternal(Array.from(value), currentValues, getAsyncContent)})`;
@@ -2011,7 +2132,10 @@ export var fc = (function () {
                 case "[object Object]": {
                     try {
                         const toStringAccessor = value.toString;
-                        if (typeof toStringAccessor === "function" && toStringAccessor !== Object.prototype.toString) {
+                        if (
+                            typeof toStringAccessor === "function" &&
+                            toStringAccessor !== Object.prototype.toString
+                        ) {
                             return value.toString();
                         }
                     } catch (err) {
@@ -2045,7 +2169,9 @@ export var fc = (function () {
                 case "[object Set]":
                     return `new Set(${stringifyInternal(Array.from(value), currentValues, getAsyncContent)})`;
                 case "[object String]":
-                    return typeof value === "string" ? JSON.stringify(value) : `new String(${JSON.stringify(value)})`;
+                    return typeof value === "string"
+                        ? JSON.stringify(value)
+                        : `new String(${JSON.stringify(value)})`;
                 case "[object Symbol]": {
                     const s = value;
                     if (Symbol.keyFor(s) !== undefined) {
@@ -2110,7 +2236,10 @@ export var fc = (function () {
                         )})`;
                     }
                     const valuePrototype = Object.getPrototypeOf(value);
-                    const className = valuePrototype && valuePrototype.constructor && valuePrototype.constructor.name;
+                    const className =
+                        valuePrototype &&
+                        valuePrototype.constructor &&
+                        valuePrototype.constructor.name;
                     if (typeof className === "string") {
                         const typedArray = value;
                         const valuesFromTypedArr = typedArray.values();
@@ -2203,7 +2332,9 @@ export var fc = (function () {
     const stringify_1$7 = stringify;
     const PreconditionFailure_1$1 = PreconditionFailure$1;
     function fromSyncCached(cachedValue) {
-        return cachedValue === null ? new PreconditionFailure_1$1.PreconditionFailure() : cachedValue;
+        return cachedValue === null
+            ? new PreconditionFailure_1$1.PreconditionFailure()
+            : cachedValue;
     }
     function fromCached(...data) {
         if (data[1]) return data[0].then(fromSyncCached);
@@ -2258,10 +2389,20 @@ export var fc = (function () {
             prop = new UnbiasedProperty_1$1.UnbiasedProperty(prop);
         }
         if (qParams.skipAllAfterTimeLimit != null) {
-            prop = new SkipAfterProperty_1.SkipAfterProperty(prop, Date.now, qParams.skipAllAfterTimeLimit, false);
+            prop = new SkipAfterProperty_1.SkipAfterProperty(
+                prop,
+                Date.now,
+                qParams.skipAllAfterTimeLimit,
+                false,
+            );
         }
         if (qParams.interruptAfterTimeLimit != null) {
-            prop = new SkipAfterProperty_1.SkipAfterProperty(prop, Date.now, qParams.interruptAfterTimeLimit, true);
+            prop = new SkipAfterProperty_1.SkipAfterProperty(
+                prop,
+                Date.now,
+                qParams.interruptAfterTimeLimit,
+                true,
+            );
         }
         if (qParams.skipEqualValues) {
             prop = new IgnoreEqualValuesProperty_1.IgnoreEqualValuesProperty(prop, true);
@@ -2299,7 +2440,8 @@ export var fc = (function () {
             this.interruptedAsFailure = interruptedAsFailure;
             this.isSuccess = () => this.pathToFailure == null;
             this.firstFailure = () => (this.pathToFailure ? +this.pathToFailure.split(":")[0] : -1);
-            this.numShrinks = () => (this.pathToFailure ? this.pathToFailure.split(":").length - 1 : 0);
+            this.numShrinks = () =>
+                this.pathToFailure ? this.pathToFailure.split(":").length - 1 : 0;
             this.rootExecutionTrees = [];
             this.currentLevelExecutionTrees = this.rootExecutionTrees;
             this.failure = null;
@@ -2314,7 +2456,10 @@ export var fc = (function () {
         }
         fail(value, id, failure) {
             if (this.verbosity >= VerbosityLevel_1$1.VerbosityLevel.Verbose) {
-                const currentTree = this.appendExecutionTree(ExecutionStatus_1$1.ExecutionStatus.Failure, value);
+                const currentTree = this.appendExecutionTree(
+                    ExecutionStatus_1$1.ExecutionStatus.Failure,
+                    value,
+                );
                 this.currentLevelExecutionTrees = currentTree.children;
             }
             if (this.pathToFailure == null) this.pathToFailure = `${id}`;
@@ -2376,7 +2521,8 @@ export var fc = (function () {
                     runConfiguration: qParams.toParameters(),
                 };
             }
-            const failed = this.numSkips > maxSkips || (this.interrupted && this.interruptedAsFailure);
+            const failed =
+                this.numSkips > maxSkips || (this.interrupted && this.interruptedAsFailure);
             return {
                 failed,
                 interrupted: this.interrupted,
@@ -2401,7 +2547,11 @@ export var fc = (function () {
         const offsetItems = offsetPath.split(":");
         const remainingItems = path.split(":");
         const middle = +offsetItems[offsetItems.length - 1] + +remainingItems[0];
-        return [...offsetItems.slice(0, offsetItems.length - 1), `${middle}`, ...remainingItems.slice(1)].join(":");
+        return [
+            ...offsetItems.slice(0, offsetItems.length - 1),
+            `${middle}`,
+            ...remainingItems.slice(1),
+        ].join(":");
     };
 
     Object.defineProperty(RunnerIterator$1, "__esModule", {value: true});
@@ -2493,7 +2643,11 @@ export var fc = (function () {
             return new Random(this.internalRng);
         }
         next(bits) {
-            return (0, pure_rand_1$1.unsafeUniformIntDistribution)(0, (1 << bits) - 1, this.internalRng);
+            return (0, pure_rand_1$1.unsafeUniformIntDistribution)(
+                0,
+                (1 << bits) - 1,
+                this.internalRng,
+            );
         }
         nextBoolean() {
             return (0, pure_rand_1$1.unsafeUniformIntDistribution)(0, 1, this.internalRng) == 1;
@@ -2735,7 +2889,12 @@ export var fc = (function () {
     const PathWalker_1$1 = PathWalker;
     const RunDetailsFormatter_1 = RunDetailsFormatter;
     function runIt(property, shrink, sourceValues, verbose, interruptedAsFailure) {
-        const runner = new RunnerIterator_1.RunnerIterator(sourceValues, shrink, verbose, interruptedAsFailure);
+        const runner = new RunnerIterator_1.RunnerIterator(
+            sourceValues,
+            shrink,
+            verbose,
+            interruptedAsFailure,
+        );
         for (const v of runner) {
             const out = property.run(v);
             runner.handleResult(out);
@@ -2743,7 +2902,12 @@ export var fc = (function () {
         return runner.runExecution;
     }
     async function asyncRunIt(property, shrink, sourceValues, verbose, interruptedAsFailure) {
-        const runner = new RunnerIterator_1.RunnerIterator(sourceValues, shrink, verbose, interruptedAsFailure);
+        const runner = new RunnerIterator_1.RunnerIterator(
+            sourceValues,
+            shrink,
+            verbose,
+            interruptedAsFailure,
+        );
         for (const v of runner) {
             const out = await property.run(v);
             runner.handleResult(out);
@@ -2756,9 +2920,9 @@ export var fc = (function () {
             .drop(pathPoints.length > 0 ? +pathPoints[0] : 0)
             .map((producer) => producer());
         const adaptedPath = ["0", ...pathPoints.slice(1)].join(":");
-        return (0, Stream_1$f.stream)((0, PathWalker_1$1.pathWalk)(adaptedPath, pathStream, shrink)).map(
-            (v) => () => v,
-        );
+        return (0, Stream_1$f.stream)(
+            (0, PathWalker_1$1.pathWalk)(adaptedPath, pathStream, shrink),
+        ).map((v) => () => v);
     }
     function buildInitialValues(valueProducers, shrink, qParams) {
         if (qParams.path.length === 0) {
@@ -2770,18 +2934,30 @@ export var fc = (function () {
         if (rawProperty == null || rawProperty.generate == null)
             throw new Error("Invalid property encountered, please use a valid property");
         if (rawProperty.run == null)
-            throw new Error("Invalid property encountered, please use a valid property not an arbitrary");
+            throw new Error(
+                "Invalid property encountered, please use a valid property not an arbitrary",
+            );
         const qParams = QualifiedParameters_1$1.QualifiedParameters.read(
-            Object.assign(Object.assign({}, (0, GlobalParameters_1$1.readConfigureGlobal)()), params),
+            Object.assign(
+                Object.assign({}, (0, GlobalParameters_1$1.readConfigureGlobal)()),
+                params,
+            ),
         );
         if (qParams.reporter !== null && qParams.asyncReporter !== null)
-            throw new Error("Invalid parameters encountered, reporter and asyncReporter cannot be specified together");
+            throw new Error(
+                "Invalid parameters encountered, reporter and asyncReporter cannot be specified together",
+            );
         if (qParams.asyncReporter !== null && !rawProperty.isAsync())
             throw new Error(
                 "Invalid parameters encountered, only asyncProperty can be used when asyncReporter specified",
             );
         const property = (0, DecorateProperty_1.decorateProperty)(rawProperty, qParams);
-        const generator = (0, Tosser_1$1.toss)(property, qParams.seed, qParams.randomType, qParams.examples);
+        const generator = (0, Tosser_1$1.toss)(
+            property,
+            qParams.seed,
+            qParams.randomType,
+            qParams.examples,
+        );
         const maxInitialIterations = qParams.path.indexOf(":") === -1 ? qParams.numRuns : -1;
         const maxSkips = qParams.numRuns * qParams.maxSkipsPerRun;
         const shrink = property.shrink.bind(property);
@@ -2793,15 +2969,20 @@ export var fc = (function () {
         );
         const finalShrink = !qParams.endOnFailure ? shrink : Stream_1$f.Stream.nil;
         return property.isAsync()
-            ? asyncRunIt(property, finalShrink, sourceValues, qParams.verbose, qParams.markInterruptAsFailure).then(
-                  (e) => e.toRunDetails(qParams.seed, qParams.path, maxSkips, qParams),
-              )
-            : runIt(property, finalShrink, sourceValues, qParams.verbose, qParams.markInterruptAsFailure).toRunDetails(
-                  qParams.seed,
-                  qParams.path,
-                  maxSkips,
-                  qParams,
-              );
+            ? asyncRunIt(
+                  property,
+                  finalShrink,
+                  sourceValues,
+                  qParams.verbose,
+                  qParams.markInterruptAsFailure,
+              ).then((e) => e.toRunDetails(qParams.seed, qParams.path, maxSkips, qParams))
+            : runIt(
+                  property,
+                  finalShrink,
+                  sourceValues,
+                  qParams.verbose,
+                  qParams.markInterruptAsFailure,
+              ).toRunDetails(qParams.seed, qParams.path, maxSkips, qParams);
     }
     Runner.check = check;
     function assert(property, params) {
@@ -2831,8 +3012,13 @@ export var fc = (function () {
     function streamSample(generator, params) {
         const extendedParams =
             typeof params === "number"
-                ? Object.assign(Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()), {numRuns: params})
-                : Object.assign(Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()), params);
+                ? Object.assign(Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()), {
+                      numRuns: params,
+                  })
+                : Object.assign(
+                      Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()),
+                      params,
+                  );
         const qParams = QualifiedParameters_1.QualifiedParameters.read(extendedParams);
         const nextProperty = toProperty(generator, qParams);
         const shrink = nextProperty.shrink.bind(nextProperty);
@@ -2862,8 +3048,13 @@ export var fc = (function () {
     function statistics(generator, classify, params) {
         const extendedParams =
             typeof params === "number"
-                ? Object.assign(Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()), {numRuns: params})
-                : Object.assign(Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()), params);
+                ? Object.assign(Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()), {
+                      numRuns: params,
+                  })
+                : Object.assign(
+                      Object.assign({}, (0, GlobalParameters_1.readConfigureGlobal)()),
+                      params,
+                  );
         const qParams = QualifiedParameters_1.QualifiedParameters.read(extendedParams);
         const recorded = {};
         for (const g of streamSample(generator, params)) {
@@ -2879,7 +3070,9 @@ export var fc = (function () {
         const longestName = data.map((i) => i[0].length).reduce((p, c) => Math.max(p, c), 0);
         const longestPercent = data.map((i) => i[1].length).reduce((p, c) => Math.max(p, c), 0);
         for (const item of data) {
-            qParams.logger(`${item[0].padEnd(longestName, ".")}..${item[1].padStart(longestPercent, ".")}`);
+            qParams.logger(
+                `${item[0].padEnd(longestName, ".")}..${item[1].padStart(longestPercent, ".")}`,
+            );
         }
     }
     Sampler.statistics = statistics;
@@ -2895,7 +3088,10 @@ export var fc = (function () {
     var BiasNumericRange = {};
 
     Object.defineProperty(BiasNumericRange, "__esModule", {value: true});
-    BiasNumericRange.biasNumericRange = BiasNumericRange.bigIntLogLike = BiasNumericRange.integerLogLike = void 0;
+    BiasNumericRange.biasNumericRange =
+        BiasNumericRange.bigIntLogLike =
+        BiasNumericRange.integerLogLike =
+            void 0;
     function integerLogLike(v) {
         return Math.floor(Math.log(v) / Math.log(2));
     }
@@ -2957,7 +3153,9 @@ export var fc = (function () {
                 previous = next;
             }
         }
-        return realGap > 0 ? (0, Stream_1$d.stream)(shrinkDecr()) : (0, Stream_1$d.stream)(shrinkIncr());
+        return realGap > 0
+            ? (0, Stream_1$d.stream)(shrinkDecr())
+            : (0, Stream_1$d.stream)(shrinkIncr());
     }
     ShrinkInteger.shrinkInteger = shrinkInteger;
 
@@ -3049,7 +3247,9 @@ export var fc = (function () {
     function integer(constraints = {}) {
         const fullConstraints = buildCompleteIntegerConstraints(constraints);
         if (fullConstraints.min > fullConstraints.max) {
-            throw new Error("fc.integer maximum value should be equal or greater than the minimum one");
+            throw new Error(
+                "fc.integer maximum value should be equal or greater than the minimum one",
+            );
         }
         if (!Number.isInteger(fullConstraints.min)) {
             throw new Error("fc.integer minimum value should be an integer");
@@ -3162,14 +3362,18 @@ export var fc = (function () {
                 if (eligibleIndices.length === 0) {
                     return;
                 }
-                this.activeSliceIndex = eligibleIndices[this.mrng.nextInt(0, eligibleIndices.length - 1)];
+                this.activeSliceIndex =
+                    eligibleIndices[this.mrng.nextInt(0, eligibleIndices.length - 1)];
                 this.nextIndexInSlice = 0;
                 this.lastIndexInSlice = targetLength - 1;
             }
         }
         next() {
             if (this.nextIndexInSlice <= this.lastIndexInSlice) {
-                return new Value_1$e.Value(this.slices[this.activeSliceIndex][this.nextIndexInSlice++], undefined);
+                return new Value_1$e.Value(
+                    this.slices[this.activeSliceIndex][this.nextIndexInSlice++],
+                    undefined,
+                );
             }
             if (this.mrng.nextInt(1, this.biasFactor) !== 1) {
                 return this.arb.generate(this.mrng, this.biasFactor);
@@ -3219,7 +3423,15 @@ export var fc = (function () {
         return minLength + Math.floor(Math.log(maxLength - minLength) / Math.log(2));
     }
     class ArrayArbitrary extends Arbitrary_1$e.Arbitrary {
-        constructor(arb, minLength, maxGeneratedLength, maxLength, depthIdentifier, setBuilder, customSlices) {
+        constructor(
+            arb,
+            minLength,
+            maxGeneratedLength,
+            maxLength,
+            depthIdentifier,
+            setBuilder,
+            customSlices,
+        ) {
             super();
             this.arb = arb;
             this.minLength = minLength;
@@ -3271,7 +3483,10 @@ export var fc = (function () {
             return s.getData();
         }
         safeGenerateNItemsNoDuplicates(setBuilder, N, mrng, biasFactorItems) {
-            const depthImpact = Math.max(0, N - biasedMaxLength(this.minLength, this.maxGeneratedLength));
+            const depthImpact = Math.max(
+                0,
+                N - biasedMaxLength(this.minLength, this.maxGeneratedLength),
+            );
             this.depthContext.depth += depthImpact;
             try {
                 return this.generateNItemsNoDuplicates(setBuilder, N, mrng, biasFactorItems);
@@ -3295,7 +3510,10 @@ export var fc = (function () {
             return items;
         }
         safeGenerateNItems(N, mrng, biasFactorItems) {
-            const depthImpact = Math.max(0, N - biasedMaxLength(this.minLength, this.maxGeneratedLength));
+            const depthImpact = Math.max(
+                0,
+                N - biasedMaxLength(this.minLength, this.maxGeneratedLength),
+            );
             this.depthContext.depth += depthImpact;
             try {
                 return this.generateNItems(N, mrng, biasFactorItems);
@@ -3333,7 +3551,12 @@ export var fc = (function () {
             const targetSize = biasMeta.size;
             const items =
                 this.setBuilder !== undefined
-                    ? this.safeGenerateNItemsNoDuplicates(this.setBuilder, targetSize, mrng, biasMeta.biasFactorItems)
+                    ? this.safeGenerateNItemsNoDuplicates(
+                          this.setBuilder,
+                          targetSize,
+                          mrng,
+                          biasMeta.biasFactorItems,
+                      )
                     : this.safeGenerateNItems(targetSize, mrng, biasMeta.biasFactorItems);
             return this.wrapper(items, false, undefined, 0);
         }
@@ -3364,7 +3587,11 @@ export var fc = (function () {
             return {size: targetSizeValue.value, biasFactorItems: biasFactor};
         }
         canShrinkWithoutContext(value) {
-            if (!Array.isArray(value) || this.minLength > value.length || value.length > this.maxLength) {
+            if (
+                !Array.isArray(value) ||
+                this.minLength > value.length ||
+                value.length > this.maxLength
+            ) {
                 return false;
             }
             for (let index = 0; index !== value.length; ++index) {
@@ -3375,7 +3602,9 @@ export var fc = (function () {
                     return false;
                 }
             }
-            const filtered = this.preFilter(value.map((item) => new Value_1$d.Value(item, undefined)));
+            const filtered = this.preFilter(
+                value.map((item) => new Value_1$d.Value(item, undefined)),
+            );
             return filtered.length === value.length;
         }
         shrinkItemByItem(value, safeContext, endIndex) {
@@ -3416,7 +3645,12 @@ export var fc = (function () {
             const safeContext =
                 context !== undefined
                     ? context
-                    : {shrunkOnce: false, lengthContext: undefined, itemsContexts: [], startIndex: 0};
+                    : {
+                          shrunkOnce: false,
+                          lengthContext: undefined,
+                          itemsContexts: [],
+                          startIndex: 0,
+                      };
             return this.lengthArb
                 .shrink(value.length, safeContext.lengthContext)
                 .drop(
@@ -3525,7 +3759,9 @@ export var fc = (function () {
             }
             const defaultSizeInSize = orderedSize.indexOf(defaultSize);
             if (defaultSizeInSize === -1) {
-                throw new Error(`Unable to offset size based on the unknown defaulted one: ${defaultSize}`);
+                throw new Error(
+                    `Unable to offset size based on the unknown defaulted one: ${defaultSize}`,
+                );
             }
             const resultingSizeInSize = defaultSizeInSize + sizeInRelative - 4;
             return resultingSizeInSize < 0
@@ -3535,7 +3771,12 @@ export var fc = (function () {
                   : orderedSize[resultingSizeInSize];
         }
         exports.relativeSizeToSize = relativeSizeToSize;
-        function maxGeneratedLengthFromSizeForArbitrary(size, minLength, maxLength, specifiedMaxLength) {
+        function maxGeneratedLengthFromSizeForArbitrary(
+            size,
+            minLength,
+            maxLength,
+            specifiedMaxLength,
+        ) {
             const {baseSize: defaultSize = exports.DefaultSize, defaultSizeToMaxWhenMaxSpecified} =
                 (0, GlobalParameters_1.readConfigureGlobal)() || {};
             const definedSize =
@@ -3582,7 +3823,8 @@ export var fc = (function () {
         }
         exports.depthBiasFromSizeForArbitrary = depthBiasFromSizeForArbitrary;
         function resolveSize(size) {
-            const {baseSize: defaultSize = exports.DefaultSize} = (0, GlobalParameters_1.readConfigureGlobal)() || {};
+            const {baseSize: defaultSize = exports.DefaultSize} =
+                (0, GlobalParameters_1.readConfigureGlobal)() || {};
             if (size === undefined) {
                 return defaultSize;
             }
@@ -3601,9 +3843,12 @@ export var fc = (function () {
         const maxLengthOrUnset = constraints.maxLength;
         const depthIdentifier = constraints.depthIdentifier;
         const maxLength =
-            maxLengthOrUnset !== undefined ? maxLengthOrUnset : MaxLengthFromMinLength_1$8.MaxLengthUpperBound;
+            maxLengthOrUnset !== undefined
+                ? maxLengthOrUnset
+                : MaxLengthFromMinLength_1$8.MaxLengthUpperBound;
         const specifiedMaxLength = maxLengthOrUnset !== undefined;
-        const maxGeneratedLength = (0, MaxLengthFromMinLength_1$8.maxGeneratedLengthFromSizeForArbitrary)(
+        const maxGeneratedLength = (0,
+        MaxLengthFromMinLength_1$8.maxGeneratedLengthFromSizeForArbitrary)(
             size,
             minLength,
             maxLength,
@@ -3655,7 +3900,9 @@ export var fc = (function () {
                 previous = next;
             }
         }
-        return realGap > 0 ? (0, Stream_1$a.stream)(shrinkDecr()) : (0, Stream_1$a.stream)(shrinkIncr());
+        return realGap > 0
+            ? (0, Stream_1$a.stream)(shrinkDecr())
+            : (0, Stream_1$a.stream)(shrinkIncr());
     }
     ShrinkBigInt.shrinkBigInt = shrinkBigInt;
 
@@ -3741,8 +3988,14 @@ export var fc = (function () {
         const min = constraints.min;
         const max = constraints.max;
         return {
-            min: min !== undefined ? min : DefaultMin - (max !== undefined && max < BigInt(0) ? max * max : BigInt(0)),
-            max: max !== undefined ? max : DefaultMax + (min !== undefined && min > BigInt(0) ? min * min : BigInt(0)),
+            min:
+                min !== undefined
+                    ? min
+                    : DefaultMin - (max !== undefined && max < BigInt(0) ? max * max : BigInt(0)),
+            max:
+                max !== undefined
+                    ? max
+                    : DefaultMax + (min !== undefined && min > BigInt(0) ? min * min : BigInt(0)),
         };
     }
     function extractBigIntConstraints(args) {
@@ -3771,7 +4024,9 @@ export var fc = (function () {
     const BigIntArbitrary_1$2 = BigIntArbitrary$1;
     function bigIntN(n) {
         if (n < 1) {
-            throw new Error("fc.bigIntN expects requested number of bits to be superior or equal to 1");
+            throw new Error(
+                "fc.bigIntN expects requested number of bits to be superior or equal to 1",
+            );
         }
         const min = BigInt(-1) << BigInt(n - 1);
         const max = (BigInt(1) << BigInt(n - 1)) - BigInt(1);
@@ -3804,7 +4059,9 @@ export var fc = (function () {
     const BigIntArbitrary_1 = BigIntArbitrary$1;
     function bigUintN(n) {
         if (n < 0) {
-            throw new Error("fc.bigUintN expects requested number of bits to be superior or equal to 0");
+            throw new Error(
+                "fc.bigUintN expects requested number of bits to be superior or equal to 0",
+            );
         }
         const min = BigInt(0);
         const max = (BigInt(1) << BigInt(n)) - BigInt(1);
@@ -3825,7 +4082,9 @@ export var fc = (function () {
         return v === true ? 1 : 0;
     }
     function boolean() {
-        return (0, integer_1$e.integer)({min: 0, max: 1}).map(booleanMapper, booleanUnmapper).noBias();
+        return (0, integer_1$e.integer)({min: 0, max: 1})
+            .map(booleanMapper, booleanUnmapper)
+            .noBias();
     }
     boolean$1.boolean = boolean;
 
@@ -3900,7 +4159,8 @@ export var fc = (function () {
     var IndexToCharString = {};
 
     Object.defineProperty(IndexToCharString, "__esModule", {value: true});
-    IndexToCharString.indexToCharStringUnmapper = IndexToCharString.indexToCharStringMapper = void 0;
+    IndexToCharString.indexToCharStringUnmapper = IndexToCharString.indexToCharStringMapper =
+        void 0;
     IndexToCharString.indexToCharStringMapper = String.fromCodePoint;
     function indexToCharStringUnmapper(c) {
         if (typeof c !== "string") {
@@ -3936,7 +4196,8 @@ export var fc = (function () {
     var IndexToPrintableIndex = {};
 
     Object.defineProperty(IndexToPrintableIndex, "__esModule", {value: true});
-    IndexToPrintableIndex.indexToPrintableIndexUnmapper = IndexToPrintableIndex.indexToPrintableIndexMapper = void 0;
+    IndexToPrintableIndex.indexToPrintableIndexUnmapper =
+        IndexToPrintableIndex.indexToPrintableIndexMapper = void 0;
     function indexToPrintableIndexMapper(v) {
         if (v < 95) return v + 0x20;
         if (v <= 0x7e) return v - 95;
@@ -3982,7 +4243,12 @@ export var fc = (function () {
         return v === 43 ? 62 : v === 47 ? 63 : -1;
     }
     function base64() {
-        return (0, CharacterArbitraryBuilder_1$5.buildCharacterArbitrary)(0, 63, base64Mapper, base64Unmapper);
+        return (0, CharacterArbitraryBuilder_1$5.buildCharacterArbitrary)(
+            0,
+            63,
+            base64Mapper,
+            base64Unmapper,
+        );
     }
     base64$1.base64 = base64;
 
@@ -3995,7 +4261,12 @@ export var fc = (function () {
         return v;
     }
     function char() {
-        return (0, CharacterArbitraryBuilder_1$4.buildCharacterArbitrary)(0x20, 0x7e, identity, identity);
+        return (0, CharacterArbitraryBuilder_1$4.buildCharacterArbitrary)(
+            0x20,
+            0x7e,
+            identity,
+            identity,
+        );
     }
     char$1.char = char;
 
@@ -4053,7 +4324,12 @@ export var fc = (function () {
         return v < 58 ? v - 48 : v >= 97 && v < 103 ? v - 97 + 10 : -1;
     }
     function hexa() {
-        return (0, CharacterArbitraryBuilder_1$1.buildCharacterArbitrary)(0, 15, hexaMapper, hexaUnmapper);
+        return (0, CharacterArbitraryBuilder_1$1.buildCharacterArbitrary)(
+            0,
+            15,
+            hexaMapper,
+            hexaUnmapper,
+        );
     }
     hexa$1.hexa = hexa;
 
@@ -4144,8 +4420,14 @@ export var fc = (function () {
     const integer_1$c = integer$1;
     const TimeToDate_1 = TimeToDate;
     function date(constraints) {
-        const intMin = constraints && constraints.min !== undefined ? constraints.min.getTime() : -8640000000000000;
-        const intMax = constraints && constraints.max !== undefined ? constraints.max.getTime() : 8640000000000000;
+        const intMin =
+            constraints && constraints.min !== undefined
+                ? constraints.min.getTime()
+                : -8640000000000000;
+        const intMax =
+            constraints && constraints.max !== undefined
+                ? constraints.max.getTime()
+                : 8640000000000000;
         if (Number.isNaN(intMin)) throw new Error("fc.date min must be valid instance of Date");
         if (Number.isNaN(intMax)) throw new Error("fc.date max must be valid instance of Date");
         if (intMin > intMax) throw new Error("fc.date max must be greater or equal to min");
@@ -4201,9 +4483,9 @@ export var fc = (function () {
             if (value.length === 0) {
                 return Stream_1$7.Stream.nil();
             }
-            return new Stream_1$7.Stream(this.shrinkImpl(value, context !== undefined ? context : [])).map((v) =>
-                this.wrapper(v),
-            );
+            return new Stream_1$7.Stream(
+                this.shrinkImpl(value, context !== undefined ? context : []),
+            ).map((v) => this.wrapper(v));
         }
         *shrinkImpl(value, contexts) {
             const its = value.map((v, idx) => this.arb.shrink(v, contexts[idx])[Symbol.iterator]());
@@ -4399,7 +4681,8 @@ export var fc = (function () {
             const comparator = constraints.comparator;
             const selector = constraints.selector;
             const refinedSelector = (next) => selector(next.value_);
-            const isEqualForBuilder = (nextA, nextB) => comparator(refinedSelector(nextA), refinedSelector(nextB));
+            const isEqualForBuilder = (nextA, nextB) =>
+                comparator(refinedSelector(nextA), refinedSelector(nextB));
             return () => new CustomEqualSet_1.CustomEqualSet(isEqualForBuilder);
         }
         const selector = constraints.selector || ((v) => v);
@@ -4420,7 +4703,8 @@ export var fc = (function () {
             constraints.maxLength !== undefined
                 ? constraints.maxLength
                 : MaxLengthFromMinLength_1$7.MaxLengthUpperBound;
-        const maxGeneratedLength = (0, MaxLengthFromMinLength_1$7.maxGeneratedLengthFromSizeForArbitrary)(
+        const maxGeneratedLength = (0,
+        MaxLengthFromMinLength_1$7.maxGeneratedLengthFromSizeForArbitrary)(
             constraints.size,
             minLength,
             maxLength,
@@ -4445,7 +4729,8 @@ export var fc = (function () {
     var KeyValuePairsToObject = {};
 
     Object.defineProperty(KeyValuePairsToObject, "__esModule", {value: true});
-    KeyValuePairsToObject.keyValuePairsToObjectUnmapper = KeyValuePairsToObject.keyValuePairsToObjectMapper = void 0;
+    KeyValuePairsToObject.keyValuePairsToObjectUnmapper =
+        KeyValuePairsToObject.keyValuePairsToObjectMapper = void 0;
     function keyValuePairsToObjectMapper(items) {
         const obj = {};
         for (const keyValue of items) {
@@ -4482,8 +4767,13 @@ export var fc = (function () {
         if (Object.getOwnPropertySymbols(value).length > 0) {
             throw new Error("Incompatible instance received: should contain symbols");
         }
-        if (Object.getOwnPropertyNames(value).find(buildInvalidPropertyNameFilter(value)) !== undefined) {
-            throw new Error("Incompatible instance received: should contain only c/e/w properties without get/set");
+        if (
+            Object.getOwnPropertyNames(value).find(buildInvalidPropertyNameFilter(value)) !==
+            undefined
+        ) {
+            throw new Error(
+                "Incompatible instance received: should contain only c/e/w properties without get/set",
+            );
         }
         return Object.entries(value);
     }
@@ -4566,7 +4856,10 @@ export var fc = (function () {
                     constraints.depthSize,
                     constraints.maxDepth !== undefined,
                 ),
-                maxDepth: constraints.maxDepth != undefined ? constraints.maxDepth : Number.POSITIVE_INFINITY,
+                maxDepth:
+                    constraints.maxDepth != undefined
+                        ? constraints.maxDepth
+                        : Number.POSITIVE_INFINITY,
                 withCrossShrink: !!constraints.withCrossShrink,
             };
             return new FrequencyArbitrary(
@@ -4625,13 +4918,19 @@ export var fc = (function () {
         defaultShrinkForFirst(selectedIndex) {
             ++this.context.depth;
             try {
-                if (!this.mustFallbackToFirstInShrink(selectedIndex) || this.warbs[0].fallbackValue === undefined) {
+                if (
+                    !this.mustFallbackToFirstInShrink(selectedIndex) ||
+                    this.warbs[0].fallbackValue === undefined
+                ) {
                     return Stream_1$6.Stream.nil();
                 }
             } finally {
                 --this.context.depth;
             }
-            const rawShrinkValue = new Value_1$8.Value(this.warbs[0].fallbackValue.default, undefined);
+            const rawShrinkValue = new Value_1$8.Value(
+                this.warbs[0].fallbackValue.default,
+                undefined,
+            );
             return Stream_1$6.Stream.of(this.mapIntoValue(0, rawShrinkValue, null, undefined));
         }
         canShrinkWithoutContextIndex(value) {
@@ -4664,7 +4963,9 @@ export var fc = (function () {
             ++this.context.depth;
             try {
                 const value = this.warbs[idx].arbitrary.generate(mrng, biasFactor);
-                const clonedMrngForFallbackFirst = this.mustFallbackToFirstInShrink(idx) ? mrng.clone() : null;
+                const clonedMrngForFallbackFirst = this.mustFallbackToFirstInShrink(idx)
+                    ? mrng.clone()
+                    : null;
                 return this.mapIntoValue(idx, value, clonedMrngForFallbackFirst, biasFactor);
             } finally {
                 --this.context.depth;
@@ -4710,7 +5011,11 @@ export var fc = (function () {
         const constraints = args[0];
         if (isOneOfContraints(constraints)) {
             const weightedArbs = args.slice(1).map(toWeightedArbitrary);
-            return FrequencyArbitrary_1$1.FrequencyArbitrary.from(weightedArbs, constraints, "fc.oneof");
+            return FrequencyArbitrary_1$1.FrequencyArbitrary.from(
+                weightedArbs,
+                constraints,
+                "fc.oneof",
+            );
         }
         const weightedArbs = args.map(toWeightedArbitrary);
         return FrequencyArbitrary_1$1.FrequencyArbitrary.from(weightedArbs, {}, "fc.oneof");
@@ -4725,7 +5030,8 @@ export var fc = (function () {
     nat$1.nat = void 0;
     const IntegerArbitrary_1$3 = IntegerArbitrary$1;
     function nat(arg) {
-        const max = typeof arg === "number" ? arg : arg && arg.max !== undefined ? arg.max : 0x7fffffff;
+        const max =
+            typeof arg === "number" ? arg : arg && arg.max !== undefined ? arg.max : 0x7fffffff;
         if (max < 0) {
             throw new Error("fc.nat value should be greater than or equal to 0");
         }
@@ -4739,8 +5045,8 @@ export var fc = (function () {
     var IndexToMappedConstant = {};
 
     Object.defineProperty(IndexToMappedConstant, "__esModule", {value: true});
-    IndexToMappedConstant.indexToMappedConstantUnmapperFor = IndexToMappedConstant.indexToMappedConstantMapperFor =
-        void 0;
+    IndexToMappedConstant.indexToMappedConstantUnmapperFor =
+        IndexToMappedConstant.indexToMappedConstantMapperFor = void 0;
     function indexToMappedConstantMapperFor(entries) {
         return function indexToMappedConstantMapper(choiceIndex) {
             let idx = -1;
@@ -4779,7 +5085,9 @@ export var fc = (function () {
                 ? reverseMapping.negativeZeroIndex
                 : reverseMapping.mapping.get(value);
             if (choiceIndex === undefined) {
-                throw new Error("Unknown value encountered cannot be built using this mapToConstant");
+                throw new Error(
+                    "Unknown value encountered cannot be built using this mapToConstant",
+                );
             }
             return choiceIndex;
         };
@@ -4800,7 +5108,8 @@ export var fc = (function () {
                 );
             numChoices += options[idx].num;
         }
-        if (numChoices === 0) throw new Error(`fc.mapToConstant expects at least one choice among options`);
+        if (numChoices === 0)
+            throw new Error(`fc.mapToConstant expects at least one choice among options`);
         return numChoices;
     }
     function mapToConstant(...entries) {
@@ -4836,9 +5145,15 @@ export var fc = (function () {
             const decoded = decodeURIComponent(value);
             return decoded;
         }
-        const percentCharArb = (0, fullUnicode_1.fullUnicode)().map(percentCharArbMapper, percentCharArbUnmapper);
+        const percentCharArb = (0, fullUnicode_1.fullUnicode)().map(
+            percentCharArbMapper,
+            percentCharArbUnmapper,
+        );
         const buildLowerAlphaArbitrary = (others) =>
-            (0, mapToConstant_1.mapToConstant)(lowerCaseMapper, {num: others.length, build: (v) => others[v]});
+            (0, mapToConstant_1.mapToConstant)(lowerCaseMapper, {
+                num: others.length,
+                build: (v) => others[v],
+            });
         exports.buildLowerAlphaArbitrary = buildLowerAlphaArbitrary;
         const buildLowerAlphaNumericArbitrary = (others) =>
             (0, mapToConstant_1.mapToConstant)(lowerCaseMapper, numericMapper, {
@@ -4870,7 +5185,9 @@ export var fc = (function () {
     const FrequencyArbitrary_1 = FrequencyArbitrary$1;
     function option(arb, constraints = {}) {
         const freq = constraints.freq == null ? 5 : constraints.freq;
-        const nilValue = Object.prototype.hasOwnProperty.call(constraints, "nil") ? constraints.nil : null;
+        const nilValue = Object.prototype.hasOwnProperty.call(constraints, "nil")
+            ? constraints.nil
+            : null;
         const nilArb = (0, constant_1$5.constant)(nilValue);
         const weightedArbs = [
             {arbitrary: nilArb, weight: 1, fallbackValue: {default: nilValue}},
@@ -4882,7 +5199,11 @@ export var fc = (function () {
             maxDepth: constraints.maxDepth,
             depthIdentifier: constraints.depthIdentifier,
         };
-        return FrequencyArbitrary_1.FrequencyArbitrary.from(weightedArbs, frequencyConstraints, "fc.option");
+        return FrequencyArbitrary_1.FrequencyArbitrary.from(
+            weightedArbs,
+            frequencyConstraints,
+            "fc.option",
+        );
     }
     option$1.option = option;
 
@@ -4931,7 +5252,11 @@ export var fc = (function () {
                             nextStartIndex: index + 1,
                             chunks: last.chunks,
                         });
-                        stack.push({endIndexChunks: index, nextStartIndex: index + 1, chunks: newChunks});
+                        stack.push({
+                            endIndexChunks: index,
+                            nextStartIndex: index + 1,
+                            chunks: newChunks,
+                        });
                         break;
                     }
                 }
@@ -5002,8 +5327,13 @@ export var fc = (function () {
     const SlicesForStringBuilder_1$7 = SlicesForStringBuilder;
     function stringOf(charArb, constraints = {}) {
         const unmapper = (0, PatternsToString_1.patternsToStringUnmapperFor)(charArb, constraints);
-        const experimentalCustomSlices = (0, SlicesForStringBuilder_1$7.createSlicesForString)(charArb, unmapper);
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const experimentalCustomSlices = (0, SlicesForStringBuilder_1$7.createSlicesForString)(
+            charArb,
+            unmapper,
+        );
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$h.array)(charArb, enrichedConstraints).map(
             PatternsToString_1.patternsToStringMapper,
             unmapper,
@@ -5096,8 +5426,10 @@ export var fc = (function () {
         return [value[0], [value.substring(1, value.length - 1), value[value.length - 1]]];
     }
     function subdomainLabel(size) {
-        const alphaNumericArb = (0, CharacterRangeArbitraryBuilder_1$4.buildLowerAlphaNumericArbitrary)([]);
-        const alphaNumericHyphenArb = (0, CharacterRangeArbitraryBuilder_1$4.buildLowerAlphaNumericArbitrary)(["-"]);
+        const alphaNumericArb = (0,
+        CharacterRangeArbitraryBuilder_1$4.buildLowerAlphaNumericArbitrary)([]);
+        const alphaNumericHyphenArb = (0,
+        CharacterRangeArbitraryBuilder_1$4.buildLowerAlphaNumericArbitrary)(["-"]);
         return (0, tuple_1$e.tuple)(
             alphaNumericArb,
             (0, option_1$3.option)(
@@ -5133,8 +5465,13 @@ export var fc = (function () {
     }
     function domain(constraints = {}) {
         const resolvedSize = (0, MaxLengthFromMinLength_1$4.resolveSize)(constraints.size);
-        const resolvedSizeMinusOne = (0, MaxLengthFromMinLength_1$4.relativeSizeToSize)("-1", resolvedSize);
-        const alphaNumericArb = (0, CharacterRangeArbitraryBuilder_1$4.buildLowerAlphaArbitrary)([]);
+        const resolvedSizeMinusOne = (0, MaxLengthFromMinLength_1$4.relativeSizeToSize)(
+            "-1",
+            resolvedSize,
+        );
+        const alphaNumericArb = (0, CharacterRangeArbitraryBuilder_1$4.buildLowerAlphaArbitrary)(
+            [],
+        );
         const publicSuffixArb = (0, stringOf_1$4.stringOf)(alphaNumericArb, {
             minLength: 2,
             maxLength: 63,
@@ -5191,8 +5528,30 @@ export var fc = (function () {
         return value.split("@", 2);
     }
     function emailAddress(constraints = {}) {
-        const others = ["!", "#", "$", "%", "&", "'", "*", "+", "-", "/", "=", "?", "^", "_", "`", "{", "|", "}", "~"];
-        const atextArb = (0, CharacterRangeArbitraryBuilder_1$3.buildLowerAlphaNumericArbitrary)(others);
+        const others = [
+            "!",
+            "#",
+            "$",
+            "%",
+            "&",
+            "'",
+            "*",
+            "+",
+            "-",
+            "/",
+            "=",
+            "?",
+            "^",
+            "_",
+            "`",
+            "{",
+            "|",
+            "}",
+            "~",
+        ];
+        const atextArb = (0, CharacterRangeArbitraryBuilder_1$3.buildLowerAlphaNumericArbitrary)(
+            others,
+        );
         const localPartArb = (0, AdapterArbitrary_1.adapter)(
             (0, array_1$f.array)(
                 (0, stringOf_1$3.stringOf)(atextArb, {
@@ -5204,10 +5563,10 @@ export var fc = (function () {
             ),
             dotAdapter,
         ).map(dotMapper, dotUnmapper);
-        return (0, tuple_1$d.tuple)(localPartArb, (0, domain_1$1.domain)({size: constraints.size})).map(
-            atMapper,
-            atUnmapper,
-        );
+        return (0, tuple_1$d.tuple)(
+            localPartArb,
+            (0, domain_1$1.domain)({size: constraints.size}),
+        ).map(atMapper, atUnmapper);
     }
     emailAddress$1.emailAddress = emailAddress;
 
@@ -5285,7 +5644,10 @@ export var fc = (function () {
             }
             return {
                 sign: 1,
-                data: a.sign === 1 ? substract64DataInternal(a.data, b.data) : substract64DataInternal(b.data, a.data),
+                data:
+                    a.sign === 1
+                        ? substract64DataInternal(a.data, b.data)
+                        : substract64DataInternal(b.data, a.data),
             };
         }
         function substract64(arrayIntA, arrayIntB) {
@@ -5317,7 +5679,10 @@ export var fc = (function () {
         function halve64(a) {
             return {
                 sign: a.sign,
-                data: [Math.floor(a.data[0] / 2), (a.data[0] % 2 === 1 ? 0x80000000 : 0) + Math.floor(a.data[1] / 2)],
+                data: [
+                    Math.floor(a.data[0] / 2),
+                    (a.data[0] % 2 === 1 ? 0x80000000 : 0) + Math.floor(a.data[1] / 2),
+                ],
             };
         }
         exports.halve64 = halve64;
@@ -5420,15 +5785,23 @@ export var fc = (function () {
             }
             if (current.sign === 1) {
                 return (
-                    (0, ArrayInt64_1$2.isEqual64)(current, (0, ArrayInt64_1$2.add64)(context, ArrayInt64_1$2.Unit64)) &&
-                    (0, ArrayInt64_1$2.isStrictlyPositive64)((0, ArrayInt64_1$2.substract64)(current, this.min))
+                    (0, ArrayInt64_1$2.isEqual64)(
+                        current,
+                        (0, ArrayInt64_1$2.add64)(context, ArrayInt64_1$2.Unit64),
+                    ) &&
+                    (0, ArrayInt64_1$2.isStrictlyPositive64)(
+                        (0, ArrayInt64_1$2.substract64)(current, this.min),
+                    )
                 );
             } else {
                 return (
                     (0, ArrayInt64_1$2.isEqual64)(
                         current,
                         (0, ArrayInt64_1$2.substract64)(context, ArrayInt64_1$2.Unit64),
-                    ) && (0, ArrayInt64_1$2.isStrictlyNegative64)((0, ArrayInt64_1$2.substract64)(current, this.max))
+                    ) &&
+                    (0, ArrayInt64_1$2.isStrictlyNegative64)(
+                        (0, ArrayInt64_1$2.substract64)(current, this.max),
+                    )
                 );
             }
         }
@@ -5436,7 +5809,12 @@ export var fc = (function () {
             if (context === undefined) {
                 return false;
             }
-            if (typeof context !== "object" || context === null || !("sign" in context) || !("data" in context)) {
+            if (
+                typeof context !== "object" ||
+                context === null ||
+                !("sign" in context) ||
+                !("data" in context)
+            ) {
                 throw new Error(`Invalid context type passed to ArrayInt64Arbitrary (#1)`);
             }
             return true;
@@ -5460,7 +5838,9 @@ export var fc = (function () {
                     {min: this.min, max: (0, ArrayInt64_1$2.substract64)(this.min, logMin)},
                 ];
             } else {
-                const logGap = (0, ArrayInt64_1$2.logLike64)((0, ArrayInt64_1$2.substract64)(this.max, this.min));
+                const logGap = (0, ArrayInt64_1$2.logLike64)(
+                    (0, ArrayInt64_1$2.substract64)(this.max, this.min),
+                );
                 const arbCloseToMin = {
                     min: this.min,
                     max: (0, ArrayInt64_1$2.add64)(this.min, logGap),
@@ -5485,7 +5865,10 @@ export var fc = (function () {
     var DoubleHelpers = {};
 
     Object.defineProperty(DoubleHelpers, "__esModule", {value: true});
-    DoubleHelpers.indexToDouble = DoubleHelpers.doubleToIndex = DoubleHelpers.decomposeDouble = void 0;
+    DoubleHelpers.indexToDouble =
+        DoubleHelpers.doubleToIndex =
+        DoubleHelpers.decomposeDouble =
+            void 0;
     const ArrayInt64_1$1 = ArrayInt64;
     const INDEX_POSITIVE_INFINITY$1 = {sign: 1, data: [2146435072, 0]};
     const INDEX_NEGATIVE_INFINITY$1 = {sign: -1, data: [2146435072, 1]};
@@ -5558,7 +5941,8 @@ export var fc = (function () {
         }
         const postIndexHigh = index.data[0] - 0x200000;
         const exponent = -1021 + (postIndexHigh >> 20);
-        const significand = 1 + ((postIndexHigh & 0xfffff) * 2 ** 32 + index.data[1]) * Number.EPSILON;
+        const significand =
+            1 + ((postIndexHigh & 0xfffff) * 2 ** 32 + index.data[1]) * Number.EPSILON;
         return significand * 2 ** exponent;
     }
     DoubleHelpers.indexToDouble = indexToDouble;
@@ -5570,7 +5954,9 @@ export var fc = (function () {
     const DoubleHelpers_1 = DoubleHelpers;
     function safeDoubleToIndex(d, constraintsLabel) {
         if (Number.isNaN(d)) {
-            throw new Error("fc.double constraints." + constraintsLabel + " must be a 32-bit float");
+            throw new Error(
+                "fc.double constraints." + constraintsLabel + " must be a 32-bit float",
+            );
         }
         return (0, DoubleHelpers_1.doubleToIndex)(d);
     }
@@ -5588,7 +5974,9 @@ export var fc = (function () {
         const minIndex = safeDoubleToIndex(min, "min");
         const maxIndex = safeDoubleToIndex(max, "max");
         if ((0, ArrayInt64_1.isStrictlySmaller64)(maxIndex, minIndex)) {
-            throw new Error("fc.double constraints.min must be smaller or equal to constraints.max");
+            throw new Error(
+                "fc.double constraints.min must be smaller or equal to constraints.max",
+            );
         }
         if (noNaN) {
             return (0, ArrayInt64Arbitrary_1.arrayInt64)(minIndex, maxIndex).map(
@@ -5600,7 +5988,9 @@ export var fc = (function () {
         const minIndexWithNaN = positiveMaxIdx
             ? minIndex
             : (0, ArrayInt64_1.substract64)(minIndex, ArrayInt64_1.Unit64);
-        const maxIndexWithNaN = positiveMaxIdx ? (0, ArrayInt64_1.add64)(maxIndex, ArrayInt64_1.Unit64) : maxIndex;
+        const maxIndexWithNaN = positiveMaxIdx
+            ? (0, ArrayInt64_1.add64)(maxIndex, ArrayInt64_1.Unit64)
+            : maxIndex;
         return (0, ArrayInt64Arbitrary_1.arrayInt64)(minIndexWithNaN, maxIndexWithNaN).map(
             (index) => {
                 if (
@@ -5613,7 +6003,9 @@ export var fc = (function () {
             (value) => {
                 if (typeof value !== "number") throw new Error("Unsupported type");
                 if (Number.isNaN(value))
-                    return !(0, ArrayInt64_1.isEqual64)(maxIndex, maxIndexWithNaN) ? maxIndexWithNaN : minIndexWithNaN;
+                    return !(0, ArrayInt64_1.isEqual64)(maxIndex, maxIndexWithNaN)
+                        ? maxIndexWithNaN
+                        : minIndexWithNaN;
                 return (0, DoubleHelpers_1.doubleToIndex)(value);
             },
         );
@@ -5665,7 +6057,11 @@ export var fc = (function () {
         const decomp = decomposeFloat(f);
         const exponent = decomp.exponent;
         const significand = decomp.significand;
-        if (Number.isNaN(exponent) || Number.isNaN(significand) || !Number.isInteger(significand * 0x800000)) {
+        if (
+            Number.isNaN(exponent) ||
+            Number.isNaN(significand) ||
+            !Number.isInteger(significand * 0x800000)
+        ) {
             return Number.NaN;
         }
         if (f > 0 || (f === 0 && 1 / f === Number.POSITIVE_INFINITY)) {
@@ -5700,10 +6096,14 @@ export var fc = (function () {
         const conversionTrick =
             "you can convert any double to a 32-bit float by using `new Float32Array([myDouble])[0]`";
         const errorMessage =
-            "fc.float constraints." + constraintsLabel + " must be a 32-bit float - " + conversionTrick;
+            "fc.float constraints." +
+            constraintsLabel +
+            " must be a 32-bit float - " +
+            conversionTrick;
         if (
             Number.isNaN(f) ||
-            (Number.isFinite(f) && (f < -FloatHelpers_1.MAX_VALUE_32 || f > FloatHelpers_1.MAX_VALUE_32))
+            (Number.isFinite(f) &&
+                (f < -FloatHelpers_1.MAX_VALUE_32 || f > FloatHelpers_1.MAX_VALUE_32))
         ) {
             throw new Error(errorMessage);
         }
@@ -5744,7 +6144,8 @@ export var fc = (function () {
             },
             (value) => {
                 if (typeof value !== "number") throw new Error("Unsupported type");
-                if (Number.isNaN(value)) return maxIndex !== maxIndexWithNaN ? maxIndexWithNaN : minIndexWithNaN;
+                if (Number.isNaN(value))
+                    return maxIndex !== maxIndexWithNaN ? maxIndexWithNaN : minIndexWithNaN;
                 return (0, FloatHelpers_1.floatToIndex)(value);
             },
         );
@@ -5773,34 +6174,42 @@ export var fc = (function () {
     Object.defineProperty(hash$1, "__esModule", {value: true});
     hash$1.hash = void 0;
     const crc32Table = [
-        0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3, 0x0edb8832,
-        0x79dcb8a4, 0xe0d5e91e, 0x97d2d988, 0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
-        0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7, 0x136c9856, 0x646ba8c0, 0xfd62f97a,
-        0x8a65c9ec, 0x14015c4f, 0x63066cd9, 0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
-        0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c, 0xdbbbc9d6, 0xacbcf940, 0x32d86ce3,
-        0x45df5c75, 0xdcd60dcf, 0xabd13d59, 0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423,
-        0xcfba9599, 0xb8bda50f, 0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924, 0x2f6f7c87, 0x58684c11, 0xc1611dab,
-        0xb6662d3d, 0x76dc4190, 0x01db7106, 0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
-        0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb, 0x086d3d2d, 0x91646c97, 0xe6635c01, 0x6b6b51f4,
-        0x1c6c6162, 0x856530d8, 0xf262004e, 0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457, 0x65b0d9c6, 0x12b7e950,
-        0x8bbeb8ea, 0xfcb9887c, 0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65, 0x4db26158, 0x3ab551ce, 0xa3bc0074,
-        0xd4bb30e2, 0x4adfa541, 0x3dd895d7, 0xa4d1c46d, 0xd3d6f4fb, 0x4369e96a, 0x346ed9fc, 0xad678846, 0xda60b8d0,
-        0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9, 0x5005713c, 0x270241aa, 0xbe0b1010, 0xc90c2086, 0x5768b525,
-        0x206f85b3, 0xb966d409, 0xce61e49f, 0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4, 0x59b33d17, 0x2eb40d81,
-        0xb7bd5c3b, 0xc0ba6cad, 0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a, 0xead54739, 0x9dd277af, 0x04db2615,
-        0x73dc1683, 0xe3630b12, 0x94643b84, 0x0d6d6a3e, 0x7a6a5aa8, 0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1,
-        0xf00f9344, 0x8708a3d2, 0x1e01f268, 0x6906c2fe, 0xf762575d, 0x806567cb, 0x196c3671, 0x6e6b06e7, 0xfed41b76,
-        0x89d32be0, 0x10da7a5a, 0x67dd4acc, 0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5, 0xd6d6a3e8, 0xa1d1937e,
-        0x38d8c2c4, 0x4fdff252, 0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b, 0xd80d2bda, 0xaf0a1b4c, 0x36034af6,
-        0x41047a60, 0xdf60efc3, 0xa867df55, 0x316e8eef, 0x4669be79, 0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236,
-        0xcc0c7795, 0xbb0b4703, 0x220216b9, 0x5505262f, 0xc5ba3bbe, 0xb2bd0b28, 0x2bb45a92, 0x5cb36a04, 0xc2d7ffa7,
-        0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d, 0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a, 0x9c0906a9, 0xeb0e363f,
-        0x72076785, 0x05005713, 0x95bf4a82, 0xe2b87a14, 0x7bb12bae, 0x0cb61b38, 0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7,
-        0x0bdbdf21, 0x86d3d2d4, 0xf1d4e242, 0x68ddb3f8, 0x1fda836e, 0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777,
-        0x88085ae6, 0xff0f6a70, 0x66063bca, 0x11010b5c, 0x8f659eff, 0xf862ae69, 0x616bffd3, 0x166ccf45, 0xa00ae278,
-        0xd70dd2ee, 0x4e048354, 0x3903b3c2, 0xa7672661, 0xd06016f7, 0x4969474d, 0x3e6e77db, 0xaed16a4a, 0xd9d65adc,
-        0x40df0b66, 0x37d83bf0, 0xa9bcae53, 0xdebb9ec5, 0x47b2cf7f, 0x30b5ffe9, 0xbdbdf21c, 0xcabac28a, 0x53b39330,
-        0x24b4a3a6, 0xbad03605, 0xcdd70693, 0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
+        0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535,
+        0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988, 0x09b64c2b, 0x7eb17cbd,
+        0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2, 0xf3b97148, 0x84be41de, 0x1adad47d,
+        0x6ddde4eb, 0xf4d4b551, 0x83d385c7, 0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec,
+        0x14015c4f, 0x63066cd9, 0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4,
+        0xa2677172, 0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c,
+        0xdbbbc9d6, 0xacbcf940, 0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59, 0x26d930ac,
+        0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423, 0xcfba9599, 0xb8bda50f,
+        0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924, 0x2f6f7c87, 0x58684c11, 0xc1611dab,
+        0xb6662d3d, 0x76dc4190, 0x01db7106, 0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f,
+        0x9fbfe4a5, 0xe8b8d433, 0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb,
+        0x086d3d2d, 0x91646c97, 0xe6635c01, 0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
+        0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457, 0x65b0d9c6, 0x12b7e950, 0x8bbeb8ea,
+        0xfcb9887c, 0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65, 0x4db26158, 0x3ab551ce,
+        0xa3bc0074, 0xd4bb30e2, 0x4adfa541, 0x3dd895d7, 0xa4d1c46d, 0xd3d6f4fb, 0x4369e96a,
+        0x346ed9fc, 0xad678846, 0xda60b8d0, 0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9,
+        0x5005713c, 0x270241aa, 0xbe0b1010, 0xc90c2086, 0x5768b525, 0x206f85b3, 0xb966d409,
+        0xce61e49f, 0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4, 0x59b33d17, 0x2eb40d81,
+        0xb7bd5c3b, 0xc0ba6cad, 0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a, 0xead54739,
+        0x9dd277af, 0x04db2615, 0x73dc1683, 0xe3630b12, 0x94643b84, 0x0d6d6a3e, 0x7a6a5aa8,
+        0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1, 0xf00f9344, 0x8708a3d2, 0x1e01f268,
+        0x6906c2fe, 0xf762575d, 0x806567cb, 0x196c3671, 0x6e6b06e7, 0xfed41b76, 0x89d32be0,
+        0x10da7a5a, 0x67dd4acc, 0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5, 0xd6d6a3e8,
+        0xa1d1937e, 0x38d8c2c4, 0x4fdff252, 0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b,
+        0xd80d2bda, 0xaf0a1b4c, 0x36034af6, 0x41047a60, 0xdf60efc3, 0xa867df55, 0x316e8eef,
+        0x4669be79, 0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236, 0xcc0c7795, 0xbb0b4703,
+        0x220216b9, 0x5505262f, 0xc5ba3bbe, 0xb2bd0b28, 0x2bb45a92, 0x5cb36a04, 0xc2d7ffa7,
+        0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d, 0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a,
+        0x9c0906a9, 0xeb0e363f, 0x72076785, 0x05005713, 0x95bf4a82, 0xe2b87a14, 0x7bb12bae,
+        0x0cb61b38, 0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7, 0x0bdbdf21, 0x86d3d2d4, 0xf1d4e242,
+        0x68ddb3f8, 0x1fda836e, 0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777, 0x88085ae6,
+        0xff0f6a70, 0x66063bca, 0x11010b5c, 0x8f659eff, 0xf862ae69, 0x616bffd3, 0x166ccf45,
+        0xa00ae278, 0xd70dd2ee, 0x4e048354, 0x3903b3c2, 0xa7672661, 0xd06016f7, 0x4969474d,
+        0x3e6e77db, 0xaed16a4a, 0xd9d65adc, 0x40df0b66, 0x37d83bf0, 0xa9bcae53, 0xdebb9ec5,
+        0x47b2cf7f, 0x30b5ffe9, 0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6, 0xbad03605,
+        0xcdd70693, 0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
         0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
     ];
     function hash(repr) {
@@ -5824,7 +6233,9 @@ export var fc = (function () {
                     const c2 = cNext & 1023;
                     crc = crc32Table[(crc & 0xff) ^ (240 | ((c1 >> 8) & 7))] ^ (crc >> 8);
                     crc = crc32Table[(crc & 0xff) ^ (128 | ((c1 >> 2) & 63))] ^ (crc >> 8);
-                    crc = crc32Table[(crc & 0xff) ^ (128 | ((c2 >> 6) & 15) | ((c1 & 3) << 4))] ^ (crc >> 8);
+                    crc =
+                        crc32Table[(crc & 0xff) ^ (128 | ((c2 >> 6) & 15) | ((c1 & 3) << 4))] ^
+                        (crc >> 8);
                     crc = crc32Table[(crc & 0xff) ^ (128 | (c2 & 63))] ^ (crc >> 8);
                 }
             } else {
@@ -5866,7 +6277,10 @@ export var fc = (function () {
                         const seenValues = Object.keys(recorded)
                             .sort()
                             .map((k) => `${k} => ${(0, stringify_1$5.stringify)(recorded[k])}`)
-                            .map((line) => `/* ${(0, TextEscaper_1$2.escapeForMultilineComments)(line)} */`);
+                            .map(
+                                (line) =>
+                                    `/* ${(0, TextEscaper_1$2.escapeForMultilineComments)(line)} */`,
+                            );
                         return `function(a, b) {
   // With hash and stringify coming from fast-check${seenValues.length !== 0 ? `\n  ${seenValues.join("\n  ")}` : ""}
   const cmp = ${cmp};
@@ -5935,13 +6349,18 @@ export var fc = (function () {
                     const repr = (0, stringify_1$4.stringify)(args);
                     const val = outs[(0, hash_1.hash)(`${seed}${repr}`) % outs.length];
                     recorded[repr] = val;
-                    return (0, symbols_1$4.hasCloneMethod)(val) ? val[symbols_1$4.cloneMethod]() : val;
+                    return (0, symbols_1$4.hasCloneMethod)(val)
+                        ? val[symbols_1$4.cloneMethod]()
+                        : val;
                 };
                 function prettyPrint(stringifiedOuts) {
                     const seenValues = Object.keys(recorded)
                         .sort()
                         .map((k) => `${k} => ${(0, stringify_1$4.stringify)(recorded[k])}`)
-                        .map((line) => `/* ${(0, TextEscaper_1$1.escapeForMultilineComments)(line)} */`);
+                        .map(
+                            (line) =>
+                                `/* ${(0, TextEscaper_1$1.escapeForMultilineComments)(line)} */`,
+                        );
                     return `function(...args) {
   // With hash and stringify coming from fast-check${seenValues.length !== 0 ? `\n  ${seenValues.join("\n  ")}` : ""}
   const outs = ${stringifiedOuts};
@@ -5950,9 +6369,12 @@ export var fc = (function () {
                 }
                 return Object.defineProperties(f, {
                     toString: {value: () => prettyPrint((0, stringify_1$4.stringify)(outs))},
-                    [stringify_1$4.toStringMethod]: {value: () => prettyPrint((0, stringify_1$4.stringify)(outs))},
+                    [stringify_1$4.toStringMethod]: {
+                        value: () => prettyPrint((0, stringify_1$4.stringify)(outs)),
+                    },
                     [stringify_1$4.asyncToStringMethod]: {
-                        value: async () => prettyPrint(await (0, stringify_1$4.asyncStringify)(outs)),
+                        value: async () =>
+                            prettyPrint(await (0, stringify_1$4.asyncStringify)(outs)),
                     },
                     [symbols_1$4.cloneMethod]: {value: producer, configurable: true},
                 });
@@ -5968,7 +6390,10 @@ export var fc = (function () {
     maxSafeInteger$1.maxSafeInteger = void 0;
     const IntegerArbitrary_1$2 = IntegerArbitrary$1;
     function maxSafeInteger() {
-        return new IntegerArbitrary_1$2.IntegerArbitrary(Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+        return new IntegerArbitrary_1$2.IntegerArbitrary(
+            Number.MIN_SAFE_INTEGER,
+            Number.MAX_SAFE_INTEGER,
+        );
     }
     maxSafeInteger$1.maxSafeInteger = maxSafeInteger;
 
@@ -6038,7 +6463,9 @@ export var fc = (function () {
         if (typeof value !== "string") {
             throw new Error("Invalid type");
         }
-        return value.split(".").map((v) => (0, NatToStringifiedNat_1$1.tryParseStringifiedNat)(v, 10));
+        return value
+            .split(".")
+            .map((v) => (0, NatToStringifiedNat_1$1.tryParseStringifiedNat)(v, 10));
     }
     function ipV4() {
         return (0, tuple_1$a.tuple)(
@@ -6064,7 +6491,10 @@ export var fc = (function () {
         return (0, tuple_1$9.tuple)(
             (0, constantFrom_1$1.constantFrom)("dec", "oct", "hex"),
             (0, nat_1$1.nat)(maxValue),
-        ).map(NatToStringifiedNat_1.natToStringifiedNatMapper, NatToStringifiedNat_1.natToStringifiedNatUnmapper);
+        ).map(
+            NatToStringifiedNat_1.natToStringifiedNatMapper,
+            NatToStringifiedNat_1.natToStringifiedNatUnmapper,
+        );
     }
     StringifiedNatArbitraryBuilder.buildStringifiedNatArbitrary = buildStringifiedNatArbitrary;
 
@@ -6111,7 +6541,8 @@ export var fc = (function () {
     var CodePointsToString = {};
 
     Object.defineProperty(CodePointsToString, "__esModule", {value: true});
-    CodePointsToString.codePointsToStringUnmapper = CodePointsToString.codePointsToStringMapper = void 0;
+    CodePointsToString.codePointsToStringUnmapper = CodePointsToString.codePointsToStringMapper =
+        void 0;
     function codePointsToStringMapper(tab) {
         return tab.join("");
     }
@@ -6136,7 +6567,9 @@ export var fc = (function () {
             charArbitrary,
             CodePointsToString_1$5.codePointsToStringUnmapper,
         );
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$d.array)(charArbitrary, enrichedConstraints).map(
             CodePointsToString_1$5.codePointsToStringMapper,
             CodePointsToString_1$5.codePointsToStringUnmapper,
@@ -6257,14 +6690,14 @@ export var fc = (function () {
             (0, ipV4_1$1.ipV4)(),
         );
         return (0, oneof_1$5.oneof)(
-            (0, tuple_1$7.tuple)((0, array_1$c.array)(h16Arb, {minLength: 6, maxLength: 6, size: "max"}), ls32Arb).map(
-                EntitiesToIPv6_1.fullySpecifiedMapper,
-                EntitiesToIPv6_1.fullySpecifiedUnmapper,
-            ),
-            (0, tuple_1$7.tuple)((0, array_1$c.array)(h16Arb, {minLength: 5, maxLength: 5, size: "max"}), ls32Arb).map(
-                EntitiesToIPv6_1.onlyTrailingMapper,
-                EntitiesToIPv6_1.onlyTrailingUnmapper,
-            ),
+            (0, tuple_1$7.tuple)(
+                (0, array_1$c.array)(h16Arb, {minLength: 6, maxLength: 6, size: "max"}),
+                ls32Arb,
+            ).map(EntitiesToIPv6_1.fullySpecifiedMapper, EntitiesToIPv6_1.fullySpecifiedUnmapper),
+            (0, tuple_1$7.tuple)(
+                (0, array_1$c.array)(h16Arb, {minLength: 5, maxLength: 5, size: "max"}),
+                ls32Arb,
+            ).map(EntitiesToIPv6_1.onlyTrailingMapper, EntitiesToIPv6_1.onlyTrailingUnmapper),
             (0, tuple_1$7.tuple)(
                 (0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 1, size: "max"}),
                 (0, array_1$c.array)(h16Arb, {minLength: 4, maxLength: 4, size: "max"}),
@@ -6284,19 +6717,21 @@ export var fc = (function () {
                 (0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 4, size: "max"}),
                 h16Arb,
                 ls32Arb,
-            ).map(EntitiesToIPv6_1.multiTrailingMapperOne, EntitiesToIPv6_1.multiTrailingUnmapperOne),
-            (0, tuple_1$7.tuple)((0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 5, size: "max"}), ls32Arb).map(
-                EntitiesToIPv6_1.singleTrailingMapper,
-                EntitiesToIPv6_1.singleTrailingUnmapper,
+            ).map(
+                EntitiesToIPv6_1.multiTrailingMapperOne,
+                EntitiesToIPv6_1.multiTrailingUnmapperOne,
             ),
-            (0, tuple_1$7.tuple)((0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 6, size: "max"}), h16Arb).map(
-                EntitiesToIPv6_1.singleTrailingMapper,
-                EntitiesToIPv6_1.singleTrailingUnmapper,
-            ),
-            (0, tuple_1$7.tuple)((0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 7, size: "max"})).map(
-                EntitiesToIPv6_1.noTrailingMapper,
-                EntitiesToIPv6_1.noTrailingUnmapper,
-            ),
+            (0, tuple_1$7.tuple)(
+                (0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 5, size: "max"}),
+                ls32Arb,
+            ).map(EntitiesToIPv6_1.singleTrailingMapper, EntitiesToIPv6_1.singleTrailingUnmapper),
+            (0, tuple_1$7.tuple)(
+                (0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 6, size: "max"}),
+                h16Arb,
+            ).map(EntitiesToIPv6_1.singleTrailingMapper, EntitiesToIPv6_1.singleTrailingUnmapper),
+            (0, tuple_1$7.tuple)(
+                (0, array_1$c.array)(h16Arb, {minLength: 0, maxLength: 7, size: "max"}),
+            ).map(EntitiesToIPv6_1.noTrailingMapper, EntitiesToIPv6_1.noTrailingUnmapper),
         );
     }
     ipV6$1.ipV6 = ipV6;
@@ -6316,19 +6751,25 @@ export var fc = (function () {
         }
         generate(mrng, biasFactor) {
             if (!this.underlying) {
-                throw new Error(`Lazy arbitrary ${JSON.stringify(this.name)} not correctly initialized`);
+                throw new Error(
+                    `Lazy arbitrary ${JSON.stringify(this.name)} not correctly initialized`,
+                );
             }
             return this.underlying.generate(mrng, biasFactor);
         }
         canShrinkWithoutContext(value) {
             if (!this.underlying) {
-                throw new Error(`Lazy arbitrary ${JSON.stringify(this.name)} not correctly initialized`);
+                throw new Error(
+                    `Lazy arbitrary ${JSON.stringify(this.name)} not correctly initialized`,
+                );
             }
             return this.underlying.canShrinkWithoutContext(value);
         }
         shrink(value, context) {
             if (!this.underlying) {
-                throw new Error(`Lazy arbitrary ${JSON.stringify(this.name)} not correctly initialized`);
+                throw new Error(
+                    `Lazy arbitrary ${JSON.stringify(this.name)} not correctly initialized`,
+                );
             }
             return this.underlying.shrink(value, context);
         }
@@ -6352,7 +6793,8 @@ export var fc = (function () {
                 continue;
             }
             const lazyAtKey = lazyArbs[key];
-            const lazyArb = lazyAtKey !== undefined ? lazyAtKey : new LazyArbitrary_1.LazyArbitrary(key);
+            const lazyArb =
+                lazyAtKey !== undefined ? lazyAtKey : new LazyArbitrary_1.LazyArbitrary(key);
             lazyArb.underlying = strictArbs[key];
             lazyArbs[key] = lazyArb;
         }
@@ -6373,7 +6815,9 @@ export var fc = (function () {
         WordsToLorem.wordsToJoinedStringMapper =
             void 0;
     function wordsToJoinedStringMapper(words) {
-        return words.map((w) => (w[w.length - 1] === "," ? w.substr(0, w.length - 1) : w)).join(" ");
+        return words
+            .map((w) => (w[w.length - 1] === "," ? w.substr(0, w.length - 1) : w))
+            .join(" ");
     }
     WordsToLorem.wordsToJoinedStringMapper = wordsToJoinedStringMapper;
     function wordsToJoinedStringUnmapperFor(wordsArbitrary) {
@@ -6384,7 +6828,8 @@ export var fc = (function () {
             const words = [];
             for (const candidate of value.split(" ")) {
                 if (wordsArbitrary.canShrinkWithoutContext(candidate)) words.push(candidate);
-                else if (wordsArbitrary.canShrinkWithoutContext(candidate + ",")) words.push(candidate + ",");
+                else if (wordsArbitrary.canShrinkWithoutContext(candidate + ","))
+                    words.push(candidate + ",");
                 else throw new Error("Unsupported word");
             }
             return words;
@@ -6418,7 +6863,10 @@ export var fc = (function () {
             for (let idx = 0; idx !== candidates.length; ++idx) {
                 const candidate = candidates[idx];
                 if (wordsArbitrary.canShrinkWithoutContext(candidate)) words.push(candidate);
-                else if (idx === candidates.length - 1 && wordsArbitrary.canShrinkWithoutContext(candidate + ","))
+                else if (
+                    idx === candidates.length - 1 &&
+                    wordsArbitrary.canShrinkWithoutContext(candidate + ",")
+                )
                     words.push(candidate + ",");
                 else throw new Error("Unsupported word");
             }
@@ -6621,7 +7069,11 @@ export var fc = (function () {
                 WordsToLorem_1.sentencesToParagraphUnmapper,
             );
         } else {
-            return (0, array_1$b.array)(wordArbitrary, {minLength: 1, maxLength: maxCount, size}).map(
+            return (0, array_1$b.array)(wordArbitrary, {
+                minLength: 1,
+                maxLength: maxCount,
+                size,
+            }).map(
                 WordsToLorem_1.wordsToJoinedStringMapper,
                 (0, WordsToLorem_1.wordsToJoinedStringUnmapperFor)(wordArbitrary),
             );
@@ -6676,7 +7128,11 @@ export var fc = (function () {
         const preservedFlags = flags & allowedMask;
         let numMissingFlags = countToggledBits(flags - preservedFlags);
         let nFlags = preservedFlags;
-        for (let mask = BigInt(1); mask <= allowedMask && numMissingFlags !== 0; mask <<= BigInt(1)) {
+        for (
+            let mask = BigInt(1);
+            mask <= allowedMask && numMissingFlags !== 0;
+            mask <<= BigInt(1)
+        ) {
             if (!(nFlags & mask)) {
                 nFlags |= mask;
                 --numMissingFlags;
@@ -6695,7 +7151,11 @@ export var fc = (function () {
     ToggleFlags.computeTogglePositions = computeTogglePositions;
     function computeFlagsFromChars(untoggledChars, toggledChars, togglePositions) {
         let flags = BigInt(0);
-        for (let idx = 0, mask = BigInt(1); idx !== togglePositions.length; ++idx, mask <<= BigInt(1)) {
+        for (
+            let idx = 0, mask = BigInt(1);
+            idx !== togglePositions.length;
+            ++idx, mask <<= BigInt(1)
+        ) {
             if (untoggledChars[togglePositions[idx]] !== toggledChars[togglePositions[idx]]) {
                 flags |= mask;
             }
@@ -6704,7 +7164,11 @@ export var fc = (function () {
     }
     ToggleFlags.computeFlagsFromChars = computeFlagsFromChars;
     function applyFlagsOnChars(chars, flags, togglePositions, toggleCase) {
-        for (let idx = 0, mask = BigInt(1); idx !== togglePositions.length; ++idx, mask <<= BigInt(1)) {
+        for (
+            let idx = 0, mask = BigInt(1);
+            idx !== togglePositions.length;
+            ++idx, mask <<= BigInt(1)
+        ) {
             if (flags & mask) chars[togglePositions[idx]] = toggleCase(chars[togglePositions[idx]]);
         }
     }
@@ -6735,11 +7199,22 @@ export var fc = (function () {
         generate(mrng, biasFactor) {
             const rawStringValue = this.stringArb.generate(mrng, biasFactor);
             const chars = [...rawStringValue.value];
-            const togglePositions = (0, ToggleFlags_1.computeTogglePositions)(chars, this.toggleCase);
+            const togglePositions = (0, ToggleFlags_1.computeTogglePositions)(
+                chars,
+                this.toggleCase,
+            );
             const flagsArb = (0, bigUintN_1.bigUintN)(togglePositions.length);
             const flagsValue = flagsArb.generate(mrng, undefined);
-            (0, ToggleFlags_1.applyFlagsOnChars)(chars, flagsValue.value, togglePositions, this.toggleCase);
-            return new Value_1$5.Value(chars.join(""), this.buildContextFor(rawStringValue, flagsValue));
+            (0, ToggleFlags_1.applyFlagsOnChars)(
+                chars,
+                flagsValue.value,
+                togglePositions,
+                this.toggleCase,
+            );
+            return new Value_1$5.Value(
+                chars.join(""),
+                this.buildContextFor(rawStringValue, flagsValue),
+            );
         }
         canShrinkWithoutContext(value) {
             if (typeof value !== "string") {
@@ -6787,18 +7262,35 @@ export var fc = (function () {
                 .shrink(rawString, contextSafe.rawStringContext)
                 .map((nRawStringValue) => {
                     const nChars = [...nRawStringValue.value];
-                    const nTogglePositions = (0, ToggleFlags_1.computeTogglePositions)(nChars, this.toggleCase);
-                    const nFlags = (0, ToggleFlags_1.computeNextFlags)(flags, nTogglePositions.length);
-                    (0, ToggleFlags_1.applyFlagsOnChars)(nChars, nFlags, nTogglePositions, this.toggleCase);
+                    const nTogglePositions = (0, ToggleFlags_1.computeTogglePositions)(
+                        nChars,
+                        this.toggleCase,
+                    );
+                    const nFlags = (0, ToggleFlags_1.computeNextFlags)(
+                        flags,
+                        nTogglePositions.length,
+                    );
+                    (0, ToggleFlags_1.applyFlagsOnChars)(
+                        nChars,
+                        nFlags,
+                        nTogglePositions,
+                        this.toggleCase,
+                    );
                     return new Value_1$5.Value(
                         nChars.join(""),
-                        this.buildContextFor(nRawStringValue, new Value_1$5.Value(nFlags, undefined)),
+                        this.buildContextFor(
+                            nRawStringValue,
+                            new Value_1$5.Value(nFlags, undefined),
+                        ),
                     );
                 })
                 .join(
                     (0, LazyIterableIterator_1$2.makeLazy)(() => {
                         const chars = [...rawString];
-                        const togglePositions = (0, ToggleFlags_1.computeTogglePositions)(chars, this.toggleCase);
+                        const togglePositions = (0, ToggleFlags_1.computeTogglePositions)(
+                            chars,
+                            this.toggleCase,
+                        );
                         return (0, bigUintN_1.bigUintN)(togglePositions.length)
                             .shrink(flags, contextSafe.flagsContext)
                             .map((nFlagsValue) => {
@@ -6812,7 +7304,10 @@ export var fc = (function () {
                                 return new Value_1$5.Value(
                                     nChars.join(""),
                                     this.buildContextFor(
-                                        new Value_1$5.Value(rawString, contextSafe.rawStringContext),
+                                        new Value_1$5.Value(
+                                            rawString,
+                                            contextSafe.rawStringContext,
+                                        ),
                                         nFlagsValue,
                                     ),
                                 );
@@ -6895,10 +7390,12 @@ export var fc = (function () {
         (commonjsGlobal && commonjsGlobal.__rest) ||
         function (s, e) {
             var t = {};
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0) t[p] = s[p];
+            for (var p in s)
+                if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0) t[p] = s[p];
             if (s != null && typeof Object.getOwnPropertySymbols === "function")
                 for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-                    if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i])) t[p[i]] = s[p[i]];
+                    if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                        t[p[i]] = s[p[i]];
                 }
             return t;
         };
@@ -6916,7 +7413,9 @@ export var fc = (function () {
         const {min = defaultMin, max = defaultMax} = constraints,
             arrayConstraints = __rest(constraints, ["min", "max"]);
         if (min > max) {
-            throw new Error(`Invalid range passed to ${generatorName}: min must be lower than or equal to max`);
+            throw new Error(
+                `Invalid range passed to ${generatorName}: min must be lower than or equal to max`,
+            );
         }
         if (min < defaultMin) {
             throw new Error(
@@ -6936,7 +7435,8 @@ export var fc = (function () {
             },
         );
     }
-    TypedIntArrayArbitraryBuilder.typedIntArrayArbitraryArbitraryBuilder = typedIntArrayArbitraryArbitraryBuilder;
+    TypedIntArrayArbitraryBuilder.typedIntArrayArbitraryArbitraryBuilder =
+        typedIntArrayArbitraryArbitraryBuilder;
 
     Object.defineProperty(int16Array$1, "__esModule", {value: true});
     int16Array$1.int16Array = void 0;
@@ -7070,13 +7570,21 @@ export var fc = (function () {
     }
     function toGeneratorValue(value) {
         if (value.hasToBeCloned) {
-            return new Value_1$4.Value(value.value_, {generatorContext: value.context}, () => value.value);
+            return new Value_1$4.Value(
+                value.value_,
+                {generatorContext: value.context},
+                () => value.value,
+            );
         }
         return new Value_1$4.Value(value.value_, {generatorContext: value.context});
     }
     function toShrinkerValue(value) {
         if (value.hasToBeCloned) {
-            return new Value_1$4.Value(value.value_, {shrinkerContext: value.context}, () => value.value);
+            return new Value_1$4.Value(
+                value.value_,
+                {shrinkerContext: value.context},
+                () => value.value,
+            );
         }
         return new Value_1$4.Value(value.value_, {shrinkerContext: value.context});
     }
@@ -7097,9 +7605,13 @@ export var fc = (function () {
                 return this.shrinkerArbitrary.shrink(value, undefined).map(toShrinkerValue);
             }
             if ("generatorContext" in context) {
-                return this.generatorArbitrary.shrink(value, context.generatorContext).map(toGeneratorValue);
+                return this.generatorArbitrary
+                    .shrink(value, context.generatorContext)
+                    .map(toGeneratorValue);
             }
-            return this.shrinkerArbitrary.shrink(value, context.shrinkerContext).map(toShrinkerValue);
+            return this.shrinkerArbitrary
+                .shrink(value, context.shrinkerContext)
+                .map(toShrinkerValue);
         }
     }
     WithShrinkFromOtherArbitrary$1.WithShrinkFromOtherArbitrary = WithShrinkFromOtherArbitrary;
@@ -7114,9 +7626,13 @@ export var fc = (function () {
             return generatorArbitrary;
         }
         const shrinkerArbitrary = (0, integer_1$1.integer)({min, max});
-        return new WithShrinkFromOtherArbitrary_1.WithShrinkFromOtherArbitrary(generatorArbitrary, shrinkerArbitrary);
+        return new WithShrinkFromOtherArbitrary_1.WithShrinkFromOtherArbitrary(
+            generatorArbitrary,
+            shrinkerArbitrary,
+        );
     }
-    RestrictedIntegerArbitraryBuilder.restrictedIntegerArbitraryBuilder = restrictedIntegerArbitraryBuilder;
+    RestrictedIntegerArbitraryBuilder.restrictedIntegerArbitraryBuilder =
+        restrictedIntegerArbitraryBuilder;
 
     Object.defineProperty(sparseArray$1, "__esModule", {value: true});
     sparseArray$1.sparseArray = void 0;
@@ -7148,13 +7664,15 @@ export var fc = (function () {
             noTrailingHole,
             depthIdentifier,
         } = constraints;
-        const maxGeneratedNumElements = (0, MaxLengthFromMinLength_1$3.maxGeneratedLengthFromSizeForArbitrary)(
+        const maxGeneratedNumElements = (0,
+        MaxLengthFromMinLength_1$3.maxGeneratedLengthFromSizeForArbitrary)(
             size,
             minNumElements,
             maxNumElements,
             constraints.maxNumElements !== undefined,
         );
-        const maxGeneratedLength = (0, MaxLengthFromMinLength_1$3.maxGeneratedLengthFromSizeForArbitrary)(
+        const maxGeneratedLength = (0,
+        MaxLengthFromMinLength_1$3.maxGeneratedLengthFromSizeForArbitrary)(
             size,
             maxGeneratedNumElements,
             maxLength,
@@ -7171,7 +7689,8 @@ export var fc = (function () {
             );
         }
         const resultedMaxNumElements = Math.min(maxNumElements, maxLength);
-        const resultedSizeMaxNumElements = constraints.maxNumElements !== undefined || size !== undefined ? size : "=";
+        const resultedSizeMaxNumElements =
+            constraints.maxNumElements !== undefined || size !== undefined ? size : "=";
         const maxGeneratedIndexAuthorized = Math.max(maxGeneratedLength - 1, 0);
         const maxIndexAuthorized = Math.max(maxLength - 1, 0);
         const sparseArrayNoTrailingHole = (0, uniqueArray_1$1.uniqueArray)(
@@ -7277,7 +7796,8 @@ export var fc = (function () {
     var ObjectToPrototypeLess = {};
 
     Object.defineProperty(ObjectToPrototypeLess, "__esModule", {value: true});
-    ObjectToPrototypeLess.objectToPrototypeLessUnmapper = ObjectToPrototypeLess.objectToPrototypeLessMapper = void 0;
+    ObjectToPrototypeLess.objectToPrototypeLessUnmapper =
+        ObjectToPrototypeLess.objectToPrototypeLessMapper = void 0;
     function objectToPrototypeLessMapper(o) {
         return Object.assign(Object.create(null), o);
     }
@@ -7385,7 +7905,9 @@ export var fc = (function () {
                 tie("object"),
                 ...(constraints.withMap ? [tie("map")] : []),
                 ...(constraints.withSet ? [tie("set")] : []),
-                ...(constraints.withObjectString ? [tie("anything").map((o) => (0, stringify_1$3.stringify)(o))] : []),
+                ...(constraints.withObjectString
+                    ? [tie("anything").map((o) => (0, stringify_1$3.stringify)(o))]
+                    : []),
                 ...(constraints.withNullPrototype ? [prototypeLessOf(tie("object"))] : []),
                 ...(constraints.withTypedArray ? [typedArray({maxLength: maxKeys, size})] : []),
                 ...(constraints.withSparseArray
@@ -7407,7 +7929,11 @@ export var fc = (function () {
                       },
                   )
                 : constraints.key,
-            array: (0, array_1$7.array)(tie("anything"), {maxLength: maxKeys, size, depthIdentifier}),
+            array: (0, array_1$7.array)(tie("anything"), {
+                maxLength: maxKeys,
+                size,
+                depthIdentifier,
+            }),
             set: setOf(tie("anything"), maxKeys, size, depthIdentifier),
             map: (0, oneof_1$3.oneof)(
                 mapOf(tie("keys"), tie("anything"), maxKeys, size, depthIdentifier),
@@ -7434,7 +7960,9 @@ export var fc = (function () {
             charArbitrary,
             CodePointsToString_1$4.codePointsToStringUnmapper,
         );
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$6.array)(charArbitrary, enrichedConstraints).map(
             CodePointsToString_1$4.codePointsToStringMapper,
             CodePointsToString_1$4.codePointsToStringUnmapper,
@@ -7465,7 +7993,9 @@ export var fc = (function () {
         if (typeof value !== "object" || value === null || !("constructor" in value)) {
             return value;
         }
-        return value.constructor === Boolean || value.constructor === Number || value.constructor === String
+        return value.constructor === Boolean ||
+            value.constructor === Number ||
+            value.constructor === String
             ? value.valueOf()
             : value;
     }
@@ -7475,7 +8005,10 @@ export var fc = (function () {
     BoxedArbitraryBuilder.boxedArbitraryBuilder = void 0;
     const UnboxedToBoxed_1 = UnboxedToBoxed;
     function boxedArbitraryBuilder(arb) {
-        return arb.map(UnboxedToBoxed_1.unboxedToBoxedMapper, UnboxedToBoxed_1.unboxedToBoxedUnmapper);
+        return arb.map(
+            UnboxedToBoxed_1.unboxedToBoxedMapper,
+            UnboxedToBoxed_1.unboxedToBoxedUnmapper,
+        );
     }
     BoxedArbitraryBuilder.boxedArbitraryBuilder = boxedArbitraryBuilder;
 
@@ -7550,7 +8083,9 @@ export var fc = (function () {
         );
     }
     function object(constraints) {
-        return objectInternal((0, QualifiedObjectConstraints_1$1.toQualifiedObjectConstraints)(constraints));
+        return objectInternal(
+            (0, QualifiedObjectConstraints_1$1.toQualifiedObjectConstraints)(constraints),
+        );
     }
     object$1.object = object;
 
@@ -7598,7 +8133,10 @@ export var fc = (function () {
     const anything_1$1 = anything$1;
     function jsonValue(constraints = {}) {
         return (0, anything_1$1.anything)(
-            (0, JsonConstraintsBuilder_1$1.jsonConstraintsBuilder)((0, string_1.string)(), constraints),
+            (0, JsonConstraintsBuilder_1$1.jsonConstraintsBuilder)(
+                (0, string_1.string)(),
+                constraints,
+            ),
         );
     }
     jsonValue$1.jsonValue = jsonValue;
@@ -7628,7 +8166,9 @@ export var fc = (function () {
             charArbitrary,
             CodePointsToString_1$3.codePointsToStringUnmapper,
         );
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$5.array)(charArbitrary, enrichedConstraints).map(
             CodePointsToString_1$3.codePointsToStringMapper,
             CodePointsToString_1$3.codePointsToStringUnmapper,
@@ -7643,7 +8183,10 @@ export var fc = (function () {
     const anything_1 = anything$1;
     function unicodeJsonValue(constraints = {}) {
         return (0, anything_1.anything)(
-            (0, JsonConstraintsBuilder_1.jsonConstraintsBuilder)((0, unicodeString_1.unicodeString)(), constraints),
+            (0, JsonConstraintsBuilder_1.jsonConstraintsBuilder)(
+                (0, unicodeString_1.unicodeString)(),
+                constraints,
+            ),
         );
     }
     unicodeJsonValue$1.unicodeJsonValue = unicodeJsonValue;
@@ -7698,7 +8241,8 @@ export var fc = (function () {
             return obj;
         };
     }
-    ValuesAndSeparateKeysToObject.buildValuesAndSeparateKeysToObjectMapper = buildValuesAndSeparateKeysToObjectMapper;
+    ValuesAndSeparateKeysToObject.buildValuesAndSeparateKeysToObjectMapper =
+        buildValuesAndSeparateKeysToObjectMapper;
     function buildValuesAndSeparateKeysToObjectUnmapper(keys, noKeyValue) {
         return function valuesAndSeparateKeysToObjectUnmapper(value) {
             if (typeof value !== "object" || value === null) {
@@ -7712,11 +8256,19 @@ export var fc = (function () {
             for (let idx = 0; idx !== keys.length; ++idx) {
                 const descriptor = Object.getOwnPropertyDescriptor(value, keys[idx]);
                 if (descriptor !== undefined) {
-                    if (!descriptor.configurable || !descriptor.enumerable || !descriptor.writable) {
-                        throw new Error("Incompatible instance received: should contain only c/e/w properties");
+                    if (
+                        !descriptor.configurable ||
+                        !descriptor.enumerable ||
+                        !descriptor.writable
+                    ) {
+                        throw new Error(
+                            "Incompatible instance received: should contain only c/e/w properties",
+                        );
                     }
                     if (descriptor.get !== undefined || descriptor.set !== undefined) {
-                        throw new Error("Incompatible instance received: should contain only no get/set properties");
+                        throw new Error(
+                            "Incompatible instance received: should contain only no get/set properties",
+                        );
                     }
                     ++extractedPropertiesCount;
                     extractedValues.push(descriptor.value);
@@ -7727,7 +8279,9 @@ export var fc = (function () {
             const namePropertiesCount = Object.getOwnPropertyNames(value).length;
             const symbolPropertiesCount = Object.getOwnPropertySymbols(value).length;
             if (extractedPropertiesCount !== namePropertiesCount + symbolPropertiesCount) {
-                throw new Error("Incompatible instance received: should not contain extra properties");
+                throw new Error(
+                    "Incompatible instance received: should not contain extra properties",
+                );
             }
             return extractedValues;
         };
@@ -7748,12 +8302,19 @@ export var fc = (function () {
         for (let index = 0; index !== keys.length; ++index) {
             const k = keys[index];
             const requiredArbitrary = recordModel[k];
-            if (requiredKeys === undefined || requiredKeys.indexOf(k) !== -1) arbs.push(requiredArbitrary);
+            if (requiredKeys === undefined || requiredKeys.indexOf(k) !== -1)
+                arbs.push(requiredArbitrary);
             else arbs.push((0, option_1$2.option)(requiredArbitrary, {nil: noKeyValue}));
         }
         return (0, tuple_1$4.tuple)(...arbs).map(
-            (0, ValuesAndSeparateKeysToObject_1.buildValuesAndSeparateKeysToObjectMapper)(keys, noKeyValue),
-            (0, ValuesAndSeparateKeysToObject_1.buildValuesAndSeparateKeysToObjectUnmapper)(keys, noKeyValue),
+            (0, ValuesAndSeparateKeysToObject_1.buildValuesAndSeparateKeysToObjectMapper)(
+                keys,
+                noKeyValue,
+            ),
+            (0, ValuesAndSeparateKeysToObject_1.buildValuesAndSeparateKeysToObjectUnmapper)(
+                keys,
+                noKeyValue,
+            ),
         );
     }
     PartialRecordArbitraryBuilder.buildPartialRecordArbitrary = buildPartialRecordArbitrary;
@@ -7763,28 +8324,44 @@ export var fc = (function () {
     const PartialRecordArbitraryBuilder_1 = PartialRecordArbitraryBuilder;
     function record(recordModel, constraints) {
         if (constraints == null) {
-            return (0, PartialRecordArbitraryBuilder_1.buildPartialRecordArbitrary)(recordModel, undefined);
+            return (0, PartialRecordArbitraryBuilder_1.buildPartialRecordArbitrary)(
+                recordModel,
+                undefined,
+            );
         }
         if ("withDeletedKeys" in constraints && "requiredKeys" in constraints) {
-            throw new Error(`requiredKeys and withDeletedKeys cannot be used together in fc.record`);
+            throw new Error(
+                `requiredKeys and withDeletedKeys cannot be used together in fc.record`,
+            );
         }
         const requireDeletedKeys =
             ("requiredKeys" in constraints && constraints.requiredKeys !== undefined) ||
             ("withDeletedKeys" in constraints && !!constraints.withDeletedKeys);
         if (!requireDeletedKeys) {
-            return (0, PartialRecordArbitraryBuilder_1.buildPartialRecordArbitrary)(recordModel, undefined);
+            return (0, PartialRecordArbitraryBuilder_1.buildPartialRecordArbitrary)(
+                recordModel,
+                undefined,
+            );
         }
-        const requiredKeys = ("requiredKeys" in constraints ? constraints.requiredKeys : undefined) || [];
+        const requiredKeys =
+            ("requiredKeys" in constraints ? constraints.requiredKeys : undefined) || [];
         for (let idx = 0; idx !== requiredKeys.length; ++idx) {
             const descriptor = Object.getOwnPropertyDescriptor(recordModel, requiredKeys[idx]);
             if (descriptor === undefined) {
-                throw new Error(`requiredKeys cannot reference keys that have not been defined in recordModel`);
+                throw new Error(
+                    `requiredKeys cannot reference keys that have not been defined in recordModel`,
+                );
             }
             if (!descriptor.enumerable) {
-                throw new Error(`requiredKeys cannot reference keys that have are enumerable in recordModel`);
+                throw new Error(
+                    `requiredKeys cannot reference keys that have are enumerable in recordModel`,
+                );
             }
         }
-        return (0, PartialRecordArbitraryBuilder_1.buildPartialRecordArbitrary)(recordModel, requiredKeys);
+        return (0, PartialRecordArbitraryBuilder_1.buildPartialRecordArbitrary)(
+            recordModel,
+            requiredKeys,
+        );
     }
     record$1.record = record;
 
@@ -7809,7 +8386,9 @@ export var fc = (function () {
         }
         generate(mrng, biasFactor) {
             const appliedBiasFactor =
-                biasFactor !== undefined && mrng.nextInt(1, biasFactor) === 1 ? biasFactor : undefined;
+                biasFactor !== undefined && mrng.nextInt(1, biasFactor) === 1
+                    ? biasFactor
+                    : undefined;
             const enrichedProducer = () => {
                 const seenValues = [];
                 const g = function* (arb, clonedMrng) {
@@ -7822,9 +8401,14 @@ export var fc = (function () {
                 const s = new Stream_1$3.Stream(g(this.arb, mrng.clone()));
                 return Object.defineProperties(s, {
                     toString: {value: () => prettyPrint(seenValues.map(stringify_1$2.stringify))},
-                    [stringify_1$2.toStringMethod]: {value: () => prettyPrint(seenValues.map(stringify_1$2.stringify))},
+                    [stringify_1$2.toStringMethod]: {
+                        value: () => prettyPrint(seenValues.map(stringify_1$2.stringify)),
+                    },
                     [stringify_1$2.asyncToStringMethod]: {
-                        value: async () => prettyPrint(await Promise.all(seenValues.map(stringify_1$2.asyncStringify))),
+                        value: async () =>
+                            prettyPrint(
+                                await Promise.all(seenValues.map(stringify_1$2.asyncStringify)),
+                            ),
                     },
                     [symbols_1$3.cloneMethod]: {value: enrichedProducer, enumerable: true},
                 });
@@ -7862,7 +8446,9 @@ export var fc = (function () {
             charArbitrary,
             CodePointsToString_1$2.codePointsToStringUnmapper,
         );
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$4.array)(charArbitrary, enrichedConstraints).map(
             CodePointsToString_1$2.codePointsToStringMapper,
             CodePointsToString_1$2.codePointsToStringUnmapper,
@@ -7921,10 +8507,14 @@ export var fc = (function () {
         } = constraints;
         const minLength = unscaledMinLength + 3 - ((unscaledMinLength + 3) % 4);
         const maxLength = unscaledMaxLength - (unscaledMaxLength % 4);
-        const requestedSize = constraints.maxLength === undefined && size === undefined ? "=" : size;
-        if (minLength > maxLength) throw new Error("Minimal length should be inferior or equal to maximal length");
-        if (minLength % 4 !== 0) throw new Error("Minimal length of base64 strings must be a multiple of 4");
-        if (maxLength % 4 !== 0) throw new Error("Maximal length of base64 strings must be a multiple of 4");
+        const requestedSize =
+            constraints.maxLength === undefined && size === undefined ? "=" : size;
+        if (minLength > maxLength)
+            throw new Error("Minimal length should be inferior or equal to maximal length");
+        if (minLength % 4 !== 0)
+            throw new Error("Minimal length of base64 strings must be a multiple of 4");
+        if (maxLength % 4 !== 0)
+            throw new Error("Maximal length of base64 strings must be a multiple of 4");
         const charArbitrary = (0, base64_1.base64)();
         const experimentalCustomSlices = (0, SlicesForStringBuilder_1$2.createSlicesForString)(
             charArbitrary,
@@ -7937,7 +8527,10 @@ export var fc = (function () {
             experimentalCustomSlices,
         };
         return (0, array_1$3.array)(charArbitrary, enrichedConstraints)
-            .map(CodePointsToString_1$1.codePointsToStringMapper, CodePointsToString_1$1.codePointsToStringUnmapper)
+            .map(
+                CodePointsToString_1$1.codePointsToStringMapper,
+                CodePointsToString_1$1.codePointsToStringUnmapper,
+            )
             .map(StringToBase64_1.stringToBase64Mapper, StringToBase64_1.stringToBase64Unmapper);
     }
     base64String$1.base64String = base64String;
@@ -7956,7 +8549,9 @@ export var fc = (function () {
             charArbitrary,
             CodePointsToString_1.codePointsToStringUnmapper,
         );
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$2.array)(charArbitrary, enrichedConstraints).map(
             CodePointsToString_1.codePointsToStringMapper,
             CodePointsToString_1.codePointsToStringUnmapper,
@@ -7994,7 +8589,9 @@ export var fc = (function () {
             charArbitrary,
             CharsToString_1.charsToStringUnmapper,
         );
-        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {experimentalCustomSlices});
+        const enrichedConstraints = Object.assign(Object.assign({}, constraints), {
+            experimentalCustomSlices,
+        });
         return (0, array_1$1.array)(charArbitrary, enrichedConstraints).map(
             CharsToString_1.charsToStringMapper,
             CharsToString_1.charsToStringUnmapper,
@@ -8077,7 +8674,9 @@ export var fc = (function () {
         }
         generate(mrng, biasFactor) {
             const lengthArb =
-                biasFactor !== undefined && mrng.nextInt(1, biasFactor) === 1 ? this.biasedLengthArb : this.lengthArb;
+                biasFactor !== undefined && mrng.nextInt(1, biasFactor) === 1
+                    ? this.biasedLengthArb
+                    : this.lengthArb;
             const size = lengthArb.generate(mrng, undefined);
             const sizeValue = size.value;
             const remainingElements = this.originalArray.map((_v, idx) => idx);
@@ -8111,14 +8710,23 @@ export var fc = (function () {
             return this.lengthArb
                 .shrink(value.length, context)
                 .map((newSize) => {
-                    return new Value_1$2.Value(value.slice(value.length - newSize.value), newSize.context);
+                    return new Value_1$2.Value(
+                        value.slice(value.length - newSize.value),
+                        newSize.context,
+                    );
                 })
                 .join(
                     value.length > this.minLength
                         ? (0, LazyIterableIterator_1$1.makeLazy)(() =>
                               this.shrink(value.slice(1), undefined)
                                   .filter((newValue) => this.minLength <= newValue.value.length + 1)
-                                  .map((newValue) => new Value_1$2.Value([value[0]].concat(newValue.value), undefined)),
+                                  .map(
+                                      (newValue) =>
+                                          new Value_1$2.Value(
+                                              [value[0]].concat(newValue.value),
+                                              undefined,
+                                          ),
+                                  ),
                           )
                         : Stream_1$2.Stream.nil(),
                 );
@@ -8131,7 +8739,12 @@ export var fc = (function () {
     const SubarrayArbitrary_1$1 = SubarrayArbitrary$1;
     function subarray(originalArray, constraints = {}) {
         const {minLength = 0, maxLength = originalArray.length} = constraints;
-        return new SubarrayArbitrary_1$1.SubarrayArbitrary(originalArray, true, minLength, maxLength);
+        return new SubarrayArbitrary_1$1.SubarrayArbitrary(
+            originalArray,
+            true,
+            minLength,
+            maxLength,
+        );
     }
     subarray$1.subarray = subarray;
 
@@ -8142,7 +8755,12 @@ export var fc = (function () {
     const SubarrayArbitrary_1 = SubarrayArbitrary$1;
     function shuffledSubarray(originalArray, constraints = {}) {
         const {minLength = 0, maxLength = originalArray.length} = constraints;
-        return new SubarrayArbitrary_1.SubarrayArbitrary(originalArray, false, minLength, maxLength);
+        return new SubarrayArbitrary_1.SubarrayArbitrary(
+            originalArray,
+            false,
+            minLength,
+            maxLength,
+        );
     }
     shuffledSubarray$1.shuffledSubarray = shuffledSubarray;
 
@@ -8153,7 +8771,8 @@ export var fc = (function () {
     var NumberToPaddedEight = {};
 
     Object.defineProperty(NumberToPaddedEight, "__esModule", {value: true});
-    NumberToPaddedEight.numberToPaddedEightUnmapper = NumberToPaddedEight.numberToPaddedEightMapper = void 0;
+    NumberToPaddedEight.numberToPaddedEightUnmapper =
+        NumberToPaddedEight.numberToPaddedEightMapper = void 0;
     function numberToPaddedEightMapper(n) {
         return n.toString(16).padStart(8, "0");
     }
@@ -8188,7 +8807,8 @@ export var fc = (function () {
     var PaddedEightsToUuid = {};
 
     Object.defineProperty(PaddedEightsToUuid, "__esModule", {value: true});
-    PaddedEightsToUuid.paddedEightsToUuidUnmapper = PaddedEightsToUuid.paddedEightsToUuidMapper = void 0;
+    PaddedEightsToUuid.paddedEightsToUuidUnmapper = PaddedEightsToUuid.paddedEightsToUuidMapper =
+        void 0;
     function paddedEightsToUuidMapper(t) {
         return `${t[0]}-${t[1].substring(4)}-${t[1].substring(0, 4)}-${t[2].substring(0, 4)}-${t[2].substring(
             4,
@@ -8214,9 +8834,18 @@ export var fc = (function () {
     const PaddedNumberArbitraryBuilder_1$1 = PaddedNumberArbitraryBuilder;
     const PaddedEightsToUuid_1$1 = PaddedEightsToUuid;
     function uuid() {
-        const padded = (0, PaddedNumberArbitraryBuilder_1$1.buildPaddedNumberArbitrary)(0, 0xffffffff);
-        const secondPadded = (0, PaddedNumberArbitraryBuilder_1$1.buildPaddedNumberArbitrary)(0x10000000, 0x5fffffff);
-        const thirdPadded = (0, PaddedNumberArbitraryBuilder_1$1.buildPaddedNumberArbitrary)(0x80000000, 0xbfffffff);
+        const padded = (0, PaddedNumberArbitraryBuilder_1$1.buildPaddedNumberArbitrary)(
+            0,
+            0xffffffff,
+        );
+        const secondPadded = (0, PaddedNumberArbitraryBuilder_1$1.buildPaddedNumberArbitrary)(
+            0x10000000,
+            0x5fffffff,
+        );
+        const thirdPadded = (0, PaddedNumberArbitraryBuilder_1$1.buildPaddedNumberArbitrary)(
+            0x80000000,
+            0xbfffffff,
+        );
         return (0, tuple_1$3.tuple)(padded, secondPadded, thirdPadded, padded).map(
             PaddedEightsToUuid_1$1.paddedEightsToUuidMapper,
             PaddedEightsToUuid_1$1.paddedEightsToUuidUnmapper,
@@ -8232,13 +8861,19 @@ export var fc = (function () {
     const PaddedNumberArbitraryBuilder_1 = PaddedNumberArbitraryBuilder;
     const PaddedEightsToUuid_1 = PaddedEightsToUuid;
     function uuidV(versionNumber) {
-        const padded = (0, PaddedNumberArbitraryBuilder_1.buildPaddedNumberArbitrary)(0, 0xffffffff);
+        const padded = (0, PaddedNumberArbitraryBuilder_1.buildPaddedNumberArbitrary)(
+            0,
+            0xffffffff,
+        );
         const offsetSecond = versionNumber * 0x10000000;
         const secondPadded = (0, PaddedNumberArbitraryBuilder_1.buildPaddedNumberArbitrary)(
             offsetSecond,
             offsetSecond + 0x0fffffff,
         );
-        const thirdPadded = (0, PaddedNumberArbitraryBuilder_1.buildPaddedNumberArbitrary)(0x80000000, 0xbfffffff);
+        const thirdPadded = (0, PaddedNumberArbitraryBuilder_1.buildPaddedNumberArbitrary)(
+            0x80000000,
+            0xbfffffff,
+        );
         return (0, tuple_1$2.tuple)(padded, secondPadded, thirdPadded, padded).map(
             PaddedEightsToUuid_1.paddedEightsToUuidMapper,
             PaddedEightsToUuid_1.paddedEightsToUuidUnmapper,
@@ -8262,7 +8897,24 @@ export var fc = (function () {
     const stringOf_1$2 = stringOf$1;
     const tuple_1$1 = tuple$1;
     function hostUserInfo(size) {
-        const others = ["-", ".", "_", "~", "!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=", ":"];
+        const others = [
+            "-",
+            ".",
+            "_",
+            "~",
+            "!",
+            "$",
+            "&",
+            "'",
+            "(",
+            ")",
+            "*",
+            "+",
+            ",",
+            ";",
+            "=",
+            ":",
+        ];
         return (0, stringOf_1$2.stringOf)(
             (0, CharacterRangeArbitraryBuilder_1$2.buildAlphaNumericPercentArbitrary)(others),
             {size},
@@ -8300,12 +8952,20 @@ export var fc = (function () {
         const size = c.size;
         const hostnameArbs = [(0, domain_1.domain)({size})]
             .concat(c.withIPv4 === true ? [(0, ipV4_1.ipV4)()] : [])
-            .concat(c.withIPv6 === true ? [(0, ipV6_1.ipV6)().map(bracketedMapper, bracketedUnmapper)] : [])
+            .concat(
+                c.withIPv6 === true
+                    ? [(0, ipV6_1.ipV6)().map(bracketedMapper, bracketedUnmapper)]
+                    : [],
+            )
             .concat(c.withIPv4Extended === true ? [(0, ipV4Extended_1.ipV4Extended)()] : []);
         return (0, tuple_1$1.tuple)(
-            c.withUserInfo === true ? (0, option_1$1.option)(hostUserInfo(size)) : (0, constant_1$1.constant)(null),
+            c.withUserInfo === true
+                ? (0, option_1$1.option)(hostUserInfo(size))
+                : (0, constant_1$1.constant)(null),
             (0, oneof_1$1.oneof)(...hostnameArbs),
-            c.withPort === true ? (0, option_1$1.option)((0, nat_1.nat)(65535)) : (0, constant_1$1.constant)(null),
+            c.withPort === true
+                ? (0, option_1$1.option)((0, nat_1.nat)(65535))
+                : (0, constant_1$1.constant)(null),
         ).map(userHostPortMapper, userHostPortUnmapper);
     }
     webAuthority$1.webAuthority = webAuthority;
@@ -8319,19 +8979,42 @@ export var fc = (function () {
     const CharacterRangeArbitraryBuilder_1$1 = CharacterRangeArbitraryBuilder;
     const stringOf_1$1 = stringOf$1;
     function buildUriQueryOrFragmentArbitrary(size) {
-        const others = ["-", ".", "_", "~", "!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=", ":", "@", "/", "?"];
+        const others = [
+            "-",
+            ".",
+            "_",
+            "~",
+            "!",
+            "$",
+            "&",
+            "'",
+            "(",
+            ")",
+            "*",
+            "+",
+            ",",
+            ";",
+            "=",
+            ":",
+            "@",
+            "/",
+            "?",
+        ];
         return (0, stringOf_1$1.stringOf)(
             (0, CharacterRangeArbitraryBuilder_1$1.buildAlphaNumericPercentArbitrary)(others),
             {size},
         );
     }
-    UriQueryOrFragmentArbitraryBuilder.buildUriQueryOrFragmentArbitrary = buildUriQueryOrFragmentArbitrary;
+    UriQueryOrFragmentArbitraryBuilder.buildUriQueryOrFragmentArbitrary =
+        buildUriQueryOrFragmentArbitrary;
 
     Object.defineProperty(webFragments$1, "__esModule", {value: true});
     webFragments$1.webFragments = void 0;
     const UriQueryOrFragmentArbitraryBuilder_1$1 = UriQueryOrFragmentArbitraryBuilder;
     function webFragments(constraints = {}) {
-        return (0, UriQueryOrFragmentArbitraryBuilder_1$1.buildUriQueryOrFragmentArbitrary)(constraints.size);
+        return (0, UriQueryOrFragmentArbitraryBuilder_1$1.buildUriQueryOrFragmentArbitrary)(
+            constraints.size,
+        );
     }
     webFragments$1.webFragments = webFragments;
 
@@ -8341,7 +9024,9 @@ export var fc = (function () {
     webQueryParameters$1.webQueryParameters = void 0;
     const UriQueryOrFragmentArbitraryBuilder_1 = UriQueryOrFragmentArbitraryBuilder;
     function webQueryParameters(constraints = {}) {
-        return (0, UriQueryOrFragmentArbitraryBuilder_1.buildUriQueryOrFragmentArbitrary)(constraints.size);
+        return (0, UriQueryOrFragmentArbitraryBuilder_1.buildUriQueryOrFragmentArbitrary)(
+            constraints.size,
+        );
     }
     webQueryParameters$1.webQueryParameters = webQueryParameters;
 
@@ -8352,7 +9037,25 @@ export var fc = (function () {
     const CharacterRangeArbitraryBuilder_1 = CharacterRangeArbitraryBuilder;
     const stringOf_1 = stringOf$1;
     function webSegment(constraints = {}) {
-        const others = ["-", ".", "_", "~", "!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=", ":", "@"];
+        const others = [
+            "-",
+            ".",
+            "_",
+            "~",
+            "!",
+            "$",
+            "&",
+            "'",
+            "(",
+            ")",
+            "*",
+            "+",
+            ",",
+            ";",
+            "=",
+            ":",
+            "@",
+        ];
         return (0, stringOf_1.stringOf)(
             (0, CharacterRangeArbitraryBuilder_1.buildAlphaNumericPercentArbitrary)(others),
             {size: constraints.size},
@@ -8440,10 +9143,9 @@ export var fc = (function () {
     }
     function buildUriPathArbitrary(resolvedSize) {
         const [segmentSize, numSegmentSize] = sqrtSize(resolvedSize);
-        return (0, array_1.array)((0, webSegment_1.webSegment)({size: segmentSize}), {size: numSegmentSize}).map(
-            SegmentsToPath_1.segmentsToPathMapper,
-            SegmentsToPath_1.segmentsToPathUnmapper,
-        );
+        return (0, array_1.array)((0, webSegment_1.webSegment)({size: segmentSize}), {
+            size: numSegmentSize,
+        }).map(SegmentsToPath_1.segmentsToPathMapper, SegmentsToPath_1.segmentsToPathUnmapper);
     }
     UriPathArbitraryBuilder.buildUriPathArbitrary = buildUriPathArbitrary;
 
@@ -8464,7 +9166,10 @@ export var fc = (function () {
         const resolvedSize = (0, MaxLengthFromMinLength_1$1.resolveSize)(c.size);
         const resolvedAuthoritySettingsSize =
             c.authoritySettings !== undefined && c.authoritySettings.size !== undefined
-                ? (0, MaxLengthFromMinLength_1$1.relativeSizeToSize)(c.authoritySettings.size, resolvedSize)
+                ? (0, MaxLengthFromMinLength_1$1.relativeSizeToSize)(
+                      c.authoritySettings.size,
+                      resolvedSize,
+                  )
                 : resolvedSize;
         const resolvedAuthoritySettings = Object.assign(Object.assign({}, c.authoritySettings), {
             size: resolvedAuthoritySettingsSize,
@@ -8478,7 +9183,9 @@ export var fc = (function () {
             authorityArb,
             pathArb,
             c.withQueryParameters === true
-                ? (0, option_1.option)((0, webQueryParameters_1.webQueryParameters)({size: resolvedSize}))
+                ? (0, option_1.option)(
+                      (0, webQueryParameters_1.webQueryParameters)({size: resolvedSize}),
+                  )
                 : (0, constant_1.constant)(null),
             c.withFragments === true
                 ? (0, option_1.option)((0, webFragments_1.webFragments)({size: resolvedSize}))
@@ -8516,7 +9223,9 @@ export var fc = (function () {
                 .map((c) => c.toString())
                 .join(",");
             const metadata = this.metadataForReplay();
-            return metadata.length !== 0 ? `${serializedCommands} /*${metadata}*/` : serializedCommands;
+            return metadata.length !== 0
+                ? `${serializedCommands} /*${metadata}*/`
+                : serializedCommands;
         }
     }
     CommandsIterable$1.CommandsIterable = CommandsIterable;
@@ -8654,12 +9363,21 @@ export var fc = (function () {
     const oneof_1 = oneof$1;
     const RestrictedIntegerArbitraryBuilder_1 = RestrictedIntegerArbitraryBuilder;
     class CommandsArbitrary extends Arbitrary_1$1.Arbitrary {
-        constructor(commandArbs, maxGeneratedCommands, maxCommands, sourceReplayPath, disableReplayLog) {
+        constructor(
+            commandArbs,
+            maxGeneratedCommands,
+            maxCommands,
+            sourceReplayPath,
+            disableReplayLog,
+        ) {
             super();
             this.sourceReplayPath = sourceReplayPath;
             this.disableReplayLog = disableReplayLog;
-            this.oneCommandArb = (0, oneof_1.oneof)(...commandArbs).map((c) => new CommandWrapper_1.CommandWrapper(c));
-            this.lengthArb = (0, RestrictedIntegerArbitraryBuilder_1.restrictedIntegerArbitraryBuilder)(
+            this.oneCommandArb = (0, oneof_1.oneof)(...commandArbs).map(
+                (c) => new CommandWrapper_1.CommandWrapper(c),
+            );
+            this.lengthArb = (0,
+            RestrictedIntegerArbitraryBuilder_1.restrictedIntegerArbitraryBuilder)(
                 0,
                 maxGeneratedCommands,
                 maxCommands,
@@ -8708,14 +9426,17 @@ export var fc = (function () {
             return itemsRaw.filter((c, idx) => {
                 const state = this.replayPath[this.replayPathPosition + idx];
                 if (state === undefined) throw new Error(`Too short replayPath`);
-                if (!state && c.value_.hasRan) throw new Error(`Mismatch between replayPath and real execution`);
+                if (!state && c.value_.hasRan)
+                    throw new Error(`Mismatch between replayPath and real execution`);
                 return state;
             });
         }
         filterForShrinkImpl(itemsRaw) {
             if (this.replayPathPosition === 0) {
                 this.replayPath =
-                    this.sourceReplayPath !== null ? ReplayPath_1.ReplayPath.parse(this.sourceReplayPath) : [];
+                    this.sourceReplayPath !== null
+                        ? ReplayPath_1.ReplayPath.parse(this.sourceReplayPath)
+                        : [];
             }
             const items =
                 this.replayPathPosition < this.replayPath.length
@@ -8735,7 +9456,9 @@ export var fc = (function () {
             if (items.length === 0) {
                 return Stream_1$1.Stream.nil();
             }
-            const rootShrink = shrunkOnce ? Stream_1$1.Stream.nil() : new Stream_1$1.Stream([[]][Symbol.iterator]());
+            const rootShrink = shrunkOnce
+                ? Stream_1$1.Stream.nil()
+                : new Stream_1$1.Stream([[]][Symbol.iterator]());
             const nextShrinks = [];
             for (let numToKeep = 0; numToKeep !== items.length; ++numToKeep) {
                 nextShrinks.push(
@@ -8743,7 +9466,9 @@ export var fc = (function () {
                         const fixedStart = items.slice(0, numToKeep);
                         return this.lengthArb
                             .shrink(items.length - 1 - numToKeep, undefined)
-                            .map((l) => fixedStart.concat(items.slice(items.length - (l.value + 1))));
+                            .map((l) =>
+                                fixedStart.concat(items.slice(items.length - (l.value + 1))),
+                            );
                     }),
                 );
             }
@@ -8752,7 +9477,9 @@ export var fc = (function () {
                     (0, LazyIterableIterator_1.makeLazy)(() =>
                         this.oneCommandArb
                             .shrink(items[itemAt].value_, items[itemAt].context)
-                            .map((v) => items.slice(0, itemAt).concat([v], items.slice(itemAt + 1))),
+                            .map((v) =>
+                                items.slice(0, itemAt).concat([v], items.slice(itemAt + 1)),
+                            ),
                     ),
                 );
             }
@@ -8778,7 +9505,8 @@ export var fc = (function () {
             replayPath = null,
         } = constraints;
         const specifiedMaxCommands = constraints.maxCommands !== undefined;
-        const maxGeneratedCommands = (0, MaxLengthFromMinLength_1.maxGeneratedLengthFromSizeForArbitrary)(
+        const maxGeneratedCommands = (0,
+        MaxLengthFromMinLength_1.maxGeneratedLengthFromSizeForArbitrary)(
             size,
             0,
             maxCommands,
@@ -8910,7 +9638,11 @@ export var fc = (function () {
     ModelRunner.asyncModelRun = asyncModelRun;
     async function scheduledModelRun(scheduler, s, cmds) {
         const scheduledCommands = (0, ScheduledCommand_1.scheduleCommands)(scheduler, cmds);
-        const out = internalAsyncModelRun(s, scheduledCommands, scheduler.schedule(Promise.resolve(), "startModel"));
+        const out = internalAsyncModelRun(
+            s,
+            scheduledCommands,
+            scheduler.schedule(Promise.resolve(), "startModel"),
+        );
         await scheduler.waitAll();
         await out;
     }
@@ -9013,8 +9745,12 @@ export var fc = (function () {
                             ? [item, item.name, undefined]
                             : [item.builder, item.label, item.metadata];
                     return previouslyScheduled.then(() => {
-                        const scheduled = this.scheduleInternal("sequence", label, dummyResolvedPromise, metadata, () =>
-                            builder(),
+                        const scheduled = this.scheduleInternal(
+                            "sequence",
+                            label,
+                            dummyResolvedPromise,
+                            metadata,
+                            () => builder(),
                         );
                         scheduled.catch(() => {
                             status.faulty = true;
@@ -9149,7 +9885,9 @@ export var fc = (function () {
             clone: () => buildNextTaskIndex$1(ordering),
             nextTaskIndex: (scheduledTasks) => {
                 if (ordering.length <= numTasks) {
-                    throw new Error(`Invalid schedulerFor defined: too many tasks have been scheduled`);
+                    throw new Error(
+                        `Invalid schedulerFor defined: too many tasks have been scheduled`,
+                    );
                 }
                 const taskIndex = scheduledTasks.findIndex((t) => t.taskId === ordering[numTasks]);
                 if (taskIndex === -1) {

@@ -59,7 +59,10 @@ export const $config = (function () {
                     txnCompletedErrorCodes.push(51113);
                 }
 
-                if (txnCompletedErrorCodes.includes(errorCode) || kSnapshotErrors.includes(errorCode)) {
+                if (
+                    txnCompletedErrorCodes.includes(errorCode) ||
+                    kSnapshotErrors.includes(errorCode)
+                ) {
                     // We pass `ignoreActiveTxn = true` to startTransaction so that we will not
                     // throw `Transaction already in progress on this session` when trying to start
                     // a new transaction on this client session that already has an active
@@ -75,7 +78,10 @@ export const $config = (function () {
                     continue;
                 }
 
-                if (TxnUtil.isTransientTransactionError(e) || errorCode === ErrorCodes.ConflictingOperationInProgress) {
+                if (
+                    TxnUtil.isTransientTransactionError(e) ||
+                    errorCode === ErrorCodes.ConflictingOperationInProgress
+                ) {
                     joinAndRetry = true;
                     continue;
                 }
@@ -99,7 +105,11 @@ export const $config = (function () {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
                 assert.commandWorked(
-                    collection.runCommand("findAndModify", {query: {_id: this.tid}, update: {$inc: {x: 1}}, new: true}),
+                    collection.runCommand("findAndModify", {
+                        query: {_id: this.tid},
+                        update: {$inc: {x: 1}},
+                        new: true,
+                    }),
                 );
             });
         },
@@ -143,7 +153,9 @@ export const $config = (function () {
             do {
                 try {
                     shouldJoin = false;
-                    quietly(() => assert.commandWorked(this.session.commitTransaction_forTesting()));
+                    quietly(() =>
+                        assert.commandWorked(this.session.commitTransaction_forTesting()),
+                    );
                 } catch (e) {
                     if (
                         e.code === ErrorCodes.TransactionTooOld ||
@@ -225,7 +237,12 @@ export const $config = (function () {
             runFindAndGetMore: 0.2,
             commitTxn: 0.2,
         },
-        commitTxn: {runFindAndModify: 0.25, runUpdate: 0.25, runDelete: 0.25, runFindAndGetMore: 0.25},
+        commitTxn: {
+            runFindAndModify: 0.25,
+            runUpdate: 0.25,
+            runDelete: 0.25,
+            runFindAndGetMore: 0.25,
+        },
     };
 
     return {

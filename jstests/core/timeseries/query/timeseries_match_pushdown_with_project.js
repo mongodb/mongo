@@ -31,12 +31,20 @@ const runTest = function ({docs, pipeline, behaviour, expectedResult}) {
     if (getEngine(explain) === "classic") {
         // In the classic engine $_internalUnpackBucket is run as an aggregation stage.
         const stages = getAggPlanStages(explain, "$_internalUnpackBucket");
-        assert.gte(stages.length, 1, "Should have at least one $_internalUnpackBucket stage: " + tojson(explain));
+        assert.gte(
+            stages.length,
+            1,
+            "Should have at least one $_internalUnpackBucket stage: " + tojson(explain),
+        );
         unpackStages = stages.map((s) => s.$_internalUnpackBucket);
     } else if (sbeEnabledForUnpackPushdown) {
         // In the case when only unpack is pushed down to SBE, the explain has it in agg stages.
         unpackStages = getAggPlanStages(explain, "UNPACK_TS_BUCKET");
-        assert.gte(unpackStages.length, 1, "Should have at least one UNPACK_TS_BUCKET stage: " + tojson(explain));
+        assert.gte(
+            unpackStages.length,
+            1,
+            "Should have at least one UNPACK_TS_BUCKET stage: " + tojson(explain),
+        );
     } else {
         assert.doassert("No unpacking stage found in explain: " + tojson(explain));
     }
@@ -49,7 +57,11 @@ const runTest = function ({docs, pipeline, behaviour, expectedResult}) {
                     pipeline,
                 )} but got ${tojson(explain)}`,
             );
-            assert.sameMembers(behaviour.include, unpackStage.include, `Includes of unpack stage: ${tojson(explain)}`);
+            assert.sameMembers(
+                behaviour.include,
+                unpackStage.include,
+                `Includes of unpack stage: ${tojson(explain)}`,
+            );
         }
         if (behaviour.exclude) {
             assert(
@@ -58,7 +70,11 @@ const runTest = function ({docs, pipeline, behaviour, expectedResult}) {
                     pipeline,
                 )} but got ${tojson(explain)}`,
             );
-            assert.sameMembers(behaviour.exclude, unpackStage.exclude, `Excludes of unpack stage: ${tojson(explain)}`);
+            assert.sameMembers(
+                behaviour.exclude,
+                unpackStage.exclude,
+                `Excludes of unpack stage: ${tojson(explain)}`,
+            );
         }
     }
 
@@ -69,7 +85,11 @@ const runTest = function ({docs, pipeline, behaviour, expectedResult}) {
         `Incorrect number of results: ${tojson(res)} + for pipeline ${tojson(pipeline)}`,
     );
     res.forEach((doc, i) => {
-        assert.docEq(expectedResult[i], doc, `Incorrect result: ${tojson(res)} + for pipeline ${tojson(pipeline)}`);
+        assert.docEq(
+            expectedResult[i],
+            doc,
+            `Incorrect result: ${tojson(res)} + for pipeline ${tojson(pipeline)}`,
+        );
     });
 };
 

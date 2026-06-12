@@ -16,7 +16,11 @@ let expectedMessage = "Error: 'blockUntilSearchIndexQueryable' argument must be 
 assert.eq(error, expectedMessage);
 
 error = assert.throws(() =>
-    updateSearchIndex(coll, {name: "foo-block", definition: {"mappings": {"dynamic": true}}}, {arg2: 1}),
+    updateSearchIndex(
+        coll,
+        {name: "foo-block", definition: {"mappings": {"dynamic": true}}},
+        {arg2: 1},
+    ),
 );
 expectedMessage =
     "Error: updateSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object";

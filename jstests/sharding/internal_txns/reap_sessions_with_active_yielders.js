@@ -38,7 +38,9 @@ const mongosTestColl = mongosTestDB.getCollection(collName);
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 // This test relies on the router shard version cache within shard0 being up to date because it
@@ -58,18 +60,34 @@ const sessionsColl = st.s.getCollection("config.system.sessions");
 const transactionsCollOnShard0 = shard0Primary.getCollection("config.transactions");
 const imageCollOnShard0 = shard0Primary.getCollection("config.image_collection");
 
-function assertNumEntries({sessionUUID, numSessionsCollEntries, numTransactionsCollEntries, numImageCollEntries}) {
+function assertNumEntries({
+    sessionUUID,
+    numSessionsCollEntries,
+    numTransactionsCollEntries,
+    numImageCollEntries,
+}) {
     const filter = {"_id.id": sessionUUID};
-    assert.eq(numSessionsCollEntries, sessionsColl.find(filter).itcount(), tojson(sessionsColl.find().toArray()));
+    assert.eq(
+        numSessionsCollEntries,
+        sessionsColl.find(filter).itcount(),
+        tojson(sessionsColl.find().toArray()),
+    );
     assert.eq(
         numTransactionsCollEntries,
         transactionsCollOnShard0.find(filter).itcount(),
         tojson(transactionsCollOnShard0.find().toArray()),
     );
-    assert.eq(numImageCollEntries, imageCollOnShard0.find().itcount(), tojson(imageCollOnShard0.find().toArray()));
+    assert.eq(
+        numImageCollEntries,
+        imageCollOnShard0.find().itcount(),
+        tojson(imageCollOnShard0.find().toArray()),
+    );
 }
 
-jsTest.log("Test reaping when there is an internal transaction with an active " + "TransactionRouter yielder");
+jsTest.log(
+    "Test reaping when there is an internal transaction with an active " +
+        "TransactionRouter yielder",
+);
 
 const parentLsid = {
     id: UUID(),

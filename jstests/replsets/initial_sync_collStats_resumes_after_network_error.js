@@ -21,11 +21,17 @@ const primaryColl = primaryDb.getCollection("testColl");
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Add some data to be cloned.
-assert.commandWorked(primaryDb.testColl.insert([{a: 1}, {b: 2}, {c: 3}, {d: 4}, {e: 5}, {f: 6}, {g: 7}]));
+assert.commandWorked(
+    primaryDb.testColl.insert([{a: 1}, {b: 2}, {c: 3}, {d: 4}, {e: 5}, {f: 6}, {g: 7}]),
+);
 
 jsTest.log("Adding a new node to the replica set");
 // Create the secondary node which will use logical initial sync to sync from the primary.
@@ -66,7 +72,9 @@ assert.commandWorked(
 // Disconnect the secondary from the primary to get a network error on the first collStats command.
 primary.disconnect(secondary);
 jsTestLog("Secondary disconnected; Allowing secondary initial sync to resume.");
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangBeforeClonerStage", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "hangBeforeClonerStage", mode: "off"}),
+);
 
 // Verify the node retries the collStats stage.
 assert.commandWorked(
@@ -80,7 +88,9 @@ assert.commandWorked(
 primary.reconnect(secondary);
 
 // Turn off the failpoint before retrying collStats and allow the node to proceed with initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangBeforeRetryingClonerStage", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "hangBeforeRetryingClonerStage", mode: "off"}),
+);
 
 // Wait for the failpoint after collStats stage.
 assert.commandWorked(
@@ -98,12 +108,16 @@ const testCollRes = testDbRes.initialSyncStatus.databases.test["test.testColl"];
 assert.eq(testCollRes.bytesToCopy, 231);
 
 // Turn off the failpoint after collStats stage and allow node to proceed with initial sync.
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangAfterClonerStage", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "hangAfterClonerStage", mode: "off"}),
+);
 
 // Let the oplog fetcher run so we can complete initial sync.
 jsTestLog("Releasing the oplog fetcher failpoint.");
 assert.commandWorked(
-    secondary.getDB("test").adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+    secondary
+        .getDB("test")
+        .adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
 );
 
 jsTestLog("Waiting for initial sync to complete.");

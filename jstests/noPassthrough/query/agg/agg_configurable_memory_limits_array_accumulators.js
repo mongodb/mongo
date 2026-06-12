@@ -54,7 +54,9 @@ function setParam(param, val) {
 
 (function testInternalQueryMaxConcatArraysBytesSetting() {
     // Test that the default 100MB memory limit isn't reached with our data.
-    assert.doesNotThrow(() => coll.aggregate([{$group: {_id: null, strings: {$concatArrays: "$y"}}}]));
+    assert.doesNotThrow(() =>
+        coll.aggregate([{$group: {_id: null, strings: {$concatArrays: "$y"}}}]),
+    );
 
     // Now lower the limit to test that its configuration is obeyed.
     const originalVal = setParam("internalQueryMaxConcatArraysBytes", memLimitArray);
@@ -68,7 +70,11 @@ function setParam(param, val) {
 (function testInternalQueryMaxConcatArraysBytesSettingWindowFunc() {
     let pipeline = [
         {
-            $setWindowFields: {partitionBy: null, sortBy: {_id: 1}, output: {allStr: {$concatArrays: "$y"}}},
+            $setWindowFields: {
+                partitionBy: null,
+                sortBy: {_id: 1},
+                output: {allStr: {$concatArrays: "$y"}},
+            },
         },
     ];
     // Test that the default 100MB memory limit isn't reached with our data.

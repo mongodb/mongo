@@ -10,12 +10,19 @@ let runTest = function (writeFunc) {
     let testDB = st.s.getDB("test");
     testDB.dropDatabase();
 
-    assert.commandWorked(testDB.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(testDB.adminCommand({shardCollection: "test.user", key: {x: 1}}));
     assert.commandWorked(testDB.adminCommand({split: "test.user", middle: {x: 0}}));
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+        testDB.adminCommand({
+            moveChunk: "test.user",
+            find: {x: 0},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     let testDB2 = st.s1.getDB("test");
@@ -23,7 +30,12 @@ let runTest = function (writeFunc) {
 
     // Move chunk to bump version on a different mongos.
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+        testDB.adminCommand({
+            moveChunk: "test.user",
+            find: {x: 0},
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     // Issue a query and make sure it gets routed to the right shard.
@@ -32,7 +44,12 @@ let runTest = function (writeFunc) {
     // At this point, s1 thinks the version of 'test.user' is 2, bounce it again so it gets
     // incremented to 3
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+        testDB.adminCommand({
+            moveChunk: "test.user",
+            find: {x: 0},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     // Issue a query and make sure it gets routed to the right shard again.
@@ -41,7 +58,12 @@ let runTest = function (writeFunc) {
     // At this point, s0 thinks the version of 'test.user' is 3, bounce it again so it gets
     // incremented to 4
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+        testDB.adminCommand({
+            moveChunk: "test.user",
+            find: {x: 0},
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     // Ensure that write commands with multi version do not reset the connection shard version

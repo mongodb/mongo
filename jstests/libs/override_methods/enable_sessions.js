@@ -37,7 +37,9 @@ Mongo.prototype.getDB = function (dbName) {
     ) {
         const causalConsistency = Math.random() < 0.5;
         sessionOptions.causalConsistency = causalConsistency;
-        jsTestLog(`Sessions override setting causalConsistency=${causalConsistency} for db ${dbName}`);
+        jsTestLog(
+            `Sessions override setting causalConsistency=${causalConsistency} for db ${dbName}`,
+        );
 
         delete sessionOptions.maybeUseCausalConsistency;
     }

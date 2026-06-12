@@ -36,9 +36,18 @@ function initCollection(coll) {
     // shard output.
     const padding = "X".repeat((128 * 1024 * 1024) / kDocCount);
     assert.commandWorked(
-        coll.insert(Array.from({length: kDocCount}, (_, i) => ({_id: i, a: i, b: i, padding: padding}))),
+        coll.insert(
+            Array.from({length: kDocCount}, (_, i) => ({_id: i, a: i, b: i, padding: padding})),
+        ),
     );
-    st.shardColl(coll.getName(), {_id: 1}, {_id: kDocCount / 2}, {_id: 0}, dbName, true /*waitForDelete*/);
+    st.shardColl(
+        coll.getName(),
+        {_id: 1},
+        {_id: kDocCount / 2},
+        {_id: 0},
+        dbName,
+        true /*waitForDelete*/,
+    );
 }
 
 function initCursorFind(coll) {
@@ -110,9 +119,13 @@ function killReleaseMemoryCommandOnMongos() {
 }
 
 function configureMongodFailPoint() {
-    return configureFailPoint(st.rs0.getPrimary().getDB(dbName), "releaseMemoryHangAfterPinCursor", {
-        namespace: db.coll.getFullName(),
-    });
+    return configureFailPoint(
+        st.rs0.getPrimary().getDB(dbName),
+        "releaseMemoryHangAfterPinCursor",
+        {
+            namespace: db.coll.getFullName(),
+        },
+    );
 }
 
 runInterruptTest(configureMongodFailPoint, killReleaseMemoryCommandOnMongos);

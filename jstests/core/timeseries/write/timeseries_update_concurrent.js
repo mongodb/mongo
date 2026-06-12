@@ -32,7 +32,10 @@ import {runningWithViewlessTimeseriesUpgradeDowngrade} from "jstests/core/timese
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && !db.getSession().getOptions().shouldRetryWrites()) {
+if (
+    runningWithViewlessTimeseriesUpgradeDowngrade(db) &&
+    !db.getSession().getOptions().shouldRetryWrites()
+) {
     jsTest.log.info(
         "Skipping test using parallel shell & failpoints since in this suite it may get interrupted by viewless timeseries upgrade/downgrade (SERVER-122589).",
     );
@@ -50,11 +53,25 @@ const testCases = {
     REPLACE_METAFIELD: 2,
 };
 
-const validateUpdateIndex = (initialDocList, updateList, testType, failCode, newMetaField = null) => {
+const validateUpdateIndex = (
+    initialDocList,
+    updateList,
+    testType,
+    failCode,
+    newMetaField = null,
+) => {
     const testDB = db.getSiblingDB(dbName);
     const awaitTestUpdate = startParallelShell(
         funWithArgs(
-            function (dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
+            function (
+                dbName,
+                collName,
+                timeFieldName,
+                metaFieldName,
+                initialDocList,
+                updateList,
+                failCode,
+            ) {
                 const testDB = db.getSiblingDB(dbName);
                 const coll = testDB.getCollection(collName);
 
@@ -67,7 +84,10 @@ const validateUpdateIndex = (initialDocList, updateList, testType, failCode, new
                 assert.commandWorked(coll.insert(initialDocList));
 
                 assert.commandWorked(
-                    testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}),
+                    testDB.adminCommand({
+                        configureFailPoint: "hangDuringBatchUpdate",
+                        mode: "alwaysOn",
+                    }),
                 );
 
                 assert.commandFailedWithCode(
@@ -105,7 +125,9 @@ const validateUpdateIndex = (initialDocList, updateList, testType, failCode, new
             break;
     }
 
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}),
+    );
 
     // Wait for testUpdate to finish.
     awaitTestUpdate();

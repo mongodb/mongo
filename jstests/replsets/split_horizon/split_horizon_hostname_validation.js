@@ -21,7 +21,9 @@ function testConfig(hostName, horizonName, expectedReject, options = {}) {
 
     // Correctly start up a replset with the mongod as its node, and wait until it becomes primary
     assert.commandWorked(
-        mongod.adminCommand({replSetInitiate: {_id: "test", members: [{_id: 0, host: "localhost:" + mongod.port}]}}),
+        mongod.adminCommand({
+            replSetInitiate: {_id: "test", members: [{_id: 0, host: "localhost:" + mongod.port}]},
+        }),
     );
     assert.soon(() => {
         return assert.commandWorked(mongod.adminCommand({hello: 1})).isWritablePrimary;

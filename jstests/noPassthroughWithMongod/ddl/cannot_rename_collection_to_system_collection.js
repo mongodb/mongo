@@ -11,7 +11,10 @@ testDB.getCollection("a").drop();
 assert.commandWorked(testDB.createCollection("a"));
 
 // Ensure we cannot rename "a" to a system collections
-assert.commandFailedWithCode(testDB.getCollection("a").renameCollection("system.a"), ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    testDB.getCollection("a").renameCollection("system.a"),
+    ErrorCodes.IllegalOperation,
+);
 
 // Ensure we cannot rename system collections to "a".
 assert.commandFailedWithCode(

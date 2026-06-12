@@ -46,7 +46,9 @@ assert.commandWorked(
 );
 
 // Force the classic engine so CBR applies.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 // Insert enough documents for sampling to work.
 const kNumDocs = 1000;
@@ -135,7 +137,9 @@ assert.commandWorked(coll.createIndex({b: 1}));
     const planningBefore = getPlanningMetrics(db);
 
     // Zero-result query: the nonexistentField filter eliminates every document. All plans have low productivity.
-    assert.commandWorked(coll.find({a: {$gte: 0}, b: {$gte: 0}, nonexistentField: {$exists: true}}).explain());
+    assert.commandWorked(
+        coll.find({a: {$gte: 0}, b: {$gte: 0}, nonexistentField: {$exists: true}}).explain(),
+    );
 
     const cbrAfter = getCBRMetrics(db);
     const mpAfter = getMultiPlannerMetrics(db);

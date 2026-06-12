@@ -22,7 +22,9 @@ const testColl = st.getDB(dbName).getCollection(collectionName);
 // Set up.
 // shard0 -- x: (-inf, 0)
 // shard1 -- x: [0, inf)
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
@@ -264,7 +266,8 @@ const testCases = [
         },
     },
     {
-        logMessage: "Insert two documents matching on the query, one on each shard, ensure only one is removed.",
+        logMessage:
+            "Insert two documents matching on the query, one on each shard, ensure only one is removed.",
         insertDoc: [
             {_id: 0, x: -2, y: 3},
             {_id: 1, x: 2, y: 3},
@@ -277,7 +280,8 @@ const testCases = [
         },
     },
     {
-        logMessage: "Insert two documents, one on each shard, ensure neither is modified when query does not match.",
+        logMessage:
+            "Insert two documents, one on each shard, ensure neither is modified when query does not match.",
         insertDoc: [
             {_id: 0, x: -2, y: 5},
             {_id: 1, x: 2, y: 5},
@@ -306,7 +310,12 @@ testCases.forEach((testCase) => {
     };
     runCommandAndVerify(testCase, retryableWriteFields);
 
-    const transactionFields = {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
+    const transactionFields = {
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(0),
+        startTransaction: true,
+        autocommit: false,
+    };
     runCommandAndVerify(testCase, transactionFields);
 });
 

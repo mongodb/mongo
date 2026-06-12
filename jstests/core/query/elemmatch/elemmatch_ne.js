@@ -9,7 +9,9 @@ coll.drop();
 assert.commandWorked(coll.createIndex({"arr.a": 1, "c": 1, "d": 1}));
 
 assert.commandWorked(coll.insert({_id: 0, arr: [{a: 1}, {a: 2}], c: 4, d: 5, a: 1}));
-assert.commandWorked(coll.insert(Array.from({length: 100}, () => ({arr: [{a: 99}], c: 99, d: 99}))));
+assert.commandWorked(
+    coll.insert(Array.from({length: 100}, () => ({arr: [{a: 99}], c: 99, d: 99}))),
+);
 
 // Test inequality inside $elemmatch.
 const res = coll

@@ -4,7 +4,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const runTest = function (conn, failPointConn) {
     jsTestLog("Setting up users");
     const db = conn.getDB("admin");
-    assert.commandWorked(db.runCommand({createUser: "admin", pwd: "pwd", roles: jsTest.adminUserRoles}));
+    assert.commandWorked(
+        db.runCommand({createUser: "admin", pwd: "pwd", roles: jsTest.adminUserRoles}),
+    );
     assert.eq(db.auth("admin", "pwd"), 1);
     assert.commandWorked(db.runCommand({createUser: "testuser", pwd: "pwd", roles: []}));
     db.grantRolesToUser("testuser", [{role: "readWrite", db: "test"}]);

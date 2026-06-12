@@ -34,7 +34,9 @@ function runOtherOperations(collName) {
     const primaryColl = primaryDB[collName];
     const secondaryColl = secondaryDB[collName];
     jsTestLog("Attempting an insert in " + primaryColl.getFullName());
-    assert.commandWorked(primaryColl.insert({_id: 0, a: 1}, {writeConcern: {w: 2, wtimeout: 30000}}));
+    assert.commandWorked(
+        primaryColl.insert({_id: 0, a: 1}, {writeConcern: {w: 2, wtimeout: 30000}}),
+    );
     assert.docEq(secondaryColl.find({a: 1}).toArray(), [{_id: 0, a: 1}]);
 
     jsTestLog("Attempting a multiple insert in " + primaryColl.getFullName());
@@ -53,7 +55,9 @@ function runOtherOperations(collName) {
     ]);
 
     jsTestLog("Attempting an update in " + primaryColl.getFullName());
-    assert.commandWorked(primaryColl.update({_id: 0}, {$set: {x: 1}}, {writeConcern: {w: 2, wtimeout: 30000}}));
+    assert.commandWorked(
+        primaryColl.update({_id: 0}, {$set: {x: 1}}, {writeConcern: {w: 2, wtimeout: 30000}}),
+    );
     assert.docEq(secondaryColl.find({a: 1}).toArray(), [{_id: 0, a: 1, x: 1}]);
 
     jsTestLog("Attempting an delete in " + primaryColl.getFullName());
@@ -107,7 +111,9 @@ jsTestLog("Creating timeseries collection");
 const collNameTS = "tstestcoll";
 const primaryCollTS = primaryDB[collNameTS];
 assert.commandWorked(
-    primaryDB.createCollection(primaryCollTS.getName(), {timeseries: {timeField: "time", metaField: "measurement"}}),
+    primaryDB.createCollection(primaryCollTS.getName(), {
+        timeseries: {timeField: "time", metaField: "measurement"},
+    }),
 );
 
 jsTestLog("Starting blocked vectored time series insert in parallel thread");

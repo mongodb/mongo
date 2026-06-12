@@ -21,7 +21,9 @@ let st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == "undefined") {
@@ -147,7 +149,10 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
         let result = sendRecvChunkStatus(recipientPrimary, ns, migrationDoc.migrationSessionId);
         jsTestLog("recvChunkStatus: " + tojson(result));
 
-        return result.state === "fail" && result.errmsg.startsWith("migrate failed: TransactionTooOld:");
+        return (
+            result.state === "fail" &&
+            result.errmsg.startsWith("migrate failed: TransactionTooOld:")
+        );
     });
 
     // Verify deletion task doesn't exist on recipient.
@@ -209,7 +214,10 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
         let result = sendRecvChunkStatus(recipientPrimary, ns, migrationDoc.migrationSessionId);
         jsTestLog("recvChunkStatus: " + tojson(result));
 
-        return result.state === "fail" && result.errmsg.startsWith("migrate failed: TransactionTooOld:");
+        return (
+            result.state === "fail" &&
+            result.errmsg.startsWith("migrate failed: TransactionTooOld:")
+        );
     });
 
     // Verify deletion task doesn't exist on recipient.

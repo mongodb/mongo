@@ -44,7 +44,9 @@ assert.commandWorked(coll.insert(invalidDocForIndex));
 // We are using this fail point to pause the index build before it starts the collection scan.
 // This is important for this test because we want to prevent the index build on the primary from
 // observing the invalid document while we block its progress.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "alwaysOn"}),
+);
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {"a.0": 1});
 
@@ -57,7 +59,11 @@ try {
 
     // The index build on the secondary will fail on the invalid document but will wait for the
     // abortIndexBuild oplog entry from the primary.
-    const secondaryOpId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "a.0_1");
+    const secondaryOpId = IndexBuildTest.waitForIndexBuildToStart(
+        secondaryDB,
+        coll.getName(),
+        "a.0_1",
+    );
     IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, secondaryOpId);
 } finally {
     testDB.adminCommand({configureFailPoint: "hangAfterSettingUpIndexBuild", mode: "off"});

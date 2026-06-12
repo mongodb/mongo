@@ -32,7 +32,9 @@ const mongos = st.s;
 const primaryShard = st.rs0.getPrimary();
 
 const mongosDB = mongos.getDB(dbName);
-assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Insert documents so reads have something to find.
 assert.commandWorked(mongosDB.getCollection(collName).insert({_id: 1, x: 1}));
@@ -96,7 +98,9 @@ const shard1Primary = st.rs1.getPrimary();
 
 {
     const check = verifyExternalCounterIncrements("primary", shard1Primary, "executedOnPrimary");
-    const pipeline = [{$lookup: {from: foreignCollName, localField: "x", foreignField: "x", as: "matched"}}];
+    const pipeline = [
+        {$lookup: {from: foreignCollName, localField: "x", foreignField: "x", as: "matched"}},
+    ];
     assert.commandWorked(
         mongosDB.runCommand({
             aggregate: collName,
@@ -115,7 +119,9 @@ assert.commandWorked(mongosDB.getCollection(foreignCollName).insert({_id: 2, x: 
 
 {
     const check = verifyExternalCounterIncrements("primary", shard1Primary, "executedOnPrimary", 2);
-    const pipeline = [{$lookup: {from: foreignCollName, localField: "x", foreignField: "x", as: "matched"}}];
+    const pipeline = [
+        {$lookup: {from: foreignCollName, localField: "x", foreignField: "x", as: "matched"}},
+    ];
     const cursor = mongosDB.getCollection(collName).aggregate(pipeline, {batchSize: 1});
     cursor.toArray();
     check.assertIncrementedBy();

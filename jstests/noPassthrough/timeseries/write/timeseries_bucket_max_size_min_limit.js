@@ -27,8 +27,12 @@ const testDB = primary.getDB("test");
 const collName1 = `${jsTestName()}_1`;
 const collName2 = `${jsTestName()}_2`;
 
-assert.commandWorked(testDB.createCollection(collName1, {timeseries: {timeField: "time", metaField: "tag"}}));
-assert.commandWorked(testDB.createCollection(collName2, {timeseries: {timeField: "time", metaField: "tag"}}));
+assert.commandWorked(
+    testDB.createCollection(collName1, {timeseries: {timeField: "time", metaField: "tag"}}),
+);
+assert.commandWorked(
+    testDB.createCollection(collName2, {timeseries: {timeField: "time", metaField: "tag"}}),
+);
 
 // Inserts lots of buckets to coll1.
 const coll1 = testDB.getCollection(collName1);

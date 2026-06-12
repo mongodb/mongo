@@ -193,11 +193,21 @@ variants.forEach((variant) => {
         ErrorCodes.TypeMismatch,
     );
     assertCollectionRenameFailedWithCode(
-        db.adminCommand({renameCollection: {}, to: src.getFullName(), apiVersion: "1", apiStrict: true}),
+        db.adminCommand({
+            renameCollection: {},
+            to: src.getFullName(),
+            apiVersion: "1",
+            apiStrict: true,
+        }),
         ErrorCodes.TypeMismatch,
     );
     assertCollectionRenameFailedWithCode(
-        db.adminCommand({renameCollection: src.getFullName(), to: {}, apiVersion: "1", apiStrict: true}),
+        db.adminCommand({
+            renameCollection: src.getFullName(),
+            to: {},
+            apiVersion: "1",
+            apiStrict: true,
+        }),
         ErrorCodes.TypeMismatch,
     );
 

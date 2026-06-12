@@ -59,7 +59,11 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
     });
 
     // Now resume using the resume token from the first change (before the failover).
-    const resumeCursor = cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
+    const resumeCursor = cst.getChangeStream({
+        watchMode: watchMode,
+        coll: coll,
+        resumeAfter: firstChange._id,
+    });
 
     // Be sure we can read the 2nd and 3rd changes.
     cst.assertNextChangesEqual({

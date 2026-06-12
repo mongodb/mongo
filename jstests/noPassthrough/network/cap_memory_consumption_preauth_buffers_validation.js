@@ -43,7 +43,11 @@
             capMemoryConsumptionForPreAuthBuffers: 1,
         },
     });
-    assert.neq(null, conn, "Expected mongod to start successfully with capMemoryConsumptionForPreAuthBuffers=1");
+    assert.neq(
+        null,
+        conn,
+        "Expected mongod to start successfully with capMemoryConsumptionForPreAuthBuffers=1",
+    );
     MongoRunner.stopMongod(conn);
 
     jsTest.log("All parameter validation tests passed");

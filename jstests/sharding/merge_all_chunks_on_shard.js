@@ -21,7 +21,9 @@ function newShardedColl(st, testDB) {
 
 /* Split chunk */
 function splitChunk(st, coll, splitPointKeyValue) {
-    assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {x: splitPointKeyValue}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: coll.getFullName(), middle: {x: splitPointKeyValue}}),
+    );
 }
 
 /* Move range */
@@ -70,9 +72,24 @@ function setJumboFlag(mongoS, coll, chunkQuery) {
 }
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
-    configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
-    configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
-    configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
+    configureFailPointForRS(
+        st.configRS.nodes,
+        "overrideHistoryWindowInSecs",
+        {seconds: valueInSeconds},
+        "alwaysOn",
+    );
+    configureFailPointForRS(
+        st.rs0.nodes,
+        "overrideHistoryWindowInSecs",
+        {seconds: valueInSeconds},
+        "alwaysOn",
+    );
+    configureFailPointForRS(
+        st.rs1.nodes,
+        "overrideHistoryWindowInSecs",
+        {seconds: valueInSeconds},
+        "alwaysOn",
+    );
 }
 
 function resetHistoryWindowInSecs(st) {
@@ -115,13 +132,19 @@ function setBalancerMigrationsThrottling(st, valueInMS) {
 function resetBalancerMigrationsThrottling(st) {
     // No need to reset if parameter at initial state
     if (!defaultBalancerMigrationsThrottlingMs) return;
-    updateBalancerParameter(st, "balancerMigrationsThrottlingMs", defaultBalancerMigrationsThrottlingMs);
+    updateBalancerParameter(
+        st,
+        "balancerMigrationsThrottlingMs",
+        defaultBalancerMigrationsThrottlingMs,
+    );
     defaultBalancerMigrationsThrottlingMs = null;
 }
 
 function assertExpectedChunks(configDB, coll, expectedChunksPerShard) {
     for (const [shardName, expectedChunks] of Object.entries(expectedChunksPerShard)) {
-        const chunks = findChunksUtil.findChunksByNs(configDB, coll.getFullName(), {shard: shardName}).toArray();
+        const chunks = findChunksUtil
+            .findChunksByNs(configDB, coll.getFullName(), {shard: shardName})
+            .toArray();
         assert.eq(expectedChunks.length, chunks.length, chunks);
         expectedChunks.forEach((expectedChunk) => {
             const chunkFound = chunks.some(
@@ -226,7 +249,9 @@ function mergeAllChunksOnShardTest(st, testDB) {
     setOnCurrentShardSince(st.s, coll, {}, now, -historyWindowInSeconds - 1000);
 
     // Merge all mergeable chunks on shard0
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}),
+    );
     assertExpectedChunks(configDB, coll, {
         [shard0]: [
             {min: MinKey, max: 1},
@@ -236,7 +261,9 @@ function mergeAllChunksOnShardTest(st, testDB) {
     });
 
     // Merge all mergeable chunks on shard1
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}),
+    );
     assertExpectedChunks(configDB, coll, {
         [shard1]: [
             {min: 1, max: 3},
@@ -301,7 +328,9 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
     moveRange(st, coll, 2, 3, shard0);
 
     // Try to merge all mergeable chunks on shard0
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}),
+    );
 
     // All chunks must be merged except{min: 1, max: 2} and{min: 2, max: 3} because they
     // must be preserved when history widow is still active on them
@@ -316,7 +345,9 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
     });
 
     // Try to merge all mergeable chunks on shard1 and check expected results
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}),
+    );
     assertExpectedChunks(configDB, coll, {[shard1]: [{min: 7, max: 10}]});
 }
 
@@ -346,7 +377,9 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
     setJumboFlag(st.s, coll, {min: {x: 8}});
 
     // Try to merge all mergeable chunks on shard0
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}),
+    );
 
     // All chunks should be merged except {min: 3, max: 4}
     assertExpectedChunks(configDB, coll, {
@@ -359,7 +392,9 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
     });
 
     // Try to merge all mergeable chunks on shard1
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard1}),
+    );
 
     // All chunks should be merged except {min: 8, max: 9}
     assertExpectedChunks(configDB, coll, {
@@ -452,7 +487,8 @@ function testConfigurableAutoMergerIntervalSecs(st, testDB) {
             return true;
         });
         assert.soon(
-            () => findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray().length == 1,
+            () =>
+                findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray().length == 1,
             "Automerger unexpectly didn't merge back chunks within a reasonable time",
         );
     }
@@ -491,7 +527,9 @@ function testMaxTimeProcessingChunksMSParameter(st, testDB) {
      *
      *         { min: 6,      max: 7 }
      */
-    assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: shard0}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: shard0}),
+    );
     const coll = newShardedColl(st, testDB);
 
     for (let i = 0; i <= 8; i++) {
@@ -527,8 +565,14 @@ function testMaxTimeProcessingChunksMSParameter(st, testDB) {
     });
 
     // Run mergeAllChunksOnShard on shard 'shard0' and forcing a timeout of the operation.
-    const failpoint = configureFailPointForRS(st.configRS.nodes, "hangMergeAllChunksUntilReachingTimeout");
-    const failpointShard = configureFailPointForRS(st.rs0.nodes, "hangMergeAllChunksUntilReachingTimeout");
+    const failpoint = configureFailPointForRS(
+        st.configRS.nodes,
+        "hangMergeAllChunksUntilReachingTimeout",
+    );
+    const failpointShard = configureFailPointForRS(
+        st.rs0.nodes,
+        "hangMergeAllChunksUntilReachingTimeout",
+    );
 
     assert.commandWorked(
         st.s.adminCommand({
@@ -556,7 +600,9 @@ function testMaxTimeProcessingChunksMSParameter(st, testDB) {
     failpoint.off();
     failpointShard.off();
 
-    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
+    assert.commandWorked(
+        st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}),
+    );
 
     assertExpectedChunks(configDB, coll, {
         [shard0]: [
@@ -579,7 +625,9 @@ const st = new ShardingTest({mongos: 1, shards: 2, other: {enableBalancer: false
 function executeTestCase(testFunc) {
     // Create database with `shard0` as primary shard
     const testDB = st.s.getDB(jsTestName());
-    assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+    );
     testFunc(st, testDB);
 
     // Teardown: stop the balancer, reset configuration and drop db

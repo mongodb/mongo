@@ -21,7 +21,11 @@ const secondaryDB = rst.getSecondary().startSession().getDatabase(dbName);
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 assert.commandWorked(
@@ -43,8 +47,13 @@ assert.eq(diff, {docsWithDifferentContents: [], docsMissingOnSource: [], docsMis
 
 // We pause replication on the secondary to intentionally cause the contents between the primary and
 // the secondary to differ.
-assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
-checkLog.contains(secondaryDB, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+assert.commandWorked(
+    secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}),
+);
+checkLog.contains(
+    secondaryDB,
+    "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled",
+);
 
 const expectedMissingOnSecondary = [
     {_id: 30.2, num: -1},
@@ -57,9 +66,14 @@ const expectedMissingOnPrimary = [
 
 assert.commandWorked(primaryDB[collName].insert(expectedMissingOnSecondary));
 assert.commandWorked(
-    primaryDB[collName].remove({_id: {$in: expectedMissingOnPrimary.map((doc) => doc._id)}}, {justOne: false}),
+    primaryDB[collName].remove(
+        {_id: {$in: expectedMissingOnPrimary.map((doc) => doc._id)}},
+        {justOne: false},
+    ),
 );
-assert.commandWorked(primaryDB[collName].update({_id: {$in: [40, 90]}}, {$set: {extra: "yes"}}, {multi: true}));
+assert.commandWorked(
+    primaryDB[collName].update({_id: {$in: [40, 90]}}, {$set: {extra: "yes"}}, {multi: true}),
+);
 
 // Type fidelity is expected to be preserved by replication so intentionally test comparisons of
 // distinct but equivalent BSON types.
@@ -82,6 +96,8 @@ assert.eq(diff, {
     docsMissingOnSyncing: expectedMissingOnSecondary,
 });
 
-assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+assert.commandWorked(
+    secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
+);
 
 rst.stopSet();

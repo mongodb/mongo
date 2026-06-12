@@ -13,7 +13,9 @@ function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
         assert.eq(
             chunks[i],
-            findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
+            findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {
+                shard: st["shard" + i].shardName,
+            }),
             "unexpected number of chunks on shard " + i,
         );
     }
@@ -44,9 +46,15 @@ const st = new ShardingTest({
 });
 
 // Set up one sharded collection with 2 chunks, both on the primary shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}),
+);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
@@ -128,7 +136,8 @@ function runTest(testCase, testMode, readPreferenceMode) {
     assert.sameMembers(
         [{_id: -5}],
         res.cursor.firstBatch,
-        `expected to find document in first chunk, command` + ` ${tojson(targetChunk1Cmd)} returned ${tojson(res)}`,
+        `expected to find document in first chunk, command` +
+            ` ${tojson(targetChunk1Cmd)} returned ${tojson(res)}`,
     );
 
     const targetChunk1CmdTimestamp = res.cursor.atClusterTime;
@@ -136,7 +145,9 @@ function runTest(testCase, testMode, readPreferenceMode) {
 
     // Move a chunk from Shard1 to Shard2 outside of the transaction, and update it. This will
     // happen at a later logical time than the read timestamp.
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard2.shardName}),
+    );
 
     res = assert.commandWorked(
         st.s.getDB(dbName).runCommand({
@@ -195,7 +206,9 @@ function runTest(testCase, testMode, readPreferenceMode) {
             writeConcern: {w: "majority"},
         }),
     );
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}),
+    );
 }
 
 for (let testCase of kCommandTestCases) {

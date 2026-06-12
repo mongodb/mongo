@@ -46,7 +46,9 @@ function runExpressReadTest({command, expectedDocs, usesExpress, usesIdHack}) {
         });
     }
 
-    const explain = assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
+    const explain = assert.commandWorked(
+        db.runCommand({explain: command, verbosity: "executionStats"}),
+    );
 
     assert.eq(
         usesExpress,
@@ -77,7 +79,9 @@ function runExpressWriteTest({command, expectedDocs, usesExpress, usesIdHack}) {
     // Reset the collection docs then run explain.
     assert.commandWorked(coll.remove({}));
     assert.commandWorked(coll.insert(docs));
-    const explain = assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
+    const explain = assert.commandWorked(
+        db.runCommand({explain: command, verbosity: "executionStats"}),
+    );
 
     assert.eq(
         usesExpress,
@@ -129,14 +133,22 @@ runExpressReadTest({
 
 // Aggregation
 runExpressReadTest({
-    command: {aggregate: collName, pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 0)}], cursor: {}},
+    command: {
+        aggregate: collName,
+        pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 0)}],
+        cursor: {},
+    },
     usesExpress: true,
     usesIdHack: false,
     expectedDocs: [docs[0]],
 });
 
 runExpressReadTest({
-    command: {aggregate: collName, pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 1)}], cursor: {}},
+    command: {
+        aggregate: collName,
+        pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 1)}],
+        cursor: {},
+    },
     usesExpress: false,
     usesIdHack: false,
     expectedDocs: [],
@@ -226,7 +238,10 @@ runExpressWriteTest({
 
 // Update
 runExpressWriteTest({
-    command: {update: collName, updates: [{q: _buildBsonObj("_id", 0, "_id", 0), u: {$set: {c: 1}}}]},
+    command: {
+        update: collName,
+        updates: [{q: _buildBsonObj("_id", 0, "_id", 0), u: {$set: {c: 1}}}],
+    },
     usesExpress: false,
     usesIdHack: true,
     expectedDocs: [{_id: 0, a: 0, c: 1}, docs[1]],

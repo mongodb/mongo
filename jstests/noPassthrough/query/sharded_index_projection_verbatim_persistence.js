@@ -17,7 +17,9 @@ const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: "hashed"}}));
 
@@ -31,7 +33,9 @@ const kProjectionDoc = {
 // Creates a wildcard index with a wildcardProjection that normalization would change and verifies
 // the persisted projection doc on each shard matches the original, unnormalized version.
 const kWildcardIndexName = "wc_index";
-st.s.getCollection(ns).createIndex({"$**": 1}, {name: kWildcardIndexName, wildcardProjection: kProjectionDoc});
+st.s
+    .getCollection(ns)
+    .createIndex({"$**": 1}, {name: kWildcardIndexName, wildcardProjection: kProjectionDoc});
 let shardCatalogs = st.s
     .getCollection(ns)
     .aggregate([

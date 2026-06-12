@@ -38,7 +38,10 @@ function getWorkloadModel() {
     return fc
         .record({
             collSpec: getCollectionModel(),
-            queries: fc.array(getQueryAndOptionsModel(), {minLength: 1, maxLength: numQueriesPerRun}),
+            queries: fc.array(getQueryAndOptionsModel(), {
+                minLength: 1,
+                maxLength: numQueriesPerRun,
+            }),
             knobToVal: queryKnobsModel,
         })
         .map(({collSpec, queries, knobToVal}) => {
@@ -46,7 +49,10 @@ function getWorkloadModel() {
         });
 }
 
-const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl, experimentColl);
+const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(
+    controlColl,
+    experimentColl,
+);
 
 // Test with a regular collection.
 testProperty(knobCorrectnessProperty, {controlColl, experimentColl}, getWorkloadModel(), numRuns);

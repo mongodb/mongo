@@ -53,7 +53,9 @@ function testFailGetMoreAfterCursorCheckoutFailpoint({mongos, errorCode, expecte
     );
 
     // Now open a valid $changeStream cursor...
-    const aggCmdRes = assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
+    const aggCmdRes = assert.commandWorked(
+        coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}),
+    );
 
     // ... run a getMore using the cursorID from the original command response, and confirm that the
     // expected error was thrown...
@@ -68,7 +70,9 @@ function testFailGetMoreAfterCursorCheckoutFailpoint({mongos, errorCode, expecte
     assert.eq(errorLabels.includes("ResumableChangeStreamError"), expectedLabel, getMoreRes);
 
     // Finally, disable the failpoint.
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}),
+    );
 }
 // Test the expected output for both resumable and non-resumable error codes.
 testFailGetMoreAfterCursorCheckoutFailpoint({
@@ -76,11 +80,17 @@ testFailGetMoreAfterCursorCheckoutFailpoint({
     errorCode: ErrorCodes.ShutdownInProgress,
     expectedLabel: true,
 });
-testFailGetMoreAfterCursorCheckoutFailpoint({mongos: st.s, errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
+testFailGetMoreAfterCursorCheckoutFailpoint({
+    mongos: st.s,
+    errorCode: ErrorCodes.FailedToParse,
+    expectedLabel: false,
+});
 
 // Now test both aggregate and getMore under conditions of an actual cluster outage. Shard the
 // collection on shard0, split at {_id: 0}, and move the upper chunk to the other shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
 
 // Open a change stream on the collection...
@@ -146,7 +156,9 @@ assert(!("errorLabels" in err), err);
         let res = coll.watch([]);
         assert.soon(() => {
             const cursorId = res._cursorid ?? res.cursor.id;
-            res = assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: collName}));
+            res = assert.commandWorked(
+                testDB.runCommand({getMore: cursorId, collection: collName}),
+            );
         });
     });
 }

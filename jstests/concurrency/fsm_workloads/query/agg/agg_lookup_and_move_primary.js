@@ -16,7 +16,9 @@ export const $config = (function () {
                 return fn();
             } catch (e) {
                 if (interruptedQueryErrors.includes(e.code)) {
-                    jsTestLog(`Caught interrupted query error ${e.code}. Retrying ${i + 1}/${numRetries}...`);
+                    jsTestLog(
+                        `Caught interrupted query error ${e.code}. Retrying ${i + 1}/${numRetries}...`,
+                    );
                     sleep(sleepMs);
                     continue;
                 }
@@ -143,7 +145,12 @@ export const $config = (function () {
         this.foreignColl2Name = "foreignColl2";
 
         function createShardedCollection(collName) {
-            assert.commandWorked(db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: "hashed"}}));
+            assert.commandWorked(
+                db.adminCommand({
+                    shardCollection: db[collName].getFullName(),
+                    key: {_id: "hashed"},
+                }),
+            );
         }
 
         function createTrackedCollection(collName) {
@@ -151,7 +158,9 @@ export const $config = (function () {
             // move collection to a random shard
             const toShard = shards[Random.randInt(shards.length)];
             jsTestLog("Creating tracked collection: " + collName + " on shard " + toShard);
-            assert.commandWorked(db.adminCommand({moveCollection: db.getName() + "." + collName, toShard: toShard}));
+            assert.commandWorked(
+                db.adminCommand({moveCollection: db.getName() + "." + collName, toShard: toShard}),
+            );
         }
 
         function createRandomCollectionType(collName) {

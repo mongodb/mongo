@@ -28,7 +28,10 @@ const caseSensitive = {
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: caseInsensitive}));
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-let doc = coll.findAndModify({update: [{$set: {newField: {$indexOfArray: ["$x", "B"]}}}], new: true});
+let doc = coll.findAndModify({
+    update: [{$set: {newField: {$indexOfArray: ["$x", "B"]}}}],
+    new: true,
+});
 assert.eq(doc.newField, 3, doc);
 
 //

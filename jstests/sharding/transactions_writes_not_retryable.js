@@ -41,7 +41,10 @@ function runTest(st, session, sessionDB, writeCmdName, writeCmd, isSharded) {
             ", sharded: " +
             isSharded,
     );
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 
     // Fail with closed connection.
     assert.commandWorked(
@@ -70,9 +73,14 @@ function runTest(st, session, sessionDB, writeCmdName, writeCmd, isSharded) {
     // returned as top level codes for all commands, including batch writes.
     assert(ErrorCodes.isNetworkError(res.code), "expected network error, got: " + tojson(res.code));
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 
-    assert.commandWorked(st.rs0.getPrimary().adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+    assert.commandWorked(
+        st.rs0.getPrimary().adminCommand({configureFailPoint: "failCommand", mode: "off"}),
+    );
 }
 
 const kCmdTestCases = [
@@ -106,7 +114,9 @@ const sessionDB = session.getDatabase(dbName);
 // Unsharded.
 jsTestLog("Testing against unsharded collection");
 
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}),
+);
 
 kCmdTestCases.forEach((cmdTestCase) => {
     runTest(st, session, sessionDB, cmdTestCase.name, cmdTestCase.command, false /*isSharded*/);
@@ -115,7 +125,9 @@ kCmdTestCases.forEach((cmdTestCase) => {
 // Sharded
 jsTestLog("Testing against sharded collection");
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
 

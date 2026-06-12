@@ -40,8 +40,16 @@ jsTest.log("Untrack a collection after performing movePrimary commands works as 
 
     // then move and track the collection, placing it outside the current primary...
     assert.commandWorked(db.adminCommand({moveCollection: kNss, toShard: originalPrimaryShard}));
-    assert.commandFailedWithCode(db.adminCommand({untrackUnshardedCollection: kNss}), ErrorCodes.OperationFailed);
-    verifyCollectionTrackingState(db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
+    assert.commandFailedWithCode(
+        db.adminCommand({untrackUnshardedCollection: kNss}),
+        ErrorCodes.OperationFailed,
+    );
+    verifyCollectionTrackingState(
+        db,
+        kNss,
+        true /*expectedToBeTracked*/,
+        true /*expectedToBeUnsplittable*/,
+    );
 
     // ... and invoke movePrimary once again to allow untrackCollection to succeed.
     assert.commandWorked(db.adminCommand({movePrimary: kDbName, to: originalPrimaryShard}));

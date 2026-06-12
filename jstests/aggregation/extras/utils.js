@@ -232,7 +232,10 @@ export function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip =
     for (let leftElem of al) {
         let foundMatch = false;
         for (let i = 0; i < ar.length; ++i) {
-            if (!matchedElementsInRight.has(i) && anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
+            if (
+                !matchedElementsInRight.has(i) &&
+                anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)
+            ) {
                 matchedElementsInRight.add(i); // Don't use the same value each time.
                 foundMatch = true;
                 break;
@@ -264,7 +267,10 @@ export function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip
     for (let leftElem of al) {
         let foundMatch = false;
         for (let i = 0; i < ar.length; ++i) {
-            if (!matchedIndexesInRight.has(i) && anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
+            if (
+                !matchedIndexesInRight.has(i) &&
+                anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)
+            ) {
                 matchedIndexesInRight.add(i); // Don't use the same value each time.
                 foundMatch = true;
                 break;
@@ -351,7 +357,8 @@ export function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
  */
 export function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
     if (al.length != ar.length) {
-        if (verbose) print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
+        if (verbose)
+            print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
         return false;
     }
 
@@ -447,7 +454,11 @@ export function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
     const response = assert.commandFailed(
         coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}),
     );
-    assert.eq(-1, response.errmsg.indexOf(expectedMessage), "Error message contained '" + expectedMessage + "'");
+    assert.eq(
+        -1,
+        response.errmsg.indexOf(expectedMessage),
+        "Error message contained '" + expectedMessage + "'",
+    );
 }
 
 /**
@@ -455,7 +466,12 @@ export function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
  * the 'actual' array has a matching element in the 'expected' array, without honoring elements
  * order.
  */
-export function assertArrayEq({actual = [], expected = [], fieldsToSkip = [], extraErrorMsg = ""} = {}) {
+export function assertArrayEq({
+    actual = [],
+    expected = [],
+    fieldsToSkip = [],
+    extraErrorMsg = "",
+} = {}) {
     assert.eq(arguments.length, 1, "assertArrayEq arguments must be in an object");
     assert(
         arrayEq(actual, expected, false, null, fieldsToSkip),
@@ -551,7 +567,10 @@ export function getExplainedPipelineFromAggregation(
     const result = coll.explain().aggregate(pipeCopy, aggOptions);
 
     assert.commandWorked(result);
-    return getExplainPipelineFromAggregationResult(result, {inhibitOptimization, postPlanningResults});
+    return getExplainPipelineFromAggregationResult(result, {
+        inhibitOptimization,
+        postPlanningResults,
+    });
 }
 
 export function getExplainPipelineFromAggregationResult(

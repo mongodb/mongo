@@ -53,5 +53,13 @@ assert.eq(2, nearCount, "unexpected document count for near");
 assert.eq(1, geoNearResult.length, `unexpected $geoNear result: ${tojson(geoNearResult)}`);
 
 const geoNearStats = geoNearResult[0];
-assert.eq(2, geoNearStats.nResults, `unexpected document count for $geoNear: ${tojson(geoNearStats)}`);
-assert.gt(dist, geoNearStats.maxDistance, `unexpected maximum distance in $geoNear results: ${tojson(geoNearStats)}`);
+assert.eq(
+    2,
+    geoNearStats.nResults,
+    `unexpected document count for $geoNear: ${tojson(geoNearStats)}`,
+);
+assert.gt(
+    dist,
+    geoNearStats.maxDistance,
+    `unexpected maximum distance in $geoNear results: ${tojson(geoNearStats)}`,
+);

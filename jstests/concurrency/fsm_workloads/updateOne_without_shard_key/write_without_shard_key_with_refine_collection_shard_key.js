@@ -41,7 +41,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         for (let i = this.latchCount; i >= 0; --i) {
             const latchCollName = collName + "_" + i;
             let coll = db.getCollection(latchCollName);
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}),
+            );
             assert.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }
@@ -58,7 +60,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         return collName + "_" + this.latch.getCount().toString();
     };
 
-    $config.states.refineCollectionShardKey = function refineCollectionShardKey(db, collName, connCache) {
+    $config.states.refineCollectionShardKey = function refineCollectionShardKey(
+        db,
+        collName,
+        connCache,
+    ) {
         jsTestLog("Running refineCollectionShardKey state.");
         const latchCollName = this.getCurrentLatchCollName(collName);
 
@@ -84,15 +90,27 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.findAndModify = function findAndModify(db, collName, connCache) {
-        $super.states.findAndModify.apply(this, [db, this.getCurrentLatchCollName(collName), connCache]);
+        $super.states.findAndModify.apply(this, [
+            db,
+            this.getCurrentLatchCollName(collName),
+            connCache,
+        ]);
     };
 
     $config.states.updateOne = function findAndModify(db, collName, connCache) {
-        $super.states.updateOne.apply(this, [db, this.getCurrentLatchCollName(collName), connCache]);
+        $super.states.updateOne.apply(this, [
+            db,
+            this.getCurrentLatchCollName(collName),
+            connCache,
+        ]);
     };
 
     $config.states.deleteOne = function findAndModify(db, collName, connCache) {
-        $super.states.deleteOne.apply(this, [db, this.getCurrentLatchCollName(collName), connCache]);
+        $super.states.deleteOne.apply(this, [
+            db,
+            this.getCurrentLatchCollName(collName),
+            connCache,
+        ]);
     };
 
     $config.transitions = {

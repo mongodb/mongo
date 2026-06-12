@@ -39,10 +39,13 @@ rollbackTest.transitionToRollbackOperations();
 let serverStatus = rollbackNode.adminCommand("serverStatus");
 // When there is no pin, the `min pinned timestamp` value is `Timestamp::max()`. I don't believe
 // there is a JS constant for `Timestamp::max()`, so we capture it now for later.
-let maxTimestampValue = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned timestamp"];
+let maxTimestampValue =
+    serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned timestamp"];
 
 // Perform a write that pins history. This write will be rolled back.
-let result = assert.commandWorked(rollbackNode.adminCommand({"pinHistoryReplicated": Timestamp(100, 1), round: true}));
+let result = assert.commandWorked(
+    rollbackNode.adminCommand({"pinHistoryReplicated": Timestamp(100, 1), round: true}),
+);
 let origPinTs = result["pinTs"];
 
 serverStatus = rollbackNode.adminCommand("serverStatus");

@@ -12,7 +12,9 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
 import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
-const {metricsDir: primaryMetricsDir, otelParams: primaryOtelParams} = otelFileExportParams(`${jsTestName()}_node0`);
+const {metricsDir: primaryMetricsDir, otelParams: primaryOtelParams} = otelFileExportParams(
+    `${jsTestName()}_node0`,
+);
 const {metricsDir: secondaryMetricsDir, otelParams: secondaryOtelParams} = otelFileExportParams(
     `${jsTestName()}_node1`,
 );
@@ -67,7 +69,9 @@ IndexBuildTest.pauseIndexBuilds(primary);
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 // Wait for the index build to be observable on the secondary.
-const indexMap = IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexMap = IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1"], {
+    includeBuildUUIDs: true,
+});
 const indexBuildUUID = indexMap["a_1"].buildUUID;
 
 const newPrimary = rst.getSecondary();

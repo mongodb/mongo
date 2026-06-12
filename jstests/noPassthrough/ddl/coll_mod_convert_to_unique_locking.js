@@ -28,10 +28,14 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.insert({a: 1}));
 
 // Disallows new duplicate keys on the index.
-assert.commandWorked(testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}),
+);
 
 let awaitCollMod = () => {};
-const failPoint = configureFailPoint(primary, "hangAfterCollModIndexUniqueReleaseIXLock", {nss: coll.getFullName()});
+const failPoint = configureFailPoint(primary, "hangAfterCollModIndexUniqueReleaseIXLock", {
+    nss: coll.getFullName(),
+});
 
 // Attempts to run collMod to convert the index to unique during which the index is modified.
 awaitCollMod = assertCommandFailedWithCodeInParallelShell(
@@ -52,6 +56,8 @@ failPoint.off();
 awaitCollMod();
 
 // Reruns the collmod without the index being modified and succeeds.
-assert.commandWorked(testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
+);
 
 rst.stopSet();

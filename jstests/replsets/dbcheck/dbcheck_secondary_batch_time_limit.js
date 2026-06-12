@@ -25,7 +25,10 @@ function runTest(validateMode) {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     rst.startSet();
@@ -37,7 +40,9 @@ function runTest(validateMode) {
     const primaryDB = primary.getDB(dbName);
     const secondaryDB = secondary.getDB(dbName);
 
-    assert.commandWorked(secondary.adminCommand({"setParameter": 1, "dbCheckSecondaryBatchMaxTimeMs": 1}));
+    assert.commandWorked(
+        secondary.adminCommand({"setParameter": 1, "dbCheckSecondaryBatchMaxTimeMs": 1}),
+    );
     const writeConcern = {w: "majority"};
 
     resetAndInsert(rst, primaryDB, collName, nDocs);

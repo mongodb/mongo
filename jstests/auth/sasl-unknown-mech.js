@@ -3,7 +3,12 @@
 const mongod = MongoRunner.runMongod({auth: ""});
 const admin = mongod.getDB("admin");
 
-admin.createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"]});
+admin.createUser({
+    user: "admin",
+    pwd: "pwd",
+    roles: ["root"],
+    mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"],
+});
 admin.auth("admin", "pwd");
 
 // base64 encoded: 'n,,n=admin,r=deadbeefcafeba11';

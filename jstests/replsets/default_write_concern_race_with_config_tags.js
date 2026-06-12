@@ -35,7 +35,9 @@ cfg.settings.getLastErrorModes = {
 async function runReconfigFn(cfg) {
     const {ReplSetTest} = await import("jstests/libs/replsettest.js");
     jsTestLog("Running reconfig");
-    assert.commandWorked(db.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
+    assert.commandWorked(
+        db.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}),
+    );
     jsTestLog("Finished running reconfig");
 }
 
@@ -54,7 +56,9 @@ hangDuringReconfigFP.off();
 waitForReconfig();
 
 jsTestLog("Attempting setDefaultRWC again (should succeed).");
-assert.commandWorked(primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}),
+);
 
 jsTestLog("Checking writeability.");
 const coll = primary.getDB("db").getCollection("coll");

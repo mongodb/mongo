@@ -4,7 +4,11 @@
  * @tags: [featureFlagQueryStatsDelete]
  */
 import {it} from "jstests/libs/mochalite.js";
-import {getQueryStatsDeleteCmd, kHashedFieldName, kHashedIdField} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsDeleteCmd,
+    kHashedFieldName,
+    kHashedIdField,
+} from "jstests/libs/query/query_stats_utils.js";
 import {runTokenizationTestsForTopology} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 
 const collName = jsTestName();
@@ -96,7 +100,10 @@ runTokenizationTestsForTopology(
     "delete command one way tokenization (Standalone)",
     () => {
         const conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+            setParameter: {
+                internalQueryStatsRateLimit: -1,
+                internalQueryStatsWriteCmdSampleRate: 1,
+            },
         });
         return {fixture: conn, testDB: conn.getDB("test")};
     },

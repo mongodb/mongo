@@ -11,17 +11,29 @@ const targetColl = mongosDB["target"];
 
 function setAggHang(mode) {
     assert.commandWorked(
-        st.shard0.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}),
+        st.shard0.adminCommand({
+            configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
+            mode: mode,
+        }),
     );
     assert.commandWorked(
-        st.shard1.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}),
+        st.shard1.adminCommand({
+            configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
+            mode: mode,
+        }),
     );
 
     assert.commandWorked(
-        st.shard0.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}),
+        st.shard0.adminCommand({
+            configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch",
+            mode: mode,
+        }),
     );
     assert.commandWorked(
-        st.shard1.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}),
+        st.shard1.adminCommand({
+            configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch",
+            mode: mode,
+        }),
     );
 }
 
@@ -30,7 +42,9 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
     setAggHang("alwaysOn");
 
     // Set the primary shard.
-    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}),
+    );
 
     let comment = jsTestName() + "_comment";
     let outFn = `
@@ -65,7 +79,9 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
     );
 
     // Migrate the primary shard from shard0 to shard1.
-    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}),
+    );
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");

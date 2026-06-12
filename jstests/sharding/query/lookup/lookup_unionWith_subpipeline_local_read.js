@@ -47,7 +47,9 @@ const replSets = [st.rs0, st.rs1];
 const local = mongosDB.local;
 const foreign = mongosDB.foreign;
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Turn on the profiler and increase the query log level for both shards.
 for (let rs of replSets) {
@@ -55,12 +57,18 @@ for (let rs of replSets) {
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
     assert.commandWorked(
-        primary.adminCommand({setParameter: 1, logComponentVerbosity: {replication: {heartbeats: 0}}}),
+        primary.adminCommand({
+            setParameter: 1,
+            logComponentVerbosity: {replication: {heartbeats: 0}},
+        }),
     );
     enableLocalReadLogs(primary);
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
     assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {replication: {heartbeats: 0}}}),
+        secondary.adminCommand({
+            setParameter: 1,
+            logComponentVerbosity: {replication: {heartbeats: 0}},
+        }),
     );
     enableLocalReadLogs(secondary);
 }
@@ -96,7 +104,9 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
     const foreignNs = pipeline[0][stage].from ? pipeline[0][stage].from : pipeline[0][stage].coll;
 
     for (let i = 0; i < replSets.length; i++) {
-        const node = expected.executeOnSecondaries ? replSets[i].getSecondary() : replSets[i].getPrimary();
+        const node = expected.executeOnSecondaries
+            ? replSets[i].getSecondary()
+            : replSets[i].getPrimary();
 
         // Confirm that the top-level execution of the pipeline is as expected.
         if (expected.toplevelExec) {
@@ -125,7 +135,10 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
         // 'subPipelineRemote' and 'subPipelineLocal'.
         if (expected.subPipelineRemote) {
             const filter = {
-                $or: [{"command.aggregate": {$eq: foreignNs}}, {"command.aggregate": {$eq: foreign.getName()}}],
+                $or: [
+                    {"command.aggregate": {$eq: foreignNs}},
+                    {"command.aggregate": {$eq: foreign.getName()}},
+                ],
                 "command.comment": comment,
                 "errName": {$ne: "StaleConfig"},
             };
@@ -145,9 +158,17 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
         if (expected.subPipelineLocal) {
             const localReadCount = getPossibleViewLocalReadCount(node, foreignNs, comment);
             if (expected.subPipelineLocal[i]) {
-                assert.gt(localReadCount, 0, `Expected non-zero number of local reads for ${node.name}`);
+                assert.gt(
+                    localReadCount,
+                    0,
+                    `Expected non-zero number of local reads for ${node.name}`,
+                );
             } else {
-                assert.eq(0, localReadCount, `Expected zero local read but found: ${localReadCount} for ${node.name}`);
+                assert.eq(
+                    0,
+                    localReadCount,
+                    `Expected zero local read but found: ${localReadCount} for ${node.name}`,
+                );
             }
         }
     }
@@ -511,7 +532,9 @@ assertAggResultAndRouting(
 // the lookup.
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
-const idLookupPipeline = [{$lookup: {from: foreign.getName(), as: "bs", localField: "_id", foreignField: "_id"}}];
+const idLookupPipeline = [
+    {$lookup: {from: foreign.getName(), as: "bs", localField: "_id", foreignField: "_id"}},
+];
 const idLookupExpectedRes = [
     {_id: -2, a: -2, bs: []},
     {_id: -1, a: 1, bs: [{_id: -1, b: 2}]},
@@ -555,7 +578,10 @@ assertAggResultAndRouting(
 // TODO SERVER-98118 remove this test case.
 // For the authoritative shards, the secondaries will wait internally when they are yet to
 // catch up. This causes them to be always up to date.
-const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"), "AuthoritativeShardsCRUD");
+const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AuthoritativeShardsCRUD",
+);
 if (!isAuthoritativeShardEnabled) {
     // Test $lookup when it is routed to a secondary which is not yet aware of the foreign
     // collection.
@@ -731,7 +757,9 @@ pipeline = [
             as: "bs",
             localField: "a",
             foreignField: "b",
-            pipeline: [{$lookup: {from: "otherForeign", as: "cs", localField: "b", foreignField: "c"}}],
+            pipeline: [
+                {$lookup: {from: "otherForeign", as: "cs", localField: "b", foreignField: "c"}},
+            ],
         },
     },
 ];
@@ -811,7 +839,11 @@ awaitShell = startParallelShell(
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Move the primary to the other shard to verify that $lookup execution changes correctly mid-query.
 failPoint.wait();
-moveDatabaseAndUnshardedColls(st.s0.getDB(dbName), st.shard1.shardName, false /* moveShardedData */);
+moveDatabaseAndUnshardedColls(
+    st.s0.getDB(dbName),
+    st.shard1.shardName,
+    false /* moveShardedData */,
+);
 
 // Let the aggregate complete.
 failPoint.off();

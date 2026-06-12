@@ -22,7 +22,12 @@ baseColl.drop();
 foreignColl.drop();
 
 assert.commandWorked(
-    baseColl.insertMany([{obj: {a: 1, d: 1}}, {obj: {a: 1, d: 2}}, {obj: {a: 2, d: 1}}, {obj: {a: 2, d: 2}}]),
+    baseColl.insertMany([
+        {obj: {a: 1, d: 1}},
+        {obj: {a: 1, d: 2}},
+        {obj: {a: 2, d: 1}},
+        {obj: {a: 2, d: 2}},
+    ]),
 );
 // Indexes provide multikeyness/path arrayness info for the resolved local paths 'obj.a' and
 // 'obj.d'. Without these the join optimizer would bail out and the bug would not be hit.
@@ -49,7 +54,9 @@ runTestWithUnorderedComparison({
             $lookup: {
                 from: foreignColl.getName(),
                 let: {x: "$obj"},
-                pipeline: [{$match: {$expr: {$and: [{$eq: ["$a", "$$x.a"]}, {$eq: ["$d", "$$x.d"]}]}}}],
+                pipeline: [
+                    {$match: {$expr: {$and: [{$eq: ["$a", "$$x.a"]}, {$eq: ["$d", "$$x.d"]}]}}},
+                ],
                 as: "joined",
             },
         },
@@ -76,7 +83,9 @@ runTestWithUnorderedComparison({
             $lookup: {
                 from: foreignColl.getName(),
                 let: {x: "$obj"},
-                pipeline: [{$match: {$expr: {$and: [{$eq: ["$$x.a", "$a"]}, {$eq: ["$$x.d", "$d"]}]}}}],
+                pipeline: [
+                    {$match: {$expr: {$and: [{$eq: ["$$x.a", "$a"]}, {$eq: ["$$x.d", "$d"]}]}}},
+                ],
                 as: "joined",
             },
         },

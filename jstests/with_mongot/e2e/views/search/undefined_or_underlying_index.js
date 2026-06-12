@@ -32,7 +32,9 @@ const viewName = "bestPictureAwardsWithRottenTomatoScore";
 const bestPicturesViewPipeline = [
     {"$addFields": {rotten_tomatoes_score: {$ifNull: ["$rotten_tomatoes_score", "62%"]}}},
 ];
-assert.commandWorked(testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline));
+assert.commandWorked(
+    testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline),
+);
 const bestPictureView = testDb[viewName];
 
 // Create two indexes on bestPictureColl, none on bestPictureView.
@@ -116,7 +118,10 @@ const undefinedOrUnderlyingIndexTestCases = (isStoredSource) => {
     for (const indexName of indexNames) {
         jsTestLog(`Testing index: ${indexName} with stored source: ${isStoredSource}`);
         assertArrayEq({actual: basicQueryResult(indexName), expected: []});
-        assertArrayEq({actual: unionWithQueryResult(indexName), expected: [{title: "Breaking Bad"}]});
+        assertArrayEq({
+            actual: unionWithQueryResult(indexName),
+            expected: [{title: "Breaking Bad"}],
+        });
         assertArrayEq({actual: lookupQueryResult(indexName), expected: []});
     }
 };

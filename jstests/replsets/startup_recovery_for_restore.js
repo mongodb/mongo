@@ -37,7 +37,11 @@ const paddingStr = "XXXXXXXXX";
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Pre-load some documents.
@@ -84,7 +88,9 @@ for (let id = 1; id <= nExtraDocs; id++) {
 bulk.execute();
 const lastId = nDocs + nExtraDocs;
 
-const penultimateOpTime = assert.commandWorked(db.runCommand({find: collName, limit: 1})).operationTime;
+const penultimateOpTime = assert.commandWorked(
+    db.runCommand({find: collName, limit: 1}),
+).operationTime;
 
 const sentinel2Timestamp = assert.commandWorked(
     db.runCommand({insert: sentinelCollName, documents: [{_id: "s2"}]}),
@@ -112,7 +118,9 @@ assert(minValid.hasOwnProperty("begin"), tojson(minValid));
 jsTestLog("Restarting restore node again, in repl set mode with stable checkpointing disabled");
 restoreNode = rst.restart(restoreNode, {
     noReplSet: false,
-    setParameter: Object.merge(startParams, {"failpoint.disableSnapshotting": "{'mode':'alwaysOn'}"}),
+    setParameter: Object.merge(startParams, {
+        "failpoint.disableSnapshotting": "{'mode':'alwaysOn'}",
+    }),
 });
 
 rst.awaitSecondaryNodes(undefined, [restoreNode]);
@@ -141,7 +149,11 @@ jsTestLog("Crashing restore node before it takes the first stable checkpoint");
 rst.stop(restoreNode, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
 
 jsTestLog("Restarting restore node again, in repl set mode");
-restoreNode = rst.start(restoreNode, {noReplSet: false, setParameter: startParams}, /* restart */ true);
+restoreNode = rst.start(
+    restoreNode,
+    {noReplSet: false, setParameter: startParams},
+    /* restart */ true,
+);
 
 rst.awaitSecondaryNodes(undefined, [restoreNode]);
 jsTestLog("Finished restarting restore node");
@@ -164,11 +176,15 @@ rst.stepUp(restoreNode, {awaitReplicationBeforeStepUp: false});
 
 // Should also be able to read at the final sentinel optime on restore node.
 const restoreNodeSession = restoreNode.startSession({causalConsistency: false});
-restoreNodeSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: sentinel2Timestamp}});
+restoreNodeSession.startTransaction({
+    readConcern: {level: "snapshot", atClusterTime: sentinel2Timestamp},
+});
 const restoreNodeSessionDb = restoreNodeSession.getDatabase(dbName);
 jsTestLog("Checking top-of-oplog read works on restored node.");
 
-let res = assert.commandWorked(restoreNodeSessionDb.runCommand({find: collName, filter: {"_id": lastId}}));
+let res = assert.commandWorked(
+    restoreNodeSessionDb.runCommand({find: collName, filter: {"_id": lastId}}),
+);
 assert.eq(1, res.cursor.firstBatch.length);
 assert.docEq({_id: lastId, paddingStr: paddingStr}, res.cursor.firstBatch[0]);
 
@@ -176,7 +192,9 @@ assert.docEq({_id: lastId, paddingStr: paddingStr}, res.cursor.firstBatch[0]);
 restoreNodeSession.abortTransaction();
 
 // Should NOT able to read at the first sentinel optime on the restore node.
-restoreNodeSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: sentinel1Timestamp}});
+restoreNodeSession.startTransaction({
+    readConcern: {level: "snapshot", atClusterTime: sentinel1Timestamp},
+});
 jsTestLog(
     "Checking restore node majority optime read, which should fail, because the restore node does not have that history.",
 );
@@ -190,7 +208,9 @@ restoreNodeSession.abortTransaction();
 jsTestLog(
     "Checking restore node top-of-oplog minus 1 read, which should fail, because the restore node does not have that history.",
 );
-restoreNodeSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: penultimateOpTime}});
+restoreNodeSession.startTransaction({
+    readConcern: {level: "snapshot", atClusterTime: penultimateOpTime},
+});
 res = assert.commandFailedWithCode(
     restoreNodeSessionDb.runCommand({find: collName, filter: {"_id": lastId}}),
     ErrorCodes.SnapshotTooOld,

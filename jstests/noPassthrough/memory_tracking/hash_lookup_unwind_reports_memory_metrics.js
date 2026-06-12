@@ -51,7 +51,9 @@ const ingredientDocs = [
 assert.commandWorked(recipes.insertMany(recipeDocs));
 assert.commandWorked(ingredients.insertMany(ingredientDocs));
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+);
 
 {
     const pipeline = [

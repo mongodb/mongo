@@ -55,7 +55,9 @@ function setUpTestMode(mode) {
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     } else if (mode == kTestMode.kFailover) {
         const oldPrimary = st.rs0.getPrimary();
-        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     }
@@ -77,7 +79,12 @@ function makeInsertCmdObj(docs, {lsid, txnNumber, isTransaction}) {
     return cmdObj;
 }
 
-function testTxnNumberValidation(makeSessionOptsFunc, prevTxnStateName, testModeName, expectedError) {
+function testTxnNumberValidation(
+    makeSessionOptsFunc,
+    prevTxnStateName,
+    testModeName,
+    expectedError,
+) {
     if (
         (prevTxnStateName == "kStarted" || prevTxnStateName == "kAbortedWithoutPrepare") &&
         testModeName != "kNonRecovery"
@@ -101,20 +108,28 @@ function testTxnNumberValidation(makeSessionOptsFunc, prevTxnStateName, testMode
     switch (prevTxnState) {
         case kTxnState.kCommitted:
             assert.commandWorked(
-                shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+                shard0TestDB.adminCommand(
+                    makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+                ),
             );
             break;
         case kTxnState.kAbortedWithoutPrepare:
             assert.commandWorked(
-                shard0TestDB.adminCommand(makeAbortTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+                shard0TestDB.adminCommand(
+                    makeAbortTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+                ),
             );
             break;
         case kTxnState.kAbortedWithPrepare:
             assert.commandWorked(
-                shard0TestDB.adminCommand(makePrepareTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+                shard0TestDB.adminCommand(
+                    makePrepareTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+                ),
             );
             assert.commandWorked(
-                shard0TestDB.adminCommand(makeAbortTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+                shard0TestDB.adminCommand(
+                    makeAbortTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber),
+                ),
             );
             break;
         default:

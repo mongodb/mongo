@@ -76,7 +76,10 @@ assert.commandWorked(coll.createIndex({a: 1}, {}, "ESP"));
 coll.dropIndexes();
 
 // Not enough data-bearing nodes to satisfy commit quorum.
-assert.commandFailedWithCode(coll.createIndex({a: 1}, {}, nNodes + 1), ErrorCodes.UnsatisfiableCommitQuorum);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1}, {}, nNodes + 1),
+    ErrorCodes.UnsatisfiableCommitQuorum,
+);
 coll.dropIndexes();
 
 replSet.stopSet();

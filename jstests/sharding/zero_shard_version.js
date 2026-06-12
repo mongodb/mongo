@@ -8,11 +8,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let st = new ShardingTest({shards: 2, mongos: 2});
 
 let testDB_s0 = st.s.getDB("test");
-assert.commandWorked(testDB_s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    testDB_s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(testDB_s0.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 
 let checkShardMajorVersion = function (conn, expectedMajorVersion) {
-    const shardVersion = assert.commandWorked(conn.adminCommand({getShardVersion: "test.user"})).global;
+    const shardVersion = assert.commandWorked(
+        conn.adminCommand({getShardVersion: "test.user"}),
+    ).global;
     assert.eq(
         shardVersion.getTime(),
         expectedMajorVersion,
@@ -38,7 +42,9 @@ let checkShardMajorVersion = function (conn, expectedMajorVersion) {
 
 let testDB_s1 = st.s1.getDB("test");
 assert.commandWorked(testDB_s1.user.insert({x: 1}));
-assert.commandWorked(testDB_s1.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}));
+assert.commandWorked(
+    testDB_s1.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}),
+);
 
 st.configRS.awaitLastOpCommitted();
 
@@ -115,7 +121,9 @@ testDB_s1.adminCommand({split: "test.user", middle: {x: 0}});
 
 testDB_s1.user.insert({x: 1});
 testDB_s1.user.insert({x: -11});
-assert.commandWorked(testDB_s1.adminCommand({moveChunk: "test.user", find: {x: -1}, to: st.shard0.shardName}));
+assert.commandWorked(
+    testDB_s1.adminCommand({moveChunk: "test.user", find: {x: -1}, to: st.shard0.shardName}),
+);
 
 st.configRS.awaitLastOpCommitted();
 
@@ -152,7 +160,9 @@ assert.eq(null, testDB_s1.user.findOne({x: 1}));
 assert.commandWorked(testDB_s1.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 testDB_s1.user.insert({x: 1});
 
-assert.commandWorked(testDB_s1.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}));
+assert.commandWorked(
+    testDB_s1.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}),
+);
 
 st.configRS.awaitLastOpCommitted();
 

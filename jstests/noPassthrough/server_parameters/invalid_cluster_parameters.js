@@ -19,10 +19,19 @@ const clusterParameterInsertSucceeds = (doc) => {
 
 clusterParameterInsertSucceeds({"_id": "testIntClusterParameter"});
 assert.commandFailedWithCode(
-    conn.getDB("config").clusterParameters.insert({"_id": "testStrClusterParameter", "clusterParameterTime": "abcd"}),
+    conn.getDB("config").clusterParameters.insert({
+        "_id": "testStrClusterParameter",
+        "clusterParameterTime": "abcd",
+    }),
     ErrorCodes.TypeMismatch,
 );
-assert.commandFailedWithCode(conn.getDB("config").clusterParameters.insert({"_id": 12345}), ErrorCodes.OperationFailed);
-assert.commandFailedWithCode(conn.getDB("config").clusterParameters.insert({"_id": ""}), ErrorCodes.OperationFailed);
+assert.commandFailedWithCode(
+    conn.getDB("config").clusterParameters.insert({"_id": 12345}),
+    ErrorCodes.OperationFailed,
+);
+assert.commandFailedWithCode(
+    conn.getDB("config").clusterParameters.insert({"_id": ""}),
+    ErrorCodes.OperationFailed,
+);
 
 MongoRunner.stopMongod(conn);

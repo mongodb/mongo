@@ -19,7 +19,9 @@ function getDbMetadata(db) {
 db.dropDatabase();
 
 const originalPrimary = getRandomShardName(db);
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: originalPrimary}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: originalPrimary}),
+);
 
 const originalMetadata = getDbMetadata(db);
 assert.eq(originalPrimary, originalMetadata.primary);

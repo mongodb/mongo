@@ -13,7 +13,9 @@ let writeRes;
 // Create a cluster with 3 shards.
 let st = new ShardingTest({shards: 3});
 let testDB = st.s.getDB("test");
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}),
+);
 
 // Create a collection sharded on {a: 1}. Add 2dsphere index to test $geoNear.
 let coll = testDB.getCollection("simple_collation");
@@ -28,9 +30,15 @@ assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), k
 // shard0002: { "a" : "a" } -->> { "a" : { "$maxKey" : 1 }}
 assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {a: 10}}));
 assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {a: "a"}}));
-assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 1}, to: st.shard0.shardName}));
-assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: "FOO"}, to: st.shard1.shardName}));
-assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: "foo"}, to: st.shard2.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 1}, to: st.shard0.shardName}),
+);
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: "FOO"}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: "foo"}, to: st.shard2.shardName}),
+);
 
 // Put data on each shard.
 // Note that the balancer is off by default, so the chunks will stay put.
@@ -183,10 +191,16 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded findAndModify that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-let res = coll.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
+let res = coll.findAndModify({
+    query: {a: "foo"},
+    update: {$set: {b: 1}},
+    collation: caseInsensitive,
+});
 assert(res.a === "foo" || res.a === "FOO");
 
-explain = coll.explain().findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
+explain = coll
+    .explain()
+    .findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -199,8 +213,13 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded findAndModify on numbers with non-simple collation should succeed. This should be
 // single-shard.
-assert.eq(100, coll.findAndModify({query: {a: 100}, update: {$set: {b: 1}}, collation: caseInsensitive}).a);
-explain = coll.explain().findAndModify({query: {a: 100}, update: {$set: {b: 1}}, collation: caseInsensitive});
+assert.eq(
+    100,
+    coll.findAndModify({query: {a: 100}, update: {$set: {b: 1}}, collation: caseInsensitive}).a,
+);
+explain = coll
+    .explain()
+    .findAndModify({query: {a: 100}, update: {$set: {b: 1}}, collation: caseInsensitive});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -305,7 +324,9 @@ assert.commandWorked(coll.insert(a_100));
 // Sharded deleteOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 let beforeNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
-writeRes = assert.commandWorked(coll.remove({a: "foo"}, {justOne: true, collation: caseInsensitive}));
+writeRes = assert.commandWorked(
+    coll.remove({a: "foo"}, {justOne: true, collation: caseInsensitive}),
+);
 assert.eq(1, writeRes.nRemoved);
 let afterNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
 assert.eq(beforeNumDocsMatch - 1, afterNumDocsMatch);
@@ -330,7 +351,9 @@ assert.commandWorked(coll.insert(a_100));
 // Sharded deleteOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
-writeRes = assert.commandWorked(coll.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive}));
+writeRes = assert.commandWorked(
+    coll.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive}),
+);
 let countDocMatch = coll.find({_id: "foo"}).collation(caseInsensitive).count();
 assert.eq(1, writeRes.nRemoved);
 assert.eq(0, countDocMatch);
@@ -362,7 +385,9 @@ assert.commandWorked(coll.insert(a_100));
 writeRes = coll.update({a: "foo"}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
 assert.commandWorked(writeRes);
 assert.eq(2, writeRes.nMatched);
-explain = coll.explain().update({a: "foo"}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
+explain = coll
+    .explain()
+    .update({a: "foo"}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
 assert.commandWorked(explain);
 assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 
@@ -378,13 +403,17 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 writeRes = coll.update({a: 100}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
-explain = coll.explain().update({a: 100}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
+explain = coll
+    .explain()
+    .update({a: 100}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-writeRes = assert.commandWorked(coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
+writeRes = assert.commandWorked(
+    coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}),
+);
 assert.eq(1, writeRes.nMatched);
 explain = coll.explain().update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive});
 assert.commandWorked(explain);
@@ -411,7 +440,9 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
-writeRes = assert.commandWorked(coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
+writeRes = assert.commandWorked(
+    coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}),
+);
 assert.eq(1, writeRes.nMatched);
 assert.commandWorked(coll.remove({_id: "foo"}, {justOne: true}));
 
@@ -439,7 +470,11 @@ assert.eq(1, writeRes.nMatched);
 
 // Sharded upsert that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-writeRes = coll.update({a: "filter"}, {$set: {b: 1}}, {multi: false, upsert: true, collation: caseInsensitive});
+writeRes = coll.update(
+    {a: "filter"},
+    {$set: {b: 1}},
+    {multi: false, upsert: true, collation: caseInsensitive},
+);
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nUpserted);
 assert.commandWorked(coll.remove({a: "filter"}, {justOne: true}));
@@ -453,10 +488,16 @@ assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Upsert on numbers with non-simple collation should succeed, because it is single shard.
-writeRes = coll.update({a: 100}, {$set: {b: 1}}, {multi: true, upsert: true, collation: caseInsensitive});
+writeRes = coll.update(
+    {a: 100},
+    {$set: {b: 1}},
+    {multi: true, upsert: true, collation: caseInsensitive},
+);
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
-explain = coll.explain().update({a: 100}, {$set: {b: 1}}, {multi: true, upsert: true, collation: caseInsensitive});
+explain = coll
+    .explain()
+    .update({a: 100}, {$set: {b: 1}}, {multi: true, upsert: true, collation: caseInsensitive});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 

@@ -18,8 +18,12 @@ let resetCollectionAndViews = function () {
     viewDB.runCommand({drop: "view"});
     viewDB.runCommand({drop: "viewOnView"});
     assert.commandWorked(viewDB.runCommand({create: "collection"}));
-    assert.commandWorked(viewDB.runCommand({create: "view", viewOn: "collection", pipeline: [{$match: {a: 1}}]}));
-    assert.commandWorked(viewDB.runCommand({create: "viewOnView", viewOn: "view", pipeline: [{$match: {b: 1}}]}));
+    assert.commandWorked(
+        viewDB.runCommand({create: "view", viewOn: "collection", pipeline: [{$match: {a: 1}}]}),
+    );
+    assert.commandWorked(
+        viewDB.runCommand({create: "viewOnView", viewOn: "view", pipeline: [{$match: {b: 1}}]}),
+    );
 };
 let assertFindResultEq = function (collName, expected) {
     let res = viewDB.runCommand({find: collName, filter: {}, projection: {_id: 0, a: 1, b: 1}});
@@ -74,7 +78,11 @@ resetCollectionAndViews();
 assert.commandWorked(collection.insert(doc));
 assertFindResultEq("viewOnView", [doc]);
 assert.commandWorked(
-    viewDB.runCommand({collMod: "view", viewOn: "collection", pipeline: [{$match: {nonexistent: 1}}]}),
+    viewDB.runCommand({
+        collMod: "view",
+        viewOn: "collection",
+        pipeline: [{$match: {nonexistent: 1}}],
+    }),
 );
 assertFindResultEq("viewOnView", []);
 

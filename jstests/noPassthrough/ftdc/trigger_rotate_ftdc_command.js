@@ -1,7 +1,11 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function checkNoFTDCEntryLogs(conn) {
-    assert.eq(false, checkLog.checkContainsOnce(conn, "FTDC Entry"), "Found FTDC Entry log line on " + conn.host);
+    assert.eq(
+        false,
+        checkLog.checkContainsOnce(conn, "FTDC Entry"),
+        "Found FTDC Entry log line on " + conn.host,
+    );
 }
 
 function rotate(conn, path, rotateCount) {
@@ -26,13 +30,17 @@ function rotate(conn, path, rotateCount) {
     const singlePath = MongoRunner.toRealPath("ftdclogs-standalone-single-rotate");
     const multiPath = MongoRunner.toRealPath("ftdclogs-standalone-multi-rotate");
 
-    const singleStandalone = MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: singlePath}});
+    const singleStandalone = MongoRunner.runMongod({
+        setParameter: {diagnosticDataCollectionDirectoryPath: singlePath},
+    });
     rotate(singleStandalone, singlePath, 1);
 
     checkNoFTDCEntryLogs(singleStandalone);
     MongoRunner.stopMongod(singleStandalone);
 
-    const multiStandalone = MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: multiPath}});
+    const multiStandalone = MongoRunner.runMongod({
+        setParameter: {diagnosticDataCollectionDirectoryPath: multiPath},
+    });
     rotate(multiStandalone, multiPath, 25);
 
     checkNoFTDCEntryLogs(multiStandalone);

@@ -87,7 +87,9 @@ export const $config = (function () {
         }
 
         const anchorDb = getRandomDb(db);
-        const anchorColl = session.getDatabase(anchorDb.getName()).getCollection(kAnchorCollectionName);
+        const anchorColl = session
+            .getDatabase(anchorDb.getName())
+            .getCollection(kAnchorCollectionName);
         anchorColl.findOne();
         return true;
     }
@@ -100,16 +102,23 @@ export const $config = (function () {
 
         try {
             assert.commandWorked(
-                targetColl.getDB().getMongo().adminCommand({flushRouterConfig: targetColl.getFullName()}),
+                targetColl
+                    .getDB()
+                    .getMongo()
+                    .adminCommand({flushRouterConfig: targetColl.getFullName()}),
             );
         } catch (e) {
             // May fail due to spurious error or interruptions. Ignore.
-            print(`maybeRefreshRoutingMetadata: failed to flush router config for ${targetColl.getFullName()}: ${e}`);
+            print(
+                `maybeRefreshRoutingMetadata: failed to flush router config for ${targetColl.getFullName()}: ${e}`,
+            );
         }
     }
 
     function getSessionCollection(session, targetColl) {
-        return session.getDatabase(targetColl.getDB().getName()).getCollection(targetColl.getName());
+        return session
+            .getDatabase(targetColl.getDB().getName())
+            .getCollection(targetColl.getName());
     }
 
     function getEpochKey(collectionEpoch) {
@@ -178,7 +187,10 @@ export const $config = (function () {
                 // b) Tracked unsplittable on a randomly chosen data shard
                 const targetShard = shards[Random.randInt(shards.length)]._id;
                 assert.commandWorked(
-                    db.runCommand({createUnsplittableCollection: collectionName, dataShard: targetShard}),
+                    db.runCommand({
+                        createUnsplittableCollection: collectionName,
+                        dataShard: targetShard,
+                    }),
                 );
                 collType = "unsplittable on " + targetShard;
             } else {
@@ -200,7 +212,13 @@ export const $config = (function () {
         const collectionEpoch = UUID();
         bulk.insert({_id: kMetaDocId, x: kMetaDocId, collection_epoch: collectionEpoch});
         for (let i = 0; i < data.numSeedDocuments; i++) {
-            bulk.insert({_id: i, x: i, counter: 0, createdBy: "initial_docs", collection_epoch: collectionEpoch});
+            bulk.insert({
+                _id: i,
+                x: i,
+                counter: 0,
+                createdBy: "initial_docs",
+                collection_epoch: collectionEpoch,
+            });
         }
         var result = bulk.execute();
         assert.eq(
@@ -208,7 +226,9 @@ export const $config = (function () {
             data.numSeedDocuments + 1,
             `Failed to insert all documents: expected ${data.numSeedDocuments + 1}, got ${result.nInserted}`,
         );
-        print(`createAndPopulateCollection: created ${ns} with collection_epoch=${collectionEpoch}`);
+        print(
+            `createAndPopulateCollection: created ${ns} with collection_epoch=${collectionEpoch}`,
+        );
     }
 
     // Create N databases, each with M collections, randomly sharded or unsharded.
@@ -251,7 +271,9 @@ export const $config = (function () {
         );
         const collectionEpoch = metaDoc.collection_epoch;
         const docsWithUnexpectedEpoch = docs.filter(
-            (d) => !d.hasOwnProperty("collection_epoch") || !bsonBinaryEqual(d.collection_epoch, collectionEpoch),
+            (d) =>
+                !d.hasOwnProperty("collection_epoch") ||
+                !bsonBinaryEqual(d.collection_epoch, collectionEpoch),
         );
         assert.eq(
             0,
@@ -276,7 +298,11 @@ export const $config = (function () {
             for (let baseId = 0; baseId < linkedPairOffset; baseId++) {
                 const baseDoc = seedDocsById[baseId];
                 const pairedDoc = seedDocsById[baseId + linkedPairOffset];
-                assert.eq(baseId, baseDoc._id, `Unexpected seed doc at index ${baseId}: ${tojson(baseDoc)}`);
+                assert.eq(
+                    baseId,
+                    baseDoc._id,
+                    `Unexpected seed doc at index ${baseId}: ${tojson(baseDoc)}`,
+                );
                 assert.eq(
                     baseId + linkedPairOffset,
                     pairedDoc._id,
@@ -295,7 +321,9 @@ export const $config = (function () {
         // Expect to see all thread-owned documents created by this thread, with no extras.
         const epochKey = getEpochKey(collectionEpoch);
         const docsInsertedByThisThread = self.insertedIds[epochKey] || new Set();
-        const expectedThreadDocIds = new Set(Array.from(docsInsertedByThisThread).map((id) => id.toString()));
+        const expectedThreadDocIds = new Set(
+            Array.from(docsInsertedByThisThread).map((id) => id.toString()),
+        );
 
         const readThreadDocs = docs.filter((d) => d.createdBy === self.tid);
         const actualThreadDocIds = new Set(readThreadDocs.map((d) => d._id.toString()));
@@ -487,7 +515,11 @@ export const $config = (function () {
 
         // If the transaction succeeded and we inserted docs, track the _ids
         if (insertOutcome !== null) {
-            addTrackedIdsForEpoch(this.insertedIds, insertOutcome.collectionEpoch, insertOutcome.insertedIds);
+            addTrackedIdsForEpoch(
+                this.insertedIds,
+                insertOutcome.collectionEpoch,
+                insertOutcome.insertedIds,
+            );
             print(
                 `transactionalInsert: inserted ${insertOutcome.insertedIds.length} docs in ${targetColl.getFullName()}, ` +
                     `_ids=[${insertOutcome.insertedIds.map((id) => id.toString()).join(", ")}], collection_epoch=${insertOutcome.collectionEpoch}, ` +
@@ -544,7 +576,10 @@ export const $config = (function () {
                 const trackedIdsArray = Array.from(trackedIdsSet);
 
                 // Delete between 1 and 3 documents, but no more than what we have tracked
-                const numToDelete = Math.min(Random.randInt(kMaxMutableDocsPerTxn) + 1, trackedIdsArray.length);
+                const numToDelete = Math.min(
+                    Random.randInt(kMaxMutableDocsPerTxn) + 1,
+                    trackedIdsArray.length,
+                );
                 const idsToDelete = pickRandomDistinctElements(trackedIdsArray, numToDelete);
 
                 // Delete documents by specific _id
@@ -563,7 +598,11 @@ export const $config = (function () {
 
         // After successful commit, remove the deleted _ids from our tracking
         if (deleteOutcome !== null && deleteOutcome.deletedIds.length > 0) {
-            removeTrackedIdsForEpoch(this.insertedIds, deleteOutcome.collectionEpoch, deleteOutcome.deletedIds);
+            removeTrackedIdsForEpoch(
+                this.insertedIds,
+                deleteOutcome.collectionEpoch,
+                deleteOutcome.deletedIds,
+            );
             print(
                 `transactionalDelete: deleted ${deleteOutcome.deletedIds.length} docs from ${targetColl.getFullName()}, ` +
                     `_ids=[${deleteOutcome.deletedIds.map((id) => id.toString()).join(", ")}], collection_epoch=${deleteOutcome.collectionEpoch}, ` +

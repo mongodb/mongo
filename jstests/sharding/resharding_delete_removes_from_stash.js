@@ -78,7 +78,9 @@ reshardingTest.withReshardingInBackground(
         //
         // Note: This insert happens after the clone timestamp has been established, so it
         // will be applied during the oplog application phase.
-        jsTest.log("Inserting document with conflicting _id on donor0 (will go to stash collection)...");
+        jsTest.log(
+            "Inserting document with conflicting _id on donor0 (will go to stash collection)...",
+        );
         assert.commandWorked(
             inputCollection.insert({
                 _id: "conflict",

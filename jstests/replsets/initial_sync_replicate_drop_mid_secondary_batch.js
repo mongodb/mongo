@@ -65,7 +65,9 @@ jsTestLog("Adding more data to initial sync");
 assert.commandWorked(primaryDB.getCollection(collName).insert({"c": 3}));
 rst.awaitReplication(undefined /* timeout */, undefined /*secondaryOpTimeType */, [syncSource]);
 
-const dropFailPoint = configureFailPoint(syncSource, "hangAfterApplyingCollectionDropOplogEntry", {dbName: dbName});
+const dropFailPoint = configureFailPoint(syncSource, "hangAfterApplyingCollectionDropOplogEntry", {
+    dbName: dbName,
+});
 
 assert(primaryDB.getCollection(collName).drop({writeConcern: {w: 1}}));
 
@@ -74,7 +76,10 @@ dropFailPoint.wait();
 sleep(10 * 1000);
 
 // Enable this so we too can see the drop entry.
-const allowExternalReadsFp = configureFailPoint(syncSource, "allowExternalReadsForReverseOplogScanRule");
+const allowExternalReadsFp = configureFailPoint(
+    syncSource,
+    "allowExternalReadsForReverseOplogScanRule",
+);
 
 const syncSourceEntries = syncSource
     .getCollection("local.oplog.rs")
@@ -105,7 +110,10 @@ assert.soonNoExcept(function () {
     assert(nodeStatus, () => "[1] status does not exist: " + tojson(nodeStatus));
     assert(nodeStatus.initialSyncStatus, () => "[2] no initialSyncStatus: " + tojson(nodeStatus));
     // Is actually the 'stopTimestamp'.
-    assert(nodeStatus.initialSyncStatus.initialSyncOplogEnd, () => "[3] no stopTimestamp: " + tojson(nodeStatus));
+    assert(
+        nodeStatus.initialSyncStatus.initialSyncOplogEnd,
+        () => "[3] no stopTimestamp: " + tojson(nodeStatus),
+    );
     const currentStopTs = nodeStatus.initialSyncStatus.initialSyncOplogEnd;
     assert.eq(currentStopTs, targetStopTs, () => "[4] wrong stopTimestamp: " + tojson(nodeStatus));
 
@@ -117,7 +125,11 @@ assert.soonNoExcept(function () {
     }
 
     // We should never not exceed that timestamp.
-    assert.lte(currentStopTs, targetStopTs, () => "[5] exceeded stopTimestamp: " + tojson(nodeStatus));
+    assert.lte(
+        currentStopTs,
+        targetStopTs,
+        () => "[5] exceeded stopTimestamp: " + tojson(nodeStatus),
+    );
     return false;
 });
 

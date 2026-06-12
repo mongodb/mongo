@@ -16,10 +16,14 @@ const mongosDB = st.s0.getDB("merge_requires_unique_index");
 const foreignDB = st.s0.getDB("merge_requires_unique_index_foreign");
 
 // Enable sharding on the test DB and ensure that shard0 is the primary.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Enable sharding on the foreign DB, except ensure that shard1 is the primary shard.
-assert.commandWorked(foreignDB.adminCommand({enableSharding: foreignDB.getName(), primaryShard: st.rs1.getURL()}));
+assert.commandWorked(
+    foreignDB.adminCommand({enableSharding: foreignDB.getName(), primaryShard: st.rs1.getURL()}),
+);
 
 const sourceColl = mongosDB.source;
 let targetColl = mongosDB.target;
@@ -34,11 +38,19 @@ function resetTargetColl(shardKey, split) {
     // Shard the target collection, and set the unique flag to ensure that there's a unique
     // index on the shard key.
     assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: targetColl.getFullName(), key: shardKey, unique: true}),
+        mongosDB.adminCommand({
+            shardCollection: targetColl.getFullName(),
+            key: shardKey,
+            unique: true,
+        }),
     );
     assert.commandWorked(mongosDB.adminCommand({split: targetColl.getFullName(), middle: split}));
     assert.commandWorked(
-        mongosDB.adminCommand({moveChunk: targetColl.getFullName(), find: split, to: st.rs1.getURL()}),
+        mongosDB.adminCommand({
+            moveChunk: targetColl.getFullName(),
+            find: split,
+            to: st.rs1.getURL(),
+        }),
     );
 }
 
@@ -92,7 +104,9 @@ function runOnFieldsTests(targetShardKey, targetSplit) {
     // Test that a unique, partial index on the "on" fields cannot be used to satisfy the
     // requirement.
     resetTargetColl(targetShardKey, targetSplit);
-    assert.commandWorked(targetColl.createIndex(indexSpec, {unique: true, partialFilterExpression: {a: {$gte: 2}}}));
+    assert.commandWorked(
+        targetColl.createIndex(indexSpec, {unique: true, partialFilterExpression: {a: {$gte: 2}}}),
+    );
     assertMergeFailsWithoutUniqueIndex({
         source: sourceColl,
         onFields: Object.keys(indexSpec),
@@ -154,10 +168,16 @@ function runOnFieldsTests(targetShardKey, targetSplit) {
     resetTargetColl(targetShardKey, targetSplit);
     assert.commandWorked(targetColl.createIndex(dottedPathIndexSpec, {unique: true}));
     assert.commandWorked(
-        targetColl.insert(Object.merge(targetShardKey, {newField: [{subField: "hi"}, {subField: "hello"}]})),
+        targetColl.insert(
+            Object.merge(targetShardKey, {newField: [{subField: "hi"}, {subField: "hello"}]}),
+        ),
     );
     assert.commandWorked(
-        sourceColl.update({}, {$set: {newField: {subField: "hi"}, proofOfUpdate: "PROOF"}}, {multi: true}),
+        sourceColl.update(
+            {},
+            {$set: {newField: {subField: "hi"}, proofOfUpdate: "PROOF"}},
+            {multi: true},
+        ),
     );
 
     // If whenMatched is "replace" and whenNotMatched is "insert", expect the command to

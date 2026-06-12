@@ -25,7 +25,9 @@ const simpleCollation = {
 
 // Create a case-sensitive/simple collection and a case-insensitive collection.
 assert.commandWorked(testDB.createCollection(noCollationColl.getName()));
-assert.commandWorked(testDB.createCollection(caseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}));
+assert.commandWorked(
+    testDB.createCollection(caseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}),
+);
 
 assert.commandWorked(
     noCollationColl.insert([
@@ -69,7 +71,9 @@ assert.docEq(
 // a pipeline with a non-simple user-specified collation uses the latter for comparisons on the
 // foreign collection.
 results = noCollationColl
-    .aggregate(unionWith(caseInsensitiveColl.getName(), ["B"]), {collation: caseInsensitiveCollation})
+    .aggregate(unionWith(caseInsensitiveColl.getName(), ["B"]), {
+        collation: caseInsensitiveCollation,
+    })
     .toArray();
 assert.docEq(
     [
@@ -129,7 +133,9 @@ assert.commandWorked(
 
 // Verify that the command succeeds if both the pipeline and the $unionWith'd view uses a simple
 // collation.
-results = caseInsensitiveColl.aggregate(unionWith("noCollationView", ["B"]), {collation: simpleCollation}).toArray();
+results = caseInsensitiveColl
+    .aggregate(unionWith("noCollationView", ["B"]), {collation: simpleCollation})
+    .toArray();
 assert.docEq(
     [
         {val: "B", caseSensitiveView: true},

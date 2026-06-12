@@ -11,7 +11,9 @@
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const conn = MongoRunner.runMongod({setParameter: {featureFlagGetExecutorDeferredEngineChoice: true}});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagGetExecutorDeferredEngineChoice: true},
+});
 const db = conn.getDB("engine_selection");
 
 // This test expects SBE to be selected, which cannot happen when forceClassicEngine or SBE full
@@ -39,7 +41,10 @@ assert.commandWorked(foreignColl.insert({a: 1}));
 // Run a $lookup-$unwind, then assert that the plan-based engine selection logging shows that the LU node was on the QuerySolution.
 const explain = localColl
     .explain()
-    .aggregate([{$lookup: {from: "foreignColl", as: "res", localField: "a", foreignField: "a"}}, {$unwind: "$res"}]);
+    .aggregate([
+        {$lookup: {from: "foreignColl", as: "res", localField: "a", foreignField: "a"}},
+        {$unwind: "$res"},
+    ]);
 assert.eq(getEngine(explain), "sbe");
 
 const logs = assert.commandWorked(db.adminCommand({getLog: "global"})).log;

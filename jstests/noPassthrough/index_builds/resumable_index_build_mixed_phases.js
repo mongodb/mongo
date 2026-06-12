@@ -20,7 +20,14 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const runTest = function (docs, indexSpecs, failPoints, resumePhases, resumeChecks, collNameSuffix) {
+const runTest = function (
+    docs,
+    indexSpecs,
+    failPoints,
+    resumePhases,
+    resumeChecks,
+    collNameSuffix,
+) {
     const coll = rst
         .getPrimary()
         .getDB(dbName)

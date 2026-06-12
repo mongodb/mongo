@@ -38,7 +38,10 @@ res = assert.commandWorked(
 assert.eq(
     lt,
     res.$clusterTime,
-    "expected the disconnected mongos to send cluster time: " + tojson(lt) + ", received: " + tojson(res.$clusterTime),
+    "expected the disconnected mongos to send cluster time: " +
+        tojson(lt) +
+        ", received: " +
+        tojson(res.$clusterTime),
 );
 
 st.stop();

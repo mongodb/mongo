@@ -58,7 +58,10 @@ for (let i = -numDocuments / 2; i < numDocuments / 2; ++i) {
 }
 
 jsTestLog("Fail if missing required field toShard.");
-assert.commandFailedWithCode(db.adminCommand({moveCollection: unsplittableCollNs}), ErrorCodes.IDLFailedToParse);
+assert.commandFailedWithCode(
+    db.adminCommand({moveCollection: unsplittableCollNs}),
+    ErrorCodes.IDLFailedToParse,
+);
 
 jsTestLog("Directly calling reshardCollection on the unsplittable collection should fail.");
 assert.commandFailedWithCode(
@@ -82,7 +85,9 @@ const primaryShard = getPrimaryShardNameForDB(db);
 const nonPrimaryShard = shardName0 == primaryShard ? shardName1 : shardName0;
 
 jsTestLog("Move to non-primary shard (" + nonPrimaryShard + ")");
-assert.commandWorked(db.adminCommand({moveCollection: unsplittableCollNs, toShard: nonPrimaryShard}));
+assert.commandWorked(
+    db.adminCommand({moveCollection: unsplittableCollNs, toShard: nonPrimaryShard}),
+);
 
 // Should have unsplittable set to true
 let unshardedColl = configDb.collections.findOne({_id: unsplittableCollNs});

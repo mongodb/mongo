@@ -63,7 +63,11 @@ function testDbCheckInvocationParameters(replSet) {
     runDbCheck(replSet, db, collName, dbCheckParameters, true /*awaitCompletion*/);
 
     checkEntryBounds(start, end);
-    assertForDbCheckErrorsForAllNodes(replSet, true /*assertForErrors*/, true /*assertForWarnings*/);
+    assertForDbCheckErrorsForAllNodes(
+        replSet,
+        true /*assertForErrors*/,
+        true /*assertForWarnings*/,
+    );
 
     // Now, clear the health logs again,
     clearHealthLog(replSet);

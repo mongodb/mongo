@@ -16,12 +16,22 @@ const collName = jsTestName();
 
 function validateDeleteEntry(entry, sum, max, min) {
     assert.eq(entry.key.queryShape.command, "delete");
-    assert(entry.metrics.writes.hasOwnProperty("nDeleteOps"), "Expected nDeleteOps in writes metrics", {
+    assert(
+        entry.metrics.writes.hasOwnProperty("nDeleteOps"),
+        "Expected nDeleteOps in writes metrics",
+        {
+            entry,
+        },
+    );
+    assert.eq(entry.metrics.writes.nDeleteOps.sum, sum, `Expected nDeleteOps.sum to be ${sum}`, {
         entry,
     });
-    assert.eq(entry.metrics.writes.nDeleteOps.sum, sum, `Expected nDeleteOps.sum to be ${sum}`, {entry});
-    assert.eq(entry.metrics.writes.nDeleteOps.max, max, `Expected nDeleteOps.max to be ${max}`, {entry});
-    assert.eq(entry.metrics.writes.nDeleteOps.min, min, `Expected nDeleteOps.min to be ${min}`, {entry});
+    assert.eq(entry.metrics.writes.nDeleteOps.max, max, `Expected nDeleteOps.max to be ${max}`, {
+        entry,
+    });
+    assert.eq(entry.metrics.writes.nDeleteOps.min, min, `Expected nDeleteOps.min to be ${min}`, {
+        entry,
+    });
 }
 
 /**
@@ -176,7 +186,10 @@ runDeleteCmdMetricsTests(
     "Standalone",
     () => {
         const conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+            setParameter: {
+                internalQueryStatsRateLimit: -1,
+                internalQueryStatsWriteCmdSampleRate: 1,
+            },
         });
         const testDB = conn.getDB("test");
         testDB[collName].drop();
@@ -190,7 +203,12 @@ runDeleteCmdMetricsTests(
     () => {
         const st = new ShardingTest({
             shards: 2,
-            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1}},
+            mongosOptions: {
+                setParameter: {
+                    internalQueryStatsRateLimit: -1,
+                    internalQueryStatsWriteCmdSampleRate: 1,
+                },
+            },
         });
         const testDB = st.s.getDB("test");
         st.shardColl(testDB[collName], {_id: 1}, {_id: 1}, {_id: 1});
@@ -199,6 +217,8 @@ runDeleteCmdMetricsTests(
     (fixture) => fixture.stop(),
     ({testDB, coll}) => {
         const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
-        assert.gte(Object.keys(stats.shards).length, 2, "Expected data on at least 2 shards", {shards: stats.shards});
+        assert.gte(Object.keys(stats.shards).length, 2, "Expected data on at least 2 shards", {
+            shards: stats.shards,
+        });
     },
 );

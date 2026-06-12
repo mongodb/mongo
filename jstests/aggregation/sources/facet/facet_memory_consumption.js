@@ -46,7 +46,9 @@ function cartesianProductPipeline(exponent) {
 (function failsWhenResultDocumentExeedsMaxBSONSize() {
     // This pipeline uses $facet to create a document that is larger than the 16MB max document
     // size.
-    const result = assert.throws(() => coll.aggregate([{$facet: {product: cartesianProductPipeline(6)}}]).toArray());
+    const result = assert.throws(() =>
+        coll.aggregate([{$facet: {product: cartesianProductPipeline(6)}}]).toArray(),
+    );
     assert.eq(result.code, ErrorCodes.BSONObjectTooLarge);
 })();
 
@@ -54,7 +56,9 @@ function cartesianProductPipeline(exponent) {
     // This pipeline uses $facet to create an intermediate document that is larger than the 16MB
     // max document size but smaller than the 100MB allowed for an intermediate document. The
     // $unwind stage breaks the large document into a bunch of small documents, which is legal.
-    const result = coll.aggregate([{$facet: {product: cartesianProductPipeline(6)}}, {$unwind: "$product"}]).toArray();
+    const result = coll
+        .aggregate([{$facet: {product: cartesianProductPipeline(6)}}, {$unwind: "$product"}])
+        .toArray();
     assert.eq(64, result.length, result);
 })();
 
@@ -63,7 +67,9 @@ function cartesianProductPipeline(exponent) {
     // an intermediate document. Even with the $unwind stage, the pipeline should fail, this time
     // with error code 31034.
     const result = assert.throws(() =>
-        coll.aggregate([{$facet: {product: cartesianProductPipeline(10)}}, {$unwind: "$product"}]).toArray(),
+        coll
+            .aggregate([{$facet: {product: cartesianProductPipeline(10)}}, {$unwind: "$product"}])
+            .toArray(),
     );
     // Since v8.3, $facet will return the 'ExceededMemoryLimit' error code. Older versions can return error code
     // kFacetOutputTooLarge (4031700) in this case.

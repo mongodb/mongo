@@ -70,7 +70,9 @@ assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
 assert.commandWorked(mongosConn.getDB("admin").runCommand({enablesharding: testDBName}));
 testDB[testCollName].createIndex({x: 1});
 assert.commandWorked(
-    mongosConn.getDB("admin").runCommand({shardcollection: testDBName + "." + testCollName, key: {x: 1}}),
+    mongosConn
+        .getDB("admin")
+        .runCommand({shardcollection: testDBName + "." + testCollName, key: {x: 1}}),
 );
 
 // Test case where GLE should return an error

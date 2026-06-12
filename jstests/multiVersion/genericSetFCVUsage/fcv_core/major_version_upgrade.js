@@ -57,12 +57,14 @@ for (let i = 0; i < versions.length; i++) {
         assert.eq(
             1,
             testDB[oldVersionCollection].count(),
-            `data from ${oldVersionCollection} should be available; options: ` + tojson(mongodOptions),
+            `data from ${oldVersionCollection} should be available; options: ` +
+                tojson(mongodOptions),
         );
         assert.neq(
             null,
             IndexCatalogHelpers.findByKeyPattern(testDB[oldVersionCollection].getIndexes(), {a: 1}),
-            `index from ${oldVersionCollection} should be available; options: ` + tojson(mongodOptions),
+            `index from ${oldVersionCollection} should be available; options: ` +
+                tojson(mongodOptions),
         );
     }
 
@@ -85,7 +87,9 @@ for (let i = 0; i < versions.length; i++) {
     // Set the appropriate featureCompatibilityVersion upon upgrade, if applicable.
     if (version.hasOwnProperty("featureCompatibilityVersion")) {
         let adminDB = conn.getDB("admin");
-        const res = adminDB.runCommand({"setFeatureCompatibilityVersion": version.featureCompatibilityVersion});
+        const res = adminDB.runCommand({
+            "setFeatureCompatibilityVersion": version.featureCompatibilityVersion,
+        });
         if (!res.ok && res.code === 7369100) {
             // We failed due to requiring 'confirm: true' on the command. This will only
             // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
@@ -130,7 +134,11 @@ for (let i = 0; i < versions.length; i++) {
     // Upgrade the secondary nodes first.
     rst.upgradeSecondaries({binVersion: version.binVersion});
 
-    assert.eq(primary, rst.getPrimary(), "Primary changed unexpectedly after upgrading secondaries");
+    assert.eq(
+        primary,
+        rst.getPrimary(),
+        "Primary changed unexpectedly after upgrading secondaries",
+    );
     assert.neq(
         null,
         primary,
@@ -144,7 +152,9 @@ for (let i = 0; i < versions.length; i++) {
     assert.eq(
         1,
         testDB[version.testCollection].count(),
-        `mongo should have inserted 1 document into collection ${version.testCollection}; ` + "nodes: " + tojson(nodes),
+        `mongo should have inserted 1 document into collection ${version.testCollection}; ` +
+            "nodes: " +
+            tojson(nodes),
     );
 
     // Create an index on the new collection.
@@ -152,7 +162,11 @@ for (let i = 0; i < versions.length; i++) {
 
     // Do the index creation and insertion again after upgrading the primary node.
     primary = rst.upgradePrimary(primary, {binVersion: version.binVersion});
-    assert.neq(null, primary, `replica set was unable to start up with version: ${version.binVersion}`);
+    assert.neq(
+        null,
+        primary,
+        `replica set was unable to start up with version: ${version.binVersion}`,
+    );
     assert.binVersion(primary, version.binVersion);
     testDB = primary.getDB("test");
 
@@ -190,7 +204,9 @@ for (let i = 0; i < versions.length; i++) {
     // Set the appropriate featureCompatibilityVersion upon upgrade, if applicable.
     if (version.hasOwnProperty("featureCompatibilityVersion")) {
         let primaryAdminDB = primary.getDB("admin");
-        const res = primaryAdminDB.runCommand({"setFeatureCompatibilityVersion": version.featureCompatibilityVersion});
+        const res = primaryAdminDB.runCommand({
+            "setFeatureCompatibilityVersion": version.featureCompatibilityVersion,
+        });
         if (!res.ok && res.code === 7369100) {
             // We failed due to requiring 'confirm: true' on the command. This will only
             // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the

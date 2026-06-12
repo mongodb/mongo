@@ -12,7 +12,11 @@
  *   requires_fcv_80
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator,
+} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db[jsTestName()];
 const collName = coll.getFullName();
@@ -35,7 +39,14 @@ let res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 2, nModified: 2, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 0,
+    nMatched: 2,
+    nModified: 2,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -61,7 +72,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 2, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 2,
+    nMatched: 0,
+    nModified: 0,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -100,7 +118,14 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 5);
-summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 1, nMatched: 2, nModified: 2, nUpserted: 0});
+summaryFieldsValidator(res, {
+    nErrors: 0,
+    nInserted: 2,
+    nDeleted: 1,
+    nMatched: 2,
+    nModified: 2,
+    nUpserted: 0,
+});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});

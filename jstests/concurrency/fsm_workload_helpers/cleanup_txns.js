@@ -31,7 +31,11 @@ export function abortTransaction(sessionAwareDB, txnNumber) {
         autocommit: false,
     };
     const res = rawDB.adminCommand(abortCmd);
-    return assert.commandWorkedOrFailedWithCode(res, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
+    return assert.commandWorkedOrFailedWithCode(
+        res,
+        abortErrorCodes,
+        () => `cmd: ${tojson(abortCmd)}`,
+    );
 }
 
 /**

@@ -29,11 +29,23 @@ let randomStr = () => {
     return str;
 };
 
-function verifyRangeDeleterStatusOnShard(st, shardPrimary, toShardName, expectFailure, ns, chunkToMove) {
+function verifyRangeDeleterStatusOnShard(
+    st,
+    shardPrimary,
+    toShardName,
+    expectFailure,
+    ns,
+    chunkToMove,
+) {
     // Test 1: Attempt to receive a chunk that would require cleaning an overlapping range.
     // To set this up, we assume a range deletion task was previously created for chunkToMove on
     // this shard.
-    const moveChunkRes = st.s.adminCommand({moveChunk: ns, find: chunkToMove, to: toShardName, _waitForDelete: true});
+    const moveChunkRes = st.s.adminCommand({
+        moveChunk: ns,
+        find: chunkToMove,
+        to: toShardName,
+        _waitForDelete: true,
+    });
     if (expectFailure) {
         assert.commandFailedWithCode(
             moveChunkRes,
@@ -80,7 +92,9 @@ function createRangeDeletionTask(st, shardPrimary, toShardName, chunkToMove) {
 
 const st = new ShardingTest({shards: 3});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 // Split into a few chunks across shards
@@ -89,9 +103,21 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 // Chunk3: {_id: 100}    -> {_id: MaxKey} on shard2
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 100}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {_id: 100}, to: st.shard2.shardName, _waitForDelete: true}),
+    st.s.adminCommand({
+        moveChunk: ns,
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: ns,
+        find: {_id: 100},
+        to: st.shard2.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 const chunkOnShard0 = {
@@ -116,22 +142,56 @@ jsTest.log("Test Case: Enable/disable the range deleter via the server parameter
     createRangeDeletionTask(st, st.shard0, st.shard2.shardName, chunkOnShard0);
     createRangeDeletionTask(st, st.shard1, st.shard2.shardName, chunkOnShard1);
 
-    verifyRangeDeleterStatusOnShard(st, st.shard0, st.shard0.shardName, true /*expectFailure*/, ns, chunkOnShard0);
-    verifyRangeDeleterStatusOnShard(st, st.shard1, st.shard1.shardName, true /*expectFailure*/, ns, chunkOnShard1);
+    verifyRangeDeleterStatusOnShard(
+        st,
+        st.shard0,
+        st.shard0.shardName,
+        true /*expectFailure*/,
+        ns,
+        chunkOnShard0,
+    );
+    verifyRangeDeleterStatusOnShard(
+        st,
+        st.shard1,
+        st.shard1.shardName,
+        true /*expectFailure*/,
+        ns,
+        chunkOnShard1,
+    );
 
     // Enable the range deleter service and verify the status on all shards.
     st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
     st.shard1.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
 
-    verifyRangeDeleterStatusOnShard(st, st.shard0, st.shard0.shardName, false /*expectFailure*/, ns, chunkOnShard0);
-    verifyRangeDeleterStatusOnShard(st, st.shard1, st.shard1.shardName, false /*expectFailure*/, ns, chunkOnShard1);
+    verifyRangeDeleterStatusOnShard(
+        st,
+        st.shard0,
+        st.shard0.shardName,
+        false /*expectFailure*/,
+        ns,
+        chunkOnShard0,
+    );
+    verifyRangeDeleterStatusOnShard(
+        st,
+        st.shard1,
+        st.shard1.shardName,
+        false /*expectFailure*/,
+        ns,
+        chunkOnShard1,
+    );
 
     // Clean up: Move chunks back to their original shards for consistency in subsequent tests.
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkOnShard1, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard1, to: st.shard1.shardName}),
+    );
 })();
 
-jsTest.log("Test Case: Disabling the server parameter does not affect moving non-conflicting chunks");
+jsTest.log(
+    "Test Case: Disabling the server parameter does not affect moving non-conflicting chunks",
+);
 (() => {
     st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: true});
 
@@ -146,11 +206,18 @@ jsTest.log("Test Case: Disabling the server parameter does not affect moving non
     // Clean up: Move it back to shard0 and enable the range deleter.
     st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: nonConflictingChunk, to: st.shard0.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: nonConflictingChunk,
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
     );
 })();
 
-jsTest.log("Test Case: moveChunk with _waitForDelete should succeed and not hang when the range deleter is disabled");
+jsTest.log(
+    "Test Case: moveChunk with _waitForDelete should succeed and not hang when the range deleter is disabled",
+);
 (() => {
     // Disable the resumable range deleter on shard0.
     st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: true});
@@ -158,14 +225,21 @@ jsTest.log("Test Case: moveChunk with _waitForDelete should succeed and not hang
     // The moveChunk command should succeed because the migration commits successfully, even though
     // the range deleter cannot be waited on due to being disabled.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: chunkOnShard0,
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     // Re-enable the range deleter on shard0 to allow cleanup.
     st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
 
     // Move the chunk back to its original shard to maintain consistency for subsequent test cases.
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}),
+    );
 })();
 
 jsTest.log(
@@ -181,7 +255,9 @@ jsTest.log(
         setParameter: {rangeDeleterBatchDelayMS: 60000, rangeDeleterBatchSize: 128},
     });
 
-    st.rs0.getPrimary().adminCommand({setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 500});
+    st.rs0
+        .getPrimary()
+        .adminCommand({setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 500});
 
     let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
 
@@ -193,7 +269,9 @@ jsTest.log(
     bulkOp.execute();
 
     // Move a chunk to shard1, this will start the range deletion on shard0.
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard1.shardName}),
+    );
 
     // Move the same chunk back, this will make this migration to wait for the range to be deleted.
     jsTest.log(

@@ -34,7 +34,10 @@ st.configRS.getSecondaries().forEach(function (secondaryConn) {
 // Test authenticate through a fresh connection.
 let newConn = new Mongo(st.s.host);
 
-assert.commandFailedWithCode(newConn.getDB("test").runCommand({find: "user"}), ErrorCodes.Unauthorized);
+assert.commandFailedWithCode(
+    newConn.getDB("test").runCommand({find: "user"}),
+    ErrorCodes.Unauthorized,
+);
 
 newConn.getDB("admin").auth("root", "pass");
 
@@ -43,9 +46,15 @@ assert.neq(null, res);
 assert.eq("world", res.hello);
 
 // Test authenticate through new mongos.
-let otherMongos = MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.configRS.getURL()});
+let otherMongos = MongoRunner.runMongos({
+    keyFile: "jstests/libs/key1",
+    configdb: st.configRS.getURL(),
+});
 
-assert.commandFailedWithCode(otherMongos.getDB("test").runCommand({find: "user"}), ErrorCodes.Unauthorized);
+assert.commandFailedWithCode(
+    otherMongos.getDB("test").runCommand({find: "user"}),
+    ErrorCodes.Unauthorized,
+);
 
 otherMongos.getDB("admin").auth("root", "pass");
 

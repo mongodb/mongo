@@ -5,7 +5,10 @@
 import {setupDbName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 function checkDbNameExistenceOnConfigCatalog(dbName, shouldExist) {
-    assert.eq(shouldExist ? 1 : 0, db.getSiblingDB("config").databases.countDocuments({_id: dbName}));
+    assert.eq(
+        shouldExist ? 1 : 0,
+        db.getSiblingDB("config").databases.countDocuments({_id: dbName}),
+    );
 }
 
 function listDatabasesFilteredByDbName(dbName) {
@@ -28,7 +31,10 @@ jsTest.log("Cannot shard db with the name that just differ on case");
 
     assert.commandWorked(db.adminCommand({enableSharding: testDbName}));
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
-    assert.commandFailedWithCode(db.adminCommand({enableSharding: testDbNameAllCaps}), ErrorCodes.DatabaseDifferCase);
+    assert.commandFailedWithCode(
+        db.adminCommand({enableSharding: testDbNameAllCaps}),
+        ErrorCodes.DatabaseDifferCase,
+    );
     checkDbNameExistenceOnConfigCatalog(testDbNameAllCaps, 0);
 }
 

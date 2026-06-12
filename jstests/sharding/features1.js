@@ -5,7 +5,10 @@ let s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
 // ---- can't shard system namespaces ----
-assert.commandFailed(s.s0.adminCommand({shardcollection: "test.system.blah", key: {num: 1}}), "shard system namespace");
+assert.commandFailed(
+    s.s0.adminCommand({shardcollection: "test.system.blah", key: {num: 1}}),
+    "shard system namespace",
+);
 
 // ---- setup test.foo -----
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
@@ -15,7 +18,11 @@ assert.commandWorked(db.foo.createIndex({y: 1}));
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 10}}));
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.foo", find: {num: 20}, to: s.getOther(s.getPrimaryShard("test")).name}),
+    s.s0.adminCommand({
+        movechunk: "test.foo",
+        find: {num: 20},
+        to: s.getOther(s.getPrimaryShard("test")).name,
+    }),
 );
 
 assert.commandWorked(db.foo.insert({num: 5}));
@@ -45,15 +52,24 @@ assert.eq(5, b.foo.getIndexKeys().length, "c index 3");
 // ---- can't shard thing with unique indexes ------
 assert.commandWorked(db.foo2.createIndex({a: 1}));
 printjson(db.foo2.getIndexes());
-assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo2", key: {num: 1}}), "shard with index");
+assert.commandWorked(
+    s.s0.adminCommand({shardcollection: "test.foo2", key: {num: 1}}),
+    "shard with index",
+);
 
 assert.commandWorked(db.foo3.createIndex({a: 1}, true));
 printjson(db.foo3.getIndexes());
-assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo3", key: {num: 1}}), "shard with unique index");
+assert.commandFailed(
+    s.s0.adminCommand({shardcollection: "test.foo3", key: {num: 1}}),
+    "shard with unique index",
+);
 
 assert.commandWorked(db.foo7.createIndex({num: 1, a: 1}, true));
 printjson(db.foo7.getIndexes());
-assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo7", key: {num: 1}}), "shard with ok unique index");
+assert.commandWorked(
+    s.s0.adminCommand({shardcollection: "test.foo7", key: {num: 1}}),
+    "shard with ok unique index",
+);
 
 // ---- unique shard key ----
 assert.commandWorked(
@@ -62,7 +78,11 @@ assert.commandWorked(
 );
 assert.commandWorked(s.s0.adminCommand({split: "test.foo4", middle: {num: 10}}));
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.foo4", find: {num: 20}, to: s.getOther(s.getPrimaryShard("test")).name}),
+    s.s0.adminCommand({
+        movechunk: "test.foo4",
+        find: {num: 20},
+        to: s.getOther(s.getPrimaryShard("test")).name,
+    }),
 );
 
 assert.commandWorked(db.foo4.insert({num: 5}));
@@ -106,7 +126,10 @@ assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo5", key: {num:
 
 // ---- can't shard non-empty collection without index -----
 assert.commandWorked(db.foo8.insert({a: 1}));
-assert.commandFailed(s.s0.adminCommand({shardcollection: "test.foo8", key: {a: 1}}), "non-empty collection");
+assert.commandFailed(
+    s.s0.adminCommand({shardcollection: "test.foo8", key: {a: 1}}),
+    "non-empty collection",
+);
 
 // ---- can shard non-empty collection with null values in shard key ----
 assert.commandWorked(db.foo9.insert({b: 1}));

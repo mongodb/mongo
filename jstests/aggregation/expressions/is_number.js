@@ -6,7 +6,10 @@ coll.drop();
 
 function testIsNumber(inputExprPath, expectedOutput, inputId) {
     const result = coll
-        .aggregate([{"$match": {_id: inputId}}, {"$project": {_id: 0, "isNum": {"$isNumber": inputExprPath}}}])
+        .aggregate([
+            {"$match": {_id: inputId}},
+            {"$project": {_id: 0, "isNum": {"$isNumber": inputExprPath}}},
+        ])
         .toArray();
     assert.eq(result, expectedOutput);
 }

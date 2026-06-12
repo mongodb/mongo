@@ -14,7 +14,10 @@ rst.initiate();
 
 const directConn = rst.getPrimary();
 const rsConn = new Mongo(rst.getURL());
-assert(rsConn.isReplicaSetConnection(), "expected " + rsConn.host + " to be a replica set connection string");
+assert(
+    rsConn.isReplicaSetConnection(),
+    "expected " + rsConn.host + " to be a replica set connection string",
+);
 
 function stepDownPrimary(rst) {
     const awaitShell = startParallelShell(
@@ -41,7 +44,10 @@ const error = assert.throws(function () {
     // even after it stepped down so long as it hasn't closed its connection. But this may also
     // throw if the ReplicaSetMonitor's backgroud refresh has already noticed that this node is
     // no longer primary.
-    assert.commandFailedWithCode(rsConn.getDB("test").runCommand({find: "mycoll"}), ErrorCodes.NotPrimaryNoSecondaryOk);
+    assert.commandFailedWithCode(
+        rsConn.getDB("test").runCommand({find: "mycoll"}),
+        ErrorCodes.NotPrimaryNoSecondaryOk,
+    );
 
     // However, once the server responds back with a "not master" error, DBClientRS will cause
     // the ReplicaSetMonitor to attempt to discover the current primary, which will cause this
@@ -50,7 +56,8 @@ const error = assert.throws(function () {
 });
 assert(
     /Could not find host/.test(error.toString()),
-    "find command failed for a reason other than being unable to discover a new primary: " + tojson(error),
+    "find command failed for a reason other than being unable to discover a new primary: " +
+        tojson(error),
 );
 
 try {

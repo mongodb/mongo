@@ -16,7 +16,9 @@ let collCompound = mongos.getCollection("foo.barCompound");
 let collNested = mongos.getCollection("foo.barNested");
 let collHashed = mongos.getCollection("foo.barHashed");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard0.shardName}),
+);
 
 //
 // Split the collection so that "abcde-0" and "abcde-1" go on different shards when possible
@@ -33,8 +35,12 @@ assert.commandWorked(
     }),
 );
 
-assert.commandWorked(admin.runCommand({shardCollection: collCompound.toString(), key: {a: 1, b: 1}}));
-assert.commandWorked(admin.runCommand({split: collCompound.toString(), middle: {a: "abcde-1", b: 0}}));
+assert.commandWorked(
+    admin.runCommand({shardCollection: collCompound.toString(), key: {a: 1, b: 1}}),
+);
+assert.commandWorked(
+    admin.runCommand({split: collCompound.toString(), middle: {a: "abcde-1", b: 0}}),
+);
 assert.commandWorked(
     admin.runCommand({
         moveChunk: collCompound.toString(),
@@ -55,7 +61,9 @@ assert.commandWorked(
     }),
 );
 
-assert.commandWorked(admin.runCommand({shardCollection: collHashed.toString(), key: {hash: "hashed"}}));
+assert.commandWorked(
+    admin.runCommand({shardCollection: collHashed.toString(), key: {hash: "hashed"}}),
+);
 
 st.printShardingStatus();
 
@@ -162,13 +170,21 @@ collNested.remove({});
 // Op-style updates with regex succeed on sharded collections.
 assert.commandWorked(collSharded.update({a: /abcde-1/}, {"$set": {b: 1}}, {upsert: false}));
 assert.commandWorked(collSharded.update({a: /abcde-[1-2]/}, {"$set": {b: 1}}, {upsert: false}));
-assert.commandWorked(collNested.update({a: {b: /abcde-1/}}, {"$set": {"a.b": /abcde-1/, b: 1}}, {upsert: false}));
+assert.commandWorked(
+    collNested.update({a: {b: /abcde-1/}}, {"$set": {"a.b": /abcde-1/, b: 1}}, {upsert: false}),
+);
 assert.commandWorked(collNested.update({"a.b": /abcde.*/}, {"$set": {b: 1}}, {upsert: false}));
 
 assert.commandWorked(collSharded.update({a: /abcde.*/}, {$set: {a: /abcde.*/}}, {upsert: true}));
-assert.commandWorked(collCompound.update({a: /abcde-1/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
-assert.commandWorked(collNested.update({"a.b": /abcde.*/}, {$set: {"a.b": /abcde.*/}}, {upsert: true}));
-assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {$set: {"a.b": /abcde.*/}}, {upsert: true}));
+assert.commandWorked(
+    collCompound.update({a: /abcde-1/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}),
+);
+assert.commandWorked(
+    collNested.update({"a.b": /abcde.*/}, {$set: {"a.b": /abcde.*/}}, {upsert: true}),
+);
+assert.commandWorked(
+    collNested.update({a: {b: /abcde.*/}}, {$set: {"a.b": /abcde.*/}}, {upsert: true}),
+);
 assert.commandWorked(collNested.update({c: 1}, {$set: {"a.b": /abcde.*/}}, {upsert: true}));
 
 // Upsert by replacement-style regex succeed on sharded collections.
@@ -246,7 +262,9 @@ assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
 assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
 assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
 assert.eq(1, collNested.find({a: {b: /abcde.*/}}).itcount());
-assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(
+    collNested.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}),
+);
 assert.eq(1, collNested.find({updated: true}).itcount());
 assert.commandWorked(collNested.remove({a: {b: /abcde.*/}}));
 assert.eq(2, collNested.find().itcount());

@@ -22,13 +22,19 @@ function runTest(downgradeVersion) {
     // The default WC is majority and stopServerReplication will prevent satisfying any majority
     // writes.
     assert.commandWorked(
-        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        primary.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
 
     // Set the featureCompatibilityVersion to the downgrade version so that a downgrade node can
     // join the set.
     assert.commandWorked(
-        primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+        primary
+            .getDB("admin")
+            .runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
     );
 
     // Add a downgrade node to the set.
@@ -46,7 +52,9 @@ function runTest(downgradeVersion) {
     // Set the featureCompatibilityVersion to the upgrade version. This will not replicate to
     // the downgrade secondary, but the downgrade secondary will no longer be able to
     // communicate with the rest of the set.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Shut down the latest version secondary.
     rst.stop(latestSecondary);

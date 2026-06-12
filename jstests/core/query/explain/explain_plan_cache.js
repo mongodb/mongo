@@ -95,7 +95,10 @@ function predicateTest(explainMode) {
 
     // Nothing should be cached at first.
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 1}}).explain(explainMode), false);
-    assertWinningPlanCacheStatus(getAggPlannerExplain(explainMode, [{$match: {a: 1}}, {$unwind: "$d"}]), false);
+    assertWinningPlanCacheStatus(
+        getAggPlannerExplain(explainMode, [{$match: {a: 1}}, {$unwind: "$d"}]),
+        false,
+    );
 
     // Run the query to get it cached.
     for (let i = 0; i < 5; i++) {
@@ -107,7 +110,10 @@ function predicateTest(explainMode) {
     // For both find and agg we should have the winning plan cached. Use different values in the
     // predicates to show the hash is indifferent to the value.
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 2}}).explain(explainMode), true);
-    assertWinningPlanCacheStatus(getAggPlannerExplain(explainMode, [{$match: {a: 2}}, {$unwind: "$d"}]), true);
+    assertWinningPlanCacheStatus(
+        getAggPlannerExplain(explainMode, [{$match: {a: 2}}, {$unwind: "$d"}]),
+        true,
+    );
 
     // Test with rooted OR.
     coll.getPlanCache().clear();
@@ -125,14 +131,20 @@ function predicateTest(explainMode) {
     coll.getPlanCache().clear();
     for (let i = 0; i < 5; i++) {
         coll.find({
-            $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
+            $and: [
+                {$or: [{a: 10}, {b: {$gt: 99}}]},
+                {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]},
+            ],
         }).toArray();
     }
     assert.eq(coll.getPlanCache().list().length, 1);
     assertWinningPlanCacheStatus(
         coll
             .find({
-                $and: [{$or: [{a: 2}, {b: {$gt: 100}}]}, {$or: [{a: {$in: [6, 2]}}, {b: {$in: [7, 100]}}]}],
+                $and: [
+                    {$or: [{a: 2}, {b: {$gt: 100}}]},
+                    {$or: [{a: {$in: [6, 2]}}, {b: {$in: [7, 100]}}]},
+                ],
             })
             .explain(explainMode),
         true,

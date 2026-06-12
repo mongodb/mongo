@@ -53,7 +53,9 @@ function buildIndexAndAssertChangeInIndexCount(keyPattern, indexOptions, expecte
     // In a sharded cluster, the results from all shards are returned in cmdRes.raw.
     assert(cmdRes.numIndexesBefore != null || Object.values(cmdRes.raw), tojson(cmdRes));
     const numIndexesAfter =
-        cmdRes.numIndexesAfter != null ? cmdRes.numIndexesAfter : Object.values(cmdRes.raw)[0].numIndexesAfter;
+        cmdRes.numIndexesAfter != null
+            ? cmdRes.numIndexesAfter
+            : Object.values(cmdRes.raw)[0].numIndexesAfter;
 
     assert.eq(numIndexesAfter, numIndexesBefore + expectedChange, cmdRes);
 }
@@ -96,7 +98,10 @@ assert.commandWorked(coll.dropIndex("sparse_index"));
 assertNewIndexBuilt(keyPattern, initialIndexSpec);
 
 // Verifies that an index can be built on the same fields if the collation is different.
-assertNewIndexBuilt(keyPattern, makeSpec({name: "simple_collation_index", collation: {locale: "simple"}}));
+assertNewIndexBuilt(
+    keyPattern,
+    makeSpec({name: "simple_collation_index", collation: {locale: "simple"}}),
+);
 
 // Verifies that an index can be built on the same fields if the partialFilterExpression is
 // different.
@@ -113,12 +118,17 @@ assertNewIndexBuilt(
 // equivalent. If we attempt to build this index with the same name as the initial index, the
 // operation will return success but will not actually do any work, since the requested index
 // already exists.
-const partialFilterDupeSpec = makeSpec({partialFilterExpression: {$and: [{b: "blah"}, {a: {$lt: 10}}, {a: {$gt: 0}}]}});
+const partialFilterDupeSpec = makeSpec({
+    partialFilterExpression: {$and: [{b: "blah"}, {a: {$lt: 10}}, {a: {$gt: 0}}]},
+});
 assertIndexAlreadyExists(keyPattern, partialFilterDupeSpec);
 
 // Verifies that attempting to build the dupe index with a different name will result in an error.
 partialFilterDupeSpec.name = "partial_filter_dupe_index";
-assert.commandFailedWithCode(coll.createIndex(keyPattern, partialFilterDupeSpec), ErrorCodes.IndexOptionsConflict);
+assert.commandFailedWithCode(
+    coll.createIndex(keyPattern, partialFilterDupeSpec),
+    ErrorCodes.IndexOptionsConflict,
+);
 
 // We take collation into account when checking partialFilterExpression equivalence.
 // In this instance we are using a case-insensitive collation, and so the predicate {b: "BLAH"} will
@@ -203,23 +213,44 @@ assertNewIndexBuilt(wildcardKeyPattern, {name: "wc_noa_id", wildcardProjection: 
 
 // Verifies that an index with sub fields for a field which is included in another wildcard path
 // projection can be created.
-assertNewIndexBuilt(wildcardKeyPattern, {name: "wc_a_sub_b_c", wildcardProjection: {"a.b": 1, "a.c": 1}});
+assertNewIndexBuilt(wildcardKeyPattern, {
+    name: "wc_a_sub_b_c",
+    wildcardProjection: {"a.b": 1, "a.c": 1},
+});
 
 // Verifies that indexes with a path projection which is identical after normalization can not be
 // created.
-assertIndexAlreadyExists(wildcardKeyPattern, {name: "wc_a_sub_b_c", wildcardProjection: {a: {b: 1, c: 1}}});
+assertIndexAlreadyExists(wildcardKeyPattern, {
+    name: "wc_a_sub_b_c",
+    wildcardProjection: {a: {b: 1, c: 1}},
+});
 assert.commandFailedWithCode(
-    coll.createIndex(wildcardKeyPattern, {name: "wc_a_sub_b_c_1", wildcardProjection: {a: {b: 1, c: 1}}}),
+    coll.createIndex(wildcardKeyPattern, {
+        name: "wc_a_sub_b_c_1",
+        wildcardProjection: {a: {b: 1, c: 1}},
+    }),
     ErrorCodes.IndexOptionsConflict,
 );
-assertIndexAlreadyExists(wildcardKeyPattern, {name: "wc_a_sub_b_c", wildcardProjection: {a: {c: 1, b: 1}}});
+assertIndexAlreadyExists(wildcardKeyPattern, {
+    name: "wc_a_sub_b_c",
+    wildcardProjection: {a: {c: 1, b: 1}},
+});
 assert.commandFailedWithCode(
-    coll.createIndex(wildcardKeyPattern, {name: "wc_a_sub_b_c_1", wildcardProjection: {a: {c: 1, b: 1}}}),
+    coll.createIndex(wildcardKeyPattern, {
+        name: "wc_a_sub_b_c_1",
+        wildcardProjection: {a: {c: 1, b: 1}},
+    }),
     ErrorCodes.IndexOptionsConflict,
 );
-assertIndexAlreadyExists(wildcardKeyPattern, {name: "wc_a_sub_b_c", wildcardProjection: {"a.c": 1, "a.b": 1}});
+assertIndexAlreadyExists(wildcardKeyPattern, {
+    name: "wc_a_sub_b_c",
+    wildcardProjection: {"a.c": 1, "a.b": 1},
+});
 assert.commandFailedWithCode(
-    coll.createIndex(wildcardKeyPattern, {name: "wc_a_sub_b_c_1", wildcardProjection: {"a.c": 1, "a.b": 1}}),
+    coll.createIndex(wildcardKeyPattern, {
+        name: "wc_a_sub_b_c_1",
+        wildcardProjection: {"a.c": 1, "a.b": 1},
+    }),
     ErrorCodes.IndexOptionsConflict,
 );
 
@@ -234,17 +265,35 @@ assertNewIndexBuilt(compoundWildcardIndex, {name: "cwi_noa", wildcardProjection:
 
 // Verifies that the {_id: 0, a: 0} path projection is same as {a: 0} and thus an index with the
 // projection can not be created.
-assertIndexAlreadyExists(compoundWildcardIndex, {name: "cwi_noa", wildcardProjection: {_id: 0, a: 0, other: 0}});
+assertIndexAlreadyExists(compoundWildcardIndex, {
+    name: "cwi_noa",
+    wildcardProjection: {_id: 0, a: 0, other: 0},
+});
 
-assertNewIndexBuilt(compoundWildcardIndex, {name: "cwi_a_sub_b_c", wildcardProjection: {"a.b": 1, "a.c": 1}});
+assertNewIndexBuilt(compoundWildcardIndex, {
+    name: "cwi_a_sub_b_c",
+    wildcardProjection: {"a.b": 1, "a.c": 1},
+});
 
-assertIndexAlreadyExists(compoundWildcardIndex, {name: "cwi_a_sub_b_c", wildcardProjection: {"a.b": 1, "a.c": 1}});
+assertIndexAlreadyExists(compoundWildcardIndex, {
+    name: "cwi_a_sub_b_c",
+    wildcardProjection: {"a.b": 1, "a.c": 1},
+});
 assert.commandFailedWithCode(
-    coll.createIndex(compoundWildcardIndex, {name: "cwi_a_sub_b_c_1", wildcardProjection: {"a.b": 1, "a.c": 1}}),
+    coll.createIndex(compoundWildcardIndex, {
+        name: "cwi_a_sub_b_c_1",
+        wildcardProjection: {"a.b": 1, "a.c": 1},
+    }),
     ErrorCodes.IndexOptionsConflict,
 );
-assertIndexAlreadyExists(compoundWildcardIndex, {name: "cwi_a_sub_b_c", wildcardProjection: {"a.c": 1, "a.b": 1}});
+assertIndexAlreadyExists(compoundWildcardIndex, {
+    name: "cwi_a_sub_b_c",
+    wildcardProjection: {"a.c": 1, "a.b": 1},
+});
 assert.commandFailedWithCode(
-    coll.createIndex(compoundWildcardIndex, {name: "cwi_a_sub_b_c_1", wildcardProjection: {"a.c": 1, "a.b": 1}}),
+    coll.createIndex(compoundWildcardIndex, {
+        name: "cwi_a_sub_b_c_1",
+        wildcardProjection: {"a.c": 1, "a.b": 1},
+    }),
     ErrorCodes.IndexOptionsConflict,
 );

@@ -31,11 +31,15 @@ for (let i = 0; i < numdocs; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.commandWorked(db.createView("viewWithNow", coll.getName(), [{$addFields: {timeField: "$$NOW"}}]));
+assert.commandWorked(
+    db.createView("viewWithNow", coll.getName(), [{$addFields: {timeField: "$$NOW"}}]),
+);
 const viewWithNow = db["viewWithNow"];
 
 assert.commandWorked(
-    db.createView("viewWithClusterTime", coll.getName(), [{$addFields: {timeField: "$$CLUSTER_TIME"}}]),
+    db.createView("viewWithClusterTime", coll.getName(), [
+        {$addFields: {timeField: "$$CLUSTER_TIME"}},
+    ]),
 );
 const viewWithClusterTime = db["viewWithClusterTime"];
 
@@ -168,7 +172,10 @@ runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
 // The deferred get_executor path does not support the SBE plan cache.
-if (sbePlanCacheEnabled(db) && !FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice")) {
+if (
+    sbePlanCacheEnabled(db) &&
+    !FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice")
+) {
     function verifyPlanCacheSize(query) {
         coll.getPlanCache().clear();
 
@@ -224,6 +231,9 @@ if (sbePlanCacheEnabled(db) && !FeatureFlagUtil.isPresentAndEnabled(db, "GetExec
             .find({$expr: {$lt: ["$timeField", {$subtract: ["$$NOW", 100]}]}})
             .explain("queryPlanner");
         const winningPlan = getWinningPlanFromExplain(explainResults);
-        assert(isIxscan(db, winningPlan), `Expected winningPlan to be index scan plan: ${tojson(winningPlan)}`);
+        assert(
+            isIxscan(db, winningPlan),
+            `Expected winningPlan to be index scan plan: ${tojson(winningPlan)}`,
+        );
     }
 }

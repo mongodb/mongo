@@ -9,17 +9,27 @@
  *  - nodb suites (tests create their own ShardingTest or ReplSetTest): overrides ShardingTest
  *    and ReplSetTest to downgrade FCV after cluster setup.
  */
-import {kOverrideConstructor as kOverrideConstructorForST, ShardingTest} from "jstests/libs/shardingtest.js";
-import {kOverrideConstructor as kOverrideConstructorForRST, ReplSetTest} from "jstests/libs/replsettest.js";
+import {
+    kOverrideConstructor as kOverrideConstructorForST,
+    ShardingTest,
+} from "jstests/libs/shardingtest.js";
+import {
+    kOverrideConstructor as kOverrideConstructorForRST,
+    ReplSetTest,
+} from "jstests/libs/replsettest.js";
 
 if (typeof db !== "undefined") {
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}),
+    );
 }
 
 ShardingTest[kOverrideConstructorForST] = class ShardingTestWithPinnedFCV extends ShardingTest {
     constructor(params) {
         super(params);
-        assert.commandWorked(this.s.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}));
+        assert.commandWorked(
+            this.s.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}),
+        );
     }
 };
 
@@ -27,7 +37,10 @@ ReplSetTest[kOverrideConstructorForRST] = class ReplSetTestWithPinnedFCV extends
     initiate(...args) {
         super.initiate(...args);
         assert.commandWorked(
-            this.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}),
+            this.getPrimary().adminCommand({
+                setFeatureCompatibilityVersion: lastContinuousFCV,
+                confirm: true,
+            }),
         );
     }
 };

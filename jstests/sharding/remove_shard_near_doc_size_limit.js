@@ -35,7 +35,9 @@ const bigDocSize = 16 * 1024 * 1024 - 4096;
 const bigDocPayload = "x".repeat(bigDocSize);
 
 let st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 jsTest.log("Sharding collection with one chunk on each shard.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -53,7 +55,10 @@ function assertDocsExist(shardKeys, numDocs, payloadSize) {
             assert.eq(
                 payload.length,
                 payloadSize,
-                tojson(query) + " does not have the expected payload length of " + payloadSize + " bytes",
+                tojson(query) +
+                    " does not have the expected payload length of " +
+                    payloadSize +
+                    " bytes",
             );
         }
     });
@@ -69,7 +74,9 @@ shardKeys.forEach((key) => {
 
 // Start balancer to migrate chunks from the removed shard.
 assert.commandWorked(
-    st.s.getDB("config").settings.update({_id: "balancer"}, {$set: {attemptToBalanceJumboChunks: true}}, true),
+    st.s
+        .getDB("config")
+        .settings.update({_id: "balancer"}, {$set: {attemptToBalanceJumboChunks: true}}, true),
 );
 st.startBalancer();
 

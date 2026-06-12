@@ -39,13 +39,18 @@ const expressionsWithNewFeaturesThatCanBeParsedByOldFCV = [
         expression: {$split: ["$splitParams.input", "$splitParams.delimiter"]},
         failureErrorCode: [40086, 10503900],
     },
-    ...["convertStringToObject", "convertStringToArray", "convertObjectToString", "convertArrayToString"].map(
-        (convertCase) => ({
-            viewName: convertCase + "View",
-            expression: {$convert: {input: `\$${convertCase}Params.input`, to: `\$${convertCase}Params.to`}},
-            failureErrorCode: [ErrorCodes.ConversionFailure],
-        }),
-    ),
+    ...[
+        "convertStringToObject",
+        "convertStringToArray",
+        "convertObjectToString",
+        "convertArrayToString",
+    ].map((convertCase) => ({
+        viewName: convertCase + "View",
+        expression: {
+            $convert: {input: `\$${convertCase}Params.input`, to: `\$${convertCase}Params.to`},
+        },
+        failureErrorCode: [ErrorCodes.ConversionFailure],
+    })),
 ];
 
 // These expressions are either completely new, or have new syntactic parameters, that
@@ -170,7 +175,9 @@ function assertCreateAndEvaluateViewsWithNewFeaturesPass(primaryConnection) {
         ...expressionsWithNewFeaturesThatCannotBeParsedByOldFCV,
     ]) {
         db[expr.viewName].drop();
-        assert.commandWorked(db.createView(expr.viewName, collectionName, [{$project: {output: expr.expression}}]));
+        assert.commandWorked(
+            db.createView(expr.viewName, collectionName, [{$project: {output: expr.expression}}]),
+        );
         assert.commandWorked(db.runCommand({find: expr.viewName, filter: {}}));
         db[expr.viewName].drop();
 
@@ -192,8 +199,13 @@ function assertCreateOrEvaluateViewsWithNewFeaturesFail(primaryConnection) {
     // work.
     for (const expr of expressionsWithNewFeaturesThatCanBeParsedByOldFCV) {
         db[expr.viewName].drop();
-        assert.commandWorked(db.createView(expr.viewName, collectionName, [{$project: {output: expr.expression}}]));
-        assert.commandFailedWithCode(db.runCommand({find: expr.viewName, filter: {}}), expr.failureErrorCode);
+        assert.commandWorked(
+            db.createView(expr.viewName, collectionName, [{$project: {output: expr.expression}}]),
+        );
+        assert.commandFailedWithCode(
+            db.runCommand({find: expr.viewName, filter: {}}),
+            expr.failureErrorCode,
+        );
         db[expr.viewName].drop();
     }
 

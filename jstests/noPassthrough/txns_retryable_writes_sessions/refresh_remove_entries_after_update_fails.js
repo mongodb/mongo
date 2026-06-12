@@ -15,7 +15,13 @@ TestData.disableImplicitSessions = true;
 const refreshCommand = {refreshLogicalSessionCacheNow: 1};
 const startSessionCommand = {startSession: 1};
 
-function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpointsFunc, destroyFunc) {
+function runTest(
+    conn,
+    initialSessionsCount,
+    enableFailpointsFunc,
+    disableFailpointsFunc,
+    destroyFunc,
+) {
     const admin = conn.getDB("admin");
     const config = conn.getDB("config");
     function getSessionCacheStats() {
@@ -41,10 +47,19 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
     }
 
     jsTest.log.info("Refresh after creating sessions");
-    assert.commandWorked(admin.runCommand(refreshCommand), "failed to refresh after creating sessions");
-    assert.eq(config.system.sessions.count() - initialSessions, 10, "should have 10 session records");
+    assert.commandWorked(
+        admin.runCommand(refreshCommand),
+        "failed to refresh after creating sessions",
+    );
+    assert.eq(
+        config.system.sessions.count() - initialSessions,
+        10,
+        "should have 10 session records",
+    );
     const statsAfterCreatingSessions = getSessionCacheStats();
-    jsTest.log.info("Session cache stats after creating 10 entries: " + tojson(statsAfterCreatingSessions));
+    jsTest.log.info(
+        "Session cache stats after creating 10 entries: " + tojson(statsAfterCreatingSessions),
+    );
     assert.eq(
         statsAfterCreatingSessions.lastSessionsCollectionJobEntriesEnded,
         0,
@@ -60,14 +75,19 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
 
     // End the first three sessions.
     const endSessionsBatch1 = sessions.slice(0, 3).map((s) => s.id);
-    assert.commandWorked(admin.runCommand({endSessions: endSessionsBatch1}), "failed to end first batch of sessions");
+    assert.commandWorked(
+        admin.runCommand({endSessions: endSessionsBatch1}),
+        "failed to end first batch of sessions",
+    );
     jsTest.log.info("start one more session");
     const eleventhSession = admin.runCommand(startSessionCommand);
     assert.commandWorked(eleventhSession, "unable to start session");
 
     // The failAllUpdates failpoint will cause the refreshSessions operation to fail
     // since it uses update operations to refresh session lastUse timestamps.
-    jsTest.log.info("Enable failpoint that will call subsequent refreshes to fail when updating session timestamp");
+    jsTest.log.info(
+        "Enable failpoint that will call subsequent refreshes to fail when updating session timestamp",
+    );
     enableFailpointsFunc();
 
     jsTest.log.info("Refresh after enabling failpoint");
@@ -104,7 +124,10 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
     // End more sessions (sessions 4-6) while the failpoint is still active.
     jsTest.log.info("End three more sessions");
     const endSessionsBatch2 = sessions.slice(3, 6).map((s) => s.id);
-    assert.commandWorked(admin.runCommand({endSessions: endSessionsBatch2}), "failed to end second batch of sessions");
+    assert.commandWorked(
+        admin.runCommand({endSessions: endSessionsBatch2}),
+        "failed to end second batch of sessions",
+    );
 
     // Attempt refresh again - should still fail.
     jsTest.log.info("Attempt to refresh again - failpoint is still active");
@@ -112,7 +135,9 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
     assert.commandFailed(refreshResult2, "refresh should still fail with failAllUpdates enabled");
 
     const statsAfterSecondBatch = getSessionCacheStats();
-    jsTest.log.info("Session cache stats after second batch ended: " + tojson(statsAfterSecondBatch));
+    jsTest.log.info(
+        "Session cache stats after second batch ended: " + tojson(statsAfterSecondBatch),
+    );
     assert.eq(
         statsAfterSecondBatch.lastSessionsCollectionJobEntriesEnded,
         3,
@@ -141,10 +166,16 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
     jsTest.log.info("End two more sessions after disabling failpoint");
     // End more sessions (sessions 7-8) without the failpoint enabled.
     const endSessionsBatch3 = sessions.slice(6, 8).map((s) => s.id);
-    assert.commandWorked(admin.runCommand({endSessions: endSessionsBatch3}), "failed to end third batch of sessions");
+    assert.commandWorked(
+        admin.runCommand({endSessions: endSessionsBatch3}),
+        "failed to end third batch of sessions",
+    );
 
     // Now refresh should succeed, and the eleventh session should be added to the collection.
-    assert.commandWorked(admin.runCommand(refreshCommand), "refresh should succeed after disabling failpoint");
+    assert.commandWorked(
+        admin.runCommand(refreshCommand),
+        "refresh should succeed after disabling failpoint",
+    );
     assert.eq(
         config.system.sessions.count() - initialSessions,
         3,
@@ -154,7 +185,11 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
     // Get stats after successful refresh.
     const statsAfter = getSessionCacheStats();
     jsTest.log.info("Session cache stats after successful refresh: " + tojson(statsAfter));
-    assert.eq(statsAfter.lastSessionsCollectionJobEntriesEnded, 2, "should have ended at least 2 accumulated sessions");
+    assert.eq(
+        statsAfter.lastSessionsCollectionJobEntriesEnded,
+        2,
+        "should have ended at least 2 accumulated sessions",
+    );
     assert.eq(
         statsAfter.lastSessionsCollectionJobEntriesRefreshed,
         1,
@@ -172,7 +207,11 @@ function runTest(conn, initialSessionsCount, enableFailpointsFunc, disableFailpo
     const twelfthSession = admin.runCommand(startSessionCommand);
     assert.commandWorked(twelfthSession, "unable to start session");
     assert.commandWorked(admin.runCommand(refreshCommand));
-    assert.eq(config.system.sessions.count() - initialSessions, 2, "original 10 sessions should be cleaned up");
+    assert.eq(
+        config.system.sessions.count() - initialSessions,
+        2,
+        "original 10 sessions should be cleaned up",
+    );
     assert.commandWorked(admin.runCommand({endSessions: [eleventhSession.id]}));
     assert.commandWorked(admin.runCommand({endSessions: [twelfthSession.id]}));
     assert.commandWorked(admin.runCommand(refreshCommand));
@@ -361,13 +400,19 @@ function onlyOneShardFailedTest() {
         }
         sessions.push(res);
     }
-    jsTest.log.info("Should create " + numOnShard0 + " on shard 0 and " + numOnShard1 + " on shard 1");
+    jsTest.log.info(
+        "Should create " + numOnShard0 + " on shard 0 and " + numOnShard1 + " on shard 1",
+    );
 
     // Refresh to persist all sessions to the collection.
     assert.commandWorked(admin.runCommand(refreshCommand));
     const initialCount = config.system.sessions.count();
     jsTest.log.info("Initial session count: " + initialCount);
-    assert.gte(initialCount, initialMinPerShard * 2, "should have at least " + initialMinPerShard * 2 + " sessions");
+    assert.gte(
+        initialCount,
+        initialMinPerShard * 2,
+        "should have at least " + initialMinPerShard * 2 + " sessions",
+    );
     const shard0Primary = st.rs0.getPrimary();
     const shard0DB = shard0Primary.getDB("config");
     const shard1DB = st.rs1.getPrimary().getDB("config");
@@ -396,7 +441,9 @@ function onlyOneShardFailedTest() {
         }
         newSessions.push(res);
     }
-    jsTest.log.info("Should create " + numOnShard0 + " on shard 0 and " + numOnShard1 + " on shard 1");
+    jsTest.log.info(
+        "Should create " + numOnShard0 + " on shard 0 and " + numOnShard1 + " on shard 1",
+    );
     const statsBeforeRefreshFailure = getSessionCacheStats();
     assert.gte(
         statsBeforeRefreshFailure.activeSessionsCount,

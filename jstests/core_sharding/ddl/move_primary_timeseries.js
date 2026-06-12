@@ -35,7 +35,9 @@ assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
 const initPrimaryShard = db.getDatabasePrimaryShardId();
 
 // Create a timeseries collection
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 assert.commandWorked(coll.createIndex({temp: 1, t: 1}));
 doInserts(N);
 assert.eq(N, coll.countDocuments({}));

@@ -34,7 +34,13 @@ const primaryDB = primary.getDB(dbName);
  * side-write interceptor is already active), performs concurrent writes, then resumes and verifies
  * the index was created.
  */
-function runWildcardBuildTest({testName, indexSpec, indexOptions = {}, seedDocs = [], concurrentDocs = []}) {
+function runWildcardBuildTest({
+    testName,
+    indexSpec,
+    indexOptions = {},
+    seedDocs = [],
+    concurrentDocs = [],
+}) {
     jsTestLog(`---- ${testName} ----`);
 
     const collName = testName;
@@ -54,7 +60,12 @@ function runWildcardBuildTest({testName, indexSpec, indexOptions = {}, seedDocs 
     // so any writes during the pause will be captured as side-writes.
     IndexBuildTest.pauseIndexBuilds(primary);
 
-    const awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), indexSpec, options);
+    const awaitIndex = IndexBuildTest.startIndexBuild(
+        primary,
+        coll.getFullName(),
+        indexSpec,
+        options,
+    );
     IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, indexName);
 
     IndexBuildTest.assertIndexesSoon(coll, 2, ["_id_"], [indexName]);
@@ -189,7 +200,12 @@ runWildcardBuildTest({
 
     const indexName = "wildcard_idx";
     IndexBuildTest.pauseIndexBuilds(primary);
-    const awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {"$**": 1}, {name: indexName});
+    const awaitIndex = IndexBuildTest.startIndexBuild(
+        primary,
+        coll.getFullName(),
+        {"$**": 1},
+        {name: indexName},
+    );
     IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, indexName);
 
     // Concurrent updates and deletes while the build is paused.
@@ -260,9 +276,13 @@ runWildcardBuildTest({
     const indexName = "wildcard_to_abort";
     IndexBuildTest.pauseIndexBuilds(primary);
 
-    const awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {"$**": 1}, {name: indexName}, [
-        ErrorCodes.IndexBuildAborted,
-    ]);
+    const awaitIndex = IndexBuildTest.startIndexBuild(
+        primary,
+        coll.getFullName(),
+        {"$**": 1},
+        {name: indexName},
+        [ErrorCodes.IndexBuildAborted],
+    );
     IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, indexName);
 
     // Abort the in-progress wildcard index build via dropIndexes.

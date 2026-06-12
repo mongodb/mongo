@@ -24,7 +24,10 @@ function makeMatchForFilteringByShape(query) {
 
 // Returns a BSON object representing the plan cache entry for the query shape {a: 1, b: 1}.
 function getSingleEntryStats() {
-    const cursor = coll.aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1})]);
+    const cursor = coll.aggregate([
+        {$planCacheStats: {}},
+        makeMatchForFilteringByShape({a: 1, b: 1}),
+    ]);
     assert(cursor.hasNext());
     const entryStats = cursor.next();
     assert(!cursor.hasNext());
@@ -60,19 +63,42 @@ assert.eq(3, coll.aggregate([{$planCacheStats: {}}]).itcount());
 
 // We should be able to find particular cache entries by maching on the query from which the
 // entry was created.
-assert.eq(1, coll.aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1})]).itcount());
-assert.eq(1, coll.aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1, c: 1})]).itcount());
-assert.eq(1, coll.aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1, d: 1})]).itcount());
+assert.eq(
+    1,
+    coll.aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1})]).itcount(),
+);
+assert.eq(
+    1,
+    coll
+        .aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1, c: 1})])
+        .itcount(),
+);
+assert.eq(
+    1,
+    coll
+        .aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1, d: 1})])
+        .itcount(),
+);
 
 // A similar match on a query filter that was never run should turn up nothing.
-assert.eq(0, coll.aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1, e: 1})]).itcount());
+assert.eq(
+    0,
+    coll
+        .aggregate([{$planCacheStats: {}}, makeMatchForFilteringByShape({a: 1, b: 1, e: 1})])
+        .itcount(),
+);
 
 // Test $group over the plan cache metadata.
-assert.eq(1, coll.aggregate([{$planCacheStats: {}}, {$group: {_id: "$createdFromQuery.query.a"}}]).itcount());
+assert.eq(
+    1,
+    coll.aggregate([{$planCacheStats: {}}, {$group: {_id: "$createdFromQuery.query.a"}}]).itcount(),
+);
 
 // Explain should show that a $match gets absorbed into the $planCacheStats stage.
 let explain = assert.commandWorked(
-    coll.explain().aggregate([{$planCacheStats: {}}, {$match: {"createdFromQuery.query": {a: 1, b: 1}}}]),
+    coll
+        .explain()
+        .aggregate([{$planCacheStats: {}}, {$match: {"createdFromQuery.query": {a: 1, b: 1}}}]),
 );
 assert.eq(explain.stages.length, 1);
 const planCacheStatsExplain = getAggPlanStage(explain, "$planCacheStats");
@@ -113,7 +139,11 @@ assert.eq(false, entryStats.indexFilterSet);
 // report that no index filter is set. Setting a filter clears the cache, so we rerun the query
 // associated with the cache entry.
 assert.commandWorked(
-    testDb.runCommand({planCacheSetFilter: coll.getName(), query: {a: 1, b: 1, c: 1}, indexes: [{a: 1}, {b: 1}]}),
+    testDb.runCommand({
+        planCacheSetFilter: coll.getName(),
+        query: {a: 1, b: 1, c: 1},
+        indexes: [{a: 1}, {b: 1}],
+    }),
 );
 assert.eq(2, coll.aggregate([{$planCacheStats: {}}]).itcount());
 assert.eq(2, coll.find({a: 1, b: 1, c: 1}).itcount());
@@ -123,7 +153,11 @@ assert.eq(false, entryStats.indexFilterSet);
 
 // Create an index filter on shape {a: 1, b: 1}, and verify that indexFilterSet is now true.
 assert.commandWorked(
-    testDb.runCommand({planCacheSetFilter: coll.getName(), query: {a: 1, b: 1}, indexes: [{a: 1}, {b: 1}]}),
+    testDb.runCommand({
+        planCacheSetFilter: coll.getName(),
+        query: {a: 1, b: 1},
+        indexes: [{a: 1}, {b: 1}],
+    }),
 );
 assert.eq(2, coll.aggregate([{$planCacheStats: {}}]).itcount());
 assert.eq(3, coll.find({a: 1, b: 1}).itcount());
@@ -143,7 +177,10 @@ if (entryStats["version"] === "1") {
     assert(entryStats.hasOwnProperty("cachedPlan"));
     const ixscanStage = getPlanStage(getCachedPlan(entryStats.cachedPlan), "IXSCAN");
     assert.neq(ixscanStage, null);
-    assert(bsonWoCompare(ixscanStage.keyPattern, {a: 1}) === 0 || bsonWoCompare(ixscanStage.keyPattern, {b: 1}) === 0);
+    assert(
+        bsonWoCompare(ixscanStage.keyPattern, {a: 1}) === 0 ||
+            bsonWoCompare(ixscanStage.keyPattern, {b: 1}) === 0,
+    );
 
     // There should be at least two plans in 'creationExecStats', and each should have at least one
     // index scan.
@@ -152,7 +189,10 @@ if (entryStats["version"] === "1") {
     for (let plan of entryStats.creationExecStats) {
         assert(plan.hasOwnProperty("executionStages"));
         // If we are in SBE mode, then explain output format is different for 'creationExecStats'.
-        const stages = getPlanStages(plan.executionStages, isUsingSbePlanCache ? "ixseek" : "IXSCAN");
+        const stages = getPlanStages(
+            plan.executionStages,
+            isUsingSbePlanCache ? "ixseek" : "IXSCAN",
+        );
         assert.gt(stages.length, 0);
     }
 
@@ -166,7 +206,9 @@ if (entryStats["version"] === "1") {
 }
 
 // Should throw an error if $planCacheStats is not first.
-assert.throws(() => coll.aggregate([{$match: {createdFromQuery: {a: 1, b: 1}}}, {$planCacheStats: {}}]));
+assert.throws(() =>
+    coll.aggregate([{$match: {createdFromQuery: {a: 1, b: 1}}}, {$planCacheStats: {}}]),
+);
 
 // If the plan cache is cleared, then there are no longer any results returned by
 // $planCacheStats.

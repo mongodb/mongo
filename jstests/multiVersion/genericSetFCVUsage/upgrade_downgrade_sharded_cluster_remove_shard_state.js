@@ -24,7 +24,10 @@ const dbName = jsTestName();
 
 const kShardsNs = "config.shards";
 
-function validateNumberOfDocumentsWithStateAttributeInShardsCollection(st, expectedNumberOfDocuments) {
+function validateNumberOfDocumentsWithStateAttributeInShardsCollection(
+    st,
+    expectedNumberOfDocuments,
+) {
     assert.soon(() => {
         try {
             // we search for elements in the shards collection with the state field still set
@@ -77,7 +80,9 @@ function setupClusterAndDatabase(binVersion) {
     });
     st.configRS.awaitReplication();
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     return st;
 }
@@ -98,7 +103,13 @@ function checkConfigAndShardsFCV(expectedFCV) {
     const shard1Secondary = st.rs1.getSecondary();
     shard1Secondary.setSecondaryOk();
 
-    for (const node of [configPrimary, shard0Primary, shard0Secondary, shard1Primary, shard1Secondary]) {
+    for (const node of [
+        configPrimary,
+        shard0Primary,
+        shard0Secondary,
+        shard1Primary,
+        shard1Secondary,
+    ]) {
         jsTest.log.info("Verify that the FCV is properly set on node " + getNodeName(node));
 
         const fcvDoc = node.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
@@ -146,7 +157,9 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     st.upgradeCluster("latest");
 
     jsTest.log.info("Upgrading FCV to " + latestFCV);
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     checkClusterAfterFCVUpgrade(latestFCV);
 
@@ -154,7 +167,9 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Setting and testing cluster using old binaries in old FCV mode
 
     jsTest.log.info("Downgrading FCV to " + oldVersion);
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion, confirm: true}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion, confirm: true}),
+    );
 
     jsTest.log.info("Downgrading binaries to version " + oldVersion);
     st.downgradeCluster(oldVersion);

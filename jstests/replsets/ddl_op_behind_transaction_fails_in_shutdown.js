@@ -81,18 +81,30 @@ function runDropCollection(dbName, collName) {
 // This is best-effort, not deterministic, since we cannot place a fail point directly in the
 // locking code as that would hang everything rather than just drop.
 assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangDropCollectionBeforeLockAcquisition", mode: "alwaysOn"}),
+    primary.adminCommand({
+        configureFailPoint: "hangDropCollectionBeforeLockAcquisition",
+        mode: "alwaysOn",
+    }),
 );
 let joinDropCollection;
 try {
     jsTest.log("Starting a parallel shell to concurrently run drop collection...");
-    joinDropCollection = startParallelShell(funWithArgs(runDropCollection, dbName, collName), primary.port);
+    joinDropCollection = startParallelShell(
+        funWithArgs(runDropCollection, dbName, collName),
+        primary.port,
+    );
 
     jsTest.log("Waiting for drop collection to block behind the prepared transaction...");
-    checkLog.contains(primary, "Hanging drop collection before lock acquisition while fail point is set");
+    checkLog.contains(
+        primary,
+        "Hanging drop collection before lock acquisition while fail point is set",
+    );
 } finally {
     assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "hangDropCollectionBeforeLockAcquisition", mode: "off"}),
+        primary.adminCommand({
+            configureFailPoint: "hangDropCollectionBeforeLockAcquisition",
+            mode: "off",
+        }),
     );
 }
 sleep(1 * 1000);

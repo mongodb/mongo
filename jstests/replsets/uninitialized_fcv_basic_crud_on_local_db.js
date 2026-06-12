@@ -37,7 +37,10 @@ for (const opts of [{}, {shardsvr: ""}, {configsvr: ""}]) {
         coll.find({}, {_id: 0}).toArray(),
     );
     assert.eq(2, coll.count({}));
-    assert.sameMembers([{x: 2, a: 2}], coll.aggregate([{$sort: {x: -1}}, {$limit: 1}, {$project: {_id: 0}}]).toArray());
+    assert.sameMembers(
+        [{x: 2, a: 2}],
+        coll.aggregate([{$sort: {x: -1}}, {$limit: 1}, {$project: {_id: 0}}]).toArray(),
+    );
 
     rst.stopSet();
 }

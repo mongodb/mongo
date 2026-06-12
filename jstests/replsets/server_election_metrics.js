@@ -49,7 +49,10 @@ ${tojson(serverStatusResponse)}`,
     verifyElectionMetricsField(serverStatusResponse, "numCatchUpsTimedOut");
     verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithError");
     verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithNewTerm");
-    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd");
+    verifyElectionMetricsField(
+        serverStatusResponse,
+        "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd",
+    );
 }
 
 // Set up the replica set.

@@ -24,7 +24,9 @@ export const $config = (function () {
             const y = Random.randInt(this.numUniqueKeys);
             const z = Random.randInt(this.numUniqueKeys);
             // Range queries.
-            const count = db[collName].aggregate([{$match: {a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}}]).itcount();
+            const count = db[collName]
+                .aggregate([{$match: {a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}}])
+                .itcount();
             const docs = db[collName].find({a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}).toArray();
         },
     };
@@ -33,7 +35,9 @@ export const $config = (function () {
 
     function setup(db, collName, cluster) {
         function setParameter(db, parameterName, newValue, originalStorage) {
-            const originalParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, [parameterName]: 1}));
+            const originalParamValue = assert.commandWorked(
+                db.adminCommand({getParameter: 1, [parameterName]: 1}),
+            );
             assert.commandWorked(db.adminCommand({setParameter: 1, [parameterName]: newValue}));
             originalStorage[db.getMongo().host] = originalParamValue[parameterName];
         }

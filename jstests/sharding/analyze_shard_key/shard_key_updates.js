@@ -51,7 +51,9 @@ function runTest({isShardedColl, execCtxType}) {
     const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
     const ns = dbName + "." + collName;
     const shardKey = {"a.x.i": 1, b: 1};
-    jsTest.log(`Test analyzing the shard key ${tojsononeline({shardKey, ns, isShardedColl, execCtxType})}`);
+    jsTest.log(
+        `Test analyzing the shard key ${tojsononeline({shardKey, ns, isShardedColl, execCtxType})}`,
+    );
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
@@ -70,8 +72,12 @@ function runTest({isShardedColl, execCtxType}) {
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {"a.x.i": 1}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {"a.x.i": -1000}}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {"a.x.i": 1000}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {"a.x.i": -1000}, to: st.shard1.shardName}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {"a.x.i": 1000}, to: st.shard2.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {"a.x.i": -1000}, to: st.shard1.shardName}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {"a.x.i": 1000}, to: st.shard2.shardName}),
+        );
     }
 
     const runCmd = (cmdFunc) => {
@@ -124,7 +130,9 @@ function runTest({isShardedColl, execCtxType}) {
     assert.commandWorked(mongosDB.getCollection(collName).insert(docs));
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-    assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}));
+    assert.commandWorked(
+        st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}),
+    );
     QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
     // Test with a mix of modifier, replacement and pipeline updates and findAndModify updates.
@@ -149,7 +157,10 @@ function runTest({isShardedColl, execCtxType}) {
     // preImage:   {_id: 2, a: {x: {i: 2, ii: 2}, y: 2}, b: 2, c: 2}
     // postImage:  {_id: 2, a: {x: {i: -2, ii: 2}, y: 2}, b: 2, c: 2}
     runCmd((coll) =>
-        coll.findAndModify({query: {"a.x.i": 2}, update: {_id: 2, a: {x: {i: -2, ii: 2}, y: 2}, b: 2, c: 2}}),
+        coll.findAndModify({
+            query: {"a.x.i": 2},
+            update: {_id: 2, a: {x: {i: -2, ii: 2}, y: 2}, b: 2, c: 2},
+        }),
     );
     [numFindAndModifys, numTxnRetries, numShardKeyUpdates] = incrementByTxnRetries(
         numFindAndModifys,
@@ -160,7 +171,9 @@ function runTest({isShardedColl, execCtxType}) {
     // This updates "a.x.i" and "c".
     // preImage:   {_id: 3, a: {x: {i: 3, ii: 3}, y: 3}, b: 3, c: 3}
     // postImage:  {_id: 3, a: {x: {i: -3, ii: 3}, y: 3}, b: 3, c: 3}
-    runCmd((coll) => assert.commandWorked(coll.update({"a.x.i": 3}, {$set: {"a.x.i": -3}}, {$set: {c: -3}})));
+    runCmd((coll) =>
+        assert.commandWorked(coll.update({"a.x.i": 3}, {$set: {"a.x.i": -3}}, {$set: {c: -3}})),
+    );
     [numUpdates, numTxnRetries, numShardKeyUpdates] = incrementByTxnRetries(
         numUpdates,
         numTxnRetries,
@@ -241,7 +254,9 @@ function runTest({isShardedColl, execCtxType}) {
     // preImage:   {_id: 10, a: {x: {i: 10, ii: 10}}, b: 10, c: 10}
     // postImage:  {_id: 10, a: {x: {i: 10, ii: 10}}, c: 10}
     runCmd((coll) =>
-        assert.commandWorked(coll.update({"a.x.i": 10}, {_id: 10, a: {x: {i: 10, ii: 10}, y: 10}, c: 10})),
+        assert.commandWorked(
+            coll.update({"a.x.i": 10}, {_id: 10, a: {x: {i: 10, ii: 10}, y: 10}, c: 10}),
+        ),
     );
     [numUpdates, numTxnRetries, numShardKeyUpdates] = incrementByTxnRetries(
         numUpdates,
@@ -263,7 +278,12 @@ function runTest({isShardedColl, execCtxType}) {
     // collection is sharded.
     // preImage:   {_id: -100, a: {x: {i: -100, ii: -100}, y: -100}, b: -100, c: -100}
     // postImage:  {_id: -100, a: {x: {i: -1100, ii: -100}, y: -100}, b: -1000, c: -100}
-    runCmd((coll) => coll.findAndModify({query: {"a.x.i": -100}, update: {$inc: {"a.x.i": -1000}, $set: {b: -1000}}}));
+    runCmd((coll) =>
+        coll.findAndModify({
+            query: {"a.x.i": -100},
+            update: {$inc: {"a.x.i": -1000}, $set: {b: -1000}},
+        }),
+    );
     [numFindAndModifys, numTxnRetries, numShardKeyUpdates] = incrementByTxnRetries(
         numFindAndModifys,
         numTxnRetries,
@@ -290,7 +310,9 @@ function runTest({isShardedColl, execCtxType}) {
     assert.eq(res0.writeDistribution.sampleSize.total, numTotal, res0);
     assert.eq(res0.writeDistribution.percentageOfShardKeyUpdates, 100, res0);
 
-    assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}));
+    assert.commandWorked(
+        st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}),
+    );
     QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
     // Below are not shard key updates.
@@ -304,7 +326,11 @@ function runTest({isShardedColl, execCtxType}) {
     // This deletes "a.x.ii".
     // preImage:   {_id: 12, a: {x: {i: 12, ii: 12}, y: 12}, b: 12, c: 12}
     // postImage:  {_id: 12, a: {x: {i: 12}, y: 12}, b: 12, c: 12}
-    runCmd((coll) => assert.commandWorked(coll.update({"a.x.i": 12}, {_id: 12, a: {x: {i: 12}, y: 12}, b: 12, c: 12})));
+    runCmd((coll) =>
+        assert.commandWorked(
+            coll.update({"a.x.i": 12}, {_id: 12, a: {x: {i: 12}, y: 12}, b: 12, c: 12}),
+        ),
+    );
     [numUpdates, numTxnRetries] = incrementByTxnRetries(numUpdates, numTxnRetries);
 
     // This updates "a.y".
@@ -317,7 +343,9 @@ function runTest({isShardedColl, execCtxType}) {
     // preImage:   {_id: 14, a: {x: {i: 14, ii: 14}, y: 14}, b: 14, c: 14}
     // postImage:  {_id: 14, a: {x: {i: 14, ii: 14}}, b: 14, c: 14}
     runCmd((coll) =>
-        assert.commandWorked(coll.update({"a.x.i": 14}, {_id: 14, a: {x: {i: 14, ii: 14}}, b: 14, c: 14})),
+        assert.commandWorked(
+            coll.update({"a.x.i": 14}, {_id: 14, a: {x: {i: 14, ii: 14}}, b: 14, c: 14}),
+        ),
     );
     [numUpdates, numTxnRetries] = incrementByTxnRetries(numUpdates, numTxnRetries);
 
@@ -337,7 +365,9 @@ function runTest({isShardedColl, execCtxType}) {
     // preImage:   {_id: 17, a: {x: {i: 17, ii: 17}, y: 17}, b: 17, c: 17}
     // postImage:  {_id: 17, a: {x: {i: 17, ii: 17}, y: 17}, b: 17]}
     runCmd((coll) =>
-        assert.commandWorked(coll.update({"a.x.i": 17}, {_id: 17, a: {x: {i: 17, ii: 17}, y: 17}, b: 17})),
+        assert.commandWorked(
+            coll.update({"a.x.i": 17}, {_id: 17, a: {x: {i: 17, ii: 17}, y: 17}, b: 17}),
+        ),
     );
     [numUpdates, numTxnRetries] = incrementByTxnRetries(numUpdates, numTxnRetries);
 

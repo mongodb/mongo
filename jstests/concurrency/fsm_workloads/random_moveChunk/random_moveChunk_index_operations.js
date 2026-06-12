@@ -67,8 +67,13 @@ export const $config = (function () {
             // Pick a chunk from that thread's collection
             const chunkColl = db.getSiblingDB("config").chunks;
             const targetNs = db.getName() + "." + targetThreadColl;
-            const chunksJoinClause = findChunksUtil.getChunksJoinClause(db.getSiblingDB("config"), targetNs);
-            const randomChunk = chunkColl.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}]).toArray()[0];
+            const chunksJoinClause = findChunksUtil.getChunksJoinClause(
+                db.getSiblingDB("config"),
+                targetNs,
+            );
+            const randomChunk = chunkColl
+                .aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
+                .toArray()[0];
             const fromShard = randomChunk.shard;
             const bounds = [randomChunk.min, randomChunk.max];
 
@@ -96,7 +101,8 @@ export const $config = (function () {
                     (e.code && acceptableCodes.includes(e.code)) ||
                     // Indexes may be transiently inconsistent across shards, which can lead a
                     // concurrent migration to abort if the recipient's collection is non-empty.
-                    (e.code === ErrorCodes.OperationFailed && e.message.includes("CannotCreateCollection"))
+                    (e.code === ErrorCodes.OperationFailed &&
+                        e.message.includes("CannotCreateCollection"))
                 ) {
                     print("Ignoring acceptable moveChunk error: " + tojson(e));
                     return;
@@ -117,7 +123,9 @@ export const $config = (function () {
             assert.commandWorked(
                 db.runCommand({
                     createIndexes: this.collName,
-                    indexes: [{key: index, name: indexName, expireAfterSeconds: data.expireAfterSeconds}],
+                    indexes: [
+                        {key: index, name: indexName, expireAfterSeconds: data.expireAfterSeconds},
+                    ],
                 }),
             );
 
@@ -196,7 +204,10 @@ export const $config = (function () {
                         assert.hasFields(indexList, ["indexes"]);
                         const indexes = indexList["indexes"];
                         const indexKeyPatterns = indexes.map((index) => getKeyPattern(index));
-                        return ShardedIndexUtil.containsBSONIgnoreFieldsOrder(indexKeyPatterns, expectedIndex);
+                        return ShardedIndexUtil.containsBSONIgnoreFieldsOrder(
+                            indexKeyPatterns,
+                            expectedIndex,
+                        );
                     });
                     if (!match) {
                         print(
@@ -209,11 +220,16 @@ export const $config = (function () {
                 }
 
                 // Check that each shard has each reported index.
-                const inconsistentIndexes = ShardedIndexUtil.findInconsistentIndexesAcrossShards(actualIndexes, false);
+                const inconsistentIndexes = ShardedIndexUtil.findInconsistentIndexesAcrossShards(
+                    actualIndexes,
+                    false,
+                );
                 for (const shard in inconsistentIndexes) {
                     const shardInconsistentIndexes = inconsistentIndexes[shard];
                     if (shardInconsistentIndexes.length !== 0) {
-                        print(`found inconsistent indexes for ${collName}: ${tojson(inconsistentIndexes)}`);
+                        print(
+                            `found inconsistent indexes for ${collName}: ${tojson(inconsistentIndexes)}`,
+                        );
                         return false;
                     }
                 }
@@ -234,10 +250,28 @@ export const $config = (function () {
         // First step should always be to create an index so that we can have at least one index to
         // drop or modify when transitioning to either dropIndexes or collMod.
         init: {createIndexes: 1.0},
-        createIndexes: {moveChunk: 0.4, createIndexes: 0.15, dropIndexes: 0.15, collMod: 0.15, verifyIndexes: 0.15},
+        createIndexes: {
+            moveChunk: 0.4,
+            createIndexes: 0.15,
+            dropIndexes: 0.15,
+            collMod: 0.15,
+            verifyIndexes: 0.15,
+        },
         moveChunk: {createIndexes: 0.25, dropIndexes: 0.25, collMod: 0.25, verifyIndexes: 0.25},
-        dropIndexes: {moveChunk: 0.4, createIndexes: 0.15, dropIndexes: 0.15, collMod: 0.15, verifyIndexes: 0.15},
-        collMod: {moveChunk: 0.4, createIndexes: 0.15, dropIndexes: 0.15, collMod: 0.15, verifyIndexes: 0.15},
+        dropIndexes: {
+            moveChunk: 0.4,
+            createIndexes: 0.15,
+            dropIndexes: 0.15,
+            collMod: 0.15,
+            verifyIndexes: 0.15,
+        },
+        collMod: {
+            moveChunk: 0.4,
+            createIndexes: 0.15,
+            dropIndexes: 0.15,
+            collMod: 0.15,
+            verifyIndexes: 0.15,
+        },
         verifyIndexes: {moveChunk: 0.25, createIndexes: 0.25, dropIndexes: 0.25, collMod: 0.25},
     };
 

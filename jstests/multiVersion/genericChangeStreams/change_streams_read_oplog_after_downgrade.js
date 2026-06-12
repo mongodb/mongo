@@ -24,7 +24,9 @@ const st = new ShardingTest({
         setParameter: {logComponentVerbosity: "{command: {verbosity: 2}}"},
     },
     other: {
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+        configOptions: {
+            setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000},
+        },
         mongosOptions: {binVersion: "latest"},
     },
     // By default, our test infrastructure sets the election timeout to a very high value (24
@@ -34,7 +36,9 @@ const st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 let shardedColl = st.s.getDB(dbName)[collName];
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {sk: 1}}));
 
@@ -125,7 +129,9 @@ const standardTestCases = [
             assert.commandWorked(
                 coll.runCommand({
                     update: shardedColl.getName(),
-                    updates: [{q: {sk: -2}, u: [{$replaceRoot: {newRoot: {sk: -2, largeStr: largeStr}}}]}],
+                    updates: [
+                        {q: {sk: -2}, u: [{$replaceRoot: {newRoot: {sk: -2, largeStr: largeStr}}}]},
+                    ],
                 }),
             );
         },
@@ -189,9 +195,11 @@ const standardTestCases = [
         generateOpLogEntry: function (coll) {
             assert.commandWorked(coll.insert({sk: 2, a: 1}));
             assert.commandWorked(
-                coll
-                    .getDB()
-                    .adminCommand({reshardCollection: coll.getFullName(), key: {sk: 1, a: 1}, numInitialChunks: 1}),
+                coll.getDB().adminCommand({
+                    reshardCollection: coll.getFullName(),
+                    key: {sk: 1, a: 1},
+                    numInitialChunks: 1,
+                }),
             );
         },
     },
@@ -231,7 +239,9 @@ const changeStreamsVariants = [
     },
     {
         watch: function (options) {
-            return shardedColl.getDB().watch([], Object.assign(options, {fullDocument: "updateLookup"}));
+            return shardedColl
+                .getDB()
+                .watch([], Object.assign(options, {fullDocument: "updateLookup"}));
         },
     },
     {
@@ -272,7 +282,9 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
 
         // Find the oplog entry for the document inserted above, and return its timestamp.
         const oplog = st.rs0.getPrimary().getCollection("local.oplog.rs");
-        const opLogEntries = oplog.find({op: "i", "o._id": documentId, ns: shardedColl.getFullName()}).toArray();
+        const opLogEntries = oplog
+            .find({op: "i", "o._id": documentId, ns: shardedColl.getFullName()})
+            .toArray();
         assert.eq(opLogEntries.length, 1);
         return opLogEntries[0].ts;
     }
@@ -283,7 +295,9 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
     let testStartTime = createSentinelEntryAndGetTimeStamp(testNum);
     const outputChangeStreams = [];
     for (let testCase of testCases) {
-        jsTestLog(`Opening a change stream for '${testCase.testName}' at startTime: ${tojson(testStartTime)}`);
+        jsTestLog(
+            `Opening a change stream for '${testCase.testName}' at startTime: ${tojson(testStartTime)}`,
+        );
 
         // Capture the 'resumeToken' when the sentinel entry is found. We use the token to resume
         // the stream rather than the 'testStartTime' because resuming from a token adds more stages
@@ -346,7 +360,10 @@ function resumeStreamsOnDowngradedVersion(changeStreams) {
             }
             try {
                 const nextEvent = csCursor.next();
-                return nextEvent.documentKey && nextEvent.documentKey._id == changeStream.endSentinelEntry;
+                return (
+                    nextEvent.documentKey &&
+                    nextEvent.documentKey._id == changeStream.endSentinelEntry
+                );
             } catch (e) {
                 jsTestLog("Error occurred while reading change stream. " + tojson(e));
 
@@ -370,7 +387,9 @@ function runTests(downgradeVersion) {
     const downgradeFCV = downgradeVersion === "last-lts" ? lastLTSFCV : lastContinuousFCV;
     // Downgrade the entire cluster to the 'downgradeVersion' binVersion.
     assert.commandWorked(
-        st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+        st.s
+            .getDB(dbName)
+            .adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
     );
     st.downgradeCluster(downgradeVersion);
 
@@ -387,7 +406,9 @@ runTests("last-continuous");
 
 // Upgrade the entire cluster back to the latest version.
 st.upgradeCluster("latest", {waitUntilStable: true});
-assert.commandWorked(st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 // Test resuming change streams after downgrading the cluster to 'last-lts'.
 runTests("last-lts");

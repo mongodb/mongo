@@ -25,4 +25,7 @@ let err = t.createIndex({geometry: "2dsphere"}, add2dsphereVersionIfNeeded());
 assert.commandFailed(err);
 
 // Document's _id should be in error message.
-assert(-1 != err.errmsg.indexOf("42"), "Error message didn't contain document _id.\nMessage: \"" + err.errmsg + '"\n');
+assert(
+    -1 != err.errmsg.indexOf("42"),
+    "Error message didn't contain document _id.\nMessage: \"" + err.errmsg + '"\n',
+);

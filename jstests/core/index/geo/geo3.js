@@ -22,7 +22,9 @@ t.createIndex({loc: "2d"});
 
 // Test the "query" parameter in $geoNear.
 
-let res = t.aggregate([{$geoNear: {near: [50, 50], distanceField: "dist", query: {a: 2}}}, {$limit: 10}]).toArray();
+let res = t
+    .aggregate([{$geoNear: {near: [50, 50], distanceField: "dist", query: {a: 2}}}, {$limit: 10}])
+    .toArray();
 assert.eq(10, res.length, tojson(res));
 res.forEach((doc) => assert.eq(2, doc.a, tojson(doc)));
 
@@ -51,7 +53,9 @@ testFiltering("just loc");
 assert.commandWorked(t.dropIndex({loc: "2d"}));
 assert.commandWorked(t.createIndex({loc: "2d", a: 1}));
 
-res = t.aggregate([{$geoNear: {near: [50, 50], distanceField: "dist", query: {a: 2}}}, {$limit: 10}]).toArray();
+res = t
+    .aggregate([{$geoNear: {near: [50, 50], distanceField: "dist", query: {a: 2}}}, {$limit: 10}])
+    .toArray();
 assert.eq(10, res.length, "B3");
 res.forEach((doc) => assert.eq(2, doc.a, tojson(doc)));
 

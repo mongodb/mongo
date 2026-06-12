@@ -12,7 +12,10 @@ import {
 } from "jstests/with_mongot/search_mocked/lib/server_85694_query_constants.js";
 
 let nodeOptions = {
-    setParameter: {enableTestCommands: 1, logComponentVerbosity: tojson({query: 5, command: 2, network: 0})},
+    setParameter: {
+        enableTestCommands: 1,
+        logComponentVerbosity: tojson({query: 5, command: 2, network: 0}),
+    },
 };
 
 const stWithMock = new ShardingTestWithMongotMock({
@@ -38,7 +41,9 @@ const coll = testDB.getCollection(collName);
 
 const singleResultId = ObjectId("65ba75afca88f584bdbac735");
 
-assert.commandWorked(coll.insertOne({_id: singleResultId, openfda: {manufacturer_name: "Factory", route: ["ORAL"]}}));
+assert.commandWorked(
+    coll.insertOne({_id: singleResultId, openfda: {manufacturer_name: "Factory", route: ["ORAL"]}}),
+);
 
 // Set the mock responses for a query which includes the result cursors.
 function setQueryMockResponses(isSearchMeta) {
@@ -80,7 +85,9 @@ function setQueryMockResponses(isSearchMeta) {
 // returned by mongot(mock).
 function testSearchQuery() {
     setQueryMockResponses(false);
-    let queryResult = coll.aggregate([{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}]).toArray();
+    let queryResult = coll
+        .aggregate([{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}])
+        .toArray();
     assert.eq([{_id: singleResultId, meta: expectedSearchMeta}], queryResult);
 }
 

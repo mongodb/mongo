@@ -114,14 +114,26 @@ function checkResults(result, assertExecutionStatsCallback) {
 }
 
 for (let pipeline of [pipelineShardedStages, pipelineNoShardedStages, facet]) {
-    checkResults(coll.explain("executionStats").aggregate(pipeline), assertStageExecutionStatsPresent);
-    checkResults(coll.explain("allPlansExecution").aggregate(pipeline), assertStageExecutionStatsPresent);
+    checkResults(
+        coll.explain("executionStats").aggregate(pipeline),
+        assertStageExecutionStatsPresent,
+    );
+    checkResults(
+        coll.explain("allPlansExecution").aggregate(pipeline),
+        assertStageExecutionStatsPresent,
+    );
 }
 
 // Only test $changeStream if we are on a replica set or on a sharded cluster.
 if (FixtureHelpers.isReplSet(db) || FixtureHelpers.isSharded(coll)) {
-    checkResults(coll.explain("executionStats").aggregate(changeStream), assertStageExecutionStatsPresent);
-    checkResults(coll.explain("allPlansExecution").aggregate(changeStream), assertStageExecutionStatsPresent);
+    checkResults(
+        coll.explain("executionStats").aggregate(changeStream),
+        assertStageExecutionStatsPresent,
+    );
+    checkResults(
+        coll.explain("allPlansExecution").aggregate(changeStream),
+        assertStageExecutionStatsPresent,
+    );
 }
 
 // Returns the number of documents
@@ -137,7 +149,10 @@ function numberOfDocsReturnedByMatchStage(explain) {
 }
 
 const matchPipeline = [{$_internalInhibitOptimization: {}}, {$match: {a: {$gte: 500}}}];
-assert.eq(numberOfDocsReturnedByMatchStage(coll.explain("executionStats").aggregate(matchPipeline)), 500);
+assert.eq(
+    numberOfDocsReturnedByMatchStage(coll.explain("executionStats").aggregate(matchPipeline)),
+    500,
+);
 
 // Checks $group totalOutputDataSizeBytes execution statistic.
 (function testGroupStatTotalDataSizeBytes() {

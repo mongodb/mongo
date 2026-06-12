@@ -221,14 +221,20 @@ let st = new ShardingTest({
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard0.name}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: "test.user", middle: {x: 0}}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.name}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.name}),
+);
 
 // Insert documents to prime mongos and shards with the latest sharding metadata.
 let testDB = st.s0.getDB("test");
@@ -308,7 +314,9 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
     // participant shards).
     waitForCommitTransactionToComplete(st.rs0, lsid, txnNumber);
 
-    assert.commandWorked(st.rs1.getPrimary().getDB("config").transactions.remove({}, false /* justOne */));
+    assert.commandWorked(
+        st.rs1.getPrimary().getDB("config").transactions.remove({}, false /* justOne */),
+    );
 
     assert.commandFailedWithCode(
         sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken),
@@ -330,7 +338,10 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
 
     const recoveryShardReplSetTest = st.rs1;
 
-    stopReplicationOnSecondaries(recoveryShardReplSetTest, false /* changeReplicaSetDefaultWCToLocal */);
+    stopReplicationOnSecondaries(
+        recoveryShardReplSetTest,
+        false /* changeReplicaSetDefaultWCToLocal */,
+    );
 
     // Do a write on the recovery node to bump the recovery node's system last OpTime. We do this
     // write with {w: 1} because we stopped replication on secondaries so anything else is
@@ -352,7 +363,9 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
     // Once the recovery shard primary can majority commit writes again, commitTransaction
     // returns NoSuchTransaction without a writeConcern error.
     restartReplicationOnSecondaries(recoveryShardReplSetTest);
-    res = sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}});
+    res = sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken, {
+        writeConcern: {w: "majority"},
+    });
     assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
     assert.eq(null, res.writeConcernError);
 })();
@@ -367,7 +380,10 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
 
     const recoveryShardReplSetTest = st.rs1;
 
-    stopReplicationOnSecondaries(recoveryShardReplSetTest, false /* changeReplicaSetDefaultWCToLocal */);
+    stopReplicationOnSecondaries(
+        recoveryShardReplSetTest,
+        false /* changeReplicaSetDefaultWCToLocal */,
+    );
 
     // Do a write on the recovery node to bump the recovery node's system last OpTime. We do this
     // write with {w: 1} because we stopped replication on secondaries so anything else is
@@ -389,7 +405,11 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
     // Once the recovery shard primary can majority commit writes again, commitTransaction
     // returns ok without a writeConcern error.
     restartReplicationOnSecondaries(recoveryShardReplSetTest);
-    assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken, {
+            writeConcern: {w: "majority"},
+        }),
+    );
 })();
 
 //
@@ -576,15 +596,18 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
 
     // Set the transaction expiry to be very high, so we can ascertain the recovery request
     // through the alternate router is what causes the transaction to abort.
-    const getParamRes = st.rs1.getPrimary().adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1});
+    const getParamRes = st.rs1
+        .getPrimary()
+        .adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1});
     assert.commandWorked(getParamRes);
     assert.neq(null, getParamRes.transactionLifetimeLimitSeconds);
     const originalTransactionLifetimeLimitSeconds = getParamRes.transactionLifetimeLimitSeconds;
 
     assert.commandWorked(
-        st.rs1
-            .getPrimary()
-            .adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60 * 60 * 1000 /* 1000 hours */}),
+        st.rs1.getPrimary().adminCommand({
+            setParameter: 1,
+            transactionLifetimeLimitSeconds: 60 * 60 * 1000 /* 1000 hours */,
+        }),
     );
 
     const recoveryToken = startNewMultiShardWriteTransaction();
@@ -600,9 +623,10 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) 
     );
 
     assert.commandWorked(
-        st.rs1
-            .getPrimary()
-            .adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalTransactionLifetimeLimitSeconds}),
+        st.rs1.getPrimary().adminCommand({
+            setParameter: 1,
+            transactionLifetimeLimitSeconds: originalTransactionLifetimeLimitSeconds,
+        }),
     );
 })();
 

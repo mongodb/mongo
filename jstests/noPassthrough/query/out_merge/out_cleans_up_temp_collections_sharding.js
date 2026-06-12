@@ -26,7 +26,11 @@ function runOut(dbName, sourceCollName, targetCollName, expectCommandWorked, tim
         aggregate: sourceCollName,
         pipeline: [
             {
-                $out: {db: dbName, coll: targetCollName, timeseries: timeseries ? {timeField: "t"} : null},
+                $out: {
+                    db: dbName,
+                    coll: targetCollName,
+                    timeseries: timeseries ? {timeField: "t"} : null,
+                },
             },
         ],
         cursor: {},
@@ -108,7 +112,9 @@ function testFn(timeseries, failFn, userWriteBlockMode = false) {
     // Check the temporary collection was annotated to the garbage-collector collection.
     assert.eq(
         1,
-        shardPrimaryNode.getDB("config")["agg_temp_collections"].count({_id: dbName + "." + tempCollections[0]}),
+        shardPrimaryNode
+            .getDB("config")
+            ["agg_temp_collections"].count({_id: dbName + "." + tempCollections[0]}),
     );
 
     if (userWriteBlockMode) {
@@ -129,7 +135,10 @@ function testFn(timeseries, failFn, userWriteBlockMode = false) {
     assert.soon(
         () => {
             let tempCollections = getTempCollections();
-            let garbageCollectionEntries = st.rs0.getPrimary().getDB("config")["agg_temp_collections"].count();
+            let garbageCollectionEntries = st.rs0
+                .getPrimary()
+                .getDB("config")
+                ["agg_temp_collections"].count();
 
             return tempCollections.length === 0 && garbageCollectionEntries === 0;
         },

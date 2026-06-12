@@ -66,7 +66,10 @@ curOp = primary
     .aggregate([{$currentOp: {}}, {$match: curOpFilter}])
     .toArray();
 assert(curOp.length == 1);
-assert(curOp[0].hasOwnProperty("dataThroughputLastSecond") && curOp[0].hasOwnProperty("dataThroughputAverage"));
+assert(
+    curOp[0].hasOwnProperty("dataThroughputLastSecond") &&
+        curOp[0].hasOwnProperty("dataThroughputAverage"),
+);
 
 // Finish up validating the collection.
 cursorDataSizeFailPoint.off();

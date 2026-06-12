@@ -34,7 +34,9 @@ const runTest = function (isCorrupted = false) {
     const collName = "coll_" + collCount++;
     const coll = db[collName];
 
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
 
     const uncompressedBucket = {
         _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -69,7 +71,9 @@ const runTest = function (isCorrupted = false) {
     };
 
     jsTestLog("Insert uncompressed bucket document.");
-    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket, getRawOperationSpec(db)));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket, getRawOperationSpec(db)),
+    );
     assert.eq(coll.find().itcount(), 2);
     assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
     assert.eq(
@@ -81,7 +85,9 @@ const runTest = function (isCorrupted = false) {
         jsTestLog("Corrupting the bucket by adding an extra data field.");
         // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
         assert.commandWorked(
-            conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+            conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
         );
 
         // Corrupt the uncompressed bucket by adding an extra data field to it. This
@@ -96,7 +102,9 @@ const runTest = function (isCorrupted = false) {
 
         // Disable allowing inconsistent state on buckets
         assert.commandWorked(
-            conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
+            conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
         );
 
         jsTestLog(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
@@ -121,7 +129,9 @@ const runTest = function (isCorrupted = false) {
 
     if (isCorrupted) {
         assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 2);
-        jsTestLog("Remove corrupted bucket to prevent the validate post-hook from seeing it after the test.");
+        jsTestLog(
+            "Remove corrupted bucket to prevent the validate post-hook from seeing it after the test.",
+        );
         assert.commandWorked(
             getTimeseriesCollForRawOps(db, coll).remove(
                 {_id: ObjectId("65a6eb806ffc9fa4280ecac4")},

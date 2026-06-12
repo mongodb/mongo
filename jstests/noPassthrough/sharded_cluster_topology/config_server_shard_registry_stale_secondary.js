@@ -55,7 +55,9 @@ configRS.awaitReplication();
 // ---------------------------------------------------------------------------
 // Step 2: Stop replication on one secondary to make it stale.
 // ---------------------------------------------------------------------------
-jsTestLog("Step 2: Stopping replication on config secondary " + staleSecondary.host + " to make it stale");
+jsTestLog(
+    "Step 2: Stopping replication on config secondary " + staleSecondary.host + " to make it stale",
+);
 stopServerReplication(staleSecondary);
 
 // ---------------------------------------------------------------------------

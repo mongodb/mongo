@@ -26,7 +26,10 @@ const runTestCollectionNoCollation = () => {
     insertData(coll);
 
     const results = coll
-        .aggregate([{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100", "1000"]}}], numericOrdering)
+        .aggregate(
+            [{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100", "1000"]}}],
+            numericOrdering,
+        )
         .toArray();
     assert.eq(3, results.length);
     assert.eq({_id: "1", count: 3}, results[0]);
@@ -47,7 +50,9 @@ const runTestCollectionWithCollation = () => {
     insertData(coll);
 
     // Test that $bucket respects the inherited collation.
-    let results = coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100", "1000"]}}]).toArray();
+    let results = coll
+        .aggregate([{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100", "1000"]}}])
+        .toArray();
     assert.eq(3, results.length);
     assert.eq({_id: "1", count: 3}, results[0]);
     assert.eq({_id: "10", count: 3}, results[1]);
@@ -63,14 +68,22 @@ const runTestCollectionWithCollation = () => {
     );
 
     // Test that $bucket rejects boundaries that are not sorted according to the collation.
-    assert.throws(() => coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["100", "20", "4"]}}]));
+    assert.throws(() =>
+        coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["100", "20", "4"]}}]),
+    );
 
     assert.throws(() =>
-        coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["4", "20", "100"]}}], {collation: {locale: "simple"}}),
+        coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["4", "20", "100"]}}], {
+            collation: {locale: "simple"},
+        }),
     );
 
     // Test that $bucket rejects a default value that falls within the boundaries.
-    assert.throws(() => coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100"], default: "40"}}]));
+    assert.throws(() =>
+        coll.aggregate([
+            {$bucket: {groupBy: "$num", boundaries: ["1", "10", "100"], default: "40"}},
+        ]),
+    );
 
     assert.throws(() =>
         coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["100", "999"], default: "2"}}], {

@@ -15,7 +15,11 @@ const coll = db[collName];
 coll.drop();
 
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"}),
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "samplingCE",
+    }),
 );
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 2, b: 2}));

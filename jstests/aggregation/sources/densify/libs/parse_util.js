@@ -5,7 +5,10 @@
 export let parseUtil = function (db, coll, stageName, options = {}) {
     function run(stage, extraCommandArgs = options) {
         return coll.runCommand(
-            Object.merge({aggregate: coll.getName(), pipeline: [stage], cursor: {}}, extraCommandArgs),
+            Object.merge(
+                {aggregate: coll.getName(), pipeline: [stage], cursor: {}},
+                extraCommandArgs,
+            ),
         );
     }
 
@@ -41,7 +44,11 @@ export let parseUtil = function (db, coll, stageName, options = {}) {
         );
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a", partitionByFields: "incorrect", range: {step: 1.0, bounds: "full"}},
+                [stageName]: {
+                    field: "a",
+                    partitionByFields: "incorrect",
+                    range: {step: 1.0, bounds: "full"},
+                },
             }),
             ErrorCodes.TypeMismatch,
             "BSON field '$densify.partitionByFields' is the wrong type 'string', expected type 'array'",
@@ -50,21 +57,33 @@ export let parseUtil = function (db, coll, stageName, options = {}) {
         // 'partitionByFields' contains the field that is being desified.
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a", partitionByFields: ["a"], range: {step: 1.0, bounds: "full"}},
+                [stageName]: {
+                    field: "a",
+                    partitionByFields: ["a"],
+                    range: {step: 1.0, bounds: "full"},
+                },
             }),
             8993000,
             "BSON field '$densify.partitionByFields' contains the field that is being densified",
         );
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a.b", partitionByFields: ["a"], range: {step: 1.0, bounds: "full"}},
+                [stageName]: {
+                    field: "a.b",
+                    partitionByFields: ["a"],
+                    range: {step: 1.0, bounds: "full"},
+                },
             }),
             9554500,
             "The field that is being densified contains the BSON field '$densify.partitionByFields'",
         );
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a", partitionByFields: ["a.b"], range: {step: 1.0, bounds: "full"}},
+                [stageName]: {
+                    field: "a",
+                    partitionByFields: ["a.b"],
+                    range: {step: 1.0, bounds: "full"},
+                },
             }),
             8993000,
             "BSON field '$densify.partitionByFields' contains the field that is being densified",
@@ -118,7 +137,11 @@ export let parseUtil = function (db, coll, stageName, options = {}) {
         // Field path expression instead of field path
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a", partitionByFields: ["$b"], range: {step: 1.0, bounds: [0, 1]}},
+                [stageName]: {
+                    field: "a",
+                    partitionByFields: ["$b"],
+                    range: {step: 1.0, bounds: [0, 1]},
+                },
             }),
             16410,
             "FieldPath field names may not start with '$'. Consider using $getField or $setField.",
@@ -126,7 +149,11 @@ export let parseUtil = function (db, coll, stageName, options = {}) {
         // Partition bounds but not partitionByFields
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a", partitionByFields: [], range: {step: 1.0, bounds: "partition"}},
+                [stageName]: {
+                    field: "a",
+                    partitionByFields: [],
+                    range: {step: 1.0, bounds: "partition"},
+                },
             }),
             5733408,
             "one may not specify the bounds as 'partition' without specifying a non-empty array of partitionByFields. You may have meant to specify 'full' bounds.",
@@ -165,7 +192,10 @@ export let parseUtil = function (db, coll, stageName, options = {}) {
         // Mixed numeric and date bounds
         assert.commandFailedWithCode(
             run({
-                [stageName]: {field: "a", range: {step: 1.0, bounds: [1, new ISODate("2020-01-01")]}},
+                [stageName]: {
+                    field: "a",
+                    range: {step: 1.0, bounds: [1, new ISODate("2020-01-01")]},
+                },
             }),
             5733406,
             "a bounding array must contain either both dates or both numeric types",
@@ -243,7 +273,11 @@ export let parseUtil = function (db, coll, stageName, options = {}) {
         );
         assert.commandWorked(
             run({
-                [stageName]: {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "full"}},
+                [stageName]: {
+                    field: "a",
+                    partitionByFields: ["b", "c"],
+                    range: {step: 1.0, bounds: "full"},
+                },
             }),
         );
         assert.commandWorked(

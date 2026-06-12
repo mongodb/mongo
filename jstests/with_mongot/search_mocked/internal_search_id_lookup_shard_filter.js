@@ -9,7 +9,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
  * Verifies that orphaned documents exist on their respective shards when queried directly,
  * but are filtered out when querying via mongos.
  */
-function verifyOrphansFilteredViaMongos({coll, directShard0Coll, directShard1Coll, shard0OrphanIds, shard1OrphanIds}) {
+function verifyOrphansFilteredViaMongos({
+    coll,
+    directShard0Coll,
+    directShard1Coll,
+    shard0OrphanIds,
+    shard1OrphanIds,
+}) {
     const directCountOnShard0 = directShard0Coll.find({_id: {$in: shard0OrphanIds}}).itcount();
     assert.eq(
         directCountOnShard0,
@@ -46,7 +52,9 @@ describe("$_internalSearchIdLookup shard filtering", function () {
         this.testDB = mongos.getDB(dbName);
         this.testColl = this.testDB.getCollection(collName);
 
-        assert.commandWorked(this.testDB.adminCommand({enableSharding: dbName, primaryShard: this.st.shard0.name}));
+        assert.commandWorked(
+            this.testDB.adminCommand({enableSharding: dbName, primaryShard: this.st.shard0.name}),
+        );
 
         // Documents that end up on shard0.
         for (const id of [1, 2, 3, 4, 5, 6, 7, 8]) {
@@ -179,7 +187,11 @@ describe("$_internalSearchIdLookup shard filtering", function () {
         ];
 
         const result = this.testColl.aggregate(pipeline).toArray();
-        assert.eq(result, expectedDocs, "Orphan documents should be filtered out by $_internalSearchIdLookup");
+        assert.eq(
+            result,
+            expectedDocs,
+            "Orphan documents should be filtered out by $_internalSearchIdLookup",
+        );
     });
 
     it("filters orphans across getMore batches", function () {
@@ -245,8 +257,14 @@ describe("$_internalSearchIdLookup shard filtering", function () {
             {_id: 17.5, shardKey: 100},
         ];
 
-        const resultWithSmallBatch = this.testColl.aggregate(pipeline, {cursor: {batchSize: 1}}).toArray();
-        assert.eq(resultWithSmallBatch, expectedDocs, "Orphan filtering should work across getMore batches");
+        const resultWithSmallBatch = this.testColl
+            .aggregate(pipeline, {cursor: {batchSize: 1}})
+            .toArray();
+        assert.eq(
+            resultWithSmallBatch,
+            expectedDocs,
+            "Orphan filtering should work across getMore batches",
+        );
     });
 
     it("filters orphans in $lookup subpipeline", function () {
@@ -342,7 +360,12 @@ describe("$_internalSearchIdLookup shard filtering", function () {
         ];
 
         // Orphans (_id: 15, 17) should not appear.
-        const expectedUnionDocs = [{_id: 2, shardKey: 0}, {_id: 12, shardKey: 100}, {_id: 100}, {_id: 200}];
+        const expectedUnionDocs = [
+            {_id: 2, shardKey: 0},
+            {_id: 12, shardKey: 100},
+            {_id: 100},
+            {_id: 200},
+        ];
 
         const unionResult = baseColl.aggregate(unionPipeline).toArray();
         assert.eq(unionResult, expectedUnionDocs, "$unionWith should filter orphans");

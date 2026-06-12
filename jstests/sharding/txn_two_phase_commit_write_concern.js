@@ -34,10 +34,16 @@ const lsid = {
 };
 let txnNumber = 0;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
@@ -193,7 +199,9 @@ function testCommitDecisionWriteConcern(writeConcern) {
     }
     assertDecisionCommittedOnNodes(st.rs0, st.rs0.nodes.length - nodesToStopReplication.length);
 
-    jsTest.log("Verify that the coordinator doc is majority committed regardless of the client's writeConcern");
+    jsTest.log(
+        "Verify that the coordinator doc is majority committed regardless of the client's writeConcern",
+    );
     // Re-enable replication to allow the decision to be majority committed and two-phase
     // commit to finish.
     if (nodesToStopReplication.length > 0) {
@@ -205,7 +213,9 @@ function testCommitDecisionWriteConcern(writeConcern) {
     deleteCoordDocFailPoint.off();
 
     jsTest.log("Verify the insert operation was committed successfully");
-    let res = assert.commandWorked(st.s.getDB(kDbName).runCommand({find: kCollName, filter: {$or: docs}, lsid: lsid}));
+    let res = assert.commandWorked(
+        st.s.getDB(kDbName).runCommand({find: kCollName, filter: {$or: docs}, lsid: lsid}),
+    );
     assert.eq(2, res.cursor.firstBatch.length);
 
     txnNumber++;

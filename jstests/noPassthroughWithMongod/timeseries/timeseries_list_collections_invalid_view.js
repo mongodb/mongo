@@ -21,7 +21,9 @@ assert.commandWorked(testDB.dropDatabase());
 const timeFieldName = "time";
 const coll = testDB.getCollection("t");
 
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+);
 if (areViewlessTimeseriesEnabled(db)) {
     assert.commandWorked(
         testDB.createCollection("my_view", {
@@ -32,11 +34,20 @@ if (areViewlessTimeseriesEnabled(db)) {
 }
 assert.commandWorked(
     testDB.adminCommand({
-        applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: {_id: "invalid", pipeline: "invalid"}}],
+        applyOps: [
+            {
+                op: "i",
+                ns: testDB.getName() + ".system.views",
+                o: {_id: "invalid", pipeline: "invalid"},
+            },
+        ],
     }),
 );
 
-assert.commandFailedWithCode(testDB.runCommand({listCollections: 1}), ErrorCodes.InvalidViewDefinition);
+assert.commandFailedWithCode(
+    testDB.runCommand({listCollections: 1}),
+    ErrorCodes.InvalidViewDefinition,
+);
 assert.commandFailedWithCode(
     testDB.runCommand({listCollections: 1, ...kRawOperationSpec}),
     ErrorCodes.InvalidViewDefinition,
@@ -71,6 +82,10 @@ assert(collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db,
 // However, this restriction isn't in place on earlier versions and its possible for users to
 // upgrade to this version with a dropped system.views collection while having time-series
 // collections present. This allows us to continue to test the behaviour of this scenario.
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "alwaysOn"}),
+);
 assert(testDB.system.views.drop());
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "off"}),
+);

@@ -48,7 +48,8 @@ function verifyChangeStreamReturnsResumableChangeStreamErrorOnNodeRollback(rollb
         [],
     );
     assert(
-        response.hasOwnProperty("errorLabels") && response.errorLabels.includes("ResumableChangeStreamError"),
+        response.hasOwnProperty("errorLabels") &&
+            response.errorLabels.includes("ResumableChangeStreamError"),
         `Expected "ResumableChangeStreamError" label in the "getMore" command response: ${tojson(response)}`,
     );
 }
@@ -63,7 +64,9 @@ replicaSetRollbackTest.stop();
 const shardingTest = new ShardingTest({
     shards: 1,
     mongos: 1,
-    configReplSetTestOptions: {settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis}},
+    configReplSetTestOptions: {
+        settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis},
+    },
     config: [{}, {}, {rsConfig: {priority: 0}}],
     other: {useBridge: true},
 });

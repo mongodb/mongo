@@ -51,7 +51,9 @@ function createTestRoleAndUser(db, roleName, privs) {
     assert.commandWorked(admin.runCommand({createRole: roleName, roles: [], privileges: privs}));
 
     const userName = "user|" + roleName;
-    assert.commandWorked(db.runCommand({createUser: userName, pwd: "pwd", roles: [{role: roleName, db: "admin"}]}));
+    assert.commandWorked(
+        db.runCommand({createUser: userName, pwd: "pwd", roles: [{role: roleName, db: "admin"}]}),
+    );
 }
 
 function runTestOnRole(db, roleName, expectedColls) {
@@ -72,7 +74,12 @@ function runTestOnRole(db, roleName, expectedColls) {
     assert.commandWorked(res);
     assert.eq(expectedColls.sort(nameSort), res.cursor.firstBatch.sort(nameSort));
 
-    res = db.runCommand({listCollections: 1, nameOnly: true, authorizedCollections: true, filter: {"name": "foo"}});
+    res = db.runCommand({
+        listCollections: 1,
+        nameOnly: true,
+        authorizedCollections: true,
+        filter: {"name": "foo"},
+    });
     assert.commandWorked(res);
     if (roleName.indexOf("Buckets") != -1) {
         assert.eq([resFooTS], res.cursor.firstBatch);
@@ -143,16 +150,30 @@ function runTestOnConnection(conn) {
     admin.logout();
 
     runTestOnRole(db, "roleWithExactNamespacePrivileges", [resFoo, resBar]);
-    runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivileges", [resFoo, resBar, resSystemViews]);
+    runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivileges", [
+        resFoo,
+        resBar,
+        resSystemViews,
+    ]);
 
     runTestOnRole(db, "roleWithCollectionPrivileges", [resFoo, resBar]);
     runTestOnRole(db, "roleWithCollectionAndSystemPrivileges", [resFoo, resBar, resSystemViews]);
 
     runTestOnRole(db, "roleWithDatabasePrivileges", [resFoo, resBar, ...resOther]);
-    runTestOnRole(db, "roleWithDatabaseAndSystemPrivileges", [resFoo, resBar, ...resOther, resSystemViews]);
+    runTestOnRole(db, "roleWithDatabaseAndSystemPrivileges", [
+        resFoo,
+        resBar,
+        ...resOther,
+        resSystemViews,
+    ]);
 
     runTestOnRole(db, "roleWithAnyNormalResourcePrivileges", [resFoo, resBar, ...resOther]);
-    runTestOnRole(db, "roleWithAnyNormalResourceAndSystemPrivileges", [resFoo, resBar, ...resOther, resSystemViews]);
+    runTestOnRole(db, "roleWithAnyNormalResourceAndSystemPrivileges", [
+        resFoo,
+        resBar,
+        ...resOther,
+        resSystemViews,
+    ]);
 }
 
 function runSystemsBucketsTestOnConnection(conn, isMongod) {
@@ -219,7 +240,11 @@ function runSystemsBucketsTestOnConnection(conn, isMongod) {
         runTestOnRole(db, "roleWithAnySystemBucketsInDB", [resFooTS, resBarTS]);
         runTestOnRole(db, "roleWithAnySystemBuckets", [resFooTS, resBarTS]);
     } else {
-        runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resBarTS, resSBFoo]);
+        runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [
+            resFooTS,
+            resBarTS,
+            resSBFoo,
+        ]);
         runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resBarTS, resSBFoo]);
         runTestOnRole(db, "roleWithAnySystemBucketsInDB", [resFooTS, resBarTS, resSBFoo, resSBBar]);
         runTestOnRole(db, "roleWithAnySystemBuckets", [resFooTS, resBarTS, resSBFoo, resSBBar]);
@@ -238,13 +263,23 @@ function runNoAuthTestOnConnection(conn) {
     assert.commandWorked(resFull);
     let resAuthColls = db.runCommand({listCollections: 1, authorizedCollections: true});
     assert.commandWorked(resAuthColls);
-    assert.eq(resFull.cursor.firstBatch.sort(nameSort), resAuthColls.cursor.firstBatch.sort(nameSort));
+    assert.eq(
+        resFull.cursor.firstBatch.sort(nameSort),
+        resAuthColls.cursor.firstBatch.sort(nameSort),
+    );
 
     let resNameOnly = db.runCommand({listCollections: 1, nameOnly: true});
     assert.commandWorked(resNameOnly);
-    let resNameOnlyAuthColls = db.runCommand({listCollections: 1, nameOnly: true, authorizedCollections: true});
+    let resNameOnlyAuthColls = db.runCommand({
+        listCollections: 1,
+        nameOnly: true,
+        authorizedCollections: true,
+    });
     assert.commandWorked(resNameOnlyAuthColls);
-    assert.eq(resNameOnly.cursor.firstBatch.sort(nameSort), resNameOnlyAuthColls.cursor.firstBatch.sort(nameSort));
+    assert.eq(
+        resNameOnly.cursor.firstBatch.sort(nameSort),
+        resNameOnlyAuthColls.cursor.firstBatch.sort(nameSort),
+    );
 
     let resWithFilter = db.runCommand({
         listCollections: 1,
@@ -261,7 +296,12 @@ runTestOnConnection(mongod);
 runSystemsBucketsTestOnConnection(mongod, true);
 MongoRunner.stopMongod(mongod);
 
-const st = new ShardingTest({shards: 1, mongos: 1, config: 1, other: {keyFile: "jstests/libs/key1"}});
+const st = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    config: 1,
+    other: {keyFile: "jstests/libs/key1"},
+});
 runTestOnConnection(st.s0);
 runSystemsBucketsTestOnConnection(st.s0, false);
 st.stop();

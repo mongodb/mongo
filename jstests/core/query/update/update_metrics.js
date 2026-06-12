@@ -39,7 +39,11 @@ let serverStatusBeforeTest = testDB.serverStatus();
 const updateField = TestData.runningWithBulkWriteOverride ? "bulkWrite" : "update";
 
 // Verify that the metrics.commands[updateField].pipeline counter is present.
-assert.gte(serverStatusBeforeTest.metrics.commands[updateField].pipeline, 0, tojson(serverStatusBeforeTest));
+assert.gte(
+    serverStatusBeforeTest.metrics.commands[updateField].pipeline,
+    0,
+    tojson(serverStatusBeforeTest),
+);
 
 // Verify that that update command without aggregation pipeline-style update does not increment the
 // counter.
@@ -63,7 +67,11 @@ assert.eq(
 serverStatusBeforeTest = testDB.serverStatus();
 
 // Verify that the metrics.commands[updateField].arrayFilters counter is present.
-assert.gte(serverStatusBeforeTest.metrics.commands[updateField].arrayFilters, 0, tojson(serverStatusBeforeTest));
+assert.gte(
+    serverStatusBeforeTest.metrics.commands[updateField].arrayFilters,
+    0,
+    tojson(serverStatusBeforeTest),
+);
 
 // Verify that that update command without arrayFilters does not increment the counter.
 assert.commandWorked(coll.update({key: 1}, {$set: {value: 5}}));
@@ -75,7 +83,13 @@ assert.eq(
 );
 
 // Verify that that update command with arrayFilters increments the counter.
-assert.commandWorked(coll.update({key: 1}, {$set: {"array.$[element]": 20}}, {arrayFilters: [{"element": {$gt: 6}}]}));
+assert.commandWorked(
+    coll.update(
+        {key: 1},
+        {$set: {"array.$[element]": 20}},
+        {arrayFilters: [{"element": {$gt: 6}}]},
+    ),
+);
 serverStatusAfterTest = testDB.serverStatus();
 assert.eq(
     serverStatusBeforeTest.metrics.commands[updateField].arrayFilters + 1,
@@ -91,7 +105,11 @@ assert.commandWorked(
     ]),
 );
 assert.commandWorked(
-    coll.update({}, {$set: {"array.$[element]": 20}}, {multi: true, arrayFilters: [{"element": {$gt: 6}}]}),
+    coll.update(
+        {},
+        {$set: {"array.$[element]": 20}},
+        {multi: true, arrayFilters: [{"element": {$gt: 6}}]},
+    ),
 );
 serverStatusAfterTest = testDB.serverStatus();
 assert.eq(
@@ -106,7 +124,9 @@ assert.eq(
 // timeseries updates aren't supported (older binaries / multiversion suites).
 if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
     const tsColl = testDB.update_metrics_timeseries;
-    assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    );
     assert.commandWorked(
         tsColl.insert([
             {t: ISODate(), m: 1, value: 1, array: [5, 10]},
@@ -127,7 +147,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
     // arrayFilters update on a timeseries collection should bump the arrayFilters counter.
     serverStatusBeforeTest = testDB.serverStatus();
     assert.commandWorked(
-        tsColl.update({m: 1}, {$set: {"array.$[element]": 42}}, {multi: true, arrayFilters: [{"element": {$gt: 6}}]}),
+        tsColl.update(
+            {m: 1},
+            {$set: {"array.$[element]": 42}},
+            {multi: true, arrayFilters: [{"element": {$gt: 6}}]},
+        ),
     );
     serverStatusAfterTest = testDB.serverStatus();
     assert.eq(

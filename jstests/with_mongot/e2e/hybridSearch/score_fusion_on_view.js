@@ -26,10 +26,18 @@ import {
  */
 export function createScoreFusionPipeline(inputPipelines, viewPipeline = null) {
     const scoreFusionStage = {
-        $scoreFusion: {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}},
+        $scoreFusion: {
+            input: {pipelines: {}, normalization: "sigmoid"},
+            combination: {method: "avg"},
+        },
     };
 
-    return createHybridSearchPipeline(inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
+    return createHybridSearchPipeline(
+        inputPipelines,
+        viewPipeline,
+        scoreFusionStage,
+        /**isRankFusion*/ false,
+    );
 }
 
 /**
@@ -49,7 +57,13 @@ export function createScoreFusionPipeline(inputPipelines, viewPipeline = null) {
  *     search or vectorSearch stage). Use this to determine whether to compare explain results since
  *     they will otherwise differ if $scoreFusion has a hybrid search input pipeline.
  */
-const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorrectness, isMongotPipeline = false) => {
+const runScoreFusionViewTest = (
+    testName,
+    inputPipelines,
+    viewPipeline,
+    checkCorrectness,
+    isMongotPipeline = false,
+) => {
     runHybridSearchViewTest(
         testName,
         inputPipelines,
@@ -64,8 +78,16 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
     runScoreFusionViewTest(
         "geo_near",
         {
-            a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
-            b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+            a: [
+                {$score: {score: "$x", normalization: "minMaxScaler"}},
+                {$match: {x: {$gt: 3}}},
+                {$sort: {x: -1}},
+            ],
+            b: [
+                {$score: {score: "$y", normalization: "sigmoid"}},
+                {$match: {x: {$lte: 15}}},
+                {$sort: {x: 1}},
+            ],
         },
         [{$geoNear: {spherical: true, near: {type: "Point", coordinates: [1, 1]}}}],
         /*checkCorrectness=**/ true,
@@ -74,8 +96,16 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
     runScoreFusionViewTest(
         "match_with_text",
         {
-            a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
-            b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+            a: [
+                {$score: {score: "$x", normalization: "minMaxScaler"}},
+                {$match: {x: {$gt: 3}}},
+                {$sort: {x: -1}},
+            ],
+            b: [
+                {$score: {score: "$y", normalization: "sigmoid"}},
+                {$match: {x: {$lte: 15}}},
+                {$sort: {x: 1}},
+            ],
         },
         [{$match: {$text: {$search: "foo"}}}],
         /*CheckCorrectness=**/ true,
@@ -128,7 +158,11 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
     runScoreFusionViewTest(
         "score_and_limit",
         {
-            a: [{$score: {score: "$y", normalization: "minMaxScaler"}}, {$sort: {x: 1}}, {$limit: 10}],
+            a: [
+                {$score: {score: "$y", normalization: "minMaxScaler"}},
+                {$sort: {x: 1}},
+                {$limit: 10},
+            ],
             b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$sort: {x: -1}}, {$limit: 8}],
         },
         [{$match: {a: "bar"}}],
@@ -160,7 +194,10 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
                 {$score: {score: {$subtract: [4.0, 2]}, normalization: "sigmoid"}},
                 {$sort: {x: 1}},
             ],
-            b: [{$score: {score: {$subtract: [4.0, 2]}, normalization: "minMaxScaler"}}, {$sort: {x: 1}}],
+            b: [
+                {$score: {score: {$subtract: [4.0, 2]}, normalization: "minMaxScaler"}},
+                {$sort: {x: 1}},
+            ],
             c: [
                 {$match: {"$expr": {$lt: ["$x", 15]}}},
                 {$score: {score: {$subtract: [4.0, 2]}, normalization: "sigmoid"}},
@@ -191,7 +228,11 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
                 {$score: {score: {$add: [10, 2]}, normalization: "minMaxScaler", weight: 0.5}},
                 {$sort: {x: 1}},
             ],
-            b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$sample: {size: 5}}, {$sort: {x: 1}}],
+            b: [
+                {$score: {score: "$x", normalization: "sigmoid"}},
+                {$sample: {size: 5}},
+                {$sort: {x: 1}},
+            ],
         },
         [{$match: {"$expr": {$lt: ["$x", 10]}}}],
         /*checkCorrectness=**/ false,
@@ -329,21 +370,43 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
 // interfere with view resolution of the user provided $unionWith.
 (function testScoreFusionViewWithSubsequentUnionOnSameView() {
     const scoreFusionInputPipelines = {
-        a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
-        b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+        a: [
+            {$score: {score: "$x", normalization: "minMaxScaler"}},
+            {$match: {x: {$gt: 3}}},
+            {$sort: {x: -1}},
+        ],
+        b: [
+            {$score: {score: "$y", normalization: "sigmoid"}},
+            {$match: {x: {$lte: 15}}},
+            {$sort: {x: 1}},
+        ],
     };
 
-    testHybridSearchViewWithSubsequentUnionOnSameView(scoreFusionInputPipelines, createScoreFusionPipeline);
+    testHybridSearchViewWithSubsequentUnionOnSameView(
+        scoreFusionInputPipelines,
+        createScoreFusionPipeline,
+    );
 })();
 
 // Test a $unionWith following a $scoreFusion to verify that the $scoreFusion desugaring doesn't
 // interfere with view resolution of the user provided $unionWith.
 (function testScoreFusionViewWithSubsequentUnionOnDifferentView() {
     const scoreFusionInputPipelines = {
-        a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
-        b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+        a: [
+            {$score: {score: "$x", normalization: "minMaxScaler"}},
+            {$match: {x: {$gt: 3}}},
+            {$sort: {x: -1}},
+        ],
+        b: [
+            {$score: {score: "$y", normalization: "sigmoid"}},
+            {$match: {x: {$lte: 15}}},
+            {$sort: {x: 1}},
+        ],
     };
-    testHybridSearchViewWithSubsequentUnionOnDifferentView(scoreFusionInputPipelines, createScoreFusionPipeline);
+    testHybridSearchViewWithSubsequentUnionOnDifferentView(
+        scoreFusionInputPipelines,
+        createScoreFusionPipeline,
+    );
 })();
 
 // $scoreFusion with an empty input pipeline should trigger the correct error.

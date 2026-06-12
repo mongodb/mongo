@@ -29,7 +29,9 @@ describe("config-only mode startup", function () {
     });
 
     it("Command line options", function () {
-        jsTest.log.info("Verifying mongos starts successfully with --configOnly against a plain replica set");
+        jsTest.log.info(
+            "Verifying mongos starts successfully with --configOnly against a plain replica set",
+        );
         const mongos = MongoRunner.runMongos({configdb: this.rs.getURL(), configOnly: true});
 
         assert.neq(null, mongos, "mongos was unable to start up");
@@ -60,7 +62,11 @@ describe("config-only mode startup", function () {
             threw = false;
             MongoRunner.stopMongod(mongod);
         } catch (e) {
-            assert.eq(e.returnCode, MongoRunner.EXIT_BADOPTIONS, "mongod exited with unexpected exit code");
+            assert.eq(
+                e.returnCode,
+                MongoRunner.EXIT_BADOPTIONS,
+                "mongod exited with unexpected exit code",
+            );
         }
         assert.eq(threw, true, "mongod was able to start up with configOnly");
     });

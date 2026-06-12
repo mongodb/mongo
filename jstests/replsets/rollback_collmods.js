@@ -47,11 +47,17 @@ let CommonOps = (node) => {
 
     // Start with no validator.
     assert.commandWorked(
-        testDb.runCommand({collMod: coll3Name, validationLevel: "moderate", validationAction: "warn"}),
+        testDb.runCommand({
+            collMod: coll3Name,
+            validationLevel: "moderate",
+            validationAction: "warn",
+        }),
     );
 
     // Start with no validation level.
-    assert.commandWorked(testDb.runCommand({collMod: coll4Name, validator: {a: 1}, validationAction: "warn"}));
+    assert.commandWorked(
+        testDb.runCommand({collMod: coll4Name, validator: {a: 1}, validationAction: "warn"}),
+    );
 };
 
 // Operations that will be performed on the rollback node past the common point.

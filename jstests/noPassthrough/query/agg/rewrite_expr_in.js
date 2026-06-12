@@ -70,8 +70,12 @@ testCases.forEach((expr) => {
 });
 
 // Verify that optimized results are equal to results when optimizations are disabled.
-assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
-assert.commandWorked(db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}),
+);
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}),
+);
 
 testCases.forEach((expr, i) => {
     const pipeline = [{$_internalInhibitOptimization: {}}, {$match: {$expr: expr}}];

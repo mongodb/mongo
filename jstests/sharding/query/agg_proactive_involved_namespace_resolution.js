@@ -28,7 +28,12 @@ describe("proactive involved-namespace resolution", function () {
     const makeDb = (tag) => {
         const dbName = `proactiveInv_${tag}_${dbCounter++}`;
         const db = this.st.s.getDB(dbName);
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: dbName, primaryShard: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                enableSharding: dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
+        );
         return {db, dbName};
     };
 
@@ -39,14 +44,19 @@ describe("proactive involved-namespace resolution", function () {
     // option) when a collation is provided, and the simpler createView otherwise.
     const makeView = (db, name, backing, pipeline = [], collation = null) => {
         if (collation) {
-            return assert.commandWorked(db.createCollection(name, {viewOn: backing, pipeline, collation}));
+            return assert.commandWorked(
+                db.createCollection(name, {viewOn: backing, pipeline, collation}),
+            );
         }
         return assert.commandWorked(db.createView(name, backing, pipeline));
     };
 
     // Asserts that a $lookup result has exactly one outer doc whose join array has exactly one
     // entry with the expected label.
-    const assertSingleLookupMatch = (result, {joinField = "matched", labelValue = "found"} = {}) => {
+    const assertSingleLookupMatch = (
+        result,
+        {joinField = "matched", labelValue = "found"} = {},
+    ) => {
         assert.eq(result.length, 1, tojson(result));
         assert.eq(result[0][joinField].length, 1, tojson(result[0][joinField]));
         assert.eq(result[0][joinField][0].label, labelValue, tojson(result[0][joinField]));
@@ -72,11 +82,17 @@ describe("proactive involved-namespace resolution", function () {
         try {
             fn();
         } finally {
-            const res = assert.commandWorked(this.st.s.adminCommand({configureFailPoint: fpName, mode: "off"}));
+            const res = assert.commandWorked(
+                this.st.s.adminCommand({configureFailPoint: fpName, mode: "off"}),
+            );
             fp._finalCount = res.count;
         }
         const entries = fp._finalCount - fp.timesEntered;
-        assert.eq(entries % 2, 0, `unexpected failpoint entry count ${entries} (expected multiple of 2)`);
+        assert.eq(
+            entries % 2,
+            0,
+            `unexpected failpoint entry count ${entries} (expected multiple of 2)`,
+        );
         return entries / 2;
     };
 
@@ -93,17 +109,19 @@ describe("proactive involved-namespace resolution", function () {
                 "Expected cycle creation to be rejected: " + tojson(createRes),
             );
         } else {
-            assert.commandFailedWithCode(db.runCommand({aggregate: "v1", pipeline: [], cursor: {}}), [
-                ErrorCodes.ViewDepthLimitExceeded,
-                ErrorCodes.GraphContainsCycle,
-            ]);
+            assert.commandFailedWithCode(
+                db.runCommand({aggregate: "v1", pipeline: [], cursor: {}}),
+                [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.GraphContainsCycle],
+            );
         }
     });
 
     it("preserves timeseries metadata when $lookup foreign is a timeseries view", () => {
         const {db} = makeDb("ts");
 
-        assert.commandWorked(db.createCollection("ts", {timeseries: {timeField: "t", metaField: "m"}}));
+        assert.commandWorked(
+            db.createCollection("ts", {timeseries: {timeField: "t", metaField: "m"}}),
+        );
         assert.commandWorked(
             db.ts.insert([
                 {t: new Date(), m: "a", v: 1},
@@ -113,7 +131,9 @@ describe("proactive involved-namespace resolution", function () {
         assert.commandWorked(db.driver.insert([{_id: 1, mKey: "a"}]));
 
         const r = db.driver
-            .aggregate([{$lookup: {from: "ts", localField: "mKey", foreignField: "m", as: "tsJoin"}}])
+            .aggregate([
+                {$lookup: {from: "ts", localField: "mKey", foreignField: "m", as: "tsJoin"}},
+            ])
             .toArray();
 
         assert.eq(r.length, 1, tojson(r));
@@ -202,7 +222,16 @@ describe("proactive involved-namespace resolution", function () {
         // most one reparse.
         const kickbacks = countKickbacks(() => {
             r = db.topView
-                .aggregate([{$lookup: {from: "lookupView", localField: "k", foreignField: "k", as: "joined"}}])
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: "lookupView",
+                            localField: "k",
+                            foreignField: "k",
+                            as: "joined",
+                        },
+                    },
+                ])
                 .toArray();
         });
 
@@ -238,11 +267,17 @@ describe("proactive involved-namespace resolution", function () {
         let result;
         const kickbacks = countKickbacks(() => {
             result = db.driver
-                .aggregate([{$lookup: {from: "midView", localField: "k", foreignField: "k", as: "joined"}}])
+                .aggregate([
+                    {$lookup: {from: "midView", localField: "k", foreignField: "k", as: "joined"}},
+                ])
                 .toArray();
         });
 
-        assert.eq(kickbacks, 1, `Expected 1 kickback (transitive closure resolved upfront), got ${kickbacks}`);
+        assert.eq(
+            kickbacks,
+            1,
+            `Expected 1 kickback (transitive closure resolved upfront), got ${kickbacks}`,
+        );
         assert.eq(result.length, 1, tojson(result));
         assert.eq(result[0].joined.length, 1, tojson(result[0].joined));
         assert.eq(result[0].joined[0].tags.length, 1, tojson(result[0].joined[0].tags));
@@ -273,8 +308,22 @@ describe("proactive involved-namespace resolution", function () {
         const kickbacks = countKickbacks(() => {
             result = db.orders
                 .aggregate([
-                    {$lookup: {from: "customersView", localField: "cust", foreignField: "cust", as: "c"}},
-                    {$lookup: {from: "productsView", localField: "prod", foreignField: "prod", as: "p"}},
+                    {
+                        $lookup: {
+                            from: "customersView",
+                            localField: "cust",
+                            foreignField: "cust",
+                            as: "c",
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: "productsView",
+                            localField: "prod",
+                            foreignField: "prod",
+                            as: "p",
+                        },
+                    },
                 ])
                 .toArray();
         });
@@ -298,7 +347,16 @@ describe("proactive involved-namespace resolution", function () {
 
         // "Alice" matches the stored "alice" under the shared case-insensitive collation.
         const result = db.orders
-            .aggregate([{$lookup: {from: "tagsView", localField: "tag", foreignField: "name", as: "matched"}}])
+            .aggregate([
+                {
+                    $lookup: {
+                        from: "tagsView",
+                        localField: "tag",
+                        foreignField: "name",
+                        as: "matched",
+                    },
+                },
+            ])
             .toArray();
 
         assertSingleLookupMatch(result);
@@ -317,9 +375,21 @@ describe("proactive involved-namespace resolution", function () {
         makeView(db, "foreignView", "foreignColl", [{$match: {name: "ALICE"}}], ciCollation);
 
         const result = db.outerColl
-            .aggregate([{$lookup: {from: "foreignView", localField: "tag", foreignField: "name", as: "matched"}}], {
-                collation: ciCollation,
-            })
+            .aggregate(
+                [
+                    {
+                        $lookup: {
+                            from: "foreignView",
+                            localField: "tag",
+                            foreignField: "name",
+                            as: "matched",
+                        },
+                    },
+                ],
+                {
+                    collation: ciCollation,
+                },
+            )
             .toArray();
 
         assertSingleLookupMatch(result);
@@ -336,7 +406,16 @@ describe("proactive involved-namespace resolution", function () {
         // No explicit request collation — the top-level view's collation is inherited and matches
         // the foreign view's collation.
         const result = db.topView
-            .aggregate([{$lookup: {from: "foreignView", localField: "tag", foreignField: "name", as: "matched"}}])
+            .aggregate([
+                {
+                    $lookup: {
+                        from: "foreignView",
+                        localField: "tag",
+                        foreignField: "name",
+                        as: "matched",
+                    },
+                },
+            ])
             .toArray();
 
         assertSingleLookupMatch(result);
@@ -452,7 +531,16 @@ describe("proactive involved-namespace resolution", function () {
         assert.commandFailedWithCode(
             db.runCommand({
                 aggregate: "orders",
-                pipeline: [{$lookup: {from: "tagsView", localField: "tag", foreignField: "name", as: "matched"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "tagsView",
+                            localField: "tag",
+                            foreignField: "name",
+                            as: "matched",
+                        },
+                    },
+                ],
                 cursor: {},
             }),
             ErrorCodes.OptionNotSupportedOnView,
@@ -520,7 +608,16 @@ describe("proactive involved-namespace resolution", function () {
         assert.commandFailedWithCode(
             db.runCommand({
                 aggregate: "orders",
-                pipeline: [{$lookup: {from: "tagsView", localField: "tag", foreignField: "name", as: "matched"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "tagsView",
+                            localField: "tag",
+                            foreignField: "name",
+                            as: "matched",
+                        },
+                    },
+                ],
                 collation: {locale: "fr"},
                 cursor: {},
             }),
@@ -542,7 +639,16 @@ describe("proactive involved-namespace resolution", function () {
         assert.commandFailedWithCode(
             db.runCommand({
                 aggregate: "collView",
-                pipeline: [{$lookup: {from: "foreignView", localField: "k", foreignField: "k", as: "joined"}}],
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "foreignView",
+                            localField: "k",
+                            foreignField: "k",
+                            as: "joined",
+                        },
+                    },
+                ],
                 cursor: {},
             }),
             ErrorCodes.OptionNotSupportedOnView,

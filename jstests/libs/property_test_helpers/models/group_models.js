@@ -3,7 +3,10 @@
  *
  * Note that $avg cannot be supported because it can cause floating point differences in results.
  */
-import {getAssignableFieldArb, dollarFieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    getAssignableFieldArb,
+    dollarFieldArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 

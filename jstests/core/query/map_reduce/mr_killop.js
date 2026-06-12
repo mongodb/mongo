@@ -54,7 +54,8 @@ function getOpCode() {
         if (cmdBody.$truncated) {
             const stringifiedCmd = cmdBody.$truncated;
             return (
-                (stringifiedCmd.search("mapreduce") >= 0 || stringifiedCmd.search("aggregate") >= 0) &&
+                (stringifiedCmd.search("mapreduce") >= 0 ||
+                    stringifiedCmd.search("aggregate") >= 0) &&
                 stringifiedCmd.search(source.getName()) >= 0
             );
         }
@@ -97,7 +98,9 @@ function runTest(map, reduce, finalize, scope, wait) {
 
     // The assert below won't be caught by this test script, but it will cause error messages to be
     // printed.
-    const awaitShell = startParallelShell("assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );");
+    const awaitShell = startParallelShell(
+        "assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );",
+    );
 
     if (wait) {
         sleep(20);
@@ -113,7 +116,11 @@ function runTest(map, reduce, finalize, scope, wait) {
 
     // When the map reduce op is killed, the spawned shell will exit
     const exitCode = awaitShell({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected shell to exit abnormally due to map-reduce execution being terminated");
+    assert.neq(
+        0,
+        exitCode,
+        "expected shell to exit abnormally due to map-reduce execution being terminated",
+    );
     assert.eq(-1, getOpCode());
 }
 

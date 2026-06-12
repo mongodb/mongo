@@ -25,7 +25,12 @@ assert.commandWorked(coll.insert({a: 1}));
 // yet want created for this test.
 //
 MongoRunner.stopMongod(standalone);
-standalone = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: standalone.dbpath, profile: "2"});
+standalone = MongoRunner.runMongod({
+    restart: true,
+    cleanData: false,
+    dbpath: standalone.dbpath,
+    profile: "2",
+});
 
 //
 // Execute a query that will get interrupted for exceeding its 'maxTimeMS' value. The profiler
@@ -44,7 +49,11 @@ const err = assert.throws(function () {
         .maxTimeMS(1000)
         .count();
 });
-assert.contains(err.code, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError], err);
+assert.contains(
+    err.code,
+    [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+    err,
+);
 
 // The mongod should have created the 'system.profile' collection automatically.
 const res = db.runCommand({listCollections: 1, filter: {name: "system.profile"}});

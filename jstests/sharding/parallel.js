@@ -14,9 +14,11 @@ let shards = [s.shard0.shardName, s.shard1.shardName, s.shard2.shardName];
 
 for (var i = 0; i < N; i += N / 10) {
     s.adminCommand({split: "test.foo", middle: {_id: i}});
-    s.s
-        .getDB("admin")
-        .runCommand({moveChunk: "test.foo", find: {_id: i}, to: shards[Math.floor(Math.random() * numShards)]});
+    s.s.getDB("admin").runCommand({
+        moveChunk: "test.foo",
+        find: {_id: i},
+        to: shards[Math.floor(Math.random() * numShards)],
+    });
 }
 
 s.startBalancer();

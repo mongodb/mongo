@@ -29,7 +29,9 @@ const dbName = "test";
 const db = primary.getDB(dbName);
 
 // Control checkpoints.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "alwaysOn"}),
+);
 
 // Mocks WT returning EBUSY when dropping the table.
 assert.commandWorked(primary.adminCommand({configureFailPoint: "WTDropEBUSY", mode: "alwaysOn"}));
@@ -81,6 +83,8 @@ checkLog.containsJson(primary, 6776600, {
     },
 });
 
-assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}),
+);
 
 rst.stopSet();

@@ -35,7 +35,11 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 const db = primary.getDB("test");
 
@@ -46,7 +50,9 @@ assert.commandWorked(db.runCommand({create: collName, writeConcern: {w: "majorit
 assert.commandWorked(db[collName].createIndex({a: 1}, {unique: true}));
 
 // Having changeStreamPreAndPostImages is required to cause the findAndModify to reserve optimes.
-assert.commandWorked(db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}),
+);
 
 // Insert the document to be updated by findAndModify.
 assert.commandWorked(db[collName].insert({a: 3}));
@@ -90,7 +96,11 @@ const triggerPrepareConflictThread = new Thread(
         const collection = session.getDatabase(dbName).getCollection(collName);
         jsTestLog("Inserting a conflicting operation while keeping a hole open.");
         assert.throwsWithCode(() => {
-            collection.findAndModify({query: {a: 3}, update: {a: 2, fromFindAndModify: true}, upsert: true});
+            collection.findAndModify({
+                query: {a: 3},
+                update: {a: 2, fromFindAndModify: true},
+                upsert: true,
+            });
         }, ErrorCodes.DuplicateKey);
     },
     primary.host,

@@ -7,7 +7,10 @@ assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a 
 let runCheckOnReplSet = function (db) {
     let primaryInfo = db.adminCommand("isMaster");
 
-    assert(primaryInfo.ismaster, "shell is not connected to the primary or master node: " + tojson(primaryInfo));
+    assert(
+        primaryInfo.ismaster,
+        "shell is not connected to the primary or master node: " + tojson(primaryInfo),
+    );
 
     let testFixture = new ReplSetTest(db.getMongo().host);
     testFixture.checkOplogs();
@@ -24,7 +27,9 @@ if (db.getMongo().isMongos()) {
 
     // Run check on config server.
     let cmdLineOpts = db.adminCommand({getCmdLineOpts: 1});
-    let configConn = newMongoWithRetry(cmdLineOpts.parsed.sharding.configDB, undefined, {gRPC: false});
+    let configConn = newMongoWithRetry(cmdLineOpts.parsed.sharding.configDB, undefined, {
+        gRPC: false,
+    });
     runCheckOnReplSet(configConn.getDB("admin"));
 } else {
     runCheckOnReplSet(db);

@@ -56,7 +56,10 @@ function removeShardOld(s, shardName, timeout) {
                     // removed. This would cause the command to fail with ShardNotFound.
                     return kNoRetry;
                 }
-                if (res.code === ErrorCodes.HostUnreachable && TestData.runningWithConfigStepdowns) {
+                if (
+                    res.code === ErrorCodes.HostUnreachable &&
+                    TestData.runningWithConfigStepdowns
+                ) {
                     // The mongos may exhaust its retries due to having consecutive config stepdowns. In
                     // this case, the mongos will return a HostUnreachable error.
                     // We should retry the operation when this happens.

@@ -25,7 +25,12 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
  * @param {Object} [replSet] the ReplSetTest instance to adopt
  * @param {int} [timeout] how long to wait for initial sync to start
  */
-export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, replBatchLimitBytes = 100 * 1024 * 1024) {
+export function InitialSyncTest(
+    name = "InitialSyncTest",
+    replSet,
+    timeout,
+    replBatchLimitBytes = 100 * 1024 * 1024,
+) {
     this.replBatchLimitBytes = replBatchLimitBytes;
     const State = {
         kBeforeInitialSync: "kBeforeInitialSync",
@@ -152,7 +157,9 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
         };
 
         if (TestData.logComponentVerbosity) {
-            nodeOptions.setParameter.logComponentVerbosity = tojsononeline(TestData.logComponentVerbosity);
+            nodeOptions.setParameter.logComponentVerbosity = tojsononeline(
+                TestData.logComponentVerbosity,
+            );
         }
 
         // Restart the node with the first synchronization failpoint enabled so that initial sync
@@ -166,7 +173,12 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
      */
     function waitUntilInitialSyncPausedOrCompleted() {
         assert.soon(function () {
-            if (checkLog.checkContainsOnce(secondary, "initialSyncFuzzerSynchronizationPoint1 fail point enabled")) {
+            if (
+                checkLog.checkContainsOnce(
+                    secondary,
+                    "initialSyncFuzzerSynchronizationPoint1 fail point enabled",
+                )
+            ) {
                 return true;
             }
             return hasCompletedInitialSync();
@@ -187,7 +199,10 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
             }),
         );
         assert.commandWorked(
-            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint1", "mode": "off"}),
+            secondary.adminCommand({
+                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
+                "mode": "off",
+            }),
         );
         checkLog.contains(secondary, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
     }
@@ -205,7 +220,10 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
             }),
         );
         assert.commandWorked(
-            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint2", "mode": "off"}),
+            secondary.adminCommand({
+                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint2",
+                "mode": "off",
+            }),
         );
 
         waitUntilInitialSyncPausedOrCompleted();
@@ -238,7 +256,10 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
             assert.soon(hasStartedInitialSync, "failed to start initial sync", initialSyncTimeout);
             transitionIfAllowed(State.kDuringInitialSync);
 
-            checkLog.contains(secondary, "initialSyncFuzzerSynchronizationPoint1 fail point enabled");
+            checkLog.contains(
+                secondary,
+                "initialSyncFuzzerSynchronizationPoint1 fail point enabled",
+            );
 
             return false;
         }
@@ -246,7 +267,11 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
         // Make sure this wasn't called after the test fixture was stopped or this function already
         // returned that initial sync was completed.
         assert.neq(currState, State.kStopped, "Cannot call step() if the test fixture was stopped");
-        assert.neq(currState, State.kInitialSyncCompleted, "Cannot call step() if initial sync already completed");
+        assert.neq(
+            currState,
+            State.kInitialSyncCompleted,
+            "Cannot call step() if initial sync already completed",
+        );
 
         pauseBeforeSyncSourceCommand();
 
@@ -260,7 +285,10 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
         if (hasCompletedInitialSync()) {
             transitionIfAllowed(State.kInitialSyncCompleted);
             assert.commandWorked(
-                secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint1", "mode": "off"}),
+                secondary.adminCommand({
+                    "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
+                    "mode": "off",
+                }),
             );
             return true;
         }
@@ -278,10 +306,16 @@ export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, repl
 
     this.fail = function () {
         assert.commandWorked(
-            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint1", "mode": "off"}),
+            secondary.adminCommand({
+                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
+                "mode": "off",
+            }),
         );
         assert.commandWorked(
-            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint2", "mode": "off"}),
+            secondary.adminCommand({
+                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint2",
+                "mode": "off",
+            }),
         );
     };
 

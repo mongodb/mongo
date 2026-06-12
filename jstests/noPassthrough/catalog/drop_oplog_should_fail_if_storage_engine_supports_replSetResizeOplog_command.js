@@ -27,7 +27,10 @@ assert.commandWorked(localDB.runCommand({create: "oplog.rs", capped: true, size:
 
 if (storageEngineIsWiredTiger()) {
     const ret = assert.commandFailed(localDB.runCommand({drop: "oplog.rs"}));
-    assert.eq("can't drop oplog on storage engines that support replSetResizeOplog command", ret.errmsg);
+    assert.eq(
+        "can't drop oplog on storage engines that support replSetResizeOplog command",
+        ret.errmsg,
+    );
 } else {
     assert.commandWorked(localDB.runCommand({drop: "oplog.rs"}));
 }

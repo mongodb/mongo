@@ -67,7 +67,10 @@ if (!TestData.configShard) {
     // In config shard mode, creating this user above also created it on the first shard.
     var priAdminDB = replTest.getPrimary().getDB("admin");
     replTest.getPrimary().waitForClusterTime(60);
-    priAdminDB.createUser({user: "user", pwd: "password", roles: jsTest.adminUserRoles}, {w: 3, wtimeout: 30000});
+    priAdminDB.createUser(
+        {user: "user", pwd: "password", roles: jsTest.adminUserRoles},
+        {w: 3, wtimeout: 30000},
+    );
 }
 
 coll.drop();

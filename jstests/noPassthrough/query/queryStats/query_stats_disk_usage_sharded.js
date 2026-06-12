@@ -136,7 +136,11 @@ function runUnionWithShardedPipelineTest(st) {
             {
                 $unionWith: {
                     coll: coll2.getName(),
-                    pipeline: [{$match: {v: {$gt: "?number"}}}, {$sort: {v: 1}}, {$limit: "?number"}],
+                    pipeline: [
+                        {$match: {v: {$gt: "?number"}}},
+                        {$sort: {v: 1}},
+                        {$limit: "?number"},
+                    ],
                 },
             },
         ],

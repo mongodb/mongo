@@ -131,7 +131,8 @@ globalThis.__processScopes = function (frame) {
                 return {name, value: '"' + unwrapped + '"', type, variablesReference: 0};
             }
             if (type === "object") {
-                if (debuggerObj.class === "Array") return formatArrayVariable(unwrapped, debuggerObj, name, varRef);
+                if (debuggerObj.class === "Array")
+                    return formatArrayVariable(unwrapped, debuggerObj, name, varRef);
                 return formatObjectVariable(debuggerObj.class, debuggerObj, name, varRef);
             }
             return {name, value: String(unwrapped), type, variablesReference: 0};
@@ -159,7 +160,12 @@ globalThis.__processScopes = function (frame) {
                 elemType = typeof elemValue;
                 if (elemType === "string") elemStr = `"${elemValue}"`;
             }
-            arrayElements.push({name: `[${i}]`, value: elemStr, type: elemType, variablesReference: 0});
+            arrayElements.push({
+                name: `[${i}]`,
+                value: elemStr,
+                type: elemType,
+                variablesReference: 0,
+            });
         }
         globalThis.__storeVariables(variablesReference, arrayElements);
         return {name, value: `Array(${arr.length})`, type: "array", variablesReference};

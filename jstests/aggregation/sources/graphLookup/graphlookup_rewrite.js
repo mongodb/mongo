@@ -36,10 +36,16 @@ function assertStagesAndOutput({
     const output = coll.aggregate(pipeline).toArray();
 
     for (const stage of expectedStages) {
-        assert(aggPlanHasStage(explain, stage), `${msg}: missing stage ${stage}: ${tojson(explain)}`);
+        assert(
+            aggPlanHasStage(explain, stage),
+            `${msg}: missing stage ${stage}: ${tojson(explain)}`,
+        );
     }
     for (const stage of optimizedAwayStages) {
-        assert(!aggPlanHasStage(explain, stage), `${msg}: stage ${stage} not optimized away: ${tojson(explain)}`);
+        assert(
+            !aggPlanHasStage(explain, stage),
+            `${msg}: stage ${stage} not optimized away: ${tojson(explain)}`,
+        );
     }
 
     const res = orderedArrayComparison

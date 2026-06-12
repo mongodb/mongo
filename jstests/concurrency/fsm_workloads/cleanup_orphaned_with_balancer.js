@@ -67,7 +67,10 @@ export const $config = (function () {
             // Verify that sum equals original total.
             assert(
                 this.initialCount === totalCount,
-                "Document count doesn't match initial count: " + this.initialCount + " != " + totalCount,
+                "Document count doesn't match initial count: " +
+                    this.initialCount +
+                    " != " +
+                    totalCount,
             );
         },
 

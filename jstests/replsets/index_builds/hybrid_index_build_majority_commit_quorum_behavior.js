@@ -66,9 +66,15 @@ function createIndex(dbName, collName, indexName) {
 }
 
 // Make secondary index build to hang after collection scan phase.
-const insertDumpFailPoint = configureFailPoint(secondary, "hangAfterIndexBuildDumpsInsertsFromBulk");
+const insertDumpFailPoint = configureFailPoint(
+    secondary,
+    "hangAfterIndexBuildDumpsInsertsFromBulk",
+);
 // Start the index build on primary in parallel shell.
-const joinCreateIndexThread = startParallelShell(funWithArgs(createIndex, dbName, collName, indexName), primary.port);
+const joinCreateIndexThread = startParallelShell(
+    funWithArgs(createIndex, dbName, collName, indexName),
+    primary.port,
+);
 
 jsTestLog("Waiting for Collection scan phase to complete");
 insertDumpFailPoint.wait();

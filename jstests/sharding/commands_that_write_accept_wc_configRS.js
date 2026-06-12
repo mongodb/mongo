@@ -118,7 +118,9 @@ commands.push({
 commands.push({
     req: {dropUser: "tempUser"},
     setupFunc: function () {
-        assert.commandWorked(db.runCommand({createUser: "tempUser", pwd: "password", roles: jsTest.basicUserRoles}));
+        assert.commandWorked(
+            db.runCommand({createUser: "tempUser", pwd: "password", roles: jsTest.basicUserRoles}),
+        );
         assert(noauthDB.auth("tempUser", "password"), "auth failed");
         noauthDB.logout();
     },
@@ -162,7 +164,8 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
             assert.commandFailed(res);
             assert(
                 !res.writeConcernError,
-                "command on config servers with a paused replicaset had writeConcernError: " + tojson(res),
+                "command on config servers with a paused replicaset had writeConcernError: " +
+                    tojson(res),
             );
         } else {
             // This command passes and returns a writeConcernError when there is a
@@ -186,7 +189,8 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
         cmd.confirmFunc();
         assert(
             !res.writeConcernError,
-            "command on config servers with a paused replicaset had writeConcernError: " + tojson(res),
+            "command on config servers with a paused replicaset had writeConcernError: " +
+                tojson(res),
         );
     }
 }
@@ -201,7 +205,10 @@ function testValidWriteConcern(wc, cmd) {
     // Command with a full cluster should succeed.
     let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
-    assert(!res.writeConcernError, "command on a full cluster had writeConcernError: " + tojson(res));
+    assert(
+        !res.writeConcernError,
+        "command on a full cluster had writeConcernError: " + tojson(res),
+    );
 
     cmd.confirmFunc();
 

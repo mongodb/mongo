@@ -18,10 +18,16 @@ admin.auth("admin", "pwd");
 
 test.createUser({user: "user1", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]});
 test.createUser({user: "user256", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]});
-test.createUser({user: "user", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"]});
+test.createUser({
+    user: "user",
+    pwd: "pwd",
+    roles: [],
+    mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"],
+});
 
 // Count the number of authentications performed during setup
-const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
+    .mechanisms;
 admin.logout();
 
 const ingressMechs = ["SCRAM-SHA-1", "SCRAM-SHA-256", "MONGODB-X509"];
@@ -32,11 +38,15 @@ function assertStats() {
     ++expected["SCRAM-SHA-256"].ingress.authenticate.successful;
     ++expected["SCRAM-SHA-256"].ingress.authenticate.total;
 
-    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+        .authentication.mechanisms;
     Object.keys(expected).forEach(function (mech) {
         try {
             if (ingressMechs.includes(mech)) {
-                assert.eq(mechStats[mech].ingress.authenticate.total, expected[mech].ingress.authenticate.total);
+                assert.eq(
+                    mechStats[mech].ingress.authenticate.total,
+                    expected[mech].ingress.authenticate.total,
+                );
                 assert.eq(
                     mechStats[mech].ingress.authenticate.successful,
                     expected[mech].ingress.authenticate.successful,
@@ -52,8 +62,14 @@ function assertStats() {
             } else {
                 assert(!mechStats[mech].hasOwnProperty("ingress"));
             }
-            assert.eq(mechStats[mech].egress.authenticate.total, expected[mech].egress.authenticate.total);
-            assert.eq(mechStats[mech].egress.authenticate.successful, expected[mech].egress.authenticate.successful);
+            assert.eq(
+                mechStats[mech].egress.authenticate.total,
+                expected[mech].egress.authenticate.total,
+            );
+            assert.eq(
+                mechStats[mech].egress.authenticate.successful,
+                expected[mech].egress.authenticate.successful,
+            );
         } catch (e) {
             print("Mechanism: " + mech);
             print("mechStats: " + tojson(mechStats));
@@ -142,7 +158,8 @@ assertFailureInternal();
 // Need to auth as admin one more time to get final stats.
 admin.auth("admin", "pwd");
 
-const finalStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+const finalStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
+    .mechanisms;
 replTest.stopSet();
 
 printjson(finalStats);

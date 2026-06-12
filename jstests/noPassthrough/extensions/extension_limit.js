@@ -9,7 +9,10 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -70,7 +73,10 @@ function assertLimitEquivalence(
             }
 
             // Assert mergerPart has $extensionLimit.
-            assert(extensionExplain.splitPipeline.hasOwnProperty("mergerPart"), "splitPipeline should have mergerPart");
+            assert(
+                extensionExplain.splitPipeline.hasOwnProperty("mergerPart"),
+                "splitPipeline should have mergerPart",
+            );
             const mergerLimitStage = extensionExplain.splitPipeline.mergerPart.find((stage) =>
                 stage.hasOwnProperty("$extensionLimit"),
             );
@@ -94,11 +100,17 @@ function setupCollection(conn, db, coll) {
         assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
         assert.commandWorked(coll.createIndex({x: 1}));
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
-        assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {x: Math.floor(numDocuments / 2)}}));
+        assert.commandWorked(
+            db.adminCommand({split: coll.getFullName(), middle: {x: Math.floor(numDocuments / 2)}}),
+        );
 
         assert(shardIds.length > 1);
-        assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 250}, to: shardIds[0]}));
-        assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 750}, to: shardIds[1]}));
+        assert.commandWorked(
+            db.adminCommand({moveChunk: coll.getFullName(), find: {x: 250}, to: shardIds[0]}),
+        );
+        assert.commandWorked(
+            db.adminCommand({moveChunk: coll.getFullName(), find: {x: 750}, to: shardIds[1]}),
+        );
     }
 
     const bulkDocs = [];
@@ -120,10 +132,20 @@ function runTests(conn) {
         // Basic limit tests
         // ===========================
         // Test 1: Basic limit
-        assertLimitEquivalence([{$limit: 5}], [{$extensionLimit: 5}], "Basic limit (5 docs from 10)", coll);
+        assertLimitEquivalence(
+            [{$limit: 5}],
+            [{$extensionLimit: 5}],
+            "Basic limit (5 docs from 10)",
+            coll,
+        );
 
         // Test 2: Limit of 1 (minimal case)
-        assertLimitEquivalence([{$limit: 1}], [{$extensionLimit: 1}], "Limit 1 (minimal limit)", coll);
+        assertLimitEquivalence(
+            [{$limit: 1}],
+            [{$extensionLimit: 1}],
+            "Limit 1 (minimal limit)",
+            coll,
+        );
 
         // Test 3: Limit larger than collection
         assertLimitEquivalence(
@@ -222,7 +244,12 @@ function runTests(conn) {
             false,
         );
 
-        assertLimitEquivalence([{$limit: 7}, {$skip: 2}], [{$extensionLimit: 7}, {$skip: 2}], "Limit then skip", coll);
+        assertLimitEquivalence(
+            [{$limit: 7}, {$skip: 2}],
+            [{$extensionLimit: 7}, {$skip: 2}],
+            "Limit then skip",
+            coll,
+        );
 
         // Test 11: Limit after $group.
         // $group is split before $extensionLimit, nothing should get pushed to shards (don't limit
@@ -230,7 +257,11 @@ function runTests(conn) {
         // $extensionLimit wouldn't be pushed since it's not recognized.
         assertLimitEquivalence(
             [{$group: {_id: "$category", total: {$sum: "$value"}}}, {$sort: {_id: 1}}, {$limit: 2}],
-            [{$group: {_id: "$category", total: {$sum: "$value"}}}, {$sort: {_id: 1}}, {$extensionLimit: 2}],
+            [
+                {$group: {_id: "$category", total: {$sum: "$value"}}},
+                {$sort: {_id: 1}},
+                {$extensionLimit: 2},
+            ],
             "Group then limit",
             coll,
             false,
@@ -289,7 +320,11 @@ function runTests(conn) {
         if (!FixtureHelpers.isSharded(coll)) {
             assert.eq(batchedExtension, batchedNative, "Batched cursor results should match");
         } else {
-            assert.eq(batchedExtension.length, batchedNative.length, "Batched cursor result lengths should match");
+            assert.eq(
+                batchedExtension.length,
+                batchedNative.length,
+                "Batched cursor result lengths should match",
+            );
         }
         // Test 17: Top-N query with sort + limit
         const topN = coll.aggregate([{$sort: {value: -1}}, {$extensionLimit: 5}]).toArray();
@@ -359,7 +394,11 @@ function runTests(conn) {
         );
 
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: collName, pipeline: [{$extensionLimit: "abc"}], cursor: {}}),
+            testDB.runCommand({
+                aggregate: collName,
+                pipeline: [{$extensionLimit: "abc"}],
+                cursor: {},
+            }),
             11484701,
             "Extension $extensionLimit with string should fail",
         );
@@ -368,4 +407,9 @@ function runTests(conn) {
     }
 }
 
-withExtensions({"liblimit_mongo_extension.so": {}}, runTests, ["sharded", "standalone", "replica_set"], {shards: 2});
+withExtensions(
+    {"liblimit_mongo_extension.so": {}},
+    runTests,
+    ["sharded", "standalone", "replica_set"],
+    {shards: 2},
+);

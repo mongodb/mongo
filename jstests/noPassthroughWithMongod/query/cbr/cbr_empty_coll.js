@@ -62,7 +62,10 @@ function testEmptyColl() {
     // Index union
     const emptyCollUnionExp = coll
         .find({
-            $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
+            $and: [
+                {$or: [{a: 10}, {b: {$gt: 99}}]},
+                {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]},
+            ],
         })
         .explain();
     assertAllPlansHaveZeroCE(emptyCollUnionExp);
@@ -89,7 +92,11 @@ function createHistogram(field) {
 try {
     for (const mode of ["heuristicCE", "samplingCE"]) {
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: mode}),
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: true,
+                internalQueryCBRCEMode: mode,
+            }),
         );
         testNonExistentColl();
         testEmptyColl();
@@ -98,7 +105,9 @@ try {
     {
         createHistogram("a");
         createHistogram("b");
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "histogramCE"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "histogramCE"}),
+        );
         testEmptyColl();
     }
 } finally {

@@ -18,7 +18,9 @@ const collUnsharded = db[collName + "_unsharded"];
 assert.commandWorked(db.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Range-shard the test collection on _id.
 assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -29,8 +31,12 @@ assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey] chunks to shard1.
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}),
+);
 
 function runArrayAccumTest(testName, accumulator) {
     // Check the result of the aggregation on the unsharded collection vs. the sharded collection to
@@ -39,7 +45,9 @@ function runArrayAccumTest(testName, accumulator) {
     if (accumulator === setUnionAcc) {
         // Need to add a stage to sort the values in the result array since the $setUnion
         // accumulator does not guarantee anything about the order of values.
-        pipeline.push({$project: {_id: 1, numbers: {$sortArray: {input: "$lotsOfNumbers", sortBy: 1}}}});
+        pipeline.push({
+            $project: {_id: 1, numbers: {$sortArray: {input: "$lotsOfNumbers", sortBy: 1}}},
+        });
     }
     let res = coll.aggregate(pipeline).toArray();
     let resUnsharded = collUnsharded.aggregate(pipeline).toArray();
@@ -79,7 +87,9 @@ function runArrayAccumTest(testName, accumulator) {
     if (accumulator === setUnionAcc) {
         // Need to add a stage to sort the values in the result array since the $setUnion
         // accumulator does not guarantee anything about the order of values.
-        pipeline.push({$project: {_id: 1, numbers: {$sortArray: {input: "$lotsOfNumbers", sortBy: 1}}}});
+        pipeline.push({
+            $project: {_id: 1, numbers: {$sortArray: {input: "$lotsOfNumbers", sortBy: 1}}},
+        });
     }
     pipeline.push({$sort: {_id: 1}});
 

@@ -18,7 +18,10 @@ const collName = "collectionWithMalformedValidator";
     assert.commandWorked(testDB[collName].insert({a: "hello world"}));
 
     assert.commandWorked(
-        conn.adminCommand({configureFailPoint: "allowSettingMalformedCollectionValidators", mode: "alwaysOn"}),
+        conn.adminCommand({
+            configureFailPoint: "allowSettingMalformedCollectionValidators",
+            mode: "alwaysOn",
+        }),
     );
 
     // Invalid because '*' indicates that repetitions should be allowed but it's preceded by a
@@ -26,7 +29,9 @@ const collName = "collectionWithMalformedValidator";
     const invalidRegex = "^*";
 
     // Use collMod to give the collection a malformed validator.
-    assert.commandWorked(testDB.runCommand({collMod: collName, validator: {email: {$regex: invalidRegex}}}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: collName, validator: {email: {$regex: invalidRegex}}}),
+    );
 
     MongoRunner.stopMongod(conn);
 })();

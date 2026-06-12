@@ -36,7 +36,10 @@ function profilerChangeWasLogged({from, to, db}) {
 }
 
 profileLevelDB.getProfilingLevel();
-assert(!profilerChangeWasLogged({from: 0, to: -1, db: profileLevelDB}), "Didn't expect anything to be logged");
+assert(
+    !profilerChangeWasLogged({from: 0, to: -1, db: profileLevelDB}),
+    "Didn't expect anything to be logged",
+);
 
 assert.throws(() => {
     profileLevelDB.setProfilingLevel(-1);
@@ -44,19 +47,31 @@ assert.throws(() => {
 
 profileLevelDB.setProfilingLevel(0);
 assert(profileLevelDB.getProfilingLevel() == 0, "prof level 0");
-assert(profilerChangeWasLogged({from: 0, to: 0, db: profileLevelDB}), "Didn't find expected log line");
+assert(
+    profilerChangeWasLogged({from: 0, to: 0, db: profileLevelDB}),
+    "Didn't find expected log line",
+);
 
 profileLevelDB.setProfilingLevel(1);
 assert(profileLevelDB.getProfilingLevel() == 1, "p1");
-assert(profilerChangeWasLogged({from: 0, to: 1, db: profileLevelDB}), "Didn't find expected log line");
+assert(
+    profilerChangeWasLogged({from: 0, to: 1, db: profileLevelDB}),
+    "Didn't find expected log line",
+);
 
 profileLevelDB.setProfilingLevel(2);
 assert(profileLevelDB.getProfilingLevel() == 2, "p2");
-assert(profilerChangeWasLogged({from: 1, to: 2, db: profileLevelDB}), "Didn't find expected log line");
+assert(
+    profilerChangeWasLogged({from: 1, to: 2, db: profileLevelDB}),
+    "Didn't find expected log line",
+);
 
 profileLevelDB.setProfilingLevel(0);
 assert(profileLevelDB.getProfilingLevel() == 0, "prof level 0");
-assert(profilerChangeWasLogged({from: 2, to: 0, db: profileLevelDB}), "Didn't find expected log line");
+assert(
+    profilerChangeWasLogged({from: 2, to: 0, db: profileLevelDB}),
+    "Didn't find expected log line",
+);
 
 assert.throws(() => {
     profileLevelDB.setProfilingLevel(10);

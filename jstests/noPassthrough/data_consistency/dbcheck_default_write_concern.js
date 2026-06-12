@@ -7,7 +7,11 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {awaitDbCheckCompletion, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {
+    awaitDbCheckCompletion,
+    resetAndInsert,
+    runDbCheck,
+} from "jstests/replsets/libs/dbcheck_utils.js";
 
 (function () {
     "use strict";
@@ -92,9 +96,9 @@ import {awaitDbCheckCompletion, resetAndInsert, runDbCheck} from "jstests/replse
                 const dbcheckFp = configureFailPoint(primary, "hangBeforeProcessingDbCheckRun");
                 runDbCheck(rst, testDB, collName, parameters);
                 dbcheckFp.wait();
-                const dbcheckWC = testDB.currentOp().inprog.filter((x) => x["desc"] === "dbCheck")[0]["command"][
-                    "writeConcern"
-                ];
+                const dbcheckWC = testDB
+                    .currentOp()
+                    .inprog.filter((x) => x["desc"] === "dbCheck")[0]["command"]["writeConcern"];
                 // Make sure that default wc is applied.
                 assert.eq(defaultWC, dbcheckWC);
                 dbcheckFp.off();

@@ -28,15 +28,22 @@ rst.awaitReplication();
 
 const secondary = rst.getSecondary();
 
-const hangAfterIndexBuildDumpsInsertsFromBulk = configureFailPoint(primary, "hangAfterIndexBuildDumpsInsertsFromBulk");
+const hangAfterIndexBuildDumpsInsertsFromBulk = configureFailPoint(
+    primary,
+    "hangAfterIndexBuildDumpsInsertsFromBulk",
+);
 const hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum = configureFailPoint(
     secondary,
     "hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum",
 );
 
-const waitForIndexBuildToComplete = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+const waitForIndexBuildToComplete = IndexBuildTest.startIndexBuild(
+    primary,
+    primaryColl.getFullName(),
+    {a: 1},
+    null,
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 
 // Wait for the primary to start the index build.
 hangAfterIndexBuildDumpsInsertsFromBulk.wait();
@@ -67,7 +74,9 @@ assert.soon(() => {
 assert.soon(() => {
     return (
         1 ===
-        secondary.getDB("test").currentOp({desc: "IndexBuildsCoordinator-StepUp", killPending: true})["inprog"].length
+        secondary
+            .getDB("test")
+            .currentOp({desc: "IndexBuildsCoordinator-StepUp", killPending: true})["inprog"].length
     );
 });
 
@@ -79,7 +88,13 @@ hangAfterIndexBuildDumpsInsertsFromBulk.off();
 waitForIndexBuildToComplete();
 waitForStepDown();
 
-IndexBuildTest.assertIndexesSoon(rst.getPrimary().getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
-IndexBuildTest.assertIndexesSoon(rst.getSecondary().getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
+IndexBuildTest.assertIndexesSoon(rst.getPrimary().getDB(dbName).getCollection(collName), 2, [
+    "_id_",
+    "a_1",
+]);
+IndexBuildTest.assertIndexesSoon(rst.getSecondary().getDB(dbName).getCollection(collName), 2, [
+    "_id_",
+    "a_1",
+]);
 
 rst.stopSet();

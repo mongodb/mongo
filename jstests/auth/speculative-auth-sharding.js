@@ -15,7 +15,8 @@ const admin = st.s.getDB("admin");
 admin.createUser({user: "admin", pwd: "pwd", roles: ["root"]});
 admin.auth("admin", "pwd");
 
-let lastStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+let lastStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
+    .mechanisms;
 jsTest.log("Inintial stats: " + lastStats);
 
 const ingressMechs = ["SCRAM-SHA-1", "SCRAM-SHA-256", "MONGODB-X509"];
@@ -24,7 +25,8 @@ function test(uri, incrMech, isClusterAuth = false) {
     jsTest.log("Connecting to: " + uri);
     assert.eq(runMongoProgram("mongo", uri, "--eval", ";"), 0);
 
-    const stats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+    const stats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
+        .mechanisms;
     try {
         assert.eq(Object.keys(lastStats).length, Object.keys(stats).length);
         Object.keys(lastStats).forEach(function (mech) {

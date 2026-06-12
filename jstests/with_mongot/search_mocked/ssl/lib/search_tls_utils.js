@@ -26,7 +26,11 @@ function shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode}) {
     return false;
 }
 
-function setUpMongotAndMongodWithTLSOptions({mongotMockTLSMode, mongodTLSMode = "disabled", searchTLSMode = null}) {
+function setUpMongotAndMongodWithTLSOptions({
+    mongotMockTLSMode,
+    mongodTLSMode = "disabled",
+    searchTLSMode = null,
+}) {
     const mongotmock = new MongotMock();
     mongotmock.start({bypassAuth: false, tlsMode: mongotMockTLSMode});
     const mongotConn = mongotmock.getConnection();
@@ -82,7 +86,12 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
 
     const collUUID = getUUIDFromListCollections(db, coll.getName());
     const searchQuery = {query: "cakes", path: "title"};
-    const searchCmd = {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: "test"};
+    const searchCmd = {
+        search: coll.getName(),
+        collectionUUID: collUUID,
+        query: searchQuery,
+        $db: "test",
+    };
 
     {
         const cursorId = NumberLong(123);
@@ -126,7 +135,9 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
             },
         ];
 
-        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+        );
     }
 
     // Perform a $search query.

@@ -34,16 +34,24 @@ describe("Query shape hash in profiler", function () {
 
     after(function () {
         // Restore the default slow query logging threshold.
-        assert.commandWorked(db.runCommand({profile: profilingStatus.was, slowms: profilingStatus.slowms}));
+        assert.commandWorked(
+            db.runCommand({profile: profilingStatus.was, slowms: profilingStatus.slowms}),
+        );
     });
 
     // Finds the query shape hash from profiler output where the query has comment 'queryComment'.
     function getQueryShapeHashFromQueryProfiler(queryComment, profilerCount) {
-        const profiles = db.system.profile.find({"command.comment": queryComment}).sort({ts: -1}).toArray();
+        const profiles = db.system.profile
+            .find({"command.comment": queryComment})
+            .sort({ts: -1})
+            .toArray();
         assert.eq(profiles.length, profilerCount, "Couldn't find any profiling data");
 
         const lastProfile = profiles[0];
-        assert(lastProfile.queryShapeHash, "Couldn't find query shape hash in query profiler's data");
+        assert(
+            lastProfile.queryShapeHash,
+            "Couldn't find query shape hash in query profiler's data",
+        );
         return lastProfile.queryShapeHash;
     }
 
@@ -53,7 +61,10 @@ describe("Query shape hash in profiler", function () {
 
         // Get query shape hash from query profiler.
         let profilerCount = 1;
-        const queryProfilerQueryShapeHash = getQueryShapeHashFromQueryProfiler(query.comment, profilerCount);
+        const queryProfilerQueryShapeHash = getQueryShapeHashFromQueryProfiler(
+            query.comment,
+            profilerCount,
+        );
 
         // If cursor is still present, issue a getMore and check for query shape hash being
         // reported.

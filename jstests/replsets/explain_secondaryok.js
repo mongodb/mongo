@@ -40,9 +40,10 @@ assert.eq(1, secondary.getDB("test").explain_secondaryok.findOne({a: 1})["a"]);
 //
 
 // Explain a count on the primary.
-let explainOut = primary
-    .getDB("test")
-    .runCommand({explain: {count: "explain_secondaryok", query: {a: 1}}, verbosity: "executionStats"});
+let explainOut = primary.getDB("test").runCommand({
+    explain: {count: "explain_secondaryok", query: {a: 1}},
+    verbosity: "executionStats",
+});
 assert.commandWorked(explainOut, "explain read op on primary");
 
 // Explain an update on the primary.
@@ -71,16 +72,18 @@ assert.eq(1, secondary.getDB("test").explain_secondaryok.findOne({a: 1})["a"]);
 // Explain a count on the secondary with secondaryOk off. Should fail because
 // secondaryOk is required for explains on a secondary.
 secondary.getDB("test").getMongo().setSecondaryOk(false);
-explainOut = secondary
-    .getDB("test")
-    .runCommand({explain: {count: "explain_secondaryok", query: {a: 1}}, verbosity: "executionStats"});
+explainOut = secondary.getDB("test").runCommand({
+    explain: {count: "explain_secondaryok", query: {a: 1}},
+    verbosity: "executionStats",
+});
 assert.commandFailed(explainOut, "explain read op on secondary, secondaryOk false");
 
 // Explain of count should succeed once secondaryOk is true.
 secondary.getDB("test").getMongo().setSecondaryOk();
-explainOut = secondary
-    .getDB("test")
-    .runCommand({explain: {count: "explain_secondaryok", query: {a: 1}}, verbosity: "executionStats"});
+explainOut = secondary.getDB("test").runCommand({
+    explain: {count: "explain_secondaryok", query: {a: 1}},
+    verbosity: "executionStats",
+});
 assert.commandWorked(explainOut, "explain read op on secondary, secondaryOk true");
 
 // Explain .find() on a secondary, setting secondaryOk directly on the query.
@@ -99,7 +102,11 @@ explainOut = secondary
 assert.commandWorked(explainOut, "explain read op on secondary, slaveOk bit set to true on query");
 
 secondary.getDB("test").getMongo().setSecondaryOk();
-explainOut = secondary.getDB("test").explain_secondaryok.explain("executionStats").find({a: 1}).finish();
+explainOut = secondary
+    .getDB("test")
+    .explain_secondaryok.explain("executionStats")
+    .find({a: 1})
+    .finish();
 assert.commandWorked(explainOut, "explain .find() on secondary, secondaryOk set to true");
 
 // Explain .find() on a secondary, setting secondaryOk to false with various read preferences.
@@ -112,11 +119,18 @@ readPrefModes.forEach(function (prefString) {
         .find({a: 1})
         .readPref(prefString)
         .finish();
-    assert.commandWorked(explainOut, "explain .find() on secondary, '" + prefString + "' read preference on query");
+    assert.commandWorked(
+        explainOut,
+        "explain .find() on secondary, '" + prefString + "' read preference on query",
+    );
 
     // Similarly should succeed if a read preference is set on the connection.
     secondary.setReadPref(prefString);
-    explainOut = secondary.getDB("test").explain_secondaryok.explain("executionStats").find({a: 1}).finish();
+    explainOut = secondary
+        .getDB("test")
+        .explain_secondaryok.explain("executionStats")
+        .find({a: 1})
+        .finish();
     assert.commandWorked(
         explainOut,
         "explain .find() on secondary, '" + prefString + "' read preference on connection",
@@ -129,16 +143,18 @@ readPrefModes.forEach(function (prefString) {
 // primary.
 let prefStringPrimary = "primary";
 secondary.getDB("test").getMongo().setSecondaryOk(false);
-explainOut = secondary
-    .getDB("test")
-    .runCommand({explain: {find: "explain_secondaryok", query: {a: 1}}, verbosity: "executionStats"});
+explainOut = secondary.getDB("test").runCommand({
+    explain: {find: "explain_secondaryok", query: {a: 1}},
+    verbosity: "executionStats",
+});
 assert.commandFailed(explainOut, "not primary and secondaryOk=false");
 
 // Similarly should fail if a read preference is set on the connection.
 secondary.setReadPref(prefStringPrimary);
-explainOut = secondary
-    .getDB("test")
-    .runCommand({explain: {find: "explain_secondaryok", query: {a: 1}}, verbosity: "executionStats"});
+explainOut = secondary.getDB("test").runCommand({
+    explain: {find: "explain_secondaryok", query: {a: 1}},
+    verbosity: "executionStats",
+});
 assert.commandFailed(explainOut, "not primary and secondaryOk=false");
 // Unset read pref on the connection.
 secondary.setReadPref();

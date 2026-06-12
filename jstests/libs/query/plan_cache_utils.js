@@ -83,13 +83,22 @@ export function assertCacheUsage({
         if (cacheEntryVersion === 2) {
             assert(entry.cachedPlan.stages.includes(cachedIndexName), entry);
         } else {
-            assert(planHasIxScanStageForIndex(getCachedPlan(entry.cachedPlan), cachedIndexName), entry);
+            assert(
+                planHasIxScanStageForIndex(getCachedPlan(entry.cachedPlan), cachedIndexName),
+                entry,
+            );
         }
     }
     return entry;
 }
 
-export function setUpActiveCacheEntry(coll, pipeline, cacheEntryVersion, cachedIndexName, assertFn) {
+export function setUpActiveCacheEntry(
+    coll,
+    pipeline,
+    cacheEntryVersion,
+    cachedIndexName,
+    assertFn,
+) {
     // For the first run, the query should go through multiplanning and create inactive cache entry.
     assertFn(coll.aggregate(pipeline));
     assertCacheUsage({

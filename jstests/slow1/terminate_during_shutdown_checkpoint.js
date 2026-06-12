@@ -63,7 +63,9 @@ const threadWorkload = function (host, threadId, start, end) {
 
             const docId = Math.floor(Math.random() * (end - start + 1)) + start;
 
-            jsTestLog("ThreadId: " + threadId + ", inserting document with _id " + docId.toString());
+            jsTestLog(
+                "ThreadId: " + threadId + ", inserting document with _id " + docId.toString(),
+            );
             const insertRes = sessionColl.insert({
                 _id: docId,
                 a: docId,
@@ -100,13 +102,17 @@ const threadWorkload = function (host, threadId, start, end) {
                     jsTestLog("ThreadId: " + threadId + ", committing prepared transaction");
                     PrepareHelpers.commitTransaction(session, prepareTimestamp);
                 } else {
-                    jsTestLog("ThreadId: " + threadId + ", leaving prepared transaction uncommitted");
+                    jsTestLog(
+                        "ThreadId: " + threadId + ", leaving prepared transaction uncommitted",
+                    );
                 }
                 session = undefined;
             }
 
             if (i % 1000 == 0) {
-                jsTestLog("ThreadId: " + threadId + ", Progress: " + (i - start) + "/" + (end - start));
+                jsTestLog(
+                    "ThreadId: " + threadId + ", Progress: " + (i - start) + "/" + (end - start),
+                );
             }
         }
     } catch (e) {
@@ -119,7 +125,9 @@ const rst = new ReplSetTest({
     nodeOptions: {
         syncdelay: 10, // Fast checkpoint intervals.
         slowms: 30000, // Don't log slow queries.
-        setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2, wt: {wtCheckpoint: 1}}})},
+        setParameter: {
+            logComponentVerbosity: tojsononeline({storage: {recovery: 2, wt: {wtCheckpoint: 1}}}),
+        },
         wiredTigerEngineConfigString:
             "debug_mode=(slow_checkpoint=true,table_logging=true),verbose=[checkpoint_cleanup,checkpoint_progress]",
     },
@@ -148,7 +156,13 @@ while (numUncleanShutdowns < kNumUncleanShutdowns) {
     const kNumThreads = 10;
     let threads = [];
     for (let i = 0; i < kNumThreads; i++) {
-        let thread = new Thread(threadWorkload, primary.host, i, i * kOpsPerThread, kOpsPerThread + i * kOpsPerThread);
+        let thread = new Thread(
+            threadWorkload,
+            primary.host,
+            i,
+            i * kOpsPerThread,
+            kOpsPerThread + i * kOpsPerThread,
+        );
         threads.push(thread);
         thread.start();
     }

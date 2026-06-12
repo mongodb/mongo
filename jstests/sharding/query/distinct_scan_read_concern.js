@@ -14,7 +14,11 @@ TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
 
 function validateResults({results, nonOrphanDocuments, mayReturnOrphans}) {
     const asStrings = results.map((x) => tojson(x));
-    assert.eq(new Set(asStrings).size, results.length, "Results are not distinct: " + tojson(results));
+    assert.eq(
+        new Set(asStrings).size,
+        results.length,
+        "Results are not distinct: " + tojson(results),
+    );
 
     const isOrphan = (value) => value.includes("orphan");
     const nonOrphansFound = asStrings.reduce((acc, value) => acc + (isOrphan(value) ? 0 : 1), 0);
@@ -52,10 +56,16 @@ function runDistinctTest({
     // though the command does support them.
     const cmdArgs = {distinct: coll.getName(), key, query: filter, ...options};
     const results = assert.commandWorked(coll.getDB().runCommand(cmdArgs)).values;
-    const explain = assert.commandWorked(coll.getDB().runCommand({explain: cmdArgs, verbosity: "queryPlanner"}));
+    const explain = assert.commandWorked(
+        coll.getDB().runCommand({explain: cmdArgs, verbosity: "queryPlanner"}),
+    );
 
     validateResults({results, mayReturnOrphans, nonOrphanDocuments});
-    validateExplain({explain, shouldHaveShardFilteringStage, shouldHaveDistinctScan: shouldHaveDistinctScan});
+    validateExplain({
+        explain,
+        shouldHaveShardFilteringStage,
+        shouldHaveDistinctScan: shouldHaveDistinctScan,
+    });
 }
 
 function runAggregationTest({
@@ -80,7 +90,10 @@ function runAggregationTest({
     runTest([{$match: filter}, {$group: {_id: "$" + key}}]);
     if (sort) {
         runTest([{$sort: sort}, {$match: filter}, {$group: {_id: "$" + key}}]);
-        runTest([{$match: filter}, {$group: {_id: "$" + key, accum: {$top: {sortBy: sort, output: "$" + key}}}}]);
+        runTest([
+            {$match: filter},
+            {$group: {_id: "$" + key, accum: {$top: {sortBy: sort, output: "$" + key}}}},
+        ]);
     }
 }
 
@@ -142,7 +155,12 @@ const testCases = [
     },
 ];
 
-function runTestsWithOptions({coll, options = {}, mayReturnOrphans, shouldHaveShardFilteringStage}) {
+function runTestsWithOptions({
+    coll,
+    options = {},
+    mayReturnOrphans,
+    shouldHaveShardFilteringStage,
+}) {
     const commonTestProps = {coll, options, mayReturnOrphans, shouldHaveShardFilteringStage};
     for (const testCase of testCases) {
         print("Running distinct test: " + tojson(testCase));
@@ -152,7 +170,8 @@ function runTestsWithOptions({coll, options = {}, mayReturnOrphans, shouldHaveSh
         runAggregationTest({
             ...commonTestProps,
             ...testCase,
-            shouldHaveDistinctScan: testCase.shouldHaveDistinctScan && !testCase.shouldHaveDistinctScanDistinctOnly,
+            shouldHaveDistinctScan:
+                testCase.shouldHaveDistinctScan && !testCase.shouldHaveDistinctScanDistinctOnly,
         });
     }
 }

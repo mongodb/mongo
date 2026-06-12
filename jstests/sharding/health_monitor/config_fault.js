@@ -20,7 +20,10 @@ const setFailPoint = {
 };
 
 let st = new ShardingTest({
-    mongos: [{setParameter: params}, {setParameter: Object.assign({}, params, setFailPoint), waitForConnect: false}],
+    mongos: [
+        {setParameter: params},
+        {setParameter: Object.assign({}, params, setFailPoint), waitForConnect: false},
+    ],
 });
 assert.commandWorked(st.s0.adminCommand({"ping": 1})); // Ensure s0 is unaffected.
 

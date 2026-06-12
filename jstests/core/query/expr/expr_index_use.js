@@ -12,7 +12,12 @@
 //   exclude_from_timeseries_crud_passthrough,
 // ]
 
-import {getAggPlanStage, getEngine, getPlanStage, hasRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getEngine,
+    getPlanStage,
+    hasRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.expr_index_use;
 coll.drop();
@@ -66,7 +71,10 @@ assert.commandWorked(coll.createIndex({"w.z": 1}));
  *  - isEOF:            Boolean indicating whether the plan defaults to EOF.
  */
 function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
-    assert(metricsToCheck.hasOwnProperty("nReturned"), "metricsToCheck must contain an nReturned field");
+    assert(
+        metricsToCheck.hasOwnProperty("nReturned"),
+        "metricsToCheck must contain an nReturned field",
+    );
 
     let aggOptions = {};
     if (collation) {
@@ -95,7 +103,14 @@ function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
     ];
     assert.eq(metricsToCheck.nReturned, coll.aggregate(pipelineWithProject, aggOptions).itcount());
     let explain = coll.explain("executionStats").aggregate(pipelineWithProject, aggOptions);
-    assert(getAggPlanStage(explain, "COLLSCAN", getEngine(explain) === "sbe" /* useQueryPlannerSection */), explain);
+    assert(
+        getAggPlanStage(
+            explain,
+            "COLLSCAN",
+            getEngine(explain) === "sbe" /* useQueryPlannerSection */,
+        ),
+        explain,
+    );
 
     // Verifies that there are no rejected plans, and that the winning plan uses the expected
     // index.
@@ -142,8 +157,14 @@ confirmExpectedExprExecution({$gte: ["$x", 1]}, {nReturned: 3, expectedIndex: {x
 confirmExpectedExprExecution({$gte: [1, "$x"]}, {nReturned: 21, expectedIndex: {x: 1, y: 1}});
 
 // $and with both children eligible for index use.
-confirmExpectedExprExecution({$and: [{$eq: ["$x", 2]}, {$eq: ["$y", 2]}]}, {nReturned: 1, expectedIndex: {x: 1, y: 1}});
-confirmExpectedExprExecution({$and: [{$gt: ["$x", 1]}, {$lt: ["$y", 5]}]}, {nReturned: 1, expectedIndex: {x: 1, y: 1}});
+confirmExpectedExprExecution(
+    {$and: [{$eq: ["$x", 2]}, {$eq: ["$y", 2]}]},
+    {nReturned: 1, expectedIndex: {x: 1, y: 1}},
+);
+confirmExpectedExprExecution(
+    {$and: [{$gt: ["$x", 1]}, {$lt: ["$y", 5]}]},
+    {nReturned: 1, expectedIndex: {x: 1, y: 1}},
+);
 
 // $and with one child eligible for index use and one that is not.
 confirmExpectedExprExecution(
@@ -289,7 +310,9 @@ confirmExpectedExprExecution({$eq: ["$w", "$$REMOVE"]}, {nReturned: 16});
 // Equality match against text index prefix is expected to fail. Equality predicates are
 // required against the prefix fields of a text index, but currently $eq inside $expr does not
 // qualify.
-assert.throws(() => coll.aggregate([{$match: {$expr: {$eq: ["$k", 1]}, $text: {$search: "abc"}}}]).itcount());
+assert.throws(() =>
+    coll.aggregate([{$match: {$expr: {$eq: ["$k", 1]}, $text: {$search: "abc"}}}]).itcount(),
+);
 
 // Test that comparison match in $expr respects the collection's default collation, both when
 // there is an index with a matching collation and when there isn't.
@@ -328,8 +351,23 @@ const docs = [
 assert.commandWorked(coll.insert(docs));
 assert.commandWorked(coll.createIndex({w: 1}));
 
-confirmExpectedExprExecution({$eq: ["$w", {z: undefined, u: ["array"]}]}, {nReturned: 1, expectedIndex: {w: 1}});
-confirmExpectedExprExecution({$gt: ["$w", {z: undefined, u: ["array"]}]}, {nReturned: 1, expectedIndex: {w: 1}});
-confirmExpectedExprExecution({$gte: ["$w", {z: undefined, u: ["array"]}]}, {nReturned: 2, expectedIndex: {w: 1}});
-confirmExpectedExprExecution({$lt: ["$w", {z: undefined, u: ["array"]}]}, {nReturned: 6, expectedIndex: {w: 1}});
-confirmExpectedExprExecution({$lte: ["$w", {z: undefined, u: ["array"]}]}, {nReturned: 7, expectedIndex: {w: 1}});
+confirmExpectedExprExecution(
+    {$eq: ["$w", {z: undefined, u: ["array"]}]},
+    {nReturned: 1, expectedIndex: {w: 1}},
+);
+confirmExpectedExprExecution(
+    {$gt: ["$w", {z: undefined, u: ["array"]}]},
+    {nReturned: 1, expectedIndex: {w: 1}},
+);
+confirmExpectedExprExecution(
+    {$gte: ["$w", {z: undefined, u: ["array"]}]},
+    {nReturned: 2, expectedIndex: {w: 1}},
+);
+confirmExpectedExprExecution(
+    {$lt: ["$w", {z: undefined, u: ["array"]}]},
+    {nReturned: 6, expectedIndex: {w: 1}},
+);
+confirmExpectedExprExecution(
+    {$lte: ["$w", {z: undefined, u: ["array"]}]},
+    {nReturned: 7, expectedIndex: {w: 1}},
+);

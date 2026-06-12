@@ -28,13 +28,23 @@ export const runner = (function () {
                 numEnabledModes++;
             }
         });
-        assert.eq(1, numEnabledModes, "One and only one execution mode can be enabled " + tojson(mode));
+        assert.eq(
+            1,
+            numEnabledModes,
+            "One and only one execution mode can be enabled " + tojson(mode),
+        );
 
         return mode;
     }
 
     function validateExecutionOptions(mode, options) {
-        let allowedKeys = ["dbNamePrefix", "sessionOptions", "actionFiles", "threadMultiplier", "tenantId"];
+        let allowedKeys = [
+            "dbNamePrefix",
+            "sessionOptions",
+            "actionFiles",
+            "threadMultiplier",
+            "tenantId",
+        ];
 
         if (mode.parallel) {
             allowedKeys.push("numSubsets");
@@ -55,21 +65,35 @@ export const runner = (function () {
         }
 
         if (typeof options.numSubsets !== "undefined") {
-            assert(Number.isInteger(options.numSubsets), "expected number of subsets to be an integer");
+            assert(
+                Number.isInteger(options.numSubsets),
+                "expected number of subsets to be an integer",
+            );
             assert.gt(options.numSubsets, 0);
         }
 
         if (typeof options.iterations !== "undefined") {
-            assert(Number.isInteger(options.iterations), "expected number of iterations to be an integer");
+            assert(
+                Number.isInteger(options.iterations),
+                "expected number of iterations to be an integer",
+            );
             assert.gt(options.iterations, 0);
         }
 
         if (typeof options.dbNamePrefix !== "undefined") {
-            assert.eq("string", typeof options.dbNamePrefix, "expected dbNamePrefix to be a string");
+            assert.eq(
+                "string",
+                typeof options.dbNamePrefix,
+                "expected dbNamePrefix to be a string",
+            );
         }
 
         if (typeof options.actionFiles !== "undefined") {
-            assert.eq("string", typeof options.actionFiles.permitted, "expected actionFiles.permitted to be a string");
+            assert.eq(
+                "string",
+                typeof options.actionFiles.permitted,
+                "expected actionFiles.permitted to be a string",
+            );
 
             assert.eq(
                 "string",
@@ -77,12 +101,23 @@ export const runner = (function () {
                 "expected actionFiles.idleRequest to be a string",
             );
 
-            assert.eq("string", typeof options.actionFiles.idleAck, "expected actionFiles.idleAck to be a string");
+            assert.eq(
+                "string",
+                typeof options.actionFiles.idleAck,
+                "expected actionFiles.idleAck to be a string",
+            );
         }
 
         options.threadMultiplier = options.threadMultiplier || 1;
-        assert(Number.isInteger(options.threadMultiplier), "expected threadMultiplier to be an integer");
-        assert.gte(options.threadMultiplier, 1, "expected threadMultiplier to be greater than or equal to 1");
+        assert(
+            Number.isInteger(options.threadMultiplier),
+            "expected threadMultiplier to be an integer",
+        );
+        assert.gte(
+            options.threadMultiplier,
+            1,
+            "expected threadMultiplier to be greater than or equal to 1",
+        );
 
         return options;
     }
@@ -99,7 +134,10 @@ export const runner = (function () {
         });
 
         if (typeof options.dropDatabaseDenylist !== "undefined") {
-            assert(Array.isArray(options.dropDatabaseDenylist), "expected dropDatabaseDenylist to be an array");
+            assert(
+                Array.isArray(options.dropDatabaseDenylist),
+                "expected dropDatabaseDenylist to be an array",
+            );
         }
 
         if (typeof options.keepExistingDatabases !== "undefined") {
@@ -113,7 +151,11 @@ export const runner = (function () {
         options.validateCollections = options.hasOwnProperty("validateCollections")
             ? options.validateCollections
             : true;
-        assert.eq("boolean", typeof options.validateCollections, "expected validateCollections to be a boolean");
+        assert.eq(
+            "boolean",
+            typeof options.validateCollections,
+            "expected validateCollections to be a boolean",
+        );
 
         return options;
     }
@@ -184,7 +226,11 @@ export const runner = (function () {
 
         workloads.forEach(function (workload) {
             // Workloads cannot have a shardKey if sameCollection is specified
-            if (clusterOptions.sameCollection && cluster.isSharded() && context[workload].config.data.shardKey) {
+            if (
+                clusterOptions.sameCollection &&
+                cluster.isSharded() &&
+                context[workload].config.data.shardKey
+            ) {
                 throw new Error("cannot specify a shardKey with sameCollection option");
             }
             if (firstWorkload || !clusterOptions.sameCollection) {
@@ -337,7 +383,10 @@ export const runner = (function () {
                 uniqueTraces
                     .map(function (obj) {
                         let line =
-                            pluralize("thread", obj.freq) + " with tids " + JSON.stringify(obj.tids) + " threw\n";
+                            pluralize("thread", obj.freq) +
+                            " with tids " +
+                            JSON.stringify(obj.tids) +
+                            " threw\n";
                         return indent(line + obj.value, 8);
                     })
                     .join("\n\n")
@@ -390,14 +439,20 @@ export const runner = (function () {
         // This property must be enumerable because of SERVER-21338, which prevents
         // objects with non-enumerable properties from being serialized properly in
         // Threads.
-        Object.defineProperty(config.data, "iterations", {enumerable: true, value: config.iterations});
+        Object.defineProperty(config.data, "iterations", {
+            enumerable: true,
+            value: config.iterations,
+        });
     }
 
     function setThreadCount(config) {
         // This property must be enumerable because of SERVER-21338, which prevents
         // objects with non-enumerable properties from being serialized properly in
         // Threads.
-        Object.defineProperty(config.data, "threadCount", {enumerable: true, value: config.threadCount});
+        Object.defineProperty(config.data, "threadCount", {
+            enumerable: true,
+            value: config.threadCount,
+        });
     }
 
     async function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {
@@ -420,7 +475,15 @@ export const runner = (function () {
         jsTest.log("End of schedule");
     }
 
-    function cleanupWorkload(workload, context, cluster, errors, header, dbHashDenylist, cleanupOptions) {
+    function cleanupWorkload(
+        workload,
+        context,
+        cluster,
+        errors,
+        header,
+        dbHashDenylist,
+        cleanupOptions,
+    ) {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
@@ -432,7 +495,12 @@ export const runner = (function () {
             cluster.checkReplicationConsistency(dbHashDenylist, phase);
         } catch (e) {
             errors.push(
-                new WorkloadFailure(e.toString(), e.stack, "main", header + " checking consistency on secondaries"),
+                new WorkloadFailure(
+                    e.toString(),
+                    e.stack,
+                    "main",
+                    header + " checking consistency on secondaries",
+                ),
             );
             return false;
         }
@@ -442,7 +510,14 @@ export const runner = (function () {
                 cluster.validateAllCollections(phase);
             }
         } catch (e) {
-            errors.push(new WorkloadFailure(e.toString(), e.stack, "main", header + " validating collections"));
+            errors.push(
+                new WorkloadFailure(
+                    e.toString(),
+                    e.stack,
+                    "main",
+                    header + " validating collections",
+                ),
+            );
             return false;
         }
 
@@ -504,7 +579,10 @@ export const runner = (function () {
             // initial clusterTime and initial operationTime for the sessions they'll create so that
             // they are guaranteed to observe the effects of the workload's $config.setup() function
             // being called.
-            if (typeof executionOptions.sessionOptions === "object" && executionOptions.sessionOptions !== null) {
+            if (
+                typeof executionOptions.sessionOptions === "object" &&
+                executionOptions.sessionOptions !== null
+            ) {
                 // We only start a session for the worker threads and never start one for the main
                 // thread. We can therefore get the clusterTime and operationTime tracked by the
                 // underlying DummyDriverSession through any DB instance (i.e. the "test" database
@@ -516,8 +594,12 @@ export const runner = (function () {
                 // constructor. To work around this behavior, we instead pass a stringified form of
                 // the JavaScript object through the Thread constructor and use eval() to
                 // rehydrate it.
-                executionOptions.sessionOptions.initialClusterTime = tojson(session.getClusterTime());
-                executionOptions.sessionOptions.initialOperationTime = tojson(session.getOperationTime());
+                executionOptions.sessionOptions.initialClusterTime = tojson(
+                    session.getClusterTime(),
+                );
+                executionOptions.sessionOptions.initialOperationTime = tojson(
+                    session.getOperationTime(),
+                );
             }
 
             try {
@@ -532,14 +614,30 @@ export const runner = (function () {
                 errors.push(
                     ...threadMgr
                         .joinAll()
-                        .map((e) => new WorkloadFailure(e.err, e.stack, e.tid, "Foreground " + e.workloads.join(" "))),
+                        .map(
+                            (e) =>
+                                new WorkloadFailure(
+                                    e.err,
+                                    e.stack,
+                                    e.tid,
+                                    "Foreground " + e.workloads.join(" "),
+                                ),
+                        ),
                 );
             }
         } finally {
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
             let cleanupResults = cleanup.map((workload) =>
-                cleanupWorkload(workload, context, cluster, errors, "Foreground", dbHashDenylist, cleanupOptions),
+                cleanupWorkload(
+                    workload,
+                    context,
+                    cluster,
+                    errors,
+                    "Foreground",
+                    dbHashDenylist,
+                    cleanupOptions,
+                ),
             );
             teardownFailed = cleanupResults.some((success) => success === false);
 
@@ -556,10 +654,19 @@ export const runner = (function () {
         throwError(errors);
 
         // Ensure that all operations replicated correctly to the secondaries.
-        cluster.checkReplicationConsistency(dbHashDenylist, "after workload-group teardown and data clean-up");
+        cluster.checkReplicationConsistency(
+            dbHashDenylist,
+            "after workload-group teardown and data clean-up",
+        );
     }
 
-    async function runWorkloads(workloads, clusterOptions, executionMode, executionOptions, cleanupOptions) {
+    async function runWorkloads(
+        workloads,
+        clusterOptions,
+        executionMode,
+        executionOptions,
+        cleanupOptions,
+    ) {
         assert.gt(workloads.length, 0, "need at least one workload to run");
 
         executionMode = validateExecutionMode(executionMode);
@@ -572,7 +679,12 @@ export const runner = (function () {
         Object.freeze(cleanupOptions); // immutable after validation (and normalization)
 
         let context = {};
-        await loadWorkloadContext(workloads, context, executionOptions, true /* applyMultipliers */);
+        await loadWorkloadContext(
+            workloads,
+            context,
+            executionOptions,
+            true /* applyMultipliers */,
+        );
         let threadMgr = new ThreadManager(clusterOptions);
 
         let cluster = new Cluster(clusterOptions, executionOptions.sessionOptions);
@@ -642,15 +754,32 @@ export const runner = (function () {
             executionOptions = executionOptions || {};
             cleanupOptions = cleanupOptions || {};
 
-            await runWorkloads(workloads, clusterOptions, {serial: true}, executionOptions, cleanupOptions);
+            await runWorkloads(
+                workloads,
+                clusterOptions,
+                {serial: true},
+                executionOptions,
+                cleanupOptions,
+            );
         },
 
-        parallel: async function parallel(workloads, clusterOptions, executionOptions, cleanupOptions) {
+        parallel: async function parallel(
+            workloads,
+            clusterOptions,
+            executionOptions,
+            cleanupOptions,
+        ) {
             clusterOptions = clusterOptions || {};
             executionOptions = executionOptions || {};
             cleanupOptions = cleanupOptions || {};
 
-            await runWorkloads(workloads, clusterOptions, {parallel: true}, executionOptions, cleanupOptions);
+            await runWorkloads(
+                workloads,
+                clusterOptions,
+                {parallel: true},
+                executionOptions,
+                cleanupOptions,
+            );
         },
 
         internals: {

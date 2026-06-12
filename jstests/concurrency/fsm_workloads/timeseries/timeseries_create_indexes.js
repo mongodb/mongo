@@ -33,11 +33,17 @@ function getRandomCollection(db) {
 // Older binaries don't do this, so they can return more error codes.
 const isPreV82Binary =
     TestData.multiversionBinVersion &&
-    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(TestData.multiversionBinVersion), "8.2") < 0;
+    MongoRunner.compareBinVersions(
+        MongoRunner.getBinVersionFor(TestData.multiversionBinVersion),
+        "8.2",
+    ) < 0;
 // Since binary v8.3, index ops. take a single lock, so we don't expect CollectionUUIDMismatch.
 const isPreV83Binary =
     TestData.multiversionBinVersion &&
-    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(TestData.multiversionBinVersion), "8.3") < 0;
+    MongoRunner.compareBinVersions(
+        MongoRunner.getBinVersionFor(TestData.multiversionBinVersion),
+        "8.3",
+    ) < 0;
 
 export const $config = (function () {
     let data = {nsPrefix: "create_idx_", numCollections: 5};
@@ -45,7 +51,9 @@ export const $config = (function () {
     let states = {
         createNormalColl: function (db, collname) {
             const coll = getRandomCollection(db);
-            assert.commandWorkedOrFailedWithCode(db.createCollection(coll.getName()), [ErrorCodes.NamespaceExists]);
+            assert.commandWorkedOrFailedWithCode(db.createCollection(coll.getName()), [
+                ErrorCodes.NamespaceExists,
+            ]);
         },
         createTimeseriesColl: function (db, collname) {
             const coll = getRandomCollection(db);
@@ -101,7 +109,12 @@ export const $config = (function () {
             coll.drop();
         },
         createIndex: function (db, collName) {
-            const allIndexSpecs = [{[metaFieldName]: 1}, {[timeFieldName]: 1}, {"measurement": 1}, {"other": 1}];
+            const allIndexSpecs = [
+                {[metaFieldName]: 1},
+                {[timeFieldName]: 1},
+                {"measurement": 1},
+                {"other": 1},
+            ];
 
             const coll = getRandomCollection(db);
             const indexSpec = allIndexSpecs[Math.floor(Math.random() * allIndexSpecs.length)];

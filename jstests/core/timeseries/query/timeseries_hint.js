@@ -52,7 +52,11 @@ function runTest({command, expectedResult, expectedDirection}) {
     const plan = db.runCommand({explain: command});
     const scan = getAggPlanStage(plan, "COLLSCAN");
     assert(scan, "Expected a COLLSCAN stage" + tojson(plan));
-    assert.eq(scan.direction, expectedDirection, "Expected a " + expectedDirection + " COLLSCAN " + tojson(scan));
+    assert.eq(
+        scan.direction,
+        expectedDirection,
+        "Expected a " + expectedDirection + " COLLSCAN " + tojson(scan),
+    );
 }
 
 // Test find: ascending and descending.

@@ -11,7 +11,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = Object.extend(
         {
             explainBasicUpdate: function explainBasicUpdate(db, collName) {
-                let res = db[collName].explain("executionStats").update({i: this.nInserted}, {$set: {j: 49}});
+                let res = db[collName]
+                    .explain("executionStats")
+                    .update({i: this.nInserted}, {$set: {j: 49}});
                 assert.commandWorked(res);
                 // eslint-disable-next-line
                 assert.eq(1, explain.executionStats.totalDocsExamined);

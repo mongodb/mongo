@@ -21,7 +21,11 @@ assert.eq(0, stats.wiredTiger.btree["row-store leaf pages"]);
 
 MongoRunner.stopMongod(mongo);
 
-mongo = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, wiredTigerStatisticsSetting: "all"});
+mongo = MongoRunner.runMongod({
+    dbpath: dbpath,
+    noCleanData: true,
+    wiredTigerStatisticsSetting: "all",
+});
 db = mongo.getDB("test");
 coll = db.getCollection("stats");
 

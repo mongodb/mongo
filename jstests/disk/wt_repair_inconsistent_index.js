@@ -45,7 +45,9 @@ let runTest = function (mongodOptions) {
         const indexUri = getUriForIndex(testColl, indexName);
 
         const db = mongod.getDB(baseName);
-        assert.commandWorked(db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}),
+        );
         assert.commandWorked(testColl.insert({a: 2}));
 
         // Disable validation because it is expected to not pass due to index inconsistencies.

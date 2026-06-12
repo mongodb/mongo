@@ -28,7 +28,9 @@ function runTest(conn) {
     AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res0);
     AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res0);
 
-    const res1 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {x: 1}, keyCharacteristics: false}));
+    const res1 = assert.commandWorked(
+        conn.adminCommand({analyzeShardKey: ns, key: {x: 1}, keyCharacteristics: false}),
+    );
     AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res1);
     AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res1);
 
@@ -39,7 +41,12 @@ function runTest(conn) {
     AnalyzeShardKeyUtil.assertNotContainReadWriteDistributionMetrics(res2);
 
     const res3 = assert.commandWorked(
-        conn.adminCommand({analyzeShardKey: ns, key: {x: 1}, keyCharacteristics: true, readWriteDistribution: true}),
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: {x: 1},
+            keyCharacteristics: true,
+            readWriteDistribution: true,
+        }),
     );
     AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res3);
     AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res3);
@@ -67,7 +74,10 @@ function runTest(conn) {
         }),
         ErrorCodes.IllegalOperation,
     );
-    assert.eq(res4.errmsg, "Cannot analyze the characteristics of a shard key that does not have a supporting index");
+    assert.eq(
+        res4.errmsg,
+        "Cannot analyze the characteristics of a shard key that does not have a supporting index",
+    );
 
     assert(coll.drop());
 }

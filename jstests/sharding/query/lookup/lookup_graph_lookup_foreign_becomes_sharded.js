@@ -44,7 +44,10 @@ function setupBothMongos() {
         for (let j = 0; j < numMatches; ++j) {
             const mongosForInsert = j % 2 ? freshMongos : staleMongos;
             assert.commandWorked(
-                mongosForInsert[foreignCollection.getName()].insert({_id: numMatches * i + j, foreign: i}),
+                mongosForInsert[foreignCollection.getName()].insert({
+                    _id: numMatches * i + j,
+                    foreign: i,
+                }),
             );
         }
     }
@@ -108,13 +111,18 @@ for (let testCase of testCases) {
 }
 
 // Use freshMongos to shard the foreignCollection, so staleMongos still thinks it is unsharded.
-assert.commandWorked(freshMongos.adminCommand({shardCollection: foreignCollection.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    freshMongos.adminCommand({shardCollection: foreignCollection.getFullName(), key: {_id: 1}}),
+);
 
 // Now run a getMore for each of the test cases. The foreign collection has become sharded mid-
 // iteration, but we can recover from this and continue execution.
 for (let testCase of testCases) {
     const getMoreCmdRes = assert.commandWorked(
-        freshMongos.runCommand({getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
+        freshMongos.runCommand({
+            getMore: testCase.aggCmdRes.cursor.id,
+            collection: testCase.aggCmd.aggregate,
+        }),
         `Expected getMore to succeed. Original command: ${tojson(testCase.aggCmd)}`,
     );
     assert.eq(getMoreCmdRes.cursor.nextBatch.length, 4, "Expected getMore to return 4 results");
@@ -161,8 +169,8 @@ assert.commandWorked(primaryDB.setProfilingLevel(2));
 // Wait until both mongos have refreshed their view of the new Primary.
 st.waitUntilStable();
 
-const prevStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1})).shardingStatistics
-    .countStaleConfigErrors;
+const prevStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
+    .shardingStatistics.countStaleConfigErrors;
 
 // Verify that the 'aggregate' command works and produces (batchSize) results, indicating that the
 // $lookup or $graphLookup succeeded on the unsharded foreign collection.
@@ -171,11 +179,15 @@ for (let testCase of testCases) {
     assert.eq(aggCmdRes.cursor.firstBatch.length, batchSize);
 }
 
-const newStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1})).shardingStatistics
-    .countStaleConfigErrors;
+const newStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
+    .shardingStatistics.countStaleConfigErrors;
 
 // ... and a single StaleConfig error for the foreign namespace. These StaleConfig errors are not
 // always reported in the profiler, but they are reflected in the serverStatus StaleConfig error
 // counter.
-assert.gt(newStaleConfigErrorCount, prevStaleConfigErrorCount, "StaleConfig errors must have happened");
+assert.gt(
+    newStaleConfigErrorCount,
+    prevStaleConfigErrorCount,
+    "StaleConfig errors must have happened",
+);
 st.stop();

@@ -58,12 +58,20 @@ assert.commandFailedWithCode(
 );
 
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: -1.0}}]}),
+    db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{$match: {$sampleRate: -1.0}}],
+    }),
     ErrorCodes.BadValue,
 );
 
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: 2.0}}]}),
+    db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{$match: {$sampleRate: 2.0}}],
+    }),
     ErrorCodes.BadValue,
 );
 

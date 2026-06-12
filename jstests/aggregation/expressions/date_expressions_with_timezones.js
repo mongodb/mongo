@@ -109,7 +109,9 @@ function runDateTimeExpressionWithTimezone(exprName, tz) {
 
 function testDateTimeExpression(exprName, expectedValues) {
     assert(coll.drop());
-    assert.commandWorked(coll.insert({date: ISODate("2017-01-16T01:02:03.456Z"), timezone: "America/Sao_Paulo"}));
+    assert.commandWorked(
+        coll.insert({date: ISODate("2017-01-16T01:02:03.456Z"), timezone: "America/Sao_Paulo"}),
+    );
     assert.eq(
         expectedValues.idBasedTzExpected,
         runDateTimeExpressionWithTimezone(exprName, "$timezone").cursor.firstBatch[0].out,
@@ -121,7 +123,9 @@ function testDateTimeExpression(exprName, expectedValues) {
 
     // Test expression with offset based timezone
     assert(coll.drop());
-    assert.commandWorked(coll.insert({date: ISODate("2017-01-01T01:02:03.456Z"), timezone: "-01:30"}));
+    assert.commandWorked(
+        coll.insert({date: ISODate("2017-01-01T01:02:03.456Z"), timezone: "-01:30"}),
+    );
     assert.eq(
         expectedValues.offsetBasedTzExpected,
         runDateTimeExpressionWithTimezone(exprName, "$timezone").cursor.firstBatch[0].out,
@@ -134,13 +138,22 @@ function testDateTimeExpression(exprName, expectedValues) {
     // Test expression when document has no $timezone field
     assert(coll.drop());
     assert.commandWorked(coll.insert({date: ISODate("2017-01-16T01:02:03.456Z")}));
-    assert.eq(null, runDateTimeExpressionWithTimezone(exprName, "$timezone").cursor.firstBatch[0].out);
-    assert.eq(expectedValues.noTzExpected, runDateTimeExpressionWithTimezone(exprName).cursor.firstBatch[0].out);
+    assert.eq(
+        null,
+        runDateTimeExpressionWithTimezone(exprName, "$timezone").cursor.firstBatch[0].out,
+    );
+    assert.eq(
+        expectedValues.noTzExpected,
+        runDateTimeExpressionWithTimezone(exprName).cursor.firstBatch[0].out,
+    );
 
     // Test expression when document has no date field
     assert(coll.drop());
     assert.commandWorked(coll.insert({timezone: "America/Sao_Paulo"}));
-    assert.eq(null, runDateTimeExpressionWithTimezone(exprName, "$timezone").cursor.firstBatch[0].out);
+    assert.eq(
+        null,
+        runDateTimeExpressionWithTimezone(exprName, "$timezone").cursor.firstBatch[0].out,
+    );
 
     // test with invalid timezone identifier
     assert(coll.drop());
@@ -156,23 +169,73 @@ function testDateTimeExpression(exprName, expectedValues) {
 
     // test with invalid date type
     assert(coll.drop());
-    assert.commandWorked(coll.insert({date: "2017-06-16T00:00:00.000Z", timezone: "America/Sao_Paulo"}));
+    assert.commandWorked(
+        coll.insert({date: "2017-06-16T00:00:00.000Z", timezone: "America/Sao_Paulo"}),
+    );
     assert.commandFailedWithCode(runDateTimeExpressionWithTimezone(exprName, "$timezone"), 16006);
 }
 
-testDateTimeExpression("$dayOfWeek", {idBasedTzExpected: 1, offsetBasedTzExpected: 7, noTzExpected: 2});
-testDateTimeExpression("$dayOfMonth", {idBasedTzExpected: 15, offsetBasedTzExpected: 31, noTzExpected: 16});
-testDateTimeExpression("$dayOfYear", {idBasedTzExpected: 15, offsetBasedTzExpected: 366, noTzExpected: 16});
-testDateTimeExpression("$year", {idBasedTzExpected: 2017, offsetBasedTzExpected: 2016, noTzExpected: 2017});
-testDateTimeExpression("$month", {idBasedTzExpected: 1, offsetBasedTzExpected: 12, noTzExpected: 1});
-testDateTimeExpression("$hour", {idBasedTzExpected: 23, offsetBasedTzExpected: 23, noTzExpected: 1});
-testDateTimeExpression("$minute", {idBasedTzExpected: 2, offsetBasedTzExpected: 32, noTzExpected: 2});
-testDateTimeExpression("$second", {idBasedTzExpected: 3, offsetBasedTzExpected: 3, noTzExpected: 3});
-testDateTimeExpression("$millisecond", {idBasedTzExpected: 456, offsetBasedTzExpected: 456, noTzExpected: 456});
+testDateTimeExpression("$dayOfWeek", {
+    idBasedTzExpected: 1,
+    offsetBasedTzExpected: 7,
+    noTzExpected: 2,
+});
+testDateTimeExpression("$dayOfMonth", {
+    idBasedTzExpected: 15,
+    offsetBasedTzExpected: 31,
+    noTzExpected: 16,
+});
+testDateTimeExpression("$dayOfYear", {
+    idBasedTzExpected: 15,
+    offsetBasedTzExpected: 366,
+    noTzExpected: 16,
+});
+testDateTimeExpression("$year", {
+    idBasedTzExpected: 2017,
+    offsetBasedTzExpected: 2016,
+    noTzExpected: 2017,
+});
+testDateTimeExpression("$month", {
+    idBasedTzExpected: 1,
+    offsetBasedTzExpected: 12,
+    noTzExpected: 1,
+});
+testDateTimeExpression("$hour", {
+    idBasedTzExpected: 23,
+    offsetBasedTzExpected: 23,
+    noTzExpected: 1,
+});
+testDateTimeExpression("$minute", {
+    idBasedTzExpected: 2,
+    offsetBasedTzExpected: 32,
+    noTzExpected: 2,
+});
+testDateTimeExpression("$second", {
+    idBasedTzExpected: 3,
+    offsetBasedTzExpected: 3,
+    noTzExpected: 3,
+});
+testDateTimeExpression("$millisecond", {
+    idBasedTzExpected: 456,
+    offsetBasedTzExpected: 456,
+    noTzExpected: 456,
+});
 testDateTimeExpression("$week", {idBasedTzExpected: 3, offsetBasedTzExpected: 52, noTzExpected: 3});
-testDateTimeExpression("$isoWeekYear", {idBasedTzExpected: 2017, offsetBasedTzExpected: 2016, noTzExpected: 2017});
-testDateTimeExpression("$isoDayOfWeek", {idBasedTzExpected: 7, offsetBasedTzExpected: 6, noTzExpected: 1});
-testDateTimeExpression("$isoWeek", {idBasedTzExpected: 2, offsetBasedTzExpected: 52, noTzExpected: 3});
+testDateTimeExpression("$isoWeekYear", {
+    idBasedTzExpected: 2017,
+    offsetBasedTzExpected: 2016,
+    noTzExpected: 2017,
+});
+testDateTimeExpression("$isoDayOfWeek", {
+    idBasedTzExpected: 7,
+    offsetBasedTzExpected: 6,
+    noTzExpected: 1,
+});
+testDateTimeExpression("$isoWeek", {
+    idBasedTzExpected: 2,
+    offsetBasedTzExpected: 52,
+    noTzExpected: 3,
+});
 
 // Make sure the data type returned by the date/time expressions is correct
 function testDateTimeExpressionType(exprName, exprType) {

@@ -51,7 +51,10 @@ assert.commandWorked(coll.insertMany(allDocs));
 
 function testRankFusion({pipeline, expectedResults}) {
     let results = coll.aggregate(pipeline).toArray();
-    assert(orderedArrayEq(results, expectedResults), `$rankFusion returned unexpected output: ${tojson(results)}`);
+    assert(
+        orderedArrayEq(results, expectedResults),
+        `$rankFusion returned unexpected output: ${tojson(results)}`,
+    );
 }
 
 function withAndWithoutIndex({index, assertFn}) {
@@ -190,7 +193,11 @@ function withAndWithoutIndex({index, assertFn}) {
             const irrelevantSort = {$sort: {n_per_serving: -1, _id: 1}};
             testWithSortVariation([actualExpectedSort]);
             testWithSortVariation([irrelevantSort, actualExpectedSort]);
-            testWithSortVariation([irrelevantSort, {$_internalInhibitOptimization: {}}, actualExpectedSort]);
+            testWithSortVariation([
+                irrelevantSort,
+                {$_internalInhibitOptimization: {}},
+                actualExpectedSort,
+            ]);
             testWithSortVariation([{$_internalInhibitOptimization: {}}, actualExpectedSort]);
         },
     });

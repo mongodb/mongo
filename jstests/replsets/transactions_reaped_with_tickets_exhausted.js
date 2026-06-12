@@ -96,7 +96,10 @@ for (let thread of threads) {
 }
 
 // Transaction should already be aborted.
-let res = assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+let res = assert.commandFailedWithCode(
+    session.abortTransaction_forTesting(),
+    ErrorCodes.NoSuchTransaction,
+);
 assert(res.errmsg.match(/Transaction .* has been aborted/), res.errmsg);
 
 session.endSession();

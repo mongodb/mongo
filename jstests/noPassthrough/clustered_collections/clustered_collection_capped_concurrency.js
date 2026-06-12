@@ -38,7 +38,11 @@ function validateCappedInsertConcurrency(db, coll, clustered, expectedConcurrent
     const ns = coll.getFullName();
     const failPointName = "hangAfterCollectionInserts";
     const fp = assert.commandWorked(
-        db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn", data: {collectionNS: ns}}),
+        db.adminCommand({
+            configureFailPoint: failPointName,
+            mode: "alwaysOn",
+            data: {collectionNS: ns},
+        }),
     );
     const timesEntered = fp.count;
 
@@ -69,7 +73,10 @@ function validateCappedInsertConcurrency(db, coll, clustered, expectedConcurrent
     } else {
         // Assert the insert is serialized - it acquires the Metadata resource in strong exclusive
         // mode.
-        assert.neq(db.currentOp({ns: ns, "op": "insert"}).inprog[0].lockStats.Metadata.acquireCount.W, undefined);
+        assert.neq(
+            db.currentOp({ns: ns, "op": "insert"}).inprog[0].lockStats.Metadata.acquireCount.W,
+            undefined,
+        );
     }
 
     assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));

@@ -37,7 +37,9 @@ const mongosParams = {
 };
 
 const assertFaultState = function (state) {
-    let result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+    let result = assert.commandWorked(
+        st.s0.adminCommand({serverStatus: 1, health: {details: true}}),
+    ).health;
     print(`Server health: ${tojson(result)}`);
     assert(result.state == state);
 };
@@ -49,7 +51,9 @@ var st = new ShardingTest({
     config: 3,
 });
 
-assert.commandWorked(st.s0.adminCommand({"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 3}}}));
+assert.commandWorked(
+    st.s0.adminCommand({"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 3}}}),
+);
 
 const configPrimary = st.configRS.getPrimary();
 const admin = configPrimary.getDB("admin");
@@ -85,7 +89,9 @@ st.config2.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config2, 1.0);
 
 const failedChecksCount = function () {
-    let result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+    let result = assert.commandWorked(
+        st.s0.adminCommand({serverStatus: 1, health: {details: true}}),
+    ).health;
     print(`Server status: ${tojson(result)}`);
     return result.configServer.totalChecksWithFailure && result.state == "TransientFault";
 };

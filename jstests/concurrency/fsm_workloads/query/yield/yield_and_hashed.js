@@ -94,7 +94,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             assert.commandWorked(
                 db.adminCommand({
                     setParameter: 1,
-                    internalQueryForceIntersectionPlans: this.originalQueryForceIntersectionPlans[db.getMongo().host],
+                    internalQueryForceIntersectionPlans:
+                        this.originalQueryForceIntersectionPlans[db.getMongo().host],
                 }),
             );
         });

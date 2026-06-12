@@ -159,7 +159,12 @@ testCases.forEach((testCase) => {
     runCommandAndCheckError(testCase, retryableWriteFields);
 
     jsTest.log(testCase.logMessage + "\n" + "Running in a transaction.");
-    const transactionFields = {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
+    const transactionFields = {
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(0),
+        startTransaction: true,
+        autocommit: false,
+    };
     runCommandAndCheckError(testCase, transactionFields);
 });
 

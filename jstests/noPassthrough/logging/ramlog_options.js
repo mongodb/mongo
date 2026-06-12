@@ -23,10 +23,18 @@
     const db = mongod.getDB(dbName);
 
     // Get the server parameters
-    const serverParams = db.adminCommand({getParameter: 1, ramLogMaxLines: 1, ramLogMaxSizeBytes: 1});
+    const serverParams = db.adminCommand({
+        getParameter: 1,
+        ramLogMaxLines: 1,
+        ramLogMaxSizeBytes: 1,
+    });
 
     // Verify the parameters were set correctly
-    assert.eq(serverParams.ramLogMaxLines, ramLogMaxLines, "ramLogMaxLines parameter was not set correctly");
+    assert.eq(
+        serverParams.ramLogMaxLines,
+        ramLogMaxLines,
+        "ramLogMaxLines parameter was not set correctly",
+    );
     assert.eq(
         serverParams.ramLogMaxSizeBytes,
         ramLogMaxSizeBytes,
@@ -46,8 +54,16 @@
     );
 
     // Verify the parameters were updated
-    const updatedParams = db.adminCommand({getParameter: 1, ramLogMaxLines: 1, ramLogMaxSizeBytes: 1});
-    assert.eq(updatedParams.ramLogMaxLines, newRamLogMaxLines, "ramLogMaxLines parameter was not updated correctly");
+    const updatedParams = db.adminCommand({
+        getParameter: 1,
+        ramLogMaxLines: 1,
+        ramLogMaxSizeBytes: 1,
+    });
+    assert.eq(
+        updatedParams.ramLogMaxLines,
+        newRamLogMaxLines,
+        "ramLogMaxLines parameter was not updated correctly",
+    );
     assert.eq(
         updatedParams.ramLogMaxSizeBytes,
         newRamLogMaxSizeBytes,

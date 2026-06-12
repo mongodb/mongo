@@ -47,12 +47,17 @@ export function isRawOperationSupported(db) {
     // binary-compatible flag enabled. We detect this through an FCV-gated feature flag, which works
     // because the FCV can only be upgraded once all binaries in the cluster are upgraded.
     const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
     if (isMultiversion) {
-        const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(conn, "AllBinariesSupportRawDataOperations");
+        const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(
+            conn,
+            "AllBinariesSupportRawDataOperations",
+        );
         if (
             !flagDoc ||
-            FeatureFlagUtil.getFeatureFlagDocStatus(conn, flagDoc) !== FeatureFlagUtil.FlagStatus.kEnabled
+            FeatureFlagUtil.getFeatureFlagDocStatus(conn, flagDoc) !==
+                FeatureFlagUtil.FlagStatus.kEnabled
         ) {
             return false;
         }
@@ -67,7 +72,11 @@ export function isRawOperationSupported(db) {
     // Note that we may return true here even if 'AllBinariesSupportRawDataOperations' is disabled
     // (e.g. in FCV upgrade/downgrade suites, where all binaries are always on the latest version)
     const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(conn, "RawDataCrudOperations");
-    if (!flagDoc || FeatureFlagUtil.getFeatureFlagDocStatus(conn, flagDoc) !== FeatureFlagUtil.FlagStatus.kEnabled) {
+    if (
+        !flagDoc ||
+        FeatureFlagUtil.getFeatureFlagDocStatus(conn, flagDoc) !==
+            FeatureFlagUtil.FlagStatus.kEnabled
+    ) {
         return false;
     }
 

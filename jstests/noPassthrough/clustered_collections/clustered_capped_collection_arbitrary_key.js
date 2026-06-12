@@ -24,7 +24,12 @@ replicatedColl.drop();
 nonReplicatedColl.drop();
 
 ClusteredCappedUtils.testClusteredCappedCollectionWithTTL(nonReplicatedDB, collName, "ts");
-ClusteredCappedUtils.testClusteredTailableCursorCreation(nonReplicatedDB, collName, "ts", false /* isReplicated */);
+ClusteredCappedUtils.testClusteredTailableCursorCreation(
+    nonReplicatedDB,
+    collName,
+    "ts",
+    false /* isReplicated */,
+);
 for (let awaitData of [false, true]) {
     ClusteredCappedUtils.testClusteredTailableCursorWithTTL(
         nonReplicatedDB,

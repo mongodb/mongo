@@ -106,7 +106,9 @@ withTxnAndAutoRetryOnMongos(
         assert.eq(countRes.length, 1, tojson(countRes));
         assert.eq(countRes[0].count, 2, tojson(countRes));
 
-        assert.commandWorked(db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({a: 3}));
+        assert.commandWorked(
+            db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({a: 3}),
+        );
         countRes = coll.aggregate([{$count: "count"}]).toArray();
         assert.eq(countRes.length, 1, tojson(countRes));
         assert.eq(countRes[0].count, 2, tojson(countRes));
@@ -124,7 +126,9 @@ assert.throws(() => coll.aggregate({$currentOp: {allUsers: true, localOps: true}
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.throws(() => coll.aggregate({$collStats: {latencyStats: {histograms: true}, storageStats: {}}}).next());
+assert.throws(() =>
+    coll.aggregate({$collStats: {latencyStats: {histograms: true}, storageStats: {}}}).next(),
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});

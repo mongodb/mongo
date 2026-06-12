@@ -36,25 +36,48 @@ function checkCollectionDataConsistency(primary, secondary, dbs, colls) {
         const primaryDocs = primaryColl.find().sort({_id: 1}).toArray();
         const secondaryDocs = secondaryColl.find().sort({_id: 1}).toArray();
 
-        assert.eq(primaryDocs.length, secondaryDocs.length, `Document array length mismatch for ${dbName}.${collName}`);
+        assert.eq(
+            primaryDocs.length,
+            secondaryDocs.length,
+            `Document array length mismatch for ${dbName}.${collName}`,
+        );
 
         for (let j = 0; j < primaryDocs.length; j++) {
-            assert.docEq(primaryDocs[j], secondaryDocs[j], `Document mismatch at index ${j} in ${dbName}.${collName}`);
+            assert.docEq(
+                primaryDocs[j],
+                secondaryDocs[j],
+                `Document mismatch at index ${j} in ${dbName}.${collName}`,
+            );
         }
 
-        jsTest.log.info(`✓ Collection ${dbName}.${collName} is consistent ` + `(${primaryCount} documents)`);
+        jsTest.log.info(
+            `✓ Collection ${dbName}.${collName} is consistent ` + `(${primaryCount} documents)`,
+        );
     }
 }
 
-export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, checkConsistency = false) {
+export function checkPrepareTxnTableUpdate(
+    primary,
+    secondary,
+    commitOrAbort,
+    checkConsistency = false,
+) {
     Random.setRandomSeed();
-    const checkTransactionTableEntry = (lsid, txnNumber, preparedTs, expectedAffectedNamespaces) => {
-        const primaryTxnEntry = primary.getDB("config").transactions.findOne({"_id.id": lsid.id, "txnNum": txnNumber});
+    const checkTransactionTableEntry = (
+        lsid,
+        txnNumber,
+        preparedTs,
+        expectedAffectedNamespaces,
+    ) => {
+        const primaryTxnEntry = primary
+            .getDB("config")
+            .transactions.findOne({"_id.id": lsid.id, "txnNum": txnNumber});
         const secondaryTxnEntry = secondary
             .getDB("config")
             .transactions.findOne({"_id.id": lsid.id, "txnNum": txnNumber});
         const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+            Boolean(TestData.multiversionBinVersion);
         if (isMultiversion) {
             delete primaryTxnEntry.affectedNamespaces;
             delete secondaryTxnEntry.affectedNamespaces;
@@ -77,7 +100,10 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
             }
 
             if (
-                (FeatureFlagUtil.isPresentAndEnabled(primary.getDB("admin"), "ReplicatedFastCountDurability") ||
+                (FeatureFlagUtil.isPresentAndEnabled(
+                    primary.getDB("admin"),
+                    "ReplicatedFastCountDurability",
+                ) ||
                     PersistenceProviderUtil.allNodesHavePropertyWithValue(
                         primary,
                         "shouldUseReplicatedFastCount",
@@ -176,11 +202,16 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
         true /* oneOplog */,
     );
 
-    const expectedAffectedNamespaces = Array.from({length: numberOfCollections}, (_, i) => `${dbs[i]}.${colls[i]}`);
+    const expectedAffectedNamespaces = Array.from(
+        {length: numberOfCollections},
+        (_, i) => `${dbs[i]}.${colls[i]}`,
+    );
     expectedAffectedNamespaces.sort();
     const arr = Array.from({length: numberOfCollections}, (_, i) => i);
 
-    jsTest.log.info("Test transaction with many operations that fits in one oplog, with: " + commitOrAbort);
+    jsTest.log.info(
+        "Test transaction with many operations that fits in one oplog, with: " + commitOrAbort,
+    );
     doPrepareTest(
         expectedAffectedNamespaces,
         (session) => {
@@ -192,7 +223,9 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
                     // Some collections are written once, and others are written twice.
                     if (doWrite) {
                         if (i % 3 == 0) {
-                            assert.commandWorked(coll.update({_id: largeId}, {$set: {"updated": id++}}));
+                            assert.commandWorked(
+                                coll.update({_id: largeId}, {$set: {"updated": id++}}),
+                            );
                         } else if (i % 3 == 1) {
                             assert.commandWorked(coll.deleteOne({_id: largeId}));
                             assert.commandWorked(coll.insert({_id: largeId}));
@@ -209,7 +242,8 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
     );
 
     jsTest.log.info(
-        "Test a transaction with many operations that spans multiple oplog entries, with: " + commitOrAbort,
+        "Test a transaction with many operations that spans multiple oplog entries, with: " +
+            commitOrAbort,
     );
     const kSize10MB = 10 * 1024 * 1024;
     const createLargeDocument = (id) => ({
@@ -227,7 +261,9 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
                     // Some collections are written once, and others are written twice.
                     if (doWrite) {
                         if (i % 3 == 0) {
-                            assert.commandWorked(coll.update({_id: largeId}, {$set: {"updated": id++}}));
+                            assert.commandWorked(
+                                coll.update({_id: largeId}, {$set: {"updated": id++}}),
+                            );
                         } else if (i % 3 == 1) {
                             assert.commandWorked(coll.deleteOne({_id: largeId}));
                             assert.commandWorked(coll.insert({_id: largeId}));

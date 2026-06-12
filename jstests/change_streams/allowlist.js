@@ -48,12 +48,22 @@ const denylist = [
 // Verify that each of the allowlisted stages are permitted to run in a $changeStream.
 for (let allowedStage of allowlist) {
     assert.commandWorked(
-        db.runCommand({aggregate: coll.getName(), pipeline: changeStream.concat(allowedStage), cursor: {}}),
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: changeStream.concat(allowedStage),
+            cursor: {},
+        }),
     );
 }
 
 // Verify that all of the allowlisted stages are able to run in a $changeStream together.
-assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: changeStream.concat(allowlist), cursor: {}}));
+assert.commandWorked(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: changeStream.concat(allowlist),
+        cursor: {},
+    }),
+);
 
 // Verify that a $changeStream pipeline fails to validate if a denylisted stage is present.
 for (let bannedStage of denylist) {

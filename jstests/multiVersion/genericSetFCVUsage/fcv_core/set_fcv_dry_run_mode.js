@@ -85,7 +85,9 @@ function testFailedDryRun(conn, fromFCV, toFCV, failPointName, expectedError, sh
             }),
         );
     }
-    jsTestLog(`Performing dry-run validation for transition from ${fromFCV} to ${toFCV} expecting failure.`);
+    jsTestLog(
+        `Performing dry-run validation for transition from ${fromFCV} to ${toFCV} expecting failure.`,
+    );
     const res = db.runCommand({
         setFeatureCompatibilityVersion: toFCV,
         dryRun: true,

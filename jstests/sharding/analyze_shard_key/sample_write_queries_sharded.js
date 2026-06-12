@@ -44,7 +44,9 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shar
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}),
+);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];
@@ -143,11 +145,16 @@ const expectedSampledQueryDocs = [];
 
     // 'explain' queries should not get sampled.
     assert.commandWorked(
-        mongosDB.runCommand({explain: {update: collName, updates: [{q: {x: 101}, u: [{$set: {y: 101}}]}]}}),
+        mongosDB.runCommand({
+            explain: {update: collName, updates: [{q: {x: 101}, u: [{$set: {y: 101}}]}]},
+        }),
     );
     assert.commandWorked(
         mongosDB.runCommand({
-            explain: {update: collName, updates: [{q: {x: {$gte: 102}}, u: {$set: {y: 102}}, multi: true}]},
+            explain: {
+                update: collName,
+                updates: [{q: {x: {$gte: 102}}, u: {$set: {y: 102}}, multi: true}],
+            },
         }),
     );
 
@@ -169,7 +176,9 @@ const expectedSampledQueryDocs = [];
     };
 
     assert.commandWorked(
-        mongosDB.runCommand(Object.assign({}, originalCmdObj1, {lsid: {id: UUID()}, txnNumber: NumberLong(1)})),
+        mongosDB.runCommand(
+            Object.assign({}, originalCmdObj1, {lsid: {id: UUID()}, txnNumber: NumberLong(1)}),
+        ),
     );
     assert.neq(mongosColl.findOne({x: 999, y: -1, z: [-1], v: -1}), null);
 
@@ -242,9 +251,13 @@ const expectedSampledQueryDocs = [];
     });
 
     // 'explain' queries should not get sampled.
-    assert.commandWorked(mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: 301}, limit: 1}]}}));
     assert.commandWorked(
-        mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: {$gte: 401}}, limit: 0}]}}),
+        mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: 301}, limit: 1}]}}),
+    );
+    assert.commandWorked(
+        mongosDB.runCommand({
+            explain: {delete: collName, deletes: [{q: {x: {$gte: 401}}, limit: 0}]},
+        }),
     );
 })();
 
@@ -287,7 +300,9 @@ const expectedSampledQueryDocs = [];
 
     // 'explain' queries should not get sampled.
     assert.commandWorked(
-        mongosDB.runCommand({explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}),
+        mongosDB.runCommand({
+            explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}},
+        }),
     );
 
     // This is a WouldChangeOwningShard update. It causes the document to move from shard1 to
@@ -304,7 +319,9 @@ const expectedSampledQueryDocs = [];
     const shardNames1 = [st.rs1.name];
 
     assert.commandWorked(
-        mongosDB.runCommand(Object.assign({}, originalCmdObj1, {lsid: {id: UUID()}, txnNumber: NumberLong(1)})),
+        mongosDB.runCommand(
+            Object.assign({}, originalCmdObj1, {lsid: {id: UUID()}, txnNumber: NumberLong(1)}),
+        ),
     );
     assert.neq(mongosColl.findOne({x: 1006, y: -6, z: [6, 0, 6]}), null);
 

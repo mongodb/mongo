@@ -56,7 +56,9 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
         }
     } else if (upgradeOptions.upgradeOneConfigNode >= 0) {
         // Upgrade one specific config server node by index
-        jsTest.log.info(`Upgrading config server node index: ${upgradeOptions.upgradeOneConfigNode}`);
+        jsTest.log.info(
+            `Upgrading config server node index: ${upgradeOptions.upgradeOneConfigNode}`,
+        );
         const nodeIndex = upgradeOptions.upgradeOneConfigNode;
         assert(nodeIndex < this.configRS.nodes.length);
         let configNode = this.configRS.nodes[nodeIndex];
@@ -72,10 +74,15 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
         });
         this.configRS.awaitSecondaryNodes(this.configRS.timeoutMS, [configNode]);
 
-        jsTest.log.info(`Upgraded config server node index: ${upgradeOptions.upgradeOneConfigNode}, ${configNode}`);
+        jsTest.log.info(
+            `Upgraded config server node index: ${upgradeOptions.upgradeOneConfigNode}, ${configNode}`,
+        );
 
         // Update the reference in the configRS nodes array and shortcuts
-        this["config" + nodeIndex] = this["c" + nodeIndex] = this.configRS.nodes[nodeIndex] = configNode;
+        this["config" + nodeIndex] =
+            this["c" + nodeIndex] =
+            this.configRS.nodes[nodeIndex] =
+                configNode;
 
         this.configRS.awaitNodesAgreeOnPrimary();
         jsTest.log.info(`Config node ${nodeIndex} successfully restarted and rejoined`);
@@ -128,7 +135,11 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
     }
 };
 
-ShardingTest.prototype.downgradeCluster = function (binVersion, downgradeOptions, nodeOptions = {}) {
+ShardingTest.prototype.downgradeCluster = function (
+    binVersion,
+    downgradeOptions,
+    nodeOptions = {},
+) {
     downgradeOptions = downgradeOptions || {};
     if (downgradeOptions.downgradeShards == undefined) downgradeOptions.downgradeShards = true;
     if (downgradeOptions.downgradeOneShard == undefined) downgradeOptions.downgradeOneShard = false;
@@ -216,10 +227,15 @@ ShardingTest.prototype.downgradeCluster = function (binVersion, downgradeOptions
         });
         this.configRS.awaitSecondaryNodes(this.configRS.timeoutMS, [configNode]);
 
-        jsTest.log.info(`Downgraded config server node index: ${downgradeOptions.downgradeOneConfig}, ${configNode}`);
+        jsTest.log.info(
+            `Downgraded config server node index: ${downgradeOptions.downgradeOneConfig}, ${configNode}`,
+        );
 
         // Update the reference in the configRS nodes array and shortcuts
-        this["config" + nodeIndex] = this["c" + nodeIndex] = this.configRS.nodes[nodeIndex] = configNode;
+        this["config" + nodeIndex] =
+            this["c" + nodeIndex] =
+            this.configRS.nodes[nodeIndex] =
+                configNode;
 
         this.configRS.awaitNodesAgreeOnPrimary();
         jsTest.log.info(`Config node ${nodeIndex} successfully restarted and rejoined`);

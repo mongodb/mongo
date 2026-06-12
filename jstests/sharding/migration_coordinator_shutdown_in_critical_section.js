@@ -37,7 +37,9 @@ const dbName = "test";
 const st = new ShardingTest({shards: 2});
 const donorShard = st.shard0;
 const recipientShard = st.shard1;
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}),
+);
 
 function testShutDownAfterFailPoint(failPointName) {
     const [collName, ns] = getNewNs(dbName);
@@ -77,7 +79,9 @@ function testShutDownAfterFailPoint(failPointName) {
                 if (isAuthoritativeDDLEnabled) {
                     db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName});
                 } else {
-                    assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+                    assert.commandWorked(
+                        db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                    );
                 }
             },
             ns,

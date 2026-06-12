@@ -19,7 +19,9 @@ function setSbe(conn, test, val) {
     if (test instanceof ShardingTest) {
         setParameterOnAllNonConfigNodes(testDb.getMongo(), "internalQueryFrameworkControl", val);
     } else {
-        assert.commandWorked(testDb.adminCommand({setParameter: 1, "internalQueryFrameworkControl": val}));
+        assert.commandWorked(
+            testDb.adminCommand({setParameter: 1, "internalQueryFrameworkControl": val}),
+        );
     }
 }
 
@@ -40,7 +42,10 @@ function runTestOnFixtures(runQueriesAndCompareResults) {
         const st = new ShardingTest(Object.assign({shards: 2}));
         const testDB = st.s.getDB("test");
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: st.shard0.shardName,
+            }),
         );
         runQueriesAndCompareResults(st.s, st);
         st.stop();
@@ -104,7 +109,14 @@ function runTestAsyncAddDropIndex(conn, query, index, indexName, docs, results) 
 function testSuite(conn) {
     const testDb = conn.getDB("test");
     for (let testCase of TestCases) {
-        runTest(conn, testCase.query, testCase.index, testCase.indexName, testCase.docs, testCase.results);
+        runTest(
+            conn,
+            testCase.query,
+            testCase.index,
+            testCase.indexName,
+            testCase.docs,
+            testCase.results,
+        );
         runTestAsyncAddDropIndex(
             conn,
             testCase.query,

@@ -56,7 +56,9 @@ function runTest(startChangeStream) {
             validationAction: "error",
         };
 
-        assert.commandWorked(testDB[collName].runCommand({collMod: collName, validator: options.schemaValidator}));
+        assert.commandWorked(
+            testDB[collName].runCommand({collMod: collName, validator: options.schemaValidator}),
+        );
 
         const numShards = FixtureHelpers.numberOfShardsForCollection(testDB[collName]);
 
@@ -75,7 +77,9 @@ function runTest(startChangeStream) {
 
         // Modify the validation level.
         const newValidationLevel = "off";
-        assert.commandWorked(testDB[collName].runCommand({collMod: collName, validationLevel: newValidationLevel}));
+        assert.commandWorked(
+            testDB[collName].runCommand({collMod: collName, validationLevel: newValidationLevel}),
+        );
 
         expectedChanges = [];
         for (let i = 0; i < numShards; ++i) {
@@ -100,7 +104,9 @@ function runTest(startChangeStream) {
         // Modify the validation action, i.e. the parameter which determined whether to error on
         // invalid documents or warn.
         const newValidationAction = "warn";
-        assert.commandWorked(testDB[collName].runCommand({collMod: collName, validationAction: newValidationAction}));
+        assert.commandWorked(
+            testDB[collName].runCommand({collMod: collName, validationAction: newValidationAction}),
+        );
 
         expectedChanges = [];
         for (let i = 0; i < numShards; ++i) {
@@ -151,8 +157,12 @@ function runTest(startChangeStream) {
                 hidden: options.hidden ? true : false,
             },
         };
-        assert.commandWorked(testDB[collName].runCommand({collMod: collName, index: toggleIndexHiddenOp.index}));
-        assert.commandWorked(testDB[collName].runCommand({collMod: collName, index: undoToggleIndexHiddenOp.index}));
+        assert.commandWorked(
+            testDB[collName].runCommand({collMod: collName, index: toggleIndexHiddenOp.index}),
+        );
+        assert.commandWorked(
+            testDB[collName].runCommand({collMod: collName, index: undoToggleIndexHiddenOp.index}),
+        );
 
         const numShards = FixtureHelpers.numberOfShardsForCollection(testDB[collName]);
 
@@ -193,7 +203,10 @@ function runTest(startChangeStream) {
                 index: {name: indexName, expireAfterSeconds: NumberLong(100000)},
             };
             assert.commandWorked(
-                testDB[collName].runCommand({collMod: collName, index: modifyIndexExpireAfterSecondsOp.index}),
+                testDB[collName].runCommand({
+                    collMod: collName,
+                    index: modifyIndexExpireAfterSecondsOp.index,
+                }),
             );
 
             expectedChanges = [];

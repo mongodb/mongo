@@ -34,7 +34,11 @@ function runTest(conn, disableAtRunTime) {
     // Create a view.
     let pipeline = [
         {
-            $set: {"a": {$cond: {if: {$in: ["read", "$$USER_ROLES.role"]}, then: "$a", else: "$$REMOVE"}}},
+            $set: {
+                "a": {
+                    $cond: {if: {$in: ["read", "$$USER_ROLES.role"]}, then: "$a", else: "$$REMOVE"},
+                },
+            },
         },
     ];
     assert.commandWorked(db.createView("coll_view", collName, pipeline));
@@ -69,6 +73,9 @@ runTest(mongodDisabledAtRuntime, true);
 MongoRunner.stopMongod(mongodDisabledAtRuntime);
 
 // Start up a mongod with the parameter disabled.
-const mongodDisabledAtStartup = MongoRunner.runMongod({auth: "", setParameter: {enableAccessToUserRoles: false}});
+const mongodDisabledAtStartup = MongoRunner.runMongod({
+    auth: "",
+    setParameter: {enableAccessToUserRoles: false},
+});
 runTest(mongodDisabledAtStartup, false);
 MongoRunner.stopMongod(mongodDisabledAtStartup);

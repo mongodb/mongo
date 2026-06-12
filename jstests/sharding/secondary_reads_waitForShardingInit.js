@@ -39,7 +39,10 @@ let anotherSecondary = replTest.getSecondaries()[1];
 
 // Set failpoint on one secondary to hang during sharding initialization
 jsTest.log("Going to turn on the hangDuringShardingInitialization fail point.");
-const fpHangDuringShardInit = configureFailPoint(hangingSecondary, "hangDuringShardingInitialization");
+const fpHangDuringShardInit = configureFailPoint(
+    hangingSecondary,
+    "hangDuringShardingInitialization",
+);
 
 /**
  * Force the other secondary node to sync from the primary. If it syncs from the hanging secondary
@@ -51,12 +54,17 @@ const fpForceSyncSource = forceSyncSource(replTest, anotherSecondary, primary);
 
 jsTest.log("Going to add replica set as shard: " + tojson(replTest.getReplSetConfig()));
 const shardName = "newShard";
-assert.commandWorked(st.s.getDB("admin").runCommand({addShard: replTest.getURL(), name: shardName}));
+assert.commandWorked(
+    st.s.getDB("admin").runCommand({addShard: replTest.getURL(), name: shardName}),
+);
 fpHangDuringShardInit.wait();
 
 jsTest.log("Check and wait for the sharding state to be initialized on primary.");
 assert.soon(function () {
-    const shardingStatePrimary = replTest.getPrimary().getDB("admin").runCommand({shardingState: 1});
+    const shardingStatePrimary = replTest
+        .getPrimary()
+        .getDB("admin")
+        .runCommand({shardingState: 1});
     return shardingStatePrimary.enabled == true;
 });
 
@@ -71,7 +79,9 @@ assert.commandWorked(sessionDb.foo.insert({x: 1}));
 // TODO (SERVER-97816) remove check once 9.0 becomes last LTS.
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 if (!isMultiversion) {
-    jsTest.log("Going to send a read request which will be versioned by the mongoS to force the secondary to wait");
+    jsTest.log(
+        "Going to send a read request which will be versioned by the mongoS to force the secondary to wait",
+    );
     const error = st.s.getDB(dbName).runCommand({
         find: "foo",
         maxTimeMS: 10000,

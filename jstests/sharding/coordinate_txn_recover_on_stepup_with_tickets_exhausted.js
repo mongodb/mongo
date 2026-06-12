@@ -68,17 +68,29 @@ hangBeforeWritingDecisionFp.wait();
 // Step-up the secondary and make it hang before doing the work to recover
 // the TransactionCoordinator for the prepared transaction on step-up.
 const secondary = st.rs1.getSecondary();
-const hangBeforeTxnCoordinatorOnStepUpWorkFp = configureFailPoint(secondary, "hangBeforeTxnCoordinatorOnStepUpWork");
+const hangBeforeTxnCoordinatorOnStepUpWorkFp = configureFailPoint(
+    secondary,
+    "hangBeforeTxnCoordinatorOnStepUpWork",
+);
 st.rs1.stepUp(secondary, {awaitWritablePrimary: false, awaitReplicationBeforeStepUp: false});
 hangBeforeTxnCoordinatorOnStepUpWorkFp.wait();
 
-const hangBeforeWritingEndOfTransactionFp = configureFailPoint(secondary, "hangBeforeWritingEndOfTransaction");
+const hangBeforeWritingEndOfTransactionFp = configureFailPoint(
+    secondary,
+    "hangBeforeWritingEndOfTransaction",
+);
 
 // Set the read and write tickets to 0 before executing the code to recover the
 // TransactionCoordinator.
-assert.commandWorked(secondary.getDB("admin").adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 0}));
 assert.commandWorked(
-    secondary.getDB("admin").adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 0}),
+    secondary
+        .getDB("admin")
+        .adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 0}),
+);
+assert.commandWorked(
+    secondary
+        .getDB("admin")
+        .adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 0}),
 );
 hangBeforeTxnCoordinatorOnStepUpWorkFp.off();
 
@@ -89,10 +101,14 @@ hangBeforeWritingEndOfTransactionFp.off();
 
 // Reset the read and write tickets to a non-zero value to allow the test to finish.
 assert.commandWorked(
-    secondary.getDB("admin").adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 128}),
+    secondary
+        .getDB("admin")
+        .adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 128}),
 );
 assert.commandWorked(
-    secondary.getDB("admin").adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 128}),
+    secondary
+        .getDB("admin")
+        .adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 128}),
 );
 
 preparedTxnThread.join();

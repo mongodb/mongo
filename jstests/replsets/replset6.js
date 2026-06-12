@@ -24,7 +24,10 @@ assert.soon(function () {
 });
 
 assert.commandWorked(
-    admin.runCommand({renameCollection: "jstests_replsets_replset6.one", to: "jstests_replsets_replset6.two"}),
+    admin.runCommand({
+        renameCollection: "jstests_replsets_replset6.one",
+        to: "jstests_replsets_replset6.two",
+    }),
 );
 assert.soon(function () {
     if (-1 == s.getDB(baseName).getCollectionNames().indexOf("two")) {

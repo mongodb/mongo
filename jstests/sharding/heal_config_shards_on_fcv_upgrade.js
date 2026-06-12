@@ -20,8 +20,12 @@ function runConfigShardsFixUpTest() {
     });
 
     function triggerSelfHeal() {
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "8.0", confirm: true}));
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: "8.0", confirm: true}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     }
 
     let configPrimary = st.configRS.getPrimary();
@@ -56,7 +60,9 @@ function runConfigShardsFixUpTest() {
         // Test that if some of the entries already have a topologyTime, it is not overwritten.
         // Update one, leaving the other untouched. From the previous step, we know all topology
         // times are the same, so we won't cause any monotonicity issues.
-        jsTest.log(configPrimary.getDB("config")["shards"].updateOne({}, {$unset: {topologyTime: ""}}));
+        jsTest.log(
+            configPrimary.getDB("config")["shards"].updateOne({}, {$unset: {topologyTime: ""}}),
+        );
         const docWithTopologyTimeBefore = configPrimary
             .getDB("config")
             ["shards"].find({topologyTime: latestTopologyTime})
@@ -75,7 +81,9 @@ function runConfigShardsFixUpTest() {
         );
 
         // The other doc has a greater topologyTime.
-        const updatedDoc = shardDocs.find((doc) => timestampCmp(doc.topologyTime, latestTopologyTime) != 0);
+        const updatedDoc = shardDocs.find(
+            (doc) => timestampCmp(doc.topologyTime, latestTopologyTime) != 0,
+        );
         assert.gt(updatedDoc.topologyTime, latestTopologyTime);
     }
 

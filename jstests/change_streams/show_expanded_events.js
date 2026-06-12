@@ -12,7 +12,10 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -29,7 +32,11 @@ assert.commandFailedWithCode(
 );
 
 assert.commandWorked(
-    testDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {showExpandedEvents: true}}], cursor: {}}),
+    testDB.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {showExpandedEvents: true}}],
+        cursor: {},
+    }),
 );
 
 const dbName = testDB.getName();
@@ -100,7 +107,12 @@ assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$inc: {a: 1}
     ns,
     operationType: "update",
     documentKey: {_id: 0},
-    updateDescription: {removedFields: [], updatedFields: {a: 3}, truncatedArrays: [], disambiguatedPaths: {}},
+    updateDescription: {
+        removedFields: [],
+        updatedFields: {a: 3},
+        truncatedArrays: [],
+        disambiguatedPaths: {},
+    },
 });
 
 // Test change stream event for 'remove' operation.

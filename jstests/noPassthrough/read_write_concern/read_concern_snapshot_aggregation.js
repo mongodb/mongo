@@ -40,27 +40,55 @@ function testSnapshotAggFailsWithCode(coll, pipeline, code) {
 }
 
 // Test that $changeStream is disallowed with transactions.
-testSnapshotAggFailsWithCode(kCollName, [{$changeStream: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    kCollName,
+    [{$changeStream: {}}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $collStats is disallowed with transactions.
-testSnapshotAggFailsWithCode(kCollName, [{$collStats: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    kCollName,
+    [{$collStats: {}}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $indexStats is disallowed with transactions.
-testSnapshotAggFailsWithCode(kCollName, [{$indexStats: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    kCollName,
+    [{$indexStats: {}}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $listLocalSessions is disallowed with transactions.
-testSnapshotAggFailsWithCode(1, [{$listLocalSessions: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    1,
+    [{$listLocalSessions: {}}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $listClusterCatalog is disallowed with transactions.
-testSnapshotAggFailsWithCode(1, [{$listClusterCatalog: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    1,
+    [{$listClusterCatalog: {}}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $out is disallowed with transactions.
-testSnapshotAggFailsWithCode(kCollName, [{$out: "out"}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    kCollName,
+    [{$out: "out"}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $listSessions is disallowed with transactions. This stage must be run against
 // 'system.sessions' in the config database, which cannot be queried in a transaction.
 sessionDB = session.getDatabase(kConfigDB);
-testSnapshotAggFailsWithCode("system.sessions", [{$listSessions: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+testSnapshotAggFailsWithCode(
+    "system.sessions",
+    [{$listSessions: {}}],
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Test that $currentOp is disallowed with transactions. We have to reassign 'sessionDB' to
 // refer to the admin database, because $currentOp pipelines are required to run against
@@ -105,10 +133,20 @@ function testLookupReadConcernSnapshotIsolation({
 
     assert.commandWorked(localColl.insert(localDocsPost, kWCMajority));
     assert.commandWorked(foreignColl.insert(foreignDocsPost, kWCMajority));
-    let results = new DBCommandCursor(sessionDB, cmdRes, undefined, undefined, NumberLong(txnNumber)).toArray();
+    let results = new DBCommandCursor(
+        sessionDB,
+        cmdRes,
+        undefined,
+        undefined,
+        NumberLong(txnNumber),
+    ).toArray();
     assert.eq(results, expectedResults);
     assert.commandWorked(
-        sessionDB.adminCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        sessionDB.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
     );
 }
 
@@ -118,7 +156,10 @@ testLookupReadConcernSnapshotIsolation({
     foreignDocsPre: [{_id: 1}],
     localDocsPost: [{_id: 3}],
     foreignDocsPost: [{_id: 2}, {_id: 3}],
-    pipeline: [{$lookup: {from: "foreign", localField: "_id", foreignField: "_id", as: "as"}}, {$sort: {_id: 1}}],
+    pipeline: [
+        {$lookup: {from: "foreign", localField: "_id", foreignField: "_id", as: "as"}},
+        {$sort: {_id: 1}},
+    ],
     expectedResults: [
         {_id: 0, as: []},
         {_id: 1, as: [{_id: 1}]},
@@ -199,7 +240,11 @@ let cmdRes = assert.commandWorked(
         aggregate: kCollName,
         pipeline: [
             {
-                $geoNear: {spherical: true, near: {type: "Point", coordinates: [0, 0]}, distanceField: "distance"},
+                $geoNear: {
+                    spherical: true,
+                    near: {type: "Point", coordinates: [0, 0]},
+                    distanceField: "distance",
+                },
             },
         ],
         txnNumber: NumberLong(++txnNumber),
@@ -214,7 +259,10 @@ const cursorId = cmdRes.cursor.id;
 assert.neq(cursorId, 0);
 
 assert.commandWorked(
-    coll.insert({_id: numInitialGeoInsert, geo: {type: "Point", coordinates: [0, 0]}}, {writeConcern: {w: "majority"}}),
+    coll.insert(
+        {_id: numInitialGeoInsert, geo: {type: "Point", coordinates: [0, 0]}},
+        {writeConcern: {w: "majority"}},
+    ),
 );
 
 cmdRes = assert.commandWorked(
@@ -226,7 +274,11 @@ cmdRes = assert.commandWorked(
     }),
 );
 assert.commandWorked(
-    sessionDB.adminCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
 );
 assert(cmdRes.hasOwnProperty("cursor"));
 assert(cmdRes.cursor.hasOwnProperty("nextBatch"));
@@ -265,7 +317,11 @@ cmdRes = sessionDB.runCommand({
     autocommit: false,
 });
 assert.commandWorked(
-    sessionDB.adminCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
 );
 assert.commandWorked(cmdRes);
 assert.eq(0, cmdRes.cursor.id);

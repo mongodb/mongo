@@ -3,7 +3,10 @@
 // collections will live on different shards. Majority read concern cannot be off with multi-shard
 // transactions, which is why this test needs the tag below.
 // @tags: [requires_majority_read_concern]
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
@@ -16,7 +19,9 @@ assert.commandWorked(testDB1.dropDatabase());
 assert.commandWorked(testDB2.dropDatabase());
 
 // Create one collection on each database.
-let [db1Coll, db2Coll] = [testDB1, testDB2].map((testDB) => assertDropAndRecreateCollection(testDB, "test"));
+let [db1Coll, db2Coll] = [testDB1, testDB2].map((testDB) =>
+    assertDropAndRecreateCollection(testDB, "test"),
+);
 
 // Create a ChangeStreamTest on the 'admin' db. Cluster-wide change streams can only be opened
 // on admin.
@@ -77,7 +82,9 @@ assert.commandWorked(
 );
 
 // Test that collection drops from any database result in "drop" notifications for the stream.
-[db1Coll, db2Coll] = [testDB1, testDB2].map((testDB) => assertDropAndRecreateCollection(testDB, "test"));
+[db1Coll, db2Coll] = [testDB1, testDB2].map((testDB) =>
+    assertDropAndRecreateCollection(testDB, "test"),
+);
 let _idForTest = 0;
 for (let collToInvalidate of [db1Coll, db2Coll]) {
     // Start watching all changes in the cluster.
@@ -151,13 +158,20 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
             assertDropCollection(otherDB, collOtherDB.getName());
             aggCursor = cst.startWatchingAllChangesForCluster();
             assert.commandWorked(
-                testDB.adminCommand({renameCollection: collToInvalidate.getFullName(), to: collOtherDB.getFullName()}),
+                testDB.adminCommand({
+                    renameCollection: collToInvalidate.getFullName(),
+                    to: collOtherDB.getFullName(),
+                }),
             );
             // Do not check the 'ns' field since it will contain the namespace of the temp
             // collection created when renaming a collection across databases.
             change = cst.getOneChange(aggCursor);
             assert.eq(change.operationType, "rename", tojson(change));
-            assert.eq(change.to, {db: otherDB.getName(), coll: collOtherDB.getName()}, tojson(change));
+            assert.eq(
+                change.to,
+                {db: otherDB.getName(), coll: collOtherDB.getName()},
+                tojson(change),
+            );
             // Rename across databases also drops the source collection after the collection is
             // copied over.
             cst.assertNextChangesEqual({
@@ -224,7 +238,9 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
     // the change stream.
     aggCursor = cst.startWatchingAllChangesForCluster();
     // Creating a view will generate an insert entry on the "system.views" collection.
-    assert.commandWorked(testDB.runCommand({create: "view1", viewOn: collToInvalidate.getName(), pipeline: []}));
+    assert.commandWorked(
+        testDB.runCommand({create: "view1", viewOn: collToInvalidate.getName(), pipeline: []}),
+    );
     // Drop the "system.views" collection.
     assertDropCollection(testDB, "system.views");
     // Verify that the change stream does not report the insertion into "system.views", and is

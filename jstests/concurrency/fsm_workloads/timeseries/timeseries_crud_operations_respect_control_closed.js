@@ -108,7 +108,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.setControlClosedTrue = function setControlClosedTrue(db, collNameSuffix) {
         for (let i = 0; i < data.numBucketsToCloseAtATime; i++) {
-            const bucketMeta = Random.randInt($baseConfig.threadCount * data.numBucketMetaFieldsPerThread);
+            const bucketMeta = Random.randInt(
+                $baseConfig.threadCount * data.numBucketMetaFieldsPerThread,
+            );
             // Get a random bucket metadata, and then find a bucket with that metadata that does not
             // have its control.closed field set to true, and that is still being inserted into (its
             // count is less than the max amount of documents per bucket).
@@ -138,13 +140,29 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.insertOrdered = function (db, collNameSuffix) {
         const collName = getCollectionName(collNameSuffix);
-        insert(db, collName, this.tid, true, this.readingNo, data.numBucketMetaFieldsPerThread, data.numDocs);
+        insert(
+            db,
+            collName,
+            this.tid,
+            true,
+            this.readingNo,
+            data.numBucketMetaFieldsPerThread,
+            data.numDocs,
+        );
         this.readingNo += data.numDocs;
     };
 
     $config.states.insertUnordered = function (db, collNameSuffix) {
         const collName = getCollectionName(collNameSuffix);
-        insert(db, collName, this.tid, false, this.readingNo, data.numBucketMetaFieldsPerThread, data.numDocs);
+        insert(
+            db,
+            collName,
+            this.tid,
+            false,
+            this.readingNo,
+            data.numBucketMetaFieldsPerThread,
+            data.numDocs,
+        );
         this.readingNo += data.numDocs;
     };
 
@@ -191,8 +209,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const collNameForRawOps = getTimeseriesCollForRawOps(db, getCollectionName(collNameSuffix));
         const rawOperationSpec = getRawOperationSpec(db);
 
-        const bucketsToValidate = handleQueryPlanKilled(() => db[data.bucketValidationCollName].find().toArray());
-        const numTotalBuckets = handleQueryPlanKilled(() => db[collNameForRawOps].countDocuments({}, rawOperationSpec));
+        const bucketsToValidate = handleQueryPlanKilled(() =>
+            db[data.bucketValidationCollName].find().toArray(),
+        );
+        const numTotalBuckets = handleQueryPlanKilled(() =>
+            db[collNameForRawOps].countDocuments({}, rawOperationSpec),
+        );
         // Let's go through all of the buckets that we had set the control.closed field to true for,
         // and validate that they have not been written to since.
         jsTestLog(
@@ -205,7 +227,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             const bucket = bucketsToValidate[i];
             numDocsInBucketWhenClosed += bucket.control.count;
             const bucketsInCollection = handleQueryPlanKilled(() =>
-                db[collNameForRawOps].aggregate([{$match: {_id: bucket._id}}], rawOperationSpec).toArray(),
+                db[collNameForRawOps]
+                    .aggregate([{$match: {_id: bucket._id}}], rawOperationSpec)
+                    .toArray(),
             );
             assert.eq(bucketsInCollection.length, 1);
             const bucketInCollection = bucketsInCollection[0];

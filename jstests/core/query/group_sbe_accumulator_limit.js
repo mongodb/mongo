@@ -27,7 +27,11 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAllNodeExplains, getPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeStatus, kFeatureFlagSbeFullEnabled, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeStatus,
+    kFeatureFlagSbeFullEnabled,
+    kSbeDisabled,
+} from "jstests/libs/query/sbe_util.js";
 
 /*
  * The 'internalMaxGroupAccumulatorsInSbe' query knob is 25 by default. Check that nothing in the
@@ -38,12 +42,15 @@ const expectedMaxGroupAccumulatorsInSbe = 25;
 const maxGroupAccumulatorsInSbeParameterValues = FixtureHelpers.mapOnEachShardNode({
     db: db.getSiblingDB("admin"),
     func: (adminDB) =>
-        assert.commandWorked(adminDB.runCommand({getParameter: 1, internalMaxGroupAccumulatorsInSbe: 1}))
-            .internalMaxGroupAccumulatorsInSbe,
+        assert.commandWorked(
+            adminDB.runCommand({getParameter: 1, internalMaxGroupAccumulatorsInSbe: 1}),
+        ).internalMaxGroupAccumulatorsInSbe,
 });
 
 assert(
-    maxGroupAccumulatorsInSbeParameterValues.every((value) => value == expectedMaxGroupAccumulatorsInSbe),
+    maxGroupAccumulatorsInSbeParameterValues.every(
+        (value) => value == expectedMaxGroupAccumulatorsInSbe,
+    ),
     maxGroupAccumulatorsInSbeParameterValues,
 );
 
@@ -57,7 +64,9 @@ const sbeStatus = checkSbeStatus(db);
 const coll = db.getSiblingDB(jsTestName())["regular"];
 coll.drop();
 
-assert.commandWorked(coll.insert(Array.from({length: 10}, (_, i) => ({_id: i, group: i, value: i}))));
+assert.commandWorked(
+    coll.insert(Array.from({length: 10}, (_, i) => ({_id: i, group: i, value: i}))),
+);
 
 const tsColl = db.getSiblingDB(jsTestName())["timeseries"];
 tsColl.drop();
@@ -91,7 +100,13 @@ function testGroupWithNAccumulators({coll, n, expectedLimit}) {
      * the limit or when SBE is explicitly disabled.
      */
     const expectedGroupNodes =
-        sbeStatus === kSbeDisabled ? 0 : sbeStatus === kFeatureFlagSbeFullEnabled ? 1 : n <= expectedLimit ? 1 : 0;
+        sbeStatus === kSbeDisabled
+            ? 0
+            : sbeStatus === kFeatureFlagSbeFullEnabled
+              ? 1
+              : n <= expectedLimit
+                ? 1
+                : 0;
 
     jsTest.log.info("Testing $group with n accumulators: ", {
         collection: coll.getName(),
@@ -101,10 +116,9 @@ function testGroupWithNAccumulators({coll, n, expectedLimit}) {
     });
 
     // Construct the body of a $group stage with 'n' accumulator expressions.
-    const groupStageBody = Array.from({length: n}, (_, i) => ({[`accumulator${i}`]: {$sum: `$value`}})).reduce(
-        (group, accumulator) => Object.assign(group, accumulator),
-        {_id: "$group"},
-    );
+    const groupStageBody = Array.from({length: n}, (_, i) => ({
+        [`accumulator${i}`]: {$sum: `$value`},
+    })).reduce((group, accumulator) => Object.assign(group, accumulator), {_id: "$group"});
 
     // Run the aggregation and check the number of GROUP nodes in the explain plan.
     const explain = assert.commandWorked(coll.explain().aggregate([{$group: groupStageBody}]));

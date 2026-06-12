@@ -80,11 +80,18 @@ function testCMCCommandWithFailpoint(threadParams, expectedError, failpoint) {
         maxTimeMS *= 2;
         retries++;
     }
-    assert.lt(retries, maxRetries, `Failed to reach ${failpoint} failpoint after ${maxRetries} attempts.`);
+    assert.lt(
+        retries,
+        maxRetries,
+        `Failed to reach ${failpoint} failpoint after ${maxRetries} attempts.`,
+    );
 }
 
 function testCMCCommandWithAsyncDrop(threadParams, expectedError) {
-    const blockDDLFailPoint = configureFailPoint(st.getPrimaryShard(kDbName), "hangBeforeRunningCoordinatorInstance");
+    const blockDDLFailPoint = configureFailPoint(
+        st.getPrimaryShard(kDbName),
+        "hangBeforeRunningCoordinatorInstance",
+    );
     // Launch drop database operation and use a failpoint to make it block after taking the DDL lock
     let asyncDropDatabase = new Thread(
         function (host, dbName) {
@@ -118,14 +125,18 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
     );
 }
 {
-    jsTestLog("Checks that dbMetadataLockMaxTimeMS works when dealing with database lock contention");
+    jsTestLog(
+        "Checks that dbMetadataLockMaxTimeMS works when dealing with database lock contention",
+    );
     testCMCCommandWithAsyncDrop(
         {host: st.s.host, dbName: "admin", dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1},
         9944001,
     );
 }
 {
-    jsTestLog("Checks that dbMetadataLockMaxTimeMS does not cover up other ExceededTimedLimit errors");
+    jsTestLog(
+        "Checks that dbMetadataLockMaxTimeMS does not cover up other ExceededTimedLimit errors",
+    );
     testCMCCommandWithFailpoint(
         {host: st.s.host, dbName: "admin", dbMetadataLockMaxTimeMS: 10000, maxTimeMS: -1},
         ErrorCodes.ExceededTimeLimit,
@@ -141,7 +152,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
     );
 }
 {
-    jsTestLog("Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error when used with maxTimeMS");
+    jsTestLog(
+        "Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error when used with maxTimeMS",
+    );
     testCMCCommandWithFailpoint(
         {host: st.s.host, dbName: "admin", dbMetadataLockMaxTimeMS: 100, maxTimeMS: 10000},
         9944001,
@@ -149,7 +162,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
     );
 }
 {
-    jsTestLog("Checks that the maxTimeMS timeout fails with expected error when used with dbMetadataLockMaxTimeMS");
+    jsTestLog(
+        "Checks that the maxTimeMS timeout fails with expected error when used with dbMetadataLockMaxTimeMS",
+    );
     testCMCCommandWithFailpoint(
         {host: st.s.host, dbName: "admin", dbMetadataLockMaxTimeMS: 10000, maxTimeMS: 100},
         ErrorCodes.MaxTimeMSExpired,
@@ -157,14 +172,18 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
     );
 }
 {
-    jsTestLog("Checks that maxTimeMS works when dealing with database lock contention for a specific db");
+    jsTestLog(
+        "Checks that maxTimeMS works when dealing with database lock contention for a specific db",
+    );
     testCMCCommandWithAsyncDrop(
         {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: -1, maxTimeMS: 300},
         ErrorCodes.MaxTimeMSExpired,
     );
 }
 {
-    jsTestLog("Checks that dbMetadataLockMaxTimeMS works when dealing with database lock contention for a specific db");
+    jsTestLog(
+        "Checks that dbMetadataLockMaxTimeMS works when dealing with database lock contention for a specific db",
+    );
     testCMCCommandWithAsyncDrop(
         {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1},
         9944001,
@@ -181,7 +200,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
     );
 }
 {
-    jsTestLog("Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error for a specific db");
+    jsTestLog(
+        "Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error for a specific db",
+    );
     testCMCCommandWithFailpoint(
         {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1},
         9944001,

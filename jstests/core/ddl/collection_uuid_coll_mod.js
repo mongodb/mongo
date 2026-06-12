@@ -12,7 +12,8 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB["coll"];
 assert.commandWorked(coll.insert({_id: 0}));
 
-const uuid = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch[0].info.uuid;
+const uuid = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch[0].info
+    .uuid;
 
 // 1. The command succeeds when the correct UUID is provided.
 assert.commandWorked(testDB.runCommand({collMod: coll.getName(), collectionUUID: uuid}));

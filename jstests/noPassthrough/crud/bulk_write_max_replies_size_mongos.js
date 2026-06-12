@@ -52,7 +52,9 @@ assert.commandWorked(db.adminCommand({moveChunk: ns2, find: {a: 0}, to: st.shard
 // collection will get a staleness error.
 ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns2, null, st.shard1, {a: 0});
 
-assert.commandWorked(st.s.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(20)}));
+assert.commandWorked(
+    st.s.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(20)}),
+);
 
 // Test that replies size limit is hit when bulkWriteMaxRepliesSize is set and ordered = false.
 // This request should generate two child requests that will be executed in parallel on mongos:
@@ -84,7 +86,12 @@ assert.eq(res.nErrors, 1);
 cursorSizeValidator(res, 2);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, n: 0, code: ErrorCodes.ExceededMemoryLimit});
+cursorEntryValidator(res.cursor.firstBatch[1], {
+    ok: 0,
+    idx: 1,
+    n: 0,
+    code: ErrorCodes.ExceededMemoryLimit,
+});
 
 // Test that replies size limit is hit when bulkWriteMaxRepliesSize is set and ordered = true.
 // This request should generate a child request to shard0 containing the first write, which
@@ -106,6 +113,11 @@ assert.eq(res.nErrors, 1);
 cursorSizeValidator(res, 2);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, n: 0, code: ErrorCodes.ExceededMemoryLimit});
+cursorEntryValidator(res.cursor.firstBatch[1], {
+    ok: 0,
+    idx: 1,
+    n: 0,
+    code: ErrorCodes.ExceededMemoryLimit,
+});
 
 st.stop();

@@ -35,7 +35,9 @@ const qsNaturalHints = [[{"$natural": 1}], [{"$natural": -1}], [{"$natural": 1},
 
 // Ensure Query Settings can override notablescan, consistently in SBE and Classic.
 for (const internalQueryFrameworkControl of ["trySbeRestricted", "forceClassicEngine"]) {
-    const prevIQFC = assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl})).was;
+    const prevIQFC = assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl}),
+    ).was;
 
     const qsutils = new QuerySettingsUtils(db);
 
@@ -43,7 +45,10 @@ for (const internalQueryFrameworkControl of ["trySbeRestricted", "forceClassicEn
     // suitable index.
     const cmd = {
         aggregate: "foo",
-        pipeline: [{$match: {a: 1}}, {$lookup: {from: "foo2", as: "res", localField: "a", foreignField: "b"}}],
+        pipeline: [
+            {$match: {a: 1}},
+            {$lookup: {from: "foo2", as: "res", localField: "a", foreignField: "b"}},
+        ],
         cursor: {},
     };
 
@@ -54,9 +59,13 @@ for (const internalQueryFrameworkControl of ["trySbeRestricted", "forceClassicEn
     // Now try with query settings specifically allowing table scans of the foreign collection.
     for (const allowedIndexes of qsNaturalHints) {
         const ns = {db: db.getName(), coll: "foo2"};
-        qsutils.withQuerySettings({...cmd, $db: db.getName()}, {indexHints: [{ns, allowedIndexes}]}, () => {
-            assert.commandWorked(db.runCommand(cmd));
-        });
+        qsutils.withQuerySettings(
+            {...cmd, $db: db.getName()},
+            {indexHints: [{ns, allowedIndexes}]},
+            () => {
+                assert.commandWorked(db.runCommand(cmd));
+            },
+        );
     }
 
     // Confirm that settings for the main collection don't allow table scans of the _foreign_
@@ -64,12 +73,20 @@ for (const internalQueryFrameworkControl of ["trySbeRestricted", "forceClassicEn
     for (const allowedIndexes of qsNaturalHints) {
         // Namespace for the _main_ collection.
         const ns = {db: db.getName(), coll: "foo"};
-        qsutils.withQuerySettings({...cmd, $db: db.getName()}, {indexHints: [{ns, allowedIndexes}]}, () => {
-            assert.commandFailedWithCode(db.runCommand(cmd), [ErrorCodes.NoQueryExecutionPlans]);
-        });
+        qsutils.withQuerySettings(
+            {...cmd, $db: db.getName()},
+            {indexHints: [{ns, allowedIndexes}]},
+            () => {
+                assert.commandFailedWithCode(db.runCommand(cmd), [
+                    ErrorCodes.NoQueryExecutionPlans,
+                ]);
+            },
+        );
     }
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevIQFC}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevIQFC}),
+    );
 }
 
 rst.stopSet();

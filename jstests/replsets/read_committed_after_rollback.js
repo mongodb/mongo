@@ -53,7 +53,11 @@ let [newPrimary, pureSecondary, ...arbiters] = replTest.getSecondaries();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    oldPrimary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    oldPrimary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 // This is the collection that all of the tests will use.
@@ -62,7 +66,9 @@ let oldPrimaryColl = oldPrimary.getCollection(collName);
 let newPrimaryColl = newPrimary.getCollection(collName);
 
 // Set up initial state.
-assert.commandWorked(oldPrimaryColl.insert({_id: 1, state: "old"}, {writeConcern: {w: "majority", wtimeout: 30000}}));
+assert.commandWorked(
+    oldPrimaryColl.insert({_id: 1, state: "old"}, {writeConcern: {w: "majority", wtimeout: 30000}}),
+);
 replTest.awaitReplication();
 assert.eq(doDirtyRead(oldPrimaryColl), "old");
 assert.eq(doCommittedRead(oldPrimaryColl), "old");
@@ -115,7 +121,9 @@ oldPrimary.reconnect(newPrimary);
 assert.soon(
     function () {
         try {
-            return oldPrimary.adminCommand("hello").secondary && doDirtyRead(oldPrimaryColl) == "new";
+            return (
+                oldPrimary.adminCommand("hello").secondary && doDirtyRead(oldPrimaryColl) == "new"
+            );
         } catch (e) {
             return false; // ignore disconnect errors.
         }
@@ -133,7 +141,10 @@ restartServerReplication(pureSecondary);
 assert.commandWorked(
     newPrimary
         .getDB(name)
-        .unrelatedCollection.insert({a: 1}, {writeConcern: {w: "majority", wtimeout: replTest.timeoutMS}}),
+        .unrelatedCollection.insert(
+            {a: 1},
+            {writeConcern: {w: "majority", wtimeout: replTest.timeoutMS}},
+        ),
 );
 assert.eq(doCommittedRead(newPrimaryColl), "new");
 // Do another write to the new primary so that the old primary can be sure to receive the
@@ -141,7 +152,10 @@ assert.eq(doCommittedRead(newPrimaryColl), "new");
 assert.commandWorked(
     newPrimary
         .getDB(name)
-        .unrelatedCollection.insert({a: 2}, {writeConcern: {w: "majority", wtimeout: replTest.timeoutMS}}),
+        .unrelatedCollection.insert(
+            {a: 2},
+            {writeConcern: {w: "majority", wtimeout: replTest.timeoutMS}},
+        ),
 );
 assert.eq(doCommittedRead(oldPrimaryColl), "new");
 

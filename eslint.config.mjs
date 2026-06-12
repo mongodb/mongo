@@ -352,7 +352,8 @@ export default [
             "no-restricted-syntax": [
                 "error",
                 {
-                    message: "Invalid load call. Please convert your library to a module and import it instead.",
+                    message:
+                        "Invalid load call. Please convert your library to a module and import it instead.",
                     selector: 'CallExpression > Identifier[name="load"]',
                 },
             ],

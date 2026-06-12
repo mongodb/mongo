@@ -17,7 +17,11 @@
  *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
-import {assertEngine, getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    assertEngine,
+    getPlanStage,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 if (!checkSbeRestrictedOrFullyEnabled(db)) {
@@ -60,8 +64,14 @@ for (const pipeline of distinctPipelines) {
 const nonDistinctPipelines = [
     [{$group: {_id: "$b"}}],
     [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: -1}, output: "$c"}}}}],
-    [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$top: {sortBy: {b: 1, a: 1}, output: "$c"}}}}],
-    [{$match: {d: {$gt: 3}}}, {$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}],
+    [
+        {$sort: {a: 1, b: 1}},
+        {$group: {_id: "$a", accum: {$top: {sortBy: {b: 1, a: 1}, output: "$c"}}}},
+    ],
+    [
+        {$match: {d: {$gt: 3}}},
+        {$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}},
+    ],
     // Ensure subplanning $or branches does not use DISTINCT_SCAN.
     [{$match: {$or: [{a: {$gt: 0}, b: {$lt: 10}}, {a: {$lt: 10}}]}}, {$group: {_id: "$a"}}],
 ];

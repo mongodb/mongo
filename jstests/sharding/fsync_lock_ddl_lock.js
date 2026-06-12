@@ -15,7 +15,9 @@ const collName = "collTest";
 const renamedCollName = "collTest1";
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 const db = st.s0.getDB(dbName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 const coll = st.s.getDB(dbName).getCollection(collName);
 coll.insert({x: 1});
 assert.eq(coll.count(), 1);
@@ -35,7 +37,10 @@ function waitUntilOpCountIs(opFilter, num, st) {
     });
 }
 
-let ddlCoordinatorFailPoint = configureFailPoint(st.getPrimaryShard(dbName), "hangBeforeRunningCoordinatorInstance");
+let ddlCoordinatorFailPoint = configureFailPoint(
+    st.getPrimaryShard(dbName),
+    "hangBeforeRunningCoordinatorInstance",
+);
 
 let codeToRun = () => {
     const collName = "collTest";

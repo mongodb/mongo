@@ -35,7 +35,10 @@ function testDocOnBoundsPartitioned() {
                 "range": {
                     "step": 6,
                     "unit": "hour",
-                    "bounds": [ISODate("2023-09-13T00:00:00.000Z"), ISODate("2023-09-16T00:00:00.000Z")],
+                    "bounds": [
+                        ISODate("2023-09-13T00:00:00.000Z"),
+                        ISODate("2023-09-16T00:00:00.000Z"),
+                    ],
                 },
             },
         },
@@ -82,7 +85,10 @@ function testDocOnBoundsNotPartitioned() {
                 "range": {
                     "step": 6,
                     "unit": "hour",
-                    "bounds": [ISODate("2023-09-13T00:00:00.000Z"), ISODate("2023-09-16T00:00:00.000Z")],
+                    "bounds": [
+                        ISODate("2023-09-13T00:00:00.000Z"),
+                        ISODate("2023-09-16T00:00:00.000Z"),
+                    ],
                 },
             },
         },

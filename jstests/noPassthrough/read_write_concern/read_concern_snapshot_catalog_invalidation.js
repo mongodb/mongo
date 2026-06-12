@@ -50,7 +50,9 @@ function testCommand(cmd, curOpFilter, expectSucceed) {
 
     // Start a command with readConcern "snapshot" that hangs after establishing a storage
     // engine transaction.
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterPreallocateSnapshot", mode: "alwaysOn"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangAfterPreallocateSnapshot", mode: "alwaysOn"}),
+    );
 
     // Execute command in parallel shell. Read commands should work even if catalog changes has
     // occured since opening the snapshot.
@@ -79,7 +81,9 @@ function testCommand(cmd, curOpFilter, expectSucceed) {
 
     // Disable the hang and check for parallel shell success. Success indicates that the command
     // failed due to collection metadata invalidation.
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterPreallocateSnapshot", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangAfterPreallocateSnapshot", mode: "off"}),
+    );
 
     awaitCommand();
 }

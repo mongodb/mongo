@@ -20,11 +20,21 @@ if (topology.type === Topology.kReplicaSet) {
     hosts.push(...topology.nodes);
     new ReplSetTest(topology.nodes[0]).awaitSecondaryNodes();
 } else {
-    throw new Error("Can only enabling profiler on a replica set. Unrecognized topology format: " + tojson(topology));
+    throw new Error(
+        "Can only enabling profiler on a replica set. Unrecognized topology format: " +
+            tojson(topology),
+    );
 }
 jsTest.log.info("Implicitly enabling profiler", {hosts});
 
-function runCommandAfterEnablingProfiler(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandAfterEnablingProfiler(
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (!excludedCommandNames.includes(commandName) && !enabledDbNames.has(dbName)) {
         // Implicitly enable profiling for this database on all the nodes in the replica set.
         hosts.forEach((host) => {
@@ -66,6 +76,8 @@ function runCommandAfterEnablingProfiler(conn, dbName, commandName, commandObj, 
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicitly_enable_profiler.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicitly_enable_profiler.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandAfterEnablingProfiler);

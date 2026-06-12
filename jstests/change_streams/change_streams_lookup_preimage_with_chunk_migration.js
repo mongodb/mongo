@@ -45,11 +45,19 @@ const coll = (() => {
 
     // Allow 'system.preimages' collection to record pre-images for the specified collection. Ensure
     // that the recording is actually enabled for the collection.
-    assert.commandWorked(db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}),
+    );
     assert(db.getCollectionInfos({name: collName})[0].options.changeStreamPreAndPostImages.enabled);
 
     // Shard the collection based on '_id'. Split chunk at '_id: 1'.
-    st.shardColl(collName, {_id: 1} /* shard key */, {_id: 1} /* split at */, false /* move */, dbName);
+    st.shardColl(
+        collName,
+        {_id: 1} /* shard key */,
+        {_id: 1} /* split at */,
+        false /* move */,
+        dbName,
+    );
 
     return coll;
 })();
@@ -105,7 +113,11 @@ function verifyPreImages(shard, docId, annotations) {
 
     for (let idx = 0; idx < foundPreImages.length; idx++) {
         assert.eq(foundPreImages[idx].preImage._id, docId, foundPreImages[idx].preImage);
-        assert.eq(foundPreImages[idx].preImage.annotate, annotations[idx], foundPreImages[idx].preImage);
+        assert.eq(
+            foundPreImages[idx].preImage.annotate,
+            annotations[idx],
+            foundPreImages[idx].preImage,
+        );
     }
 }
 
@@ -133,7 +145,10 @@ function verifyChangeStreamEvents(csCursor, events) {
 // Tests that pre-images are recorded correctly when run sequentially with the chunk-migration.
 (function testSerialUpdateAndMoveChunk() {
     // Open change streams here to record all events in the collection.
-    const csCursor = coll.watch([], {fullDocument: "required", fullDocumentBeforeChange: "required"});
+    const csCursor = coll.watch([], {
+        fullDocument: "required",
+        fullDocumentBeforeChange: "required",
+    });
 
     // Insert 1 document to the collection.
     assert.commandWorked(coll.insert({_id: 0, annotate: "before_update"}));
@@ -148,7 +163,12 @@ function verifyChangeStreamEvents(csCursor, events) {
     assert.commandWorked(coll.update({_id: 0}, {$set: {annotate: "update"}}));
 
     jsTest.log("Migrating chunk with document '{_id: 0}'");
-    st.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: recipient.name, _waitForDelete: true});
+    st.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {_id: 0},
+        to: recipient.name,
+        _waitForDelete: true,
+    });
     jsTest.log("Successfully migrated chunk with document '{_id: 0}");
 
     // Ensure that donor and recipient shard observed the expected 'fromMigrate' events. Note that
@@ -171,7 +191,10 @@ function verifyChangeStreamEvents(csCursor, events) {
 // Tests that pre-images are recorded correctly when run in-parallel with the chunk-migration.
 (function testParallelUpdateDeleteAndMoveChunk() {
     // Open change streams to record all events in the collection.
-    const csCursor = coll.watch([], {fullDocument: "required", fullDocumentBeforeChange: "required"});
+    const csCursor = coll.watch([], {
+        fullDocument: "required",
+        fullDocumentBeforeChange: "required",
+    });
 
     // Insert 2 documents to the collection.
     assert.commandWorked(coll.insert({_id: 1, annotate: "before_update"}));
@@ -226,7 +249,9 @@ function verifyChangeStreamEvents(csCursor, events) {
 
     // Verify that after the chunk-migration is complete, the pre-image collection exists on the
     // recipient shard with clustered-index enabled.
-    const preImageCollInfo = recipient.getDB("config").getCollectionInfos({name: "system.preimages"});
+    const preImageCollInfo = recipient
+        .getDB("config")
+        .getCollectionInfos({name: "system.preimages"});
     assert.eq(preImageCollInfo.length, 1, preImageCollInfo);
     assert(preImageCollInfo[0].options.hasOwnProperty("clusteredIndex"), preImageCollInfo[0]);
 

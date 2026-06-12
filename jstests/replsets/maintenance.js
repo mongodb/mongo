@@ -23,7 +23,10 @@ assert.soon(function () {
     return conns[1].getDB("admin").hello().secondary;
 });
 
-let join = startParallelShell("db.getSiblingDB('bar').runCommand({compact : 'foo'});", replTest.ports[1]);
+let join = startParallelShell(
+    "db.getSiblingDB('bar').runCommand({compact : 'foo'});",
+    replTest.ports[1],
+);
 
 print("joining");
 join();

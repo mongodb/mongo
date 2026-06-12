@@ -36,7 +36,10 @@ function resultsMatch(expectedMatches, actualMatches) {
     }
 
     for (let i = 0; i < expectedMatches.length; ++i) {
-        if (expectedMatches[i].a !== actualMatches[i].a || expectedMatches[i].b !== actualMatches[i].b) {
+        if (
+            expectedMatches[i].a !== actualMatches[i].a ||
+            expectedMatches[i].b !== actualMatches[i].b
+        ) {
             return false;
         }
     }
@@ -145,11 +148,26 @@ function checkForwardDirection(options) {
     assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$lt: 3}}});
 
     // Lower and upper bounds checks.
-    assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 0}}});
-    assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lt: 1}}});
-    assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 1}}});
-    assertMatches({expectedQueryResults: [{a: 1, b: 1}], query: {a: {$in: [1, 2]}, b: {$gt: 0, $lte: 1}}});
-    assertMatches({expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$gte: 2, $lt: 3}}});
+    assertMatches({
+        expectedQueryResults: [{a: 2, b: 0}],
+        query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 0}},
+    });
+    assertMatches({
+        expectedQueryResults: [{a: 2, b: 0}],
+        query: {a: {$in: [1, 2]}, b: {$gte: 0, $lt: 1}},
+    });
+    assertMatches({
+        expectedQueryResults: [{a: 2, b: 0}],
+        query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 1}},
+    });
+    assertMatches({
+        expectedQueryResults: [{a: 1, b: 1}],
+        query: {a: {$in: [1, 2]}, b: {$gt: 0, $lte: 1}},
+    });
+    assertMatches({
+        expectedQueryResults: [{a: 1, b: 2}],
+        query: {a: {$in: [1, 2]}, b: {$gte: 2, $lt: 3}},
+    });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
         query: {a: {$in: [1, 2]}, b: {$gte: 2.5, $lte: 3}},
@@ -219,14 +237,23 @@ function checkReverseDirection(options) {
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gte: 0}}});
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gte: 5}}});
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$lte: 5}}});
-    assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$lte: 5, $gte: 5}}});
+    assertMatches({
+        expectedQueryResults: [{a: 2, b: 5}],
+        query: {a: {$in: [1, 2]}, b: {$lte: 5, $gte: 5}},
+    });
 
     // For matching documents, highest value of 'b' is 2.
     assertMatches({expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$lt: 3}}});
-    assertMatches({expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$lt: 3, $gt: 1}}});
+    assertMatches({
+        expectedQueryResults: [{a: 1, b: 2}],
+        query: {a: {$in: [1, 2]}, b: {$lt: 3, $gt: 1}},
+    });
 
     // For matching documents, highest value of 'b' is 1.
-    assertMatches({expectedQueryResults: [{a: 1, b: 1}], query: {a: {$in: [1, 2]}, b: {$lt: 2, $gte: 1}}});
+    assertMatches({
+        expectedQueryResults: [{a: 1, b: 1}],
+        query: {a: {$in: [1, 2]}, b: {$lt: 2, $gte: 1}},
+    });
 
     // These queries expect 3 as the highest value of 'b' among matching documents, but there
     // are two documents with a value of 3 for the field 'b'. Either document is acceptable,

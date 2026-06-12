@@ -42,11 +42,21 @@ assert.commandWorked(mongos.adminCommand({hello: 1}));
         .find({}, {_id: 1})
         .toArray()
         .map((doc) => doc._id);
-    assert(dbDocs.includes("unshardedDB"), `Expected 'unshardedDB' in config.databases, got: ${tojson(dbDocs)}`);
-    assert(dbDocs.includes("shardedDB"), `Expected 'shardedDB' in config.databases, got: ${tojson(dbDocs)}`);
+    assert(
+        dbDocs.includes("unshardedDB"),
+        `Expected 'unshardedDB' in config.databases, got: ${tojson(dbDocs)}`,
+    );
+    assert(
+        dbDocs.includes("shardedDB"),
+        `Expected 'shardedDB' in config.databases, got: ${tojson(dbDocs)}`,
+    );
 
     const shardedColls = configDB.collections.find({_id: "shardedDB.test"}).toArray();
-    assert.eq(1, shardedColls.length, `Expected shardedDB.test in config.collections, got: ${tojson(shardedColls)}`);
+    assert.eq(
+        1,
+        shardedColls.length,
+        `Expected shardedDB.test in config.collections, got: ${tojson(shardedColls)}`,
+    );
 }
 
 // Verify that data operations are correctly rejected with config-only mode errors.

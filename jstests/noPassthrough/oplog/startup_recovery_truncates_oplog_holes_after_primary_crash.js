@@ -56,7 +56,9 @@ try {
     //
     // The primary's durable timestamp should be pinned by the prior hanging uncommitted write. So
     // this second write will have an oplog hole behind it and will be truncated after a crash.
-    assert.commandWorked(primaryColl.insert({_id: "writeAfterHole"}, {writeConcern: {w: 1, j: true}}));
+    assert.commandWorked(
+        primaryColl.insert({_id: "writeAfterHole"}, {writeConcern: {w: 1, j: true}}),
+    );
 
     const findResult = primaryColl.findOne({_id: "writeAfterHole"});
     assert.eq(findResult, {"_id": "writeAfterHole"});

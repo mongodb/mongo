@@ -108,7 +108,8 @@ export const $config = (function () {
             print(`Finished inserting documents.`);
         },
         moveCollection: function moveCollection(db, collName, connCache) {
-            const shouldContinueMoveCollection = this.moveCollectionCount <= kMaxMoveCollectionExecutions;
+            const shouldContinueMoveCollection =
+                this.moveCollectionCount <= kMaxMoveCollectionExecutions;
             if (this.tid === 0 && shouldContinueMoveCollection) {
                 const coll = db.getCollection(collName);
                 const toShard = calculateToShard(db, coll.getFullName());
@@ -120,12 +121,15 @@ export const $config = (function () {
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             const namespace = `${db}.${collName}`;
             print(`Started to untrack collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
-                // Handles the case where the collection is not located on its primary
-                ErrorCodes.OperationFailed,
-                // Handles the case where the collection is sharded
-                ErrorCodes.InvalidNamespace,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}),
+                [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                ],
+            );
             print(`Untrack collection completed`);
         },
     };
@@ -153,7 +157,9 @@ export const $config = (function () {
             // When implicit sharding may be skipped, the collection may not have been sharded, so
             // the database may not be registered in the cluster catalog.
             this.primaryShard = undefined;
-            print(`unshardCollection skipped for ${ns}: collection is not tracked in cluster catalog`);
+            print(
+                `unshardCollection skipped for ${ns}: collection is not tracked in cluster catalog`,
+            );
         } else {
             assert.commandWorked(result);
         }

@@ -33,7 +33,9 @@ if (areViewlessTimeseriesEnabled(testDB)) {
     quit();
 }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 const foreignCollName = "foreign_coll";
 const foreignViewName = "foreign_view";
@@ -62,14 +64,18 @@ assert.commandWorked(testDB[foreignCollName].insert(allDocs));
 // local_coll must be sharded so it stays on shard0 during movePrimary.
 const localColl = testDB[localCollName];
 assert.commandWorked(localColl.createIndex({a: 1}));
-assert.commandWorked(testDB.adminCommand({shardCollection: `${dbName}.${localCollName}`, key: {a: 1}}));
+assert.commandWorked(
+    testDB.adminCommand({shardCollection: `${dbName}.${localCollName}`, key: {a: 1}}),
+);
 assert.commandWorked(localColl.insert({_id: 0, a: 1}));
 
 assert.commandWorked(testDB.createView(foreignViewName, foreignCollName, [{$set: {viewVal: 100}}]));
 
 // Pause shard0 before it resolves namespaces / creates the ExpressionContext.
 // Filter by namespace so FTDC and other internal aggregates are not affected.
-const fp = configureFailPoint(st.shard0, "hangBeforeCreatingAggCatalogState", {ns: `${dbName}.${localCollName}`});
+const fp = configureFailPoint(st.shard0, "hangBeforeCreatingAggCatalogState", {
+    ns: `${dbName}.${localCollName}`,
+});
 
 const awaitAggregate = startParallelShell(
     funWithArgs(

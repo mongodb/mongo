@@ -23,13 +23,19 @@ const firstMongosColl = firstMongosDB.test;
 
 // Enable sharding on the test DB and ensure its primary is shard 0.
 assert.commandWorked(
-    firstMongosDB.adminCommand({enableSharding: firstMongosDB.getName(), primaryShard: st.rs0.getURL()}),
+    firstMongosDB.adminCommand({
+        enableSharding: firstMongosDB.getName(),
+        primaryShard: st.rs0.getURL(),
+    }),
 );
 
 // Establish a change stream while it is unsharded, then shard the collection, move a chunk, and
 // record a resume token after the first chunk migration.
 const cst1 = new ChangeStreamTest(firstMongosDB);
-const changeStream = cst1.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: firstMongosColl});
+const changeStream = cst1.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: firstMongosColl,
+});
 
 assert.commandWorked(firstMongosColl.insert({_id: -1}));
 assert.commandWorked(firstMongosColl.insert({_id: 1}));
@@ -42,10 +48,18 @@ for (let nextId of [-1, 1]) {
 
 // Shard the test collection on _id, split the collection into 2 chunks: [MinKey, 0) and
 // [0, MaxKey), then move the [0, MaxKey) chunk to shard 1.
-assert.commandWorked(firstMongosDB.adminCommand({shardCollection: firstMongosColl.getFullName(), key: {_id: 1}}));
-assert.commandWorked(firstMongosDB.adminCommand({split: firstMongosColl.getFullName(), middle: {_id: 0}}));
 assert.commandWorked(
-    firstMongosDB.adminCommand({moveChunk: firstMongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}),
+    firstMongosDB.adminCommand({shardCollection: firstMongosColl.getFullName(), key: {_id: 1}}),
+);
+assert.commandWorked(
+    firstMongosDB.adminCommand({split: firstMongosColl.getFullName(), middle: {_id: 0}}),
+);
+assert.commandWorked(
+    firstMongosDB.adminCommand({
+        moveChunk: firstMongosColl.getFullName(),
+        find: {_id: 1},
+        to: st.rs1.getURL(),
+    }),
 );
 
 // Then do one insert to each shard.

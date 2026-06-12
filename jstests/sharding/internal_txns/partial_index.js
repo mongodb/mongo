@@ -26,7 +26,9 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
 
     function assertPartialIndexExists(node) {
         const configDB = node.getDB("config");
-        const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"})).cursor.firstBatch;
+        const indexSpecs = assert.commandWorked(
+            configDB.runCommand({"listIndexes": "transactions"}),
+        ).cursor.firstBatch;
         indexSpecs.sort((index0, index1) => index0.name > index1.name);
         assert.eq(indexSpecs.length, 2);
         const idIndexSpec = indexSpecs[0];
@@ -47,7 +49,10 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         const explainRes = assert.commandWorked(
             configTxnColl
                 .explain()
-                .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber}, {_id: 1})
+                .find(
+                    {"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
+                    {_id: 1},
+                )
                 .finish(),
         );
         const winningPlan = getWinningPlanFromExplain(explainRes);
@@ -55,7 +60,10 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         assert.eq(winningPlan.inputStage.stage, "IXSCAN");
 
         const findRes = configTxnColl
-            .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber}, {_id: 1})
+            .find(
+                {"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
+                {_id: 1},
+            )
             .toArray();
         assert.eq(findRes.length, 1);
         assert.eq(findRes[0]._id, childSessionDoc._id);
@@ -63,14 +71,18 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
 
     function assertPartialIndexDoesNotExist(node) {
         const configDB = node.getDB("config");
-        const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"})).cursor.firstBatch;
+        const indexSpecs = assert.commandWorked(
+            configDB.runCommand({"listIndexes": "transactions"}),
+        ).cursor.firstBatch;
         assert.eq(indexSpecs.length, 1, indexSpecs);
         const idIndexSpec = indexSpecs[0];
         assert.eq(idIndexSpec.key, {"_id": 1});
     }
 
     function indexRecreationTest(expectRecreateAfterDrop) {
-        assert.commandWorked(st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName));
+        assert.commandWorked(
+            st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName),
+        );
         st.rs0.awaitReplication();
 
         st.rs0.nodes.forEach((node) => {
@@ -78,7 +90,9 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         });
 
         let primary = st.rs0.getPrimary();
-        assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
         assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 
         st.rs0.awaitNodesAgreeOnPrimary();
@@ -181,11 +195,15 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     //
 
     const indexConn = st.rs0.getPrimary();
-    assert.commandWorked(indexConn.getCollection("config.transactions").dropIndex(kPartialIndexName));
+    assert.commandWorked(
+        indexConn.getCollection("config.transactions").dropIndex(kPartialIndexName),
+    );
 
     // Normal writes don't involve config.transactions, so they succeed.
     assert.commandWorked(
-        indexConn.getDB(kDbName).runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}),
+        indexConn
+            .getDB(kDbName)
+            .runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}),
     );
 
     // Retryable writes read from the partial index, so they fail.
@@ -266,7 +284,9 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     assert.commandFailedWithCode(
         indexConn.getDB("config").runCommand({
             createIndexes: "transactions",
-            indexes: [{v: 2, name: "parent_lsid", key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1}}],
+            indexes: [
+                {v: 2, name: "parent_lsid", key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1}},
+            ],
         }),
         ErrorCodes.IllegalOperation,
     );
@@ -287,13 +307,18 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     // Operations involving the index should succeed now.
 
     assert.commandWorked(
-        indexConn.getDB(kDbName).runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}),
+        indexConn
+            .getDB(kDbName)
+            .runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}),
     );
 
     assert.commandWorked(
-        indexConn
-            .getDB(kDbName)
-            .runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}, txnNumber: NumberLong(11)}),
+        indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: {id: UUID()},
+            txnNumber: NumberLong(11),
+        }),
     );
 
     let userSessionAfter = {id: UUID()};
@@ -399,7 +424,9 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         shards: 1,
         other: {
             rs: {nodes: 2},
-            rsOptions: {setParameter: "featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp=true"},
+            rsOptions: {
+                setParameter: "featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp=true",
+            },
         },
         // By default, our test infrastructure sets the election timeout to a very high value (24
         // hours). For this test, we need a shorter election timeout because it relies on nodes

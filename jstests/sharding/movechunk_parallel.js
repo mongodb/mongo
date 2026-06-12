@@ -24,7 +24,9 @@ let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 4});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.TestColl", key: {Key: 1}}));
 
 let coll = st.s0.getDB("TestDB").TestColl;
@@ -45,11 +47,15 @@ assert.commandWorked(st.moveChunk("TestDB.TestColl", {Key: 30}, st.shard1.shardN
 
 assert.eq(
     2,
-    findChunksUtil.findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard0.shardName}).itcount(),
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard0.shardName})
+        .itcount(),
 );
 assert.eq(
     2,
-    findChunksUtil.findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard1.shardName}).itcount(),
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard1.shardName})
+        .itcount(),
 );
 
 // Pause migrations at shards 2 and 3
@@ -85,19 +91,27 @@ joinMoveChunk2();
 
 assert.eq(
     1,
-    findChunksUtil.findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard0.shardName}).itcount(),
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard0.shardName})
+        .itcount(),
 );
 assert.eq(
     1,
-    findChunksUtil.findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard1.shardName}).itcount(),
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard1.shardName})
+        .itcount(),
 );
 assert.eq(
     1,
-    findChunksUtil.findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard2.shardName}).itcount(),
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard2.shardName})
+        .itcount(),
 );
 assert.eq(
     1,
-    findChunksUtil.findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard3.shardName}).itcount(),
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB("config"), "TestDB.TestColl", {shard: st.shard3.shardName})
+        .itcount(),
 );
 
 st.stop();

@@ -205,7 +205,12 @@ function runTests(conn) {
 
     for (let i = 0; i < testsToRun.length; i++) {
         const test = testsToRun[i];
-        jsTest.log("TESTING: role = " + test.role + ", tenant = " + (test.isTenantedUser ? "true" : "false"));
+        jsTest.log(
+            "TESTING: role = " +
+                test.role +
+                ", tenant = " +
+                (test.isTenantedUser ? "true" : "false"),
+        );
         const username = "testUser" + i.toString();
         let role = test.role;
         // Unless skipUseTenant is set, we want to always allow non-tenanted users to pass unsigned
@@ -235,7 +240,9 @@ function runTests(conn) {
         // We use security token to auth tenant users, and the mongo.auth method to auth non-tenant
         // users.
         if (test.isTenantedUser) {
-            conn._setSecurityToken(_createSecurityToken({user: username, db: "admin", tenant: tenantId1}, kVTSKey));
+            conn._setSecurityToken(
+                _createSecurityToken({user: username, db: "admin", tenant: tenantId1}, kVTSKey),
+            );
         } else {
             assert(admin.auth(username, "pwd"));
         }
@@ -250,12 +257,18 @@ function runTests(conn) {
                 assert.commandWorked(db.runCommand({find: nss.coll}, nss.tenant));
                 assert.commandWorked(db.runCommand({insert: nss.coll, documents: [{a: username}]}));
             } else {
-                const unsignedToken = nss.tenant ? _createTenantToken({tenant: nss.tenant}) : undefined;
-                assert.commandFailedWithCode(runCommandWithSecurityToken(unsignedToken, db, {find: nss.coll}), [
-                    ErrorCodes.Unauthorized,
-                ]);
+                const unsignedToken = nss.tenant
+                    ? _createTenantToken({tenant: nss.tenant})
+                    : undefined;
                 assert.commandFailedWithCode(
-                    runCommandWithSecurityToken(unsignedToken, db, {insert: nss.coll, documents: [{a: username}]}),
+                    runCommandWithSecurityToken(unsignedToken, db, {find: nss.coll}),
+                    [ErrorCodes.Unauthorized],
+                );
+                assert.commandFailedWithCode(
+                    runCommandWithSecurityToken(unsignedToken, db, {
+                        insert: nss.coll,
+                        documents: [{a: username}],
+                    }),
                     [ErrorCodes.Unauthorized],
                 );
             }

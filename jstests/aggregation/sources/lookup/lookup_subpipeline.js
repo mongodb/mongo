@@ -85,7 +85,9 @@ expectedResults = [
 testPipeline(pipeline, expectedResults, coll);
 
 // Basic non-equi theta join via $group.
-pipeline = [{$lookup: {from: "from", pipeline: [{$group: {_id: "$_id", avg: {$avg: "$_id"}}}], as: "c"}}];
+pipeline = [
+    {$lookup: {from: "from", pipeline: [{$group: {_id: "$_id", avg: {$avg: "$_id"}}}], as: "c"}},
+];
 
 expectedResults = [
     {
@@ -269,7 +271,9 @@ pipeline = [
                                     pipeline: [
                                         {
                                             $addFields: {
-                                                mergedLetVars: {$concat: ["$$var1", "$$var2", "$$var3"]},
+                                                mergedLetVars: {
+                                                    $concat: ["$$var1", "$$var2", "$$var3"],
+                                                },
                                             },
                                         },
                                     ],
@@ -402,7 +406,11 @@ assertErrorCode(
     ],
     17276,
 );
-assertErrorCode(coll, [{$lookup: {let: {var1: 1, var2: "$$var1"}, pipeline: [], from: "from", as: "as"}}], 17276);
+assertErrorCode(
+    coll,
+    [{$lookup: {let: {var1: 1, var2: "$$var1"}, pipeline: [], from: "from", as: "as"}}],
+    17276,
+);
 assertErrorCode(
     coll,
     [
@@ -530,7 +538,10 @@ pipeline = [
     {
         $lookup: {
             let: {var1: "$$CURRENT.x.y.z"},
-            pipeline: [{$match: {$expr: {$eq: ["$$var1", "$$CURRENT.x.y.z"]}}}, {$project: {_id: 0}}],
+            pipeline: [
+                {$match: {$expr: {$eq: ["$$var1", "$$CURRENT.x.y.z"]}}},
+                {$project: {_id: 0}},
+            ],
             from: "lookUp",
             as: "as",
         },
@@ -598,7 +609,9 @@ expectedResults = [
     {
         "_id": 1,
         "w": 1,
-        "firstLookup": [{"_id": 2, x: 2, "secondLookup": [{"_id": 3, y: 3, "thirdLookup": [{_id: 1, z: 1}]}]}],
+        "firstLookup": [
+            {"_id": 2, x: 2, "secondLookup": [{"_id": 3, y: 3, "thirdLookup": [{_id: 1, z: 1}]}]},
+        ],
     },
 ];
 testPipeline(pipeline, expectedResults, coll);

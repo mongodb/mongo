@@ -12,14 +12,19 @@ let coll = st.s0.getCollection("test.foo");
 // Pre-split collection: shard 0 takes {x: {$lt: 0}}, shard 1 takes {x: {$gte: 0}}.
 //
 assert.commandWorked(
-    coll.getDB().adminCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}),
+    coll
+        .getDB()
+        .adminCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}),
 );
 assert.commandWorked(coll.getDB().adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 assert.commandWorked(coll.getDB().adminCommand({split: coll.getFullName(), middle: {x: 0}}));
 assert.commandWorked(
-    coll
-        .getDB()
-        .adminCommand({moveChunk: coll.getFullName(), find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    coll.getDB().adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {x: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
 );
 
 //

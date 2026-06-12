@@ -10,7 +10,9 @@ function runTest(FCV) {
 
     const primary = rst.getPrimary();
     if (FCV != latestFCV) {
-        assert.commandWorked(primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: FCV, confirm: true}));
+        assert.commandWorked(
+            primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: FCV, confirm: true}),
+        );
     }
 
     const primaryFCV = assert.commandWorked(

@@ -17,20 +17,34 @@ const mongosColl = mongosDB[jsTestName()];
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Test that command succeeds when no internal options have been specified.
-assert.commandWorked(mongosDB.runCommand({aggregate: mongosColl.getName(), pipeline: [], cursor: {}}));
+assert.commandWorked(
+    mongosDB.runCommand({aggregate: mongosColl.getName(), pipeline: [], cursor: {}}),
+);
 
 // Test that the command fails if we have 'needsMerge: false' without 'fromRouter'.
 assert.commandFailedWithCode(
-    mongosDB.runCommand({aggregate: mongosColl.getName(), pipeline: [], cursor: {}, needsMerge: false}),
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: false,
+    }),
     ErrorCodes.FailedToParse,
 );
 
 // Test that the command fails if we have 'needsMerge: true' without 'fromRouter'.
 assert.commandFailedWithCode(
-    mongosDB.runCommand({aggregate: mongosColl.getName(), pipeline: [], cursor: {}, needsMerge: true}),
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: true,
+    }),
     ErrorCodes.FailedToParse,
 );
 
@@ -63,13 +77,23 @@ assert.commandFailedWithCode(
 // External clients get BadValue from validateRequestWithClient; internal clients get 51089 from
 // the router-level check.
 assert.commandFailedWithCode(
-    mongosDB.runCommand({aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromRouter: true}),
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        fromRouter: true,
+    }),
     [51089, ErrorCodes.BadValue],
 );
 
 // Test that 'fromRouter: false' can be specified in a command sent to mongoS.
 assert.commandWorked(
-    mongosDB.runCommand({aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromRouter: false}),
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        fromRouter: false,
+    }),
 );
 
 // Test that the command fails if we have 'needsMerge: true' with 'fromRouter: false'.

@@ -17,7 +17,12 @@ const coll = db[jsTestName()];
 function checkLogs(db, debugLogLevel, shouldLog, extensionAttrs) {
     // The log code defined in debug_logging.cpp is 11134100.
     // The severity is "D<logLevel>", for example "D3" for a debug log with level 3.
-    const matchingDebugLogLines = checkLog.getFilteredLogMessages(db, 11134100, {}, "D" + String(debugLogLevel));
+    const matchingDebugLogLines = checkLog.getFilteredLogMessages(
+        db,
+        11134100,
+        {},
+        "D" + String(debugLogLevel),
+    );
 
     // Validate that log lines contain the correct information.
     for (var log of matchingDebugLogLines) {
@@ -31,7 +36,12 @@ function checkLogs(db, debugLogLevel, shouldLog, extensionAttrs) {
 
     // After adding the 'shouldLog' optimization, $debugLog also prints a warning log indicating
     // whether the debug log should be printed or not.
-    const matchingWarningLogLines = checkLog.getFilteredLogMessages(db, shouldLog ? 11134101 : 11134102, {}, "W");
+    const matchingWarningLogLines = checkLog.getFilteredLogMessages(
+        db,
+        shouldLog ? 11134101 : 11134102,
+        {},
+        "W",
+    );
     // Since the warning line always gets printed, we expect one warning log line.
     assert.eq(matchingWarningLogLines.length, 1);
 
@@ -77,5 +87,10 @@ function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog, extensio
 })();
 
 (function checkAttributes() {
-    testDebugLog({serverLogLevel: 1, debugLogLevel: 0, commandShouldLog: true, extensionAttrs: {a: "hi", b: "bye"}});
+    testDebugLog({
+        serverLogLevel: 1,
+        debugLogLevel: 0,
+        commandShouldLog: true,
+        extensionAttrs: {a: "hi", b: "bye"},
+    });
 })();

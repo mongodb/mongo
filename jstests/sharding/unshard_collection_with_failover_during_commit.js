@@ -45,7 +45,9 @@ assert.commandWorked(bulk.execute());
 
 const hangFailpoints = [];
 reshardingTest._st.forEachConfigServer((configServer) => {
-    hangFailpoints.push(configureFailPoint(configServer, "reshardingPauseBeforeTellingParticipantsToCommit"));
+    hangFailpoints.push(
+        configureFailPoint(configServer, "reshardingPauseBeforeTellingParticipantsToCommit"),
+    );
 });
 
 reshardingTest.withUnshardCollectionInBackground({toShard: donorShardNames[0]}, () => {}, {
@@ -58,14 +60,20 @@ reshardingTest.withUnshardCollectionInBackground({toShard: donorShardNames[0]}, 
         jsTest.log("Resharding coordinator paused, triggering stepdown on primary shard");
 
         const donorShard = reshardingTest.getReplSetForShard(donorShardNames[0]);
-        assert.commandWorked(donorShard.getPrimary().adminCommand({replSetStepDown: 10, force: true}));
+        assert.commandWorked(
+            donorShard.getPrimary().adminCommand({replSetStepDown: 10, force: true}),
+        );
         donorShard.awaitNodesAgreeOnPrimary();
 
         // Set a short DDL lock timeout (500ms) to quickly verify locks are held during
         // failover.
-        let ddlLockTimeoutFp = configureFailPoint(donorShard.getPrimary(), "overrideDDLLockTimeout", {
-            "timeoutMillisecs": 500,
-        });
+        let ddlLockTimeoutFp = configureFailPoint(
+            donorShard.getPrimary(),
+            "overrideDDLLockTimeout",
+            {
+                "timeoutMillisecs": 500,
+            },
+        );
 
         const dropResult = sourceCollection.getDB().runCommand({drop: sourceCollection.getName()});
         assert.commandFailedWithCode(

@@ -21,14 +21,23 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             threadIdInArray: [this.tid],
             nestedThreadId: {threadId: this.tid},
             arrayField: [this.tid, "a string", [1, 2, 3]],
-            fieldWithNestedObject: {nestedDoc: {subNestedDoc: {leaf: "a string"}}, leaf: "a string"},
+            fieldWithNestedObject: {
+                nestedDoc: {subNestedDoc: {leaf: "a string"}},
+                leaf: "a string",
+            },
         };
     };
 
     $config.data.getQuery = function getQuery() {
         // Choose a field to query on (all have the same value, but just gives some variety in what
         // type of queries we run).
-        const possibleFields = ["threadIdA", "threadIdB", "threadIdC", "threadIdInArray", "nestedThreadId.threadId"];
+        const possibleFields = [
+            "threadIdA",
+            "threadIdB",
+            "threadIdC",
+            "threadIdInArray",
+            "nestedThreadId.threadId",
+        ];
         const chosenField = possibleFields[Math.floor(Math.random() * possibleFields.length)];
         return {[chosenField]: this.tid};
     };

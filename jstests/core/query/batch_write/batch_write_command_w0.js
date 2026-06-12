@@ -70,7 +70,10 @@ countEventually(coll, 2);
 // Upsert fail due to duplicate key index, w:0, ordered:true
 assert(coll.drop());
 assert.commandWorked(
-    db.runCommand({createIndexes: coll.getName(), indexes: [{key: {a: 1}, name: "a_1", unique: true}]}),
+    db.runCommand({
+        createIndexes: coll.getName(),
+        indexes: [{key: {a: 1}, name: "a_1", unique: true}],
+    }),
 );
 request = {
     update: coll.getName(),

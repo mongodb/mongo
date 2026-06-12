@@ -33,7 +33,9 @@ const runTest = function ({cmdBuilderFn, validateFn, retryableWrite = false}) {
     const coll = testDB.getCollection("timeseries_update_oplog" + collCount++);
     coll.drop();
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
     assert.commandWorked(coll.insertMany(initialMeasurement));
     // The above insert may generate an applyOps, so we use startTime to avoid examining it
@@ -145,7 +147,10 @@ function upsertValidateFn(testDB, coll, retryableWrite, startTime) {
     runTest({cmdBuilderFn: fullBucketMultiUpdateBuilderFn, validateFn: fullBucketValidateFn});
 })();
 (function testPartialBucketSingletonUpdate() {
-    runTest({cmdBuilderFn: partialBucketSingletonUpdateBuilderFn, validateFn: partialBucketValidateFn});
+    runTest({
+        cmdBuilderFn: partialBucketSingletonUpdateBuilderFn,
+        validateFn: partialBucketValidateFn,
+    });
 })();
 (function testPartialBucketSingletonUpdate() {
     runTest({cmdBuilderFn: fullBucketSingletonUpdateBuilderFn, validateFn: fullBucketValidateFn});

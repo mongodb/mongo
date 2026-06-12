@@ -41,7 +41,9 @@ const missingKeyErrQuery = {
 };
 
 function runTestWithCollOpts(collOpts) {
-    jsTestLog("Running dbcheck missing key range check with collection options: " + tojson(collOpts));
+    jsTestLog(
+        "Running dbcheck missing key range check with collection options: " + tojson(collOpts),
+    );
     primaryDb[collName].drop();
     assert.commandWorked(primaryDb.createCollection(collName, collOpts));
     assert.commandWorked(
@@ -58,10 +60,14 @@ function runTestWithCollOpts(collOpts) {
     for (let i = 0; i < numDocs; i++) {
         if (i === 25) {
             // Skip indexing the doc with _id: 25 on the primary.
-            skipIndexingFp = configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+            skipIndexingFp = configureFailPoint(primaryDb, "skipIndexNewRecords", {
+                skipIdIndex: false,
+            });
         } else if (i === 75) {
             // Skip indexing the doc with _id: 75 on the primary.
-            skipIndexingFp = configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+            skipIndexingFp = configureFailPoint(secondaryDb, "skipIndexNewRecords", {
+                skipIdIndex: false,
+            });
         }
         assert.commandWorked(primaryDb[collName].insert({_id: i, a: i}));
         // We need to wait the insert to be applied on secondary to make sure there is exactly one
@@ -105,10 +111,14 @@ function runTestWithCollOpts(collOpts) {
     jsTestLog("Run dbCheck on a range that would detect only the secondary inconsistency.");
     runTest(50, 100, 0 /* numExpectedErrorsPrimary */, 1 /* numExpectedErrorsSecondary */);
 
-    jsTestLog("Run dbCheck with the range specified starting/ending with the missing index key on primary");
+    jsTestLog(
+        "Run dbCheck with the range specified starting/ending with the missing index key on primary",
+    );
     runTest(24, 25, 1 /* numExpectedErrorsPrimary */, 0 /* numExpectedErrorsSecondary */);
 
-    jsTestLog("Run dbCheck with the range specified starting/ending with the missing index key on secondary");
+    jsTestLog(
+        "Run dbCheck with the range specified starting/ending with the missing index key on secondary",
+    );
     runTest(74, 75, 0 /* numExpectedErrorsPrimary */, 1 /* numExpectedErrorsSecondary */);
 
     jsTestLog("Run dbCheck when the start/end range does not exist in the collection");

@@ -59,7 +59,10 @@ function uniformPoints(origin, count, minDist, maxDist) {
         let angle = random() * 2 * PI;
         let distance = distances[points.length];
         let pointLat = asin(sin(lat) * cos(distance) + cos(lat) * sin(distance) * cos(angle));
-        let pointDLng = atan2(sin(angle) * sin(distance) * cos(lat), cos(distance) - sin(lat) * sin(pointLat));
+        let pointDLng = atan2(
+            sin(angle) * sin(distance) * cos(lat),
+            cos(distance) - sin(lat) * sin(pointLat),
+        );
         let pointLng = ((lng - pointDLng + PI) % 2) * PI - PI;
 
         // Latitude must be [-90, 90]
@@ -223,7 +226,10 @@ uniformPoints(origin, 50, 0.5, 1.5);
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}});
 
 print("Millis for uniform near pole:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
+print(
+    t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats
+        .executionTimeMillis,
+);
 assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop();
@@ -243,7 +249,10 @@ uniformPoints(origin, 50, 0.5, 1.5);
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}});
 
 print("Millis for uniform on meridian:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
+print(
+    t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats
+        .executionTimeMillis,
+);
 assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop();
@@ -263,7 +272,10 @@ uniformPoints(origin, 50, 0.5, 1.5);
 validateOrdering({geo: {$near: {$geometry: originGeo}}});
 
 print("Millis for uniform on negative meridian:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
+print(
+    t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats
+        .executionTimeMillis,
+);
 assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).itcount(), 50);
 
 // Near search with points that are really far away.
@@ -286,6 +298,9 @@ assert.eq(cur.itcount(), 10);
 cur = t.find({geo: {$near: {$geometry: originGeo}}});
 
 print("Near search on very distant points:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
+print(
+    t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats
+        .executionTimeMillis,
+);
 let pt = cur.next();
 assert(pt);

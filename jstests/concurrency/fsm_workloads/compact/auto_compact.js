@@ -42,7 +42,8 @@ export const $config = (function () {
 
     let states = (function () {
         function insertDocuments(db, collName) {
-            let nDocumentsToInsert = this.targetDocuments - db[this.threadCollName].find().itcount();
+            let nDocumentsToInsert =
+                this.targetDocuments - db[this.threadCollName].find().itcount();
             let bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (let i = 0; i < nDocumentsToInsert; ++i) {
                 bulk.insert({a: Random.randInt(2), b: "b".repeat(100000), c: "c".repeat(100000)});
@@ -87,7 +88,11 @@ export const $config = (function () {
                 const runOnce = Math.random() < 0.5;
                 while (
                     (res = assert.commandWorkedOrFailedWithCode(
-                        db.adminCommand({autoCompact: true, freeSpaceTargetMB: 1, runOnce: runOnce}),
+                        db.adminCommand({
+                            autoCompact: true,
+                            freeSpaceTargetMB: 1,
+                            runOnce: runOnce,
+                        }),
                         ErrorCodes.ObjectIsBusy,
                     )).code == ErrorCodes.ObjectIsBusy &&
                     retries < maxRetries
@@ -143,8 +148,10 @@ export const $config = (function () {
 
     function teardown(db, collName, cluster) {
         while (
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({autoCompact: false}), ErrorCodes.ObjectIsBusy).code ==
-            ErrorCodes.ObjectIsBusy
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({autoCompact: false}),
+                ErrorCodes.ObjectIsBusy,
+            ).code == ErrorCodes.ObjectIsBusy
         ) {
             sleep(1);
         }

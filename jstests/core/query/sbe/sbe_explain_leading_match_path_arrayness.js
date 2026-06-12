@@ -20,7 +20,12 @@ import {getEngine, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-function runTestCase(pipeline, assertFilterStages, aggOptions = {}, {createClustered = false} = {}) {
+function runTestCase(
+    pipeline,
+    assertFilterStages,
+    aggOptions = {},
+    {createClustered = false} = {},
+) {
     jsTest.log(
         `Testing with internalQueryFrameworkControl: pipeline: ${tojson(pipeline)}, aggOptions: ${tojson(aggOptions)}, createClustered: ${createClustered}`,
     );
@@ -29,7 +34,9 @@ function runTestCase(pipeline, assertFilterStages, aggOptions = {}, {createClust
     const coll = db[collName];
     coll.drop();
     if (createClustered) {
-        assert.commandWorked(db.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            db.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+        );
     }
     coll.insert({_id: 0, a: {b: 1, c: 1, "": 1}});
     coll.createIndex({"a.b": 1});
@@ -127,8 +134,12 @@ function prefixIdBound(pipeline) {
     return [{$match: match}, ...rest];
 }
 for (const pipeline of elisionPipelines) {
-    runTestCase(prefixIdBound(pipeline), assertOnlyLeadingMatchAvoidsTraverseF, naturalHint, {createClustered: true});
+    runTestCase(prefixIdBound(pipeline), assertOnlyLeadingMatchAvoidsTraverseF, naturalHint, {
+        createClustered: true,
+    });
 }
 for (const pipeline of emptyComponentPipelines) {
-    runTestCase(prefixIdBound(pipeline), assertLeadingMatchRetainsTraverseF, naturalHint, {createClustered: true});
+    runTestCase(prefixIdBound(pipeline), assertLeadingMatchRetainsTraverseF, naturalHint, {
+        createClustered: true,
+    });
 }

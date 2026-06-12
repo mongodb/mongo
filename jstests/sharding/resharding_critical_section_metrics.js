@@ -62,7 +62,10 @@ function assertIncrementsActiveSectionMetricSoon(fn, metricFieldName) {
     });
 }
 
-const hangWhileBlockingReads = configureFailPoint(donorShard, "reshardingPauseDonorAfterBlockingReads");
+const hangWhileBlockingReads = configureFailPoint(
+    donorShard,
+    "reshardingPauseDonorAfterBlockingReads",
+);
 
 let waitForWrite;
 let waitForRead;

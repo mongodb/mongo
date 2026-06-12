@@ -12,7 +12,10 @@
  *   requires_getmore,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -23,7 +26,8 @@ assert.commandWorked(
         collation: {locale: "en_US", strength: 2},
     }),
 );
-const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
+const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries
+    .bucketMaxSpanSeconds;
 
 // For each interesting value, insert two events:
 //   {m: <interesting>, t: <low>}
@@ -85,7 +89,10 @@ const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].op
 
     assert.commandWorked(coll.insert(docs));
     printjson(
-        getTimeseriesCollForRawOps(coll).find({}, {_id: 0, meta: 1}, kRawOperationSpec).sort({meta: 1}).toArray(),
+        getTimeseriesCollForRawOps(coll)
+            .find({}, {_id: 0, meta: 1}, kRawOperationSpec)
+            .sort({meta: 1})
+            .toArray(),
     );
     const numInterestingValues = 1 + interestingValues.length; // +1 for missing.
     // Some of these interestingValues may be considered equal for bucketing purposes, so
@@ -107,7 +114,9 @@ function runTest(sortSpec) {
     assert.contains(sortSpec.t, [-1, +1]);
 
     const naiveQuery = [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: sortSpec}];
-    const naive = getTimeseriesCollForRawOps(coll).aggregate(naiveQuery, kRawOperationSpec).toArray();
+    const naive = getTimeseriesCollForRawOps(coll)
+        .aggregate(naiveQuery, kRawOperationSpec)
+        .toArray();
 
     const optFromMinQuery = [
         {
@@ -127,7 +136,9 @@ function runTest(sortSpec) {
             },
         },
     ];
-    const optFromMin = getTimeseriesCollForRawOps(coll).aggregate(optFromMinQuery, kRawOperationSpec).toArray();
+    const optFromMin = getTimeseriesCollForRawOps(coll)
+        .aggregate(optFromMinQuery, kRawOperationSpec)
+        .toArray();
     assert.eq(naive, optFromMin);
 
     const optFromMaxQuery = [
@@ -148,7 +159,9 @@ function runTest(sortSpec) {
             },
         },
     ];
-    const optFromMax = getTimeseriesCollForRawOps(coll).aggregate(optFromMaxQuery, kRawOperationSpec).toArray();
+    const optFromMax = getTimeseriesCollForRawOps(coll)
+        .aggregate(optFromMaxQuery, kRawOperationSpec)
+        .toArray();
     assert.eq(naive, optFromMax);
 }
 

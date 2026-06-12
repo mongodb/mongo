@@ -56,7 +56,9 @@ const secondary = rst.getSecondary();
 
 primDB.runCommand({create: replRidCollName});
 
-assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [{"_id": 1}], writeConcern: {w: 2}}));
+assert.commandWorked(
+    primDB.runCommand({insert: replRidCollName, documents: [{"_id": 1}], writeConcern: {w: 2}}),
+);
 
 // Wait for knowledge of the last commit point to advance to the last write on the primary and
 // secondary.
@@ -69,7 +71,10 @@ jsTestLog("Add new replica to the ReplSet");
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: secondary.name}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: secondary.name},
+        }),
         "failpoint.initialSyncHangAfterGettingBeginApplyingTimestamp": tojson({mode: "alwaysOn"}),
     },
 });
@@ -89,7 +94,11 @@ hangInitialSyncHangAfterGettingBeginApplyingTimestamp.wait();
 
 jsTestLog("Inserting document into primary.");
 assert.commandWorked(
-    primDB.runCommand({insert: replRidCollName, documents: [{"_id": 2, "a": 2}], writeConcern: {w: 2}}),
+    primDB.runCommand({
+        insert: replRidCollName,
+        documents: [{"_id": 2, "a": 2}],
+        writeConcern: {w: 2},
+    }),
 );
 
 jsTestLog("Updating document on primary.");
@@ -138,7 +147,11 @@ jsTestLog("Re-inserting document on primary node");
 // Re-inserting the document. This operation cause the reuse of the record ID as there is no
 // highest leaf node.
 assert.commandWorked(
-    primDB.runCommand({insert: replRidCollName, documents: [{"_id": 3, "a": 4}], writeConcern: {w: 2}}),
+    primDB.runCommand({
+        insert: replRidCollName,
+        documents: [{"_id": 3, "a": 4}],
+        writeConcern: {w: 2},
+    }),
 );
 assert.eq(primDB[replRidCollName].count(), 2);
 

@@ -44,7 +44,11 @@ const lookupStrategy = {
 };
 
 // Create an object with the correct lookup counter values after the specified type of query.
-function generateExpectedCounters(joinStrategy = lookupStrategy.nonSbe, spillToDisk = 0, spillToDiskBytes = 0) {
+function generateExpectedCounters(
+    joinStrategy = lookupStrategy.nonSbe,
+    spillToDisk = 0,
+    spillToDiskBytes = 0,
+) {
     let counters = db.serverStatus().metrics.query.lookup;
     assert(counters, "counters did not exist");
     let expected = Object.assign(counters);
@@ -100,13 +104,24 @@ function compareLookupCounters(expectedCounters) {
 let expectedCounters = generateExpectedCounters();
 assert.eq(
     db.people
-        .aggregate([{$lookup: {from: "firstYears", localField: "name", foreignField: "name", as: "matches"}}])
+        .aggregate([
+            {
+                $lookup: {
+                    from: "firstYears",
+                    localField: "name",
+                    foreignField: "name",
+                    as: "matches",
+                },
+            },
+        ])
         .itcount(),
     4 /* Matching results */,
 );
 compareLookupCounters(expectedCounters);
 
-const pipeline = [{$lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}}];
+const pipeline = [
+    {$lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}},
+];
 
 // Run a lookup pipeline with a hash lookup that gets pushed down to SBE.
 expectedCounters = generateExpectedCounters(lookupStrategy.hashLookup);
@@ -132,7 +147,12 @@ assert.eq(
         .aggregate(
             [
                 {
-                    $lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"},
+                    $lookup: {
+                        from: "students",
+                        localField: "name",
+                        foreignField: "name",
+                        as: "matches",
+                    },
                 },
             ],
             {collation: {locale: "fr"}, allowDiskUse: false},

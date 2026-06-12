@@ -11,8 +11,8 @@ function authnSuccessIncrementsServerStatusTotalAuthTime(mongodRunner) {
 
     admin.auth("admin", "pwd");
 
-    const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalIngressAuthenticationTimeMicros;
+    const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+        .authentication.totalIngressAuthenticationTimeMicros;
 
     assert.gte(expected, 0);
 
@@ -20,8 +20,8 @@ function authnSuccessIncrementsServerStatusTotalAuthTime(mongodRunner) {
 
     admin.auth("admin", "pwd");
 
-    const nextExpected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalIngressAuthenticationTimeMicros;
+    const nextExpected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+        .authentication.totalIngressAuthenticationTimeMicros;
 
     assert.gt(nextExpected, expected);
 
@@ -37,15 +37,15 @@ function authnFailureIncrementsServerStatusTotalAuthTime(mongodRunner) {
     admin.auth("admin", "pwd");
 
     // Count the number of authentications performed during setup
-    const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalIngressAuthenticationTimeMicros;
+    const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+        .authentication.totalIngressAuthenticationTimeMicros;
 
     assert.gte(expected, 0);
 
     admin.auth("admin", "wrong");
 
-    const nextExpected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalIngressAuthenticationTimeMicros;
+    const nextExpected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security
+        .authentication.totalIngressAuthenticationTimeMicros;
 
     assert.gt(nextExpected, expected);
 
@@ -53,7 +53,9 @@ function authnFailureIncrementsServerStatusTotalAuthTime(mongodRunner) {
 }
 
 function newConnectionWithoutAuthn(mongodRunner, connectionHealthLoggingOn) {
-    jsTest.log("============================ newConnectionWithoutAuthn ============================");
+    jsTest.log(
+        "============================ newConnectionWithoutAuthn ============================",
+    );
 
     // Create a new connection without authentication.
     new Mongo(mongodRunner.host);
@@ -101,7 +103,9 @@ function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner, connection
                     5286306,
                     {
                         "result": 0,
-                        "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}},
+                        "metrics": {
+                            "conversation_duration": {"summary": [{"step": 1}, {"step": 2}]},
+                        },
                         "doc": {"application": {"name": "MongoDB Shell"}},
                     },
                     expectedSuccessLogs,
@@ -111,7 +115,11 @@ function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner, connection
             "Did not find expected 1 successful log entry",
         );
     } else {
-        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286306, {}), false, "Expected not to find log entry");
+        assert.eq(
+            checkLog.checkContainsOnceJson(mongodRunner, 5286306, {}),
+            false,
+            "Expected not to find log entry",
+        );
     }
 
     admin.logout();
@@ -178,7 +186,9 @@ function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner, connection
                     5286306,
                     {
                         "result": 0,
-                        "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}},
+                        "metrics": {
+                            "conversation_duration": {"summary": [{"step": 1}, {"step": 2}]},
+                        },
                         "doc": {"application": {"name": "MongoDB Shell"}},
                     },
                     expectedSuccessLogs,
@@ -197,7 +207,10 @@ function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner, connection
 }
 
 // Test that multiple authentication failure is logged correctly
-function multiAuthnFailureLogsMetricsReportWithFailedStatus(mongodRunner, connectionHealthLoggingOn) {
+function multiAuthnFailureLogsMetricsReportWithFailedStatus(
+    mongodRunner,
+    connectionHealthLoggingOn,
+) {
     jsTest.log(
         "============================ multiAuthnFailureLogsMetricsReportWithFailedStatus ============================",
     );
@@ -258,7 +271,9 @@ function multipleAuthnMixedLogsMultipleCorrectReports(mongodRunner, connectionHe
                     5286306,
                     {
                         "result": 0,
-                        "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}},
+                        "metrics": {
+                            "conversation_duration": {"summary": [{"step": 1}, {"step": 2}]},
+                        },
                         "doc": {"application": {"name": "MongoDB Shell"}},
                     },
                     expectedSuccessLogs,
@@ -314,7 +329,12 @@ let runTest = (connectionHealthLoggingOn) => {
     expectedFailureLogs = 0;
 
     try {
-        mongod.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-256"]});
+        mongod.getDB("admin").createUser({
+            user: "admin",
+            pwd: "pwd",
+            roles: ["root"],
+            mechanisms: ["SCRAM-SHA-256"],
+        });
 
         newConnectionWithoutAuthn(mongod, connectionHealthLoggingOn);
         authnSuccessLogsMetricsReportWithSuccessStatus(mongod, connectionHealthLoggingOn);

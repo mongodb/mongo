@@ -29,7 +29,9 @@ export class DataGenerator {
         this.out = tmpDir + "/data_generator_" + randomUUID;
 
         if (module == null) {
-            throw new Error("A data generator module name must be provided to DataGenerator constructor.");
+            throw new Error(
+                "A data generator module name must be provided to DataGenerator constructor.",
+            );
         } else {
             this.module = module;
         }
@@ -37,7 +39,14 @@ export class DataGenerator {
         this.seed = seed;
     }
 
-    execute({spec = null, size = null, indexes = null, drop = true, analyze = false, serial_inserts = true} = {}) {
+    execute({
+        spec = null,
+        size = null,
+        indexes = null,
+        drop = true,
+        analyze = false,
+        serial_inserts = true,
+    } = {}) {
         let args = [
             getPython3Binary(),
             DataGenerator.PROGRAM_PATH,

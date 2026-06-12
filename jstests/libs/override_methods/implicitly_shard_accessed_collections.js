@@ -94,7 +94,9 @@ DB.prototype.getCollection = function () {
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {
         if (typeof TestData.shardCollectionProbability !== "undefined") {
-            throw new Error("Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
+            throw new Error(
+                "Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability",
+            );
         }
         ShardingOverrideCommon.shardCollection(collection);
     }
@@ -108,7 +110,9 @@ DBCollection.prototype.drop = function () {
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {
         if (typeof TestData.shardCollectionProbability !== "undefined") {
-            throw new Error("Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
+            throw new Error(
+                "Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability",
+            );
         }
         ShardingOverrideCommon.shardCollection(this);
     }
@@ -162,7 +166,10 @@ Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
 
     cmdObj.out = outputSpec;
     jsTestLog(
-        "Overriding mapReduce command. Original command: " + tojson(originalCmdObj) + " New command: " + tojson(cmdObj),
+        "Overriding mapReduce command. Original command: " +
+            tojson(originalCmdObj) +
+            " New command: " +
+            tojson(cmdObj),
     );
     return originalRunCommand.apply(this, arguments);
 };

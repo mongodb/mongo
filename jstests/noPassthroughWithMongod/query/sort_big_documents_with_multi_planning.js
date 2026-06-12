@@ -36,7 +36,9 @@ const kExpectedNums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 // Same test, but with aggregation.
 {
     const nums = [];
-    coll.aggregate([{$match: {filterKey: 1}}, {$sort: sortSpec}]).forEach((doc) => nums.push(doc.num));
+    coll.aggregate([{$match: {filterKey: 1}}, {$sort: sortSpec}]).forEach((doc) =>
+        nums.push(doc.num),
+    );
 
     // The results should be in order.
     assert.eq(nums, kExpectedNums);

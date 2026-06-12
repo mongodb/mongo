@@ -17,7 +17,10 @@
  *   does_not_support_config_fuzzer,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -26,7 +29,9 @@ TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     Random.setRandomSeed();
 
@@ -73,7 +78,10 @@ TimeseriesTest.run((insert) => {
 
         // Kill the cursor before attempting to resume.
         assert.commandWorked(
-            db.runCommand({killCursors: getTimeseriesCollForRawOps(coll).getName(), cursors: [res.cursor.id]}),
+            db.runCommand({
+                killCursors: getTimeseriesCollForRawOps(coll).getName(),
+                cursors: [res.cursor.id],
+            }),
         );
 
         // Try to resume the query from the saved resume token.
@@ -103,7 +111,12 @@ TimeseriesTest.run((insert) => {
         assert.commandFailedWithCode(db.runCommand(resumeCmd), 7738600);
 
         // Test that resuming fails if querying the time-series collection without rawData.
-        let viewCmd = {find: coll.getName(), filter: {}, $_requestResumeToken: true, hint: {$natural: 1}};
+        let viewCmd = {
+            find: coll.getName(),
+            filter: {},
+            $_requestResumeToken: true,
+            hint: {$natural: 1},
+        };
         viewCmd[tokenType] = {"$recordId": BinData(5, "1234")};
         assert.commandFailedWithCode(db.runCommand(viewCmd), ErrorCodes.InvalidPipelineOperator);
     }

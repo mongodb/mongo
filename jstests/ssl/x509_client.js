@@ -44,7 +44,10 @@ function authAndTest(mongo) {
         !external.auth({user: INVALID_CLIENT_USER, mechanism: "MONGODB-X509"}),
         "authentication with invalid user should fail",
     );
-    assert(external.auth({user: CLIENT_USER, mechanism: "MONGODB-X509"}), "authentication with valid user failed");
+    assert(
+        external.auth({user: CLIENT_USER, mechanism: "MONGODB-X509"}),
+        "authentication with valid user failed",
+    );
     assert(
         external.auth({mechanism: "MONGODB-X509"}),
         "authentication with valid client cert and no user field failed",
@@ -67,7 +70,9 @@ function authAndTest(mongo) {
     // Check that there's a "Successfully authenticated" message that includes the client
     // address. For direct TLS connections this is an IP:port (e.g. "127.0.0.1:35098"); for
     // proxy protocol connections over a Unix domain socket it is "anonymous unix socket".
-    const log = assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
+    const log = assert.commandWorked(
+        external.getSiblingDB("admin").runCommand({getLog: "global"}),
+    ).log;
 
     function checkAuthSuccess(element /*, index, array*/) {
         const logJson = JSON.parse(element);
@@ -84,7 +89,10 @@ function authAndTest(mongo) {
     // It should be impossible to create users with the same name as the server's subject,
     // unless guardrails are explicitly overridden
     assert.commandFailedWithCode(
-        external.runCommand({createUser: SERVER_USER, roles: [{"role": "userAdminAnyDatabase", "db": "admin"}]}),
+        external.runCommand({
+            createUser: SERVER_USER,
+            roles: [{"role": "userAdminAnyDatabase", "db": "admin"}],
+        }),
         ErrorCodes.BadValue,
         "Created user with same name as the server's x.509 subject",
     );
@@ -92,13 +100,20 @@ function authAndTest(mongo) {
     // It should be impossible to create users with names recognized as cluster members,
     // unless guardrails are explicitly overridden
     assert.commandFailedWithCode(
-        external.runCommand({createUser: INTERNAL_USER, roles: [{"role": "userAdminAnyDatabase", "db": "admin"}]}),
+        external.runCommand({
+            createUser: INTERNAL_USER,
+            roles: [{"role": "userAdminAnyDatabase", "db": "admin"}],
+        }),
         ErrorCodes.BadValue,
         "Created user which would be recognized as a cluster member",
     );
 
     // Check that we can add a user and read data
-    test.createUser({user: "test", pwd: "test", roles: [{"role": "readWriteAnyDatabase", "db": "admin"}]});
+    test.createUser({
+        user: "test",
+        pwd: "test",
+        roles: [{"role": "readWriteAnyDatabase", "db": "admin"}],
+    });
     test.foo.findOne();
 
     external.logout();

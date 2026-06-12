@@ -21,9 +21,14 @@ assert.commandWorked(coll.insert({a: [0, "a"]}));
 // collection locks for cleanup.
 const hangBeforeCleanup = configureFailPoint(db, "hangIndexBuildBeforeAbortCleanUp");
 
-const hangAfterCollDropHasLocks = configureFailPoint(db, "hangAbortIndexBuildByBuildUUIDAfterLocks");
+const hangAfterCollDropHasLocks = configureFailPoint(
+    db,
+    "hangAbortIndexBuildByBuildUUIDAfterLocks",
+);
 
-const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: "2d"}, null, [13026]);
+const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: "2d"}, null, [
+    13026,
+]);
 
 hangBeforeCleanup.wait();
 

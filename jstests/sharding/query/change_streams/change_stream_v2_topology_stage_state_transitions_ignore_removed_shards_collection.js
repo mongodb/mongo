@@ -122,8 +122,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
     describe("Collection-level change streams", () => {
         it("FetchingStartingChangeStreamSegment → FetchingDegradedGettingChangeEvent when opened at pre-removal timestamp", () => {
             // Set up a sharded collection with chunks on shard0 and shard1.
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {_id: 0},
                 chunks: [
@@ -181,9 +188,18 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
@@ -198,8 +214,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
 
         it("FetchingNormalGettingChangeEvent → FetchingDegradedGettingChangeEvent when processing a historical MoveChunk event for a removed shard", () => {
             // Set up a sharded collection with chunks on shard0 and shard1.
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {_id: 0},
                 chunks: [
@@ -277,12 +300,30 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
-                    {from: S.FetchingNormalGettingChangeEvent, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingNormalGettingChangeEvent,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
@@ -298,8 +339,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
         it("FetchingNormalGettingChangeEvent → FetchingStartingChangeStreamSegment when all cursors disappear after processing a MoveChunk event for a removed shard", () => {
             // Set up a sharded collection with a single chunk on shard0 (shard0 is the primary and
             // receives the full range). Shard1 acts as the first "doomed" intermediate shard.
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(coll.insert({_id: 0}));
 
             // Capture T_before: shard0 is the sole owner and is present in the shard registry.
@@ -377,20 +425,41 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
-                    {from: S.FetchingNormalGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingNormalGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
 
-            assertOpenCursors(st, [st.shard2.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+            assertOpenCursors(
+                st,
+                [st.shard2.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
         });
 
         it("FetchingStartingChangeStreamSegment → FetchingNormalGettingChangeEvent directly when all shards in the initial segment are removed", () => {
             // Set up a sharded collection with a single chunk on shard0.
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(coll.insert({_id: 0}));
 
             // Move shard0's chunk to shard1. Shard1 will be removed before the change stream
@@ -462,18 +531,33 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
 
-            assertOpenCursors(st, [st.shard2.shardName], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+            assertOpenCursors(
+                st,
+                [st.shard2.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
         });
 
         it("FetchingStartingChangeStreamSegment → FetchingDegradedGettingChangeEvent when a shard in the collection placement is removed", () => {
             // Set up a sharded collection with chunks on shard0 and shard1.
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {_id: 0},
                 chunks: [
@@ -528,9 +612,18 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
@@ -545,8 +638,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
 
         it("FetchingDegradedGettingChangeEvent undo: multiple documents spanning the segment boundary are all delivered", () => {
             // Set up a sharded collection: shard0 owns [MinKey, 0), shard1 owns [0, MaxKey].
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {_id: 0},
                 chunks: [
@@ -626,9 +726,18 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );
@@ -643,8 +752,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
 
         it("Multiple documents on surviving shards delivered through Normal→Degraded→Normal recovery with two chunk moves", () => {
             // Set up a sharded collection: shard0 owns [MinKey, 0), shard1 owns [0, MaxKey].
-            assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    enableSharding: db.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             distributeCollectionDataOverShards(db, coll, {
                 middle: {_id: 0},
                 chunks: [
@@ -734,12 +850,30 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 logOffset,
                 [
                     {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
-                    {from: S.FetchingNormalGettingChangeEvent, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingDegradedGettingChangeEvent},
-                    {from: S.FetchingDegradedGettingChangeEvent, to: S.FetchingStartingChangeStreamSegment},
-                    {from: S.FetchingStartingChangeStreamSegment, to: S.FetchingNormalGettingChangeEvent},
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingNormalGettingChangeEvent,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingDegradedGettingChangeEvent,
+                    },
+                    {
+                        from: S.FetchingDegradedGettingChangeEvent,
+                        to: S.FetchingStartingChangeStreamSegment,
+                    },
+                    {
+                        from: S.FetchingStartingChangeStreamSegment,
+                        to: S.FetchingNormalGettingChangeEvent,
+                    },
                 ],
                 () => csTest.assertNoChange(csCursor),
             );

@@ -35,15 +35,21 @@ const testColl = testDB.getCollection(collName);
 let protocolVersion = null;
 
 const searchInSbe =
-    checkSbeRestrictedOrFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe");
+    checkSbeRestrictedOrFullyEnabled(testDB) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe");
 
 // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecutionStats") && !searchInSbe) {
+if (
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecutionStats") &&
+    !searchInSbe
+) {
     protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 }
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 
 assert.commandWorked(testColl.insert({_id: 1, x: "ow"}));
@@ -111,7 +117,9 @@ function testBasicCase(shard0Conn, shard1Conn, cursorId) {
     const history = [
         {
             expectedCommand: expectedMongotCommand,
-            response: mongotResponseForBatch([], NumberLong(0), testColl.getFullName(), 1, {"garbage": true}),
+            response: mongotResponseForBatch([], NumberLong(0), testColl.getFullName(), 1, {
+                "garbage": true,
+            }),
         },
     ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);

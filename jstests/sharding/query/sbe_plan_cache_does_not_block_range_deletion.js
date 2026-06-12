@@ -21,7 +21,9 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({mongos: 1, config: 1, shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 const isSBEEnabled = checkSbeFullyEnabled(st.s.getDB(dbName));
 
@@ -47,8 +49,14 @@ function runTest({indexes, document, filter}) {
     }
 
     // Ensure there is a cache entry we just created in the plan cache.
-    const keyHash = getPlanCacheKeyFromShape({query: filter, collection: coll, db: st.s.getDB(dbName)});
-    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const keyHash = getPlanCacheKeyFromShape({
+        query: filter,
+        collection: coll,
+        db: st.s.getDB(dbName),
+    });
+    const res = coll
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}])
+        .toArray();
     assert.eq(1, res.length);
 
     // Move the chunk to the second shard leaving orphaned documents on the first shard.

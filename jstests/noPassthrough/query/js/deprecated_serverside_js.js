@@ -188,14 +188,19 @@ const session = shards.s.getDB(dbName).getMongo().startSession();
 const shardedDB = session.getDatabase(dbName);
 
 assert.commandWorked(
-    shards.s0.adminCommand({enableSharding: shardedDB.getName(), primaryShard: shards.shard0.shardName}),
+    shards.s0.adminCommand({
+        enableSharding: shardedDB.getName(),
+        primaryShard: shards.shard0.shardName,
+    }),
 );
 
 const shardedColl = shardedDB.testColl;
 
 assert.commandWorked(shardedDB.createCollection(shardedColl.getName()));
 
-assert.commandWorked(shards.s0.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(
+    shards.s0.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}),
+);
 
 assert.commandWorked(shardedColl.insert(data));
 

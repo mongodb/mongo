@@ -57,7 +57,11 @@ const createIdx = IndexBuildTest.startIndexBuild(
 
 // When the index build starts, find its op id.
 let secondaryDB = secondary.getDB(primaryDB.getName());
-const opId = IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, primaryColl.getName(), "a_1");
+const opId = IndexBuildTest.waitForIndexBuildToScanCollection(
+    secondaryDB,
+    primaryColl.getName(),
+    "a_1",
+);
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
     jsTestLog("Inspecting db.currentOp() entry for index build: " + tojson(op));

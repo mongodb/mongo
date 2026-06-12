@@ -27,7 +27,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
                 // When implicit sharding may be skipped, the collection may be unsharded and absent
                 // from the cluster catalog. All commands below require it to be tracked.
-                if (FixtureHelpers.maySkipImplicitSharding() && FixtureHelpers.isUntracked(db, this.collUUID)) {
+                if (
+                    FixtureHelpers.maySkipImplicitSharding() &&
+                    FixtureHelpers.isUntracked(db, this.collUUID)
+                ) {
                     return;
                 }
 

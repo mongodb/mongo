@@ -30,7 +30,9 @@ const st = new ShardingTest({shards: 2, mongos: 1, config: 1, rs: {nodes: 1}});
 const mongos = st.s;
 const adminDB = mongos.getDB("admin");
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: fullNs, key: {x: 1}}));
 
 const coll = mongos.getDB(dbName)[collName];
@@ -38,12 +40,16 @@ for (let i = -5; i < 5; i++) {
     assert.commandWorked(coll.insert({x: i}));
 }
 assert.commandWorked(mongos.adminCommand({split: fullNs, middle: {x: 0}}));
-assert.commandWorked(mongos.adminCommand({moveChunk: fullNs, find: {x: 1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: fullNs, find: {x: 1}, to: st.shard1.shardName}),
+);
 
 // Integer value stored by a 7.3+ node.
 const kExpireAfterSeconds = 3600;
 
-assert.commandWorked(coll.createIndex({a: 1}, {name: indexName, expireAfterSeconds: kExpireAfterSeconds}));
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: indexName, expireAfterSeconds: kExpireAfterSeconds}),
+);
 
 // Helper function to rewrite shard0's durable catalog to store 'expireAfterSeconds' as double,
 // simulating data written by a pre-7.3 node.
@@ -68,7 +74,9 @@ function injectDoubleOnShard0() {
 
 // FCV < 9.0: type mismatch should be tolerated.
 jsTest.log.info("Setting FCV to lastLTSFCV", {lastLTSFCV});
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 // shard0 carries legacy double (kExpireAfterSeconds + 0.1) written by a pre-7.3 node;
 // shard1 has integer kExpireAfterSeconds. CMC must not report a false positive.
@@ -78,15 +86,22 @@ let inconsistencies = adminDB
     .checkMetadataConsistency({checkIndexes: 1})
     .toArray()
     .filter((i) => i.type === "InconsistentIndex");
-assert.eq(0, inconsistencies.length, "Expected no false positive for numeric type mismatch at FCV < 9.0", {
-    inconsistencies,
-});
+assert.eq(
+    0,
+    inconsistencies.length,
+    "Expected no false positive for numeric type mismatch at FCV < 9.0",
+    {
+        inconsistencies,
+    },
+);
 
 // FCV >= 9.0: type mismatch is a genuine inconsistency that CMC should surface.
 // On backport branches this section should be removed: the C++ code there always sets
 // tolerateExpireAfterSecondsTypeMismatch = true so there is no strict mode.
 jsTest.log.info("Upgrading FCV to latestFCV", {latestFCV});
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 // SERVER-120253 normalizes on-disk values on upgrade; re-inject the double to verify
 // CMC is strict at FCV 9.0.
@@ -96,7 +111,11 @@ inconsistencies = adminDB
     .checkMetadataConsistency({checkIndexes: 1})
     .toArray()
     .filter((i) => i.type === "InconsistentIndex");
-assert.gt(inconsistencies.length, 0, "Expected type mismatch to be flagged as InconsistentIndex at FCV 9.0");
+assert.gt(
+    inconsistencies.length,
+    0,
+    "Expected type mismatch to be flagged as InconsistentIndex at FCV 9.0",
+);
 
 // Clean up so the post-test CMC hook finds a consistent cluster.
 mongos.getDB(dbName).dropDatabase();

@@ -42,7 +42,10 @@ async function transactionFn() {
 
     // Hang before releasing the 'commitTransaction' oplog entry hole.
     assert.commandWorked(
-        db.adminCommand({configureFailPoint: "hangBeforeReleasingTransactionOplogHole", mode: "alwaysOn"}),
+        db.adminCommand({
+            configureFailPoint: "hangBeforeReleasingTransactionOplogHole",
+            mode: "alwaysOn",
+        }),
     );
 
     PrepareHelpers.commitTransaction(session, prepareTimestamp);
@@ -60,7 +63,12 @@ assert.commandWorked(
 
 jsTestLog("Waiting for 'commitTransaction' to advance lastApplied.");
 sleep(5 * 1000);
-assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeReleasingTransactionOplogHole", mode: "off"}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "hangBeforeReleasingTransactionOplogHole",
+        mode: "off",
+    }),
+);
 
 jsTestLog("Joining the transaction.");
 joinTransaction();

@@ -135,7 +135,11 @@ function normalize(path) {
     db.auth("admin", "pass");
 
     let coll = db[jsTestName()];
-    let res = db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "maxFileSize": NumberLong(100)});
+    let res = db.runCommand({
+        "startTrafficRecording": 1,
+        "destination": "recordings",
+        "maxFileSize": NumberLong(100),
+    });
     assert.eq(res.ok, true, res);
 
     // Note how many files exist at this point in time.
@@ -224,7 +228,9 @@ function normalize(path) {
     };
 
     const setRecordingDirAndVerify = (db, dirname) => {
-        assert.commandWorked(db.adminCommand({"setParameter": 1, "trafficRecordingDirectory": dirname}));
+        assert.commandWorked(
+            db.adminCommand({"setParameter": 1, "trafficRecordingDirectory": dirname}),
+        );
 
         assert(!fileExists(dirname + "/subdir"));
 
@@ -267,7 +273,10 @@ function normalize(path) {
     removeFile(recordingDir);
     mkdir(recordingDir);
 
-    let m = MongoRunner.runMongod({auth: "", setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1}});
+    let m = MongoRunner.runMongod({
+        auth: "",
+        setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1},
+    });
 
     let db = m.getDB("admin");
 
@@ -283,7 +292,11 @@ function normalize(path) {
     // Validate start response when providing recording ID.
     {
         let res = assert.commandWorked(
-            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+            db.runCommand({
+                "startTrafficRecording": 1,
+                "destination": "recordings",
+                "recordingID": "foobar",
+            }),
         );
         assert(res.created);
         assert.eq(res.status, "running");
@@ -292,7 +305,11 @@ function normalize(path) {
     {
         // Start with the same ID is allowed, but doesn't create a new recording.
         let res = assert.commandWorked(
-            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+            db.runCommand({
+                "startTrafficRecording": 1,
+                "destination": "recordings",
+                "recordingID": "foobar",
+            }),
         );
         assert(!res.created);
         assert.eq(res.status, "running");
@@ -318,7 +335,11 @@ function normalize(path) {
     {
         // Start with the same ID is allowed, but doesn't create a new recording.
         let res = assert.commandWorked(
-            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+            db.runCommand({
+                "startTrafficRecording": 1,
+                "destination": "recordings",
+                "recordingID": "foobar",
+            }),
         );
         assert(!res.created);
         assert.eq(res.status, "scheduled");
@@ -374,7 +395,10 @@ function normalize(path) {
     removeFile(recordingDir);
     mkdir(recordingDir);
 
-    let m = MongoRunner.runMongod({auth: "", setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1}});
+    let m = MongoRunner.runMongod({
+        auth: "",
+        setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1},
+    });
 
     let db = m.getDB("admin");
 
@@ -382,7 +406,11 @@ function normalize(path) {
     db.auth("admin", "pass");
 
     assert.commandWorked(
-        db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+        db.runCommand({
+            "startTrafficRecording": 1,
+            "destination": "recordings",
+            "recordingID": "foobar",
+        }),
     );
 
     {

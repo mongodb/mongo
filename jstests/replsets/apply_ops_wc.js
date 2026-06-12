@@ -10,7 +10,10 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {restartReplicationOnSecondaries, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {
+    restartReplicationOnSecondaries,
+    stopServerReplication,
+} from "jstests/libs/write_concern_util.js";
 
 let nodeCount = 3;
 let replTest = new ReplSetTest({name: "applyOpsWCSet", nodes: nodeCount});
@@ -27,7 +30,11 @@ let primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 
@@ -119,7 +126,8 @@ function testMajorityWriteConcerns(wc) {
     assertApplyOpsCommandWorked(res);
     assert(
         !res.writeConcernError,
-        "applyOps on a replicaset with 2 working nodes had writeConcern error " + tojson(res.writeConcernError),
+        "applyOps on a replicaset with 2 working nodes had writeConcern error " +
+            tojson(res.writeConcernError),
     );
 
     dropTestCollection();

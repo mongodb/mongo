@@ -3,7 +3,10 @@
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
 
-import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const simple = (n, input) => ({n, input: "$" + input});
 const topBottomN = (n, output) => ({n, output: "$" + output, sortBy: {[output]: 1}});

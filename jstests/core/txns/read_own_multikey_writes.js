@@ -34,7 +34,15 @@ const sessionDb = session.getDatabase(dbName);
     assert.eq(1, sessionColl.find({}, {_id: 0, a: 1}).sort({a: 1}).itcount());
     assert.commandWorked(session.commitTransaction_forTesting());
 
-    assert.eq(1, db.getSiblingDB(dbName).getCollection(collName).find({}, {_id: 0, a: 1}).sort({a: 1}).itcount());
+    assert.eq(
+        1,
+        db
+            .getSiblingDB(dbName)
+            .getCollection(collName)
+            .find({}, {_id: 0, a: 1})
+            .sort({a: 1})
+            .itcount(),
+    );
 })();
 
 // === Wildcard index multikey RYOW cases ===

@@ -69,7 +69,10 @@ function makeSessionOptsForTest() {
     };
 }
 
-function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsCollEntries, numImageCollEntries}) {
+function assertNumEntries(
+    sessionOpts,
+    {numSessionsCollEntries, numTransactionsCollEntries, numImageCollEntries},
+) {
     const filter = {"_id.id": sessionOpts.parentLsid.id};
 
     const sessionsCollEntries = sessionsColl.find(filter).toArray();
@@ -102,7 +105,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     assert.commandWorked(
         testDB.runCommand({
@@ -122,7 +129,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     // Retry the write statement executed in the external session.
     assert.commandWorked(
@@ -139,7 +150,10 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
@@ -148,13 +162,20 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
 
 {
-    jsTest.log("Test reaping when there is an in-progress and a committed retryable-write " + "internal transaction");
+    jsTest.log(
+        "Test reaping when there is an in-progress and a committed retryable-write " +
+            "internal transaction",
+    );
     const sessionOpts = makeSessionOptsForTest();
 
     assert.commandWorked(testColl.insert([{x: 0, y: 0}]));
@@ -183,15 +204,30 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 2, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 2,
+        numImageCollEntries: 1,
+    });
 
-    const runInternalTxn = async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+    const runInternalTxn = async (
+        primaryHost,
+        parentLsidUUIDString,
+        parentTxnNumber,
+        dbName,
+        collName,
+    ) => {
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
 
@@ -240,7 +276,9 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
             }),
         );
 
-        assert.commandWorked(primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+        );
     };
 
     // Start another internal transaction in a separate thread, and make it hang right after it
@@ -264,7 +302,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 2, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 2,
+        numImageCollEntries: 1,
+    });
 
     fp.off();
     internalTxnThread.join();
@@ -275,7 +317,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 2}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -303,7 +349,10 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForPrevRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForPrevRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
@@ -330,18 +379,29 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 2, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 2,
+        numImageCollEntries: 1,
+    });
 
     // Force the logical session cache to reap, and verify that the config.transactions entry and
     // config.image_collection entry for the previous write do get reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 1, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
     assert.commandWorked(
@@ -359,7 +419,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 2}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -387,7 +451,10 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForPrevRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForPrevRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
@@ -403,24 +470,38 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     // Force the logical session cache to reap, and verify that the config.transactions entry and
     // config.image_collection entry for the previous write do get reaped.
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(
-        primary.adminCommand(makeCommitTransactionCmdObj(sessionOpts.parentLsid, sessionOpts.parentTxnNumber)),
+        primary.adminCommand(
+            makeCommitTransactionCmdObj(sessionOpts.parentLsid, sessionOpts.parentTxnNumber),
+        ),
     );
 
     assert.eq(testColl.find({x: 0, y: 1}).itcount(), 1);
     assert.eq(testColl.find({x: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -448,12 +529,19 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForPrevRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForPrevRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     assert.commandWorked(
         testDB.runCommand({
@@ -474,11 +562,18 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForNonRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForNonRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
@@ -486,7 +581,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -514,7 +613,10 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForNonRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForNonRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
@@ -530,7 +632,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 0,
+    });
 
     // Force the logical session cache to reap, and verify that the config.transactions entry for
     // the committed non retryable-write internal transaction does get reaped since it is unrelated
@@ -538,17 +644,27 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(
-        primary.adminCommand(makeCommitTransactionCmdObj(sessionOpts.parentLsid, sessionOpts.parentTxnNumber)),
+        primary.adminCommand(
+            makeCommitTransactionCmdObj(sessionOpts.parentLsid, sessionOpts.parentTxnNumber),
+        ),
     );
 
     assert.eq(testColl.find({x: 0, y: 1}).itcount(), 1);
     assert.eq(testColl.find({x: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -576,10 +692,22 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
-    const runInternalTxn = async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+    const runInternalTxn = async (
+        primaryHost,
+        parentLsidUUIDString,
+        parentTxnNumber,
+        dbName,
+        collName,
+    ) => {
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
 
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
@@ -617,7 +745,9 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
             }),
         );
 
-        assert.commandWorked(primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+        );
     };
 
     const fp = configureFailPoint(primary, "hangAfterSessionCheckOut", {}, {skip: 1});
@@ -638,7 +768,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     fp.off();
     internalTxnThread.join();
@@ -648,7 +782,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -674,10 +812,22 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
-    const runInternalTxn = async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+    const runInternalTxn = async (
+        primaryHost,
+        parentLsidUUIDString,
+        parentTxnNumber,
+        dbName,
+        collName,
+    ) => {
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
 
@@ -701,7 +851,9 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
                 stmtId: NumberInt(0),
             }),
         );
-        assert.commandWorked(primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+        );
     };
 
     const fp = configureFailPoint(primary, "hangAfterSessionCheckOut");
@@ -722,7 +874,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
     fp.off();
     internalTxnThread.join();
@@ -731,7 +887,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 0, y: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -770,15 +930,30 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
     assert.commandWorked(
         primary.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts.childLsidForRetryableWrite, sessionOpts.childTxnNumber),
+            makeCommitTransactionCmdObj(
+                sessionOpts.childLsidForRetryableWrite,
+                sessionOpts.childTxnNumber,
+            ),
         ),
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 2, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 2,
+        numImageCollEntries: 1,
+    });
 
-    const runInternalTxn = async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+    const runInternalTxn = async (
+        primaryHost,
+        parentLsidUUIDString,
+        parentTxnNumber,
+        dbName,
+        collName,
+    ) => {
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
 
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
@@ -828,7 +1003,9 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
             }),
         );
 
-        assert.commandWorked(primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+        );
     };
 
     // Start another internal transaction in a separate thread, and make it hang right after it
@@ -852,7 +1029,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 2, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 2,
+        numImageCollEntries: 1,
+    });
 
     fp.off();
     internalTxnThread.join();
@@ -863,7 +1044,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 2}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }
@@ -888,10 +1073,22 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     );
 
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 1,
+        numTransactionsCollEntries: 1,
+        numImageCollEntries: 1,
+    });
 
-    const runInternalTxn = async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+    const runInternalTxn = async (
+        primaryHost,
+        parentLsidUUIDString,
+        parentTxnNumber,
+        dbName,
+        collName,
+    ) => {
+        const {makeCommitTransactionCmdObj} = await import(
+            "jstests/sharding/libs/sharded_transactions_helpers.js"
+        );
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
 
@@ -914,7 +1111,9 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
                 stmtId: NumberInt(0),
             }),
         );
-        assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        assert.commandWorked(
+            testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)),
+        );
     };
 
     const fp = configureFailPoint(primary, "hangBeforeSessionCheckOut");
@@ -934,7 +1133,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.commandWorked(sessionsColl.remove({"_id.id": sessionOpts.sessionUUID}));
     rst.awaitReplication();
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     // Verify that the internal transaction did not get interrupted but that the retried write
     // statement re-execute, i.e. retryablity is violated because the retry occurs after the session
@@ -945,7 +1148,11 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
     assert.eq(testColl.find({x: 0, y: 1}).itcount(), 1);
 
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
-    assertNumEntries(sessionOpts, {numSessionsCollEntries: 0, numTransactionsCollEntries: 0, numImageCollEntries: 0});
+    assertNumEntries(sessionOpts, {
+        numSessionsCollEntries: 0,
+        numTransactionsCollEntries: 0,
+        numImageCollEntries: 0,
+    });
 
     assert.commandWorked(testColl.remove({}));
 }

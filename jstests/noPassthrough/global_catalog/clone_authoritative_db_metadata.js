@@ -23,7 +23,9 @@ function getDbMetadataFromGlobalCatalog(db) {
 }
 
 function validateShardCatalog(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard = shard.getDB("config").shard.catalog.databases.findOne({_id: dbName});
+    const dbMetadataFromShard = shard
+        .getDB("config")
+        .shard.catalog.databases.findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
@@ -61,8 +63,12 @@ function runCloningDDL(conn) {
     const fooDb = st.s.getDB(fooDbName);
     const barDb = st.s.getDB(barDbName);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: fooDbName, primaryShard: st.shard1.shardName}));
-    assert.commandWorked(st.s.adminCommand({enableSharding: barDbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: fooDbName, primaryShard: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: barDbName, primaryShard: st.shard1.shardName}),
+    );
 
     runCloningDDL(st.shard1);
 
@@ -88,7 +94,9 @@ function runCloningDDL(conn) {
 
     const dbName = "idempotentDb";
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     runCloningDDL(st.shard0);
     runCloningDDL(st.shard0);
@@ -103,11 +111,17 @@ function runCloningDDL(conn) {
 }
 
 function validateCloningDDLWithConcurrentOperation(dbName, op) {
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
-    const fp = configureFailPoint(st.shard0, "hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL", {
-        dbName: dbName,
-    });
+    const fp = configureFailPoint(
+        st.shard0,
+        "hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL",
+        {
+            dbName: dbName,
+        },
+    );
 
     const awaitShardClone = startParallelShell(() => {
         assert.commandWorked(
@@ -144,7 +158,8 @@ function validateCloningDDLWithConcurrentOperation(dbName, op) {
     const dbName = "staleDb";
     const db = st.s.getDB(dbName);
 
-    const movePrimary = () => assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+    const movePrimary = () =>
+        assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
     validateCloningDDLWithConcurrentOperation(dbName, movePrimary);
 }

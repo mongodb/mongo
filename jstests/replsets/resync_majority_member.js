@@ -38,7 +38,11 @@ const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 assert.commandWorked(primaryColl.insert({"starting": "doc", writeConcern: {w: 3}}));
@@ -75,7 +79,10 @@ resyncNode = rst.restart(resyncNode, {
     startClean: true,
     setParameter: {
         "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": syncSource.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {"hostAndPort": syncSource.host},
+        }),
         "numInitialSyncAttempts": 1,
         // The sync source (minority member) has uncommitted writes ahead of its stable recovery
         // timestamp and is disconnected from the primary, so its stable timestamp will never
@@ -92,9 +99,13 @@ assert.commandWorked(
         maxTimeMS: kDefaultWaitForFailPointTimeout,
     }),
 );
-assert.commandWorked(resyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    resyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 
-assert.commandWorked(rollbackNode.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(
+    rollbackNode.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+);
 rst.awaitSecondaryNodes(null, [rollbackNode]);
 
 restartServerReplication(syncSource);

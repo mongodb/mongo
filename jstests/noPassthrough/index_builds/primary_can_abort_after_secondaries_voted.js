@@ -29,7 +29,10 @@ const secondaryColl = secondaryDB.getCollection(coll.getName());
 // Pause primary index build after starting.
 IndexBuildTest.pauseIndexBuilds(primary);
 // Pause secondary index build after voting for commit.
-const hangAfterVoteCommit = configureFailPoint(secondaryDB, "hangIndexBuildAfterSignalPrimaryForCommitReadiness");
+const hangAfterVoteCommit = configureFailPoint(
+    secondaryDB,
+    "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+);
 
 jsTest.log.info("Waiting for index build to start");
 const createIdx = IndexBuildTest.startIndexBuild(

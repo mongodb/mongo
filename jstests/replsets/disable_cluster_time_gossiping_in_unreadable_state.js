@@ -5,11 +5,15 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function setUpUsers(rst) {
     const primaryAdminDB = rst.getPrimary().getDB("admin");
-    assert.commandWorked(primaryAdminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
+    assert.commandWorked(
+        primaryAdminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}),
+    );
     assert.eq(1, primaryAdminDB.auth("admin", "admin"));
 
     assert.commandWorked(
-        primaryAdminDB.getSiblingDB("test").runCommand({createUser: "NotTrusted", pwd: "pwd", roles: ["readWrite"]}),
+        primaryAdminDB
+            .getSiblingDB("test")
+            .runCommand({createUser: "NotTrusted", pwd: "pwd", roles: ["readWrite"]}),
     );
     primaryAdminDB.logout();
 
@@ -60,7 +64,9 @@ assert(!res.hasOwnProperty("operationTime"), tojson(res));
 const invalidClusterTimeMetadata = Object.assign(validClusterTimeMetadata, {
     clusterTime: new Timestamp(validClusterTimeMetadata.clusterTime.getTime() + 100, 0),
 });
-res = assert.commandWorked(secondaryTestDB.runCommand({hello: 1, $clusterTime: invalidClusterTimeMetadata}));
+res = assert.commandWorked(
+    secondaryTestDB.runCommand({hello: 1, $clusterTime: invalidClusterTimeMetadata}),
+);
 
 assert.commandWorked(secondaryAdminDB.adminCommand({replSetMaintenance: 0}));
 

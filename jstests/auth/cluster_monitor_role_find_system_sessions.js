@@ -14,13 +14,18 @@ function runTestAs(conn, role) {
     jsTest.log(assert.commandWorked(admin.runCommand({connectionStatus: 1, showPrivileges: 1})));
 
     assert.commandWorked(config.runCommand({collStats: "system.sessions"}));
-    assert.commandFailedWithCode(config.runCommand({collStats: "system.version"}), ErrorCodes.Unauthorized);
+    assert.commandFailedWithCode(
+        config.runCommand({collStats: "system.version"}),
+        ErrorCodes.Unauthorized,
+    );
     admin.logout();
 }
 
 function runTest(conn) {
     const admin = conn.getDB("admin");
-    assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles: ["__system"]}));
+    assert.commandWorked(
+        admin.runCommand({createUser: "admin", pwd: "admin", roles: ["__system"]}),
+    );
 
     runTestAs(conn, "clusterMonitor");
 }

@@ -105,7 +105,9 @@ s.printCollectionInfo("test.foo");
 
 const myto = s.getOther(s.getPrimaryShard("test")).name;
 print("counts before move: " + tojson(s.shardCounts("test,", "foo")));
-assert.commandWorked(s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: myto, _waitForDelete: true}));
+assert.commandWorked(
+    s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: myto, _waitForDelete: true}),
+);
 print("counts after move: " + tojson(s.shardCounts("test", "foo")));
 s.printCollectionInfo("test.foo");
 assert.eq(1, s.onNumShards("test", "foo"), "on 1 shard again");
@@ -128,7 +130,9 @@ assert.eq(0, secondary.count(), "s count after drop");
 
 // ---- retry commands SERVER-1471 ----
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test2", primaryShard: s.shard0.shardName}));
+assert.commandWorked(
+    s.s0.adminCommand({enablesharding: "test2", primaryShard: s.shard0.shardName}),
+);
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test2.foo", key: {num: 1}}));
 
 const dba = s.getDB("test2");

@@ -28,11 +28,17 @@ let count;
 do {
     jsTest.log.info(`Drilling down with prefix: '${prefix}'`);
     // Get the prefix of the document in the reference collection.
-    let refPartial = assert.commandWorked(db.ref_coll.validate({collHash: true, hashPrefixes: prefix})).partial;
+    let refPartial = assert.commandWorked(
+        db.ref_coll.validate({collHash: true, hashPrefixes: prefix}),
+    ).partial;
     let refPrefix = Object.keys(refPartial)[0];
 
-    jsTest.log.info(`Run validate on the collection, and ensure that bucket '${refPrefix}' exists.`);
-    let partial = assert.commandWorked(db.coll.validate({collHash: true, hashPrefixes: prefix})).partial;
+    jsTest.log.info(
+        `Run validate on the collection, and ensure that bucket '${refPrefix}' exists.`,
+    );
+    let partial = assert.commandWorked(
+        db.coll.validate({collHash: true, hashPrefixes: prefix}),
+    ).partial;
     assert(partial[refPrefix], partial);
     assert.gt(partial[refPrefix].count, 0);
 

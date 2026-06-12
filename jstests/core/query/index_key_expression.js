@@ -302,7 +302,10 @@ const testScenarios = [
     },
     {
         doc: {a: [1, {b: [2, {c: [3, {d: 1}], e: 4}, 5, {f: 6}], g: 7}]},
-        spec: {key: {"a.b.c.d": 1, "a.g": 1, "a.b.f": 1, "a.b.c": 1, "a.b.e": 1}, name: "btreeIndex"},
+        spec: {
+            key: {"a.b.c.d": 1, "a.g": 1, "a.b.f": 1, "a.b.c": 1, "a.b.e": 1},
+            name: "btreeIndex",
+        },
         expectedIndexKeys: [
             {"a.b.c.d": null, "a.g": null, "a.b.f": null, "a.b.c": null, "a.b.e": null},
             {"a.b.c.d": null, "a.g": 7, "a.b.f": null, "a.b.c": null, "a.b.e": null},
@@ -1064,7 +1067,10 @@ const testScenarios = [
     {
         doc: {
             product_name: "Spy Coat",
-            product_attributes: {material: ["Tweed", "Wool", "Leather"], size: {length: 72, units: "inches"}},
+            product_attributes: {
+                material: ["Tweed", "Wool", "Leather"],
+                size: {length: 72, units: "inches"},
+            },
         },
         spec: {key: {"product_attributes.$**": 1}, name: "wildcardIndex"},
         expectedIndexKeys: [
@@ -1116,8 +1122,15 @@ testScenarios.forEach((testScenario) => {
     // 'expectedErrorCode' must be present and the aggregate command in such case must
     // throw an exception.
     if (testScenario.expectedIndexKeys) {
-        assert.eq(collection.aggregate(pipeline).toArray()[0], {_id: testScenario.expectedIndexKeys}, testScenario);
+        assert.eq(
+            collection.aggregate(pipeline).toArray()[0],
+            {_id: testScenario.expectedIndexKeys},
+            testScenario,
+        );
     } else {
-        assert.throwsWithCode(() => collection.aggregate(pipeline).toArray(), testScenario.expectedErrorCode);
+        assert.throwsWithCode(
+            () => collection.aggregate(pipeline).toArray(),
+            testScenario.expectedErrorCode,
+        );
     }
 });

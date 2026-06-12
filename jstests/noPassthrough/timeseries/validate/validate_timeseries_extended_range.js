@@ -40,7 +40,9 @@ describe("Validation of timeseries collection with extended-range timestamps", f
                 this.coll.insertMany(
                     [...Array(n).keys()].map(() => {
                         timestamp.setSeconds(timestamp.getSeconds() + 1);
-                        const measurement = Math.sin((2 * Math.PI * timestamp.getTime()) / millisecondsPerMinute);
+                        const measurement = Math.sin(
+                            (2 * Math.PI * timestamp.getTime()) / millisecondsPerMinute,
+                        );
                         return {
                             t: timestamp,
                             data: {
@@ -58,35 +60,57 @@ describe("Validation of timeseries collection with extended-range timestamps", f
 
     it("Passes validation with extended range timestamps before epoch", function () {
         assert.commandWorked(this.coll.insert({t: new Date(-100), data: {a: "b"}})); // Pre-epoch using integer
-        assert.commandWorked(this.coll.insert({t: new Date("1950-01-01T00:00:00Z"), data: {x: "y"}})); // Pre-epoch using UTC timestamp notation
+        assert.commandWorked(
+            this.coll.insert({t: new Date("1950-01-01T00:00:00Z"), data: {x: "y"}}),
+        ); // Pre-epoch using UTC timestamp notation
         const res = assert.commandWorked(this.coll.validate());
         assert(res.valid, res);
         assert.eq(res.warnings.length, 0, res);
     });
 
     it("Passes validation with extended range timestamps after epochalypse", function () {
-        assert.commandWorked(this.coll.insert({t: new Date("2040-01-01T00:00:01Z"), data: {a: "b"}})); // Post Jan 19, 2038
-        assert.commandWorked(this.coll.insert({t: new Date("2040-01-01T00:00:02Z"), data: {x: "y"}})); // Post Jan 19, 2038
+        assert.commandWorked(
+            this.coll.insert({t: new Date("2040-01-01T00:00:01Z"), data: {a: "b"}}),
+        ); // Post Jan 19, 2038
+        assert.commandWorked(
+            this.coll.insert({t: new Date("2040-01-01T00:00:02Z"), data: {x: "y"}}),
+        ); // Post Jan 19, 2038
         const res = assert.commandWorked(this.coll.validate());
         assert(res.valid, res);
         assert.eq(res.warnings.length, 0, res);
     });
 
     it("Passes validation with extended range timestamps before and after epoch", function () {
-        assert.commandWorked(this.coll.insert({t: new Date("1969-12-31T23:59:58Z"), data: {a: "b"}})); // Pre-epoch
-        assert.commandWorked(this.coll.insert({t: new Date("1969-12-31T23:59:59Z"), data: {a: "b"}})); // Pre-epoch
-        assert.commandWorked(this.coll.insert({t: new Date("1970-01-01T00:00:00Z"), data: {x: "y"}})); // Post-epoch
-        assert.commandWorked(this.coll.insert({t: new Date("1970-01-01T00:00:01Z"), data: {x: "y"}})); // Post-epoch
+        assert.commandWorked(
+            this.coll.insert({t: new Date("1969-12-31T23:59:58Z"), data: {a: "b"}}),
+        ); // Pre-epoch
+        assert.commandWorked(
+            this.coll.insert({t: new Date("1969-12-31T23:59:59Z"), data: {a: "b"}}),
+        ); // Pre-epoch
+        assert.commandWorked(
+            this.coll.insert({t: new Date("1970-01-01T00:00:00Z"), data: {x: "y"}}),
+        ); // Post-epoch
+        assert.commandWorked(
+            this.coll.insert({t: new Date("1970-01-01T00:00:01Z"), data: {x: "y"}}),
+        ); // Post-epoch
         const res = assert.commandWorked(this.coll.validate());
         assert(res.valid, res);
         assert.eq(res.warnings.length, 0, res);
     });
 
     it("Passes validation with extended range timestamps before and after epochalypse", function () {
-        assert.commandWorked(this.coll.insert({t: new Date("2038-01-19T03:14:05Z"), data: {a: "b"}})); // Pre-epochalypse
-        assert.commandWorked(this.coll.insert({t: new Date("2038-01-19T03:14:06Z"), data: {a: "b"}})); // Pre-epochalypse
-        assert.commandWorked(this.coll.insert({t: new Date("2038-01-19T03:14:07Z"), data: {x: "y"}})); // Post-epochalypse
-        assert.commandWorked(this.coll.insert({t: new Date("2038-01-19T03:14:08Z"), data: {x: "y"}})); // Post-epochalypse
+        assert.commandWorked(
+            this.coll.insert({t: new Date("2038-01-19T03:14:05Z"), data: {a: "b"}}),
+        ); // Pre-epochalypse
+        assert.commandWorked(
+            this.coll.insert({t: new Date("2038-01-19T03:14:06Z"), data: {a: "b"}}),
+        ); // Pre-epochalypse
+        assert.commandWorked(
+            this.coll.insert({t: new Date("2038-01-19T03:14:07Z"), data: {x: "y"}}),
+        ); // Post-epochalypse
+        assert.commandWorked(
+            this.coll.insert({t: new Date("2038-01-19T03:14:08Z"), data: {x: "y"}}),
+        ); // Post-epochalypse
         const res = assert.commandWorked(this.coll.validate());
         assert(res.valid, res);
         assert.eq(res.warnings.length, 0, res);
@@ -142,7 +166,9 @@ describe("Validation against snapshot using Replset", function () {
         this.db = this.rs.getPrimary().getDB(jsTestName());
         this.db[this.collName].drop(); // drop any potentially stale collection
 
-        assert.commandWorked(this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}));
+        assert.commandWorked(
+            this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}),
+        );
         this.coll = this.db.getCollection(this.collName);
 
         assert.commandWorked(this.coll.insert({time: ISODate("3026-02-10T18:31:35.788Z")}));
@@ -161,11 +187,16 @@ describe("Validation against snapshot using Replset", function () {
         // failures until this issue can be addressed.
 
         // TODO: SERVER-120042 It should not be required to re-create the collection for validation on a snapshot
-        assert.commandWorked(this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}));
+        assert.commandWorked(
+            this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}),
+        );
 
         const res = this.db[this.collName].validate({background: true});
         assert(res.valid, res);
-        assert.eq(res.nrecords, 1, {reason: "Expected at least 1 record from the time the snapshot was made", res});
+        assert.eq(res.nrecords, 1, {
+            reason: "Expected at least 1 record from the time the snapshot was made",
+            res,
+        });
 
         assert.eq(res.warnings.length, 0, res);
         assert.eq(res.errors.length, 0, res);
@@ -173,15 +204,21 @@ describe("Validation against snapshot using Replset", function () {
 
     it("Passes foreground validation with specified atClusterTime", function () {
         // Take a checkpoint.
-        const clusterTime = assert.commandWorked(this.db.adminCommand({fsync: 1})).$clusterTime.clusterTime;
+        const clusterTime = assert.commandWorked(this.db.adminCommand({fsync: 1})).$clusterTime
+            .clusterTime;
         assert(this.coll.drop());
 
         // TODO: SERVER-120042 It should not be required to re-create the collection for validation on a snapshot
-        assert.commandWorked(this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}));
+        assert.commandWorked(
+            this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}),
+        );
 
         const res = this.db[this.collName].validate({atClusterTime: clusterTime});
         assert(res.valid, res);
-        assert.eq(res.nrecords, 1, {reason: "Expected at least 1 record from the time the snapshot was made", res});
+        assert.eq(res.nrecords, 1, {
+            reason: "Expected at least 1 record from the time the snapshot was made",
+            res,
+        });
 
         assert.eq(res.warnings.length, 0, res);
         assert.eq(res.errors.length, 0, res);

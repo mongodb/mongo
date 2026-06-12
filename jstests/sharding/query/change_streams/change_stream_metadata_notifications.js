@@ -15,17 +15,27 @@ const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Shard the test collection on a field called 'shardKey'.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}),
+);
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
-assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 0}}));
+assert.commandWorked(
+    mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 0}}),
+);
 
 // Move the [0, MaxKey] chunk to st.shard1.shardName.
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {shardKey: 1}, to: st.rs1.getURL()}),
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {shardKey: 1},
+        to: st.rs1.getURL(),
+    }),
 );
 
 // Write a document to each chunk.
@@ -87,7 +97,10 @@ assert.soon(() => {
 assert.eq(resumeStream.getResumeToken(), collectionDropinvalidateToken);
 
 // With an explicit collation, test that we can resume from before the collection drop.
-changeStream = mongosColl.watch([], {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
+changeStream = mongosColl.watch([], {
+    resumeAfter: resumeTokenFromFirstUpdate,
+    collation: {locale: "simple"},
+});
 
 assert.soon(() => changeStream.hasNext());
 next = changeStream.next();
@@ -123,7 +136,9 @@ assert.commandWorked(
 assert.commandWorked(mongosDB.createCollection(mongosColl.getName()));
 
 // Shard the test collection on shardKey.
-assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}),
+);
 
 // Test that resuming the change stream on the recreated collection succeeds, since we will not
 // attempt to inherit the collection's default collation and can therefore ignore the new UUID.

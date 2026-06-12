@@ -20,7 +20,11 @@ function bulkInsertDocs(coll, keyField, start, end) {
     }
     const result = bulkOp.execute();
     const count = end - start;
-    assert.eq(result.nInserted, count, `Bulk insert: expected ${count} docs, inserted ${result.nInserted}`);
+    assert.eq(
+        result.nInserted,
+        count,
+        `Bulk insert: expected ${count} docs, inserted ${result.nInserted}`,
+    );
 }
 
 function assertNumDocsOnShard(namespace, shardName, expectedCount) {
@@ -42,7 +46,10 @@ let shard1 = st.shard1.shardName;
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: shard0}));
 
 jsTest.log("Verify unshardCollection fails on non-existent collection");
-assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}), ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(
+    mongos.adminCommand({unshardCollection: ns}),
+    ErrorCodes.NamespaceNotFound,
+);
 
 jsTest.log("Verify unshardCollection fails on unsharded collection");
 const unshardedCollName = "foo_unsharded";
@@ -80,7 +87,10 @@ jsTest.log("Verify unshardCollection is idempotent with same toShard");
 const collInfo = mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0];
 const prevCollUUID = collInfo.info.uuid;
 assert.commandWorked(mongos.adminCommand({unshardCollection: ns, toShard: shard1}));
-assert.eq(mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0].info.uuid, prevCollUUID);
+assert.eq(
+    mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0].info.uuid,
+    prevCollUUID,
+);
 
 jsTest.log("Verify unshardCollection fails when trying to move already unsharded collection");
 assert.commandFailedWithCode(

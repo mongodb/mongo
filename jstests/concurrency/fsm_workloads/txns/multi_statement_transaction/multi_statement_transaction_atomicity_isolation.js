@@ -65,7 +65,8 @@ export const $config = (function () {
         const result = graph.findCycle();
 
         if (result.length > 0) {
-            const isOpPartOfCycle = (op) => result.some((cyclicOp) => bsonBinaryEqual({_: op}, {_: cyclicOp}));
+            const isOpPartOfCycle = (op) =>
+                result.some((cyclicOp) => bsonBinaryEqual({_: op}, {_: cyclicOp}));
 
             const filteredDocuments = documents.map((doc) => {
                 const filteredCommitOrder = doc.order.filter(isOpPartOfCycle);
@@ -129,10 +130,16 @@ export const $config = (function () {
         // Assert that any transaction written down in $config.data also exists in the database
         // and that the docIds associated with this txnNum in $config.data match those docIds
         // associated with this txnNum in the database.
-        const highestTxnNum = Math.max(updatedDocsServerHistory.length, data.updatedDocsClientHistory.length);
+        const highestTxnNum = Math.max(
+            updatedDocsServerHistory.length,
+            data.updatedDocsClientHistory.length,
+        );
         for (let txnNum = 0; txnNum < highestTxnNum; ++txnNum) {
             assert(
-                arrayEq(updatedDocsServerHistory[txnNum] || [], data.updatedDocsClientHistory[txnNum] || []),
+                arrayEq(
+                    updatedDocsServerHistory[txnNum] || [],
+                    data.updatedDocsClientHistory[txnNum] || [],
+                ),
                 () =>
                     "expected " +
                     tojson(data.updatedDocsClientHistory[txnNum]) +
@@ -158,7 +165,9 @@ export const $config = (function () {
                     for (let collection of this.collections) {
                         const txnDbName = collection.getDB().getName();
                         const txnCollName = collection.getName();
-                        const txnCollection = this.session.getDatabase(txnDbName).getCollection(txnCollName);
+                        const txnCollection = this.session
+                            .getDatabase(txnDbName)
+                            .getCollection(txnCollName);
 
                         // We intentionally use a smaller batch size when fetching all of the
                         // documents in the collection in order to stress the behavior of reading
@@ -225,7 +234,8 @@ export const $config = (function () {
                     () => {
                         committedTxnInfo = [];
                         for (let [_, docId] of docIds.entries()) {
-                            const collection = this.collections[Random.randInt(this.collections.length)];
+                            const collection =
+                                this.collections[Random.randInt(this.collections.length)];
                             const txnDbName = collection.getDB().getName();
                             const txnCollName = collection.getName();
                             txnNumber = this.session.getTxnNumber_forTesting();
@@ -251,18 +261,28 @@ export const $config = (function () {
                                 },
                             };
 
-                            const txnCollection = this.session.getDatabase(txnDbName).getCollection(txnCollName);
+                            const txnCollection = this.session
+                                .getDatabase(txnDbName)
+                                .getCollection(txnCollName);
                             const coll = txnCollection.find().toArray();
                             const res = txnCollection.runCommand("update", {
                                 updates: [{q: {_id: docId}, u: updateMods}],
                             });
                             assert.commandWorked(
                                 res,
-                                () => "Failed to update. result: " + tojson(res) + ", collection: " + tojson(coll),
+                                () =>
+                                    "Failed to update. result: " +
+                                    tojson(res) +
+                                    ", collection: " +
+                                    tojson(coll),
                             );
                             assert.eq(res.n, 1, () => tojson(res));
                             assert.eq(res.nModified, 1, () => tojson(res));
-                            committedTxnInfo.push({_id: docId, dbName: txnDbName, collName: txnCollName});
+                            committedTxnInfo.push({
+                                _id: docId,
+                                dbName: txnDbName,
+                                collName: txnCollName,
+                            });
                         }
                     },
                     {
@@ -291,7 +311,9 @@ export const $config = (function () {
                 // 'afterClusterTime' internally and is subject to prepare conflicts (in a sharded
                 // cluster). This is meant to expose deadlocks involving prepare conflicts outside
                 // of transactions.
-                const sessionCollection = this.session.getDatabase(randomDbName).getCollection(randomCollName);
+                const sessionCollection = this.session
+                    .getDatabase(randomDbName)
+                    .getCollection(randomCollName);
 
                 try {
                     const cursor = sessionCollection.find();

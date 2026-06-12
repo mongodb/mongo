@@ -9,7 +9,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let st = new ShardingTest({shards: 3});
 
 function listDatabases(options) {
-    return assert.commandWorked(st.s.adminCommand(Object.assign({listDatabases: 1}, options))).databases;
+    return assert.commandWorked(st.s.adminCommand(Object.assign({listDatabases: 1}, options)))
+        .databases;
 }
 
 function createAndDropDatabase(dbName) {

@@ -148,7 +148,9 @@ jsTest.log("Insert and delete documents in a transaction");
 
 assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
 
-assert.commandWorked(testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}}),
+);
 
 // TODO(SERVER-39704): We use the withTxnAndAutoRetryOnMongos
 // function to handle how MongoS will propagate a StaleShardVersion error as a

@@ -18,7 +18,10 @@ function getAdminDB(connection) {
     if (typeof connection.getDB === "function") {
         adminDB = connection.getDB("admin");
     } else {
-        assert(typeof connection.getSiblingDB === "function", `Cannot get Admin DB from ${tojson(connection)}`);
+        assert(
+            typeof connection.getSiblingDB === "function",
+            `Cannot get Admin DB from ${tojson(connection)}`,
+        );
         adminDB = connection.getSiblingDB("admin");
     }
     return adminDB;
@@ -68,7 +71,10 @@ function injectReduceRefreshPeriod(connection) {
             data: {period: kRefreshTimeoutSec},
         }),
     );
-    const res = adminDB.runCommand({getParameter: 1, "failpoint.modifyReplicaSetMonitorDefaultRefreshPeriod": 1});
+    const res = adminDB.runCommand({
+        getParameter: 1,
+        "failpoint.modifyReplicaSetMonitorDefaultRefreshPeriod": 1,
+    });
     assert.commandWorked(res);
     assert.eq(res["failpoint.modifyReplicaSetMonitorDefaultRefreshPeriod"].mode, 1);
 }
@@ -95,7 +101,8 @@ function freeze(connection) {
 
 function getConfigServer(connection) {
     const adminDB = getAdminDB(connection);
-    const res = assert.commandWorked(adminDB.runCommand({serverStatus: 1})).sharding.configsvrConnectionString;
+    const res = assert.commandWorked(adminDB.runCommand({serverStatus: 1})).sharding
+        .configsvrConnectionString;
     let rx = /.*\/(.*)/g;
     let arr = rx.exec(res);
     jsTestLog(`Config server: ${arr[1]} extracted from ${tojson(res)}`);

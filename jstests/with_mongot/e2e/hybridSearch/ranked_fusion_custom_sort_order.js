@@ -32,7 +32,11 @@ const baselineSearchSpec = {
 };
 
 // Test a case where each sub-pipeline has a $sort stage.
-const matchPipeline = [{$match: {number_of_reviews: {$gte: 25}}}, {$sort: {review_score: -1, _id: 1}}, {$limit: limit}];
+const matchPipeline = [
+    {$match: {number_of_reviews: {$gte: 25}}},
+    {$sort: {review_score: -1, _id: 1}},
+    {$limit: limit},
+];
 let testQuery = [
     {
         $rankFusion: {
@@ -53,7 +57,9 @@ let testQuery = [
 
 let results = coll.aggregate(testQuery).toArray();
 
-const expectedResultIds = [21, 47, 41, 28, 11, 14, 40, 24, 6, 38, 18, 20, 13, 15, 2, 26, 31, 44, 30, 48];
+const expectedResultIds = [
+    21, 47, 41, 28, 11, 14, 40, 24, 6, 38, 18, 20, 13, 15, 2, 26, 31, 44, 30, 48,
+];
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTALS), results);
 
 // Test the same query but using $search with a 'sort' instead of a separate $sort stage.
@@ -87,7 +93,10 @@ testQuery = [
             input: {
                 pipelines: {
                     // please note the names are swapped on purpose.
-                    match: [{$search: {...baselineSearchSpec, sort: {number_of_reviews: 1, _id: -1}}}, {$limit: limit}],
+                    match: [
+                        {$search: {...baselineSearchSpec, sort: {number_of_reviews: 1, _id: -1}}},
+                        {$limit: limit},
+                    ],
                     searchone: matchPipeline,
                 },
             },
@@ -111,7 +120,10 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTA
                     pipelines: {
                         searchone: [
                             {
-                                $search: {...baselineSearchSpec, sort: {number_of_reviews: 1, _id: -1}},
+                                $search: {
+                                    ...baselineSearchSpec,
+                                    sort: {number_of_reviews: 1, _id: -1},
+                                },
                             },
                             {$limit: limit},
                         ],
@@ -157,7 +169,10 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTA
                         match: matchPipeline,
                         searchone: [
                             {
-                                $search: {...baselineSearchSpec, sort: {number_of_reviews: 1, _id: -1}},
+                                $search: {
+                                    ...baselineSearchSpec,
+                                    sort: {number_of_reviews: 1, _id: -1},
+                                },
                             },
                             {$limit: limit},
                         ],
@@ -202,7 +217,10 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTA
             $rankFusion: {
                 input: {
                     pipelines: {
-                        searchone: [{$search: {...baselineSearchSpec, sort: {name: 1, _id: -1}}}, {$limit: limit}],
+                        searchone: [
+                            {$search: {...baselineSearchSpec, sort: {name: 1, _id: -1}}},
+                            {$limit: limit},
+                        ],
                     },
                 },
             },
@@ -240,7 +258,10 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTA
     assert(sawDocArrExpectedFuzzyFailure, "expected results to be different");
 
     const innerExpectedResultIds = [47, 42, 41, 40, 38, 31, 28, 26, 24, 23, 21, 18, 14, 13, 11, 2];
-    assertDocArrExpectedFuzzy(buildExpectedResults(innerExpectedResultIds, datasets.RENTALS), innerResults);
+    assertDocArrExpectedFuzzy(
+        buildExpectedResults(innerExpectedResultIds, datasets.RENTALS),
+        innerResults,
+    );
 }
 
 {
@@ -253,7 +274,10 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTA
                 input: {
                     pipelines: {
                         match: matchPipeline,
-                        searchone: [{$search: {...baselineSearchSpec, sort: {name: 1, _id: -1}}}, {$limit: limit}],
+                        searchone: [
+                            {$search: {...baselineSearchSpec, sort: {name: 1, _id: -1}}},
+                            {$limit: limit},
+                        ],
                     },
                 },
             },
@@ -291,8 +315,13 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTA
     }
     assert(sawDocArrExpectedFuzzyFailure, "expected results to be different");
 
-    const innerExpectedResultIds = [47, 41, 28, 21, 40, 24, 14, 11, 6, 20, 42, 15, 38, 31, 44, 26, 30, 23, 48, 18];
-    assertDocArrExpectedFuzzy(buildExpectedResults(innerExpectedResultIds, datasets.RENTALS), innerResults);
+    const innerExpectedResultIds = [
+        47, 41, 28, 21, 40, 24, 14, 11, 6, 20, 42, 15, 38, 31, 44, 26, 30, 23, 48, 18,
+    ];
+    assertDocArrExpectedFuzzy(
+        buildExpectedResults(innerExpectedResultIds, datasets.RENTALS),
+        innerResults,
+    );
 }
 
 dropSearchIndex(coll, {name: getRentalSearchIndexSpec().name});

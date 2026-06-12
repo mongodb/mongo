@@ -27,7 +27,13 @@ function retrieveExtensionMetricLogsFromDb(databaseConn, comment) {
     const slowQueryLogId = 51803; // ID for 'Slow query' log messages.
 
     return checkLog
-        .getFilteredLogMessages(databaseConn, slowQueryLogId, {command: {comment: comment}}, null, true)
+        .getFilteredLogMessages(
+            databaseConn,
+            slowQueryLogId,
+            {command: {comment: comment}},
+            null,
+            true,
+        )
         .filter((log) => {
             return log.attr && log.attr.extensionMetrics !== undefined;
         });
@@ -89,7 +95,11 @@ function getAggregateProfilerEntry(db, collName, comment) {
             },
         ])
         .toArray();
-    assert.eq(profileEntries.length, 1, `Expected exactly 1 profiler entry: ${tojson(profileEntries)}`);
+    assert.eq(
+        profileEntries.length,
+        1,
+        `Expected exactly 1 profiler entry: ${tojson(profileEntries)}`,
+    );
     return profileEntries[0];
 }
 
@@ -112,7 +122,10 @@ function getGetMoreProfilerEntry(db, cursorId, comment) {
 
 // Helper function to extract extension metrics from a profiler entry.
 function getExtensionMetricsFromProfilerEntry(entry) {
-    assert(entry.extensionMetrics !== undefined, `Entry was missing 'extensionMetrics': ${tojson(entry)}`);
+    assert(
+        entry.extensionMetrics !== undefined,
+        `Entry was missing 'extensionMetrics': ${tojson(entry)}`,
+    );
     return entry.extensionMetrics;
 }
 
@@ -129,7 +142,11 @@ function validateExtensionMetrics(
 ) {
     // Verify the slow query log contains the correct metrics.
     const slowQueryLogs = getSlowQueryLogsByComment(db, comment, shardingTest, metricsOnMongoS);
-    const summedSlowQueryMetrics = sumExtensionMetricsFromSlowQueryLog(slowQueryLogs, extensionName, metricsName);
+    const summedSlowQueryMetrics = sumExtensionMetricsFromSlowQueryLog(
+        slowQueryLogs,
+        extensionName,
+        metricsName,
+    );
     assert.eq(summedSlowQueryMetrics, expectedValue);
 
     if (shardingTest) {
@@ -193,7 +210,16 @@ function runExtensionMetricsTests(conn, shardingTest = null, shouldShardCollecti
         coll.aggregate([{$metrics: {}}], {comment});
 
         // Metrics will be on mongod because there is no $sort in this pipeline.
-        validateExtensionMetrics(db, collName, comment, kCounterFieldSum, "$metrics", "counter", shardingTest, false);
+        validateExtensionMetrics(
+            db,
+            collName,
+            comment,
+            kCounterFieldSum,
+            "$metrics",
+            "counter",
+            shardingTest,
+            false,
+        );
     })();
 
     // Tests that a query that issues multiple getMore commands can report metrics in the profiler/slow query logs.
@@ -206,7 +232,16 @@ function runExtensionMetricsTests(conn, shardingTest = null, shouldShardCollecti
             comment: comment,
         });
         // Metrics should be on mongos because there is a $sort in this pipeline.
-        validateExtensionMetrics(db, collName, comment, 1, "$metrics", "counter", shardingTest, shouldShardCollection);
+        validateExtensionMetrics(
+            db,
+            collName,
+            comment,
+            1,
+            "$metrics",
+            "counter",
+            shardingTest,
+            shouldShardCollection,
+        );
 
         let cursorId = initialResult.cursor.id;
         let getMoreCounter = 1;
@@ -226,8 +261,17 @@ function runExtensionMetricsTests(conn, shardingTest = null, shouldShardCollecti
             );
 
             // Sum metrics from slow query logs for this getMore.
-            const slowQueryLogs = getSlowQueryLogsByComment(db, getMoreComment, shardingTest, shouldShardCollection);
-            const summedSlowQueryLogMetrics = sumExtensionMetricsFromSlowQueryLog(slowQueryLogs, "$metrics", "counter");
+            const slowQueryLogs = getSlowQueryLogsByComment(
+                db,
+                getMoreComment,
+                shardingTest,
+                shouldShardCollection,
+            );
+            const summedSlowQueryLogMetrics = sumExtensionMetricsFromSlowQueryLog(
+                slowQueryLogs,
+                "$metrics",
+                "counter",
+            );
             totalSlowQueryMetrics += summedSlowQueryLogMetrics;
 
             // Sum metrics from profiler for this getMore if not running in a sharded environment.
@@ -264,7 +308,15 @@ function runExtensionMetricsTests(conn, shardingTest = null, shouldShardCollecti
         const comment = "multiple_instances_share_metrics_test";
         coll.aggregate([{$metrics: {}}, {$metrics: {}}], {comment});
 
-        validateExtensionMetrics(db, collName, comment, kCounterFieldSum * 2, "$metrics", "counter", shardingTest);
+        validateExtensionMetrics(
+            db,
+            collName,
+            comment,
+            kCounterFieldSum * 2,
+            "$metrics",
+            "counter",
+            shardingTest,
+        );
     })();
 
     // Tests that a query with multiple extensions reports metrics from both extensions.
@@ -272,8 +324,24 @@ function runExtensionMetricsTests(conn, shardingTest = null, shouldShardCollecti
         const comment = "multiple_extensions_can_report_metrics_test";
         coll.aggregate([{$metrics: {}}, {$otherMetrics: {}}], {comment});
 
-        validateExtensionMetrics(db, collName, comment, kCounterFieldSum, "$metrics", "counter", shardingTest);
-        validateExtensionMetrics(db, collName, comment, 3, "$otherMetrics", "documentCount", shardingTest);
+        validateExtensionMetrics(
+            db,
+            collName,
+            comment,
+            kCounterFieldSum,
+            "$metrics",
+            "counter",
+            shardingTest,
+        );
+        validateExtensionMetrics(
+            db,
+            collName,
+            comment,
+            3,
+            "$otherMetrics",
+            "documentCount",
+            shardingTest,
+        );
     })();
 }
 

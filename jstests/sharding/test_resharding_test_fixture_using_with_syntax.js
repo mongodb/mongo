@@ -9,7 +9,10 @@
  * ]
  */
 if (_isWindows()) {
-    jsTest.log("Skipping test on Windows because it makes assumptions about exit codes for" + " std::terminate()");
+    jsTest.log(
+        "Skipping test on Windows because it makes assumptions about exit codes for" +
+            " std::terminate()",
+    );
     quit();
 }
 
@@ -32,7 +35,9 @@ const awaitShell = startParallelShell(
         reshardingTest.withReshardingInBackground(
             {
                 newShardKeyPattern: {newKey: 1},
-                newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+                newChunks: [
+                    {min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
+                ],
             },
             () => {
                 throw new Error("Intentionally throwing exception to simulate assertion failure");

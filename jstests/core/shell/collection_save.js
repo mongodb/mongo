@@ -28,4 +28,8 @@ assert.throws(
     [],
     "saving a string must throw an error",
 );
-assert.throws(() => coll.save([{"fruit": "mango"}, {"fruit": "orange"}]), [], "saving an array must throw an error");
+assert.throws(
+    () => coll.save([{"fruit": "mango"}, {"fruit": "orange"}]),
+    [],
+    "saving an array must throw an error",
+);

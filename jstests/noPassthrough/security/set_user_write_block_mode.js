@@ -91,7 +91,10 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
         // Test create index on empty and non-empty colls, collMod, drop index.
         assert.commandWorked(coll1.createIndex({"a": 1}, {"name": transientIndexName}));
         assert.commandWorked(
-            db.runCommand({collMod: coll1Name, "index": {"keyPattern": {"a": 1}, expireAfterSeconds: 200}}),
+            db.runCommand({
+                collMod: coll1Name,
+                "index": {"keyPattern": {"a": 1}, expireAfterSeconds: 200},
+            }),
         );
         assert.commandWorked(coll1.dropIndex({"a": 1}));
         assert.commandWorked(coll2.createIndex({"a": 1}, {"name": transientIndexName}));
@@ -101,7 +104,9 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
         assert.commandWorked(db.createCollection(transientCollNames[0]));
         assert.commandWorked(db.createCollection(transientCollNames[1]));
         assert.commandWorked(db[transientCollNames[0]].renameCollection(transientCollNames[2]));
-        assert.commandWorked(db[transientCollNames[2]].renameCollection(transientCollNames[1], true));
+        assert.commandWorked(
+            db[transientCollNames[2]].renameCollection(transientCollNames[1], true),
+        );
         assert(db[transientCollNames[1]].drop());
 
         // Test dropping a (non-empty) database.
@@ -115,17 +120,29 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
         assert.commandFailedWithCode(coll1.remove({a: 0, b: 0}), expectedFailure);
 
         // Test create, collMod, drop index.
-        assert.commandFailedWithCode(coll1.createIndex({"a": 1}, {"name": transientIndexName}), expectedFailure);
         assert.commandFailedWithCode(
-            db.runCommand({collMod: coll1Name, "index": {"keyPattern": {"b": 1}, expireAfterSeconds: 200}}),
+            coll1.createIndex({"a": 1}, {"name": transientIndexName}),
+            expectedFailure,
+        );
+        assert.commandFailedWithCode(
+            db.runCommand({
+                collMod: coll1Name,
+                "index": {"keyPattern": {"b": 1}, expireAfterSeconds: 200},
+            }),
             expectedFailure,
         );
         assert.commandFailedWithCode(coll1.dropIndex({"b": 1}), expectedFailure);
-        assert.commandFailedWithCode(coll2.createIndex({"a": 1}, {"name": transientIndexName}), expectedFailure);
+        assert.commandFailedWithCode(
+            coll2.createIndex({"a": 1}, {"name": transientIndexName}),
+            expectedFailure,
+        );
 
         // Test create, rename (both to a non-existent and an existing target), drop collection.
         assert.commandFailedWithCode(db.createCollection(transientCollNames[0]), expectedFailure);
-        assert.commandFailedWithCode(coll2.renameCollection(transientCollNames[1]), expectedFailure);
+        assert.commandFailedWithCode(
+            coll2.renameCollection(transientCollNames[1]),
+            expectedFailure,
+        );
         assert.commandFailedWithCode(coll2.renameCollection(coll1Name, true), expectedFailure);
         assert.commandFailedWithCode(db.runCommand({drop: coll2Name}), expectedFailure);
 
@@ -338,12 +355,16 @@ function runTest(fixture) {
     {
         // Create a temporary collection.
         const collTmpName = "collTmp";
-        fixture.applyOps([{op: "c", ns: jsTestName() + ".$cmd", o: {create: collTmpName, temp: true}}]);
+        fixture.applyOps([
+            {op: "c", ns: jsTestName() + ".$cmd", o: {create: collTmpName, temp: true}},
+        ]);
 
         // Validate that collection exists and it is marked as temporary.
         fixture.asUser(({conn}) => {
             const db = conn.getDB(jsTestName());
-            const collectionInfo = db.getCollectionInfos().find((info) => info.name === collTmpName);
+            const collectionInfo = db
+                .getCollectionInfos()
+                .find((info) => info.name === collTmpName);
 
             assert(collectionInfo);
             assert(
@@ -360,7 +381,9 @@ function runTest(fixture) {
         // Validate that temporary collections are dropped during startup recovery.
         fixture.asUser(({conn}) => {
             const db = conn.getDB(jsTestName());
-            const collectionExists = db.getCollectionInfos().some((info) => info.name === collTmpName);
+            const collectionExists = db
+                .getCollectionInfos()
+                .some((info) => info.name === collTmpName);
             assert(!collectionExists);
         });
 
@@ -392,7 +415,10 @@ function testReasons(fixture) {
     let expectedCounters = getCounters();
 
     // Ensure that write blocking cannot be enabled with an invalid reason
-    assert.commandFailedWithCode(fixture.setWriteBlockMode(false, {name: "ArglebargleGlopGlyf"}), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        fixture.setWriteBlockMode(false, {name: "ArglebargleGlopGlyf"}),
+        ErrorCodes.BadValue,
+    );
     fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
     assert.eq(getCounters(), expectedCounters);
 
@@ -401,16 +427,25 @@ function testReasons(fixture) {
     fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     fixture.assertWriteBlockReason(WriteBlockReason.DiskUseThresholdExceeded);
     fixture.asAdmin(({conn}) => {
-        checkLog.checkContainsOnceJson(conn, 10296100, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
+        checkLog.checkContainsOnceJson(conn, 10296100, {
+            reason: WriteBlockReason.DiskUseThresholdExceeded.name,
+        });
     });
     expectedCounters.DiskUseThresholdExceeded += 1;
     assert.eq(getCounters().DiskUseThresholdExceeded, expectedCounters.DiskUseThresholdExceeded);
 
     // Ensure that attempting to enable write blocking again with a different reason is an error
     {
-        const res = fixture.setWriteBlockMode(true, WriteBlockReason.ClusterToClusterMigrationInProgress);
+        const res = fixture.setWriteBlockMode(
+            true,
+            WriteBlockReason.ClusterToClusterMigrationInProgress,
+        );
         assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-        assert(res.errmsg.includes("reason: " + WriteBlockReason.ClusterToClusterMigrationInProgress.name));
+        assert(
+            res.errmsg.includes(
+                "reason: " + WriteBlockReason.ClusterToClusterMigrationInProgress.name,
+            ),
+        );
         assert(res.errmsg.includes("current: " + WriteBlockReason.DiskUseThresholdExceeded.name));
         fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     }
@@ -421,7 +456,10 @@ function testReasons(fixture) {
         let sec = fixture.rst.getSecondary();
         let admin = sec.getDB("admin");
         assert(admin.auth(bypassUser, password));
-        assert.eq(WriteBlockReason.DiskUseThresholdExceeded.enum, admin.serverStatus().repl.userWriteBlockReason);
+        assert.eq(
+            WriteBlockReason.DiskUseThresholdExceeded.enum,
+            admin.serverStatus().repl.userWriteBlockReason,
+        );
     }
 
     // Ensure that the reason and counters persist across step-down and step-up
@@ -438,9 +476,16 @@ function testReasons(fixture) {
 
     // Ensure that attempting to disable write blocking with an incorrect reason is an error
     {
-        const res = fixture.setWriteBlockMode(false, WriteBlockReason.ClusterToClusterMigrationInProgress);
+        const res = fixture.setWriteBlockMode(
+            false,
+            WriteBlockReason.ClusterToClusterMigrationInProgress,
+        );
         assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-        assert(res.errmsg.includes("reason: " + WriteBlockReason.ClusterToClusterMigrationInProgress.name));
+        assert(
+            res.errmsg.includes(
+                "reason: " + WriteBlockReason.ClusterToClusterMigrationInProgress.name,
+            ),
+        );
         assert(res.errmsg.includes("current: " + WriteBlockReason.DiskUseThresholdExceeded.name));
         fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     }
@@ -449,7 +494,9 @@ function testReasons(fixture) {
     fixture.disableWriteBlockMode(WriteBlockReason.DiskUseThresholdExceeded);
     fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
     fixture.asAdmin(({conn}) => {
-        checkLog.checkContainsOnceJson(conn, 10296101, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
+        checkLog.checkContainsOnceJson(conn, 10296101, {
+            reason: WriteBlockReason.DiskUseThresholdExceeded.name,
+        });
     });
 }
 
@@ -457,7 +504,13 @@ function testReasons(fixture) {
     // Validate that setting user write blocking fails on standalones
     const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
     const admin = conn.getDB("admin");
-    assert.commandWorked(admin.runCommand({createUser: "root", pwd: "root", roles: [{role: "__system", db: "admin"}]}));
+    assert.commandWorked(
+        admin.runCommand({
+            createUser: "root",
+            pwd: "root",
+            roles: [{role: "__system", db: "admin"}],
+        }),
+    );
     assert(admin.auth("root", "root"));
 
     assert.commandFailedWithCode(

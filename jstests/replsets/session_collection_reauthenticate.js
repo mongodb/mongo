@@ -40,7 +40,9 @@ const kAdminUser = {
 const primary = replTest.getPrimary();
 // Create the admin user
 const adminDB = primary.getDB("admin");
-assert.commandWorked(adminDB.runCommand({createUser: kAdminUser.name, pwd: kAdminUser.pwd, roles: ["root"]}));
+assert.commandWorked(
+    adminDB.runCommand({createUser: kAdminUser.name, pwd: kAdminUser.pwd, roles: ["root"]}),
+);
 assert.eq(1, adminDB.auth(kAdminUser.name, kAdminUser.pwd));
 
 const primaryAdmin = primary.getDB("admin");
@@ -51,7 +53,9 @@ const secondaryAdmin = secondary.getDB("admin");
 assert.eq(1, secondaryAdmin.auth(kAdminUser.name, kAdminUser.pwd));
 
 // Get the current value of the TTL index so that we can verify it's being properly applied.
-let res = assert.commandWorked(primary.adminCommand({getParameter: 1, localLogicalSessionTimeoutMinutes: 1}));
+let res = assert.commandWorked(
+    primary.adminCommand({getParameter: 1, localLogicalSessionTimeoutMinutes: 1}),
+);
 
 let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
 

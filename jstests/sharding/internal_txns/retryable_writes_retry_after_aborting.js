@@ -64,7 +64,12 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
         let {parentLsid, parentTxnNumber, childLsid, childTxnNumber, stmtId} = makeSessionOpts();
 
         // Execute a write statement in a retryable write.
-        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
+        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(
+            parentLsid,
+            parentTxnNumber,
+            stmtId++,
+            {_id: 0},
+        );
         assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
 
         // Execute another write statement in a retryable internal transaction.
@@ -84,7 +89,9 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
 
         // Retry all write statements including the one executed as a retryable write and verify
         // that they execute exactly once.
-        const retryResForParentSessionCmdObj = assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
+        const retryResForParentSessionCmdObj = assert.commandWorked(
+            testDB.runCommand(parentSessionCmdObj),
+        );
         assert.eq(retryResForParentSessionCmdObj.n, 1);
 
         assert.eq(testColl.find({_id: 0}).itcount(), 1);
@@ -99,7 +106,9 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
             childSessionCmdObj1.stmtId,
             {_id: 1},
         );
-        const retryResForParentSessionCmdObj1 = assert.commandWorked(testDB.runCommand(parentSessionCmdObj1));
+        const retryResForParentSessionCmdObj1 = assert.commandWorked(
+            testDB.runCommand(parentSessionCmdObj1),
+        );
         assert.eq(retryResForParentSessionCmdObj1.n, 1);
 
         assert.eq(testColl.find({_id: 0}).itcount(), 1);
@@ -121,7 +130,12 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
         let {parentLsid, parentTxnNumber, childLsid, childTxnNumber, stmtId} = makeSessionOpts();
 
         // Execute a write statement in a retryable write.
-        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
+        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(
+            parentLsid,
+            parentTxnNumber,
+            stmtId++,
+            {_id: 0},
+        );
         assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
 
         // Execute another write statement in a retryable internal transaction.
@@ -140,7 +154,9 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
         assert.commandWorked(testDB.adminCommand(abortCmdObj));
 
         // Retry.
-        const retryResForParentSessionCmdObj = assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
+        const retryResForParentSessionCmdObj = assert.commandWorked(
+            testDB.runCommand(parentSessionCmdObj),
+        );
         assert.eq(retryResForParentSessionCmdObj.n, 1);
 
         assert.eq(testColl.find({_id: 0}).itcount(), 1);

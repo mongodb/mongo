@@ -35,7 +35,11 @@ export class ResponderCertSet {
     }
 }
 
-export const OCSP_DELEGATE_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_RESPONDER_CERT, OCSP_RESPONDER_KEY);
+export const OCSP_DELEGATE_RESPONDER = new ResponderCertSet(
+    OCSP_CA_PEM,
+    OCSP_RESPONDER_CERT,
+    OCSP_RESPONDER_KEY,
+);
 
 export const OCSP_CA_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_CA_CERT, OCSP_CA_KEY);
 

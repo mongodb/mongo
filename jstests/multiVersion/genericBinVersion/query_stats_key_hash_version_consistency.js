@@ -11,7 +11,11 @@ import {
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
-    nodes: {n1: {binVersion: "last-lts"}, n2: {binVersion: "last-lts"}, n3: {binVersion: "last-lts"}},
+    nodes: {
+        n1: {binVersion: "last-lts"},
+        n2: {binVersion: "last-lts"},
+        n3: {binVersion: "last-lts"},
+    },
 });
 
 // Turn on the collecting of query stats metrics.

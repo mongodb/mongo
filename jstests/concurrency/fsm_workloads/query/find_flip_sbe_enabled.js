@@ -20,15 +20,21 @@ export const $config = (function () {
 
     function setup(db, collName, cluster) {
         cluster.executeOnMongodNodes((db) => {
-            const originalParamValue = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+            const originalParamValue = db.adminCommand({
+                getParameter: 1,
+                internalQueryFrameworkControl: 1,
+            });
             assert.commandWorked(originalParamValue);
             assert(originalParamValue.hasOwnProperty("internalQueryFrameworkControl"));
-            this.originalParamValues[db.getMongo().host] = originalParamValue.internalQueryFrameworkControl;
+            this.originalParamValues[db.getMongo().host] =
+                originalParamValue.internalQueryFrameworkControl;
         });
 
         const coll = db.getCollection(getCollectionName(collName));
         for (let i = 0; i < 10; ++i) {
-            assert.commandWorked(coll.insert({_id: i, x: i.toString(), y: i.toString(), z: i.toString()}));
+            assert.commandWorked(
+                coll.insert({_id: i, x: i.toString(), y: i.toString(), z: i.toString()}),
+            );
         }
 
         assert.commandWorked(coll.createIndex({x: 1}));
@@ -38,12 +44,17 @@ export const $config = (function () {
     let states = (function () {
         function setForceClassicEngineOn(db, collName) {
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryFrameworkControl: "forceClassicEngine",
+                }),
             );
         }
 
         function setForceClassicEngineOff(db, collName) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+            );
         }
 
         function runQueriesAndCheckResults(db, collName) {
@@ -76,7 +87,10 @@ export const $config = (function () {
         function dropIndex(db, collName) {
             const coll = db.getCollection(getCollectionName(collName));
             const res = coll.dropIndex({z: 1});
-            assert(res.ok === 1 || res.code === ErrorCodes.IndexNotFound, "Drop index failed: " + tojson(res));
+            assert(
+                res.ok === 1 || res.code === ErrorCodes.IndexNotFound,
+                "Drop index failed: " + tojson(res),
+            );
         }
 
         return {

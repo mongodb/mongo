@@ -18,7 +18,12 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: 1,
+    settings: {chainingAllowed: false},
+    useBridge: true,
+});
 rst.startSet();
 rst.initiate();
 
@@ -74,8 +79,12 @@ assertVoteCount(primary, {
 });
 
 jsTestLog("Allowing secondaries to complete initial sync");
-assert.commandWorked(newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-assert.commandWorked(newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
+assert.commandWorked(
+    newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 rst.awaitSecondaryNodes();
 
 jsTestLog("Checking that the 'newlyAdded' field is no longer set on either node");

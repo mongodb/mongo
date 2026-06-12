@@ -22,12 +22,16 @@ import {randomUpdateDelete} from "jstests/concurrency/fsm_workload_modifiers/ran
 import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 
 function getPauseMigrationsClusterParameter(db) {
-    const response = assert.commandWorked(db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+    const response = assert.commandWorked(
+        db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}),
+    );
     return response.clusterParameters[0].enabled;
 }
 
 function setPauseMigrationsClusterParameter(db, cluster, enabled) {
-    assert.commandWorked(db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled}}}));
+    assert.commandWorked(
+        db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled}}}),
+    );
 
     cluster.executeOnMongosNodes((db) => {
         // Ensure all mongoses have refreshed cluster parameter after being set.
@@ -45,7 +49,10 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
     $config.data.partitionSize = 100;
 
     $config.data.getConcurrentOperations = () => {
-        return [...$super.data.getConcurrentOperations(), ConcurrentOperation.CoordinatedMultiWrite];
+        return [
+            ...$super.data.getConcurrentOperations(),
+            ConcurrentOperation.CoordinatedMultiWrite,
+        ];
     };
 
     $config.setup = function setup(db, collName, cluster) {

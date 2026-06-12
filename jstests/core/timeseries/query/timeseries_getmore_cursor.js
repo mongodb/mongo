@@ -10,14 +10,19 @@
  *   multiversion_incompatible,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 
 const coll = db[jsTestName()];
 const timeField = "t";
 const metaField = "m";
 
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+);
 
 const baseTime = new Date("2026-01-01T00:00:00Z");
 let docs = [];
@@ -43,8 +48,14 @@ function assertCursorNs(response, label) {
 
 function assertRawBucketDoc(doc) {
     assert.hasFields(doc, ["control", "meta"]);
-    assert(!doc.hasOwnProperty(timeField), `Expected raw bucket doc without '${timeField}' field, got: ${tojson(doc)}`);
-    assert(!doc.hasOwnProperty(metaField), `Expected raw bucket doc without '${metaField}' field, got: ${tojson(doc)}`);
+    assert(
+        !doc.hasOwnProperty(timeField),
+        `Expected raw bucket doc without '${timeField}' field, got: ${tojson(doc)}`,
+    );
+    assert(
+        !doc.hasOwnProperty(metaField),
+        `Expected raw bucket doc without '${metaField}' field, got: ${tojson(doc)}`,
+    );
 }
 
 /**
@@ -68,7 +79,9 @@ function testQueryCursorNs(cmdObj, label) {
     assertRawBucketDoc(getMoreRes.cursor.nextBatch[0]);
 
     if (getMoreRes.cursor.id != 0) {
-        assert.commandWorked(db.runCommand({killCursors: rawColl.getName(), cursors: [getMoreRes.cursor.id]}));
+        assert.commandWorked(
+            db.runCommand({killCursors: rawColl.getName(), cursors: [getMoreRes.cursor.id]}),
+        );
     }
 }
 
@@ -90,21 +103,33 @@ testQueryCursorNs(
     jsTest.log.info(`Testing listIndexes cursor.ns and data format on ${rawColl.getName()}`);
 
     const listRes = assert.commandWorked(
-        db.runCommand({listIndexes: rawColl.getName(), cursor: {batchSize: 1}, ...kRawOperationSpec}),
+        db.runCommand({
+            listIndexes: rawColl.getName(),
+            cursor: {batchSize: 1},
+            ...kRawOperationSpec,
+        }),
     );
     assertCursorNs(listRes, "listIndexes initial");
 
     // Collect indexes from firstBatch and getMore separately so we can verify getMore
     // actually returned data.
     const firstBatchIndexes = [...listRes.cursor.firstBatch];
-    assert.eq(firstBatchIndexes.length, 1, "Expected exactly 1 index in firstBatch with batchSize: 1");
+    assert.eq(
+        firstBatchIndexes.length,
+        1,
+        "Expected exactly 1 index in firstBatch with batchSize: 1",
+    );
     assert.neq(listRes.cursor.id, 0, "Expected open cursor from listIndexes with batchSize: 1");
 
     const getMoreRes = assert.commandWorked(
         db.runCommand({getMore: listRes.cursor.id, collection: rawColl.getName(), batchSize: 100}),
     );
     assertCursorNs(getMoreRes, "listIndexes getMore");
-    assert.gt(getMoreRes.cursor.nextBatch.length, 0, "Expected getMore to return remaining indexes");
+    assert.gt(
+        getMoreRes.cursor.nextBatch.length,
+        0,
+        "Expected getMore to return remaining indexes",
+    );
 
     const allIndexes = firstBatchIndexes.concat(getMoreRes.cursor.nextBatch);
 
@@ -117,7 +142,11 @@ testQueryCursorNs(
         {"meta": 1, "control.max.value": -1, "control.min.value": -1},
     ];
 
-    assert.sameMembers(expectedKeys, allKeys, `listIndexes with rawData returned unexpected index keys`);
+    assert.sameMembers(
+        expectedKeys,
+        allKeys,
+        `listIndexes with rawData returned unexpected index keys`,
+    );
 }
 
 // Test exhausted with rawData, verify system.buckets is not leaked in cursor.ns
@@ -131,14 +160,23 @@ testQueryCursorNs(
     assert.gt(numBuckets, 0);
 
     const aggRes = assert.commandWorked(
-        db.runCommand({aggregate: rawColl.getName(), pipeline: [], cursor: {batchSize: 100}, ...kRawOperationSpec}),
+        db.runCommand({
+            aggregate: rawColl.getName(),
+            pipeline: [],
+            cursor: {batchSize: 100},
+            ...kRawOperationSpec,
+        }),
     );
     assertCursorNs(aggRes);
     assert.eq(aggRes.cursor.id, 0);
     assert.eq(aggRes.cursor.firstBatch.length, numBuckets);
 
     const listRes = assert.commandWorked(
-        db.runCommand({listIndexes: rawColl.getName(), cursor: {batchSize: 100}, ...kRawOperationSpec}),
+        db.runCommand({
+            listIndexes: rawColl.getName(),
+            cursor: {batchSize: 100},
+            ...kRawOperationSpec,
+        }),
     );
     assertCursorNs(listRes);
     assert.eq(listRes.cursor.id, 0);

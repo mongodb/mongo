@@ -54,7 +54,9 @@ testDB.setProfilingLevel(0);
 testDB.system.profile.drop();
 // Create 4MB system.profile collection to prevent the 'getmore' operations from overwriting the
 // original query.
-assert.commandWorked(testDB.createCollection("system.profile", {capped: true, size: 4 * 1024 * 1024}));
+assert.commandWorked(
+    testDB.createCollection("system.profile", {capped: true, size: 4 * 1024 * 1024}),
+);
 assert.commandWorked(testDB.setProfilingLevel(2));
 
 for (let j = 0; j < initialAdvance; j++) {

@@ -18,9 +18,18 @@ assert.commandWorked(
 
 // Verify that the sort with $meta operator correctly rejects invalid input.
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$meta: 1}}}), 31138);
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$meta: -1}}}), 31138);
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$meta: "searchHighlights"}}}), 31138);
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$meta: "1"}}}), 31138);
+assert.commandFailedWithCode(
+    db.runCommand({find: coll.getName(), sort: {_id: {$meta: -1}}}),
+    31138,
+);
+assert.commandFailedWithCode(
+    db.runCommand({find: coll.getName(), sort: {_id: {$meta: "searchHighlights"}}}),
+    31138,
+);
+assert.commandFailedWithCode(
+    db.runCommand({find: coll.getName(), sort: {_id: {$meta: "1"}}}),
+    31138,
+);
 
 // Verify that sort with $meta:'randVal' works and returns all the documents.
 assert.eq(
@@ -70,7 +79,11 @@ assert.commandFailedWithCode(
     31138,
 );
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$sort: {_id: {$meta: "1"}}}]}),
+    db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{$sort: {_id: {$meta: "1"}}}],
+    }),
     31138,
 );
 

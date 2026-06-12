@@ -20,7 +20,12 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: 1,
+    settings: {chainingAllowed: false},
+    useBridge: true,
+});
 rst.startSet();
 rst.initiate();
 
@@ -100,7 +105,9 @@ assertVoteCount(primary, {
 jsTestLog("Allowing member to complete initial sync");
 
 let doNotRemoveNewlyAddedFP = configureFailPoint(primaryDb, "doNotRemoveNewlyAddedOnHeartbeats");
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 rst.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Checking that the 'newlyAdded' field is still set");

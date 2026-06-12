@@ -17,7 +17,9 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
-assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
+);
 
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));

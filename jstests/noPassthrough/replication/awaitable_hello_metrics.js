@@ -13,7 +13,11 @@ function runAwaitCmd(cmd, maxAwaitTimeMS) {
     const topologyVersionField = res.topologyVersion;
 
     assert.commandWorked(
-        db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: maxAwaitTimeMS}),
+        db.runCommand({
+            [cmd]: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: maxAwaitTimeMS,
+        }),
     );
 }
 
@@ -26,12 +30,17 @@ function runTest(db, cmd, failPoint, useGRPCStats) {
     assert(topologyVersionField.hasOwnProperty("counter"), topologyVersionField);
 
     const connectionStats = () => {
-        return useGRPCStats ? db.serverStatus().gRPC.ingress.streams : db.serverStatus().connections;
+        return useGRPCStats
+            ? db.serverStatus().gRPC.ingress.streams
+            : db.serverStatus().connections;
     };
 
     // Test that metrics are properly updated when there are command requests that are waiting.
     let awaitCmdFailPoint = configureFailPoint(failPoint.conn, failPoint.failPointName);
-    let singleAwaitCmd = startParallelShell(funWithArgs(runAwaitCmd, cmd, 100), failPoint.conn.port);
+    let singleAwaitCmd = startParallelShell(
+        funWithArgs(runAwaitCmd, cmd, 100),
+        failPoint.conn.port,
+    );
 
     // Ensure the command requests have started waiting before checking the metrics.
     awaitCmdFailPoint.wait();
@@ -48,7 +57,10 @@ function runTest(db, cmd, failPoint, useGRPCStats) {
     // Refresh the number of times we have entered the failpoint.
     awaitCmdFailPoint = configureFailPoint(failPoint.conn, failPoint.failPointName);
     let firstAwaitCmd = startParallelShell(funWithArgs(runAwaitCmd, cmd, 100), failPoint.conn.port);
-    let secondAwaitCmd = startParallelShell(funWithArgs(runAwaitCmd, cmd, 100), failPoint.conn.port);
+    let secondAwaitCmd = startParallelShell(
+        funWithArgs(runAwaitCmd, cmd, 100),
+        failPoint.conn.port,
+    );
     assert.commandWorked(
         db.runCommand({
             waitForFailPoint: failPoint.failPointName,

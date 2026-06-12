@@ -103,7 +103,9 @@ jsTestLog("Reenabling checkpointer so rollback can complete");
 
 assert.soonNoExcept(
     function () {
-        assert.commandWorked(rst.nodes[0].adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+        assert.commandWorked(
+            rst.nodes[0].adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}),
+        );
         const rbid = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
         return rbid > lastRBID;
     },

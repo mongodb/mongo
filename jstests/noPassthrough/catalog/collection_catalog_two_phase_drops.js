@@ -30,7 +30,9 @@ const dbName = "test";
 const db = primary.getDB(dbName);
 
 // Pause the checkpoint thread to control the checkpoint timestamp.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "alwaysOn"}),
+);
 
 const collName = "a";
 assert.commandWorked(db.createCollection(collName));
@@ -139,6 +141,8 @@ checkLog.containsJson(primary, 6776600, {
     },
 });
 
-assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}),
+);
 
 rst.stopSet();

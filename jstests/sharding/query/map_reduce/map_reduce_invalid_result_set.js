@@ -10,7 +10,9 @@ const st = new ShardingTest({shards: 2});
 const testDB = st.getDB("test");
 const coll = "map_reduce_invalid_result_set";
 
-assert.commandWorked(st.s.adminCommand({enablesharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: "test", primaryShard: st.shard0.shardName}),
+);
 
 const lengthPerString = 1 * 1024 * 1024;
 const nDocs = 17;
@@ -41,13 +43,17 @@ function runLimitTests(dbConn, expectedError) {
     assert.soon(() => st.shard1.getDB("test").serverStatus().metrics.cursor.open.total == 0);
 
     // Test that non-inline output succeeds since no individual document is over the 16MB limit.
-    assert.commandWorked(dbConn.runCommand({mapReduce: coll, map: mapFunc, reduce: reduceFunc, out: coll + "_out"}));
+    assert.commandWorked(
+        dbConn.runCommand({mapReduce: coll, map: mapFunc, reduce: reduceFunc, out: coll + "_out"}),
+    );
     assert.eq(2, dbConn[coll + "_out"].find().itcount());
 
     // Removing two documents puts the size of results just under 16MB, and thus inline should pass.
     assert.commandWorked(dbConn[coll].remove({_id: 0}));
     assert.commandWorked(dbConn[coll].remove({_id: 1}));
-    assert.commandWorked(dbConn.runCommand({mapReduce: coll, map: mapFunc, reduce: reduceFunc, out: {inline: 1}}));
+    assert.commandWorked(
+        dbConn.runCommand({mapReduce: coll, map: mapFunc, reduce: reduceFunc, out: {inline: 1}}),
+    );
 
     // Re-insert the docs to keep the collection state consistent.
     assert.commandWorked(dbConn[coll].insert({_id: 0, key: 0, y: "a".repeat(lengthPerString)}));

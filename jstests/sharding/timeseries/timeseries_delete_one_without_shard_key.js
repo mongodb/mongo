@@ -24,7 +24,9 @@ const primaryDB = primary.getDB(dbName);
 const otherShard = st.shard1;
 const otherDB = otherShard.getDB(dbName);
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}),
+);
 
 const shard0RoutingValues = {
     shardNumber: 0,
@@ -107,9 +109,13 @@ const setUpShardedTimeseriesCollection = function (collName) {
 
     if (collName == collNameWithoutMeta) {
         assert.commandWorked(
-            testDB.createCollection(collName, {timeseries: {timeField: "time", granularity: "hours"}}),
+            testDB.createCollection(collName, {
+                timeseries: {timeField: "time", granularity: "hours"},
+            }),
         );
-        assert.commandWorked(testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"time": 1}}));
+        assert.commandWorked(
+            testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"time": 1}}),
+        );
 
         // In the measurements used for this test, timestamps use either year 2000 or year 2010 so
         // this split key in the year 2005 splits measurements across 2 shards accordingly.
@@ -121,7 +127,10 @@ const setUpShardedTimeseriesCollection = function (collName) {
             }),
         );
         assert.commandWorked(
-            testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"location.shardNumber": 1}}),
+            testDB.adminCommand({
+                shardCollection: testColl.getFullName(),
+                key: {"location.shardNumber": 1},
+            }),
         );
         splitObject = {"meta.shardNumber": 1};
     }
@@ -131,7 +140,10 @@ const setUpShardedTimeseriesCollection = function (collName) {
     // Shard 0 :   2 Corks   |   2 Dublins   |   1 New York City
     // Shard 1 :   2 Dublins |   2 Galways   |   2 New York Citys
     assert.commandWorked(
-        st.s.adminCommand({split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(), middle: splitObject}),
+        st.s.adminCommand({
+            split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+            middle: splitObject,
+        }),
     );
 
     // Move chunks to the other shard.
@@ -154,7 +166,10 @@ const setUpShardedTimeseriesCollection = function (collName) {
         .find({})
         .rawData()
         .toArray();
-    const numBucketDocsOnOtherDB = otherDB[getTimeseriesCollForRawOps(testDB, collName)].find({}).rawData().toArray();
+    const numBucketDocsOnOtherDB = otherDB[getTimeseriesCollForRawOps(testDB, collName)]
+        .find({})
+        .rawData()
+        .toArray();
     assert.gt(
         numBucketDocsOnPrimaryDB.length,
         1,

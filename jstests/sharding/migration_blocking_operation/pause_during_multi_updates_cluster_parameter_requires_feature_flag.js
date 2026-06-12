@@ -27,7 +27,9 @@ const st = new ShardingTest({shards: 1});
     }
 
     assert.commandFailedWithCode(
-        st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}),
+        st.s.adminCommand({
+            setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}},
+        }),
         ErrorCodes.BadValue,
     );
 })();

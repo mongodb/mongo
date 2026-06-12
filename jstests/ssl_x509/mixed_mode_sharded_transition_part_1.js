@@ -14,8 +14,14 @@ import {allowTLS, mixedShardTest, preferTLS} from "jstests/ssl/libs/ssl_helpers.
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-const transitionToX509allowTLS = Object.merge(allowTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
-const transitionToX509preferTLS = Object.merge(preferTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
+const transitionToX509allowTLS = Object.merge(allowTLS, {
+    transitionToAuth: "",
+    clusterAuthMode: "x509",
+});
+const transitionToX509preferTLS = Object.merge(preferTLS, {
+    transitionToAuth: "",
+    clusterAuthMode: "x509",
+});
 
 jsTest.log.info("=== Testing transitionToAuth/allowTLS - transitionToAuth/preferTLS cluster ===");
 mixedShardTest(transitionToX509allowTLS, transitionToX509preferTLS, true);

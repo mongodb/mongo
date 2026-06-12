@@ -40,7 +40,13 @@ const testKillOnClientDisconnect = (conn) => {
     // metric on non-Linux platforms.
     if (isLinux()) {
         assert.soon(() => checkLog.checkContainsOnceJson(conn, 20883)); // Interrupted operation as its client disconnected
-        assert.soon(() => 1 == getConnectionStats(conn)["establishmentRateLimit"]["interruptedDueToClientDisconnect"]);
+        assert.soon(
+            () =>
+                1 ==
+                getConnectionStats(conn)["establishmentRateLimit"][
+                    "interruptedDueToClientDisconnect"
+                ],
+        );
     }
 };
 

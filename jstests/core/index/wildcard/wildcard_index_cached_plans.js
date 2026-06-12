@@ -136,19 +136,29 @@ for (const indexSpec of wildcardIndexes) {
     // Check that indexability discriminators work with collations.
     {
         // Create wildcard index with a collation.
-        assertDropAndRecreateCollection(db, coll.getName(), {collation: {locale: "en_US", strength: 1}});
+        assertDropAndRecreateCollection(db, coll.getName(), {
+            collation: {locale: "en_US", strength: 1},
+        });
         assert.commandWorked(coll.createIndex({"b.$**": 1}));
 
         // Run a query which uses a different collation from that of the index, but does not use
         // string bounds.
-        const queryWithoutStringExplain = coll.explain().find({a: 5, b: 5}).collation({locale: "fr"}).finish();
+        const queryWithoutStringExplain = coll
+            .explain()
+            .find({a: 5, b: 5})
+            .collation({locale: "fr"})
+            .finish();
         let ixScans = getPlanStages(getWinningPlanFromExplain(queryWithoutStringExplain), "IXSCAN");
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.eq(ixScans[0].keyPattern, {$_path: 1, b: 1});
 
         // Run a query which uses a different collation from that of the index and does have string
         // bounds.
-        const queryWithStringExplain = coll.explain().find({a: 5, b: "a string"}).collation({locale: "fr"}).finish();
+        const queryWithStringExplain = coll
+            .explain()
+            .find({a: 5, b: "a string"})
+            .collation({locale: "fr"})
+            .finish();
         ixScans = getPlanStages(getWinningPlanFromExplain(queryWithStringExplain), "IXSCAN");
         assert.eq(ixScans.length, 0);
 
@@ -163,7 +173,9 @@ for (const indexSpec of wildcardIndexes) {
     // Check that indexability discriminators work with partial wildcard indexes.
     {
         assertDropAndRecreateCollection(db, coll.getName());
-        assert.commandWorked(coll.createIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 5}}}));
+        assert.commandWorked(
+            coll.createIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 5}}}),
+        );
 
         // Run a query for a value included by the partial filter expression.
         const queryIndexedExplain = coll.find({a: 4}).explain();
@@ -178,6 +190,9 @@ for (const indexSpec of wildcardIndexes) {
 
         // Check that the shapes are different since the query which searches for a value not
         // included by the partial filter expression won't be eligible to use the $** index.
-        assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain), getPlanCacheKeyFromExplain(queryUnindexedExplain));
+        assert.neq(
+            getPlanCacheKeyFromExplain(queryIndexedExplain),
+            getPlanCacheKeyFromExplain(queryUnindexedExplain),
+        );
     }
 }

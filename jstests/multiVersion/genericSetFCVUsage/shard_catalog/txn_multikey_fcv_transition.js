@@ -61,7 +61,9 @@ function runTxnInsert(collName, doc) {
 }
 
 function setFcv(target) {
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: target, confirm: true}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: target, confirm: true}),
+    );
     rst.awaitReplication();
 }
 
@@ -73,10 +75,15 @@ function createIndexedCollection(collName, idxName, key) {
 
 function assertSetMultikeyMetadataEmitted(idxName, expectedOFCV) {
     const primaryEntries = findSetMultikeyMetadataEntriesFor(primary, idxName);
-    assert.eq(1, primaryEntries.length, "expected exactly one setMultikeyMetadata entry on primary", {
-        idxName,
-        primaryEntries,
-    });
+    assert.eq(
+        1,
+        primaryEntries.length,
+        "expected exactly one setMultikeyMetadata entry on primary",
+        {
+            idxName,
+            primaryEntries,
+        },
+    );
     assert.eq(
         expectedOFCV,
         primaryEntries[0].versionContext && primaryEntries[0].versionContext.OFCV,
@@ -102,10 +109,15 @@ function assertNoopPathTaken(idxName) {
     });
 
     const noopEntries = findNoopMultikeyEntriesFor(primary, idxName);
-    assert.eq(1, noopEntries.length, "expected exactly one noop msg entry when flag disabled by FCV", {
-        idxName,
-        noopEntries,
-    });
+    assert.eq(
+        1,
+        noopEntries.length,
+        "expected exactly one noop msg entry when flag disabled by FCV",
+        {
+            idxName,
+            noopEntries,
+        },
+    );
 }
 
 setFcv(latestFCV);

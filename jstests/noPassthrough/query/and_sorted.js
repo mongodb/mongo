@@ -6,7 +6,9 @@ const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 
 // Enable sort-based index intersection and force index intersections plans.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}),
+);
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
 
@@ -35,7 +37,10 @@ function runAndSortedTests() {
 
         assertArrayEq({actual: queryResult.toArray(), expected: expectedResult});
 
-        assert.eq(shouldUseAndSorted, planHasStage(db, getWinningPlanFromExplain(expl), "AND_SORTED"));
+        assert.eq(
+            shouldUseAndSorted,
+            planHasStage(db, getWinningPlanFromExplain(expl), "AND_SORTED"),
+        );
     }
 
     // Test basic index intersection where we expect AND_SORTED to be used.
@@ -95,7 +100,11 @@ function runAndSortedTests() {
         ],
         shouldUseAndSorted: false,
     });
-    assertAndSortedUsed({query: {e: 1}, expectedResult: [{_id: 8, c: 1, d: 1, e: 1}], shouldUseAndSorted: false});
+    assertAndSortedUsed({
+        query: {e: 1},
+        expectedResult: [{_id: 8, c: 1, d: 1, e: 1}],
+        shouldUseAndSorted: false,
+    });
 
     // Test on an empty collection.
     assert(coll.drop());

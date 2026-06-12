@@ -80,7 +80,9 @@ class Connector {
     static heartbeat(conn, instanceName) {
         const db = conn.getDB(Connector.controlDatabase);
         const coll = db.getCollection(Connector.notificationsCollection);
-        assert.commandWorked(coll.updateOne({_id: instanceName}, {$inc: {heartbeatSeq: 1}}, {upsert: true}));
+        assert.commandWorked(
+            coll.updateOne({_id: instanceName}, {$inc: {heartbeatSeq: 1}}, {upsert: true}),
+        );
     }
 
     /**
@@ -126,7 +128,9 @@ class Connector {
     static notifyDone(conn, instanceName) {
         const db = conn.getDB(Connector.controlDatabase);
         const coll = db.getCollection(Connector.notificationsCollection);
-        assert.commandWorked(coll.updateOne({_id: instanceName}, {$set: {done: true}}, {upsert: true}));
+        assert.commandWorked(
+            coll.updateOne({_id: instanceName}, {$set: {done: true}}, {upsert: true}),
+        );
     }
 
     /**

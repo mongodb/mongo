@@ -123,13 +123,17 @@ export const $config = (function () {
         // sharded clusters.
         if (cluster.isSharded()) {
             cluster.executeOnConfigNodes((db) => {
-                assert.commandWorked(db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
+                assert.commandWorked(
+                    db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}),
+                );
             });
         }
         assert.commandWorked(db.runCommand({create: collName}));
         const docs = [...Array(this.numIds).keys()].map((i) => ({a: i, x: 1}));
         assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
-        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+        assert.commandWorked(
+            db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
+        );
     }
 
     function teardown(db, collName, cluster) {

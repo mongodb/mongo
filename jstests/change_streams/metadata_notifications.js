@@ -74,7 +74,11 @@ let expectedChanges = [
     {operationType: "drop"},
     {operationType: "invalidate"},
 ];
-let changes = cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
+let changes = cst.assertNextChangesEqual({
+    cursor: cursor,
+    expectedChanges: expectedChanges,
+    expectInvalidate: true,
+});
 const resumeToken = changes[0]._id;
 const resumeTokenDrop = changes[3]._id;
 const resumeTokenInvalidate = changes[4]._id;
@@ -125,7 +129,9 @@ assert.commandFailedWithCode(
 
 // Even after the 'invalidate' event has been filtered out, the cursor should hold the resume token
 // of the 'invalidate' event.
-const resumeStream = coll.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: resumeToken});
+const resumeStream = coll.watch([{$match: {operationType: "DummyOperationType"}}], {
+    resumeAfter: resumeToken,
+});
 assert.soon(() => {
     assert(!resumeStream.hasNext());
     return resumeStream.isExhausted();
@@ -171,7 +177,11 @@ if (!FixtureHelpers.isSharded(coll)) {
         },
         {operationType: "invalidate"},
     ];
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
+    cst.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: expectedChanges,
+        expectInvalidate: true,
+    });
 
     coll = testDb["renamed_coll"];
 
@@ -237,7 +247,10 @@ if (!FixtureHelpers.isSharded(coll)) {
 
     // Repeat the test again, this time using the 'dropTarget' option with an existing target
     // collection.
-    cursor = cst.startWatchingChanges({collection: "renamed_coll", pipeline: [{$changeStream: {}}]});
+    cursor = cst.startWatchingChanges({
+        collection: "renamed_coll",
+        pipeline: [{$changeStream: {}}],
+    });
     assert.commandWorked(coll.renameCollection("renamed_coll", true /* dropTarget */));
     expectedChanges = [
         {
@@ -247,7 +260,11 @@ if (!FixtureHelpers.isSharded(coll)) {
         },
         {operationType: "invalidate"},
     ];
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
+    cst.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: expectedChanges,
+        expectInvalidate: true,
+    });
 
     coll = testDb["renamed_coll"];
 
@@ -278,6 +295,10 @@ expectedChanges = [
     },
     {operationType: "invalidate"},
 ];
-cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
+cst.assertNextChangesEqual({
+    cursor: cursor,
+    expectedChanges: expectedChanges,
+    expectInvalidate: true,
+});
 
 cst.cleanUp();

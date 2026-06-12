@@ -80,7 +80,10 @@ const prepareTxnFunc = async function (sessionID) {
 };
 
 let applyFailPoint = configureFailPoint(primary, "hangBeforeSessionCheckOutForApplyPrepare");
-const waitForPrepareTxnShell = startParallelShell(funWithArgs(prepareTxnFunc, sessionID), newPrimary.port);
+const waitForPrepareTxnShell = startParallelShell(
+    funWithArgs(prepareTxnFunc, sessionID),
+    newPrimary.port,
+);
 applyFailPoint.wait();
 
 // Wait so that the update to the config.transactions table from the newly prepared transaction
@@ -101,7 +104,9 @@ waitForPrepareTxnShell();
 waitForTxnShell();
 
 let newPrimaryDB = replTest.getPrimary().getDB("test");
-const commitTimestamp = assert.commandWorked(newPrimaryDB.runCommand({insert: collName, documents: [{}]})).opTime.ts;
+const commitTimestamp = assert.commandWorked(
+    newPrimaryDB.runCommand({insert: collName, documents: [{}]}),
+).opTime.ts;
 
 assert.commandWorked(
     newPrimaryDB.adminCommand({

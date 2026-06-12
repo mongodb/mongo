@@ -31,7 +31,9 @@ assert.commandWorked(
 // Just after midnight on Saturday, April 8, 2023 in GMT, expressed as milliseconds since the epoch.
 const datePrefix = 1680912440;
 for (let i = 0; i < 50; ++i) {
-    assert.commandWorked(coll.insert({_id: i, time: new Date(datePrefix + i * 10), m: "foobar", x: i, y: i * 2}));
+    assert.commandWorked(
+        coll.insert({_id: i, time: new Date(datePrefix + i * 10), m: "foobar", x: i, y: i * 2}),
+    );
 }
 assert.gt(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), 0);
 
@@ -150,7 +152,11 @@ const cacheEntry = testLoweredPipeline({
         },
         {$project: {_id: 1, x: 1}},
     ];
-    checkPipelineUsesCacheEntry({pipeline: pipelineWithDifferentTimeFilter, expectedId: 20, cacheEntry});
+    checkPipelineUsesCacheEntry({
+        pipeline: pipelineWithDifferentTimeFilter,
+        expectedId: 20,
+        cacheEntry,
+    });
 
     const pipelineWithDifferentXFilter = [
         {
@@ -162,7 +168,11 @@ const cacheEntry = testLoweredPipeline({
         },
         {$project: {_id: 1, x: 1}},
     ];
-    checkPipelineUsesCacheEntry({pipeline: pipelineWithDifferentXFilter, expectedId: 21, cacheEntry});
+    checkPipelineUsesCacheEntry({
+        pipeline: pipelineWithDifferentXFilter,
+        expectedId: 21,
+        cacheEntry,
+    });
 }
 
 {

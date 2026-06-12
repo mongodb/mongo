@@ -14,7 +14,9 @@ for (let i = 0; i < 5; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.commandWorked(db.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "alwaysOn"}),
+);
 
 let awaitParallelShell;
 try {
@@ -62,11 +64,21 @@ try {
         collStatsRes.indexBuilds.length,
         "expected to find 2 entries in 'indexBuilds': " + tojson(collStatsRes),
     );
-    assert.eq("a_1", collStatsRes.indexBuilds[0], "expected to find an 'a_1' index build:" + tojson(collStatsRes));
-    assert.eq("b_1", collStatsRes.indexBuilds[1], "expected to find an 'b_1' index build:" + tojson(collStatsRes));
+    assert.eq(
+        "a_1",
+        collStatsRes.indexBuilds[0],
+        "expected to find an 'a_1' index build:" + tojson(collStatsRes),
+    );
+    assert.eq(
+        "b_1",
+        collStatsRes.indexBuilds[1],
+        "expected to find an 'b_1' index build:" + tojson(collStatsRes),
+    );
 } finally {
     // Ensure the failpoint is unset, even if there are assertion failures, so that we do not
     // hang the test/mongod.
-    assert.commandWorked(db.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "off"}),
+    );
     awaitParallelShell();
 }

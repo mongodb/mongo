@@ -40,7 +40,10 @@ const testOptions = function ({
     fixture.setUp(testDB, collName);
 
     const create = function () {
-        return testDB.createCollection(collName, Object.extend({timeseries: timeseriesOptions}, createOptions));
+        return testDB.createCollection(
+            collName,
+            Object.extend({timeseries: timeseriesOptions}, createOptions),
+        );
     };
     const res = create();
 
@@ -50,7 +53,8 @@ const testOptions = function ({
         // Test that the creation is idempotent.
         assert.commandWorked(create());
 
-        const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
+        const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor
+            .firstBatch;
 
         const tsColl = collections.find((coll) => coll.name == collName);
         assert(tsColl, collections);
@@ -59,7 +63,9 @@ const testOptions = function ({
             assert.eq(tsColl.options.expireAfterSeconds, createOptions.expireAfterSeconds, tsColl);
         }
 
-        const bucketsColl = collections.find((coll) => coll.name == getTimeseriesBucketsColl(collName));
+        const bucketsColl = collections.find(
+            (coll) => coll.name == getTimeseriesBucketsColl(collName),
+        );
         assertOnlyForViewlessTimeseries(testDB, !bucketsColl, collections);
         if (bucketsColl) {
             assert.eq(bucketsColl.type, "collection", bucketsColl);
@@ -72,10 +78,13 @@ const testOptions = function ({
         // collection already exists with the same name but without those additional options.
         if (
             optionsAffectStorage &&
-            (Object.entries(createOptions).length > 0 || Object.entries(timeseriesOptions).length > 1)
+            (Object.entries(createOptions).length > 0 ||
+                Object.entries(timeseriesOptions).length > 1)
         ) {
             assert.commandWorked(
-                testDB.createCollection(collName, {timeseries: {timeField: timeseriesOptions["timeField"]}}),
+                testDB.createCollection(collName, {
+                    timeseries: {timeField: timeseriesOptions["timeField"]},
+                }),
             );
             assert.commandFailedWithCode(create(), ErrorCodes.NamespaceExists);
 
@@ -95,14 +104,20 @@ const testValidTimeseriesOptions = function (timeseriesOptions) {
     testOptions({errorCode: null, timeseriesOptions: timeseriesOptions});
 };
 
-const testInvalidTimeseriesOptions = function (timeseriesOptions, errorCode = ErrorCodes.InvalidOptions) {
+const testInvalidTimeseriesOptions = function (
+    timeseriesOptions,
+    errorCode = ErrorCodes.InvalidOptions,
+) {
     testOptions({
         errorCode: errorCode,
         timeseriesOptions: timeseriesOptions,
     });
 };
 
-const testIncompatibleCreateOptions = function (createOptions, errorCode = ErrorCodes.InvalidOptions) {
+const testIncompatibleCreateOptions = function (
+    createOptions,
+    errorCode = ErrorCodes.InvalidOptions,
+) {
     testOptions({
         errorCode: errorCode,
         createOptions: createOptions,
@@ -120,7 +135,11 @@ const testCompatibleCreateOptions = function (createOptions, optionsAffectStorag
 testValidTimeseriesOptions({timeField: timeFieldName});
 testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName});
 testValidTimeseriesOptions({timeField: timeFieldName, granularity: "minutes"});
-testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName, granularity: "minutes"});
+testValidTimeseriesOptions({
+    timeField: timeFieldName,
+    metaField: metaFieldName,
+    granularity: "minutes",
+});
 
 // Granularity can include a corresponding bucketMaxSpanSeconds value, but not a
 // bucketRoundingSeconds value (even if the value corresponds to the granularity).
@@ -156,24 +175,46 @@ testValidTimeseriesOptions({
     bucketMaxSpanSeconds: 60 * 60 * 24 * 30,
 });
 
-testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName, granularity: "minutes"});
-testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName, granularity: "hours"});
+testValidTimeseriesOptions({
+    timeField: timeFieldName,
+    metaField: metaFieldName,
+    granularity: "minutes",
+});
+testValidTimeseriesOptions({
+    timeField: timeFieldName,
+    metaField: metaFieldName,
+    granularity: "hours",
+});
 
 testInvalidTimeseriesOptions("", ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: 100}, ErrorCodes.TypeMismatch);
 
-testInvalidTimeseriesOptions({timeField: timeFieldName, invalidOption: {}}, ErrorCodes.IDLUnknownField);
+testInvalidTimeseriesOptions(
+    {timeField: timeFieldName, invalidOption: {}},
+    ErrorCodes.IDLUnknownField,
+);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
-testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
-testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: timeFieldName}, ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions(
+    {timeField: timeFieldName, metaField: "sub.meta"},
+    ErrorCodes.InvalidOptions,
+);
+testInvalidTimeseriesOptions(
+    {timeField: timeFieldName, metaField: timeFieldName},
+    ErrorCodes.InvalidOptions,
+);
 
 testInvalidTimeseriesOptions(
     {timeField: timeFieldName, metaField: metaFieldName, bucketMaxSpanSeconds: 10},
     bucketMaxSpanSecondsError,
 );
 testInvalidTimeseriesOptions(
-    {timeField: timeFieldName, metaField: metaFieldName, granularity: "minutes", bucketMaxSpanSeconds: 3600},
+    {
+        timeField: timeFieldName,
+        metaField: metaFieldName,
+        granularity: "minutes",
+        bucketMaxSpanSeconds: 3600,
+    },
     bucketMaxSpanSecondsError,
 );
 
@@ -183,16 +224,22 @@ testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: "t\0ag"}, Err
 
 testCompatibleCreateOptions({expireAfterSeconds: NumberLong(100)});
 testCompatibleCreateOptions({storageEngine: {}}, false);
-if (TestData.storageEngine !== undefined) testCompatibleCreateOptions({storageEngine: {[TestData.storageEngine]: {}}});
+if (TestData.storageEngine !== undefined)
+    testCompatibleCreateOptions({storageEngine: {[TestData.storageEngine]: {}}});
 testCompatibleCreateOptions({indexOptionDefaults: {}}, false);
 if (TestData.storageEngine !== undefined)
-    testCompatibleCreateOptions({indexOptionDefaults: {storageEngine: {[TestData.storageEngine]: {}}}});
+    testCompatibleCreateOptions({
+        indexOptionDefaults: {storageEngine: {[TestData.storageEngine]: {}}},
+    });
 testCompatibleCreateOptions({collation: {locale: "ja"}});
 testCompatibleCreateOptions({writeConcern: {}}, false);
 testCompatibleCreateOptions({comment: ""}, false);
 
 testIncompatibleCreateOptions({expireAfterSeconds: NumberLong(-10)}, ErrorCodes.InvalidOptions);
-testIncompatibleCreateOptions({expireAfterSeconds: NumberLong("4611686018427387904")}, ErrorCodes.InvalidOptions);
+testIncompatibleCreateOptions(
+    {expireAfterSeconds: NumberLong("4611686018427387904")},
+    ErrorCodes.InvalidOptions,
+);
 testIncompatibleCreateOptions({expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
 testIncompatibleCreateOptions({capped: true, size: 100});
 testIncompatibleCreateOptions({capped: true, max: 100});

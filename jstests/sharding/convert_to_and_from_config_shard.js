@@ -46,7 +46,8 @@ const checkBasicCRUD = function (coll, _id) {
     const numRetries = 99999;
     const NUM_NODES = 3;
 
-    const retryableFindOne = (coll, filter) => retryOnRetryableError(() => coll.findOne(filter), numRetries, sleepMs);
+    const retryableFindOne = (coll, filter) =>
+        retryOnRetryableError(() => coll.findOne(filter), numRetries, sleepMs);
 
     const doc = retryableFindOne(coll, {_id: _id, y: {$exists: false}});
     assert.neq(null, doc);
@@ -85,20 +86,33 @@ jsTestLog("Starting background CRUD operations on the replica set.");
 // be retried until they succeed.
 TestData.overrideRetryAttempts = 99999;
 const replStopLatch = new CountDownLatch(1);
-let replThread = new Thread(checkCRUDThread, replSet.getURL(), unshardedNs, _id, replStopLatch, checkBasicCRUD);
+let replThread = new Thread(
+    checkCRUDThread,
+    replSet.getURL(),
+    unshardedNs,
+    _id,
+    replStopLatch,
+    checkBasicCRUD,
+);
 replThread.start();
 
 jsTestLog("Restarting secondaries with --configsvr.");
 const secondaries = replSet.getSecondaries();
 secondaries.forEach((secondary) => {
     // TODO SERVER-88880: Remove feature flag.
-    replSet.restart(secondary, {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: true}});
+    replSet.restart(secondary, {
+        configsvr: "",
+        setParameter: {featureFlagTransitionToCatalogShard: true},
+    });
 });
 
 jsTestLog("Restarting primary with --configsvr and waiting for new primary.");
 let primary = replSet.getPrimary();
 // TODO SERVER-88880: Remove feature flag.
-replSet.restart(primary, {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: true}});
+replSet.restart(primary, {
+    configsvr: "",
+    setParameter: {featureFlagTransitionToCatalogShard: true},
+});
 replSet.awaitNodesAgreeOnPrimary();
 
 jsTestLog("Starting a mongos.");
@@ -169,7 +183,9 @@ mongos.adminCommand({addShard: newShard.getURL(), name: "toRemoveLater"});
 
 jsTestLog("Moving chunks to second shard.");
 for (let x = 0; x < 2; x++) {
-    assert.commandWorked(mongos.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}),
+    );
 }
 
 jsTestLog("Removing second shard.");

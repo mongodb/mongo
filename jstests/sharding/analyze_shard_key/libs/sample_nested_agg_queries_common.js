@@ -25,13 +25,23 @@ export const outerAggTestCases = [
         name: "lookup_non_custom_pipeline",
         supportCustomPipeline: false,
         makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{$lookup: {from: foreignCollName, as: "joined", localField: "a", foreignField: "x"}}];
+            return [
+                {
+                    $lookup: {
+                        from: foreignCollName,
+                        as: "joined",
+                        localField: "a",
+                        foreignField: "x",
+                    },
+                },
+            ];
         },
         requireShardToRouteFunc: (db, collName, isShardedColl) => {
             // When SBE is used, the shard will not create a separate pipeline to execute the
             // inner side of a $lookup stage so there is no nested aggregate query to route,
             // because SBE does $lookup pushdown whereas Classic does not.
-            const isEligibleForSBELookupPushdown = !isShardedColl && checkSbeRestrictedOrFullyEnabled(db);
+            const isEligibleForSBELookupPushdown =
+                !isShardedColl && checkSbeRestrictedOrFullyEnabled(db);
             return !isEligibleForSBELookupPushdown;
         },
     },
@@ -253,7 +263,12 @@ export function testCustomInnerPipeline(
     const collation = QuerySamplingUtil.generateRandomCollation();
     const innerPipeline = makeInnerPipelineFunc(filter);
     const outerPipeline = makeOuterPipelineFunc(localCollName, foreignCollName, innerPipeline);
-    const originalCmdObj = {aggregate: localCollName, pipeline: outerPipeline, collation, cursor: {}};
+    const originalCmdObj = {
+        aggregate: localCollName,
+        pipeline: outerPipeline,
+        collation,
+        cursor: {},
+    };
 
     jsTest.log("Testing command " + tojsononeline({originalCmdObj, explain}));
     assert.commandWorked(mongosDB.runCommand(explain ? {explain: originalCmdObj} : originalCmdObj));
@@ -305,7 +320,12 @@ export function testNoCustomInnerPipeline(
 
     const collation = QuerySamplingUtil.generateRandomCollation();
     const outerPipeline = makeOuterPipelineFunc(localCollName, foreignCollName);
-    const originalCmdObj = {aggregate: localCollName, pipeline: outerPipeline, collation, cursor: {}};
+    const originalCmdObj = {
+        aggregate: localCollName,
+        pipeline: outerPipeline,
+        collation,
+        cursor: {},
+    };
 
     jsTest.log("Testing command " + tojsononeline({originalCmdObj, explain}));
     assert.commandWorked(mongosDB.runCommand(explain ? {explain: originalCmdObj} : originalCmdObj));

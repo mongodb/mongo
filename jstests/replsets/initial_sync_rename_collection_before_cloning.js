@@ -100,8 +100,16 @@ const secondary_db0 = secondary.getDB(db0_name);
 const secondary_db1 = secondary.getDB(db1_name);
 
 jsTestLog("Check that collection was renamed correctly on the secondary");
-assert.eq(secondary_db0[collWithinFinal_name].find().itcount(), 1, "renamed collection does not exist");
-assert.eq(secondary_db1[collAcrossFinal_name].find().itcount(), 1, "renamed_across collection does not exist");
+assert.eq(
+    secondary_db0[collWithinFinal_name].find().itcount(),
+    1,
+    "renamed collection does not exist",
+);
+assert.eq(
+    secondary_db1[collAcrossFinal_name].find().itcount(),
+    1,
+    "renamed_across collection does not exist",
+);
 assert.eq(
     secondary_db0[collRenameWithinDB_name].find().itcount(),
     0,

@@ -8,7 +8,8 @@ const topology = DiscoverTopology.findConnectedNodes(conn);
 
 if (topology.type !== Topology.kShardedCluster) {
     throw new Error(
-        "Cluster index consistency check must be run against a sharded cluster, but got: " + tojson(topology),
+        "Cluster index consistency check must be run against a sharded cluster, but got: " +
+            tojson(topology),
     );
 }
 ClusterIndexConsistencyChecker.run(db.getMongo(), globalThis.keyFile);

@@ -57,8 +57,14 @@ assert.commandWorked(coll2.insert({x: 1}));
     assert.commandWorked(st.moveChunk(ns2, {x: 1}, st.shard0.shardName));
 
     // A non-transactional agg should find: a:1 matches x:1
-    const lookupPipeline = [{$lookup: {from: collName2, localField: "a", foreignField: "x", as: "result"}}];
-    let firstResult = st.s.getDB(dbName).getCollection(collName1).aggregate(lookupPipeline).toArray();
+    const lookupPipeline = [
+        {$lookup: {from: collName2, localField: "a", foreignField: "x", as: "result"}},
+    ];
+    let firstResult = st.s
+        .getDB(dbName)
+        .getCollection(collName1)
+        .aggregate(lookupPipeline)
+        .toArray();
     jsTest.log("First aggregation result: " + tojson(firstResult));
     assert.eq(1, firstResult[0].result.length, "First lookup should find match for a:1 with x:1");
 

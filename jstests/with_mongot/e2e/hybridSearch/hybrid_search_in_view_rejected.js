@@ -21,7 +21,9 @@ assert.commandWorked(coll.insertMany(getMovieData()));
 createSearchIndex(coll, getMovieSearchIndexSpec());
 createSearchIndex(coll, getMovieVectorSearchIndexSpec());
 
-const rankFusionPipelineWithoutSearch = [{$rankFusion: {input: {pipelines: {a: [{$sort: {x: 1}}]}}}}];
+const rankFusionPipelineWithoutSearch = [
+    {$rankFusion: {input: {pipelines: {a: [{$sort: {x: 1}}]}}}},
+];
 const scoreFusionPipelineWithoutSearch = [
     {
         $scoreFusion: {
@@ -122,19 +124,34 @@ function assertViewsWithRankFusionOrScoreFusionFail(
 
 function runTest(viewName, pipelineWithoutSearch, pipelineWithSearch) {
     // First test that creating a view with $rankFusion/$scoreFusion on the collection is rejected.
-    assertViewsWithRankFusionOrScoreFusionFail(collName, viewName, pipelineWithoutSearch, pipelineWithSearch);
+    assertViewsWithRankFusionOrScoreFusionFail(
+        collName,
+        viewName,
+        pipelineWithoutSearch,
+        pipelineWithSearch,
+    );
 
     // Then test that a $rankFusion/$scoreFusion view on top of a nested identity view is also
     // rejected.
     const identityViewName = jsTestName() + "_identity_view";
     assert.commandWorked(db.createView(identityViewName, collName, []));
-    assertViewsWithRankFusionOrScoreFusionFail(identityViewName, viewName, pipelineWithoutSearch, pipelineWithSearch);
+    assertViewsWithRankFusionOrScoreFusionFail(
+        identityViewName,
+        viewName,
+        pipelineWithoutSearch,
+        pipelineWithSearch,
+    );
 
     // Lastly test that a $rankFusion/$scoreFusion view on top of a nested non-identity view is also
     // rejected.
     const nestedViewName = jsTestName() + "_view";
     assert.commandWorked(db.createView(nestedViewName, collName, [{$match: {genres: "Fantasy"}}]));
-    assertViewsWithRankFusionOrScoreFusionFail(nestedViewName, viewName, pipelineWithoutSearch, pipelineWithSearch);
+    assertViewsWithRankFusionOrScoreFusionFail(
+        nestedViewName,
+        viewName,
+        pipelineWithoutSearch,
+        pipelineWithSearch,
+    );
 }
 
 runTest("rank_fusion_view", rankFusionPipelineWithoutSearch, rankFusionPipelineWithSearch);

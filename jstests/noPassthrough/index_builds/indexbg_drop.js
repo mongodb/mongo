@@ -47,7 +47,9 @@ for (i = 0; i < size; ++i) {
 }
 assert.commandWorked(bulk.execute({w: 2, wtimeout: replTest.timeoutMS}));
 
-assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}),
+);
 
 jsTest.log("Starting background indexing for test of: " + tojson(dc));
 
@@ -64,7 +66,9 @@ jsTest.log("Dropping indexes");
 primaryDB.runCommand({dropIndexes: collection, index: "*"});
 
 jsTest.log("Waiting on replication");
-assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+assert.commandWorked(
+    secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}),
+);
 replTest.awaitReplication();
 
 print("Index list on primary:");

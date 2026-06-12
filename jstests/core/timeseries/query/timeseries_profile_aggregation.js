@@ -25,7 +25,9 @@ const testDB = db.getSiblingDB(dbName);
 const tsColl = testDB.getCollection(tsCollName);
 
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 tsColl.drop();
@@ -72,5 +74,8 @@ if (isViewfulTimeseriesOnlySuite(db)) {
     let tsResolvedViewObj = profileObj.resolvedViews[0];
 
     assert.eq(tsResolvedViewObj.viewNamespace, tsColl.getFullName());
-    assert.eq(tsResolvedViewObj.dependencyChain, [tsCollName, getTimeseriesBucketsColl(tsCollName)]);
+    assert.eq(tsResolvedViewObj.dependencyChain, [
+        tsCollName,
+        getTimeseriesBucketsColl(tsCollName),
+    ]);
 }

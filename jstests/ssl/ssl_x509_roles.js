@@ -107,7 +107,10 @@ jsTest.log.info("1. Testing x.509 auth to mongod");
 jsTest.log.info("2. Testing disabling x.509 auth with roles");
 {
     const mongo = MongoRunner.runMongod(
-        Object.merge(x509_options, {auth: "", setParameter: {allowRolesFromX509Certificates: false}}),
+        Object.merge(x509_options, {
+            auth: "",
+            setParameter: {allowRolesFromX509Certificates: false},
+        }),
     );
 
     prepConn(mongo);
@@ -138,7 +141,9 @@ jsTest.log.info("3. Testing x.509 auth to mongos");
 
 jsTest.log.info("4. Testing x.509 auth to mongos with x509 roles disabled");
 {
-    const localOptions = Object.merge(x509_options, {setParameter: {allowRolesFromX509Certificates: false}});
+    const localOptions = Object.merge(x509_options, {
+        setParameter: {allowRolesFromX509Certificates: false},
+    });
     let st = new ShardingTest({
         shards: 1,
         mongos: 1,
@@ -255,7 +260,9 @@ if (!isWindows && !jsTestOptions().shellGRPC) {
         const kSocketPrefix = `${MongoRunner.dataDir}/proxy_roles_disabled_mongos_sockets`;
         mkdir(kSocketPrefix);
 
-        const localOptions = Object.merge(x509_options, {setParameter: {allowRolesFromX509Certificates: false}});
+        const localOptions = Object.merge(x509_options, {
+            setParameter: {allowRolesFromX509Certificates: false},
+        });
         let st = new ShardingTest({
             shards: 1,
             mongos: 1,

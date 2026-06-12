@@ -93,7 +93,9 @@ function assertExpected(op, sortSpec, expectedResults) {
                 $bucketAuto: {
                     groupBy: "$state",
                     buckets: 10 * 1000,
-                    output: {associates: buildTopNBottomNSpec(op, sortSpec, "$associate", defaultN)},
+                    output: {
+                        associates: buildTopNBottomNSpec(op, sortSpec, "$associate", defaultN),
+                    },
                 },
             },
             {$project: {_id: "$_id.min", associates: 1}},
@@ -146,7 +148,12 @@ for (const doc of combinedGroup) {
 
 assert.eq(
     [bottomAsc, bottomDesc, topAsc, topDesc],
-    [expectedBottomNAscResults, expectedBottomNDescResults, expectedTopNAscResults, expectedTopNDescResults],
+    [
+        expectedBottomNAscResults,
+        expectedBottomNDescResults,
+        expectedTopNAscResults,
+        expectedTopNDescResults,
+    ],
 );
 
 // Verify that we can dynamically compute 'n' based on the group key for $group.
@@ -158,7 +165,9 @@ const dynamicBottomNResults = coll
         {
             $group: {
                 _id: {"st": "$state"},
-                bottomAssociates: {$bottomN: {output: "$associate", n: groupKeyNExpr, sortBy: {sales: 1}}},
+                bottomAssociates: {
+                    $bottomN: {output: "$associate", n: groupKeyNExpr, sortBy: {sales: 1}},
+                },
             },
         },
     ])
@@ -204,7 +213,9 @@ assert.commandFailedWithCode(
                     groupBy: "$state",
                     buckets: 2,
                     output: {
-                        bottomAssociates: {$bottomN: {output: "$associate", n: groupKeyNExpr, sortBy: {sales: 1}}},
+                        bottomAssociates: {
+                            $bottomN: {output: "$associate", n: groupKeyNExpr, sortBy: {sales: 1}},
+                        },
                     },
                 },
             },
@@ -278,7 +289,10 @@ for (const nVal of [defaultN, largestInt]) {
             const cmpResult = isAsc ? first < second : first > second;
             assert(
                 cmpResult,
-                "Incorrect order from accumulator corresponding to field '" + fieldName + "'; results: " + tojson(arr),
+                "Incorrect order from accumulator corresponding to field '" +
+                    fieldName +
+                    "'; results: " +
+                    tojson(arr),
             );
         };
 
@@ -396,12 +410,17 @@ assert.eq(aAscendingBDescending, actualAAscendingBDescending[0]["sorted"]);
 assert(coll.drop());
 assert.commandWorked(
     coll.insertMany(
-        ["apples apples pears", "pears pears", "apples apples apples", "apples doughnuts"].map((text) => ({text})),
+        ["apples apples pears", "pears pears", "apples apples apples", "apples doughnuts"].map(
+            (text) => ({text}),
+        ),
     ),
 );
 assert.commandWorked(coll.createIndex({text: "text"}));
 const sortStageResult = coll
-    .aggregate([{$match: {$text: {$search: "apples pears"}}}, {$sort: {text: {$meta: "textScore"}}}])
+    .aggregate([
+        {$match: {$text: {$search: "apples pears"}}},
+        {$sort: {text: {$meta: "textScore"}}},
+    ])
     .toArray()
     .map((doc) => doc["text"]);
 const testOperatorText = (op) => {

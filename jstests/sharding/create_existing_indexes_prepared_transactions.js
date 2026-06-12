@@ -33,8 +33,12 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
 
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}),
+);
 
 const session = st.s.getDB(dbName).getMongo().startSession({causalConsistency: false});
 let sessionDB = session.getDatabase(dbName);
@@ -45,7 +49,12 @@ let sessionColl = sessionDB[collName];
     withAbortAndRetryOnTransientTxnError(session, () => {
         session.startTransaction({writeConcern: {w: "majority"}});
 
-        assert.commandWorked(sessionColl.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+        assert.commandWorked(
+            sessionColl.runCommand({
+                createIndexes: collName,
+                indexes: [{key: {a: 1}, name: "a_1"}],
+            }),
+        );
         // Perform cross-shard writes to execute prepare path.
         assert.commandWorked(sessionColl.insert({_id: -1, m: -1}));
         assert.commandWorked(sessionColl.insert({_id: +1, m: +1}));
@@ -69,12 +78,18 @@ let sessionColl = sessionDB[collName];
         session.startTransaction({writeConcern: {w: "majority"}});
 
         assert.commandFailedWithCode(
-            sessionColl.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
+            sessionColl.runCommand({
+                createIndexes: collName,
+                indexes: [{key: {a: 1}, name: "a_1"}],
+            }),
             ErrorCodes.OperationNotSupportedInTransaction,
         );
     });
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 }
 
 // Resolve index inconsistency to pass consistency checks.

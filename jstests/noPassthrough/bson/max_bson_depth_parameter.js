@@ -36,7 +36,15 @@ assert.commandFailedWithCode(
     testDB.runCommand({
         aggregate: "coll1",
         pipeline: (function nestedPipeline(depth) {
-            return [{$lookup: {from: "coll2", as: "as", pipeline: depth > 3 ? nestedPipeline(depth - 3) : []}}];
+            return [
+                {
+                    $lookup: {
+                        from: "coll2",
+                        as: "as",
+                        pipeline: depth > 3 ? nestedPipeline(depth - 3) : [],
+                    },
+                },
+            ];
         })(maxBSONDepth),
         cursor: {},
     }),

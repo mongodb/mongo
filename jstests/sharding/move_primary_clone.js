@@ -22,7 +22,11 @@ function getCollections(shard) {
 
 function checkOptions(c, expectedOptions) {
     assert.hasFields(c, ["options"], "Missing options field for collection " + c.name);
-    assert.hasFields(c.options, expectedOptions, "Missing expected option(s) for collection " + c.name);
+    assert.hasFields(
+        c.options,
+        expectedOptions,
+        "Missing expected option(s) for collection " + c.name,
+    );
 }
 
 function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, fooUUID) {
@@ -30,7 +34,11 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, f
     [c1, c2] = getCollections(toShard);
 
     function checkName(c, expectedName) {
-        assert.eq(c.name, expectedName, "Expected collection to be " + expectedName + ", got " + c.name);
+        assert.eq(
+            c.name,
+            expectedName,
+            "Expected collection to be " + expectedName + ", got " + c.name,
+        );
     }
 
     function checkUUIDsEqual(c, expectedUUID) {
@@ -45,7 +53,9 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, f
         assert.neq(
             c.info.uuid,
             originalUUID,
-            "UUID for " + c.name + " should be different than the original collection but is the same",
+            "UUID for " +
+                c.name +
+                " should be different than the original collection but is the same",
         );
     }
 
@@ -155,13 +165,19 @@ function movePrimaryWithFailpoint(sharded) {
     let foouuid = fromColls[1].info.uuid;
 
     assert.commandWorked(
-        toShard.getDB("admin").runCommand({configureFailPoint: "movePrimaryFailPoint", mode: "alwaysOn"}),
+        toShard
+            .getDB("admin")
+            .runCommand({configureFailPoint: "movePrimaryFailPoint", mode: "alwaysOn"}),
     );
 
     // Failpoint will cause movePrimary to fail after the first collection has been copied over
     assert.commandFailed(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
 
-    assert.commandWorked(toShard.getDB("admin").runCommand({configureFailPoint: "movePrimaryFailPoint", mode: "off"}));
+    assert.commandWorked(
+        toShard
+            .getDB("admin")
+            .runCommand({configureFailPoint: "movePrimaryFailPoint", mode: "off"}),
+    );
 
     if (sharded || tracked.includes(true)) {
         // If the collections are sharded or tracked, the UUID of the collection on the donor should
@@ -171,7 +187,9 @@ function movePrimaryWithFailpoint(sharded) {
 
         // Now change an option on the toShard, and verify that calling clone again succeeds
         // when the options don't match.
-        assert.commandWorked(toShard.getDB("test1").runCommand({collMod: "bar", validationLevel: "moderate"}));
+        assert.commandWorked(
+            toShard.getDB("test1").runCommand({collMod: "bar", validationLevel: "moderate"}),
+        );
         assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: fromShard.name}));
 
         // Assert that the fromShard does not have the new options, but the toShard does

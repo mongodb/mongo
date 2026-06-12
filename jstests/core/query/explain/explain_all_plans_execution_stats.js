@@ -23,7 +23,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
             {a: 2, b: 2},
         ]),
     );
-    const agg = [{$match: {a: 1, b: 1}}, {$group: {_id: null, sum_a: {$sum: "$a"}, sum_b: {$sum: "$b"}}}];
+    const agg = [
+        {$match: {a: 1, b: 1}},
+        {$group: {_id: null, sum_a: {$sum: "$a"}, sum_b: {$sum: "$b"}}},
+    ];
 
     const explainAllPlans = coll.explain("allPlansExecution").aggregate(agg);
     assert.commandWorked(explainAllPlans);
@@ -45,7 +48,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
                 );
             }
             if (executionStatsAllShards[i].totalKeysExamined) {
-                assert(rejectedPlans[j].totalKeysExamined > 0, "did not examine any keys" + tojson(rejectedPlans[j]));
+                assert(
+                    rejectedPlans[j].totalKeysExamined > 0,
+                    "did not examine any keys" + tojson(rejectedPlans[j]),
+                );
             }
         }
     }

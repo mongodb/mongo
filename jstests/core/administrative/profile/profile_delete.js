@@ -19,7 +19,10 @@
 
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
-import {getLatestProfilerEntry, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {
+    getLatestProfilerEntry,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 
 // Setup test db and collection.
 const testDB = db.getSiblingDB("profile_delete");
@@ -30,12 +33,16 @@ const coll = testDB.getCollection(collName);
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.setProfilingLevel(1, {
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 // Increase this deadline in order to prevent flakiness in this test.
 assert.commandWorked(
-    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    testDB
+        .getSiblingDB("admin")
+        .runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
 );
 
 //
@@ -95,7 +102,11 @@ assert.commandWorked(coll.insert(docs));
 
 testComment = "test2";
 assert.commandWorked(
-    testDB.runCommand({delete: collName, deletes: [{q: {a: {$gte: 2}}, limit: 0}], comment: testComment}),
+    testDB.runCommand({
+        delete: collName,
+        deletes: [{q: {a: {$gte: 2}}, limit: 0}],
+        comment: testComment,
+    }),
 );
 
 profileObj = getLatestProfilerEntry(testDB, {"command.comment": testComment});
@@ -120,7 +131,11 @@ assert.commandWorked(coll.insert(docs));
 
 testComment = "test3";
 assert.commandWorked(
-    testDB.runCommand({delete: collName, deletes: [{q: {a: 3, b: 3}, limit: 0}], comment: testComment}),
+    testDB.runCommand({
+        delete: collName,
+        deletes: [{q: {a: 3, b: 3}, limit: 0}],
+        comment: testComment,
+    }),
 );
 
 profileObj = getLatestProfilerEntry(testDB, {"command.comment": testComment});
@@ -153,4 +168,7 @@ assert.commandFailedWithCode(deleteResult, ErrorCodes.MaxTimeMSExpired);
 // Depending on where in the command path the maxTimeMS timeout occurs we will either forego writing
 // a document to the system.profile collection or we will write the delete command entry that
 // reflects failed command execution.
-profilerHasZeroMatchingEntriesOrThrow({profileDB: testDB, filter: {"command.comment": testComment, "ok": 1}});
+profilerHasZeroMatchingEntriesOrThrow({
+    profileDB: testDB,
+    filter: {"command.comment": testComment, "ok": 1},
+});

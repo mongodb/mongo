@@ -43,18 +43,32 @@ const closedBucketFilter = {
 function getDeletePlanStage(explain, expectedDeleteStageName) {
     const winningPlan = getWinningPlanFromExplain(explain);
     const deleteStages = getPlanStages(winningPlan, expectedDeleteStageName);
-    assert.gt(deleteStages.length, 0, `${expectedDeleteStageName} stage not found in the plan: ${tojson(explain)}`);
+    assert.gt(
+        deleteStages.length,
+        0,
+        `${expectedDeleteStageName} stage not found in the plan: ${tojson(explain)}`,
+    );
     return deleteStages[0];
 }
 
 function verifyQueryPlannerOutput(
     explain,
-    {expectedDeleteStageName, expectedOpType, expectedBucketFilter, expectedResidualFilter, expectedUsedIndexName},
+    {
+        expectedDeleteStageName,
+        expectedOpType,
+        expectedBucketFilter,
+        expectedResidualFilter,
+        expectedUsedIndexName,
+    },
 ) {
     const deleteStage = getDeletePlanStage(explain, expectedDeleteStageName);
 
     if (expectedDeleteStageName === "TS_MODIFY") {
-        assert.eq(expectedOpType, deleteStage.opType, `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`);
+        assert.eq(
+            expectedOpType,
+            deleteStage.opType,
+            `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`,
+        );
         assert.eq(
             expectedBucketFilter,
             deleteStage.bucketFilter,
@@ -68,19 +82,30 @@ function verifyQueryPlannerOutput(
     } else {
         const collScanStage = getPlanStage(deleteStage, "COLLSCAN");
         assert.neq(null, collScanStage, `COLLSCAN stage not found in the plan: ${tojson(explain)}`);
-        assert.eq(expectedBucketFilter, collScanStage.filter, `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
+        assert.eq(
+            expectedBucketFilter,
+            collScanStage.filter,
+            `COLLSCAN filter is wrong: ${tojson(collScanStage)}`,
+        );
     }
 
     if (expectedUsedIndexName) {
         const ixscanStage = getPlanStage(deleteStage, "IXSCAN");
         assert.neq(null, ixscanStage, `IXSCAN stage not found in plan: ${tojson(explain)}`);
-        assert.eq(expectedUsedIndexName, ixscanStage.indexName, `Wrong index used: ${tojson(ixscanStage)}`);
+        assert.eq(
+            expectedUsedIndexName,
+            ixscanStage.indexName,
+            `Wrong index used: ${tojson(ixscanStage)}`,
+        );
     }
 }
 
 // In sharded clusters, execution stats contain per-shard results. Validate each stage name and
 // sum metrics across shards.
-function verifyExecutionStatsOutput(explain, {expectedDeleteStageName, expectedNumDeleted, expectedNumUnpacked}) {
+function verifyExecutionStatsOutput(
+    explain,
+    {expectedDeleteStageName, expectedNumDeleted, expectedNumUnpacked},
+) {
     const execStages = getExecutionStages(explain);
     assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
 
@@ -99,9 +124,17 @@ function verifyExecutionStatsOutput(explain, {expectedDeleteStageName, expectedN
             totalDeleted += stage.nWouldDelete;
         }
     }
-    assert.eq(expectedNumDeleted, totalDeleted, `Got wrong total deleted count: ${tojson(execStages)}`);
+    assert.eq(
+        expectedNumDeleted,
+        totalDeleted,
+        `Got wrong total deleted count: ${tojson(execStages)}`,
+    );
     if (expectedNumUnpacked !== null) {
-        assert.eq(expectedNumUnpacked, totalUnpacked, `Got wrong nBucketsUnpacked: ${tojson(execStages)}`);
+        assert.eq(
+            expectedNumUnpacked,
+            totalUnpacked,
+            `Got wrong nBucketsUnpacked: ${tojson(execStages)}`,
+        );
     }
 }
 
@@ -120,7 +153,9 @@ function testDeleteExplain({
     // Prepares a timeseries collection.
     const collName = `${jsTestName()}_${testCaseId++}`;
     assert.commandWorked(
-        testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(collName, {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     let coll = testDB[collName];
@@ -154,7 +189,11 @@ function testDeleteExplain({
     });
     verifyExecutionStatsOutput(executionStatsExplain, expectations);
 
-    assert.sameMembers(docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
+    assert.sameMembers(
+        docs,
+        coll.find().toArray(),
+        "Explain command must not touch documents in the collection",
+    );
 }
 
 (function testDeleteManyWithEmptyQuery() {
@@ -182,7 +221,11 @@ function testDeleteExplain({
         expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteMany",
         expectedBucketFilter: {
-            $and: [closedBucketFilter, {meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 3}}],
+            $and: [
+                closedBucketFilter,
+                {meta: {$eq: 2}},
+                {"control.max._id": {$_internalExprGte: 3}},
+            ],
         },
         expectedResidualFilter: {_id: {$gte: 3}},
         expectedNumDeleted: 2,
@@ -200,7 +243,9 @@ function testDeleteExplain({
         },
         expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteMany",
-        expectedBucketFilter: {$and: [closedBucketFilter, {"control.min._id": {$_internalExprLte: 3}}]},
+        expectedBucketFilter: {
+            $and: [closedBucketFilter, {"control.min._id": {$_internalExprLte: 3}}],
+        },
         expectedResidualFilter: {_id: {$lte: 3}},
         expectedNumDeleted: 3,
         expectedNumUnpacked: 2,
@@ -223,7 +268,10 @@ function testDeleteExplain({
                 closedBucketFilter,
                 {meta: {$eq: 2}},
                 {
-                    $and: [{"control.min._id": {$_internalExprLte: 3}}, {"control.max._id": {$_internalExprGte: 3}}],
+                    $and: [
+                        {"control.min._id": {$_internalExprLte: 3}},
+                        {"control.max._id": {$_internalExprGte: 3}},
+                    ],
                 },
             ],
         },
@@ -248,7 +296,10 @@ function testDeleteExplain({
             $and: [
                 closedBucketFilter,
                 {
-                    $and: [{"control.min._id": {$_internalExprLte: 3}}, {"control.max._id": {$_internalExprGte: 3}}],
+                    $and: [
+                        {"control.min._id": {$_internalExprLte: 3}},
+                        {"control.max._id": {$_internalExprGte: 3}},
+                    ],
                 },
             ],
         },
@@ -269,7 +320,11 @@ function testDeleteExplain({
         expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteOne",
         expectedBucketFilter: {
-            $and: [closedBucketFilter, {meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}],
+            $and: [
+                closedBucketFilter,
+                {meta: {$eq: 2}},
+                {"control.max._id": {$_internalExprGte: 1}},
+            ],
         },
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumDeleted: 1,
@@ -289,7 +344,11 @@ function testDeleteExplain({
         expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteOne",
         expectedBucketFilter: {
-            $and: [closedBucketFilter, {meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}],
+            $and: [
+                closedBucketFilter,
+                {meta: {$eq: 2}},
+                {"control.max._id": {$_internalExprGte: 1}},
+            ],
         },
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumDeleted: 1,

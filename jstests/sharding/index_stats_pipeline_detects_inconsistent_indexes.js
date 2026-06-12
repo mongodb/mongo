@@ -65,22 +65,33 @@ const pipeline = [
     // an index or a property on at least one shard was not the same on all others.
     {
         $match: {
-            $expr: {$or: [{$gt: [{$size: "$missingFromShards"}, 0]}, {$gt: [{$size: "$inconsistentProperties"}, 0]}]},
+            $expr: {
+                $or: [
+                    {$gt: [{$size: "$missingFromShards"}, 0]},
+                    {$gt: [{$size: "$inconsistentProperties"}, 0]},
+                ],
+            },
         },
     },
     // Output relevant fields.
     {$project: {_id: 0, indexName: "$$ROOT._id", inconsistentProperties: 1, missingFromShards: 1}},
 ];
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 function shardCollectionWithChunkOnEachShard(collName) {
     const ns = dbName + "." + collName;
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 100}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 100}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 100}, to: st.shard2.shardName}),
+    );
 }
 
 //
@@ -116,7 +127,11 @@ function shardCollectionWithChunkOnEachShard(collName) {
     shardCollectionWithChunkOnEachShard(collName);
     // Move the chunk off shard2.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: dbName + "." + collName, find: {_id: 100}, to: st.shard1.shardName}),
+        st.s.adminCommand({
+            moveChunk: dbName + "." + collName,
+            find: {_id: 100},
+            to: st.shard1.shardName,
+        }),
     );
 
     assert.commandWorked(st.s.getDB(dbName)[collName].createIndex({x: 1}));
@@ -132,7 +147,11 @@ function shardCollectionWithChunkOnEachShard(collName) {
     shardCollectionWithChunkOnEachShard(collName);
     // Move the chunk off the primary shard.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: dbName + "." + collName, find: {_id: -1}, to: st.shard1.shardName}),
+        st.s.adminCommand({
+            moveChunk: dbName + "." + collName,
+            find: {_id: -1},
+            to: st.shard1.shardName,
+        }),
     );
 
     assert.commandWorked(st.s.getDB(dbName)[collName].createIndex({x: 1}));
@@ -147,7 +166,9 @@ function shardCollectionWithChunkOnEachShard(collName) {
     const collName = "indexOnEachShardWithTTL";
     shardCollectionWithChunkOnEachShard(collName);
 
-    assert.commandWorked(st.s.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 101}));
+    assert.commandWorked(
+        st.s.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 101}),
+    );
 
     const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
     assert.eq(res.length, 0, tojson(res));
@@ -262,9 +283,15 @@ function shardCollectionWithChunkOnEachShard(collName) {
     const collName = "differentTTL";
     shardCollectionWithChunkOnEachShard(collName);
 
-    assert.commandWorked(st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 105}));
-    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 106}));
-    assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 107}));
+    assert.commandWorked(
+        st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 105}),
+    );
+    assert.commandWorked(
+        st.shard1.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 106}),
+    );
+    assert.commandWorked(
+        st.shard2.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 107}),
+    );
 
     const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
     assert.eq(res.length, 1, tojson(res));
@@ -288,7 +315,9 @@ function shardCollectionWithChunkOnEachShard(collName) {
     const collName = "missingTTL";
     shardCollectionWithChunkOnEachShard(collName);
 
-    assert.commandWorked(st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 105}));
+    assert.commandWorked(
+        st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 105}),
+    );
     assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({x: 1}));
     assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex({x: 1}));
 
@@ -313,17 +342,23 @@ function shardCollectionWithChunkOnEachShard(collName) {
     assert.commandWorked(
         st.shard0
             .getDB(dbName)
-            [collName].createIndex({x: 1}, {expireAfterSeconds: 100, partialFilterExpression: {x: {$gt: 50}}}),
+            [
+                collName
+            ].createIndex({x: 1}, {expireAfterSeconds: 100, partialFilterExpression: {x: {$gt: 50}}}),
     );
     assert.commandWorked(
         st.shard1
             .getDB(dbName)
-            [collName].createIndex({x: 1}, {expireAfterSeconds: 101, partialFilterExpression: {x: {$gt: 51}}}),
+            [
+                collName
+            ].createIndex({x: 1}, {expireAfterSeconds: 101, partialFilterExpression: {x: {$gt: 51}}}),
     );
     assert.commandWorked(
         st.shard2
             .getDB(dbName)
-            [collName].createIndex({x: 1}, {expireAfterSeconds: 102, partialFilterExpression: {x: {$gt: 52}}}),
+            [
+                collName
+            ].createIndex({x: 1}, {expireAfterSeconds: 102, partialFilterExpression: {x: {$gt: 52}}}),
     );
 
     const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
@@ -354,9 +389,13 @@ function shardCollectionWithChunkOnEachShard(collName) {
     assert.commandWorked(
         st.shard0
             .getDB(dbName)
-            [collName].createIndex({x: 1}, {expireAfterSeconds: 101, partialFilterExpression: {x: {$gt: 50}}}),
+            [
+                collName
+            ].createIndex({x: 1}, {expireAfterSeconds: 101, partialFilterExpression: {x: {$gt: 50}}}),
     );
-    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 100}));
+    assert.commandWorked(
+        st.shard1.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 100}),
+    );
 
     const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
     assert.eq(res.length, 1, tojson(res));

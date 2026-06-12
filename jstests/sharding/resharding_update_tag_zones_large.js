@@ -30,7 +30,9 @@ const st = new ShardingTest({
     // disable the cluster parameter refresher since it periodically runs internal transactions
     // against the the config server.
     mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
-    configOptions: {setParameter: {"reshardingCriticalSectionTimeoutMillis": 24 * 60 * 60 * 1000 /* 1 day */}},
+    configOptions: {
+        setParameter: {"reshardingCriticalSectionTimeoutMillis": 24 * 60 * 60 * 1000 /* 1 day */},
+    },
 });
 const configRSPrimary = st.configRS.getPrimary();
 
@@ -43,7 +45,9 @@ const collectionsColl = configDB.getCollection("collections");
 const chunksColl = configDB.getCollection("chunks");
 const tagsColl = configDB.getCollection("tags");
 
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: "hashed"}}));
 
 const zoneName = "testZone";
@@ -55,7 +59,12 @@ const oldZone = {
     max: {skey: NumberLong("7766103514953448109")},
 };
 assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: oldZone.min, max: oldZone.max, zone: oldZone.tag}),
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: oldZone.min,
+        max: oldZone.max,
+        zone: oldZone.tag,
+    }),
 );
 
 const collBefore = collectionsColl.findOne({_id: ns});
@@ -86,7 +95,10 @@ const reshardingFunc = (mongosHost, ns, zoneName) => {
 };
 let reshardingThread = new Thread(reshardingFunc, st.s.host, ns, zoneName);
 
-const persistFp = configureFailPoint(configRSPrimary, "reshardingPauseCoordinatorBeforeDecisionPersisted");
+const persistFp = configureFailPoint(
+    configRSPrimary,
+    "reshardingPauseCoordinatorBeforeDecisionPersisted",
+);
 reshardingThread.start();
 persistFp.wait();
 
@@ -113,7 +125,9 @@ assert.neq(collAfter, null);
 const chunksAfter = chunksColl.find({uuid: collAfter.uuid}).sort({lastmod: -1}).toArray();
 const tagsAfter = tagsColl.find({ns}).toArray();
 
-jsTest.log("Verify that the collection metadata remains the same since the resharding operation failed.");
+jsTest.log(
+    "Verify that the collection metadata remains the same since the resharding operation failed.",
+);
 
 assertEqualObj(collBefore, collAfter);
 

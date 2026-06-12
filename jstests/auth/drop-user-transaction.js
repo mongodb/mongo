@@ -13,7 +13,9 @@ function runTest(conn, testCB) {
     //      \___________.^
     assert.commandWorked(test.runCommand({createRole: "role1", roles: [], privileges: []}));
     assert.commandWorked(test.runCommand({createRole: "role2", roles: ["role1"], privileges: []}));
-    assert.commandWorked(test.runCommand({createUser: "user1", roles: ["role1", "role2"], pwd: "pwd"}));
+    assert.commandWorked(
+        test.runCommand({createUser: "user1", roles: ["role1", "role2"], pwd: "pwd"}),
+    );
 
     const beforeDrop = assert.commandWorked(test.runCommand({usersInfo: "user1"})).users[0].roles;
     assert.eq(beforeDrop.length, 2);
@@ -71,7 +73,9 @@ function runTest(conn, testCB) {
 
         jsTest.log("Verify the failpoint is triggered.");
         const kUMCTransactionCommitDelayLogId = 4993100;
-        checkLog.containsJson(mongod, kUMCTransactionCommitDelayLogId, {durationMillis: kFailpointDelay});
+        checkLog.containsJson(mongod, kUMCTransactionCommitDelayLogId, {
+            durationMillis: kFailpointDelay,
+        });
     });
 
     MongoRunner.stopMongod(mongod);
@@ -86,11 +90,19 @@ function runTest(conn, testCB) {
     rst.awaitSecondaryNodes();
 
     function relevantOp(op) {
-        return (op.op === "u" || op.op === "d") && (op.ns === "admin.system.users" || op.ns === "admin.system.roles");
+        return (
+            (op.op === "u" || op.op === "d") &&
+            (op.ns === "admin.system.users" || op.ns === "admin.system.roles")
+        );
     }
 
     function probableTransaction(op) {
-        return op.op === "c" && op.ns === "admin.$cmd" && op.o.applyOps !== undefined && op.o.applyOps.some(relevantOp);
+        return (
+            op.op === "c" &&
+            op.ns === "admin.$cmd" &&
+            op.o.applyOps !== undefined &&
+            op.o.applyOps.some(relevantOp)
+        );
     }
 
     runTest(rst.getPrimary(), function (test) {
@@ -100,14 +112,26 @@ function runTest(conn, testCB) {
 
         // Events were not executed directly on the collections.
         const updatesAndDrops = oplog.filter(relevantOp);
-        assert.eq(updatesAndDrops.length, 0, "Found expected actions on priv collections: " + tojson(updatesAndDrops));
+        assert.eq(
+            updatesAndDrops.length,
+            0,
+            "Found expected actions on priv collections: " + tojson(updatesAndDrops),
+        );
 
         // They were executed by way of a transaction.
         const txns = oplog.filter(probableTransaction);
-        assert.eq(txns.length, 1, "Found unexpected number of probable transactions: " + tojson(txns));
+        assert.eq(
+            txns.length,
+            1,
+            "Found unexpected number of probable transactions: " + tojson(txns),
+        );
 
         const txnOps = txns[0].o.applyOps;
-        assert.eq(txnOps.length, 3, "Found unexpected number of ops in transaction: " + tojson(txnOps));
+        assert.eq(
+            txnOps.length,
+            3,
+            "Found unexpected number of ops in transaction: " + tojson(txnOps),
+        );
 
         // Op1: Remove 'role1' from user1
         const msgUpdateUser = "First op should be update admin.system.users" + tojson(txnOps);

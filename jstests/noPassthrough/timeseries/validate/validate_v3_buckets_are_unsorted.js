@@ -48,7 +48,9 @@ assert(res.valid);
 
 // Compressed bucket with the compressed time field in-order and version set to 3. This should produce a warning.
 // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
-assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+assert.commandWorked(
+    conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+);
 
 const invalidVersion3Doc = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -74,7 +76,10 @@ const invalidVersion3Doc = {
     },
 };
 assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, tsColl).insert(invalidVersion3Doc, getRawOperationSpec(testDB)),
+    getTimeseriesCollForRawOps(testDB, tsColl).insert(
+        invalidVersion3Doc,
+        getRawOperationSpec(testDB),
+    ),
 );
 res = assert.commandWorked(tsColl.validate());
 assert(res.valid);

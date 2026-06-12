@@ -36,7 +36,12 @@ describe("OTel query perf counter metrics file export", function () {
         }
         assert.commandWorked(this.coll.createIndex({x: 1}));
 
-        assert.soon(() => getLatestMetrics(metricsDir) !== null, "No initial metrics export", 30000, 500);
+        assert.soon(
+            () => getLatestMetrics(metricsDir) !== null,
+            "No initial metrics export",
+            30000,
+            500,
+        );
     });
 
     after(function () {

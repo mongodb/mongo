@@ -16,7 +16,11 @@ describe("Timestamp shims and polyfills", function () {
 
     it("edge-case inputs", () => {
         assert.throws(() => Timestamp(-2, 3), [], "Timestamp time must not accept negative time");
-        assert.throws(() => Timestamp(0, -1), [], "Timestamp increment must not accept negative time");
+        assert.throws(
+            () => Timestamp(0, -1),
+            [],
+            "Timestamp increment must not accept negative time",
+        );
         assert.throws(
             () => Timestamp(0x10000 * 0x10000, 0),
             [],

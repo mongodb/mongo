@@ -27,7 +27,8 @@ class CollInfos {
      */
     constructor(conn, connName, dbName) {
         // Special listCollections filter to prevent reloading the view catalog, also skips timeseries collections.
-        const listCollectionsSkipTimeseriesAndViewsFilter = filterGetAllCollectionsExcludingViewsAndTimeseries();
+        const listCollectionsSkipTimeseriesAndViewsFilter =
+            filterGetAllCollectionsExcludingViewsAndTimeseries();
         // filter to skip views, also prevents reloading the view catalog
         const listCollectionsFilterSkipViews = filterGetAllCollectionsExcludingViews();
         this.conn = conn;
@@ -37,19 +38,25 @@ class CollInfos {
         // If it fails, fall back to the old filter that doesn't include timeseries collections
         // This is okay because viewless timeseries are disabled in older binaries
         try {
-            this.collInfosRes = conn.getDB(dbName).getCollectionInfos(listCollectionsFilterSkipViews);
+            this.collInfosRes = conn
+                .getDB(dbName)
+                .getCollectionInfos(listCollectionsFilterSkipViews);
             // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
             // Filter out system.buckets. collections
             // listCollectionsFilterSkipViews also returns the type "timeseries"
             // we will send commands directly the main namespace instead of targeting system.buckets
-            this.collInfosRes = this.collInfosRes.filter((c) => !c.name.startsWith("system.buckets."));
+            this.collInfosRes = this.collInfosRes.filter(
+                (c) => !c.name.startsWith("system.buckets."),
+            );
         } catch (e) {
             // If the filter fails with InvalidViewDefinition (e.g., in multiversion environments),
             // fall back to the old filter. It's okay if it's excluding timeseries because viewless timeseries
             // are not disabled in older versions, so we will test legacy timeseries through
             // their system.buckets namespace
             if (e.code === ErrorCodes.InvalidViewDefinition) {
-                this.collInfosRes = conn.getDB(dbName).getCollectionInfos(listCollectionsSkipTimeseriesAndViewsFilter);
+                this.collInfosRes = conn
+                    .getDB(dbName)
+                    .getCollectionInfos(listCollectionsSkipTimeseriesAndViewsFilter);
             } else {
                 throw e;
             }
@@ -67,7 +74,9 @@ class CollInfos {
      * Do additional filtering to narrow down collections that have names in collNames.
      */
     filter(desiredCollNames) {
-        this.collInfosRes = this.collInfosRes.filter((info) => desiredCollNames.includes(info.name));
+        this.collInfosRes = this.collInfosRes.filter((info) =>
+            desiredCollNames.includes(info.name),
+        );
     }
 
     hostAndNS(collName) {
@@ -96,7 +105,10 @@ class CollInfos {
         const infoPrefix = `${this.connName}(${this.conn.host}) info for ${ns} : `;
         if (collInfo !== null) {
             if (alreadyPrinted) {
-                print(`${this.connName} info for ${ns} already printed. Search for ` + `'${infoPrefix}'`);
+                print(
+                    `${this.connName} info for ${ns} already printed. Search for ` +
+                        `'${infoPrefix}'`,
+                );
             } else {
                 print(infoPrefix + tojsononeline(collInfo));
             }
@@ -108,7 +120,10 @@ class CollInfos {
         const statsPrefix = `${this.connName}(${this.conn.host}) collStats for ${ns}: `;
         if (collStats.ok === 1) {
             if (alreadyPrinted) {
-                print(`${this.connName} collStats for ${ns} already printed. Search for ` + `'${statsPrefix}'`);
+                print(
+                    `${this.connName} collStats for ${ns} already printed. Search for ` +
+                        `'${statsPrefix}'`,
+                );
             } else {
                 print(statsPrefix + tojsononeline(collStats));
             }
@@ -197,7 +212,11 @@ class DataConsistencyChecker {
                 continue;
             }
 
-            const ordering = this.bsonCompareFunction({_: doc1._id}, {_: doc2._id}, false /* checkType */);
+            const ordering = this.bsonCompareFunction(
+                {_: doc1._id},
+                {_: doc2._id},
+                false /* checkType */,
+            );
             if (ordering === 0) {
                 // The documents have the same _id but have different contents.
                 docsWithDifferentContents.push({first: doc1, second: doc2});
@@ -250,7 +269,11 @@ class DataConsistencyChecker {
             if (!map1.hasOwnProperty(spec.name)) {
                 indexesMissingOnFirst.push(spec);
             } else {
-                const ordering = this.bsonCompareFunction(map1[spec.name], spec, false /* checkType */);
+                const ordering = this.bsonCompareFunction(
+                    map1[spec.name],
+                    spec,
+                    false /* checkType */,
+                );
                 if (ordering != 0) {
                     indexesWithDifferentSpecs.push({first: map1[spec.name], second: spec});
                 }
@@ -287,7 +310,13 @@ class DataConsistencyChecker {
         };
     }
 
-    static getCollectionDiffUsingSessions(sourceSession, syncingSession, dbName, collNameOrUUID, readAtClusterTime) {
+    static getCollectionDiffUsingSessions(
+        sourceSession,
+        syncingSession,
+        dbName,
+        collNameOrUUID,
+        readAtClusterTime,
+    ) {
         const sourceDB = sourceSession.getDatabase(dbName);
         const syncingDB = syncingSession.getDatabase(dbName);
 
@@ -347,7 +376,8 @@ class DataConsistencyChecker {
             if (!sourceDoc || !syncingDoc) {
                 return false;
             }
-            const hasInvalidated = sourceDoc.hasOwnProperty("invalidated") && syncingDoc.hasOwnProperty("invalidated");
+            const hasInvalidated =
+                sourceDoc.hasOwnProperty("invalidated") && syncingDoc.hasOwnProperty("invalidated");
             if (!hasInvalidated || sourceDoc["invalidated"] === syncingDoc["invalidated"]) {
                 // We only ever expect cases where the 'invalidated' fields are mismatched.
                 return false;
@@ -360,7 +390,13 @@ class DataConsistencyChecker {
         return true;
     }
 
-    static dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs) {
+    static dumpCollectionDiff(
+        collectionPrinted,
+        sourceCollInfos,
+        syncingCollInfos,
+        collName,
+        indexDiffs,
+    ) {
         print("Dumping collection: " + sourceCollInfos.ns(collName));
 
         const sourceExists = sourceCollInfos.print(collectionPrinted, collName);
@@ -387,7 +423,10 @@ class DataConsistencyChecker {
             collName,
         );
 
-        for (let {sourceNode: sourceDoc, syncingNode: syncingDoc} of diff.docsWithDifferentContents) {
+        for (let {
+            sourceNode: sourceDoc,
+            syncingNode: syncingDoc,
+        } of diff.docsWithDifferentContents) {
             print(
                 `Mismatching documents between the source node ${sourceNode.host}` +
                     ` and the syncing node ${syncingNode.host}:`,
@@ -412,7 +451,10 @@ class DataConsistencyChecker {
     }
 
     static dumpIndexDiffs(sourceNode, syncingNode, diff) {
-        for (let {sourceNode: sourceSpec, syncingNode: syncingSpec} of diff.indexesWithDifferentSpecs) {
+        for (let {
+            sourceNode: sourceSpec,
+            syncingNode: syncingSpec,
+        } of diff.indexesWithDifferentSpecs) {
             print(
                 `Mismatching indexes between the source node ${sourceNode.host}` +
                     ` and the syncing node ${syncingNode.host}:`,
@@ -476,8 +518,16 @@ class DataConsistencyChecker {
 
         if (sourceCollections.length !== syncingCollections.length) {
             prettyPrint(`the two nodes have a different number of collections: ${dbHashesMsg}`);
-            for (const diffColl of arraySymmetricDifference(sourceCollections, syncingCollections)) {
-                this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, diffColl);
+            for (const diffColl of arraySymmetricDifference(
+                sourceCollections,
+                syncingCollections,
+            )) {
+                this.dumpCollectionDiff(
+                    collectionPrinted,
+                    sourceCollInfos,
+                    syncingCollInfos,
+                    diffColl,
+                );
             }
             success = false;
         }
@@ -495,7 +545,12 @@ class DataConsistencyChecker {
                 // 'config.system.preimages' can potentially be inconsistent via hashes, there's a
                 // special process that verifies them with ReplSetTest.checkPreImageCollection so it
                 // is safe to ignore failures here.
-                this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, coll.name);
+                this.dumpCollectionDiff(
+                    collectionPrinted,
+                    sourceCollInfos,
+                    syncingCollInfos,
+                    coll.name,
+                );
                 const shouldIgnoreFailure = this.canIgnoreCollectionDiff(
                     sourceCollInfos,
                     syncingCollInfos,
@@ -544,12 +599,18 @@ class DataConsistencyChecker {
 
                     if (sourceInfo.options?.storageEngine?.wiredTiger?.configString) {
                         sourceInfo.options.storageEngine.wiredTiger.configString =
-                            sourceInfo.options.storageEngine.wiredTiger.configString.replace(encryptionRegex, "");
+                            sourceInfo.options.storageEngine.wiredTiger.configString.replace(
+                                encryptionRegex,
+                                "",
+                            );
                     }
 
                     if (syncingInfo.options?.storageEngine?.wiredTiger?.configString) {
                         syncingInfo.options.storageEngine.wiredTiger.configString =
-                            syncingInfo.options.storageEngine.wiredTiger.configString.replace(encryptionRegex, "");
+                            syncingInfo.options.storageEngine.wiredTiger.configString.replace(
+                                encryptionRegex,
+                                "",
+                            );
                     }
 
                     if (!this.bsonCompareFunction(syncingInfo, sourceInfo)) {
@@ -558,7 +619,12 @@ class DataConsistencyChecker {
                                 dbName
                             }.${syncingInfo.name}`,
                         );
-                        this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, syncingInfo.name);
+                        this.dumpCollectionDiff(
+                            collectionPrinted,
+                            sourceCollInfos,
+                            syncingCollInfos,
+                            syncingInfo.name,
+                        );
                         success = false;
                     }
                 }
@@ -603,7 +669,12 @@ class DataConsistencyChecker {
         // collections due to SERVER-90862. In this situation, listIndexes targets different
         // namespaces before and after 8.2. So, skip comparing across 8.2.
         // TODO(SERVER-101594): Remove this workaround once only viewless timeseries exist.
-        const skipIndexesCheck = function (sourceCollInfos, syncingCollInfos, sourceCollections, collName) {
+        const skipIndexesCheck = function (
+            sourceCollInfos,
+            syncingCollInfos,
+            sourceCollections,
+            collName,
+        ) {
             const sourceVersion = sourceCollInfos.binVersion;
             const syncingVersion = syncingCollInfos.binVersion;
 
@@ -686,7 +757,10 @@ class DataConsistencyChecker {
                 reasons.push("indexes");
             }
 
-            const indexBuildsMatch = compareSets(sourceCollStats.indexBuilds, syncingCollStats.indexBuilds);
+            const indexBuildsMatch = compareSets(
+                sourceCollStats.indexBuilds,
+                syncingCollStats.indexBuilds,
+            );
             if (syncingHasIndexes && !indexBuildsMatch) {
                 reasons.push("indexBuilds");
             }
@@ -698,13 +772,21 @@ class DataConsistencyChecker {
             prettyPrint(
                 `the two nodes have different states for the collection ${dbName}.${collName}: ${reasons.join(", ")}`,
             );
-            this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs);
+            this.dumpCollectionDiff(
+                collectionPrinted,
+                sourceCollInfos,
+                syncingCollInfos,
+                collName,
+                indexDiffs,
+            );
             success = false;
         });
 
         // The hashes for the whole database should match.
         if (sourceDBHash.md5 !== syncingDBHash.md5) {
-            prettyPrint(`the two nodes have a different hash for the ${dbName} database: ${dbHashesMsg}`);
+            prettyPrint(
+                `the two nodes have a different hash for the ${dbName} database: ${dbHashesMsg}`,
+            );
             if (didIgnoreFailure) {
                 // We only expect database hash mismatches on the config db, where
                 // config.image_collection and config.system.preimages are expected to have

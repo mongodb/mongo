@@ -29,7 +29,9 @@ const db = st.getDB(dbName);
 const coll = db.getCollection(collName);
 const mongos = st.s0;
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(db.coll.insert({x: 1}));
 assert.commandWorked(db.coll.insert({x: -1}));

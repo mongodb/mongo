@@ -13,7 +13,12 @@ assert.commandWorked(testDB.runCommand({create: "basicCreate", apiVersion: "1", 
 
 // Test the command with 'apiStrict'.
 assert.commandWorked(
-    testDB.runCommand({create: "basicCreateCappedFalse", capped: false, apiVersion: "1", apiStrict: true}),
+    testDB.runCommand({
+        create: "basicCreateCappedFalse",
+        capped: false,
+        apiVersion: "1",
+        apiStrict: true,
+    }),
 );
 
 // Test that creating a capped collection fails with apiStrict=true.

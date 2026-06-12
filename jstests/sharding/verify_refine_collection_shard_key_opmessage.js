@@ -17,7 +17,9 @@ const kNsName = kDbName + "." + kCollName;
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: primaryShard}));
 assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, akey: 1}));
-assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, akey: 1}}));
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, akey: 1}}),
+);
 
 const o2expected = {
     refineCollectionShardKey: "refineShardKey.coll",

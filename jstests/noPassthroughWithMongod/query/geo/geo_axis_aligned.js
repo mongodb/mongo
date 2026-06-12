@@ -124,9 +124,16 @@ for (let b = 0; b < bits.length; b++) {
 
         // Create a 2d legacy geo index with an additional component "circleIdx" so we can run
         // geo queries against each individual circle created above.
-        assert.commandWorked(t.createIndex({loc: "2d", circleIdx: 1}, {min: bound.min, max: bound.max, bits: bits[b]}));
+        assert.commandWorked(
+            t.createIndex(
+                {loc: "2d", circleIdx: 1},
+                {min: bound.min, max: bound.max, bits: bits[b]},
+            ),
+        );
 
-        print(`Testing 2d geo index with ${bits[b]} bits at scale ${scale[s]} with ${circles.length} circles.`);
+        print(
+            `Testing 2d geo index with ${bits[b]} bits at scale ${scale[s]} with ${circles.length} circles.`,
+        );
         for (let ci = 0; ci < circles.length; ci++) {
             const circle = circles[ci];
 
@@ -145,7 +152,10 @@ for (let b = 0; b < bits.length; b++) {
             assert.eq([1, 2, 3, 4, 5], x);
 
             // $near query
-            r = t.find({loc: {$near: circle.center, $maxDistance: circle.radius}, circleIdx: ci}, {_id: 1});
+            r = t.find(
+                {loc: {$near: circle.center, $maxDistance: circle.radius}, circleIdx: ci},
+                {_id: 1},
+            );
             assert.eq(5, r.count());
 
             // $geoNear query
@@ -178,8 +188,14 @@ for (let b = 0; b < bits.length; b++) {
                     loc: {
                         $within: {
                             $box: [
-                                [circle.center[0] - circle.radius, circle.center[1] - circle.radius],
-                                [circle.center[0] + circle.radius, circle.center[1] + circle.radius],
+                                [
+                                    circle.center[0] - circle.radius,
+                                    circle.center[1] - circle.radius,
+                                ],
+                                [
+                                    circle.center[0] + circle.radius,
+                                    circle.center[1] + circle.radius,
+                                ],
                             ],
                         },
                     },

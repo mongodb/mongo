@@ -27,7 +27,9 @@ let coll = testDB.range;
 let ns = coll.getFullName();
 let shardKey = {x: 1};
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}),
+);
 
 jsTest.log("Shard the collection and create chunks.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
@@ -57,9 +59,15 @@ jsTest.log("Add shards to zones and assign zone key ranges.");
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneA"}));
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "zoneB"}));
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: "zoneC"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: -10}, zone: "zoneA"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: -10}, max: {x: 10}, zone: "zoneB"}));
-assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 10}, max: {x: MaxKey}, zone: "zoneC"}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: -10}, zone: "zoneA"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: -10}, max: {x: 10}, zone: "zoneB"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: 10}, max: {x: MaxKey}, zone: "zoneC"}),
+);
 
 jsTest.log("Check that the shards have the assigned zones.");
 let shardTags = {
@@ -70,7 +78,9 @@ let shardTags = {
 assertShardTags(configDB, shardTags);
 
 jsTest.log('Check that the balancer does not balance if "noBalance" is true.');
-assert.commandWorked(configDB.collections.update({_id: ns}, {$set: {"noBalance": true}}, {upsert: true}));
+assert.commandWorked(
+    configDB.collections.update({_id: ns}, {$set: {"noBalance": true}}, {upsert: true}),
+);
 runBalancer(st, 4);
 let shardChunkBounds = {
     [primaryShard.shardName]: [
@@ -84,8 +94,12 @@ let shardChunkBounds = {
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assert.eq(docs.length, primaryShard.getCollection(ns).count());
 
-jsTest.log("Let the balancer do the balancing, and check that the chunks and the docs are on the right shards.");
-assert.commandWorked(configDB.collections.update({_id: ns}, {$set: {"noBalance": false}}, {upsert: true}));
+jsTest.log(
+    "Let the balancer do the balancing, and check that the chunks and the docs are on the right shards.",
+);
+assert.commandWorked(
+    configDB.collections.update({_id: ns}, {$set: {"noBalance": false}}, {upsert: true}),
+);
 runBalancer(st, 4);
 shardChunkBounds = {
     [st.shard0.shardName]: [[{x: MinKey}, {x: -10}]],

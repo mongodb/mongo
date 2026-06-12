@@ -44,9 +44,15 @@ function testIndexKeyMetaProjection({
     );
     assert.eq(
         coll
-            .aggregate((sortSpec ? [{$sort: sortSpec}] : []).concat([{$match: matchSpec}, {$project: projSpec}]), {
-                hint: indexSpec,
-            })
+            .aggregate(
+                (sortSpec ? [{$sort: sortSpec}] : []).concat([
+                    {$match: matchSpec},
+                    {$project: projSpec},
+                ]),
+                {
+                    hint: indexSpec,
+                },
+            )
             .toArray(),
         aggExpectedResult,
     );
@@ -93,7 +99,9 @@ function testIndexKeyMetaProjection({
         matchSpec: {a: {$gt: 20}},
         projSpec: {_id: 0},
         indexSpec: indexSpec,
-        expectedResult: [Object.assign({a: 30, b: "z"}, metadataAvailable ? {c: {a: 30, b: "z"}} : {})],
+        expectedResult: [
+            Object.assign({a: 30, b: "z"}, metadataAvailable ? {c: {a: 30, b: "z"}} : {}),
+        ],
         aggExpectedResult: [metadataAvailable ? {c: {a: 30, b: "z"}} : {}],
     });
 
@@ -101,7 +109,9 @@ function testIndexKeyMetaProjection({
     testIndexKeyMetaProjection({
         matchSpec: {a: {$gt: 20}},
         indexSpec: indexSpec,
-        expectedResult: [Object.assign({_id: 3, a: 30, b: "z"}, metadataAvailable ? {c: {a: 30, b: "z"}} : {})],
+        expectedResult: [
+            Object.assign({_id: 3, a: 30, b: "z"}, metadataAvailable ? {c: {a: 30, b: "z"}} : {}),
+        ],
         aggExpectedResult: [Object.assign({_id: 3}, metadataAvailable ? {c: {a: 30, b: "z"}} : {})],
     });
 

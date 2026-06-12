@@ -10,7 +10,11 @@
  * - Signals completion via Connector.notifyDone(instanceName).
  */
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
-import {ChangeStreamTest, ChangeStreamWatchMode, isInvalidated} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    ChangeStreamWatchMode,
+    isInvalidated,
+} from "jstests/libs/query/change_stream_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 /**
@@ -67,8 +71,12 @@ class ChangeStreamReader {
         const host = conn.host;
         const thread = new Thread(
             async function (host, config) {
-                const {ChangeStreamReader} = await import("jstests/libs/util/change_stream/change_stream_reader.js");
-                const {Connector} = await import("jstests/libs/util/change_stream/change_stream_connector.js");
+                const {ChangeStreamReader} = await import(
+                    "jstests/libs/util/change_stream/change_stream_reader.js"
+                );
+                const {Connector} = await import(
+                    "jstests/libs/util/change_stream/change_stream_connector.js"
+                );
                 const conn = new Mongo(host);
                 try {
                     ChangeStreamReader._execute(conn, config);
@@ -170,7 +178,9 @@ class ChangeStreamReader {
      */
     static _openChangeStream(conn, config, resumeToken = null, useStartAfter = false) {
         const db =
-            config.watchMode === ChangeStreamWatchMode.kCluster ? conn.getDB("admin") : conn.getDB(config.dbName);
+            config.watchMode === ChangeStreamWatchMode.kCluster
+                ? conn.getDB("admin")
+                : conn.getDB(config.dbName);
 
         const cst = new ChangeStreamTest(db);
 
@@ -225,7 +235,8 @@ class ChangeStreamReader {
 
         const watchOptions = {
             pipeline: pipeline,
-            collection: config.watchMode === ChangeStreamWatchMode.kCollection ? config.collName : 1,
+            collection:
+                config.watchMode === ChangeStreamWatchMode.kCollection ? config.collName : 1,
             aggregateOptions: {cursor: cursorOptions},
         };
 
@@ -258,7 +269,12 @@ class ChangeStreamReader {
         assert.soon(() => {
             try {
                 if (!cst || !cursor) {
-                    ({cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, resumeToken, wasInvalidate));
+                    ({cst, cursor} = ChangeStreamReader._openChangeStream(
+                        conn,
+                        cfg,
+                        resumeToken,
+                        wasInvalidate,
+                    ));
                 }
                 // Always use skipFirst=false to check the current batch before issuing getMore.
                 // This ensures we don't miss events in firstBatch (after open) or nextBatch.
@@ -266,7 +282,10 @@ class ChangeStreamReader {
                 result = {changeEvent, cst, cursor};
                 return true;
             } catch (e) {
-                if (!TestData.enableBgMutator || !ChangeStreamReader.kFCVRetryableErrors.includes(e.code)) {
+                if (
+                    !TestData.enableBgMutator ||
+                    !ChangeStreamReader.kFCVRetryableErrors.includes(e.code)
+                ) {
                     throw e;
                 }
                 jsTest.log.debug("ChangeStreamReader FCV error, will retry", {
@@ -323,11 +342,24 @@ class ChangeStreamReader {
         let lastWasInvalidate = false;
 
         for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
-            const result = ChangeStreamReader._readOneEvent(conn, cfg, cst, cursor, lastResumeToken, lastWasInvalidate);
+            const result = ChangeStreamReader._readOneEvent(
+                conn,
+                cfg,
+                cst,
+                cursor,
+                lastResumeToken,
+                lastWasInvalidate,
+            );
             cst = result.cst;
             cursor = result.cursor;
 
-            const isInvalidate = ChangeStreamReader._processEvent(conn, cfg, result.changeEvent, count, readEventTypes);
+            const isInvalidate = ChangeStreamReader._processEvent(
+                conn,
+                cfg,
+                result.changeEvent,
+                count,
+                readEventTypes,
+            );
             lastResumeToken = result.changeEvent._id;
             lastWasInvalidate = isInvalidate;
 
@@ -338,7 +370,10 @@ class ChangeStreamReader {
             }
         }
 
-        jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
+        jsTest.log.debug("ChangeStreamReader Read events", {
+            instanceName: cfg.instanceName,
+            readEventTypes,
+        });
         tryCleanUp(cst, cfg.instanceName);
     }
 
@@ -352,7 +387,10 @@ class ChangeStreamReader {
      * @private
      */
     static _drainEvents(conn, cfg, reopenPerEvent) {
-        jsTest.log.debug(`ChangeStreamReader Starting drain (reopenPerEvent=${reopenPerEvent})`, cfg);
+        jsTest.log.debug(
+            `ChangeStreamReader Starting drain (reopenPerEvent=${reopenPerEvent})`,
+            cfg,
+        );
 
         let lastResumeToken = null;
         const readEventTypes = [];
@@ -368,17 +406,31 @@ class ChangeStreamReader {
             }
 
             const event = batch[0];
-            const isInvalidate = ChangeStreamReader._processEvent(conn, cfg, event, count++, readEventTypes);
+            const isInvalidate = ChangeStreamReader._processEvent(
+                conn,
+                cfg,
+                event,
+                count++,
+                readEventTypes,
+            );
             lastResumeToken = event._id;
 
             if (reopenPerEvent || isInvalidate) {
                 tryCleanUp(cst, cfg.instanceName);
-                ({cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, lastResumeToken, isInvalidate));
+                ({cst, cursor} = ChangeStreamReader._openChangeStream(
+                    conn,
+                    cfg,
+                    lastResumeToken,
+                    isInvalidate,
+                ));
             }
         }
 
         tryCleanUp(cst, cfg.instanceName);
-        jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
+        jsTest.log.debug("ChangeStreamReader Read events", {
+            instanceName: cfg.instanceName,
+            readEventTypes,
+        });
     }
 
     /**
@@ -394,16 +446,32 @@ class ChangeStreamReader {
         const readEventTypes = [];
 
         for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
-            const result = ChangeStreamReader._readOneEvent(conn, cfg, null, null, resumeToken, useStartAfter);
+            const result = ChangeStreamReader._readOneEvent(
+                conn,
+                cfg,
+                null,
+                null,
+                resumeToken,
+                useStartAfter,
+            );
 
-            const isInvalidate = ChangeStreamReader._processEvent(conn, cfg, result.changeEvent, count, readEventTypes);
+            const isInvalidate = ChangeStreamReader._processEvent(
+                conn,
+                cfg,
+                result.changeEvent,
+                count,
+                readEventTypes,
+            );
             resumeToken = result.changeEvent._id;
             useStartAfter = isInvalidate;
 
             tryCleanUp(result.cst, cfg.instanceName);
         }
 
-        jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
+        jsTest.log.debug("ChangeStreamReader Read events", {
+            instanceName: cfg.instanceName,
+            readEventTypes,
+        });
     }
 }
 

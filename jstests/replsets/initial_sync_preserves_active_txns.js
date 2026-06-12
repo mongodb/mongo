@@ -43,7 +43,9 @@ function doTest(commitOrAbort) {
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
     const txnEntry = primary.getDB("config").transactions.findOne();
 
-    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(
+        primary.getDB("test"),
+    );
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     // Make sure that the timestamp of the first oplog entry for this transaction matches the

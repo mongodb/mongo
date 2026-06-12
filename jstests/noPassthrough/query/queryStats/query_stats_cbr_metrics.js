@@ -10,7 +10,11 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
-import {getQueryPlannerMetrics, getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryPlannerMetrics,
+    getQueryStats,
+    resetQueryStatsStore,
+} from "jstests/libs/query/query_stats_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -42,7 +46,9 @@ function validatePlanningTimeMicros(metrics) {
     assert.gt(metric.min, 0, `planningTimeMicros.min should be positive: ${tojson(metric)}`);
     assert.gt(metric.max, 0, `planningTimeMicros.max should be positive: ${tojson(metric)}`);
 
-    const totalExecTime = Number(metrics.totalExecMicros?.sum || metrics.cursor?.firstResponseExecMicros?.sum || 0);
+    const totalExecTime = Number(
+        metrics.totalExecMicros?.sum || metrics.cursor?.firstResponseExecMicros?.sum || 0,
+    );
     assert.gt(
         totalExecTime,
         0,
@@ -191,7 +197,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 db: testDB.getSiblingDB("admin"),
                 func: (db) => {
                     prevCBRConfig = getCBRConfig(db);
-                    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}),
+                    );
                     return configureFailPoint(db, "sleepWhileMultiplanning", {ms: waitTimeMillis});
                 },
                 primaryNodeOnly: true,
@@ -218,7 +226,8 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 validatePlanningTimeMicros(stats[0].metrics);
 
                 // Convert planningTimeMicros to milliseconds for comparison with failpoint delay.
-                const planningTimeMillis = Number(queryPlannerSection.planningTimeMicros.sum) / 1000;
+                const planningTimeMillis =
+                    Number(queryPlannerSection.planningTimeMicros.sum) / 1000;
                 assert.gt(
                     planningTimeMillis,
                     waitTimeMillis,
@@ -290,13 +299,22 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         );
                         // Use sequential scan to make sampled documents deterministic for the assertion.
                         previousSequentialScanFlag = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+                            db.adminCommand({
+                                setParameter: 1,
+                                internalQuerySamplingBySequentialScan: true,
+                            }),
                         ).was;
                         previousMarginOfError = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, samplingMarginOfError: samplingMarginOfError}),
+                            db.adminCommand({
+                                setParameter: 1,
+                                samplingMarginOfError: samplingMarginOfError,
+                            }),
                         ).was;
                         previousConfidenceInterval = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, samplingConfidenceInterval: confidenceInterval}),
+                            db.adminCommand({
+                                setParameter: 1,
+                                samplingConfidenceInterval: confidenceInterval,
+                            }),
                         ).was;
                     },
                     primaryNodeOnly: true,
@@ -319,7 +337,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 if (isSbeEnabled) {
                     assert.eq(cbrSection.nDocsSampled.sum, 0);
                 } else {
-                    const expectedSampleSize = Math.round(zScore ** 2 / ((2 * samplingMarginOfError) / 100.0) ** 2);
+                    const expectedSampleSize = Math.round(
+                        zScore ** 2 / ((2 * samplingMarginOfError) / 100.0) ** 2,
+                    );
                     const nDocsSampled = Number(cbrSection.nDocsSampled.sum);
                     assert.eq(
                         nDocsSampled,
@@ -342,7 +362,10 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                             }),
                         );
                         assert.commandWorked(
-                            db.adminCommand({setParameter: 1, samplingMarginOfError: previousMarginOfError}),
+                            db.adminCommand({
+                                setParameter: 1,
+                                samplingMarginOfError: previousMarginOfError,
+                            }),
                         );
                         assert.commandWorked(
                             db.adminCommand({

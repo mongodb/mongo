@@ -52,7 +52,10 @@ function assertCacheUsage({pipeline, fromMultiPlanner, fromPlanCache, isActive})
     const entries = coll.getPlanCache().list();
 
     assert.eq(fromPlanCache, !!profileObj.fromPlanCache, () => {
-        return `Query not served from plan cache.\nProfile: ${tojson(profileObj)}\n` + `Plan cache: ${tojson(entries)}`;
+        return (
+            `Query not served from plan cache.\nProfile: ${tojson(profileObj)}\n` +
+            `Plan cache: ${tojson(entries)}`
+        );
     });
 
     assert.eq(entries.length, 1, entries);

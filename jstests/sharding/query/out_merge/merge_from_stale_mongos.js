@@ -15,7 +15,10 @@ const staleMongosTarget = st.s2.getDB(kDbName);
 const staleMongosBoth = st.s3.getDB(kDbName);
 
 assert.commandWorked(
-    staleMongosSource.adminCommand({enableSharding: staleMongosSource.getName(), primaryShard: st.rs0.getURL()}),
+    staleMongosSource.adminCommand({
+        enableSharding: staleMongosSource.getName(),
+        primaryShard: st.rs0.getURL(),
+    }),
 );
 
 const sourceColl = freshMongos.getCollection("source");
@@ -28,7 +31,9 @@ function shardCollWithMongos(mongos, coll) {
     // [0, MaxKey), then move the [0, MaxKey) chunk to shard 1.
     assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
     assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-    assert.commandWorked(mongos.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}),
+    );
 }
 
 // Configures the two mongos, staleMongosSource and staleMongosTarget, to be stale on the source
@@ -38,10 +43,18 @@ function setupStaleMongos({shardedSource, shardedTarget}) {
     // Initialize both mongos to believe the collections are unsharded.
     sourceColl.drop();
     targetColl.drop();
-    assert.commandWorked(staleMongosSource[sourceColl.getName()].insert({_id: "insert when unsharded (source)"}));
-    assert.commandWorked(staleMongosSource[targetColl.getName()].insert({_id: "insert when unsharded (source)"}));
-    assert.commandWorked(staleMongosTarget[sourceColl.getName()].insert({_id: "insert when unsharded (target)"}));
-    assert.commandWorked(staleMongosTarget[targetColl.getName()].insert({_id: "insert when unsharded (target)"}));
+    assert.commandWorked(
+        staleMongosSource[sourceColl.getName()].insert({_id: "insert when unsharded (source)"}),
+    );
+    assert.commandWorked(
+        staleMongosSource[targetColl.getName()].insert({_id: "insert when unsharded (source)"}),
+    );
+    assert.commandWorked(
+        staleMongosTarget[sourceColl.getName()].insert({_id: "insert when unsharded (target)"}),
+    );
+    assert.commandWorked(
+        staleMongosTarget[targetColl.getName()].insert({_id: "insert when unsharded (target)"}),
+    );
 
     if (shardedSource) {
         // Shard the source collection through the staleMongosTarget mongos, keeping the

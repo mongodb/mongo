@@ -30,7 +30,13 @@ function getLatestQueryShapeHashFromQueryStats(mongosConn, collName) {
  * Asserts that the queryShapeHash from $queryStats matches the queryShapeHash from mongod slow
  * query logs for an insert command.
  */
-function assertQueryStatsAndMongodHashesMatch(mongosConn, collName, comment, mongodDB, testDesc = "") {
+function assertQueryStatsAndMongodHashesMatch(
+    mongosConn,
+    collName,
+    comment,
+    mongodDB,
+    testDesc = "",
+) {
     const queryStatsHash = getLatestQueryShapeHashFromQueryStats(mongosConn, collName);
     assert.neq(
         queryStatsHash,
@@ -187,7 +193,11 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
             const entries = getQueryStatsInsertCmd(this.st.s, {
                 collName: this.collNames.unsharded,
             });
-            assert.eq(entries.length, 1, "Expected one queryStats entry for the insert: " + tojson(entries));
+            assert.eq(
+                entries.length,
+                1,
+                "Expected one queryStats entry for the insert: " + tojson(entries),
+            );
 
             // verify queryShapeHash of slow query log on shard0 match router's $queryStats
             assertQueryStatsAndMongodHashesMatch(
@@ -220,7 +230,11 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
             const entries = getQueryStatsInsertCmd(this.st.s, {
                 collName: this.collNames.sharded,
             });
-            assert.eq(entries.length, 1, "Expected one queryStats entry for the insert: " + tojson(entries));
+            assert.eq(
+                entries.length,
+                1,
+                "Expected one queryStats entry for the insert: " + tojson(entries),
+            );
 
             // verify queryShapeHash of slow query log on shard0 match router's $queryStats
             assertQueryStatsAndMongodHashesMatch(

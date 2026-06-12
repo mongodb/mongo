@@ -9,7 +9,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1, configShard: true});
 
-function checkNotificationPresenceAcrossShards(numNotificationsByShard, lowerBoundClusterTime, upperBoundClusterTime) {
+function checkNotificationPresenceAcrossShards(
+    numNotificationsByShard,
+    lowerBoundClusterTime,
+    upperBoundClusterTime,
+) {
     const matchingCriteriaForRetargetingOplogEntry = {
         op: "n",
         ns: "",
@@ -36,21 +40,37 @@ function checkNotificationPresenceAcrossShards(numNotificationsByShard, lowerBou
     });
 }
 
-jsTest.log.info('An FCV downgrade transition triggers one "retargeting" change stream event on each shard.');
-const clusterTimeBeforeFCVDowngrade = st.s.getDB("admin").runCommand({hello: 1}).$clusterTime.clusterTime;
+jsTest.log.info(
+    'An FCV downgrade transition triggers one "retargeting" change stream event on each shard.',
+);
+const clusterTimeBeforeFCVDowngrade = st.s.getDB("admin").runCommand({hello: 1})
+    .$clusterTime.clusterTime;
 const clusterTimeAfterFCVDowngrade = assert.commandWorked(
     st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
 ).$clusterTime.clusterTime;
-checkNotificationPresenceAcrossShards(1, clusterTimeBeforeFCVDowngrade, clusterTimeAfterFCVDowngrade);
+checkNotificationPresenceAcrossShards(
+    1,
+    clusterTimeBeforeFCVDowngrade,
+    clusterTimeAfterFCVDowngrade,
+);
 
-jsTest.log.info('setFCV downgrade generates no "retargeting" change stream events when resolves into a no-op.');
+jsTest.log.info(
+    'setFCV downgrade generates no "retargeting" change stream events when resolves into a no-op.',
+);
 const clusterTimeAfterNoopFCVDowngrade = assert.commandWorked(
     st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
 ).$clusterTime.clusterTime;
-checkNotificationPresenceAcrossShards(0, clusterTimeAfterFCVDowngrade, clusterTimeAfterNoopFCVDowngrade);
+checkNotificationPresenceAcrossShards(
+    0,
+    clusterTimeAfterFCVDowngrade,
+    clusterTimeAfterNoopFCVDowngrade,
+);
 
-jsTest.log.info('An FCV upgrade transition triggers one "retargeting" change stream event on each shard.');
-const clusterTimeBeforeFCVUpgrade = st.s.getDB("admin").runCommand({hello: 1}).$clusterTime.clusterTime;
+jsTest.log.info(
+    'An FCV upgrade transition triggers one "retargeting" change stream event on each shard.',
+);
+const clusterTimeBeforeFCVUpgrade = st.s.getDB("admin").runCommand({hello: 1})
+    .$clusterTime.clusterTime;
 const clusterTimeAfterFCVUpgrade = assert.commandWorked(
     st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
 ).$clusterTime.clusterTime;
@@ -59,10 +79,16 @@ checkNotificationPresenceAcrossShards(1, clusterTimeBeforeFCVUpgrade, clusterTim
 /*
  * The retargeting notification is generated as part of setFCV::_resetPlacementHistory(), which due to design constraints has to be called upon each command invocation.
  */
-jsTest.log.info('setFCV upgrade generates one "retargeting" change stream events when resolves into a no-op.');
+jsTest.log.info(
+    'setFCV upgrade generates one "retargeting" change stream events when resolves into a no-op.',
+);
 const clusterTimeAfterNoopFCVUpgrade = assert.commandWorked(
     st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
 ).$clusterTime.clusterTime;
-checkNotificationPresenceAcrossShards(1, clusterTimeAfterFCVUpgrade, clusterTimeAfterNoopFCVUpgrade);
+checkNotificationPresenceAcrossShards(
+    1,
+    clusterTimeAfterFCVUpgrade,
+    clusterTimeAfterNoopFCVUpgrade,
+);
 
 st.stop();

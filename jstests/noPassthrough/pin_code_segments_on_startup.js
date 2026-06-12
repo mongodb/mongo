@@ -18,7 +18,10 @@ let replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
 configRS.initiate(replConfig);
 
-const connS = MongoRunner.runMongos({configdb: configRS.getURL(), setParameter: {lockCodeSegmentsInMemory: true}});
+const connS = MongoRunner.runMongos({
+    configdb: configRS.getURL(),
+    setParameter: {lockCodeSegmentsInMemory: true},
+});
 assert.neq(null, connS, "mongos was unable to start up");
 assert.eq(0, MongoRunner.stopMongos(connS));
 

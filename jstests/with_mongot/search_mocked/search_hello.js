@@ -12,7 +12,11 @@ const mongotConn = mongotmock.getConnection();
 function checkResponseFields(commandString) {
     jsTestLog("Testing " + commandString + " for MongotMock");
     const commandResponse = assert.commandWorked(mongotConn.adminCommand(commandString));
-    assert.eq(commandResponse.ismongot, true, "ismongot is not true, command response: " + tojson(commandResponse));
+    assert.eq(
+        commandResponse.ismongot,
+        true,
+        "ismongot is not true, command response: " + tojson(commandResponse),
+    );
 
     if (commandString === "hello") {
         assert.eq(
@@ -26,7 +30,11 @@ function checkResponseFields(commandString) {
             "isWritablePrimary is not true, command response: " + tojson(commandResponse),
         );
     } else {
-        assert.eq(commandResponse.ismaster, true, "ismaster is not true, command response: " + tojson(commandResponse));
+        assert.eq(
+            commandResponse.ismaster,
+            true,
+            "ismaster is not true, command response: " + tojson(commandResponse),
+        );
         assert.eq(
             commandResponse.isWritablePrimary,
             undefined,

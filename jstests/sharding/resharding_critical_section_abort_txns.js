@@ -158,7 +158,9 @@ const dbName = "testDb";
 const testDB = st.s.getDB(dbName);
 
 // Make shard0 the primary shard for the test database.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 /**
  * Tests transitioning to "preparing-to-block-writes" state while there are unprepared transactions
@@ -209,11 +211,15 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
     const setParameterResCriticalSectionTimeout = assert.commandWorked(
         configPrimary.adminCommand({
             setParameter: 1,
-            reshardingCriticalSectionTimeoutMillis: reshardingCriticalSectionTimeoutMillisForTimeoutTest,
+            reshardingCriticalSectionTimeoutMillis:
+                reshardingCriticalSectionTimeoutMillisForTimeoutTest,
         }),
     );
 
-    let beforeBlockingFp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
+    let beforeBlockingFp = configureFailPoint(
+        configPrimary,
+        "reshardingPauseCoordinatorBeforeBlockingWrites",
+    );
 
     let moveCollThread = new Thread(runMoveCollection, st.s.host, ns0, st.shard0.shardName);
     moveCollThread.start();
@@ -224,19 +230,27 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
     jsTest.log("Starting a transaction on the donor shard involving the collection being moved");
     const lsid0 = {id: UUID()};
     const txnNumber0 = NumberLong(15);
-    assert.commandWorked(testDB.runCommand(makeInsertCmdObj(collName0, lsid0, txnNumber0, [{x: 1}])));
+    assert.commandWorked(
+        testDB.runCommand(makeInsertCmdObj(collName0, lsid0, txnNumber0, [{x: 1}])),
+    );
     let prepareRes0;
     if (testOptions.preparedTxns) {
-        prepareRes0 = assert.commandWorked(shard1Primary.adminCommand(makePrepareTxnCmdObj(lsid0, txnNumber0)));
+        prepareRes0 = assert.commandWorked(
+            shard1Primary.adminCommand(makePrepareTxnCmdObj(lsid0, txnNumber0)),
+        );
     }
 
     jsTest.log("Starting a transaction on the donor shard involving the other collection");
     const lsid1 = {id: UUID()};
     const txnNumber1 = NumberLong(25);
-    assert.commandWorked(testDB.runCommand(makeInsertCmdObj(collName1, lsid1, txnNumber1, [{x: 1}])));
+    assert.commandWorked(
+        testDB.runCommand(makeInsertCmdObj(collName1, lsid1, txnNumber1, [{x: 1}])),
+    );
     let prepareRes1;
     if (testOptions.preparedTxns) {
-        prepareRes1 = assert.commandWorked(shard1Primary.adminCommand(makePrepareTxnCmdObj(lsid1, txnNumber1)));
+        prepareRes1 = assert.commandWorked(
+            shard1Primary.adminCommand(makePrepareTxnCmdObj(lsid1, txnNumber1)),
+        );
     }
 
     jsTest.log("Unpausing moveCollection");
@@ -268,8 +282,12 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
         const moveCollRes = moveCollThread.returnData();
         assert.commandFailedWithCode(moveCollRes, ErrorCodes.ReshardingCriticalSectionTimeout);
 
-        assert.commandWorked(shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid0, txnNumber0, prepareRes0)));
-        assert.commandWorked(shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid1, txnNumber1, prepareRes1)));
+        assert.commandWorked(
+            shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid0, txnNumber0, prepareRes0)),
+        );
+        assert.commandWorked(
+            shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid1, txnNumber1, prepareRes1)),
+        );
 
         assert.eq(testColl0.find({x: 1}).itcount(), 1);
         assert.eq(testColl1.find({x: 1}).itcount(), 1);
@@ -281,7 +299,8 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
         setParameterResAbortUnpreparedTxns = assert.commandWorked(
             shard1Primary.adminCommand({
                 setParameter: 1,
-                reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites: setParameterResAbortUnpreparedTxns.was,
+                reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+                    setParameterResAbortUnpreparedTxns.was,
             }),
         );
     }
@@ -332,7 +351,10 @@ function testPreparingToBlockWritesWhileSessionCheckedOutNonCommitOrAbort() {
     assert.eq(testColl0.find().itcount(), 1);
     assert.eq(testColl1.find().itcount(), 1);
 
-    let beforeBlockingFp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
+    let beforeBlockingFp = configureFailPoint(
+        configPrimary,
+        "reshardingPauseCoordinatorBeforeBlockingWrites",
+    );
     let insertFp = configureFailPoint(shard1Primary, "hangDuringBatchInsert", {
         nss: ns0,
         shouldContinueOnInterrupt: true,
@@ -446,7 +468,10 @@ function testPreparingToBlockWritesWhileSessionCheckedOutCommitOrAbort() {
     assert.eq(testColl0.find().itcount(), 1);
     assert.eq(testColl1.find().itcount(), 1);
 
-    let beforeBlockingFp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
+    let beforeBlockingFp = configureFailPoint(
+        configPrimary,
+        "reshardingPauseCoordinatorBeforeBlockingWrites",
+    );
 
     let moveCollThread = new Thread(runMoveCollection, st.s.host, ns0, st.shard0.shardName);
     moveCollThread.start();
@@ -457,24 +482,44 @@ function testPreparingToBlockWritesWhileSessionCheckedOutCommitOrAbort() {
     jsTest.log("Starting a transaction on the donor shard involving the collection being moved");
     const lsid0 = {id: UUID()};
     const txnNumber0 = 15;
-    assert.commandWorked(testDB.runCommand(makeInsertCmdObj(collName0, lsid0, txnNumber0, [{x: 1}])));
+    assert.commandWorked(
+        testDB.runCommand(makeInsertCmdObj(collName0, lsid0, txnNumber0, [{x: 1}])),
+    );
 
     jsTest.log("Starting a transaction on the donor shard involving the other collection");
     const lsid1 = {id: UUID()};
     const txnNumber1 = 25;
-    assert.commandWorked(testDB.runCommand(makeInsertCmdObj(collName1, lsid1, txnNumber1, [{x: 1}])));
+    assert.commandWorked(
+        testDB.runCommand(makeInsertCmdObj(collName1, lsid1, txnNumber1, [{x: 1}])),
+    );
 
-    jsTest.log("Starting to commit the transaction on the donor shard involving the collection being moved");
-    jsTest.log("Starting to abort the transaction on the donor shard involving the other collection");
+    jsTest.log(
+        "Starting to commit the transaction on the donor shard involving the collection being moved",
+    );
+    jsTest.log(
+        "Starting to abort the transaction on the donor shard involving the other collection",
+    );
     let commitTxnFp = configureFailPoint(shard1Primary, "hangBeforeCommitingTxn", {
         uuid: lsid0.id,
         shouldCheckForInterrupt: true,
     });
-    let abortTxnFp = configureFailPoint(shard1Primary, "hangBeforeAbortingTxn", {shouldCheckForInterrupt: true});
+    let abortTxnFp = configureFailPoint(shard1Primary, "hangBeforeAbortingTxn", {
+        shouldCheckForInterrupt: true,
+    });
 
-    let txnThread0 = new Thread(runCommitTxnCmd, shard1Primary.host, extractUUIDFromObject(lsid0.id), txnNumber0);
+    let txnThread0 = new Thread(
+        runCommitTxnCmd,
+        shard1Primary.host,
+        extractUUIDFromObject(lsid0.id),
+        txnNumber0,
+    );
     txnThread0.start();
-    let txnThread1 = new Thread(runAbortTxnCmd, shard1Primary.host, extractUUIDFromObject(lsid1.id), txnNumber1);
+    let txnThread1 = new Thread(
+        runAbortTxnCmd,
+        shard1Primary.host,
+        extractUUIDFromObject(lsid1.id),
+        txnNumber1,
+    );
     txnThread1.start();
 
     jsTest.log("Waiting for commitTransaction to block");

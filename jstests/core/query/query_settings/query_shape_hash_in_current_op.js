@@ -44,7 +44,9 @@ describe("Query shape hash in $currentOp", function () {
     const kFailPointInFind = "waitInFindBeforeMakingBatch";
 
     function getQueryShapeHashFromCurrentOp(failPointName, cmd) {
-        jsTest.log.info(`[denis631] Create Fail Point ${failPointName} for '${coll.getFullName()}' collection.`);
+        jsTest.log.info(
+            `[denis631] Create Fail Point ${failPointName} for '${coll.getFullName()}' collection.`,
+        );
         const failPoint = configureFailPoint(db, failPointName, {nss: coll.getFullName()});
 
         jsTest.log.info(`[denis631] Start 'cmd' in parallel shell.`, {cmd});
@@ -72,7 +74,11 @@ describe("Query shape hash in $currentOp", function () {
                 {localOps: true},
             );
             jsTest.log.info("$currentOps", {currentOps});
-            assert.eq(1, currentOps.length, `expecting only 1 currentOp, 'currentOps': ${JSON.stringify(currentOps)}`);
+            assert.eq(
+                1,
+                currentOps.length,
+                `expecting only 1 currentOp, 'currentOps': ${JSON.stringify(currentOps)}`,
+            );
             assert(
                 currentOps[0].queryShapeHash,
                 `expect 'currentOp' to have queryShapeHash field. 'currentOps': ${JSON.stringify(currentOps)}`,
@@ -101,10 +107,16 @@ describe("Query shape hash in $currentOp", function () {
     });
 
     it("for find should be same as QueryShapeHash reported in explain", function () {
-        const queryShapeHashFromCurrentOp = getQueryShapeHashFromCurrentOp(kFailPointInFind, findQuery);
+        const queryShapeHashFromCurrentOp = getQueryShapeHashFromCurrentOp(
+            kFailPointInFind,
+            findQuery,
+        );
 
-        jsTest.log.info("Make sure query shape hash from '$currentOp' matches the one from explain.");
-        const queryShapeHashFromExplain = qsutils.getQueryShapeHashFromExplain(findQueryRepresentative);
+        jsTest.log.info(
+            "Make sure query shape hash from '$currentOp' matches the one from explain.",
+        );
+        const queryShapeHashFromExplain =
+            qsutils.getQueryShapeHashFromExplain(findQueryRepresentative);
         assert.eq(
             queryShapeHashFromCurrentOp,
             queryShapeHashFromExplain,

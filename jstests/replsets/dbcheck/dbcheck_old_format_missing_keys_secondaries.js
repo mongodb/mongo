@@ -7,7 +7,10 @@
  * ]
  */
 
-import {DbCheckOldFormatKeysTest, defaultNumDocs} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
+import {
+    DbCheckOldFormatKeysTest,
+    defaultNumDocs,
+} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
 import {
     checkHealthLog,
     forEachNonArbiterSecondary,
@@ -30,17 +33,30 @@ const rst = dbCheckTest.getRst();
 const primary = dbCheckTest.getPrimary();
 
 jsTestLog("Running dbCheck");
-runDbCheck(rst, primary.getDB(dbName), collName, {validateMode: "dataConsistencyAndMissingIndexKeysCheck"}, true);
+runDbCheck(
+    rst,
+    primary.getDB(dbName),
+    collName,
+    {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+    true,
+);
 
 // Verify that dbCheck does not find any inconsistency on the primary.
 checkHealthLog(primary.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, 0);
 
 forEachNonArbiterSecondary(rst, function (node) {
     // Verify that dbCheck detects the inconsistencies for each doc on the secondaries.
-    checkHealthLog(node.getDB("local").system.healthlog, logQueries.missingIndexKeysQuery, defaultNumDocs);
+    checkHealthLog(
+        node.getDB("local").system.healthlog,
+        logQueries.missingIndexKeysQuery,
+        defaultNumDocs,
+    );
 
     // Verify that dbCheck detects the inconsistencies for each doc on the secondaries.
-    const missingKeyEntries = node.getDB("local").system.healthlog.find(logQueries.missingIndexKeysQuery).toArray();
+    const missingKeyEntries = node
+        .getDB("local")
+        .system.healthlog.find(logQueries.missingIndexKeysQuery)
+        .toArray();
     for (const missingKeyEntry of missingKeyEntries) {
         const numMissingKeysForRecord = missingKeyEntry.data.context.missingIndexKeys.length;
         const recordId = missingKeyEntry.data.context.recordID;

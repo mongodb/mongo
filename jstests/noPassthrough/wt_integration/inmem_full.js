@@ -62,7 +62,9 @@ let res;
 let count = 0;
 for (
     let j = 0;
-    j < (2 /* The size should never be off by more than a factor of 2. */ * cacheKB) / (docSizeKB * batchSize);
+    j <
+    (2 /* The size should never be off by more than a factor of 2. */ * cacheKB) /
+        (docSizeKB * batchSize);
     j++
 ) {
     res = t.insert(batch);
@@ -86,7 +88,10 @@ assert.lt(count * docSizeKB, cacheKB * 1.5, "inserted data size is at most 150% 
 // Adding a large field to all existing documents should run out of memory.
 // This is the repro reported in SERVER-22599.
 const blob = randomBlob(docSizeKB);
-assert.commandFailedWithCode(t.update({}, {$set: {blob: blob}}, false, true), ErrorCodes.ExceededMemoryLimit);
+assert.commandFailedWithCode(
+    t.update({}, {$set: {blob: blob}}, false, true),
+    ErrorCodes.ExceededMemoryLimit,
+);
 
 // Indexes are sufficiently large that it should be impossible to add a new one.
 assert.commandFailedWithCode(t.createIndex({a: 1}), ErrorCodes.ExceededMemoryLimit);
@@ -97,7 +102,10 @@ assert.commandFailedWithCode(t.createIndex({a: 1}), ErrorCodes.ExceededMemoryLim
 // The `cursor` option became required in 3.6 unless you use `explain`; see
 // https://www.mongodb.com/docs/manual/reference/command/aggregate/#dbcmd.aggregate
 assert.commandFailedWithCode(
-    t.runCommand("aggregate", {pipeline: [{$project: {a: 1, b: 1}}, {$out: "test.out"}], cursor: {}}),
+    t.runCommand("aggregate", {
+        pipeline: [{$project: {a: 1, b: 1}}, {$out: "test.out"}],
+        cursor: {},
+    }),
     ErrorCodes.ExceededMemoryLimit,
 );
 

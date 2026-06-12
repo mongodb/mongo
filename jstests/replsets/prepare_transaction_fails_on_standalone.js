@@ -11,6 +11,9 @@ const testDB = standalone.getDB(dbName);
 
 assert.commandWorked(testDB.runCommand({create: collName}));
 
-assert.commandFailedWithCode(testDB.adminCommand({prepareTransaction: 1}), ErrorCodes.ReadConcernMajorityNotEnabled);
+assert.commandFailedWithCode(
+    testDB.adminCommand({prepareTransaction: 1}),
+    ErrorCodes.ReadConcernMajorityNotEnabled,
+);
 
 MongoRunner.stopMongod(standalone);

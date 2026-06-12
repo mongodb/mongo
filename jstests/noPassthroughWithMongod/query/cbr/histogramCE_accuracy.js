@@ -12,7 +12,10 @@ import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ArrayDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/array.js";
 import {BooleanDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/boolean.js";
-import {DateDataset, TimestampDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/date_time.js";
+import {
+    DateDataset,
+    TimestampDataset,
+} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/date_time.js";
 import {
     OneHoleDataset,
     OnePeakDataset,
@@ -40,7 +43,11 @@ const coll = db[collName];
 function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
     try {
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: true,
+                internalQueryCBRCEMode: "histogramCE",
+            }),
         );
 
         coll.drop();
@@ -76,7 +83,9 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
                 );
 
                 jsTest.log.info({predicate});
-                print(`actualDocuments: ${actualDocuments}; cardinalityEstimate: ${cardinalityEstimate}`);
+                print(
+                    `actualDocuments: ${actualDocuments}; cardinalityEstimate: ${cardinalityEstimate}`,
+                );
 
                 if (Math.abs(actualDocuments - cardinalityEstimate) > 1) {
                     jsTest.log.info({plan});

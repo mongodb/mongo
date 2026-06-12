@@ -16,7 +16,12 @@ assert.commandWorked(mongosTestColl.insert({x: 1})); // Set up the collection.
 const sessionsColl = st.s.getCollection("config.system.sessions");
 const transactionsCollOnShard = shard0Primary.getCollection("config.transactions");
 
-function assertNumEntries({sessionUUID, numSessionsCollEntries, numTransactionsCollEntries, allowedDelta}) {
+function assertNumEntries({
+    sessionUUID,
+    numSessionsCollEntries,
+    numTransactionsCollEntries,
+    allowedDelta,
+}) {
     const filter = {"_id.id": sessionUUID};
 
     // Assert the number of entries is within a range because sometimes the session created by an
@@ -40,7 +45,9 @@ function assertNumEntries({sessionUUID, numSessionsCollEntries, numTransactionsC
 function runInternalTxn(conn, lsid) {
     const testInternalTxnCmdObj = {
         testInternalTransactions: 1,
-        commandInfos: [{dbName: kDbName, command: {insert: kCollName, documents: [{x: -10}, {x: 10}]}}],
+        commandInfos: [
+            {dbName: kDbName, command: {insert: kCollName, documents: [{x: -10}, {x: 10}]}},
+        ],
         lsid: lsid,
     };
     assert.commandWorked(conn.adminCommand(testInternalTxnCmdObj));

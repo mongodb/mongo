@@ -39,7 +39,9 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 const numInitialDocs = 100;
@@ -52,7 +54,10 @@ assert.commandWorked(bulk.execute());
 const donorPrimary = st.rs0.getPrimary();
 const recipientPrimary = st.rs1.getPrimary();
 
-const hangBeforeCriticalSectionFp = configureFailPoint(donorPrimary, "hangBeforeEnteringCriticalSection");
+const hangBeforeCriticalSectionFp = configureFailPoint(
+    donorPrimary,
+    "hangBeforeEnteringCriticalSection",
+);
 
 jsTest.log.info("Starting moveChunk in background");
 const awaitResult = startParallelShell(
@@ -78,11 +83,14 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(testColl.update({_id: i}, {$set: {payload: "updated"}}));
 }
 
-const donorCountNonDeprioritizableBeforeMigration = getTotalMarkedNonDeprioritizableCount(donorPrimary);
-const recipientCountNonDeprioritizableBeforeMigration = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
+const donorCountNonDeprioritizableBeforeMigration =
+    getTotalMarkedNonDeprioritizableCount(donorPrimary);
+const recipientCountNonDeprioritizableBeforeMigration =
+    getTotalMarkedNonDeprioritizableCount(recipientPrimary);
 
 jsTest.log.info(
-    "Donor totalMarkedNonDeprioritizable before critical section: " + donorCountNonDeprioritizableBeforeMigration,
+    "Donor totalMarkedNonDeprioritizable before critical section: " +
+        donorCountNonDeprioritizableBeforeMigration,
 );
 jsTest.log.info(
     "Recipient totalMarkedNonDeprioritizable before critical section: " +
@@ -94,12 +102,18 @@ hangBeforeCriticalSectionFp.off();
 
 awaitResult();
 
-const donorCountNonDeprioritizableAfterMigration = getTotalMarkedNonDeprioritizableCount(donorPrimary);
-const recipientCountNonDeprioritizableAfterMigration = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
+const donorCountNonDeprioritizableAfterMigration =
+    getTotalMarkedNonDeprioritizableCount(donorPrimary);
+const recipientCountNonDeprioritizableAfterMigration =
+    getTotalMarkedNonDeprioritizableCount(recipientPrimary);
 
-jsTest.log.info("Donor totalMarkedNonDeprioritizable after migration: " + donorCountNonDeprioritizableAfterMigration);
 jsTest.log.info(
-    "Recipient totalMarkedNonDeprioritizable after migration: " + recipientCountNonDeprioritizableAfterMigration,
+    "Donor totalMarkedNonDeprioritizable after migration: " +
+        donorCountNonDeprioritizableAfterMigration,
+);
+jsTest.log.info(
+    "Recipient totalMarkedNonDeprioritizable after migration: " +
+        recipientCountNonDeprioritizableAfterMigration,
 );
 
 assert.gt(
@@ -115,7 +129,9 @@ assert.gt(
 
 const donorCountDeprioritizableBeforeRangeDeletion = getTotalDeprioritizationCount(donorPrimary);
 
-assert.commandWorked(donorPrimary.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}));
+assert.commandWorked(
+    donorPrimary.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}),
+);
 assert.soon(() => {
     return donorPrimary.getCollection("config.rangeDeletions").countDocuments({}) === 0;
 }, "Timed out waiting for range deletions to complete on donor");

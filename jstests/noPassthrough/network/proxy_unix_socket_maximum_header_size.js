@@ -36,7 +36,10 @@ function setParameterWithAssert(conn, kvp, shouldSucceed = true) {
     const result = conn.adminCommand(command);
 
     const assertion = shouldSucceed ? assert.commandWorked : assert.commandFailed;
-    assertion(result, `Expected setParameter for ${kvp} ${shouldSucceed ? "to succeed" : "to fail"}`);
+    assertion(
+        result,
+        `Expected setParameter for ${kvp} ${shouldSucceed ? "to succeed" : "to fail"}`,
+    );
 }
 
 function getParameter(conn, param) {
@@ -52,7 +55,8 @@ function setParameterTest(conn) {
 
     // proxyUnixSocketMaximumHeaderSize can be btwn kDefaultHeaderSize and kMaxConfigurableProxyUnixSocketHeaderSize.
     setParameterWithAssert(conn, {
-        proxyUnixSocketMaximumHeaderSize: (kMaxConfigurableProxyUnixSocketHeaderSize + kDefaultHeaderSize) / 2,
+        proxyUnixSocketMaximumHeaderSize:
+            (kMaxConfigurableProxyUnixSocketHeaderSize + kDefaultHeaderSize) / 2,
     });
 
     // proxyUnixSocketMaximumHeaderSize should be smaller than kMaxConfigurableProxyUnixSocketHeaderSize.
@@ -98,7 +102,11 @@ function runConnectTest(conn, prefix) {
     setParameterWithAssert(conn, {proxyProtocolTimeoutSecs: 1});
 
     // Phase 1: Proxy with TCP egress to the TCP proxy port — connection is not on proxy unix socket, so default limit applies.
-    currentProxyServer = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
+    currentProxyServer = new ProxyProtocolServer(
+        kProxyIngressPort,
+        kProxyEgressPort,
+        kProxyVersion,
+    );
     currentProxyServer.start();
     try {
         // When not using the proxy unix socket, we can only use a header up to kDefaultHeaderSize.
@@ -112,9 +120,14 @@ function runConnectTest(conn, prefix) {
     // Phase 2: Proxy with real unix socket egress — connection is on proxy unix socket.
     const proxySocketPath = makeProxySocketPath(prefix, conn.port);
     assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
-    currentProxyServer = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion, {
-        egressUnixSocket: proxySocketPath,
-    });
+    currentProxyServer = new ProxyProtocolServer(
+        kProxyIngressPort,
+        kProxyEgressPort,
+        kProxyVersion,
+        {
+            egressUnixSocket: proxySocketPath,
+        },
+    );
     currentProxyServer.start();
     try {
         // Now we can go past kDefaultHeaderSize.
@@ -127,7 +140,9 @@ function runConnectTest(conn, prefix) {
         assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1, false);
 
         // Test that we can configure the proxy unix socket max header size and have the previous header succeed.
-        setParameterWithAssert(conn, {proxyUnixSocketMaximumHeaderSize: kDefaultProxyUnixSocketHeaderSize + 1000});
+        setParameterWithAssert(conn, {
+            proxyUnixSocketMaximumHeaderSize: kDefaultProxyUnixSocketHeaderSize + 1000,
+        });
         assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1, true);
         assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1000, true);
 

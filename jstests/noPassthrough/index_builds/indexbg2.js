@@ -50,7 +50,11 @@ let waitParallel = function () {
 
 let turnFailPointOn = function (failPointName, i) {
     assert.commandWorked(
-        conn.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn", data: {fieldsToMatch: {i: i}}}),
+        conn.adminCommand({
+            configureFailPoint: failPointName,
+            mode: "alwaysOn",
+            data: {fieldsToMatch: {i: i}},
+        }),
     );
 };
 
@@ -83,7 +87,11 @@ let failOnInsertedDuplicateValue = function (coll) {
     try {
         bgIndexBuildPid = indexBuild();
 
-        jsTestLog("Waiting to hang index build during collection scan before insertion of {i: " + duplicateKey + "}");
+        jsTestLog(
+            "Waiting to hang index build during collection scan before insertion of {i: " +
+                duplicateKey +
+                "}",
+        );
         checkLog.containsJson(conn, 20386, {
             where: "before",
             doc: function (doc) {
@@ -119,7 +127,11 @@ let succeedWithoutWriteErrors = function (coll, newKey) {
     try {
         bgIndexBuildPid = indexBuild();
 
-        jsTestLog("Waiting to hang index build during collection scan after insertion of {i: " + duplicateKey + "}");
+        jsTestLog(
+            "Waiting to hang index build during collection scan after insertion of {i: " +
+                duplicateKey +
+                "}",
+        );
         checkLog.containsJson(conn, 20386, {
             where: "after",
             doc: function (doc) {

@@ -89,9 +89,13 @@ function testMultipleDbCheckOnDiffCollections(docSuffix) {
     assert.eq(primaryColl2.find({}).count(), nDocs);
 
     // Set up inconsistency for coll1.
-    const skipUnindexingDocumentWhenDeleted1 = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-        indexName: "a_1",
-    });
+    const skipUnindexingDocumentWhenDeleted1 = configureFailPoint(
+        primaryDB,
+        "skipUnindexingDocumentWhenDeleted",
+        {
+            indexName: "a_1",
+        },
+    );
     jsTestLog("Deleting docs");
     assert.commandWorked(primaryColl1.deleteMany({}));
     replSet.awaitReplication();
@@ -131,21 +135,38 @@ function testMultipleDbCheckOnDiffCollections(docSuffix) {
         assert.eq(healthlogArray[i].data.dbCheckParameters.validateMode, "extraIndexKeysCheck");
     }
     assert.eq(healthlogArray[0].operation, "dbCheckStart");
-    assert.eq(healthlogArray[0].namespace, "dbCheckMultipleOperations.dbCheckMultipleOperations-collection1");
+    assert.eq(
+        healthlogArray[0].namespace,
+        "dbCheckMultipleOperations.dbCheckMultipleOperations-collection1",
+    );
     assert.eq(healthlogArray[12].operation, "dbCheckStop");
-    assert.eq(healthlogArray[12].namespace, "dbCheckMultipleOperations.dbCheckMultipleOperations-collection1");
+    assert.eq(
+        healthlogArray[12].namespace,
+        "dbCheckMultipleOperations.dbCheckMultipleOperations-collection1",
+    );
 
     for (let i = 13; i <= 26; i++) {
-        assert.eq(healthlogArray[i].data.dbCheckParameters.validateMode, "dataConsistencyAndMissingIndexKeysCheck");
+        assert.eq(
+            healthlogArray[i].data.dbCheckParameters.validateMode,
+            "dataConsistencyAndMissingIndexKeysCheck",
+        );
     }
     assert.eq(healthlogArray[13].operation, "dbCheckStart");
-    assert.eq(healthlogArray[13].namespace, "dbCheckMultipleOperations.dbCheckMultipleOperations-collection2");
+    assert.eq(
+        healthlogArray[13].namespace,
+        "dbCheckMultipleOperations.dbCheckMultipleOperations-collection2",
+    );
     assert.eq(healthlogArray[26].operation, "dbCheckStop");
-    assert.eq(healthlogArray[26].namespace, "dbCheckMultipleOperations.dbCheckMultipleOperations-collection2");
+    assert.eq(
+        healthlogArray[26].namespace,
+        "dbCheckMultipleOperations.dbCheckMultipleOperations-collection2",
+    );
 }
 
 function testTooManyDbChecks(docSuffix) {
-    jsTestLog("Testing that running too many dbcheck operations will generate an error health log entry.");
+    jsTestLog(
+        "Testing that running too many dbcheck operations will generate an error health log entry.",
+    );
 
     const collectionNames = [collName1, collName2, collName3, collName4, collName5, collName6];
     collectionNames.forEach((collName) => {
@@ -162,9 +183,13 @@ function testTooManyDbChecks(docSuffix) {
 
     // Set up inconsistency for coll1.
     const primaryColl1 = primaryDB.getCollection(collName1);
-    const skipUnindexingDocumentWhenDeleted1 = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-        indexName: "a_1",
-    });
+    const skipUnindexingDocumentWhenDeleted1 = configureFailPoint(
+        primaryDB,
+        "skipUnindexingDocumentWhenDeleted",
+        {
+            indexName: "a_1",
+        },
+    );
     jsTestLog("Deleting docs");
     assert.commandWorked(primaryColl1.deleteMany({}));
     replSet.awaitReplication();
@@ -250,4 +275,7 @@ testMultipleDbCheckOnDiffCollections("");
 testTooManyDbChecks("aaaaaaaaaa");
 testQueuedDbCheckStepDown("");
 
-replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+replSet.stopSet(undefined /* signal */, false /* forRestart */, {
+    skipCheckDBHashes: true,
+    skipValidation: true,
+});

@@ -122,7 +122,9 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         const adminDB = replSet.getPrimary().getDB("admin");
         const featureFlagRequireTenantID = FeatureFlagUtil.isEnabled(adminDB, "RequireTenantID");
         const featureFlagSecurityToken = FeatureFlagUtil.isEnabled(adminDB, "SecurityToken");
-        const multitenancyDoc = assert.commandWorked(adminDB.adminCommand({getParameter: 1, multitenancySupport: 1}));
+        const multitenancyDoc = assert.commandWorked(
+            adminDB.adminCommand({getParameter: 1, multitenancySupport: 1}),
+        );
         if (
             multitenancyDoc.hasOwnProperty("multitenancySupport") &&
             multitenancyDoc.multitenancySupport &&
@@ -182,7 +184,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         let config = replSet.getReplSetConfigFromNode();
 
         // Make sure chaining is disabled, so that the tiebreaker cannot be used as a sync source.
-        assert.eq(config.settings.chainingAllowed, false, "Must set up ReplSetTest with chaining disabled.");
+        assert.eq(
+            config.settings.chainingAllowed,
+            false,
+            "Must set up ReplSetTest with chaining disabled.",
+        );
 
         // Make sure electionTimeoutMillis is set to high value to avoid unplanned elections in
         // the rollback test.
@@ -207,7 +213,9 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
 
         // Make sync source selection faster.
         replSet.nodes.forEach((node) => {
-            configureFailPoint(node, "forceBgSyncSyncSourceRetryWaitMS", {sleepMS: kRetryIntervalMS});
+            configureFailPoint(node, "forceBgSyncSyncSourceRetryWaitMS", {
+                sleepMS: kRetryIntervalMS,
+            });
             setFastGetMoreEnabled(node);
         });
 
@@ -247,7 +255,10 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
             () => {
                 try {
                     assert.commandWorked(
-                        node.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}),
+                        node.adminCommand({
+                            configureFailPoint: "setSmallOplogGetMoreMaxTimeMS",
+                            mode: "alwaysOn",
+                        }),
                         `Failed to enable setSmallOplogGetMoreMaxTimeMS failpoint.`,
                     );
                     return true;
@@ -272,7 +283,9 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         nodeOptions = nodeOptions || {};
         if (TestData.logComponentVerbosity) {
             nodeOptions["setParameter"] = nodeOptions["setParameter"] || {};
-            nodeOptions["setParameter"]["logComponentVerbosity"] = tojsononeline(TestData.logComponentVerbosity);
+            nodeOptions["setParameter"]["logComponentVerbosity"] = tojsononeline(
+                TestData.logComponentVerbosity,
+            );
         }
         if (TestData.syncdelay) {
             nodeOptions["syncdelay"] = TestData.syncdelay;
@@ -305,7 +318,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
 
     // This is an instance method primarily so it can be overridden in testing.
     this._checkDataConsistencyImpl = function () {
-        assert.eq(curState, State.kSteadyStateOps, "Not in kSteadyStateOps state, cannot check data consistency");
+        assert.eq(
+            curState,
+            State.kSteadyStateOps,
+            "Not in kSteadyStateOps state, cannot check data consistency",
+        );
 
         rst.awaitSecondaryNodes();
 
@@ -427,7 +444,10 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
                 }
 
                 let rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
-                assert(rbid > lastRBID, `Expected RBID to increment past ${lastRBID} on ${curSecondary.host}`);
+                assert(
+                    rbid > lastRBID,
+                    `Expected RBID to increment past ${lastRBID} on ${curSecondary.host}`,
+                );
 
                 assert.eq(oplogTop(curPrimary), oplogTop(curSecondary));
 
@@ -606,7 +626,10 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // trying to send out a new round of heartbeats, that indicates that rollback was already
         // in progress and had closed connections, so there's no need to retry the command.
         curSecondary.reconnect([curPrimary]);
-        assert.adminCommandWorkedAllowingNetworkError(curSecondary, {replSetTest: 1, restartHeartbeats: 1});
+        assert.adminCommandWorkedAllowingNetworkError(curSecondary, {
+            replSetTest: 1,
+            restartHeartbeats: 1,
+        });
 
         log(`RollbackTest transition to ${curState} took ${new Date() - start} ms`);
         return curPrimary;
@@ -683,7 +706,9 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // Fail-point will clear on restart so do post-start.
         setFastGetMoreEnabled(rst.nodes[nodeId]);
         // Make sync source selection faster.
-        configureFailPoint(rst.nodes[nodeId], "forceBgSyncSyncSourceRetryWaitMS", {sleepMS: kRetryIntervalMS});
+        configureFailPoint(rst.nodes[nodeId], "forceBgSyncSyncSourceRetryWaitMS", {
+            sleepMS: kRetryIntervalMS,
+        });
 
         // Step up if the restarted node is the current primary.
         if (rst.getNodeId(curPrimary) === nodeId) {

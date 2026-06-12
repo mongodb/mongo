@@ -32,7 +32,10 @@ import {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     replSet.startSet();
@@ -114,7 +117,9 @@ import {
     }
 
     function indexDropAfterFirstBatch() {
-        jsTestLog("Testing that dbcheck will not error when index is dropped in the middle of a dbcheck run.");
+        jsTestLog(
+            "Testing that dbcheck will not error when index is dropped in the middle of a dbcheck run.",
+        );
 
         clearHealthLog(replSet);
         primaryDB[collName].drop();
@@ -168,5 +173,8 @@ import {
 
     indexDropAfterFirstBatch();
 
-    replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+    replSet.stopSet(undefined /* signal */, false /* forRestart */, {
+        skipCheckDBHashes: true,
+        skipValidation: true,
+    });
 })();

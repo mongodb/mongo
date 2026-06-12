@@ -80,7 +80,8 @@ function runTest(numDocs) {
                 checkLog.checkContainsOnceJson(secondary, 7261800, attr)
             );
         },
-        "Could not find log entries containing the id: 4718200 or 7261800, and attrs: " + tojson(attr),
+        "Could not find log entries containing the id: 4718200 or 7261800, and attrs: " +
+            tojson(attr),
         timeoutMillis,
         300,
         {runHangAnalyzer: false},

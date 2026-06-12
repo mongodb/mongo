@@ -11,12 +11,17 @@
  *   requires_timeseries,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
 const unpackStage = getAggPlanStage(coll.explain().aggregate(), "$_internalUnpackBucket");
 assert(unpackStage.$_internalUnpackBucket);
 
@@ -27,7 +32,11 @@ assert.commandWorked(coll.insert(docs));
 // Make sure $_internalBoundedSort accepts it.
 const result = getTimeseriesCollForRawOps(coll)
     .aggregate(
-        [{$sort: {"control.min.t": 1}}, unpackStage, {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}}}],
+        [
+            {$sort: {"control.min.t": 1}},
+            unpackStage,
+            {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}}},
+        ],
         kRawOperationSpec,
     )
     .toArray();

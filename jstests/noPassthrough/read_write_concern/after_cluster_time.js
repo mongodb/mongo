@@ -16,7 +16,10 @@ assert.commandWorked(
 
 // afterClusterTime reads without a level fail.
 assert.commandFailedWithCode(
-    testDB.runCommand({find: "after_cluster_time", readConcern: {afterClusterTime: Timestamp(0, 0)}}),
+    testDB.runCommand({
+        find: "after_cluster_time",
+        readConcern: {afterClusterTime: Timestamp(0, 0)},
+    }),
     ErrorCodes.InvalidOptions,
     "expected non-majority afterClusterTime read to fail on standalone mongod",
 );

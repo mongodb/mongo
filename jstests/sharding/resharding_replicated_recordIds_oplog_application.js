@@ -120,5 +120,10 @@ reshardingTest.withReshardingInBackground(
     },
 );
 
-assertShardContents(recipient0, [...donor0Docs, ...donor0DocsOplogApp, ...donor1Docs, ...donor1DocsOplogApp]);
+assertShardContents(recipient0, [
+    ...donor0Docs,
+    ...donor0DocsOplogApp,
+    ...donor1Docs,
+    ...donor1DocsOplogApp,
+]);
 reshardingTest.teardown();

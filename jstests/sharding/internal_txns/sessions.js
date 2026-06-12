@@ -14,7 +14,10 @@ TestData.disableImplicitSessions = true;
 const st = new ShardingTest({
     shards: 1,
     mongosOptions: {
-        setParameter: {maxSessions: 1, "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"},
+        setParameter: {
+            maxSessions: 1,
+            "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
+        },
     },
     // Add shard coordinators and create collection coordinators use sessions internally, so this
     // needs to be higher to allow for these operations to succeed.
@@ -33,7 +36,10 @@ const kConfigSessionNs = "config.system.sessions";
     // Verify that internal sessions are only supported in transactions.
     const sessionUUID = UUID();
 
-    jsTest.log("Test running an internal session with lsid containing txnNumber and " + "txnUUID outside transaction");
+    jsTest.log(
+        "Test running an internal session with lsid containing txnNumber and " +
+            "txnUUID outside transaction",
+    );
     const lsid1 = {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()};
     assert.commandFailedWithCode(
         testDB.runCommand({
@@ -53,7 +59,9 @@ const kConfigSessionNs = "config.system.sessions";
         ErrorCodes.InvalidOptions,
     );
 
-    jsTest.log("Test running an internal session with with lsid containing txnUUID outside transaction");
+    jsTest.log(
+        "Test running an internal session with with lsid containing txnUUID outside transaction",
+    );
     const lsid2 = {id: sessionUUID, txnUUID: UUID()};
     assert.commandFailedWithCode(
         testDB.runCommand({
@@ -79,7 +87,9 @@ const kConfigSessionNs = "config.system.sessions";
 })();
 
 (() => {
-    jsTest.log("Test that the only supported child lsid formats are txnNumber+txnUUID, and txnUUID");
+    jsTest.log(
+        "Test that the only supported child lsid formats are txnNumber+txnUUID, and txnUUID",
+    );
 
     const sessionUUID = UUID();
 
@@ -114,9 +124,16 @@ const kConfigSessionNs = "config.system.sessions";
 
     const parentLsid = {id: sessionUUID};
     assert.commandWorked(
-        testDB.runCommand({insert: kCollName, documents: [{x: 0}], lsid: parentLsid, txnNumber: NumberLong(0)}),
+        testDB.runCommand({
+            insert: kCollName,
+            documents: [{x: 0}],
+            lsid: parentLsid,
+            txnNumber: NumberLong(0),
+        }),
     );
-    const parentSessionDoc = shard0Primary.getCollection(kConfigTxnNs).findOne({"_id.id": sessionUUID});
+    const parentSessionDoc = shard0Primary
+        .getCollection(kConfigTxnNs)
+        .findOne({"_id.id": sessionUUID});
     assert.neq(parentSessionDoc, null);
     assert(!parentSessionDoc.hasOwnProperty("parentLsid"));
 
@@ -125,7 +142,12 @@ const kConfigSessionNs = "config.system.sessions";
 
     // Starting an unrelated session should fail since the cache size is 1.
     assert.commandFailedWithCode(
-        testDB.runCommand({insert: kCollName, documents: [{x: 0}], lsid: {id: UUID()}, txnNumber: NumberLong(0)}),
+        testDB.runCommand({
+            insert: kCollName,
+            documents: [{x: 0}],
+            lsid: {id: UUID()},
+            txnNumber: NumberLong(0),
+        }),
         ErrorCodes.TooManyLogicalSessions,
     );
 
@@ -160,7 +182,10 @@ const kConfigSessionNs = "config.system.sessions";
         "_id.txnUUID": childLsid1.txnUUID,
     });
     assert.neq(childSessionDoc1, null);
-    assert.eq(childSessionDoc1.parentLsid, {id: childSessionDoc1._id.id, uid: childSessionDoc1._id.uid});
+    assert.eq(childSessionDoc1.parentLsid, {
+        id: childSessionDoc1._id.id,
+        uid: childSessionDoc1._id.uid,
+    });
 
     jsTest.log("Test running an internal transaction with lsid containing txnUUID");
     const childLsid2 = {id: sessionUUID, txnUUID: UUID()};
@@ -194,7 +219,10 @@ const kConfigSessionNs = "config.system.sessions";
 
     assert.eq(3, shard0Primary.getCollection(kConfigTxnNs).count({"_id.id": sessionUUID}));
     assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
-    const sessionDocs = shard0Primary.getCollection(kConfigSessionNs).find({"_id.id": sessionUUID}).toArray();
+    const sessionDocs = shard0Primary
+        .getCollection(kConfigSessionNs)
+        .find({"_id.id": sessionUUID})
+        .toArray();
     assert.eq(sessionDocs.length, 1);
     assert(!sessionDocs[0]._id.hasOwnProperty("txnTxnNumber"), tojson(sessionDocs[0]));
     assert(!sessionDocs[0]._id.hasOwnProperty("txnUUID"), tojson(sessionDocs[0]));

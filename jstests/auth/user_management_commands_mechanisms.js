@@ -18,11 +18,17 @@ function checkUser(userid, passwd, haveSCRAMSHA1, haveSCRAMSHA256) {
     function checkLogin(mech, digestOK, nodigestOK) {
         assert(test.auth({user: userid, pwd: passwd, mechanism: mech}));
         test.logout();
-        assert.eq(digestOK, test.auth({user: userid, pwd: passwd, mechanism: mech, digestPassword: true}));
+        assert.eq(
+            digestOK,
+            test.auth({user: userid, pwd: passwd, mechanism: mech, digestPassword: true}),
+        );
         if (digestOK) {
             test.logout();
         }
-        assert.eq(nodigestOK, test.auth({user: userid, pwd: passwd, mechanism: mech, digestPassword: false}));
+        assert.eq(
+            nodigestOK,
+            test.auth({user: userid, pwd: passwd, mechanism: mech, digestPassword: false}),
+        );
         if (nodigestOK) {
             test.logout();
         }
@@ -40,13 +46,24 @@ function checkUser(userid, passwd, haveSCRAMSHA1, haveSCRAMSHA256) {
     assert.eq(userInfo.users[0].mechanisms.includes("SCRAM-SHA-256"), haveSCRAMSHA256);
 
     // usersInfo with showCredentials shows correct mechanisms and credentials
-    const userInfoWithCredentials = assert.commandWorked(test.runCommand({usersInfo: userid, showCredentials: true}));
+    const userInfoWithCredentials = assert.commandWorked(
+        test.runCommand({usersInfo: userid, showCredentials: true}),
+    );
     print(tojson(userInfoWithCredentials));
-    assert.eq(userInfoWithCredentials.users[0].credentials.hasOwnProperty("SCRAM-SHA-1"), haveSCRAMSHA1);
-    assert.eq(userInfoWithCredentials.users[0].credentials.hasOwnProperty("SCRAM-SHA-256"), haveSCRAMSHA256);
+    assert.eq(
+        userInfoWithCredentials.users[0].credentials.hasOwnProperty("SCRAM-SHA-1"),
+        haveSCRAMSHA1,
+    );
+    assert.eq(
+        userInfoWithCredentials.users[0].credentials.hasOwnProperty("SCRAM-SHA-256"),
+        haveSCRAMSHA256,
+    );
     assert(Array.isArray(userInfoWithCredentials.users[0].mechanisms));
     assert.eq(userInfoWithCredentials.users[0].mechanisms.includes("SCRAM-SHA-1"), haveSCRAMSHA1);
-    assert.eq(userInfoWithCredentials.users[0].mechanisms.includes("SCRAM-SHA-256"), haveSCRAMSHA256);
+    assert.eq(
+        userInfoWithCredentials.users[0].mechanisms.includes("SCRAM-SHA-256"),
+        haveSCRAMSHA256,
+    );
     admin.logout();
 
     if (haveSCRAMSHA1) {
@@ -108,20 +125,40 @@ createUser(test, {user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 checkUser("user", "pass", true, true);
 
 // Request SHA1 only.
-createUser(test, {user: "sha1user", pwd: "pass", roles: jsTest.basicUserRoles, mechanisms: ["SCRAM-SHA-1"]});
+createUser(test, {
+    user: "sha1user",
+    pwd: "pass",
+    roles: jsTest.basicUserRoles,
+    mechanisms: ["SCRAM-SHA-1"],
+});
 checkUser("sha1user", "pass", true, false);
 
 // Request SHA256 only.
-createUser(test, {user: "sha256user", pwd: "pass", roles: jsTest.basicUserRoles, mechanisms: ["SCRAM-SHA-256"]});
+createUser(test, {
+    user: "sha256user",
+    pwd: "pass",
+    roles: jsTest.basicUserRoles,
+    mechanisms: ["SCRAM-SHA-256"],
+});
 checkUser("sha256user", "pass", false, true);
 
 // Fail passing an empty mechanisms field.
-createUserThrows(test, {user: "userNoMech", pwd: "pass", roles: jsTest.basicUserRoles, mechanisms: []});
+createUserThrows(test, {
+    user: "userNoMech",
+    pwd: "pass",
+    roles: jsTest.basicUserRoles,
+    mechanisms: [],
+});
 
 // Repeat above, but request client-side digesting.
 // Only the SCRAM-SHA-1 exclusive version should succeed.
 
-createUserThrows(test, {user: "user2", pwd: "pass", roles: jsTest.basicUserRoles, passwordDisgestor: "client"});
+createUserThrows(test, {
+    user: "user2",
+    pwd: "pass",
+    roles: jsTest.basicUserRoles,
+    passwordDisgestor: "client",
+});
 
 createUser(test, {
     user: "sha1user2",
@@ -205,7 +242,12 @@ updateUserAsUser(test, kSetOwnMechsUser, {mechanisms: ["SCRAM-SHA-256"]}, kSetOw
 checkUser(kSetOwnMechsUser, "pass", false, true);
 
 // Succeed if we're using SHA-1 only.
-createUser(test, {user: "\u2168", pwd: "pass", roles: jsTest.basicUserRoles, mechanisms: ["SCRAM-SHA-1"]});
+createUser(test, {
+    user: "\u2168",
+    pwd: "pass",
+    roles: jsTest.basicUserRoles,
+    mechanisms: ["SCRAM-SHA-1"],
+});
 checkUser("\u2168", "pass", true, false);
 
 assert(admin.auth("admin", "pass"));
@@ -217,7 +259,9 @@ allUsersInfo.users.forEach(function (userObj) {
 });
 
 // Demonstrate that usersInfo can return all users with credentials
-const allUsersInfoWithCredentials = assert.commandWorked(test.runCommand({usersInfo: 1, showCredentials: true}));
+const allUsersInfoWithCredentials = assert.commandWorked(
+    test.runCommand({usersInfo: 1, showCredentials: true}),
+);
 allUsersInfoWithCredentials.users.forEach(function (userObj) {
     assert(userObj.credentials !== undefined);
     assert(!Array.isArray(userObj.credentials));

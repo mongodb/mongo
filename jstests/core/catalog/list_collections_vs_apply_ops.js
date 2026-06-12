@@ -25,7 +25,9 @@ jsTest.log("Test that the collection metadata object is returned correctly");
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("userColl"));
     assert.commandWorked(
-        mydb.runCommand({applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "bar", temp: true}}]}),
+        mydb.runCommand({
+            applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "bar", temp: true}}],
+        }),
     );
     assert.eq(
         1,
@@ -47,7 +49,9 @@ jsTest.log('The "filter" option of listCollections may target temporary collecti
     assert.commandWorked(mydb.createCollection("userColl"));
     assert.commandWorked(
         mydb.runCommand({
-            applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "tempColl", temp: true}}],
+            applyOps: [
+                {op: "c", ns: mydb.getName() + ".$cmd", o: {create: "tempColl", temp: true}},
+            ],
         }),
     );
 

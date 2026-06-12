@@ -57,6 +57,10 @@ assert(
 
 // Checks that new fields don't attempt to read slots yet to be produced by the same stage.
 let addFieldResult1 = coll
-    .aggregate([{$addFields: {"obj": "$2i", "result": {"$multiply": ["$obj", "$3i"]}}}, {$sort: {obj: 1}}, {$limit: 2}])
+    .aggregate([
+        {$addFields: {"obj": "$2i", "result": {"$multiply": ["$obj", "$3i"]}}},
+        {$sort: {obj: 1}},
+        {$limit: 2},
+    ])
     .toArray();
 assert.eq(2, addFieldResult1.length, addFieldResult1);

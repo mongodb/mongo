@@ -24,10 +24,16 @@ let res;
 //
 
 // Non-array arrayFilters fails to parse.
-assert.writeError(coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: {i: 0}}), ErrorCodes.TypeMismatch);
+assert.writeError(
+    coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: {i: 0}}),
+    ErrorCodes.TypeMismatch,
+);
 
 // Non-object array filter fails to parse.
-assert.writeError(coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: ["bad"]}), ErrorCodes.TypeMismatch);
+assert.writeError(
+    coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: ["bad"]}),
+    ErrorCodes.TypeMismatch,
+);
 
 // Bad array filter fails to parse.
 res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0, j: 0}]});
@@ -39,11 +45,17 @@ assert.neq(
 );
 
 // Multiple array filters with the same id fails to parse.
-res = coll.update({_id: 0}, {$set: {"a.$[i]": 5, "a.$[j]": 6}}, {arrayFilters: [{i: 0}, {j: 0}, {i: 1}]});
+res = coll.update(
+    {_id: 0},
+    {$set: {"a.$[i]": 5, "a.$[j]": 6}},
+    {arrayFilters: [{i: 0}, {j: 0}, {i: 1}]},
+);
 assert.writeErrorWithCode(res, ErrorCodes.FailedToParse);
 assert.neq(
     -1,
-    res.getWriteError().errmsg.indexOf("Found multiple array filters with the same top-level field name"),
+    res
+        .getWriteError()
+        .errmsg.indexOf("Found multiple array filters with the same top-level field name"),
     "update failed for a reason other than multiple array filters with the same top-level field name",
 );
 
@@ -54,7 +66,9 @@ assert.neq(
     -1,
     res
         .getWriteError()
-        .errmsg.indexOf("The array filter for identifier 'j' was not used in the update { $set: { a.$[i]: 5.0 } }"),
+        .errmsg.indexOf(
+            "The array filter for identifier 'j' was not used in the update { $set: { a.$[i]: 5.0 } }",
+        ),
     "update failed for a reason other than unused array filter",
 );
 
@@ -63,7 +77,9 @@ res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$alwaysTrue:
 assert.writeErrorWithCode(res, ErrorCodes.FailedToParse);
 assert.neq(
     -1,
-    res.getWriteError().errmsg.indexOf("Cannot use an expression without a top-level field name in arrayFilters"),
+    res
+        .getWriteError()
+        .errmsg.indexOf("Cannot use an expression without a top-level field name in arrayFilters"),
     "update failed for a reason other than missing a top-level field name in arrayFilter",
 );
 
@@ -80,12 +96,20 @@ res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{loc: {$geoNe
 assert.writeErrorWithCode(res, [ErrorCodes.BadValue, 5626500]);
 
 // Array filter with $expr inside fails to parse.
-res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$expr: {$eq: ["$foo", "$bar"]}}]});
+res = coll.update(
+    {_id: 0},
+    {$set: {"a.$[i]": 5}},
+    {arrayFilters: [{$expr: {$eq: ["$foo", "$bar"]}}]},
+);
 assert.writeErrorWithCode(res, ErrorCodes.QueryFeatureNotAllowed);
 
 // Good value for arrayFilters succeeds.
-assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i]": 5, "a.$[j]": 6}}, {arrayFilters: [{i: 0}, {j: 0}]}));
-assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$or: [{i: 0}, {$and: [{}]}]}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$set: {"a.$[i]": 5, "a.$[j]": 6}}, {arrayFilters: [{i: 0}, {j: 0}]}),
+);
+assert.commandWorked(
+    coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$or: [{i: 0}, {$and: [{}]}]}]}),
+);
 
 //
 // Tests for findAndModify.
@@ -108,7 +132,11 @@ assert.throws(function () {
 
 // Bad array filter fails to parse.
 assert.throws(function () {
-    coll.findAndModify({query: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0, j: 0}]});
+    coll.findAndModify({
+        query: {_id: 0},
+        update: {$set: {"a.$[i]": 5}},
+        arrayFilters: [{i: 0, j: 0}],
+    });
 });
 
 // Multiple array filters with the same id fails to parse.
@@ -122,7 +150,10 @@ assert.throws(function () {
 
 // Unused array filter fails to parse.
 assert.throws(function () {
-    coll.findAndModify({query: {_id: 0}, update: {$set: {"a.$[i]": 5}, arrayFilters: [{i: 0}, {j: 0}]}});
+    coll.findAndModify({
+        query: {_id: 0},
+        update: {$set: {"a.$[i]": 5}, arrayFilters: [{i: 0}, {j: 0}]},
+    });
 });
 
 // Good value for arrayFilters succeeds.
@@ -201,16 +232,24 @@ assert.eq(0, res.modifiedCount);
 
 // updateOne with bulkWrite().
 assert.throws(function () {
-    coll.bulkWrite([{updateOne: {filter: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: "bad"}}]);
+    coll.bulkWrite([
+        {updateOne: {filter: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: "bad"}},
+    ]);
 });
-res = coll.bulkWrite([{updateOne: {filter: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}}]);
+res = coll.bulkWrite([
+    {updateOne: {filter: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}},
+]);
 assert.eq(0, res.matchedCount);
 
 // updateMany with bulkWrite().
 assert.throws(function () {
-    coll.bulkWrite([{updateMany: {filter: {}, update: {$set: {"a.$[i]": 5}}, arrayFilters: "bad"}}]);
+    coll.bulkWrite([
+        {updateMany: {filter: {}, update: {$set: {"a.$[i]": 5}}, arrayFilters: "bad"}},
+    ]);
 });
-res = coll.bulkWrite([{updateMany: {filter: {}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}}]);
+res = coll.bulkWrite([
+    {updateMany: {filter: {}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}},
+]);
 assert.eq(0, res.matchedCount);
 
 //
@@ -221,14 +260,22 @@ assert.eq(0, res.matchedCount);
 assert.throws(function () {
     coll.explain().update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: "bad"});
 });
-assert.commandWorked(coll.explain().update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]}));
+assert.commandWorked(
+    coll.explain().update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]}),
+);
 
 // findAndModify().
 assert.throws(function () {
-    coll.explain().findAndModify({query: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: "bad"});
+    coll.explain().findAndModify({
+        query: {_id: 0},
+        update: {$set: {"a.$[i]": 5}},
+        arrayFilters: "bad",
+    });
 });
 assert.commandWorked(
-    coll.explain().findAndModify({query: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}),
+    coll
+        .explain()
+        .findAndModify({query: {_id: 0}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}),
 );
 
 //
@@ -287,7 +334,9 @@ assert.neq(
     -1,
     res
         .getWriteError()
-        .errmsg.indexOf("The array filter for identifier 'i' was not used in the update { $rename: { a: \"b\" } }"),
+        .errmsg.indexOf(
+            "The array filter for identifier 'i' was not used in the update { $rename: { a: \"b\" } }",
+        ),
     "updated failed for reason other than unused array filter",
 );
 coll.drop();
@@ -303,7 +352,9 @@ res = coll.update({_id: 0}, {$rename: {"a": "b.$[]"}});
 assert.writeErrorWithCode(res, ErrorCodes.BadValue);
 assert.neq(
     -1,
-    res.getWriteError().errmsg.indexOf("The destination field for $rename may not be dynamic: b.$[]"),
+    res
+        .getWriteError()
+        .errmsg.indexOf("The destination field for $rename may not be dynamic: b.$[]"),
     "update failed for a reason other than using array updates with $rename",
 );
 assert.commandWorked(coll.update({_id: 0}, {$rename: {"a": "b"}}));
@@ -312,7 +363,11 @@ assert.eq(coll.findOne({_id: 0}), {_id: 0, b: [0]});
 // $setOnInsert.
 coll.drop();
 assert.commandWorked(
-    coll.update({_id: 0, a: [0]}, {$setOnInsert: {"a.$[i]": 1}}, {arrayFilters: [{i: 0}], upsert: true}),
+    coll.update(
+        {_id: 0, a: [0]},
+        {$setOnInsert: {"a.$[i]": 1}},
+        {arrayFilters: [{i: 0}], upsert: true},
+    ),
 );
 assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [1]});
 coll.drop();
@@ -384,7 +439,9 @@ assert.eq(coll.findOne({_id: 0}), {
 // $currentDate.
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [0, 1]}));
-assert.commandWorked(coll.update({_id: 0}, {$currentDate: {"a.$[i]": true}}, {arrayFilters: [{i: 0}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$currentDate: {"a.$[i]": true}}, {arrayFilters: [{i: 0}]}),
+);
 let doc = coll.findOne({_id: 0});
 assert(doc.a[0].constructor == Date, tojson(doc));
 assert.eq(doc.a[1], 1, printjson(doc));
@@ -438,7 +495,9 @@ assert.commandWorked(
         ],
     }),
 );
-assert.commandWorked(coll.update({_id: 0}, {$pullAll: {"a.$[i]": [0, 2]}}, {arrayFilters: [{i: 0}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$pullAll: {"a.$[i]": [0, 2]}}, {arrayFilters: [{i: 0}]}),
+);
 assert.eq(
     {
         _id: 0,
@@ -544,7 +603,9 @@ assert.eq(
 // $bit.
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [NumberInt(0), NumberInt(2)]}));
-assert.commandWorked(coll.update({_id: 0}, {$bit: {"a.$[i]": {or: NumberInt(10)}}}, {arrayFilters: [{i: 0}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$bit: {"a.$[i]": {or: NumberInt(10)}}}, {arrayFilters: [{i: 0}]}),
+);
 assert.eq({_id: 0, a: [NumberInt(10), NumberInt(2)]}, coll.findOne());
 assert.commandWorked(coll.remove({}));
 assert.commandWorked(coll.insert({_id: 0, a: [NumberInt(0), NumberInt(2)]}));
@@ -586,7 +647,9 @@ coll.drop();
 assert.commandWorked(db.createCollection(collName, {collation: {locale: "en_US", strength: 2}}));
 coll = db[collName];
 assert.commandWorked(coll.insert({_id: 0, a: ["foo", "FOO"]}));
-assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i]": "bar"}}, {arrayFilters: [{i: "foo"}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$set: {"a.$[i]": "bar"}}, {arrayFilters: [{i: "foo"}]}),
+);
 assert.eq(coll.findOne({_id: 0}), {_id: 0, a: ["bar", "bar"]});
 
 //
@@ -642,7 +705,9 @@ assert.commandWorked(
         ],
     }),
 );
-assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i].c.$[j].d": 2}}, {arrayFilters: [{"i.b": 0}, {"j.d": 0}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$set: {"a.$[i].c.$[j].d": 2}}, {arrayFilters: [{"i.b": 0}, {"j.d": 0}]}),
+);
 assert.eq(coll.findOne({_id: 0}), {
     _id: 0,
     a: [
@@ -654,7 +719,9 @@ assert.eq(coll.findOne({_id: 0}), {
 // Update all scalars in array matching a logical predicate.
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [0, 1, 3]}));
-assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i]": 2}}, {arrayFilters: [{$or: [{i: 0}, {i: 3}]}]}));
+assert.commandWorked(
+    coll.update({_id: 0}, {$set: {"a.$[i]": 2}}, {arrayFilters: [{$or: [{i: 0}, {i: 3}]}]}),
+);
 assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [2, 1, 2]});
 
 //
@@ -730,7 +797,8 @@ assert(
                 "The top-level field name must be an alphanumeric " +
                     "string beginning with a lowercase letter, found 'I'",
             ),
-    "update failed for a reason other than bad array filter identifier: " + tojson(res.getWriteError()),
+    "update failed for a reason other than bad array filter identifier: " +
+        tojson(res.getWriteError()),
 );
 
 assert.commandWorked(coll.insert({_id: 0, a: [0], b: [{j: 0}]}));

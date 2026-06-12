@@ -38,7 +38,10 @@ function runTest(cmd) {
     let failPoint = configureFailPoint(node, "waitForHelloResponse");
     // Send an awaitable hello/isMaster request. This will block until maxAwaitTimeMS has elapsed or
     // a topology change happens.
-    let firstCmdBeforeStepDown = startParallelShell(funWithArgs(runAwaitableCmd, cmd, topologyVersionField), node.port);
+    let firstCmdBeforeStepDown = startParallelShell(
+        funWithArgs(runAwaitableCmd, cmd, topologyVersionField),
+        node.port,
+    );
     failPoint.wait();
     // awaitingTopologyChanges should increment once.
     let numAwaitingTopologyChange = db.serverStatus().connections.awaitingTopologyChanges;

@@ -15,6 +15,8 @@ let o = {
 assert.commandWorked(t.save(o));
 assert.eq(o, t.findOne(), "A1");
 
-assert.commandWorked(t.update({"comments.by": "joe"}, {$inc: {"comments.$.votes": 1}}, false, true));
+assert.commandWorked(
+    t.update({"comments.by": "joe"}, {$inc: {"comments.$.votes": 1}}, false, true),
+);
 o.comments[0].votes++;
 assert.eq(o, t.findOne(), "A2");

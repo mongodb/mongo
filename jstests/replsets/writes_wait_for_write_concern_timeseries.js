@@ -25,7 +25,9 @@ replTest.initiate();
 
 const preSetupTimeseries = function (conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);
-    assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        db.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}),
+    );
 };
 
 checkWriteConcernBehaviorForAllCommands(

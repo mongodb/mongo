@@ -1,7 +1,10 @@
 // Test optimization of expressions of the form {$expr: {$eq: ["$a", 5]}}. When an index is available on the path "$a" and
 // the equality constant is not null, the original $expr is satisfied by the index scan and can be removed from the Fetch filter.
 
-import {tojsonMultiLineSortKeys, tojsonOnelineSortKeys} from "jstests/libs/query_optimization/golden_test.js";
+import {
+    tojsonMultiLineSortKeys,
+    tojsonOnelineSortKeys,
+} from "jstests/libs/query_optimization/golden_test.js";
 import {code, line, linebreak, section} from "jstests/libs/query/pretty_md.js";
 import {formatExplainRoot} from "jstests/libs/query/analyze_plan.js";
 
@@ -64,4 +67,7 @@ outputPlanAndResults([{$match: {$expr: {$eq: ["$a", null]}}}, {$project: {_id: 0
 outputPlanAndResults([{$match: {$expr: {$gt: ["$a", 1]}}}, {$project: {_id: 0, a: 1}}]);
 
 section(`Multikey index: the optimization of $expr is not eligible.`);
-outputPlanAndResults([{$match: {$expr: {$eq: ["$multiKeyField", 10]}}}, {$project: {_id: 0, multiKeyField: 1}}]);
+outputPlanAndResults([
+    {$match: {$expr: {$eq: ["$multiKeyField", 10]}}},
+    {$project: {_id: 0, multiKeyField: 1}},
+]);

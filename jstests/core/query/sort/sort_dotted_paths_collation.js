@@ -725,10 +725,38 @@ assert.commandWorked(coll.insert({_id: 3, a: "a", b: "Z"}));
 assert.commandWorked(coll.insert({_id: 4, a: "b", b: "x"}));
 assert.commandWorked(coll.insert({_id: 5, a: "B", b: "Y"}));
 assert.commandWorked(coll.insert({_id: 6, a: "B", b: "Z"}));
-testSortAndSortWithLimit({"a": 1, "b": 1}, [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}]);
-testSortAndSortWithLimit({"a": 1, "b": -1}, [{_id: 3}, {_id: 2}, {_id: 1}, {_id: 6}, {_id: 5}, {_id: 4}]);
-testSortAndSortWithLimit({"a": -1, "b": 1}, [{_id: 4}, {_id: 5}, {_id: 6}, {_id: 1}, {_id: 2}, {_id: 3}]);
-testSortAndSortWithLimit({"a": -1, "b": -1}, [{_id: 6}, {_id: 5}, {_id: 4}, {_id: 3}, {_id: 2}, {_id: 1}]);
+testSortAndSortWithLimit({"a": 1, "b": 1}, [
+    {_id: 1},
+    {_id: 2},
+    {_id: 3},
+    {_id: 4},
+    {_id: 5},
+    {_id: 6},
+]);
+testSortAndSortWithLimit({"a": 1, "b": -1}, [
+    {_id: 3},
+    {_id: 2},
+    {_id: 1},
+    {_id: 6},
+    {_id: 5},
+    {_id: 4},
+]);
+testSortAndSortWithLimit({"a": -1, "b": 1}, [
+    {_id: 4},
+    {_id: 5},
+    {_id: 6},
+    {_id: 1},
+    {_id: 2},
+    {_id: 3},
+]);
+testSortAndSortWithLimit({"a": -1, "b": -1}, [
+    {_id: 6},
+    {_id: 5},
+    {_id: 4},
+    {_id: 3},
+    {_id: 2},
+    {_id: 1},
+]);
 
 // Tests for a case where all values are scalar and the sort components have a common parent
 // path.
@@ -740,7 +768,35 @@ assert.commandWorked(coll.insert({_id: 3, obj: {a: "a", b: "Z"}}));
 assert.commandWorked(coll.insert({_id: 4, obj: {a: "b", b: "x"}}));
 assert.commandWorked(coll.insert({_id: 5, obj: {a: "B", b: "Y"}}));
 assert.commandWorked(coll.insert({_id: 6, obj: {a: "B", b: "Z"}}));
-testSortAndSortWithLimit({"obj.a": 1, "obj.b": 1}, [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}]);
-testSortAndSortWithLimit({"obj.a": 1, "obj.b": -1}, [{_id: 3}, {_id: 2}, {_id: 1}, {_id: 6}, {_id: 5}, {_id: 4}]);
-testSortAndSortWithLimit({"obj.a": -1, "obj.b": 1}, [{_id: 4}, {_id: 5}, {_id: 6}, {_id: 1}, {_id: 2}, {_id: 3}]);
-testSortAndSortWithLimit({"obj.a": -1, "obj.b": -1}, [{_id: 6}, {_id: 5}, {_id: 4}, {_id: 3}, {_id: 2}, {_id: 1}]);
+testSortAndSortWithLimit({"obj.a": 1, "obj.b": 1}, [
+    {_id: 1},
+    {_id: 2},
+    {_id: 3},
+    {_id: 4},
+    {_id: 5},
+    {_id: 6},
+]);
+testSortAndSortWithLimit({"obj.a": 1, "obj.b": -1}, [
+    {_id: 3},
+    {_id: 2},
+    {_id: 1},
+    {_id: 6},
+    {_id: 5},
+    {_id: 4},
+]);
+testSortAndSortWithLimit({"obj.a": -1, "obj.b": 1}, [
+    {_id: 4},
+    {_id: 5},
+    {_id: 6},
+    {_id: 1},
+    {_id: 2},
+    {_id: 3},
+]);
+testSortAndSortWithLimit({"obj.a": -1, "obj.b": -1}, [
+    {_id: 6},
+    {_id: 5},
+    {_id: 4},
+    {_id: 3},
+    {_id: 2},
+    {_id: 1},
+]);

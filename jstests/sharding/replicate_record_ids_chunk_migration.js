@@ -28,13 +28,19 @@ function moveSingleChunk(chunk, ns, keyDoc, useBounds) {
     // Move singleton chunk using specified method.
     if (useBounds) {
         assert.commandWorked(
-            mongos.adminCommand({moveChunk: ns, bounds: [chunk.min, chunk.max], to: shard1.shardName}),
+            mongos.adminCommand({
+                moveChunk: ns,
+                bounds: [chunk.min, chunk.max],
+                to: shard1.shardName,
+            }),
         );
     } else {
         // Select chunk using an equality match on the shard key using the 'find' option.
         const isHashed = !keyDoc;
         assert(!isHashed);
-        assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: keyDoc, to: shard1.shardName}));
+        assert.commandWorked(
+            mongos.adminCommand({moveChunk: ns, find: keyDoc, to: shard1.shardName}),
+        );
     }
 
     // Ensure that the chunk was successfully moved from the original shard 'shard0' to
@@ -73,7 +79,9 @@ function runMoveChunkReplicaRecordIDsTest(collName, keyDoc, useBounds, splitChun
             {name: "Lisa", b: 400}, // record ID: 4
         ]),
     );
-    jsTestLog(`All documents in ${ns} before deletion: ${tojson(coll.find().showRecordId().toArray())}`);
+    jsTestLog(
+        `All documents in ${ns} before deletion: ${tojson(coll.find().showRecordId().toArray())}`,
+    );
     assert.commandWorked(coll.remove({name: {$in: ["Alice", "Bob"]}}));
     const docs = coll.find().showRecordId().toArray();
     assert.eq(
@@ -114,9 +122,13 @@ function runMoveChunkReplicaRecordIDsTest(collName, keyDoc, useBounds, splitChun
     if (splitChunk) {
         assert(useBounds);
 
-        assert.commandWorked(mongos.adminCommand({split: ns, bounds: [initialChunk.min, initialChunk.max]}));
+        assert.commandWorked(
+            mongos.adminCommand({split: ns, bounds: [initialChunk.min, initialChunk.max]}),
+        );
         assert.eq(2, findChunksUtil.countChunksForNs(configDB, ns));
-        const chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: shard0.shardName}).toArray();
+        const chunks = findChunksUtil
+            .findChunksByNs(configDB, ns, {shard: shard0.shardName})
+            .toArray();
         jsTestLog(`${ns}: Chunks after split on ${shard0.shardName}: ${tojson(chunks)}`);
 
         chunks.forEach((chunk) => {

@@ -23,7 +23,9 @@ const unshardedColl = testDB.unsharded;
 const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 // Shard shardedColl on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1.
 st.shardColl(shardedColl, {x: 1}, {x: 0}, {x: 1});
@@ -64,7 +66,11 @@ function verifyLogContains(connections, inputArray, expectedNumOccurrences) {
 function setPostCommandFailpointOnShards({mode, options}) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: testDB.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "waitAfterCommandFinishesExecution", data: options, mode: mode},
+        cmdObj: {
+            configureFailPoint: "waitAfterCommandFinishesExecution",
+            data: options,
+            mode: mode,
+        },
     });
 }
 
@@ -164,7 +170,9 @@ function runCommentParamTest({
 
     // Verify that MongoS also shows the comment field in $currentOp.
     const localFilter = {
-        [`command.${cmdName}`]: ["explain", "getMore"].includes(cmdName) ? {$exists: true} : coll.getName(),
+        [`command.${cmdName}`]: ["explain", "getMore"].includes(cmdName)
+            ? {$exists: true}
+            : coll.getName(),
         "command.comment": commentObj,
     };
     assert.eq(
@@ -184,7 +192,9 @@ function runCommentParamTest({
     outShell();
 
     // Verify that profile entry has 'comment' field.
-    expectedProfilerEntries = expectedProfilerEntries ? expectedProfilerEntries : expectedRunningOps;
+    expectedProfilerEntries = expectedProfilerEntries
+        ? expectedProfilerEntries
+        : expectedRunningOps;
     let expectedProfilerEntriesList = expectedProfilerEntries;
     if (!Array.isArray(expectedProfilerEntriesList)) {
         expectedProfilerEntriesList = [expectedProfilerEntriesList];
@@ -192,7 +202,8 @@ function runCommentParamTest({
 
     const profileFilter = {"command.comment": commentObj, "errName": {$ne: "StaleConfig"}};
     const foundProfilerEntriesCount =
-        shard0DB.system.profile.find(profileFilter).itcount() + shard1DB.system.profile.find(profileFilter).itcount();
+        shard0DB.system.profile.find(profileFilter).itcount() +
+        shard1DB.system.profile.find(profileFilter).itcount();
     assert(
         expectedProfilerEntriesList.includes(foundProfilerEntriesCount),
         () =>
@@ -220,7 +231,9 @@ function runCommentParamTest({
 
         const logCountFromShardProfiles = foundProfilerEntriesCount;
         // For 'update' and 'delete' commands, or "bulkWrite" when UWE is enabled, we also log an additional line for the entire operation.
-        const logCountFromShardOps = ["update", "delete", "bulkWrite"].includes(shardCmdName) ? expectedRunningOps : 0;
+        const logCountFromShardOps = ["update", "delete", "bulkWrite"].includes(shardCmdName)
+            ? expectedRunningOps
+            : 0;
         const logCountFromMongos = 1;
         verifyLogContains(
             [testDB, shard0DB, shard1DB],
@@ -231,7 +244,11 @@ function runCommentParamTest({
 }
 
 // For find command on a sharded collection, when all the shards are targetted.
-runCommentParamTest({coll: shardedColl, command: {find: shardedColl.getName(), filter: {}}, expectedRunningOps: 2});
+runCommentParamTest({
+    coll: shardedColl,
+    command: {find: shardedColl.getName(), filter: {}},
+    expectedRunningOps: 2,
+});
 
 // For find command on a sharded collection, when a single shard is targetted.
 runCommentParamTest({
@@ -355,7 +372,10 @@ runCommentParamTest({
 // For createIndexes command on a sharded collection,  where all the shards are targetted.
 runCommentParamTest({
     coll: shardedColl,
-    command: {createIndexes: shardedColl.getName(), indexes: [{name: "newField_1", key: {newField: 1}}]},
+    command: {
+        createIndexes: shardedColl.getName(),
+        indexes: [{name: "newField_1", key: {newField: 1}}],
+    },
     expectedRunningOps: 2,
 });
 
@@ -397,7 +417,12 @@ runCommentParamTest({
 runCommentParamTest({
     coll: shardedColl,
     command: {
-        explain: {aggregate: shardedColl.getName(), pipeline: [], comment: innerComment, cursor: {}},
+        explain: {
+            aggregate: shardedColl.getName(),
+            pipeline: [],
+            comment: innerComment,
+            cursor: {},
+        },
     },
     expectedRunningOps: 2,
     commentObj: innerComment,
@@ -408,7 +433,12 @@ runCommentParamTest({
 runCommentParamTest({
     coll: shardedColl,
     command: {
-        explain: {aggregate: shardedColl.getName(), pipeline: [], comment: innerComment, cursor: {}},
+        explain: {
+            aggregate: shardedColl.getName(),
+            pipeline: [],
+            comment: innerComment,
+            cursor: {},
+        },
         comment: outerComment,
     },
     expectedRunningOps: 2,
@@ -450,7 +480,12 @@ runCommentParamTest({
 runCommentParamTest({
     coll: unshardedColl,
     command: {
-        explain: {aggregate: unshardedColl.getName(), pipeline: [], comment: innerComment, cursor: {}},
+        explain: {
+            aggregate: unshardedColl.getName(),
+            pipeline: [],
+            comment: innerComment,
+            cursor: {},
+        },
     },
     expectedRunningOps: 1,
     commentObj: innerComment,
@@ -461,7 +496,12 @@ runCommentParamTest({
 runCommentParamTest({
     coll: unshardedColl,
     command: {
-        explain: {aggregate: unshardedColl.getName(), pipeline: [], comment: innerComment, cursor: {}},
+        explain: {
+            aggregate: unshardedColl.getName(),
+            pipeline: [],
+            comment: innerComment,
+            cursor: {},
+        },
         comment: outerComment,
     },
     expectedRunningOps: 1,
@@ -547,7 +587,12 @@ comment = {
     uuid: UUID().hex(),
 };
 res = assert.commandWorked(
-    testDB.runCommand({aggregate: unshardedColl.getName(), pipeline: [], comment: comment, cursor: {batchSize: 0}}),
+    testDB.runCommand({
+        aggregate: unshardedColl.getName(),
+        pipeline: [],
+        comment: comment,
+        cursor: {batchSize: 0},
+    }),
 );
 runCommentParamTest({
     coll: unshardedColl,
@@ -559,7 +604,12 @@ runCommentParamTest({
 // Verify the 'comment' field on the getMore command takes precedence over the 'comment' field on
 // the originating command.
 res = assert.commandWorked(
-    testDB.runCommand({aggregate: unshardedColl.getName(), pipeline: [], comment: comment, cursor: {batchSize: 0}}),
+    testDB.runCommand({
+        aggregate: unshardedColl.getName(),
+        pipeline: [],
+        comment: comment,
+        cursor: {batchSize: 0},
+    }),
 );
 comment = {
     comment: "unsharded_getmore_comment",
@@ -591,7 +641,10 @@ runCommentParamTest({
     coll: shardedColl,
     command: {
         aggregate: shardedColl.getName(),
-        pipeline: [{$match: {p: null}}, {$unionWith: {coll: shardedColl.getName(), pipeline: [{$group: {_id: "$x"}}]}}],
+        pipeline: [
+            {$match: {p: null}},
+            {$unionWith: {coll: shardedColl.getName(), pipeline: [{$group: {_id: "$x"}}]}},
+        ],
         cursor: {},
     },
     expectedRunningOps: 2,

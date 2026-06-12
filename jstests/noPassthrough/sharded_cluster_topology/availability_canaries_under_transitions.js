@@ -31,7 +31,11 @@ const adminDB = mongosSession.getDatabase("admin");
 // shards and the expected number of shards
 const verify = (expectedNumberOfShards, dbsToCheck = []) => {
     const existingShards = configDB.shards.find({}).toArray();
-    assert.eq(expectedNumberOfShards, existingShards.length, "Unexpected number of shards: " + tojson(existingShards));
+    assert.eq(
+        expectedNumberOfShards,
+        existingShards.length,
+        "Unexpected number of shards: " + tojson(existingShards),
+    );
 
     assert.eq(0, configDB.collections.find({_id: "config.availability"}).itcount());
     for (let [shardName, db] of dbsToCheck) {

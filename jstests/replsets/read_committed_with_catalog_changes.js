@@ -153,7 +153,9 @@ const testCases = {
         },
         performOp: function (db) {
             assert.commandWorked(
-                db.coll.runCommand("collMod", {index: {keyPattern: {x: 1}, expireAfterSeconds: 60 * 61}}),
+                db.coll.runCommand("collMod", {
+                    index: {keyPattern: {x: 1}, expireAfterSeconds: 60 * 61},
+                }),
             );
         },
         blockedCollections: [],
@@ -219,7 +221,10 @@ function assertReadsSucceed(coll, timeoutMs = 20000) {
     // As a result, retry until the command succeeds while catching the QueryPlanKilled error.
     let res;
     assert.soon(() => {
-        res = coll.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
+        res = coll.runCommand("find", {
+            "readConcern": {"level": "majority"},
+            "maxTimeMS": timeoutMs,
+        });
         if (res.ok) {
             return true;
         }
@@ -258,7 +263,11 @@ let secondary = replTest.getSecondary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 // This is the DB that all of the tests will use.
@@ -268,7 +277,10 @@ let mainDB = primary.getDB("mainDB");
 let otherDB = primary.getDB("otherDB");
 let otherDBCollection = otherDB.collection;
 assert.commandWorked(
-    otherDBCollection.insert({}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+    otherDBCollection.insert(
+        {},
+        {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+    ),
 );
 assertReadsSucceed(otherDBCollection);
 
@@ -326,7 +338,12 @@ for (let testName in testCases) {
                   // seconds).
                   assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
               }
-              let thread = new Thread(bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
+              let thread = new Thread(
+                  bgThread,
+                  primary.host,
+                  mainDB[name].getFullName(),
+                  assertReadsSucceed,
+              );
               thread.start();
               return thread;
           });

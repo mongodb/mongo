@@ -35,12 +35,24 @@ assert.commandWorked(
 assert(arrayEq(coll.find({a: {$elemMatch: {$lt: 6, $gt: 4}}}, {_id: 0}).toArray(), [{a: [5]}]));
 
 assert(
-    arrayEq(coll.find({"a.b": {$elemMatch: {$lt: 6, $gt: 4}}}, {_id: 0}).toArray(), [{a: {b: [5]}}, {a: [{b: [5]}]}]),
+    arrayEq(coll.find({"a.b": {$elemMatch: {$lt: 6, $gt: 4}}}, {_id: 0}).toArray(), [
+        {a: {b: [5]}},
+        {a: [{b: [5]}]},
+    ]),
 );
 
-assert(arrayEq(coll.find({a: {$elemMatch: {$elemMatch: {$lt: 6, $gt: 4}}}}, {_id: 0}).toArray(), [{a: [[5]]}]));
+assert(
+    arrayEq(coll.find({a: {$elemMatch: {$elemMatch: {$lt: 6, $gt: 4}}}}, {_id: 0}).toArray(), [
+        {a: [[5]]},
+    ]),
+);
 
-assert(arrayEq(coll.find({a: {$elemMatch: {$type: "number"}}}, {_id: 0}).toArray(), [{a: [5]}, {a: [3, 7]}]));
+assert(
+    arrayEq(coll.find({a: {$elemMatch: {$type: "number"}}}, {_id: 0}).toArray(), [
+        {a: [5]},
+        {a: [3, 7]},
+    ]),
+);
 
 assert(
     arrayEq(coll.find({a: {$elemMatch: {$type: "array"}}}, {_id: 0}).toArray(), [
@@ -64,7 +76,9 @@ assert(
 );
 
 assert(
-    arrayEq(coll.find({a: {$elemMatch: {b: {$elemMatch: {$lt: 6, $gt: 4}}}}}, {_id: 0}).toArray(), [{a: [{b: [5]}]}]),
+    arrayEq(coll.find({a: {$elemMatch: {b: {$elemMatch: {$lt: 6, $gt: 4}}}}}, {_id: 0}).toArray(), [
+        {a: [{b: [5]}]},
+    ]),
 );
 
 assert(

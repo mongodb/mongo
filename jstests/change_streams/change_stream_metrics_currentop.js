@@ -12,7 +12,10 @@
  * ]
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {CursorList, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {listIdleCursors} from "jstests/libs/query/change_stream_util.js";
 import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
@@ -23,8 +26,9 @@ describe("change stream cursor metrics in currentOp", function () {
     const testColl = testDB.getCollection("test");
 
     const getClusterTimeFromInsert = (db) => {
-        return assert.commandWorked(db.runCommand({insert: "unrelated_collection", documents: [{}]})).$clusterTime
-            .clusterTime;
+        return assert.commandWorked(
+            db.runCommand({insert: "unrelated_collection", documents: [{}]}),
+        ).$clusterTime.clusterTime;
     };
 
     function idleCursorFilter(comment, cursor = null) {
@@ -36,7 +40,9 @@ describe("change stream cursor metrics in currentOp", function () {
     }
 
     function getIdleCursor(comment, cursor = null) {
-        const cursors = listIdleCursors(adminDB, idleCursorFilter(comment, cursor), {localOps: true});
+        const cursors = listIdleCursors(adminDB, idleCursorFilter(comment, cursor), {
+            localOps: true,
+        });
         assert.eq(1, cursors.length, "Expected exactly one idle change stream cursor");
         return cursors[0];
     }
@@ -103,7 +109,9 @@ describe("change stream cursor metrics in currentOp", function () {
         });
         // Verify the optime equals the clusterTime encoded in the postBatchResumeToken.
         const postBatchResumeToken = getMoreRes.cursor.postBatchResumeToken;
-        assert(postBatchResumeToken, "Expected a postBatchResumeToken in the getMore response", {getMoreRes});
+        assert(postBatchResumeToken, "Expected a postBatchResumeToken in the getMore response", {
+            getMoreRes,
+        });
         assert.eq(
             optime,
             decodeResumeToken(postBatchResumeToken).clusterTime,
@@ -128,13 +136,22 @@ describe("change stream cursor metrics in currentOp", function () {
                 0,
             ),
         );
-        assert.neq(NumberLong(0), findCursor.getId(), "Expected cursor to remain open after batchSize:0 find");
+        assert.neq(
+            NumberLong(0),
+            findCursor.getId(),
+            "Expected cursor to remain open after batchSize:0 find",
+        );
 
         const idleCursor = getIdleCursor(comment);
 
-        assert.eq(null, idleCursor?.changeStreams, "Expected changeStreams to be absent for a regular cursor", {
-            idleCursor,
-        });
+        assert.eq(
+            null,
+            idleCursor?.changeStreams,
+            "Expected changeStreams to be absent for a regular cursor",
+            {
+                idleCursor,
+            },
+        );
     });
 
     it("optime not bumped when startAtOperationTime is behind oplog tip", function () {
@@ -202,7 +219,11 @@ describe("change stream cursor metrics in currentOp", function () {
         // getMore with a short timeout: the unrelated write means the cursor will advance
         // through the oplog but produce an empty batch.
         const getMoreRes = runGetMore(cursor);
-        assert.eq(0, getMoreRes.cursor.nextBatch.length, "Expected empty batch after unrelated write");
+        assert.eq(
+            0,
+            getMoreRes.cursor.nextBatch.length,
+            "Expected empty batch after unrelated write",
+        );
 
         const cursorAfterUnrelated = getIdleCursor(comment, cursor);
         const optimeAfterUnrelated = cursorAfterUnrelated.cursor.changeStreams.optime;
@@ -281,7 +302,9 @@ describe("change stream cursor metrics in currentOp", function () {
         });
 
         const optime = idleCursor.cursor.changeStreams.optime;
-        assert(optime instanceof Timestamp, "Expected changeStreams.optime to be a timestamp", {idleCursor});
+        assert(optime instanceof Timestamp, "Expected changeStreams.optime to be a timestamp", {
+            idleCursor,
+        });
         assert.gte(
             optime,
             currentClusterTime,

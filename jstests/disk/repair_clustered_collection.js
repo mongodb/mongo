@@ -4,15 +4,26 @@
  *
  * @tags: [requires_wiredtiger]
  */
-import {assertRepairSucceeds, getUriForColl, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertRepairSucceeds,
+    getUriForColl,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const dbName = jsTestName();
 const collName = "test";
 const dbpath = MongoRunner.dataPath + dbName + "/";
 
-const runRepairTest = function runRepairTestOnMongoDInstance(collectionOptions, docToInsert, isTimeseries) {
+const runRepairTest = function runRepairTestOnMongoDInstance(
+    collectionOptions,
+    docToInsert,
+    isTimeseries,
+) {
     let mongod = startMongodOnExistingPath(dbpath);
     let db = mongod.getDB(dbName);
 

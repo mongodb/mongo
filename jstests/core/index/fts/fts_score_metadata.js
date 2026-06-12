@@ -64,7 +64,11 @@ const textMatchExpression = {
 
 (function testFindAndModifyRemoveSortOnScore() {
     setUpCollection();
-    const result = coll.findAndModify({query: textMatchExpression, sort: {score: {$meta: "score"}}, remove: true});
+    const result = coll.findAndModify({
+        query: textMatchExpression,
+        sort: {score: {$meta: "score"}},
+        remove: true,
+    });
     assert.eq(result, {_id: 2, x: "test test"});
 })();
 

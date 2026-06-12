@@ -56,7 +56,9 @@ assert.commandWorked(
 
 const shard0Primary = st.rs0.getPrimary();
 const shard1Primary = st.rs1.getPrimary();
-const hangBeforeUpdateFp = configureFailPoint(shard1Primary, "hangUpdateBeforeWrite", {ns: namespace});
+const hangBeforeUpdateFp = configureFailPoint(shard1Primary, "hangUpdateBeforeWrite", {
+    ns: namespace,
+});
 
 const joinShell = startParallelShell(
     funWithArgs(
@@ -82,7 +84,10 @@ const joinShell = startParallelShell(
 hangBeforeUpdateFp.wait();
 
 const newPrimary = st.rs0.getSecondary();
-const waitForPendingUpdateFp = configureFailPoint(newPrimary, "hangDuringMultiUpdateCoordinatorPendingUpdates");
+const waitForPendingUpdateFp = configureFailPoint(
+    newPrimary,
+    "hangDuringMultiUpdateCoordinatorPendingUpdates",
+);
 
 st.rs0.stepUp(newPrimary);
 st.rs0.awaitNodesAgreeOnPrimary();

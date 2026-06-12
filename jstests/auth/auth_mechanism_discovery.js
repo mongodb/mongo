@@ -43,6 +43,11 @@ runTest(m);
 MongoRunner.stopMongod(m);
 
 // Test sharded.
-const st = new ShardingTest({shards: 1, mongos: 1, config: 1, other: {keyFile: "jstests/libs/key1"}});
+const st = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    config: 1,
+    other: {keyFile: "jstests/libs/key1"},
+});
 runTest(st.s0);
 st.stop();

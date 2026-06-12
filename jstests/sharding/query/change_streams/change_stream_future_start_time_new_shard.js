@@ -13,8 +13,15 @@
  */
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest, addShardToCluster, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
+import {
+    ChangeStreamTest,
+    addShardToCluster,
+    getClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 describe("future startAtOperationTime with addShard", function () {
@@ -62,7 +69,9 @@ describe("future startAtOperationTime with addShard", function () {
             // Set up a sharded collection with all data on shard0.
             const collName = "coll_" + version;
             const coll = assertCreateCollection(db, collName);
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
 
             // Capture current time and set future start time ahead.
@@ -72,7 +81,9 @@ describe("future startAtOperationTime with addShard", function () {
             // Open a change stream at the future time.
             const csTest = new ChangeStreamTest(db);
             let csCursor = csTest.startWatchingChanges({
-                pipeline: [{$changeStream: {startAtOperationTime: futureStartTime, version: version}}],
+                pipeline: [
+                    {$changeStream: {startAtOperationTime: futureStartTime, version: version}},
+                ],
                 collection: coll,
                 aggregateOptions: {cursor: {batchSize: 0}},
             });
@@ -107,7 +118,9 @@ describe("future startAtOperationTime with addShard", function () {
                 // Wait until the cluster time passes the future start time.
                 assert.soon(
                     () => {
-                        const configsvrClusterTime = getClusterTime(st.configRS.getPrimary().getDB("admin"));
+                        const configsvrClusterTime = getClusterTime(
+                            st.configRS.getPrimary().getDB("admin"),
+                        );
                         return configsvrClusterTime.t >= futureStartTime.t;
                     },
                     "Timed out waiting for cluster time to reach future start time",

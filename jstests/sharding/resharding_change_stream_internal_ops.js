@@ -11,7 +11,10 @@
 //
 // ]
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
@@ -134,7 +137,10 @@ reshardingTest.withReshardingInBackground(
                 false /* skipFirstBatch */,
             );
 
-            assertChangeStreamEventEq(reshardBlockingWritesDonor0Event[0], expectedReshardBlockingWritesEvent);
+            assertChangeStreamEventEq(
+                reshardBlockingWritesDonor0Event[0],
+                expectedReshardBlockingWritesEvent,
+            );
 
             const reshardBlockingWritesDonor1Event = cstDonor1.getNextChanges(
                 changeStreamsCursorDonor1,
@@ -142,7 +148,10 @@ reshardingTest.withReshardingInBackground(
                 false /* skipFirstBatch */,
             );
 
-            assertChangeStreamEventEq(reshardBlockingWritesDonor1Event[0], expectedReshardBlockingWritesEvent);
+            assertChangeStreamEventEq(
+                reshardBlockingWritesDonor1Event[0],
+                expectedReshardBlockingWritesEvent,
+            );
         },
         postDecisionPersistedFn: () => {
             // Check for reshardDoneCatchUp event on the recipient.
@@ -167,7 +176,10 @@ reshardingTest.withReshardingInBackground(
             // '{ns: kDbName, coll: "system.resharding.<>"}.
             assert(reshardDoneCatchUpEvent.ns, reshardDoneCatchUpEvent);
             assert.eq(reshardDoneCatchUpEvent.ns.db, kDbName, reshardDoneCatchUpEvent);
-            assert(reshardDoneCatchUpEvent.ns.coll.startsWith("system.resharding."), reshardDoneCatchUpEvent);
+            assert(
+                reshardDoneCatchUpEvent.ns.coll.startsWith("system.resharding."),
+                reshardDoneCatchUpEvent,
+            );
             delete reshardDoneCatchUpEvent.ns;
 
             assertChangeStreamEventEq(reshardDoneCatchUpEvent, expectedReshardDoneCatchUpEvent);

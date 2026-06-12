@@ -42,7 +42,10 @@ export const $config = (function () {
 
     function mutexTryLock(db, collName) {
         const collMutex = getCollMutexName(collName);
-        let doc = db[data.mutexColl].findAndModify({query: {mutex: collMutex, locked: 0}, update: {$set: {locked: 1}}});
+        let doc = db[data.mutexColl].findAndModify({
+            query: {mutex: collMutex, locked: 0},
+            update: {$set: {locked: 1}},
+        });
         if (doc === null) {
             return false;
         }
@@ -76,7 +79,10 @@ export const $config = (function () {
                     let bulkRes = bulk.execute();
                     assert.commandWorked(bulkRes);
                     assert.eq(this.nDocuments, bulkRes.nInserted, tojson(bulkRes));
-                    assert.commandFailedWithCode(coll.createIndexes([{a: "2d"}]), this.expectedErrorCodes);
+                    assert.commandFailedWithCode(
+                        coll.createIndexes([{a: "2d"}]),
+                        this.expectedErrorCodes,
+                    );
                 } finally {
                     mutexUnlock(db, randomColl);
                 }

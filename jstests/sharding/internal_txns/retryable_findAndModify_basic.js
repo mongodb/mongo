@@ -14,7 +14,10 @@ const transactionTest = new RetryableInternalTransactionTest();
         return {id: UUID()};
     };
     const expectRetryToSucceed = false;
-    transactionTest.runFindAndModifyTestsEnableImageCollection({txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
+    transactionTest.runFindAndModifyTestsEnableImageCollection({
+        txnOptions: {makeSessionIdFunc},
+        expectRetryToSucceed,
+    });
 }
 
 {
@@ -23,7 +26,10 @@ const transactionTest = new RetryableInternalTransactionTest();
         return {id: UUID(), txnUUID: UUID()};
     };
     const expectRetryToSucceed = false;
-    transactionTest.runFindAndModifyTestsEnableImageCollection({txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
+    transactionTest.runFindAndModifyTestsEnableImageCollection({
+        txnOptions: {makeSessionIdFunc},
+        expectRetryToSucceed,
+    });
 }
 
 {

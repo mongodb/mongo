@@ -61,13 +61,16 @@ let parseErrors = [
     {"description": "[basx567] Near-specials (Conversion_syntax)", "string": "Infinit"},
     {"description": "[basx568] Near-specials (Conversion_syntax)", "string": "-Infinit"},
     {
-        "description": "[basx590] some baddies with dots and Es and dots and specials (Conversion_syntax)",
+        "description":
+            "[basx590] some baddies with dots and Es and dots and specials (Conversion_syntax)",
         "string": ".Infinity",
     },
     {"description": "[basx562] Near-specials (Conversion_syntax)", "string": "NaNq"},
     {"description": "[basx563] Near-specials (Conversion_syntax)", "string": "NaNs"},
     {
-        "description": "[dqbas939] overflow results at different rounding modes " + "(Overflow & Inexact & Rounded)",
+        "description":
+            "[dqbas939] overflow results at different rounding modes " +
+            "(Overflow & Inexact & Rounded)",
         "string": "-7e10000",
     },
     {
@@ -103,7 +106,9 @@ let parseErrors = [
         "string": "1.11111111111111111111111111111234650",
     },
     {
-        "description": "[dqbas938] overflow results at different rounding modes " + "(Overflow & Inexact & Rounded)",
+        "description":
+            "[dqbas938] overflow results at different rounding modes " +
+            "(Overflow & Inexact & Rounded)",
         "string": "7e10000",
     },
     {

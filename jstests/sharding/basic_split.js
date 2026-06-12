@@ -41,7 +41,9 @@ if (isFCVgte(st.s0, "8.1")) {
 // Attempt to split on a value that is not the shard key.
 assert.commandFailed(configDB.adminCommand({split: "test.user", middle: {x: 100}}));
 assert.commandFailed(configDB.adminCommand({split: "test.user", find: {x: 100}}));
-assert.commandFailed(configDB.adminCommand({split: "test.user", bounds: [{x: MinKey}, {x: MaxKey}]}));
+assert.commandFailed(
+    configDB.adminCommand({split: "test.user", bounds: [{x: MinKey}, {x: MaxKey}]}),
+);
 
 // Insert documents large enough to fill up a chunk
 let kiloDoc = "x".repeat(1023);
@@ -52,24 +54,62 @@ for (var x = -1200; x < 1200; x++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$gte: {_id: 0}}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$gte: {_id: 0}}}).itcount(),
+);
 
 // Errors if bounds do not correspond to existing chunk boundaries.
 assert.commandFailed(configDB.adminCommand({split: "test.user", bounds: [{_id: 0}, {_id: 1000}]}));
-assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$gte: {_id: 0}}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$gte: {_id: 0}}}).itcount(),
+);
 
-assert.commandWorked(configDB.adminCommand({split: "test.user", bounds: [{_id: 0}, {_id: MaxKey}]}));
-assert.gt(findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$gte: {_id: 0}}}).itcount(), 1);
+assert.commandWorked(
+    configDB.adminCommand({split: "test.user", bounds: [{_id: 0}, {_id: MaxKey}]}),
+);
+assert.gt(
+    findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$gte: {_id: 0}}}).itcount(),
+    1,
+);
 
-assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$lt: {_id: 0}}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$lt: {_id: 0}}}).itcount(),
+);
 assert.commandWorked(configDB.adminCommand({split: "test.user", middle: {_id: -600}}));
-assert.gt(findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$lt: {_id: 0}}}).itcount(), 1);
+assert.gt(
+    findChunksUtil.findChunksByNs(configDB, "test.user", {min: {$lt: {_id: 0}}}).itcount(),
+    1,
+);
 
 // Mongos must refresh metadata if the chunk version does not match
-assert.commandWorked(st.s0.adminCommand({moveChunk: "test.user", find: {_id: -900}, to: shard1, _waitForDelete: true}));
+assert.commandWorked(
+    st.s0.adminCommand({
+        moveChunk: "test.user",
+        find: {_id: -900},
+        to: shard1,
+        _waitForDelete: true,
+    }),
+);
 assert.commandWorked(st.s1.adminCommand({split: "test.user", middle: {_id: -900}}));
-assert.commandWorked(st.s1.adminCommand({moveChunk: "test.user", find: {_id: -900}, to: shard0, _waitForDelete: true}));
-assert.commandWorked(st.s1.adminCommand({moveChunk: "test.user", find: {_id: -901}, to: shard0, _waitForDelete: true}));
+assert.commandWorked(
+    st.s1.adminCommand({
+        moveChunk: "test.user",
+        find: {_id: -900},
+        to: shard0,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s1.adminCommand({
+        moveChunk: "test.user",
+        find: {_id: -901},
+        to: shard0,
+        _waitForDelete: true,
+    }),
+);
 assert.eq(0, findChunksUtil.findChunksByNs(configDB, "test.user", {shard: shard1}).itcount());
 
 //
@@ -86,13 +126,21 @@ assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, "test.compound", {min
 if (isFCVgte(st.s0, "8.1")) {
     // It should not fail on boundaries that have already been split.
     assert.commandWorked(configDB.adminCommand({split: "test.compound", middle: {x: 0, y: 0}}));
-    assert.commandWorked(configDB.adminCommand({split: "test.compound", middle: {x: MinKey, y: MinKey}}));
-    assert.commandWorked(configDB.adminCommand({split: "test.compound", middle: {x: MaxKey, y: MaxKey}}));
+    assert.commandWorked(
+        configDB.adminCommand({split: "test.compound", middle: {x: MinKey, y: MinKey}}),
+    );
+    assert.commandWorked(
+        configDB.adminCommand({split: "test.compound", middle: {x: MaxKey, y: MaxKey}}),
+    );
 } else {
     // cannot split on existing chunk boundary.
     assert.commandFailed(configDB.adminCommand({split: "test.compound", middle: {x: 0, y: 0}}));
-    assert.commandFailed(configDB.adminCommand({split: "test.compound", middle: {x: MinKey, y: MinKey}}));
-    assert.commandFailed(configDB.adminCommand({split: "test.compound", middle: {x: MaxKey, y: MaxKey}}));
+    assert.commandFailed(
+        configDB.adminCommand({split: "test.compound", middle: {x: MinKey, y: MinKey}}),
+    );
+    assert.commandFailed(
+        configDB.adminCommand({split: "test.compound", middle: {x: MaxKey, y: MaxKey}}),
+    );
 }
 
 bulk = testDB.compound.initializeUnorderedBulkOp();
@@ -101,7 +149,10 @@ for (x = -1200; x < 1200; x++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$gte: {x: 0, y: 0}}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$gte: {x: 0, y: 0}}}).itcount(),
+);
 assert.commandWorked(
     configDB.adminCommand({
         split: "test.compound",
@@ -111,10 +162,19 @@ assert.commandWorked(
         ],
     }),
 );
-assert.gt(findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$gte: {x: 0, y: 0}}}).itcount(), 1);
+assert.gt(
+    findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$gte: {x: 0, y: 0}}}).itcount(),
+    1,
+);
 
-assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$lt: {x: 0, y: 0}}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$lt: {x: 0, y: 0}}}).itcount(),
+);
 assert.commandWorked(configDB.adminCommand({split: "test.compound", find: {x: -1, y: -1}}));
-assert.gt(findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$lt: {x: 0, y: 0}}}).itcount(), 1);
+assert.gt(
+    findChunksUtil.findChunksByNs(configDB, "test.compound", {min: {$lt: {x: 0, y: 0}}}).itcount(),
+    1,
+);
 
 st.stop();

@@ -2,7 +2,10 @@
  * Test that $sum works as a window function.
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";
-import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -37,7 +40,13 @@ function verifyResults(results, valueFunction) {
         const correctDoc = valueFunction(i, Object.assign({}, origDocs[i]));
         assert(
             documentEq(correctDoc, results[i]),
-            "Got: " + tojson(results[i]) + "\nExpected: " + tojson(correctDoc) + "\n at position " + i + "\n",
+            "Got: " +
+                tojson(results[i]) +
+                "\nExpected: " +
+                tojson(correctDoc) +
+                "\n at position " +
+                i +
+                "\n",
         );
     }
 }
@@ -133,7 +142,9 @@ result = coll
         {
             $setWindowFields: {
                 sortBy: {one: 1},
-                output: {out: {$sum: {$abs: "$one"}, window: {documents: ["unbounded", "current"]}}},
+                output: {
+                    out: {$sum: {$abs: "$one"}, window: {documents: ["unbounded", "current"]}},
+                },
             },
         },
     ])
@@ -234,7 +245,10 @@ result = coll
                     "a": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
                     "newField.a": {$sum: "$two", window: {documents: ["unbounded", "current"]}},
                     "simpleArr.0.b": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
-                    "nestedDoc.1.2.a": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                    "nestedDoc.1.2.a": {
+                        $sum: "$one",
+                        window: {documents: ["unbounded", "current"]},
+                    },
                 },
             },
         },

@@ -65,7 +65,9 @@ assert.gt(afterSbePlanCacheSize, initialPlanCacheSize);
 
 // Step 2. Insert an entry to Classic Plan Cache.
 // Force classic plan cache.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 assert.eq(1, coll.find(classicQuery).itcount());
 assertQueryInPlanCache(coll, classicQuery);
 // Plan Cache must contain exactly 2 entries.
@@ -83,7 +85,9 @@ assert.eq(afterSbePlanCacheSize, getPlanCacheSize(db));
 
 // Step 4. Remove the entry from SBE Plan Cache.
 // Move back to SBE plan cache.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+);
 // Clean up SBE Plan Cache
 assert.commandWorked(db.runCommand({planCacheClear: collectionName, query: sbeQuery}));
 // Assert metric is decremented back to initial value.

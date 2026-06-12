@@ -65,7 +65,10 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
             serverStatus.opWriteConcernCounters,
             newStatus.opWriteConcernCounters,
             [
-                opName + (isPSASet ? ".noneInfo.implicitDefault.wnum.1" : ".noneInfo.implicitDefault.wmajority"),
+                opName +
+                    (isPSASet
+                        ? ".noneInfo.implicitDefault.wnum.1"
+                        : ".noneInfo.implicitDefault.wmajority"),
                 opName + ".none",
             ],
             inc,
@@ -96,7 +99,11 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
 
     // Run command with no writeConcern with CWWC set to w:1.
     assert.commandWorked(
-        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        primary.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     cmdsWithNoWCProvided.forEach((cmd) => {
         resetCollection(setupCommand);
@@ -138,7 +145,9 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "majority"}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "majority"}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -151,7 +160,9 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 0}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 0}})),
+    );
     assert.soon(() => {
         newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
         try {
@@ -171,7 +182,9 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 1}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 1}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -184,7 +197,9 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 2}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 2}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -197,7 +212,9 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     resetCollection(setupCommand);
     serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
-    assert.commandWorked(testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "myTag"}})));
+    assert.commandWorked(
+        testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: "myTag"}})),
+    );
     newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusChange(
         serverStatus.opWriteConcernCounters,
@@ -227,8 +244,18 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
 for (const isPSASet of [true, false]) {
     // Test single insert/update/delete.
     testWriteConcernMetrics({insert: collName, documents: [{}]}, "insert", 1, isPSASet);
-    testWriteConcernMetrics({update: collName, updates: [{q: {}, u: {$set: {a: 1}}}]}, "update", 1, isPSASet);
-    testWriteConcernMetrics({delete: collName, deletes: [{q: {}, limit: 1}]}, "delete", 1, isPSASet);
+    testWriteConcernMetrics(
+        {update: collName, updates: [{q: {}, u: {$set: {a: 1}}}]},
+        "update",
+        1,
+        isPSASet,
+    );
+    testWriteConcernMetrics(
+        {delete: collName, deletes: [{q: {}, limit: 1}]},
+        "delete",
+        1,
+        isPSASet,
+    );
 
     // Test batch writes.
     testWriteConcernMetrics({insert: collName, documents: [{}, {}]}, "insert", 2, isPSASet);
@@ -259,7 +286,12 @@ for (const isPSASet of [true, false]) {
 
     // Test applyOps.  All sequences of setup + command must be idempotent in steady-state oplog
     // application, as testWriteConcernMetrics will run them multiple times.
-    testWriteConcernMetrics({applyOps: [{op: "i", ns: testColl.getFullName(), o: {_id: 0}}]}, "insert", 1, isPSASet);
+    testWriteConcernMetrics(
+        {applyOps: [{op: "i", ns: testColl.getFullName(), o: {_id: 0}}]},
+        "insert",
+        1,
+        isPSASet,
+    );
     testWriteConcernMetrics(
         {
             applyOps: [
@@ -276,8 +308,14 @@ for (const isPSASet of [true, false]) {
         1,
         isPSASet,
     );
-    testWriteConcernMetrics({applyOps: [{op: "d", ns: testColl.getFullName(), o: {_id: 0}}]}, "delete", 1, isPSASet, {
-        insert: collName,
-        documents: [{_id: 0}],
-    });
+    testWriteConcernMetrics(
+        {applyOps: [{op: "d", ns: testColl.getFullName(), o: {_id: 0}}]},
+        "delete",
+        1,
+        isPSASet,
+        {
+            insert: collName,
+            documents: [{_id: 0}],
+        },
+    );
 }

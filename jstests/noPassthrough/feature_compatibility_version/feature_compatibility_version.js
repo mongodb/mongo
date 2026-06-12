@@ -14,7 +14,10 @@ checkFCV(adminDB, latestFCV);
 for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Fully downgraded to oldVersion.
     assert.commandWorked(
-        adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {version: oldVersion}}),
+        adminDB.system.version.update(
+            {_id: "featureCompatibilityVersion"},
+            {$set: {version: oldVersion}},
+        ),
     );
     checkFCV(adminDB, oldVersion);
 
@@ -38,14 +41,20 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
 
     // In downgrading states, "previousVersion" must be the latestFCV.
     assert.writeErrorWithCode(
-        adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {previousVersion: oldVersion}}),
+        adminDB.system.version.update(
+            {_id: "featureCompatibilityVersion"},
+            {$set: {previousVersion: oldVersion}},
+        ),
         4926901,
     );
     checkFCV(adminDB, oldVersion, oldVersion);
 
     // Downgrading FCV must have a 'previousVersion' field.
     assert.writeErrorWithCode(
-        adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$unset: {previousVersion: true}}),
+        adminDB.system.version.update(
+            {_id: "featureCompatibilityVersion"},
+            {$unset: {previousVersion: true}},
+        ),
         4926902,
     );
     checkFCV(adminDB, oldVersion, oldVersion);
@@ -91,26 +100,38 @@ checkFCV(adminDB, latestFCV);
 
 // Updating the featureCompatibilityVersion document with an invalid targetVersion fails.
 assert.writeErrorWithCode(
-    adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {targetVersion: lastLTSFCV}}),
+    adminDB.system.version.update(
+        {_id: "featureCompatibilityVersion"},
+        {$set: {targetVersion: lastLTSFCV}},
+    ),
     4926904,
 );
 checkFCV(adminDB, latestFCV);
 
 assert.writeErrorWithCode(
-    adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {targetVersion: lastContinuousFCV}}),
+    adminDB.system.version.update(
+        {_id: "featureCompatibilityVersion"},
+        {$set: {targetVersion: lastContinuousFCV}},
+    ),
     4926904,
 );
 checkFCV(adminDB, latestFCV);
 
 assert.writeErrorWithCode(
-    adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {targetVersion: latestFCV}}),
+    adminDB.system.version.update(
+        {_id: "featureCompatibilityVersion"},
+        {$set: {targetVersion: latestFCV}},
+    ),
     4926904,
 );
 checkFCV(adminDB, latestFCV);
 
 // Setting an unknown field.
 assert.writeErrorWithCode(
-    adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {unknownField: "unknown"}}),
+    adminDB.system.version.update(
+        {_id: "featureCompatibilityVersion"},
+        {$set: {unknownField: "unknown"}},
+    ),
     ErrorCodes.IDLUnknownField,
 );
 checkFCV(adminDB, latestFCV);

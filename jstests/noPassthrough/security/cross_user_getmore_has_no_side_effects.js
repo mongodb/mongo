@@ -36,7 +36,11 @@ function logout(userObj) {
     st.s.getDB(userObj.db).runCommand({logout: 1});
 }
 
-adminDB.createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
+adminDB.createUser({
+    user: adminUser.username,
+    pwd: adminUser.password,
+    roles: jsTest.adminUserRoles,
+});
 
 login(adminUser);
 
@@ -59,7 +63,8 @@ logout(adminUser);
 
 // As userA, run a find and get a cursor.
 login(userA);
-const cursorID = assert.commandWorked(testDB.runCommand({find: coll.getName(), batchSize: 2})).cursor.id;
+const cursorID = assert.commandWorked(testDB.runCommand({find: coll.getName(), batchSize: 2}))
+    .cursor.id;
 logout(userA);
 
 // As userB, attempt to getMore the cursor ID.

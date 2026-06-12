@@ -16,7 +16,12 @@ assert.eq(
         {_id: "test.user"},
         {
             $set: {
-                "credentials.SCRAM-SHA-1": {salt: "AAAA", storedKey: "AAAA", serverKey: "AAAA", iterationCount: 10000},
+                "credentials.SCRAM-SHA-1": {
+                    salt: "AAAA",
+                    storedKey: "AAAA",
+                    serverKey: "AAAA",
+                    iterationCount: 10000,
+                },
             },
         },
     ).nModified,

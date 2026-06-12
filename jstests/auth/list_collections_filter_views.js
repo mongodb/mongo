@@ -30,12 +30,16 @@ function runTestOnConnection(conn) {
         }),
     );
 
-    assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: [{role: "role", db: "test"}]}));
+    assert.commandWorked(
+        db.runCommand({createUser: "user", pwd: "pwd", roles: [{role: "role", db: "test"}]}),
+    );
     admin.logout();
 
     assert(db.auth("user", "pwd"));
 
-    const res = assert.commandWorked(db.runCommand({listCollections: 1, nameOnly: true, authorizedCollections: true}));
+    const res = assert.commandWorked(
+        db.runCommand({listCollections: 1, nameOnly: true, authorizedCollections: true}),
+    );
     assert.eq(2, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
 
     function nameSort(a, b) {

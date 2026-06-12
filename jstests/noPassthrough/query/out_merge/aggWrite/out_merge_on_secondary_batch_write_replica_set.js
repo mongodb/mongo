@@ -10,5 +10,7 @@ import {testOutAndMergeOnSecondaryBatchWrite} from "jstests/noPassthrough/libs/q
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
-testOutAndMergeOnSecondaryBatchWrite(new Mongo(rst.getURL()).getDB("db"), () => rst.awaitReplication());
+testOutAndMergeOnSecondaryBatchWrite(new Mongo(rst.getURL()).getDB("db"), () =>
+    rst.awaitReplication(),
+);
 rst.stopSet();

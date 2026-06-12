@@ -30,7 +30,8 @@ assert.neq(null, conn, "mongod failed to start");
 const db = conn.getDB("test");
 
 function getInvalidationCount(db) {
-    return db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+    return db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness
+        .queriesFailedDueToInvalidation;
 }
 
 function setupColl(name) {
@@ -62,7 +63,10 @@ function runPhases({runQuery, isWriteCmd}) {
         fp.off();
     }
     const after = getInvalidationCount(db);
-    assert.eq(after, before + 1, "expected invalidation counter to be incremented", {before, after});
+    assert.eq(after, before + 1, "expected invalidation counter to be incremented", {
+        before,
+        after,
+    });
 }
 
 function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
@@ -89,7 +93,11 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
         const err = assert.throws(() => runQuery(coll));
         assert.eq(err.code, ErrorCodes.QueryPlanKilled, err.message);
         assert(err.message.includes(kKilledMsg), err.message);
-        assert.eq(getInvalidationCount(testDb) - beforeControl, 1, "control must increment the counter");
+        assert.eq(
+            getInvalidationCount(testDb) - beforeControl,
+            1,
+            "control must increment the counter",
+        );
 
         // Snapshot read: INTERRUPT_ONLY means yieldOrInterrupt never reaches the check.
         const beforeTxn = getInvalidationCount(testDb);
@@ -103,7 +111,11 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
         } finally {
             session.endSession();
         }
-        assert.eq(getInvalidationCount(testDb) - beforeTxn, 0, "snapshot read must not invoke the arrayness check");
+        assert.eq(
+            getInvalidationCount(testDb) - beforeTxn,
+            0,
+            "snapshot read must not invoke the arrayness check",
+        );
     } finally {
         fp.off();
     }
@@ -164,7 +176,8 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     const coll = setupColl("text_or");
     assert.commandWorked(coll.createIndex({val: "text"}));
     runPhases({
-        runQuery: () => coll.find({$text: {$search: "hello"}}, {score: {$meta: "textScore"}}).toArray(),
+        runQuery: () =>
+            coll.find({$text: {$search: "hello"}}, {score: {$meta: "textScore"}}).toArray(),
     });
 }
 
@@ -206,7 +219,9 @@ function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
     const tsColl = db[tsCollName];
     const baseTime = new Date();
     for (let i = 0; i < NUM_DOCS; i++) {
-        assert.commandWorked(tsColl.insert({t: new Date(baseTime.getTime() + i * 1000), meta: i, v: i}));
+        assert.commandWorked(
+            tsColl.insert({t: new Date(baseTime.getTime() + i * 1000), meta: i, v: i}),
+        );
     }
     runPhases({
         isWriteCmd: true,

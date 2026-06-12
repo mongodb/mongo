@@ -7,7 +7,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 function verifyServerStatusFields(serverStatusResponse) {
     assert(
         serverStatusResponse.hasOwnProperty("transactions"),
-        "Expected the serverStatus response to have a 'transactions' field\n" + tojson(serverStatusResponse),
+        "Expected the serverStatus response to have a 'transactions' field\n" +
+            tojson(serverStatusResponse),
     );
     assert(
         serverStatusResponse.transactions.hasOwnProperty("currentActive"),

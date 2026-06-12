@@ -189,7 +189,11 @@ const notArrays = [1, "string", {object: "object"}, null];
 for (const notAnArray of notArrays) {
     assert.commandWorked(coll.insert([{_id: "doesNotMatter", vals: notAnArray}]));
 
-    assertErrorCode(coll, [{$group: {_id: null, v: {$setUnion: "$vals"}}}], ErrorCodes.TypeMismatch);
+    assertErrorCode(
+        coll,
+        [{$group: {_id: null, v: {$setUnion: "$vals"}}}],
+        ErrorCodes.TypeMismatch,
+    );
 
     assert.commandWorked(coll.deleteOne({_id: "doesNotMatter"}));
 }
@@ -243,7 +247,9 @@ assert.eq(result, [
 ]);
 
 // $bucketAuto
-result = coll.aggregate([{$bucketAuto: {groupBy: "$_id", buckets: 2, output: {nums: {$setUnion: "$arr"}}}}]).toArray();
+result = coll
+    .aggregate([{$bucketAuto: {groupBy: "$_id", buckets: 2, output: {nums: {$setUnion: "$arr"}}}}])
+    .toArray();
 assert.eq(result, [
     {"_id": {"min": 0, "max": 5}, "nums": [42]},
     {"_id": {"min": 5, "max": 9}, "nums": [42]},

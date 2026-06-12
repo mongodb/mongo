@@ -63,7 +63,10 @@ db.c.drop();
     const s1 = db.getMongo().startSession();
     s1.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
 
-    const res = assert.commandFailedWithCode(s1.getDatabase("test").c.remove({_id: 0}), ErrorCodes.WriteConflict);
+    const res = assert.commandFailedWithCode(
+        s1.getDatabase("test").c.remove({_id: 0}),
+        ErrorCodes.WriteConflict,
+    );
     assert(res.hasOwnProperty("errorLabels"), tojson(res));
     assert.contains("TransientTransactionError", res.errorLabels, tojson(res));
 

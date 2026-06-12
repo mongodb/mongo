@@ -10,7 +10,8 @@ import {executeAggregationTestCase} from "jstests/libs/query/aggregation_pipelin
 
 // TODO(SERVER-103530) : Remove multiversion check when 9.0 becomes last-lts
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 const coll = db.date_add_subtract;
 coll.drop();
@@ -30,21 +31,25 @@ function runAndAssertResultOrErrorCode(date, result, errorCode) {
 function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
     executeAggregationTestCase(coll, {
         pipeline: [{$project: {_id: 0, newDate: dateArithmeticsSpec}}],
-        inputDocuments: [{_id: 1, date: ISODate("2020-12-31T12:10:05"), unit: "month", timezone: "Europe/Paris"}],
+        inputDocuments: [
+            {_id: 1, date: ISODate("2020-12-31T12:10:05"), unit: "month", timezone: "Europe/Paris"},
+        ],
         expectedErrorCode: expectedErrorCode,
         expectedResults: expectedResult,
     });
 }
 
 (function testDateAddWithValidInputs() {
-    runAndAssert({$dateAdd: {startDate: ISODate("2020-11-30T12:10:05.872Z"), unit: "day", amount: 1}}, [
-        {newDate: ISODate("2020-12-01T12:10:05.872Z")},
-    ]);
+    runAndAssert(
+        {$dateAdd: {startDate: ISODate("2020-11-30T12:10:05.872Z"), unit: "day", amount: 1}},
+        [{newDate: ISODate("2020-12-01T12:10:05.872Z")}],
+    );
 
     if (!isMultiversion) {
-        runAndAssert({$dateAdd: {startDate: ISODate("1950-11-30T12:10:05.872Z"), unit: "day", amount: 1}}, [
-            {newDate: ISODate("1950-12-01T12:10:05.872Z")},
-        ]);
+        runAndAssert(
+            {$dateAdd: {startDate: ISODate("1950-11-30T12:10:05.872Z"), unit: "day", amount: 1}},
+            [{newDate: ISODate("1950-12-01T12:10:05.872Z")}],
+        );
 
         runAndAssert(
             {
@@ -66,7 +71,9 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
 
     runAndAssert({$dateAdd: {startDate: "$date", unit: "day", amount: null}}, [{newDate: null}]);
 
-    runAndAssert({$dateAdd: {startDate: "$date", unit: "$unit", amount: 1, timezone: null}}, [{newDate: null}]);
+    runAndAssert({$dateAdd: {startDate: "$date", unit: "$unit", amount: 1, timezone: null}}, [
+        {newDate: null},
+    ]);
 
     // Test combination of null and invalid arguments.
     runAndAssertResultOrErrorCode(
@@ -75,7 +82,9 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
         ErrorCodes.FailedToParse,
     );
 
-    runAndAssert({$dateAdd: {startDate: "New year day", unit: "$timeunit", amount: 1}}, [{newDate: null}]);
+    runAndAssert({$dateAdd: {startDate: "New year day", unit: "$timeunit", amount: 1}}, [
+        {newDate: null},
+    ]);
 
     runAndAssertResultOrErrorCode(
         {$dateAdd: {startDate: "$date", unit: "workday", amount: "$amount", timezone: "Unknown"}},
@@ -83,7 +92,9 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
         ErrorCodes.FailedToParse,
     );
 
-    runAndAssert({$dateAdd: {startDate: "$date", unit: "$unit", amount: 1.5, timezone: null}}, [{newDate: null}]);
+    runAndAssert({$dateAdd: {startDate: "$date", unit: "$unit", amount: 1.5, timezone: null}}, [
+        {newDate: null},
+    ]);
 
     // Tests when startDate and result date cross the DST time change in a timezone.
     runAndAssert(
@@ -152,9 +163,10 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
         {newDate: ISODate("2021-01-31T12:10:05Z")},
     ]);
 
-    runAndAssert({$dateAdd: {startDate: "$date", unit: "month", amount: 2, timezone: "$timezone"}}, [
-        {newDate: ISODate("2021-02-28T12:10:05Z")},
-    ]);
+    runAndAssert(
+        {$dateAdd: {startDate: "$date", unit: "month", amount: 2, timezone: "$timezone"}},
+        [{newDate: ISODate("2021-02-28T12:10:05Z")}],
+    );
 })();
 
 (function testDateSubtractWithValidInputs() {
@@ -188,9 +200,10 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
     ]);
 
     // Test last day adjustment and crossing DST time change in a timezone.
-    runAndAssert({$dateSubtract: {startDate: "$date", unit: "$unit", amount: 3, timezone: "$timezone"}}, [
-        {newDate: ISODate("2020-09-30T11:10:05Z")},
-    ]);
+    runAndAssert(
+        {$dateSubtract: {startDate: "$date", unit: "$unit", amount: 3, timezone: "$timezone"}},
+        [{newDate: ISODate("2020-09-30T11:10:05Z")}],
+    );
 
     // Test last day adjustment in the New York timezone.
     runAndAssert(
@@ -206,9 +219,16 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
     );
 
     if (!isMultiversion) {
-        runAndAssert({$dateSubtract: {startDate: ISODate("1950-12-01T12:10:05.872Z"), unit: "day", amount: 1}}, [
-            {newDate: ISODate("1950-11-30T12:10:05.872Z")},
-        ]);
+        runAndAssert(
+            {
+                $dateSubtract: {
+                    startDate: ISODate("1950-12-01T12:10:05.872Z"),
+                    unit: "day",
+                    amount: 1,
+                },
+            },
+            [{newDate: ISODate("1950-11-30T12:10:05.872Z")}],
+        );
 
         runAndAssert(
             {
@@ -241,7 +261,9 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
         coll
             .aggregate([
                 {
-                    $project: {newDate: {$dateSubtract: {startDate: "$date", unit: "month", amount: 1}}},
+                    $project: {
+                        newDate: {$dateSubtract: {startDate: "$date", unit: "month", amount: 1}},
+                    },
                 },
             ])
             .toArray(),
@@ -250,7 +272,11 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
                 {
                     $project: {
                         newDate: {
-                            $dateAdd: {startDate: ISODate("2020-11-30T12:10:00Z"), unit: "second", amount: 5},
+                            $dateAdd: {
+                                startDate: ISODate("2020-11-30T12:10:00Z"),
+                                unit: "second",
+                                amount: 5,
+                            },
                         },
                     },
                 },
@@ -271,27 +297,48 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
     runAndAssertErrorCode({$dateSubtract: {startDate: "$date", units: "day", amount: 1}}, 5166401);
 
     // Invalid string type of startDate argument.
-    runAndAssertErrorCode({$dateSubtract: {startDate: "myBirthDate", unit: "year", amount: 10}}, 5166403);
+    runAndAssertErrorCode(
+        {$dateSubtract: {startDate: "myBirthDate", unit: "year", amount: 10}},
+        5166403,
+    );
 
     // Invalid numeric type of unit argument.
     runAndAssertErrorCode({$dateAdd: {startDate: "$date", unit: 1, amount: 10}}, 5166404);
 
     // Invalid value of unit argument.
-    runAndAssertErrorCode({$dateAdd: {startDate: "$date", unit: "epoch", amount: 10}}, ErrorCodes.FailedToParse);
+    runAndAssertErrorCode(
+        {$dateAdd: {startDate: "$date", unit: "epoch", amount: 10}},
+        ErrorCodes.FailedToParse,
+    );
 
     // Invalid double type of amount argument.
-    runAndAssertErrorCode({$dateSubtract: {startDate: "$date", unit: "year", amount: 1.001}}, 5166405);
+    runAndAssertErrorCode(
+        {$dateSubtract: {startDate: "$date", unit: "year", amount: 1.001}},
+        5166405,
+    );
 
     // Overflow error of dateAdd operation due to large amount.
-    runAndAssertErrorCode({$dateSubtract: {startDate: "$date", unit: "month", amount: 12 * 300000000}}, 5166406);
+    runAndAssertErrorCode(
+        {$dateSubtract: {startDate: "$date", unit: "month", amount: 12 * 300000000}},
+        5166406,
+    );
 
     // Invalid 'amount' parameter error of dateAdd operation due to large amount.
-    runAndAssertErrorCode({$dateSubtract: {startDate: "$date", unit: "month", amount: -30000000000}}, 5976500);
+    runAndAssertErrorCode(
+        {$dateSubtract: {startDate: "$date", unit: "month", amount: -30000000000}},
+        5976500,
+    );
 
     // Invalid 'amount' parameter error of dateSubtract operation: long long min value cannot be
     // negated.
-    runAndAssertErrorCode({$dateSubtract: {startDate: "$date", unit: "day", amount: -9223372036854775808}}, 6045000);
+    runAndAssertErrorCode(
+        {$dateSubtract: {startDate: "$date", unit: "day", amount: -9223372036854775808}},
+        6045000,
+    );
 
     // Invalid value of timezone argument.
-    runAndAssertErrorCode({$dateAdd: {startDate: "$date", unit: "year", amount: 1, timezone: "Unknown"}}, 40485);
+    runAndAssertErrorCode(
+        {$dateAdd: {startDate: "$date", unit: "year", amount: 1, timezone: "Unknown"}},
+        40485,
+    );
 })();

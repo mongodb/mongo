@@ -24,7 +24,9 @@ TestData.pinToSingleMongos = true;
 
 const tsColl = db[jsTestName()];
 assertDropCollection(db, tsColl.getName());
-assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
+assert.commandWorked(
+    db.createCollection(tsColl.getName(), {timeseries: {timeField: "time", metaField: "m"}}),
+);
 assert.commandWorked(tsColl.createIndex({"m.loc": "2dsphere"}));
 assert.commandWorked(tsColl.createIndex({"m.tag": 1}));
 // Insert 10 documents, so the aggregation stages will return some documents to confirm the aggregation stage worked.
@@ -142,7 +144,9 @@ const errorTests = [
     },
     {
         stage: "$_internalJoinHint",
-        pipeline: [{$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}}],
+        pipeline: [
+            {$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}},
+        ],
         // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
         expectedErrorCodes: [40602, 10557302, 12093200, 40324, ErrorCodes.IllegalOperation],
     },
@@ -162,7 +166,9 @@ errorTests.forEach((test) => {
 const noUnpackTests = [
     {
         stage: "$_internalApplyOplogUpdate",
-        pipeline: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: Timestamp(0, 0)}}}}}],
+        pipeline: [
+            {$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: Timestamp(0, 0)}}}}},
+        ],
         returnsBucketDocs: true,
     },
     {
@@ -173,14 +179,24 @@ const noUnpackTests = [
     {
         stage: "$_internalUnpackBucket",
         pipeline: [
-            {$_internalUnpackBucket: {timeField: "time", metaField: "m", bucketMaxSpanSeconds: NumberInt(3600)}},
+            {
+                $_internalUnpackBucket: {
+                    timeField: "time",
+                    metaField: "m",
+                    bucketMaxSpanSeconds: NumberInt(3600),
+                },
+            },
         ],
         // Viewful timeseries always appends '$_internalUnpackBucket' stage, which causes an error since the stage
         // can only appear once in a pipeline.
         skipTest: !isViewlessTimeseriesOnlySuite(db),
     },
     // There are known bugs where some of these stages do not work with viewful timeseries.
-    {stage: "$listCatalog", pipeline: [{$listCatalog: {}}], skipTest: !isViewlessTimeseriesOnlySuite(db)},
+    {
+        stage: "$listCatalog",
+        pipeline: [{$listCatalog: {}}],
+        skipTest: !isViewlessTimeseriesOnlySuite(db),
+    },
     {stage: "$collStats", pipeline: [{$collStats: {latencyStats: {}}}]},
     {stage: "$indexStats", pipeline: [{$indexStats: {}}]},
     {
@@ -209,9 +225,20 @@ const unpackTests = [
     {stage: "$_internalShredDocuments", pipeline: [{$_internalShredDocuments: {}}]},
     {
         stage: "$_internalStreamingGroup",
-        pipeline: [{$_internalStreamingGroup: {_id: "$m", value: {$last: "$time"}, $monotonicIdFields: ["_id"]}}],
+        pipeline: [
+            {
+                $_internalStreamingGroup: {
+                    _id: "$m",
+                    value: {$last: "$time"},
+                    $monotonicIdFields: ["_id"],
+                },
+            },
+        ],
     },
-    {stage: "$_internalSplitPipeline", pipeline: [{$_internalSplitPipeline: {mergeType: "anyShard"}}]},
+    {
+        stage: "$_internalSplitPipeline",
+        pipeline: [{$_internalSplitPipeline: {mergeType: "anyShard"}}],
+    },
     {
         stage: "$_internalComputeGeoNearDistance",
         pipeline: [
@@ -233,8 +260,16 @@ const unpackTests = [
     {stage: "$bucket", pipeline: [{$bucket: {groupBy: "$value", boundaries: [0, 50, 100]}}]},
     {stage: "$bucketAuto", pipeline: [{$bucketAuto: {groupBy: "$value", buckets: 2}}]},
     {stage: "$count", pipeline: [{$count: "total"}]},
-    {stage: "$densify", pipeline: [{$densify: {field: "time", range: {step: 1, unit: "millisecond", bounds: "full"}}}]},
-    {stage: "$facet", pipeline: [{$facet: {pipeline1: [{$match: {value: {$gt: 0}}}], pipeline2: [{$limit: 5}]}}]},
+    {
+        stage: "$densify",
+        pipeline: [
+            {$densify: {field: "time", range: {step: 1, unit: "millisecond", bounds: "full"}}},
+        ],
+    },
+    {
+        stage: "$facet",
+        pipeline: [{$facet: {pipeline1: [{$match: {value: {$gt: 0}}}], pipeline2: [{$limit: 5}]}}],
+    },
     {stage: "$fill", pipeline: [{$fill: {sortBy: {time: 1}, output: {value: {method: "linear"}}}}]},
     {
         stage: "$geoNear",
@@ -264,18 +299,31 @@ const unpackTests = [
     },
     {stage: "$group", pipeline: [{$group: {_id: "$m.tag", total: {$sum: "$value"}}}]},
     {stage: "$limit", pipeline: [{$limit: 5}]},
-    {stage: "$lookup", pipeline: [{$lookup: {from: "other", localField: "_id", foreignField: "_id", as: "joined"}}]},
+    {
+        stage: "$lookup",
+        pipeline: [
+            {$lookup: {from: "other", localField: "_id", foreignField: "_id", as: "joined"}},
+        ],
+    },
     {stage: "$match", pipeline: [{$match: {value: {$gt: 20}}}]},
     {stage: "$merge", pipeline: [{$merge: {into: "outputCollection"}}], zeroDocsReturned: true},
     {stage: "$out", pipeline: [{$out: "outputCollection"}], zeroDocsReturned: true},
     {stage: "$project", pipeline: [{$project: {time: 1, value: 1}}]},
-    {stage: "$redact", pipeline: [{$redact: {$cond: {if: {$gt: ["$value", 50]}, then: "$$DESCEND", else: "$$PRUNE"}}}]},
+    {
+        stage: "$redact",
+        pipeline: [
+            {$redact: {$cond: {if: {$gt: ["$value", 50]}, then: "$$DESCEND", else: "$$PRUNE"}}},
+        ],
+    },
     {stage: "$replaceRoot", pipeline: [{$replaceRoot: {newRoot: "$m"}}]},
     {stage: "$replaceWith", pipeline: [{$replaceWith: "$m"}]},
     {stage: "$sample", pipeline: [{$sample: {size: 1}}]},
     {stage: "$score", pipeline: [{$score: {score: 10}}]},
     {stage: "$set", pipeline: [{$set: {newField: "$value"}}]},
-    {stage: "$setWindowFields", pipeline: [{$setWindowFields: {sortBy: {time: 1}, output: {rank: {$rank: {}}}}}]},
+    {
+        stage: "$setWindowFields",
+        pipeline: [{$setWindowFields: {sortBy: {time: 1}, output: {rank: {$rank: {}}}}}],
+    },
     {stage: "$skip", pipeline: [{$skip: 1}]},
     {stage: "$sortByCount", pipeline: [{$sortByCount: "$m.tag"}]},
     {stage: "$sort", pipeline: [{$sort: {time: 1}}]},
@@ -291,10 +339,17 @@ const unpackTests = [
     }
     const result = tsColl.aggregate(test.pipeline).toArray();
     if (test.zeroDocsReturned) {
-        assert.eq(result.length, 0, test.stage + " expected to return zero documents on timeseries collections.");
+        assert.eq(
+            result.length,
+            0,
+            test.stage + " expected to return zero documents on timeseries collections.",
+        );
         return;
     }
-    assert(result.length > 0, test.stage + " expected to return documents on timeseries collections.");
+    assert(
+        result.length > 0,
+        test.stage + " expected to return documents on timeseries collections.",
+    );
     if (!test.returnsBucketDocs) {
         // Confirm the documents were not bucket documents. We will just look at the first document
         // and ensure there is no "control.min.time" field which all bucket documents have.

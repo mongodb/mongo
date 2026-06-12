@@ -31,7 +31,11 @@ let doTest = function (signal) {
 
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
-        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        primary.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     replTest.awaitReplication();
 
@@ -89,7 +93,10 @@ let doTest = function (signal) {
     primary = primary.getSiblingDB(name);
 
     assert.commandWorked(
-        primary.foo.insert({_id: 123, x: "foo"}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+        primary.foo.insert(
+            {_id: 123, x: "foo"},
+            {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+        ),
     );
 
     for (var i = 0; i < 8; i++) {

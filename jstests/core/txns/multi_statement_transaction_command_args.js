@@ -277,7 +277,12 @@ assert.commandWorked(sessionDb.runCommand({find: collName, filter: {}}));
 // invocation, which in turn will fail the check that only the first statement in a multi-document
 // transaction can specify a readConcern.
 assert.commandFailedWithCode(
-    sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}),
+    sessionDb.runCommand({
+        find: collName,
+        filter: {},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
     [ErrorCodes.NoSuchTransaction, ErrorCodes.InvalidOptions],
 );
 
@@ -302,7 +307,11 @@ assert.commandWorked(
 
 // Committing the transaction should fail if 'autocommit' is omitted.
 assert.commandFailedWithCode(
-    sessionDb.adminCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber), writeConcern: {w: "majority"}}),
+    sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        writeConcern: {w: "majority"},
+    }),
     50768,
 );
 
@@ -343,15 +352,26 @@ assert.commandWorked(
 );
 
 // Aborting the transaction should fail if 'autocommit' is omitted.
-assert.commandFailedWithCode(sessionDb.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber)}), 50768);
+assert.commandFailedWithCode(
+    sessionDb.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber)}),
+    50768,
+);
 
 // Aborting the transaction should fail if autocommit=true.
 assert.commandFailedWithCode(
-    sessionDb.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: true}),
+    sessionDb.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: true,
+    }),
     ErrorCodes.InvalidOptions,
 );
 
 // Aborting the transaction should succeed.
 assert.commandWorked(
-    sessionDb.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+    sessionDb.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
 );

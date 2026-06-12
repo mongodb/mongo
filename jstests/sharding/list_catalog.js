@@ -13,15 +13,21 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB(jsTestName());
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const coll = db.coll;
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 // Split at {_id: 1}, moving {_id: 0} to shard0 and {_id: 1} to shard1.
 assert.commandWorked(st.splitAt(coll.getFullName(), {_id: 1}));
-assert.commandWorked(st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}),
+);
 
 const checkResult = function (res) {
     for (const entry of res) {
@@ -41,7 +47,9 @@ assert(res.some((entry) => entry.shard === st.shard1.shardName));
 checkResult(res);
 
 // Move {_id: 0} to shard1 so that shard0 does not own any chunks for the collection.
-assert.commandWorked(st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}),
+);
 
 res = coll.aggregate([{$listCatalog: {}}]).toArray();
 jsTestLog("$listCatalog with one chunk-owning shard: " + tojson(res));

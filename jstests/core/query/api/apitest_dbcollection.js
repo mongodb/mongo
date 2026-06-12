@@ -82,7 +82,8 @@ for (var i = 0; i < 100; i++) {
             assert.eq(
                 "test." + collName,
                 rawValidateResult.ns,
-                "incorrect namespace in testDb.collection.validate() result: " + tojson(rawValidateResult),
+                "incorrect namespace in testDb.collection.validate() result: " +
+                    tojson(rawValidateResult),
             );
             assert(rawValidateResult.valid, "collection validation failed");
             nrecords += rawValidateResult.nrecords;
@@ -164,7 +165,9 @@ IndexUtils.assertIndexes(coll, [], "24");
 
 (function () {
     if (typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined") {
-        print("Skipping this test because collections are implicitly sharded and sharded collections can't be capped.");
+        print(
+            "Skipping this test because collections are implicitly sharded and sharded collections can't be capped.",
+        );
         return;
     }
 
@@ -180,23 +183,31 @@ IndexUtils.assertIndexes(coll, [], "24");
     assert.eq(0, noCollStats.count, "All properties should be 0 on nonexistant collections");
     assert.eq(0, noCollStats.storageSize, "All properties should be 0 on nonexistant collections");
     assert.eq(0, noCollStats.nindexes, "All properties should be 0 on nonexistant collections");
-    assert.eq(0, noCollStats.totalIndexSize, "All properties should be 0 on nonexistant collections");
+    assert.eq(
+        0,
+        noCollStats.totalIndexSize,
+        "All properties should be 0 on nonexistant collections",
+    );
     assert.eq(0, noCollStats.totalSize, "All properties should be 0 on nonexistant collections");
 
     // scale - passed to stats() as sole numerical argument or part of an options object.
     t.drop();
-    assert.commandWorked(testDb.createCollection(t.getName(), {capped: true, size: 10 * 1024 * 1024}));
+    assert.commandWorked(
+        testDb.createCollection(t.getName(), {capped: true, size: 10 * 1024 * 1024}),
+    );
     var collectionStats = assert.commandWorked(t.stats(1024 * 1024));
     assert.eq(
         10,
         collectionStats.maxSize,
-        "testDb.collection.stats(scale) - capped collection size scaled incorrectly: " + tojson(collectionStats),
+        "testDb.collection.stats(scale) - capped collection size scaled incorrectly: " +
+            tojson(collectionStats),
     );
     var collectionStats = assert.commandWorked(t.stats({scale: 1024 * 1024}));
     assert.eq(
         10,
         collectionStats.maxSize,
-        "testDb.collection.stats({scale: N}) - capped collection size scaled incorrectly: " + tojson(collectionStats),
+        "testDb.collection.stats({scale: N}) - capped collection size scaled incorrectly: " +
+            tojson(collectionStats),
     );
 
     // Ensure that collStats can handle large values for 'scale'.
@@ -222,7 +233,8 @@ IndexUtils.assertIndexes(coll, [], "24");
     collectionStats = assert.commandWorked(t.stats());
     assert(
         !collectionStats.hasOwnProperty("indexDetails"),
-        "unexpected indexDetails found in testDb.collection.stats() result: " + tojson(collectionStats),
+        "unexpected indexDetails found in testDb.collection.stats() result: " +
+            tojson(collectionStats),
     );
     collectionStats = assert.commandWorked(t.stats({indexDetails: false}));
     assert(
@@ -233,7 +245,8 @@ IndexUtils.assertIndexes(coll, [], "24");
     collectionStats = assert.commandWorked(t.stats({indexDetails: true}));
     assert(
         collectionStats.hasOwnProperty("indexDetails"),
-        "indexDetails missing from testDb.collection.stats({indexDetails: true}) result: " + tojson(collectionStats),
+        "indexDetails missing from testDb.collection.stats({indexDetails: true}) result: " +
+            tojson(collectionStats),
     );
 
     // Returns index name.
@@ -241,7 +254,11 @@ IndexUtils.assertIndexes(coll, [], "24");
         let indexes = t.getIndexes().filter(function (doc) {
             return friendlyEqual(doc.key, indexKey);
         });
-        assert.eq(1, indexes.length, tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()));
+        assert.eq(
+            1,
+            indexes.length,
+            tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()),
+        );
         return indexes[0].name;
     }
 
@@ -260,7 +277,11 @@ IndexUtils.assertIndexes(coll, [], "24");
         if (storageEngine && storageEngine !== "wiredTiger") {
             return;
         }
-        assert.eq(1, Object.keys(collectionStats.indexDetails).length, "indexDetails must have exactly one entry");
+        assert.eq(
+            1,
+            Object.keys(collectionStats.indexDetails).length,
+            "indexDetails must have exactly one entry",
+        );
         assert(
             collectionStats.indexDetails[indexName],
             indexName + " missing from indexDetails: " + tojson(collectionStats.indexDetails),
@@ -268,7 +289,9 @@ IndexUtils.assertIndexes(coll, [], "24");
         assert.neq(
             0,
             Object.keys(collectionStats.indexDetails[indexName]).length,
-            indexName + " exists in indexDetails but contains no information: " + tojson(collectionStats),
+            indexName +
+                " exists in indexDetails but contains no information: " +
+                tojson(collectionStats),
         );
     }
 
@@ -314,9 +337,21 @@ IndexUtils.assertIndexes(coll, [], "24");
     assert.eq(emptyStats.storageSize, 0);
     assert.eq(emptyStats.totalIndexSize, 0);
 
-    assert.eq(0, t.storageSize(), "testDb.collection.storageSize() on empty collection should return 0");
-    assert.eq(0, t.totalIndexSize(), "testDb.collection.totalIndexSize() on empty collection should return 0");
-    assert.eq(0, t.totalSize(), "testDb.collection.totalSize() on empty collection should return 0");
+    assert.eq(
+        0,
+        t.storageSize(),
+        "testDb.collection.storageSize() on empty collection should return 0",
+    );
+    assert.eq(
+        0,
+        t.totalIndexSize(),
+        "testDb.collection.totalIndexSize() on empty collection should return 0",
+    );
+    assert.eq(
+        0,
+        t.totalSize(),
+        "testDb.collection.totalSize() on empty collection should return 0",
+    );
 
     t.save({a: 1});
     let stats = assert.commandWorked(t.stats());

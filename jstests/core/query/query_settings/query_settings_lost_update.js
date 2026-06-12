@@ -90,7 +90,9 @@ describe("QuerySettings", function () {
     }) {
         // Set the query settings state to one defined by 'initialConfiguration'.
         for (const {settings, representativeQuery} of initialConfiguration) {
-            assert.commandWorked(db.adminCommand({setQuerySettings: representativeQuery, settings: settings}));
+            assert.commandWorked(
+                db.adminCommand({setQuerySettings: representativeQuery, settings: settings}),
+            );
         }
 
         // Configure a fail-point to block the query settings modification command
@@ -163,7 +165,9 @@ describe("QuerySettings", function () {
                 commandToPass: qsutils.makeSetQuerySettingsCommand(
                     qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
                 ),
-                finalConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)],
+                finalConfiguration: [
+                    qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+                ],
             });
         });
 
@@ -176,7 +180,9 @@ describe("QuerySettings", function () {
                 commandToPass: qsutils.makeSetQuerySettingsCommand(
                     qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
                 ),
-                finalConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)],
+                finalConfiguration: [
+                    qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+                ],
             });
         });
     });
@@ -191,7 +197,9 @@ describe("QuerySettings", function () {
                 commandToPass: qsutils.makeSetQuerySettingsCommand(
                     qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
                 ),
-                finalConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2)],
+                finalConfiguration: [
+                    qsutils.makeQueryShapeConfiguration(querySettingsC, queryAInstance2),
+                ],
             });
         });
 

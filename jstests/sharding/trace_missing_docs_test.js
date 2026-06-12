@@ -11,7 +11,9 @@ let testDocMissing = function (useReplicaSet) {
     let coll = mongos.getCollection("foo.bar");
     let admin = mongos.getDB("admin");
 
-    assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}),
+    );
 
     coll.createIndex({sk: 1});
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {sk: 1}}));
@@ -21,7 +23,12 @@ let testDocMissing = function (useReplicaSet) {
     assert.commandWorked(coll.update({sk: 67890}, {$set: {baz: "boz"}}));
 
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {sk: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+        admin.runCommand({
+            moveChunk: coll + "",
+            find: {sk: 0},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     st.printShardingStatus();

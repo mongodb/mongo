@@ -61,7 +61,9 @@ for (let i = 0; i < kNumReadTickets; ++i) {
         funWithArgs(
             function (dbName, collName) {
                 assert.commandWorked(
-                    db.getSiblingDB(dbName).runCommand({"find": collName, readConcern: {level: "linearizable"}}),
+                    db
+                        .getSiblingDB(dbName)
+                        .runCommand({"find": collName, readConcern: {level: "linearizable"}}),
                 );
             },
             db.getName(),
@@ -137,7 +139,11 @@ assert.commandFailedWithCode(
 );
 
 assert.commandFailedWithCode(
-    db.runCommand({delete: coll.getName(), deletes: [{q: doc, limit: 1}], maxTimeMS: failureTimeoutMS}),
+    db.runCommand({
+        delete: coll.getName(),
+        deletes: [{q: doc, limit: 1}],
+        maxTimeMS: failureTimeoutMS,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 

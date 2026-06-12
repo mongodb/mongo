@@ -33,10 +33,14 @@ const mongosDB1 = st.s.getDB(`${jsTestName()}_1`);
 const adminDB = st.s.getDB("admin");
 
 // Enable sharding on mongosDB0 and ensure its primary is shard0.
-assert.commandWorked(mongosDB0.adminCommand({enableSharding: mongosDB0.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    mongosDB0.adminCommand({enableSharding: mongosDB0.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 // Enable sharding on mongosDB1 and ensure its primary is shard1.
-assert.commandWorked(mongosDB1.adminCommand({enableSharding: mongosDB1.getName(), primaryShard: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB1.adminCommand({enableSharding: mongosDB1.getName(), primaryShard: st.rs1.getURL()}),
+);
 
 // Open a connection to a different collection on each shard. We use direct connections to
 // ensure that the oplog timestamps across the shards overlap.
@@ -58,7 +62,10 @@ assert.eq(st.rs0.getPrimary().getCollection(coll0.getFullName()).count(), 10);
 assert.eq(st.rs1.getPrimary().getCollection(coll1.getFullName()).count(), 10);
 
 // Re-enable 'writePeriodicNoops' to ensure that all change stream events are returned.
-FixtureHelpers.runCommandOnEachPrimary({db: adminDB, cmdObj: {setParameter: 1, writePeriodicNoops: true}});
+FixtureHelpers.runCommandOnEachPrimary({
+    db: adminDB,
+    cmdObj: {setParameter: 1, writePeriodicNoops: true},
+});
 
 // Read the stream of events, capture them in 'changeList', and confirm that all events occurred
 // at or later than the clusterTime of the first event. Unfortunately, we cannot guarantee that

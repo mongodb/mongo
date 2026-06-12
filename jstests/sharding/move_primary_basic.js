@@ -31,7 +31,9 @@ assert.commandWorked(mongos.getDB(dbName).runCommand({createUnsplittableCollecti
 assert.commandWorked(mongos.getCollection(coll3NS).insert({name: "Peter"}));
 
 assert.commandWorked(
-    mongos.getDB(dbName).runCommand({createUnsplittableCollection: coll4Name, dataShard: shard1.shardName}),
+    mongos
+        .getDB(dbName)
+        .runCommand({createUnsplittableCollection: coll4Name, dataShard: shard1.shardName}),
 );
 assert.commandWorked(mongos.getCollection(coll4NS).insert({name: "Jack"}));
 
@@ -76,7 +78,10 @@ jsTest.log("Test that orphaned documents on recipient causes the operation to fa
     // NamespaceExists. Otherwise, when the collection is being cloned, it will fail with
     // InvalidOptions due to the UUIDS not matching.
     let expectedErrorCode = ErrorCodes.NamespaceExists;
-    assert.commandFailedWithCode(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}), expectedErrorCode);
+    assert.commandFailedWithCode(
+        mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}),
+        expectedErrorCode,
+    );
 
     // The documents are on both the shards.
     assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
@@ -86,7 +91,10 @@ jsTest.log("Test that orphaned documents on recipient causes the operation to fa
     assert.commandWorked(shard1.getCollection(coll1NS).remove({name: "Emma"}));
     assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
 
-    assert.commandFailedWithCode(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}), expectedErrorCode);
+    assert.commandFailedWithCode(
+        mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}),
+        expectedErrorCode,
+    );
 
     // Drop the orphaned collection on shard1.
     shard1.getCollection(coll1NS).drop();

@@ -80,7 +80,10 @@ function runTest(initCursor) {
         fp.off();
         awaitShell();
 
-        assert.throwsWithCode(() => cursor1.toArray(), [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled]);
+        assert.throwsWithCode(
+            () => cursor1.toArray(),
+            [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled],
+        );
         assertArrayEq({actual: cursor2.toArray(), expected: expectedResult});
     }
 
@@ -150,7 +153,11 @@ function runTest(initCursor) {
 
 runTest(initCursorFind);
 
-const sortPipeline = [{$match: {a: {$gte: 0}, b: {$gte: 0}}}, {$sort: {a: 1}}, {$_internalInhibitOptimization: {}}];
+const sortPipeline = [
+    {$match: {a: {$gte: 0}, b: {$gte: 0}}},
+    {$sort: {a: 1}},
+    {$_internalInhibitOptimization: {}},
+];
 runTest(getInitCursorCallback(sortPipeline));
 
 if (checkSbeRestrictedOrFullyEnabled(db)) {

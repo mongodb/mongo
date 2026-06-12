@@ -26,7 +26,10 @@
 
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getQueryAndOptionsModel, getSortArb} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    getQueryAndOptionsModel,
+    getSortArb,
+} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -57,7 +60,9 @@ function statsCollectorFn(explain) {
         numPlansUsedIndex++;
     }
 }
-const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {statsCollectorFn});
+const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {
+    statsCollectorFn,
+});
 
 /*
  * Generate a random $sort, aggregation pipelines, and collection. Using the $sort, create an
@@ -68,7 +73,11 @@ function getWorkloadModel(isTS) {
     return fc
         .record({
             sort: getSortArb(8 /* maxNumSortComponents */),
-            pipelines: fc.array(getQueryAndOptionsModel(), {minLength: 0, maxLength: numQueriesPerRun, size: "+2"}),
+            pipelines: fc.array(getQueryAndOptionsModel(), {
+                minLength: 0,
+                maxLength: numQueriesPerRun,
+                size: "+2",
+            }),
             collSpec: getCollectionModel({isTS}),
         })
         .map(({sort, pipelines, collSpec}) => {
@@ -92,7 +101,12 @@ function getWorkloadModel(isTS) {
         });
 }
 
-testProperty(correctnessProperty, {controlColl, experimentColl}, getWorkloadModel(false /* isTS */), numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    getWorkloadModel(false /* isTS */),
+    numRuns,
+);
 
 // Assert that the number of plans that used the index for the sort is >= 80%
 assert.gt(totalNumPlans, 0);

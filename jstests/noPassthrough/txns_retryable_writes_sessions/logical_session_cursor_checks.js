@@ -24,9 +24,15 @@ function runFixture(Fixture) {
     {
         var session1 = conn.startSession();
         var session2 = conn.startSession();
-        var res = assert.commandWorked(session1.getDatabase("data_storage").runCommand({find: "test", batchSize: 0}));
+        var res = assert.commandWorked(
+            session1.getDatabase("data_storage").runCommand({find: "test", batchSize: 0}),
+        );
         var cursorId = res.cursor.id;
-        assert.commandWorked(session1.getDatabase("data_storage").runCommand({getMore: cursorId, collection: "test"}));
+        assert.commandWorked(
+            session1
+                .getDatabase("data_storage")
+                .runCommand({getMore: cursorId, collection: "test"}),
+        );
 
         session2.endSession();
         session1.endSession();
@@ -36,9 +42,15 @@ function runFixture(Fixture) {
     {
         var session1 = conn.startSession();
         var session2 = conn.startSession();
-        var res = assert.commandWorked(session1.getDatabase("data_storage").runCommand({find: "test", batchSize: 0}));
+        var res = assert.commandWorked(
+            session1.getDatabase("data_storage").runCommand({find: "test", batchSize: 0}),
+        );
         var cursorId = res.cursor.id;
-        assert.commandFailed(session2.getDatabase("data_storage").runCommand({getMore: cursorId, collection: "test"}));
+        assert.commandFailed(
+            session2
+                .getDatabase("data_storage")
+                .runCommand({getMore: cursorId, collection: "test"}),
+        );
 
         session2.endSession();
         session1.endSession();
@@ -73,7 +85,12 @@ Standalone.prototype.getConn = function () {
 };
 
 function Sharding() {
-    this.st = new ShardingTest({shards: 1, config: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
+    this.st = new ShardingTest({
+        shards: 1,
+        config: 1,
+        mongos: 1,
+        other: {keyFile: "jstests/libs/key1"},
+    });
 }
 
 Sharding.prototype.stop = function () {

@@ -13,7 +13,11 @@ async function shouldForwardErrorsFromAsyncRunCallback(conn) {
     const res = await workerThread.main([], args, async function () {
         throw new Error("Thrown intentionally");
     });
-    assert.eq(res.err, "Error: Thrown intentionally", "should forward errors thrown in async run callback");
+    assert.eq(
+        res.err,
+        "Error: Thrown intentionally",
+        "should forward errors thrown in async run callback",
+    );
 }
 
 const conn = MongoRunner.runMongod();

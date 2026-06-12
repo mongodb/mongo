@@ -24,7 +24,10 @@ print("1. Bring up set");
 // SERVER-7455, this test is called from ssl/auth_x509.js
 let x509_options1;
 let x509_options2;
-let replTest = new ReplSetTest({name: basename, nodes: {node0: x509_options1, node1: x509_options2}});
+let replTest = new ReplSetTest({
+    name: basename,
+    nodes: {node0: x509_options1, node1: x509_options2},
+});
 
 let conns = replTest.startSet();
 replTest.initiate();

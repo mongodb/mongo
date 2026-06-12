@@ -41,13 +41,21 @@ assert.commandWorked(
 );
 
 // $where can access stored functions.
-assert.commandWorked(testDB.runCommand({find: coll.getName(), filter: {$where: "isAdult(this.age)"}}));
+assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$where: "isAdult(this.age)"}}),
+);
 
 // $function cannot access stored functions.
 assert.commandFailedWithCode(
     testDB.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$addFields: {isAdult: {$function: {body: "isAdult(age)", args: ["$age"], lang: "js"}}}}],
+        pipeline: [
+            {
+                $addFields: {
+                    isAdult: {$function: {body: "isAdult(age)", args: ["$age"], lang: "js"}},
+                },
+            },
+        ],
         cursor: {},
     }),
     ErrorCodes.JSInterpreterFailure,

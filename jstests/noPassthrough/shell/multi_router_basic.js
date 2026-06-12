@@ -73,7 +73,10 @@ testCase("Testing toConnectionList preserves options", () => {
     assert.eq(uriList.length, 3, "Should have 3 URIs");
 
     uriList.forEach((uri) => {
-        assert(uri.includes("readPreference=secondary"), "URI should contain readPreference option");
+        assert(
+            uri.includes("readPreference=secondary"),
+            "URI should contain readPreference option",
+        );
         assert(uri.includes("retryWrites=true"), "URI should contain retryWrites option");
     });
 });
@@ -123,7 +126,11 @@ testCase("Replica set", () => {
     rst.nodes.forEach((node) => {
         // Assert is a mongo but not a multi-router type
         assert.neq(node._getDefaultSession, undefined);
-        assert.eq(node.isMultiRouter, undefined, `Replica-Set node ${node} should not be MultiRouterMongo`);
+        assert.eq(
+            node.isMultiRouter,
+            undefined,
+            `Replica-Set node ${node} should not be MultiRouterMongo`,
+        );
     });
 
     rst.stopSet();
@@ -134,14 +141,22 @@ testCase("Individual shard connections are regular Mongo", () => {
     st._connections.forEach((shardConn, idx) => {
         // Assert is a mongo but not a multi-router type
         assert.neq(shardConn._getDefaultSession, undefined);
-        assert.eq(shardConn.isMultiRouter, undefined, `Shard ${idx} should not be MultiRouterMongo`);
+        assert.eq(
+            shardConn.isMultiRouter,
+            undefined,
+            `Shard ${idx} should not be MultiRouterMongo`,
+        );
     });
 
     // Check individual mongos connections (when accessed directly)
     st._mongos.forEach((mongos, idx) => {
         // Assert is a mongo but not a multi-router type
         assert.neq(mongos._getDefaultSession, undefined);
-        assert.eq(mongos.isMultiRouter, undefined, `Individual mongos ${idx} should not be MultiRouterMongo`);
+        assert.eq(
+            mongos.isMultiRouter,
+            undefined,
+            `Individual mongos ${idx} should not be MultiRouterMongo`,
+        );
     });
 });
 
@@ -151,7 +166,11 @@ testCase("Multiple mongos creates MultiRouterMongo", () => {
 
     // Should be MultiRouterMongo
     assert.eq(db.getMongo().isMultiRouter, true, "Should be MultiRouterMongo");
-    assert.eq(db.getMongo().isConnectedToMongos(), true, "MultiRouterMongo must be connected to a mongos");
+    assert.eq(
+        db.getMongo().isConnectedToMongos(),
+        true,
+        "MultiRouterMongo must be connected to a mongos",
+    );
     assert.eq(db.getMongo()._mongoConnections.length, 3, "Should have 3 mongo connections");
 });
 
@@ -169,7 +188,11 @@ testCase("getSiblingDB returns a proxy", () => {
 
     // Should be MultiRouterMongo
     assert.eq(newDb.getMongo().isMultiRouter, true, "Should be MultiRouterMongo");
-    assert.eq(newDb.getMongo().isConnectedToMongos(), true, "MultiRouterMongo must be connected to a mongos");
+    assert.eq(
+        newDb.getMongo().isConnectedToMongos(),
+        true,
+        "MultiRouterMongo must be connected to a mongos",
+    );
     assert.eq(newDb.getMongo()._mongoConnections.length, 3, "Should have 3 mongo connections");
 });
 
@@ -229,7 +252,11 @@ testCase("Testing call distribution via insert", () => {
     }
 
     // Should route randomly for all operations
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for insert operations");
+    assert.gte(
+        getNextMongoTracker.count(),
+        kOperations,
+        "Should route randomly for insert operations",
+    );
 
     // Verify all documents were inserted
     assert.eq(kOperations, coll.count({type: "insert"}), "All inserts should succeed");
@@ -259,7 +286,11 @@ testCase("Testing call distribution via update", () => {
     }
 
     // Should route randomly for all operations
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for update operations");
+    assert.gte(
+        getNextMongoTracker.count(),
+        kOperations,
+        "Should route randomly for update operations",
+    );
 
     // Verify all documents were updated
     assert.eq(kOperations, coll.count({updated: true}), "All updates should succeed");
@@ -290,7 +321,11 @@ testCase("Testing call distribution via delete", () => {
     }
 
     // Should route randomly for all operations
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for delete operations");
+    assert.gte(
+        getNextMongoTracker.count(),
+        kOperations,
+        "Should route randomly for delete operations",
+    );
 
     // Verify correct number of documents remain
     assert.eq(0, coll.count({}), "Should have no documents remaining");
@@ -352,7 +387,11 @@ testCase("Testing basic find + getMore will stick to the same connection", () =>
     assert.eq(countDocs, kTotalDocs, "GetMore never run!");
     assert.gte(getMoreTracker.count(), 0, "Must not have tracked getMore commands");
     // Only the find command must have run _getNextMongo
-    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the find");
+    assert.eq(
+        getNextMongoTracker.count(),
+        1,
+        "Must run getNextMongoCount only once when executing the find",
+    );
     assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
 
     coll.drop();
@@ -385,41 +424,52 @@ testCase("Testing basic aggregate + getMore will stick to the same connection", 
     // GetMore will never hit the proxy unless explicitly run via runCommand. next() self handle this case.
     assert.gte(getMoreTracker.count(), 0, "Must have executed getMore commands");
     // Only the aggregate command must have run _getNextMongo
-    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the aggregate");
+    assert.eq(
+        getNextMongoTracker.count(),
+        1,
+        "Must run getNextMongoCount only once when executing the aggregate",
+    );
     assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
 
     coll.drop();
 });
 
-testCase("Testing basic aggregate + getMore run explicitly will stick to the same connection", () => {
-    const uri = getMongosesURI();
-    const db = connect(uri);
-    const conn = db.getMongo();
-    const coll = db.cursorTest;
-    const kTotalDocs = 120;
+testCase(
+    "Testing basic aggregate + getMore run explicitly will stick to the same connection",
+    () => {
+        const uri = getMongosesURI();
+        const db = connect(uri);
+        const conn = db.getMongo();
+        const coll = db.cursorTest;
+        const kTotalDocs = 120;
 
-    // Insert sample data
-    insertSampleData(coll, kTotalDocs);
+        // Insert sample data
+        insertSampleData(coll, kTotalDocs);
 
-    // Track getMore calls
-    const getMoreTracker = overrideRunCommandCountingCallsForCommand(conn, "getMore");
+        // Track getMore calls
+        const getMoreTracker = overrideRunCommandCountingCallsForCommand(conn, "getMore");
 
-    // Track _getNextMongo calls
-    const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
+        // Track _getNextMongo calls
+        const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
 
-    // Create cursor with small batch size and force a getMore.
-    const cursor = coll.aggregate([{$match: {value: {$gte: 0}}}], {cursor: {batchSize: 2}});
-    assert.commandWorked(db.runCommand({getMore: cursor.getId(), collection: "cursorTest"}));
+        // Create cursor with small batch size and force a getMore.
+        const cursor = coll.aggregate([{$match: {value: {$gte: 0}}}], {cursor: {batchSize: 2}});
+        assert.commandWorked(db.runCommand({getMore: cursor.getId(), collection: "cursorTest"}));
 
-    // We must have called getMore via proxy
-    assert.eq(getMoreTracker.count(), 1, "Must have executed getMore commands");
+        // We must have called getMore via proxy
+        assert.eq(getMoreTracker.count(), 1, "Must have executed getMore commands");
 
-    // Only the aggregate command must have run _getNextMongo
-    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the aggregate");
-    assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
+        // Only the aggregate command must have run _getNextMongo
+        assert.eq(
+            getNextMongoTracker.count(),
+            1,
+            "Must run getNextMongoCount only once when executing the aggregate",
+        );
+        assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
 
-    coll.drop();
-});
+        coll.drop();
+    },
+);
 
 testCase("Testing basic find + releaseMemory will stick to the same connection", () => {
     const uri = getMongosesURI();
@@ -445,7 +495,11 @@ testCase("Testing basic find + releaseMemory will stick to the same connection",
     assert.eq(releaseMemoryTracker.count(), 1, "Must have releaseMemory commands");
 
     // Only the find command must have run _getNextMongo
-    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the find");
+    assert.eq(
+        getNextMongoTracker.count(),
+        1,
+        "Must run getNextMongoCount only once when executing the find",
+    );
     assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
 
     coll.drop();
@@ -475,7 +529,11 @@ testCase("Testing basic find + killCursors will stick to the same connection", (
     assert.eq(killCursorsTracker.count(), 1, "Must have tracked killCursors commands");
 
     // Only the find command must have run _getNextMongo
-    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the find");
+    assert.eq(
+        getNextMongoTracker.count(),
+        1,
+        "Must run getNextMongoCount only once when executing the find",
+    );
     assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
 
     coll.drop();
@@ -485,34 +543,41 @@ testCase("Testing basic find + killCursors will stick to the same connection", (
 // Test disable Multi-Routing
 // ============================================================================
 
-testCase("Testing isMultiRoutingDisabled will make the proxy run like a single router connection", () => {
-    const uri = getMongosesURI();
-    const conn = connect(uri).getMongo();
-    const kTotalCount = 30;
+testCase(
+    "Testing isMultiRoutingDisabled will make the proxy run like a single router connection",
+    () => {
+        const uri = getMongosesURI();
+        const conn = connect(uri).getMongo();
+        const kTotalCount = 30;
 
-    // Track _getNextMongo calls
-    const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
-    assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
+        // Track _getNextMongo calls
+        const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
+        assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
 
-    TestData.pinToSingleMongos = true;
-    // Run commands
-    let adminDb = conn.getDB("admin");
-    for (let i = 0; i < kTotalCount; i++) {
-        adminDb.runCommand({ping: 1});
-    }
+        TestData.pinToSingleMongos = true;
+        // Run commands
+        let adminDb = conn.getDB("admin");
+        for (let i = 0; i < kTotalCount; i++) {
+            adminDb.runCommand({ping: 1});
+        }
 
-    // We should never call _getNextMongo if multi routing is disabled
-    assert.neq(
-        conn.isMultiRouter,
-        true,
-        "When pinToSingleMongos is false, the connection should not be identified as MultiRouterMongo",
-    );
-    assert.eq(0, getNextMongoTracker.count(), "Should never call _getNextMongo when multi routing is disabled");
-    // Set back to false for other tests
-    TestData.pinToSingleMongos = false;
-    assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
-    assert.eq(conn.hasPrimaryMongoRefreshed, true, "Should be MultiRouterMongo");
-});
+        // We should never call _getNextMongo if multi routing is disabled
+        assert.neq(
+            conn.isMultiRouter,
+            true,
+            "When pinToSingleMongos is false, the connection should not be identified as MultiRouterMongo",
+        );
+        assert.eq(
+            0,
+            getNextMongoTracker.count(),
+            "Should never call _getNextMongo when multi routing is disabled",
+        );
+        // Set back to false for other tests
+        TestData.pinToSingleMongos = false;
+        assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
+        assert.eq(conn.hasPrimaryMongoRefreshed, true, "Should be MultiRouterMongo");
+    },
+);
 
 // ============================================================================
 // Test session mapping with transactions
@@ -537,10 +602,18 @@ testCase("Testing explicit session without transaction routes randomly", () => {
     }
 
     // Should have called _getNextMongo for each operation (random routing)
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for non-transactional operations");
+    assert.gte(
+        getNextMongoTracker.count(),
+        kOperations,
+        "Should route randomly for non-transactional operations",
+    );
 
     // Session should NOT be tracked in the map
-    assert.eq(conn._sessionToMongoMap.size(), 0, "Session should not be tracked without transaction");
+    assert.eq(
+        conn._sessionToMongoMap.size(),
+        0,
+        "Session should not be tracked without transaction",
+    );
 
     session.endSession();
     coll.drop();
@@ -600,17 +673,33 @@ testCase("Testing transaction operations pin to same mongos", () => {
         sessionColl.insert({x: 1, type: "txn"}, {session});
 
         // Should have called _getNextMongo once for first operation
-        assert.eq(getNextMongoTracker.count(), 1, "Should call _getNextMongo once for first txn operation");
+        assert.eq(
+            getNextMongoTracker.count(),
+            1,
+            "Should call _getNextMongo once for first txn operation",
+        );
         // Session should now be tracked
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+        assert.eq(
+            conn._sessionToMongoMap.size(),
+            1,
+            "Session should be tracked after first txn operation",
+        );
 
         // Subsequent operations should not call _getNextMongo (pinned to same mongos)
         for (let i = 2; i <= 5; i++) {
             sessionColl.insert({x: i, type: "txn"}, {session});
         }
 
-        assert.eq(getNextMongoTracker.count(), 1, "Should not call _getNextMongo for subsequent txn operations");
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+        assert.eq(
+            getNextMongoTracker.count(),
+            1,
+            "Should not call _getNextMongo for subsequent txn operations",
+        );
+        assert.eq(
+            conn._sessionToMongoMap.size(),
+            1,
+            "Session should be tracked after first txn operation",
+        );
 
         assert.commandWorked(session.commitTransaction_forTesting());
 
@@ -621,96 +710,151 @@ testCase("Testing transaction operations pin to same mongos", () => {
     coll.drop();
 });
 
-testCase("Test 3 transactional operations for the same session use different mongos across transactions", () => {
-    const uri = getMongosesURI();
-    const conn = connect(uri).getMongo();
-    const db = conn.getDB("test");
-    const coll = db.sessionTest;
-    const kNumInserts = 5;
+testCase(
+    "Test 3 transactional operations for the same session use different mongos across transactions",
+    () => {
+        const uri = getMongosesURI();
+        const conn = connect(uri).getMongo();
+        const db = conn.getDB("test");
+        const coll = db.sessionTest;
+        const kNumInserts = 5;
 
-    const session = conn.startSession();
-    const sessionDB = session.getDatabase("test");
-    const sessionColl = sessionDB.sessionTest;
+        const session = conn.startSession();
+        const sessionDB = session.getDatabase("test");
+        const sessionColl = sessionDB.sessionTest;
 
-    // Track _getNextMongo calls
-    const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
+        // Track _getNextMongo calls
+        const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
 
-    // Transaction 1
-    withRetryOnTransientTxnError(() => {
-        getNextMongoTracker.reset();
+        // Transaction 1
+        withRetryOnTransientTxnError(() => {
+            getNextMongoTracker.reset();
 
-        session.startTransaction();
+            session.startTransaction();
 
-        // First operation in transaction
-        sessionColl.insert({x: 1, type: "txn"}, {session});
+            // First operation in transaction
+            sessionColl.insert({x: 1, type: "txn"}, {session});
 
-        // Should _getNextMongo once for first operation
-        assert.eq(getNextMongoTracker.count(), 1, "Should call _getNextMongo once for first txn operation");
-        // Session should now be tracked
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+            // Should _getNextMongo once for first operation
+            assert.eq(
+                getNextMongoTracker.count(),
+                1,
+                "Should call _getNextMongo once for first txn operation",
+            );
+            // Session should now be tracked
+            assert.eq(
+                conn._sessionToMongoMap.size(),
+                1,
+                "Session should be tracked after first txn operation",
+            );
 
-        // Subsequent operations should not call _getNextMongo (pinned to same mongos)
-        for (let i = 2; i <= kNumInserts; i++) {
-            sessionColl.insert({x: i, type: "txn"}, {session});
-        }
+            // Subsequent operations should not call _getNextMongo (pinned to same mongos)
+            for (let i = 2; i <= kNumInserts; i++) {
+                sessionColl.insert({x: i, type: "txn"}, {session});
+            }
 
-        assert.eq(getNextMongoTracker.count(), 1, "Should not call _getNextMongo for subsequent txn operations");
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+            assert.eq(
+                getNextMongoTracker.count(),
+                1,
+                "Should not call _getNextMongo for subsequent txn operations",
+            );
+            assert.eq(
+                conn._sessionToMongoMap.size(),
+                1,
+                "Session should be tracked after first txn operation",
+            );
 
-        assert.commandWorked(session.commitTransaction_forTesting());
-    });
+            assert.commandWorked(session.commitTransaction_forTesting());
+        });
 
-    // Transaction 2
-    withRetryOnTransientTxnError(() => {
-        getNextMongoTracker.reset();
+        // Transaction 2
+        withRetryOnTransientTxnError(() => {
+            getNextMongoTracker.reset();
 
-        session.startTransaction();
+            session.startTransaction();
 
-        // First operation in transaction
-        sessionColl.insert({x: 1, type: "txn"}, {session});
+            // First operation in transaction
+            sessionColl.insert({x: 1, type: "txn"}, {session});
 
-        assert.eq(getNextMongoTracker.count(), 1, "Should call _getNextMongo once for first txn operation");
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+            assert.eq(
+                getNextMongoTracker.count(),
+                1,
+                "Should call _getNextMongo once for first txn operation",
+            );
+            assert.eq(
+                conn._sessionToMongoMap.size(),
+                1,
+                "Session should be tracked after first txn operation",
+            );
 
-        // Subsequent operations should not call _getNextMongo (pinned to same mongos)
-        for (let i = 2; i <= kNumInserts; i++) {
-            sessionColl.insert({y: i, type: "txn"}, {session});
-        }
+            // Subsequent operations should not call _getNextMongo (pinned to same mongos)
+            for (let i = 2; i <= kNumInserts; i++) {
+                sessionColl.insert({y: i, type: "txn"}, {session});
+            }
 
-        assert.eq(getNextMongoTracker.count(), 1, "Should not call _getNextMongo for subsequent txn operations");
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+            assert.eq(
+                getNextMongoTracker.count(),
+                1,
+                "Should not call _getNextMongo for subsequent txn operations",
+            );
+            assert.eq(
+                conn._sessionToMongoMap.size(),
+                1,
+                "Session should be tracked after first txn operation",
+            );
 
-        assert.commandWorked(session.commitTransaction_forTesting());
-    });
+            assert.commandWorked(session.commitTransaction_forTesting());
+        });
 
-    // Transaction 3
-    withRetryOnTransientTxnError(() => {
-        getNextMongoTracker.reset();
+        // Transaction 3
+        withRetryOnTransientTxnError(() => {
+            getNextMongoTracker.reset();
 
-        session.startTransaction();
+            session.startTransaction();
 
-        // First operation in transaction
-        sessionColl.insert({z: 1, type: "txn"}, {session});
+            // First operation in transaction
+            sessionColl.insert({z: 1, type: "txn"}, {session});
 
-        assert.eq(getNextMongoTracker.count(), 1, "Should call _getNextMongo once for first txn operation");
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+            assert.eq(
+                getNextMongoTracker.count(),
+                1,
+                "Should call _getNextMongo once for first txn operation",
+            );
+            assert.eq(
+                conn._sessionToMongoMap.size(),
+                1,
+                "Session should be tracked after first txn operation",
+            );
 
-        // Subsequent operations should not call _getNextMongo (pinned to same mongos)
-        for (let i = 2; i <= kNumInserts; i++) {
-            sessionColl.insert({y: i, type: "txn"}, {session});
-        }
+            // Subsequent operations should not call _getNextMongo (pinned to same mongos)
+            for (let i = 2; i <= kNumInserts; i++) {
+                sessionColl.insert({y: i, type: "txn"}, {session});
+            }
 
-        assert.eq(getNextMongoTracker.count(), 1, "Should not call _getNextMongo for subsequent txn operations");
-        assert.eq(conn._sessionToMongoMap.size(), 1, "Session should be tracked after first txn operation");
+            assert.eq(
+                getNextMongoTracker.count(),
+                1,
+                "Should not call _getNextMongo for subsequent txn operations",
+            );
+            assert.eq(
+                conn._sessionToMongoMap.size(),
+                1,
+                "Session should be tracked after first txn operation",
+            );
 
-        assert.commandWorked(session.commitTransaction_forTesting());
-    });
+            assert.commandWorked(session.commitTransaction_forTesting());
+        });
 
-    assert.eq(kNumInserts * 3, coll.count({type: "txn"}), "All transaction inserts should succeed");
+        assert.eq(
+            kNumInserts * 3,
+            coll.count({type: "txn"}),
+            "All transaction inserts should succeed",
+        );
 
-    session.endSession();
-    coll.drop();
-});
+        session.endSession();
+        coll.drop();
+    },
+);
 
 testCase("Testing session reuse after transaction routes randomly", () => {
     const uri = getMongosesURI();
@@ -741,10 +885,18 @@ testCase("Testing session reuse after transaction routes randomly", () => {
     }
 
     // Should route randomly (no txnNumber in these operations)
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly after transaction completes");
+    assert.gte(
+        getNextMongoTracker.count(),
+        kOperations,
+        "Should route randomly after transaction completes",
+    );
 
     // Session remains tracked but operations without txnNumber don't use the mapping
-    assert.eq(conn._sessionToMongoMap.size(), 1, "Session tracking persists but doesn't affect non-txn ops");
+    assert.eq(
+        conn._sessionToMongoMap.size(),
+        1,
+        "Session tracking persists but doesn't affect non-txn ops",
+    );
 
     session.endSession();
     coll.drop();
@@ -809,7 +961,11 @@ testCase("Testing retryable writes pin to same mongos", () => {
         sessionColl.insert({x: i, type: "retryable"}, {session});
     }
 
-    assert.eq(getNextMongoTracker.count(), 5, "Should not call _getNextMongo for subsequent retryable writes");
+    assert.eq(
+        getNextMongoTracker.count(),
+        5,
+        "Should not call _getNextMongo for subsequent retryable writes",
+    );
     assert.eq(conn._sessionToMongoMap.size(), 1, "We should have exactly 1 tracked session");
 
     // Verify all writes succeeded
@@ -881,7 +1037,11 @@ testCase("Testing setAutoEncryption propagates to all mongos connections", () =>
     conn._mongoConnections.forEach((mongo, idx) => {
         const options = mongo.getAutoEncryptionOptions();
         assert.neq(options, undefined, `Mongos ${idx} should have auto encryption options`);
-        assert.eq(options.keyVaultNamespace, "test.keystore", `Mongos ${idx} should have correct keyVaultNamespace`);
+        assert.eq(
+            options.keyVaultNamespace,
+            "test.keystore",
+            `Mongos ${idx} should have correct keyVaultNamespace`,
+        );
     });
 
     // Clean up
@@ -889,7 +1049,11 @@ testCase("Testing setAutoEncryption propagates to all mongos connections", () =>
     // Verify all connections are cleaned up
     conn._mongoConnections.forEach((mongo, idx) => {
         const options = mongo.getAutoEncryptionOptions();
-        assert.eq(options, undefined, `Mongos ${idx} should not have auto encryption options after cleanup`);
+        assert.eq(
+            options,
+            undefined,
+            `Mongos ${idx} should not have auto encryption options after cleanup`,
+        );
     });
 });
 
@@ -924,7 +1088,11 @@ testCase("Testing toggleAutoEncryption propagates to all mongos connections", ()
     conn._mongoConnections.forEach((mongo, idx) => {
         // We can't directly check the toggle state, but we can verify options exist
         const options = mongo.getAutoEncryptionOptions();
-        assert.neq(options, undefined, `Mongos ${idx} should have auto encryption options after toggle on`);
+        assert.neq(
+            options,
+            undefined,
+            `Mongos ${idx} should have auto encryption options after toggle on`,
+        );
     });
 
     // Toggle auto encryption off
@@ -934,7 +1102,11 @@ testCase("Testing toggleAutoEncryption propagates to all mongos connections", ()
     // Verify all underlying mongos connections have auto encryption toggled off
     conn._mongoConnections.forEach((mongo, idx) => {
         const options = mongo.getAutoEncryptionOptions();
-        assert.neq(options, undefined, `Mongos ${idx} should still have auto encryption options after toggle off`);
+        assert.neq(
+            options,
+            undefined,
+            `Mongos ${idx} should still have auto encryption options after toggle off`,
+        );
     });
 
     // Clean up by unsetting auto encryption
@@ -971,7 +1143,11 @@ testCase("Testing encryption state is independently maintained per mongos", () =
     conn._mongoConnections.forEach((mongo, idx) => {
         const options = mongo.getAutoEncryptionOptions();
         assert.neq(options, undefined, `Mongos ${idx} should have auto encryption options`);
-        assert.eq(options.keyVaultNamespace, "test.keystore", `Mongos ${idx} should have correct keyVaultNamespace`);
+        assert.eq(
+            options.keyVaultNamespace,
+            "test.keystore",
+            `Mongos ${idx} should have correct keyVaultNamespace`,
+        );
     });
 
     // Clean up
@@ -980,7 +1156,11 @@ testCase("Testing encryption state is independently maintained per mongos", () =
     // Verify all connections are cleaned up
     conn._mongoConnections.forEach((mongo, idx) => {
         const options = mongo.getAutoEncryptionOptions();
-        assert.eq(options, undefined, `Mongos ${idx} should not have auto encryption options after cleanup`);
+        assert.eq(
+            options,
+            undefined,
+            `Mongos ${idx} should not have auto encryption options after cleanup`,
+        );
     });
 });
 
@@ -1001,7 +1181,9 @@ testCase("Testing encrypted inserts are routed randomly", () => {
     assert.commandWorked(
         client.createEncryptionCollection(kCollName, {
             encryptedFields: {
-                "fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}],
+                "fields": [
+                    {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
+                ],
             },
         }),
     );
@@ -1016,7 +1198,11 @@ testCase("Testing encrypted inserts are routed randomly", () => {
     }
 
     // Should route randomly for all operations
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for insert operations");
+    assert.gte(
+        getNextMongoTracker.count(),
+        kOperations,
+        "Should route randomly for insert operations",
+    );
 
     ecoll.drop();
     assert(edb.dropDatabase());
@@ -1039,31 +1225,46 @@ testCase("Testing unsupported commands throw errors", () => {
     let msg = assert.throws(() => {
         db.runCommand({releaseMemory: ["target1", "target2"]});
     }).message;
-    assert(stringContains(msg, "releaseMemory"), "The error should be about releaseMemory, but found: " + msg);
+    assert(
+        stringContains(msg, "releaseMemory"),
+        "The error should be about releaseMemory, but found: " + msg,
+    );
 
     // Test killCursors with multiple cursors
     msg = assert.throws(() => {
         db.runCommand({killCursors: "collection", cursors: [NumberLong(1), NumberLong(2)]});
     }).message;
-    assert(stringContains(msg, "killCursors"), "The error should be about killCursors, but found: " + msg);
+    assert(
+        stringContains(msg, "killCursors"),
+        "The error should be about killCursors, but found: " + msg,
+    );
 
     // Test aggregate with $currentOp and localOps: true
     msg = assert.throws(() => {
         db.runCommand({aggregate: 1, pipeline: [{$currentOp: {localOps: true}}], cursor: {}});
     }).message;
-    assert(stringContains(msg, "currentOp"), "The error should be about currentOp, but found: " + msg);
+    assert(
+        stringContains(msg, "currentOp"),
+        "The error should be about currentOp, but found: " + msg,
+    );
 
     // Test aggregate with $listLocalSessions
     msg = assert.throws(() => {
         db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}], cursor: {}});
     }).message;
-    assert(stringContains(msg, "listLocalSessions"), "The error should be about listLocalSessions, but found: " + msg);
+    assert(
+        stringContains(msg, "listLocalSessions"),
+        "The error should be about listLocalSessions, but found: " + msg,
+    );
 
     // Test getShardVersion
     msg = assert.throws(() => {
         db.runCommand({getShardVersion: "test.collection"});
     }).message;
-    assert(stringContains(msg, "getShardVersion"), "The error should be about getShardVersion, but found: " + msg);
+    assert(
+        stringContains(msg, "getShardVersion"),
+        "The error should be about getShardVersion, but found: " + msg,
+    );
 
     // Test getDatabaseVersion
     msg = assert.throws(() => {
@@ -1081,7 +1282,11 @@ testCase("Testing unsupported commands throw errors", () => {
     assert(stringContains(msg, "getLog"), "The error should be about getLog, but found: " + msg);
     // Test configureFailPoint
     msg = assert.throws(() => {
-        db.runCommand({configureFailPoint: "failCommand", mode: "alwaysOn", data: {failCommands: ["ping"]}});
+        db.runCommand({
+            configureFailPoint: "failCommand",
+            mode: "alwaysOn",
+            data: {failCommands: ["ping"]},
+        });
     }).message;
     assert(
         stringContains(msg, "configureFailPoint"),
@@ -1177,7 +1382,11 @@ testCase("Test hello result _mongo points to MultiRouter", () => {
     const result = conn.getDB("admin").runCommand({hello: 1});
     assert.commandWorked(result);
     assert(result._mongo, "hello result must have _mongo set");
-    assert.eq(result._mongo.isMultiRouter, true, "hello result _mongo must be the MultiRouter, not a raw mongos");
+    assert.eq(
+        result._mongo.isMultiRouter,
+        true,
+        "hello result _mongo must be the MultiRouter, not a raw mongos",
+    );
 });
 
 testCase("Test query result _mongo points to MultiRouter (exhausted cursor)", () => {
@@ -1218,11 +1427,18 @@ testCase("Test find result _mongo points to MultiRouter within a transaction", (
     withRetryOnTransientTxnError(() => {
         session.startTransaction();
 
-        const findResult = sessionDB.runCommand({find: "mongoResultTest", filter: {tag: "mongoResultTxn"}});
+        const findResult = sessionDB.runCommand({
+            find: "mongoResultTest",
+            filter: {tag: "mongoResultTxn"},
+        });
         assert.commandWorked(findResult);
         assert(findResult.cursor, "find result in transaction must have a cursor");
         assert(findResult._mongo, "find result in transaction must have _mongo set");
-        assert.eq(findResult._mongo.isMultiRouter, true, "find result _mongo in transaction must be the MultiRouter");
+        assert.eq(
+            findResult._mongo.isMultiRouter,
+            true,
+            "find result _mongo in transaction must be the MultiRouter",
+        );
 
         assert.commandWorked(session.commitTransaction_forTesting());
     });

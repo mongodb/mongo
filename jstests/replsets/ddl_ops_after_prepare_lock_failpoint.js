@@ -27,7 +27,9 @@ const testColl = testDB.getCollection(collName);
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Also build an index (on the same collection) which we will later attempt to drop.
-assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [{key: {"num": 1}, name: indexName}]}));
+assert.commandWorked(
+    testDB.runCommand({createIndexes: collName, indexes: [{key: {"num": 1}, name: indexName}]}),
+);
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
@@ -38,7 +40,9 @@ assert.commandWorked(sessionColl.insert({_id: 42}));
 
 PrepareHelpers.prepareTransaction(session);
 
-assert.commandWorked(primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}),
+);
 
 /**
  * Tests that conflicting DDL ops fail immediately.
@@ -77,7 +81,10 @@ let testDDLOps = () => {
 
     // Attempt to add a new index to that collection.
     assert.commandFailedWithCode(
-        testDB.runCommand({createIndexes: collName, indexes: [{key: {"b": 1}, name: indexToCreate}]}),
+        testDB.runCommand({
+            createIndexes: collName,
+            indexes: [{key: {"b": 1}, name: indexToCreate}],
+        }),
         ErrorCodes.LockTimeout,
     );
     assert.eq(null, IndexCatalogHelpers.findByName(testColl.getIndexes(), indexToCreate));
@@ -128,9 +135,13 @@ testDDLOps();
 testCRUDOps(testColl);
 
 // Also test operations as part of a transaction (should succeed).
-testCRUDOps(primary.startSession({causalConsistency: false}).getDatabase(dbName).getCollection(collName));
+testCRUDOps(
+    primary.startSession({causalConsistency: false}).getDatabase(dbName).getCollection(collName),
+);
 
-assert.commandWorked(primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}),
+);
 
 assert.commandWorked(session.abortTransaction_forTesting());
 rst.stopSet();

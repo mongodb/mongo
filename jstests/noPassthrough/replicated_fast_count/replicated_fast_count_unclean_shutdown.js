@@ -22,7 +22,11 @@ const db = primary.getDB(jsTestName());
 const coll = db.getCollection(jsTestName());
 
 if (
-    PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedFastCount", false) &&
+    PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        db,
+        "shouldUseReplicatedFastCount",
+        false,
+    ) &&
     !FeatureFlagUtil.isEnabled(db, "ReplicatedFastCount")
 ) {
     rst.stopSet();
@@ -56,7 +60,11 @@ for (let i = 0; i < kNumBaselineDocs; i++) {
 }
 
 assert.eq(kNumBaselineDocs, coll.find().itcount(), "Actual count should be correct after flush");
-assert.eq(kNumBaselineDocs * sampleDocSize, getActualSize(coll), "Actual size should be correct after flush");
+assert.eq(
+    kNumBaselineDocs * sampleDocSize,
+    getActualSize(coll),
+    "Actual size should be correct after flush",
+);
 
 assert.eq(coll.count(), coll.find().itcount(), "Fast count should match actual count");
 assert.eq(getFastSize(db, coll), getActualSize(coll), "Fast size should match actual size");
@@ -75,7 +83,12 @@ assert.commandWorked(db.adminCommand({fsync: 1}));
 // Wait until the replicated fast count thread is hanging before flushing new size deltas.
 hangFp.wait();
 
-rst.stop(primary, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, waitpid: true});
+rst.stop(
+    primary,
+    9,
+    {allowedExitCode: MongoRunner.EXIT_SIGKILL},
+    {forRestart: true, waitpid: true},
+);
 
 rst.start(primary, undefined, /*restart=*/ true);
 rst.awaitNodesAgreeOnPrimary();
@@ -84,7 +97,11 @@ const primaryAfterRestart = rst.getPrimary();
 const dbAfterRestart = primaryAfterRestart.getDB(jsTestName());
 const collAfterRestart = dbAfterRestart.getCollection(jsTestName());
 
-assert.eq(kNumTotalDocs, collAfterRestart.find().itcount(), "Actual count should be correct after unclean shutdown");
+assert.eq(
+    kNumTotalDocs,
+    collAfterRestart.find().itcount(),
+    "Actual count should be correct after unclean shutdown",
+);
 assert.eq(
     kNumTotalDocs * sampleDocSize,
     getActualSize(collAfterRestart),

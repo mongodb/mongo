@@ -78,7 +78,9 @@ function runS2IndexV4DowngradeTest(conn, testName) {
     const downgradeFCV = binVersionToFCV(targetDowngradeVersion);
 
     // Attempt to downgrade FCV - this should fail due to v4 indexes.
-    jsTest.log.info(`[${testName}] Setting FCV to ${downgradeFCV} - this should fail due to v4 indexes`);
+    jsTest.log.info(
+        `[${testName}] Setting FCV to ${downgradeFCV} - this should fail due to v4 indexes`,
+    );
     const fcvResult = adminDB.runCommand({
         setFeatureCompatibilityVersion: downgradeFCV,
         confirm: true,
@@ -113,7 +115,10 @@ function runS2IndexV4DowngradeTest(conn, testName) {
     jsTest.log.info(`[${testName}] Dropping v4 2dsphere indexes`);
 
     // Drop the v4 indexes.
-    assert.commandWorked(coll.dropIndex("location_2dsphere"), "Failed to drop location_2dsphere index");
+    assert.commandWorked(
+        coll.dropIndex("location_2dsphere"),
+        "Failed to drop location_2dsphere index",
+    );
     assert.commandWorked(coll2.dropIndex("geo_2dsphere"), "Failed to drop geo_2dsphere index");
 
     // Verify indexes are dropped.
@@ -171,7 +176,9 @@ function runS2IndexV4DowngradeTest(conn, testName) {
     assert.neq(null, locationIndexV3, "location_2dsphere index not found");
     assert.eq(3, locationIndexV3["2dsphereIndexVersion"], "Index should have version 3");
 
-    jsTest.log.info(`[${testName}] Successfully created v3 2dsphere index on 8.3 binary with FCV 8.0`);
+    jsTest.log.info(
+        `[${testName}] Successfully created v3 2dsphere index on 8.3 binary with FCV 8.0`,
+    );
 
     // Verify the index works by running a simple query.
     const result = coll3

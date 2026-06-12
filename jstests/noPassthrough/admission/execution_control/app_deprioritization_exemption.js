@@ -43,7 +43,9 @@ describe("Execution control deprioritization exemptions", function () {
         before(function () {
             standalone = MongoRunner.runMongod({
                 setParameter: {
-                    executionControlApplicationDeprioritizationExemptions: {appNames: ["foo", "bar", "baz"]},
+                    executionControlApplicationDeprioritizationExemptions: {
+                        appNames: ["foo", "bar", "baz"],
+                    },
                 },
             });
         });
@@ -54,22 +56,34 @@ describe("Execution control deprioritization exemptions", function () {
 
         it("should get exemptions set at startup", function () {
             const res = assert.commandWorked(
-                standalone.adminCommand({getParameter: 1, executionControlApplicationDeprioritizationExemptions: 1}),
+                standalone.adminCommand({
+                    getParameter: 1,
+                    executionControlApplicationDeprioritizationExemptions: 1,
+                }),
             );
-            assert.eq(res.executionControlApplicationDeprioritizationExemptions, {appNames: ["foo", "bar", "baz"]});
+            assert.eq(res.executionControlApplicationDeprioritizationExemptions, {
+                appNames: ["foo", "bar", "baz"],
+            });
         });
 
         it("should update exemptions at runtime", function () {
             assert.commandWorked(
                 standalone.adminCommand({
                     setParameter: 1,
-                    executionControlApplicationDeprioritizationExemptions: {appNames: ["newFoo", "newBar"]},
+                    executionControlApplicationDeprioritizationExemptions: {
+                        appNames: ["newFoo", "newBar"],
+                    },
                 }),
             );
             const res = assert.commandWorked(
-                standalone.adminCommand({getParameter: 1, executionControlApplicationDeprioritizationExemptions: 1}),
+                standalone.adminCommand({
+                    getParameter: 1,
+                    executionControlApplicationDeprioritizationExemptions: 1,
+                }),
             );
-            assert.eq(res.executionControlApplicationDeprioritizationExemptions, {appNames: ["newFoo", "newBar"]});
+            assert.eq(res.executionControlApplicationDeprioritizationExemptions, {
+                appNames: ["newFoo", "newBar"],
+            });
         });
 
         it("should clear exemptions when set to empty", function () {
@@ -80,7 +94,10 @@ describe("Execution control deprioritization exemptions", function () {
                 }),
             );
             const res = assert.commandWorked(
-                standalone.adminCommand({getParameter: 1, executionControlApplicationDeprioritizationExemptions: 1}),
+                standalone.adminCommand({
+                    getParameter: 1,
+                    executionControlApplicationDeprioritizationExemptions: 1,
+                }),
             );
             assert.eq(res.executionControlApplicationDeprioritizationExemptions, {appNames: []});
         });
@@ -114,7 +131,10 @@ describe("Execution control deprioritization exemptions", function () {
             const conn = createAppConnection(primary.host, kExemptApp);
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.eq(getLowPriorityReadCount(primary), initialLowPriority);
-            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+            assert.gt(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable,
+            );
         });
 
         it("should deprioritize non-exempt apps", function () {
@@ -123,7 +143,10 @@ describe("Execution control deprioritization exemptions", function () {
             const conn = createAppConnection(primary.host, "nonExemptApp");
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.gt(getLowPriorityReadCount(primary), initialLowPriority);
-            assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+            assert.eq(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable,
+            );
         });
 
         it("should handle runtime exemption changes", function () {
@@ -135,7 +158,10 @@ describe("Execution control deprioritization exemptions", function () {
             const initialMarkedNonDeprioritizable1 = getTotalMarkedNonDeprioritizableCount(primary);
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.gt(getLowPriorityReadCount(primary), before1);
-            assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable1);
+            assert.eq(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable1,
+            );
 
             // Add to exemptions.
             setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, appName]);
@@ -146,7 +172,10 @@ describe("Execution control deprioritization exemptions", function () {
             const initialMarkedNonDeprioritizable2 = getTotalMarkedNonDeprioritizableCount(primary);
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.eq(getLowPriorityReadCount(primary), before2);
-            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable2);
+            assert.gt(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable2,
+            );
         });
 
         it("should apply exemption change mid-operation: non-exempt to exempt", function () {
@@ -190,14 +219,22 @@ describe("Execution control deprioritization exemptions", function () {
                         .toArray();
                     return ops.length > 0;
                 });
-                assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+                assert.eq(
+                    getTotalMarkedNonDeprioritizableCount(primary),
+                    initialMarkedNonDeprioritizable,
+                );
 
                 // Add exemption mid-operation.
                 setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, appName]);
             } finally {
-                assert.commandWorked(primary.adminCommand({configureFailPoint: kFailPoint, mode: "off"}));
+                assert.commandWorked(
+                    primary.adminCommand({configureFailPoint: kFailPoint, mode: "off"}),
+                );
                 if (waitForShell) waitForShell();
-                assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+                assert.gt(
+                    getTotalMarkedNonDeprioritizableCount(primary),
+                    initialMarkedNonDeprioritizable,
+                );
             }
         });
 
@@ -248,14 +285,19 @@ describe("Execution control deprioritization exemptions", function () {
                 // Remove exemption mid-operation.
                 setExecutionControlDeprioritizationExemptions(primary, [kExemptApp]);
             } finally {
-                assert.commandWorked(primary.adminCommand({configureFailPoint: kFailPoint, mode: "off"}));
+                assert.commandWorked(
+                    primary.adminCommand({configureFailPoint: kFailPoint, mode: "off"}),
+                );
                 if (waitForShell) waitForShell();
             }
 
             // After removing exemption, subsequent yields should deprioritize.
             assert.gt(getLowPriorityReadCount(primary), midOpLowPriority);
             // Since we were exempt before, the operation will be considered marked non-deprioritizable.
-            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+            assert.gt(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable,
+            );
         });
 
         it("should exempt operations matching app name prefix", function () {
@@ -265,7 +307,10 @@ describe("Execution control deprioritization exemptions", function () {
             const conn = createAppConnection(primary.host, "testPrefixApp1");
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.eq(getLowPriorityReadCount(primary), initialLowPriority);
-            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
+            assert.gt(
+                getTotalMarkedNonDeprioritizableCount(primary),
+                initialMarkedNonDeprioritizable,
+            );
         });
 
         it("should still use normal priority tickets for exempt apps", function () {
@@ -280,7 +325,11 @@ describe("Execution control deprioritization exemptions", function () {
 
     describe("Initial sync deprioritization", function () {
         const kNumDocs = 5000;
-        const kInitialSyncExemptions = ["NetworkInterfaceTL", "OplogFetcher", "MongoDB Internal Client"];
+        const kInitialSyncExemptions = [
+            "NetworkInterfaceTL",
+            "OplogFetcher",
+            "MongoDB Internal Client",
+        ];
         let replTest;
 
         before(function () {
@@ -317,7 +366,10 @@ describe("Execution control deprioritization exemptions", function () {
         it("should NOT deprioritize initial sync WITH replication exemptions", function () {
             const primary = replTest.getPrimary();
             setExecutionControlDeprioritizationExemptions(primary, kInitialSyncExemptions);
-            insertTestDocuments(primary.getDB(jsTestName()).coll, kNumDocs, {payloadSize: 256, startId: kNumDocs});
+            insertTestDocuments(primary.getDB(jsTestName()).coll, kNumDocs, {
+                payloadSize: 256,
+                startId: kNumDocs,
+            });
 
             const beforeLowPriority = getLowPriorityReadCount(primary);
             const newNode = replTest.add();

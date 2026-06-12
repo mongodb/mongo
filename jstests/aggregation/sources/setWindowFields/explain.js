@@ -42,7 +42,10 @@ assert.commandWorked(bulk.execute());
  * - 'verbosity' indicates the explain verbosity used.
  */
 function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMemUsage, verbosity) {
-    const stages = getAggPlanStages(coll.explain(verbosity).aggregate(pipeline), "$_internalSetWindowFields");
+    const stages = getAggPlanStages(
+        coll.explain(verbosity).aggregate(pipeline),
+        "$_internalSetWindowFields",
+    );
     for (let stage of stages) {
         assert(stage.hasOwnProperty("$_internalSetWindowFields"), stage);
 
@@ -72,8 +75,16 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
             assertExplainMemoryTracking(stage);
 
             const totalMemoryUsage = getTotalMemoryUsageFromStageExplainOutput(stage);
-            assert.gt(totalMemoryUsage, expectedTotalMemUsage * 0.9, "Incorrect total mem usage: " + tojson(stage));
-            assert.lt(totalMemoryUsage, 2.2 * expectedTotalMemUsage, "Incorrect total mem usage: " + tojson(stage));
+            assert.gt(
+                totalMemoryUsage,
+                expectedTotalMemUsage * 0.9,
+                "Incorrect total mem usage: " + tojson(stage),
+            );
+            assert.lt(
+                totalMemoryUsage,
+                2.2 * expectedTotalMemUsage,
+                "Incorrect total mem usage: " + tojson(stage),
+            );
         } else {
             assert(!stage.hasOwnProperty("maxFunctionMemoryUsageBytes"), stage);
             assert(!stage.hasOwnProperty("maxTotalMemoryUsageBytes"), stage);
@@ -85,17 +96,24 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
 (function testQueryPlannerVerbosity() {
     const pipeline = [
         {
-            $setWindowFields: {output: {count: {$sum: 1}, push: {$push: "$bigStr"}, set: {$addToSet: "$bigStr"}}},
+            $setWindowFields: {
+                output: {count: {$sum: 1}, push: {$push: "$bigStr"}, set: {$addToSet: "$bigStr"}},
+            },
         },
     ];
-    const stages = getAggPlanStages(coll.explain("queryPlanner").aggregate(pipeline), "$_internalSetWindowFields");
+    const stages = getAggPlanStages(
+        coll.explain("queryPlanner").aggregate(pipeline),
+        "$_internalSetWindowFields",
+    );
     checkExplainResult(stages, {}, 0, "queryPlanner");
 })();
 
 (function testUnboundedMemUsage() {
     let pipeline = [
         {
-            $setWindowFields: {output: {count: {$sum: 1}, push: {$push: "$bigStr"}, set: {$addToSet: "$bigStr"}}},
+            $setWindowFields: {
+                output: {count: {$sum: 1}, push: {$push: "$bigStr"}, set: {$addToSet: "$bigStr"}},
+            },
         },
     ];
 

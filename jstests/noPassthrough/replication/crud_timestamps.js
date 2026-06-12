@@ -41,7 +41,9 @@ function check(atClusterTime, expected) {
     session.startTransaction({readConcern: {level: "snapshot", atClusterTime: atClusterTime}});
     // Check both a collection scan and scanning the _id index.
     [{$natural: 1}, {_id: 1}].forEach((sort) => {
-        let response = assert.commandWorked(sessionDb.runCommand({find: collName, sort: sort, singleBatch: true}));
+        let response = assert.commandWorked(
+            sessionDb.runCommand({find: collName, sort: sort, singleBatch: true}),
+        );
         assert.eq(expected, response.cursor.firstBatch);
     });
     assert.commandWorked(session.commitTransaction_forTesting());

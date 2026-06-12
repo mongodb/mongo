@@ -18,7 +18,13 @@ let testDB = conn.getDB("test");
 
 // Enables a failpoint, runs 'hitFailpointFunc' to hit the failpoint, then runs
 // 'duringFailpointFunc' while the failpoint is active.
-let doDuringFailpoint = function (failPointName, structuredLogRegEx, hitFailpointFunc, duringFailpointFunc, stopKey) {
+let doDuringFailpoint = function (
+    failPointName,
+    structuredLogRegEx,
+    hitFailpointFunc,
+    duringFailpointFunc,
+    stopKey,
+) {
     clearRawMongoProgramOutput();
     assert.commandWorked(
         testDB.adminCommand({
@@ -55,7 +61,10 @@ let buildIndexInBackground = function (coll, expectDuplicateKeyError) {
     };
     const assertFunction = expectDuplicateKeyError
         ? function (collFullName) {
-              assert.commandFailedWithCode(createIndexFunction(collFullName), ErrorCodes.DuplicateKey);
+              assert.commandFailedWithCode(
+                  createIndexFunction(collFullName),
+                  ErrorCodes.DuplicateKey,
+              );
           }
         : function (collFullName) {
               assert.commandWorked(createIndexFunction(collFullName));
@@ -162,7 +171,12 @@ let runTest = function (config) {
             break;
         // Hang before the second drain.
         case 3:
-            doDuringFailpoint("hangAfterIndexBuildFirstDrain", new RegExp('"id":20666'), buildIndex, doOperation);
+            doDuringFailpoint(
+                "hangAfterIndexBuildFirstDrain",
+                new RegExp('"id":20666'),
+                buildIndex,
+                doOperation,
+            );
             break;
         // Hang before the final drain and commit.
         case 4:

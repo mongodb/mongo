@@ -25,14 +25,21 @@ assert.commandWorked(
 );
 
 // Test that findAndModify can delete a document matching a text search predicate.
-assert.eq({_id: 4, numbers: "four"}, coll.findAndModify({query: {$text: {$search: "four"}}, remove: true}));
+assert.eq(
+    {_id: 4, numbers: "four"},
+    coll.findAndModify({query: {$text: {$search: "four"}}, remove: true}),
+);
 assert.commandWorked(coll.insert({_id: 4, numbers: "four"}));
 
 // Test that findAndModify can update a document matching a text search predicate, and return the
 // old version of the document.
 assert.eq(
     {_id: 4, numbers: "four"},
-    coll.findAndModify({query: {$text: {$search: "four"}}, update: [{$set: {addedField: 1}}], new: false}),
+    coll.findAndModify({
+        query: {$text: {$search: "four"}},
+        update: [{$set: {addedField: 1}}],
+        new: false,
+    }),
 );
 assert.eq({_id: 4, numbers: "four", addedField: 1}, coll.findOne({_id: 4}));
 
@@ -51,7 +58,11 @@ assert.eq({_id: 4, numbers: "four", addedField: 2}, coll.findOne({_id: 4}));
 // Test that findAndModify can delete a document and project its text score.
 assert.eq(
     {_id: 4, numbers: "four", addedField: 2, score: 1.1},
-    coll.findAndModify({query: {$text: {$search: "four"}}, fields: {score: {$meta: "textScore"}}, remove: true}),
+    coll.findAndModify({
+        query: {$text: {$search: "four"}},
+        fields: {score: {$meta: "textScore"}},
+        remove: true,
+    }),
 );
 assert.commandWorked(coll.insert({_id: 4, numbers: "four"}));
 
@@ -59,7 +70,11 @@ assert.commandWorked(coll.insert({_id: 4, numbers: "four"}));
 // score.
 assert.eq(
     {_id: 3, numbers: "one two"},
-    coll.findAndModify({query: {$text: {$search: "one two"}}, sort: {score: {$meta: "textScore"}}, remove: true}),
+    coll.findAndModify({
+        query: {$text: {$search: "one two"}},
+        sort: {score: {$meta: "textScore"}},
+        remove: true,
+    }),
 );
 assert.commandWorked(coll.insert({_id: 3, numbers: "one two"}));
 

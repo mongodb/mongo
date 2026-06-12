@@ -30,7 +30,9 @@ const st = new ShardingTest({
 });
 
 const mongosConn = st.s;
-assert.commandWorked(mongosConn.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosConn.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongosConn.getDB(dbName).getCollection(collName).createIndex({shard: 1}));
 
 // Shard the test collection and split it into two chunks: one that contains all {shard: 1}
@@ -110,9 +112,13 @@ session2.startTransaction({readConcern: {level: "majority"}});
         let commitTimestamp = null;
         const assertCommitTimestamp = (changeDoc) => {
             if (expectCommitTimestamp) {
-                assert(changeDoc.hasOwnProperty("commitTimestamp"), "expecting doc to have a 'commitTimestamp' field", {
-                    changeDoc,
-                });
+                assert(
+                    changeDoc.hasOwnProperty("commitTimestamp"),
+                    "expecting doc to have a 'commitTimestamp' field",
+                    {
+                        changeDoc,
+                    },
+                );
                 assert(
                     isTimestamp(changeDoc["commitTimestamp"]),
                     "expecting 'commitTimestamp' field to be a timestamp",
@@ -121,10 +127,15 @@ session2.startTransaction({readConcern: {level: "majority"}});
                 if (commitTimestamp === null) {
                     commitTimestamp = changeDoc["commitTimestamp"];
                 } else {
-                    assert.eq(commitTimestamp, changeDoc["commitTimestamp"], "expecting equal commitTimestamps", {
+                    assert.eq(
                         commitTimestamp,
-                        changeDoc,
-                    });
+                        changeDoc["commitTimestamp"],
+                        "expecting equal commitTimestamps",
+                        {
+                            commitTimestamp,
+                            changeDoc,
+                        },
+                    );
                 }
             }
         };
@@ -171,10 +182,15 @@ session2.startTransaction({readConcern: {level: "majority"}});
         assertNoChanges(cursor);
     }
 
-    const changeStreamCursor = coll.watch([], {showExpandedEvents: true, showCommitTimestamp: true});
+    const changeStreamCursor = coll.watch([], {
+        showExpandedEvents: true,
+        showCommitTimestamp: true,
+    });
 
     // Insert a document and confirm that the change stream has it.
-    assert.commandWorked(coll.insert({shard: 1, _id: "no-txn-doc-1"}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        coll.insert({shard: 1, _id: "no-txn-doc-1"}, {writeConcern: {w: "majority"}}),
+    );
     assertWritesVisibleWithCapture(
         changeStreamCursor,
         [{operationType: "insert", _id: "no-txn-doc-1"}],
@@ -198,18 +214,28 @@ session2.startTransaction({readConcern: {level: "majority"}});
     );
 
     // Update one document under each transaction and confirm no change stream updates.
-    assert.commandWorked(sessionColl1.update({shard: 1, _id: "txn1-doc-1"}, {$set: {"updated": 1}}));
-    assert.commandWorked(sessionColl2.update({shard: 2, _id: "txn2-doc-2"}, {$set: {"updated": 1}}));
+    assert.commandWorked(
+        sessionColl1.update({shard: 1, _id: "txn1-doc-1"}, {$set: {"updated": 1}}),
+    );
+    assert.commandWorked(
+        sessionColl2.update({shard: 2, _id: "txn2-doc-2"}, {$set: {"updated": 1}}),
+    );
 
     // Update and then remove second doc under each transaction.
-    assert.commandWorked(sessionColl1.update({shard: 2, _id: "txn1-doc-2"}, {$set: {"update-before-delete": 1}}));
-    assert.commandWorked(sessionColl2.update({shard: 1, _id: "txn2-doc-1"}, {$set: {"update-before-delete": 1}}));
+    assert.commandWorked(
+        sessionColl1.update({shard: 2, _id: "txn1-doc-2"}, {$set: {"update-before-delete": 1}}),
+    );
+    assert.commandWorked(
+        sessionColl2.update({shard: 1, _id: "txn2-doc-1"}, {$set: {"update-before-delete": 1}}),
+    );
     assert.commandWorked(sessionColl1.remove({shard: 2, _id: "txn1-doc-2"}));
     assert.commandWorked(sessionColl2.remove({shard: 1, _id: "txn2-doc-2"}));
 
     // Perform a write outside of a transaction and confirm that the change stream sees only
     // this write.
-    assert.commandWorked(coll.insert({shard: 2, _id: "no-txn-doc-2"}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        coll.insert({shard: 2, _id: "no-txn-doc-2"}, {writeConcern: {w: "majority"}}),
+    );
     assertWritesVisibleWithCapture(
         changeStreamCursor,
         [],
@@ -219,7 +245,9 @@ session2.startTransaction({readConcern: {level: "majority"}});
     );
 
     // Perform a write outside of the transaction.
-    assert.commandWorked(coll.insert({shard: 1, _id: "no-txn-doc-3"}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        coll.insert({shard: 1, _id: "no-txn-doc-3"}, {writeConcern: {w: "majority"}}),
+    );
     assertWritesVisibleWithCapture(
         changeStreamCursor,
         [{operationType: "insert", _id: "no-txn-doc-3"}],
@@ -248,7 +276,9 @@ session2.startTransaction({readConcern: {level: "majority"}});
     );
 
     // Perform a write outside of the transaction.
-    assert.commandWorked(coll.insert({shard: 2, _id: "no-txn-doc-4"}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        coll.insert({shard: 2, _id: "no-txn-doc-4"}, {writeConcern: {w: "majority"}}),
+    );
 
     // Abort second transaction and confirm that the change stream sees only the previous
     // non-transaction write.

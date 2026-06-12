@@ -11,7 +11,8 @@ const baseDir = jsTestName();
 const dbpath = MongoRunner.dataPath + baseDir;
 const dbname = "foo";
 
-const isDirectoryPerDBSupported = jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
+const isDirectoryPerDBSupported =
+    jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 
 const m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: "", syncdelay: 1});
 
@@ -33,7 +34,10 @@ const checkDirExists = function (dbName, dbDirPath) {
     assert.eq(
         1,
         files.length,
-        "dbpath did not contain '" + dbName + "' directory when it should have: " + tojson(listFiles(dbDirPath)),
+        "dbpath did not contain '" +
+            dbName +
+            "' directory when it should have: " +
+            tojson(listFiles(dbDirPath)),
     );
     assert.gt(listFiles(files[0].name).length, 0);
 };
@@ -50,7 +54,10 @@ const checkDirRemoved = function (dbName, dbDirPath) {
                 return false;
             }
         },
-        "dbpath contained '" + dbName + "' directory when it should have been removed:" + tojson(listFiles(dbDirPath)),
+        "dbpath contained '" +
+            dbName +
+            "' directory when it should have been removed:" +
+            tojson(listFiles(dbDirPath)),
         20 * 1000,
     ); // The periodic task to run data table cleanup runs once a second.
 };

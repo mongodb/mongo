@@ -62,7 +62,9 @@ function assertCursorSortedByIndex(cursor) {
 // Some background queries can use $group and classic $group uses sorter to spill, so this
 // background spills can affect server status metrics.
 const classicGroupIncreasedSpillingKnob = "internalQueryEnableAggressiveSpillsInGroup";
-const classicGroupIncreasedSpillingInitialValue = getServerParameter(classicGroupIncreasedSpillingKnob);
+const classicGroupIncreasedSpillingInitialValue = getServerParameter(
+    classicGroupIncreasedSpillingKnob,
+);
 setServerParameter(classicGroupIncreasedSpillingKnob, false);
 
 const pipelines = [

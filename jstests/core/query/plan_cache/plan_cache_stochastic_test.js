@@ -95,7 +95,23 @@ const kSortLiterals = [-1, 1];
 // have a good chance of matching some documents. Does not include the JS pseudovalue <undefined> as
 // it causes havoc. This must also not include any array literals as they could trigger unsupported
 // $sort stages with multiple array key parts.
-const kValueLiterals = [-7, -6, 0, 6, 7, -9.99, -8.88, 8.88, 9.99, "Quoth", "the", "raven", "nevermore", null, NaN];
+const kValueLiterals = [
+    -7,
+    -6,
+    0,
+    6,
+    7,
+    -9.99,
+    -8.88,
+    8.88,
+    9.99,
+    "Quoth",
+    "the",
+    "raven",
+    "nevermore",
+    null,
+    NaN,
+];
 
 // Maximum depth for objects (including documents) and arrays.
 const kValueMaxDepth = 4;
@@ -336,7 +352,8 @@ class Accumulator {
         // The accumulator object.
         this._self = {};
 
-        this._self[kAccumulators[rngCurr.getRandomInt(0, kAccumulators.length)]] = fieldNameRefMgr.getLiteralManaged();
+        this._self[kAccumulators[rngCurr.getRandomInt(0, kAccumulators.length)]] =
+            fieldNameRefMgr.getLiteralManaged();
     } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
@@ -538,7 +555,14 @@ class AggStageUnwind {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Array of the classes representing supported aggregation stage types.
-const kStageTypes = [AggStageGroup, AggStageLookup, AggStageMatch, AggStageProject, AggStageSort, AggStageUnwind];
+const kStageTypes = [
+    AggStageGroup,
+    AggStageLookup,
+    AggStageMatch,
+    AggStageProject,
+    AggStageSort,
+    AggStageUnwind,
+];
 
 /**
  * Represents a complete aggregation pipeline.
@@ -1095,6 +1119,10 @@ if (pipelineOrig) {
         }
     } // for kNumPipelines
     print(`main: ${kNumPipelines} original pipelines were run.`);
-    print(`main: ${tested} pipelines (${((100.0 * tested) / kNumPipelines).toFixed(1)}%) tested the plan cache.`);
-    print(`main: ${kNumPipelines - tested} pipelines had the same original and mutant ground-truth results.`);
+    print(
+        `main: ${tested} pipelines (${((100.0 * tested) / kNumPipelines).toFixed(1)}%) tested the plan cache.`,
+    );
+    print(
+        `main: ${kNumPipelines - tested} pipelines had the same original and mutant ground-truth results.`,
+    );
 } // else run full test

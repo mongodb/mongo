@@ -10,9 +10,24 @@ import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 const coll = db.schema_pattern_properties;
 
 // Test top-level patternProperties.
-assertSchemaMatch(coll, {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}}, {}, true);
-assertSchemaMatch(coll, {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}}, {c: 1}, true);
-assertSchemaMatch(coll, {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}}, {ca: 1, cb: 1}, true);
+assertSchemaMatch(
+    coll,
+    {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}},
+    {},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}},
+    {c: 1},
+    true,
+);
+assertSchemaMatch(
+    coll,
+    {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}},
+    {ca: 1, cb: 1},
+    true,
+);
 assertSchemaMatch(
     coll,
     {patternProperties: {"^a": {type: "number"}, "^b": {type: "string"}}},
@@ -87,7 +102,9 @@ assertSchemaMatch(
 assertSchemaMatch(
     coll,
     {
-        properties: {obj: {properties: {aa: {type: "number"}}, patternProperties: {"^a": {type: "string"}}}},
+        properties: {
+            obj: {properties: {aa: {type: "number"}}, patternProperties: {"^a": {type: "string"}}},
+        },
     },
     {obj: {aa: 1}},
     false,

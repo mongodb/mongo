@@ -15,7 +15,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // test restarts a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-let st = new ShardingTest({shards: 2, other: {keyFile: "jstests/libs/key1", useHostname: true, chunkSize: 1}});
+let st = new ShardingTest({
+    shards: 2,
+    other: {keyFile: "jstests/libs/key1", useHostname: true, chunkSize: 1},
+});
 
 let mongos = st.s;
 let adminDB = mongos.getDB("admin");

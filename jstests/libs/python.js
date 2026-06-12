@@ -15,7 +15,9 @@ export function getPython3Binary() {
     const pythonVersion = rawMongoProgramOutput("Python"); // Will look like "Python 3.13.4\n"
     const usingPython313 = /Python 3\.13/.exec(pythonVersion);
     if (usingPython313) {
-        jsTest.log.info("Found python 3.13 by default. Likely this is because we are using a virtual environment.");
+        jsTest.log.info(
+            "Found python 3.13 by default. Likely this is because we are using a virtual environment.",
+        );
         return "python";
     }
 

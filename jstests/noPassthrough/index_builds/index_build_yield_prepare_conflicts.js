@@ -36,7 +36,11 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, internalQueryExecYie
 
 jsTestLog("Enable setYieldAllLocksHang fail point");
 let res = assert.commandWorked(
-    primaryAdmin.runCommand({configureFailPoint: "setYieldAllLocksHang", data: {namespace: collNss}, mode: "alwaysOn"}),
+    primaryAdmin.runCommand({
+        configureFailPoint: "setYieldAllLocksHang",
+        data: {namespace: collNss},
+        mode: "alwaysOn",
+    }),
 );
 let timesEntered = res.count;
 
@@ -64,7 +68,9 @@ jsTestLog("Prepare txn");
 PrepareHelpers.prepareTransaction(session);
 
 // This will make the hybrid build previously started resume.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}),
+);
 
 jsTestLog("Wait for index build to complete collection scanning phase");
 checkLog.containsJson(primary, 20391);

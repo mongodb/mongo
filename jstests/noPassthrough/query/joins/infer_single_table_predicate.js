@@ -48,9 +48,15 @@ assert.commandWorked(collA.insertMany(docs));
 assert.commandWorked(collB.insertMany(docs));
 assert.commandWorked(collC.insertMany(docs));
 
-assert.commandWorked(collA.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, x: 1, y: 1, str_1: 1, str_2: 1}));
-assert.commandWorked(collB.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, x: 1, y: 1, str_1: 1, str_2: 1}));
-assert.commandWorked(collC.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, x: 1, y: 1, str_1: 1, str_2: 1}));
+assert.commandWorked(
+    collA.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, x: 1, y: 1, str_1: 1, str_2: 1}),
+);
+assert.commandWorked(
+    collB.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, x: 1, y: 1, str_1: 1, str_2: 1}),
+);
+assert.commandWorked(
+    collC.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, x: 1, y: 1, str_1: 1, str_2: 1}),
+);
 
 function extractFilters(plan) {
     const filters = {};
@@ -272,7 +278,10 @@ runTest({
                                 {str_2: "9"},
                                 {
                                     $expr: {
-                                        $and: [{$eq: ["$b", "$$a_val"]}, {$eq: ["$str_2", "$$str1_val"]}],
+                                        $and: [
+                                            {$eq: ["$b", "$$a_val"]},
+                                            {$eq: ["$str_2", "$$str1_val"]},
+                                        ],
                                     },
                                 },
                             ],

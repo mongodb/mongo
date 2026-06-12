@@ -50,16 +50,23 @@ function checkExplainOutput(explain, verbosity) {
         for (let plan of allPlans) {
             if (plan.hasOwnProperty("shardName")) {
                 for (let shardPlan of plan.allPlans) {
-                    assert(shardPlan.hasOwnProperty("score") || isPlanCosted(shardPlan.executionStages), {
-                        explain,
-                        shardPlan,
-                    });
+                    assert(
+                        shardPlan.hasOwnProperty("score") ||
+                            isPlanCosted(shardPlan.executionStages),
+                        {
+                            explain,
+                            shardPlan,
+                        },
+                    );
                     if (!isPlanCosted(shardPlan.executionStages)) {
                         assert.gt(shardPlan.score, 0, {explain, shardPlan});
                     }
                 }
             } else {
-                assert(plan.hasOwnProperty("score") || isPlanCosted(plan.executionStages), {explain, plan});
+                assert(plan.hasOwnProperty("score") || isPlanCosted(plan.executionStages), {
+                    explain,
+                    plan,
+                });
                 if (!isPlanCosted(plan.executionStages)) {
                     assert.gt(plan.score, 0, {explain, plan});
                 }

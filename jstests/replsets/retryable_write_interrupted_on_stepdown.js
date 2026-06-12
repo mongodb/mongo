@@ -39,7 +39,9 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
             },
         });
 
-        assert.commandWorked(primaryDB.createCollection("coordinationColl", {writeConcern: {w: 1}}));
+        assert.commandWorked(
+            primaryDB.createCollection("coordinationColl", {writeConcern: {w: 1}}),
+        );
         primaryDB.getMongo().setSecondaryOk();
         primaryDB.getMongo().setReadPref("primaryPreferred");
 
@@ -52,7 +54,9 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
         );
         assert.eq(primaryDB[collName].countDocuments({}), 2);
         rst.awaitReplication();
-        rst.getSecondaries().forEach((secondary) => assert.eq(secondary.getDB(dbName)[collName].countDocuments({}), 2));
+        rst.getSecondaries().forEach((secondary) =>
+            assert.eq(secondary.getDB(dbName)[collName].countDocuments({}), 2),
+        );
     });
 
     afterEach(() => {
@@ -62,12 +66,16 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
     // Functions used to signal that an event has happened.
     // Used to coordinate writes and stepdown attempts between threads.
     function signalEvent(primaryDB, eventName) {
-        assert.commandWorked(primaryDB.coordinationColl.insertOne({_id: eventName}, {writeConcern: {w: 1}}));
+        assert.commandWorked(
+            primaryDB.coordinationColl.insertOne({_id: eventName}, {writeConcern: {w: 1}}),
+        );
     }
     function waitForEvent(primaryDB, eventName) {
         assert.soon(
             () => primaryDB.coordinationColl.findOne({_id: eventName}),
-            "Did not find '" + eventName + "' document in 'coordinationColl', the event was never signaled",
+            "Did not find '" +
+                eventName +
+                "' document in 'coordinationColl', the event was never signaled",
         );
     }
 
@@ -198,7 +206,14 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
             // Block secondaries from applying oplogs
             rst.getSecondaries().forEach((secondary) => secondary.getDB(dbName).fsyncLock());
 
-            function doRetryableWrite(primaryPort, dbName, collName, runWrite, signalEvent, waitForEvent) {
+            function doRetryableWrite(
+                primaryPort,
+                dbName,
+                collName,
+                runWrite,
+                signalEvent,
+                waitForEvent,
+            ) {
                 const newConn = new Mongo("localhost:" + primaryPort);
                 assert(newConn);
                 newConn.setSecondaryOk();
@@ -240,7 +255,11 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
             sleep(1000); // Give time to the other thread to execute the write attempt
 
             let result = assert.commandFailedWithCode(
-                primaryConn.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 1, force: false}),
+                primaryConn.adminCommand({
+                    replSetStepDown: 5,
+                    secondaryCatchUpPeriodSecs: 1,
+                    force: false,
+                }),
                 ErrorCodes.ExceededTimeLimit,
             );
             jsTest.log.info("1st stepdown, result: " + tojson(result));
@@ -257,7 +276,11 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
             sleep(1000); // Give time to the other thread to execute the write attempt
 
             result = assert.commandFailedWithCode(
-                primaryConn.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 1, force: false}),
+                primaryConn.adminCommand({
+                    replSetStepDown: 5,
+                    secondaryCatchUpPeriodSecs: 1,
+                    force: false,
+                }),
                 ErrorCodes.ExceededTimeLimit,
             );
             jsTest.log.info("2nd stepdown, result:" + tojson(result));
@@ -401,7 +424,11 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
             sleep(1000); // Give time to the other thread to execute the write attempt
 
             let result = assert.commandWorked(
-                primaryConn.adminCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 5, force: false}),
+                primaryConn.adminCommand({
+                    replSetStepDown: 10,
+                    secondaryCatchUpPeriodSecs: 5,
+                    force: false,
+                }),
             );
             jsTest.log.info("1st stepdown, result: " + tojson(result));
             assert.soon(
@@ -429,7 +456,11 @@ describe("Tests that retried writes are correctly interrupted on stepdown on the
             sleep(1000); // Give time to the other thread to execute the write attempt
 
             result = assert.commandWorked(
-                newPrimary.adminCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 5, force: false}),
+                newPrimary.adminCommand({
+                    replSetStepDown: 10,
+                    secondaryCatchUpPeriodSecs: 5,
+                    force: false,
+                }),
             );
             jsTest.log.info("2nd stepdown, result:" + tojson(result));
             assert.soon(

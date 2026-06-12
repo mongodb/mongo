@@ -67,7 +67,9 @@ describe("$vectorSearch", function () {
         assert.commandWorked(emptyColl.deleteOne({_id: "temp"}));
 
         const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit, index}}];
-        const res = assert.commandWorked(db.runCommand({aggregate: emptyCollName, pipeline, cursor: {}}));
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: emptyCollName, pipeline, cursor: {}}),
+        );
         assert.eq(res.cursor.firstBatch, []);
 
         emptyColl.drop();
@@ -76,7 +78,9 @@ describe("$vectorSearch", function () {
     it("should query mongot and return results", function () {
         const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit, index}}];
 
-        const res = assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline, cursor: {}}),
+        );
         const results = res.cursor.firstBatch;
         assert.eq(results.length, 5);
 
@@ -89,15 +93,21 @@ describe("$vectorSearch", function () {
     it("should respect the limit parameter", function () {
         const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: 1, index}}];
 
-        const res = assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline, cursor: {}}),
+        );
         assert.eq(res.cursor.firstBatch.length, 1);
     });
 
     it("should work with filter", function () {
         const filter = {"$or": [{"color": {"$gt": "C"}}, {"color": {"$lt": "C"}}]};
-        const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: 10, index, filter}}];
+        const pipeline = [
+            {$vectorSearch: {queryVector, path, numCandidates, limit: 10, index, filter}},
+        ];
 
-        const res = assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline, cursor: {}}),
+        );
         const results = res.cursor.firstBatch;
 
         results.forEach((doc) => {
@@ -113,7 +123,9 @@ describe("$vectorSearch", function () {
             {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}},
         ];
 
-        const res = assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline, cursor: {}}),
+        );
         const results = res.cursor.firstBatch;
         assert.eq(results.length, 5);
 
@@ -135,13 +147,17 @@ describe("$vectorSearch", function () {
             {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}},
         ];
 
-        const res = assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {batchSize: 2}}));
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline, cursor: {batchSize: 2}}),
+        );
 
         let results = res.cursor.firstBatch;
         let cursorId = res.cursor.id;
 
         while (cursorId != 0) {
-            const getMoreRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
+            const getMoreRes = assert.commandWorked(
+                db.runCommand({getMore: cursorId, collection: collName}),
+            );
             results = results.concat(getMoreRes.cursor.nextBatch);
             cursorId = getMoreRes.cursor.id;
         }
@@ -157,7 +173,12 @@ describe("$vectorSearch", function () {
         const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: 5, index}}];
 
         assert.commandFailedWithCode(
-            db.runCommand({aggregate: collName, pipeline, cursor: {}, readConcern: {level: "majority"}}),
+            db.runCommand({
+                aggregate: collName,
+                pipeline,
+                cursor: {},
+                readConcern: {level: "majority"},
+            }),
             [ErrorCodes.InvalidOptions, ErrorCodes.ReadConcernMajorityNotEnabled],
         );
     });

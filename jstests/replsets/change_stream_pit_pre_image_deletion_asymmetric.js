@@ -28,7 +28,9 @@ const collectionName = "coll";
 const testDB = primaryNode.getDB(jsTestName());
 
 // Create a collection with change stream pre- and post-images enabled.
-assert.commandWorked(testDB.createCollection(collectionName, {changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    testDB.createCollection(collectionName, {changeStreamPreAndPostImages: {enabled: true}}),
+);
 const coll = testDB[collectionName];
 
 // Insert a document for the test.
@@ -59,7 +61,10 @@ assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {v: 1}}, {writeConcern: {w:
 
 // Resume the initial sync process.
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 
 // Wait until the initial sync process is complete and the new node becomes a fully
@@ -83,7 +88,10 @@ const otherColl = primaryNode.getDB(jsTestName())["otherCollection"];
 // than 'lastOplogEntryToBeRemoved'.
 function oplogIsRolledOver() {
     return (
-        timestampCmp(lastOplogEntryToBeRemoved.ts, getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) <= 0
+        timestampCmp(
+            lastOplogEntryToBeRemoved.ts,
+            getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts,
+        ) <= 0
     );
 }
 

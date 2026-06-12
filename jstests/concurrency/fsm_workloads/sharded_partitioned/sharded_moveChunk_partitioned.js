@@ -28,7 +28,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // the appropriate after-state regardless of whether the operation succeeded or failed.
     // Set `skipDocumentCountCheck` to true to skip verifying the number of documents in the chunk
     // before and after the migration.
-    $config.states.moveChunk = function moveChunk(db, collName, connCache, skipDocumentCountCheck = false) {
+    $config.states.moveChunk = function moveChunk(
+        db,
+        collName,
+        connCache,
+        skipDocumentCountCheck = false,
+    ) {
         // Committing a chunk migration requires acquiring the global X lock on the CSRS primary.
         // This state function is unsafe to automatically run inside a multi-statement transaction
         // because it'll have left an idle transaction on the CSRS primary before attempting to run
@@ -98,13 +103,24 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // (see comments below for specifics).
         let fromShardRSConn = shardInfo.rsConns[fromShard];
         let toShardRSConn = shardInfo.rsConns[toShard];
-        let fromShardNumDocsAfter = ChunkHelper.getNumDocs(fromShardRSConn, ns, chunk.min._id, chunk.max._id);
-        let toShardNumDocsAfter = ChunkHelper.getNumDocs(toShardRSConn, ns, chunk.min._id, chunk.max._id);
+        let fromShardNumDocsAfter = ChunkHelper.getNumDocs(
+            fromShardRSConn,
+            ns,
+            chunk.min._id,
+            chunk.max._id,
+        );
+        let toShardNumDocsAfter = ChunkHelper.getNumDocs(
+            toShardRSConn,
+            ns,
+            chunk.min._id,
+            chunk.max._id,
+        );
         // If the moveChunk operation succeeded, verify that the shard the chunk
         // was moved to returns all data for the chunk. If waitForDelete was true,
         // also verify that the shard the chunk was moved from returns no data for the chunk.
         if (moveChunkRes.ok) {
-            const runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+            const runningWithStepdowns =
+                TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
             if (waitForDelete && !runningWithStepdowns) {
                 msg =
@@ -159,7 +175,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Regardless of whether the operation succeeded or failed, verify that the number of chunks
         // in our partition stayed the same.
-        let numChunksAfter = ChunkHelper.getNumChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+        let numChunksAfter = ChunkHelper.getNumChunks(
+            config,
+            ns,
+            this.partition.chunkLower,
+            this.partition.chunkUpper,
+        );
         msg = "Number of chunks in partition seen by config changed with moveChunk.\n" + msgBase;
         assert.eq(numChunksBefore, numChunksAfter, msg);
 
@@ -182,8 +203,14 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // If the moveChunk operation succeeded, verify that each mongos sees all data in the
             // chunk's range on only the toShard. If the operation failed, verify that each mongos
             // sees all data in the chunk's range on only the fromShard.
-            let shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
-            msg = msgBase + "\nMongos find().explain() results for chunk: " + tojson(shardsForChunk);
+            let shardsForChunk = ChunkHelper.getShardsForRange(
+                mongos,
+                ns,
+                chunk.min._id,
+                chunk.max._id,
+            );
+            msg =
+                msgBase + "\nMongos find().explain() results for chunk: " + tojson(shardsForChunk);
             assert.eq(shardsForChunk.shards.length, 1, msg);
             if (moveChunkRes.ok) {
                 msg = "moveChunk succeeded but chunk was not on new shard.\n" + msg;
@@ -197,7 +224,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // shard metadata with the toShard. If the operation failed, verify that each mongos
             // still sees the chunk's shard metadata as the fromShard.
             chunkAfter = mongos.getDB("config").chunks.findOne({_id: chunk._id});
-            msg = msgBase + "\nchunkBefore: " + tojson(chunk) + "\nchunkAfter: " + tojson(chunkAfter);
+            msg =
+                msgBase + "\nchunkBefore: " + tojson(chunk) + "\nchunkAfter: " + tojson(chunkAfter);
             if (moveChunkRes.ok) {
                 msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
                 assert.eq(chunkAfter.shard, toShard, msg);

@@ -13,8 +13,15 @@ export const funWithArgs = (fn, ...args) => {
 /**
  * Internal function used by _doAssertCommandInParallelShell().
  */
-export const _parallelShellRunCommand = function (dbName, cmdObj, expectedCode, checkResultFn, checkResultArgs) {
-    const expectedCodeStr = expectedCode === undefined ? "" : "; expectedCode: " + tojson(expectedCode);
+export const _parallelShellRunCommand = function (
+    dbName,
+    cmdObj,
+    expectedCode,
+    checkResultFn,
+    checkResultArgs,
+) {
+    const expectedCodeStr =
+        expectedCode === undefined ? "" : "; expectedCode: " + tojson(expectedCode);
     jsTestLog(
         "Starting command in parallel shell - host: " +
             db.getMongo().host +
@@ -88,7 +95,14 @@ export const _doAssertCommandInParallelShell = function (
 ) {
     // Return joinable object to caller.
     return startParallelShell(
-        funWithArgs(_parallelShellRunCommand, db.getName(), cmdObj, expectedCode, checkResultFn, checkResultArgs),
+        funWithArgs(
+            _parallelShellRunCommand,
+            db.getName(),
+            cmdObj,
+            expectedCode,
+            checkResultFn,
+            checkResultArgs,
+        ),
         conn.port,
     );
 };
@@ -97,7 +111,13 @@ export const _doAssertCommandInParallelShell = function (
  * Starts command in a parallel shell.
  * Provides similar behavior to assert.commandWorked().
  */
-export const assertCommandWorkedInParallelShell = function (conn, db, cmdObj, checkResultFn, checkResultArgs) {
+export const assertCommandWorkedInParallelShell = function (
+    conn,
+    db,
+    cmdObj,
+    checkResultFn,
+    checkResultArgs,
+) {
     return _doAssertCommandInParallelShell(conn, db, cmdObj, checkResultFn, checkResultArgs);
 };
 
@@ -122,5 +142,12 @@ export const assertCommandFailedWithCodeInParallelShell = function (
             "; command: " +
             tojson(cmdObj),
     );
-    return _doAssertCommandInParallelShell(conn, db, cmdObj, expectedCode, checkResultFn, checkResultArgs);
+    return _doAssertCommandInParallelShell(
+        conn,
+        db,
+        cmdObj,
+        expectedCode,
+        checkResultFn,
+        checkResultArgs,
+    );
 };

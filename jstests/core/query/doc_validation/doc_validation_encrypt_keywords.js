@@ -70,11 +70,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
         [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
     );
     assert.commandFailedWithCode(
-        db.createCollection(collName, {validator: nestedEncryptSchema, validationAction: "errorAndLog"}),
+        db.createCollection(collName, {
+            validator: nestedEncryptSchema,
+            validationAction: "errorAndLog",
+        }),
         [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
     );
     assert.commandFailedWithCode(
-        db.createCollection(collName, {validator: encryptMetadataSchema, validationAction: "errorAndLog"}),
+        db.createCollection(collName, {
+            validator: encryptMetadataSchema,
+            validationAction: "errorAndLog",
+        }),
         [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
     );
 }
@@ -94,7 +100,10 @@ assert.commandFailedWithCode(
 
 // Create the collection with a valid document validator and action 'warn'.
 assert.commandWorked(
-    db.createCollection(collName, {validator: {$jsonSchema: {required: ["_id"]}}, validationAction: "warn"}),
+    db.createCollection(collName, {
+        validator: {$jsonSchema: {required: ["_id"]}},
+        validationAction: "warn",
+    }),
 );
 
 // Verify that we can't collMod the validator to include an encryption-related keyword.
@@ -116,7 +125,9 @@ validateCollectionOptions();
 coll.drop();
 
 // Create the collection with an encrypted validator and action 'error'.
-assert.commandWorked(db.createCollection(collName, {validator: encryptSchema, validationAction: "error"}));
+assert.commandWorked(
+    db.createCollection(collName, {validator: encryptSchema, validationAction: "error"}),
+);
 
 // Verify that we can't collMod the validation action to 'warn' since the schema contains an
 // encryption-related keyword.
@@ -129,10 +140,10 @@ validateCollectionOptions();
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
     // Verify that we can't collMod the validation action to 'errorAndLog' since the schema contains
     // an encryption-related keyword.
-    assert.commandFailedWithCode(db.runCommand({collMod: collName, validationAction: "errorAndLog"}), [
-        ErrorCodes.InvalidOptions,
-        ErrorCodes.QueryFeatureNotAllowed,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: collName, validationAction: "errorAndLog"}),
+        [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
+    );
     validateCollectionOptions();
 }
 
@@ -168,17 +179,29 @@ validateCollectionOptions();
 
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
     assert.commandFailedWithCode(
-        db.runCommand({collMod: collName, validator: encryptSchema, validationAction: "errorAndLog"}),
+        db.runCommand({
+            collMod: collName,
+            validator: encryptSchema,
+            validationAction: "errorAndLog",
+        }),
         [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
     );
     validateCollectionOptions();
     assert.commandFailedWithCode(
-        db.runCommand({collMod: collName, validator: nestedEncryptSchema, validationAction: "errorAndLog"}),
+        db.runCommand({
+            collMod: collName,
+            validator: nestedEncryptSchema,
+            validationAction: "errorAndLog",
+        }),
         [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
     );
     validateCollectionOptions();
     assert.commandFailedWithCode(
-        db.runCommand({collMod: collName, validator: encryptMetadataSchema, validationAction: "errorAndLog"}),
+        db.runCommand({
+            collMod: collName,
+            validator: encryptMetadataSchema,
+            validationAction: "errorAndLog",
+        }),
         [ErrorCodes.InvalidOptions, ErrorCodes.QueryFeatureNotAllowed],
     );
     validateCollectionOptions();
@@ -195,7 +218,11 @@ assert.commandFailedWithCode(
 );
 validateCollectionOptions();
 assert.commandFailedWithCode(
-    db.runCommand({collMod: collName, validator: encryptMetadataSchema, validationLevel: "moderate"}),
+    db.runCommand({
+        collMod: collName,
+        validator: encryptMetadataSchema,
+        validationLevel: "moderate",
+    }),
     ErrorCodes.QueryFeatureNotAllowed,
 );
 validateCollectionOptions();

@@ -41,7 +41,8 @@ export function executeAggregationTestCase(collection, testCase) {
 export function getExpectedPipelineLimit(database) {
     const buildInfo = assert.commandWorked(database.adminCommand("buildInfo"));
     const isDebug = buildInfo.debug;
-    const isS390X = "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
+    const isS390X =
+        "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
     return isDebug ? 200 : isS390X ? 700 : 1000;
 }
 

@@ -224,7 +224,10 @@ assert.commandWorked(
     testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["coordinateCommitTransaction"]},
+        data: {
+            errorCode: ErrorCodes.ShutdownInProgress,
+            failCommands: ["coordinateCommitTransaction"],
+        },
     }),
 );
 res = sessionDb.adminCommand({
@@ -273,7 +276,10 @@ assert.soon(
         );
     },
     function () {
-        return "Failed to find drop in currentOp output: " + tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+        return (
+            "Failed to find drop in currentOp output: " +
+            tojson(adminDB.aggregate([{$currentOp: {}}]).toArray())
+        );
     },
 );
 // Start another transaction in a new session, which cannot acquire the database lock in time.
@@ -283,7 +289,10 @@ res = sessionOther.getDatabase(dbName).getCollection(collName).insert({_id: "loc
 assert.commandFailedWithCode(res, ErrorCodes.LockTimeout);
 assert(res instanceof WriteCommandError);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
-assert.commandFailedWithCode(sessionOther.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(
+    sessionOther.abortTransaction_forTesting(),
+    ErrorCodes.NoSuchTransaction,
+);
 assert.commandWorked(session.abortTransaction_forTesting());
 thread.join();
 assert.commandWorked(thread.returnData());

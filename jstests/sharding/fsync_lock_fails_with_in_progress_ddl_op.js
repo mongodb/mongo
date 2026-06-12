@@ -14,7 +14,9 @@ const dbName = "test";
 const collName = "collTest";
 const ns = dbName + "." + collName;
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 const coll = st.s.getDB(dbName).getCollection(collName);
 coll.insert({x: 1});
@@ -32,14 +34,18 @@ let ddlOpThread = new Thread(
     ns,
     newShardKey,
 );
-let ddlCoordinatorFailPoint = configureFailPoint(st.rs1.getPrimary(), "hangBeforeRemovingCoordinatorDocument");
+let ddlCoordinatorFailPoint = configureFailPoint(
+    st.rs1.getPrimary(),
+    "hangBeforeRemovingCoordinatorDocument",
+);
 
 ddlOpThread.start();
 ddlCoordinatorFailPoint.wait();
 
 // Run fsync command, should fail when DDL op is in progress
 let fsyncLockCommand = assert.commandFailed(st.s.adminCommand({fsync: 1, lock: true}));
-const errmsgRegex = /Cannot take lock while (DDL operation is|sharding coordinators are) in progress/;
+const errmsgRegex =
+    /Cannot take lock while (DDL operation is|sharding coordinators are) in progress/;
 assert(errmsgRegex.test(fsyncLockCommand.errmsg), fsyncLockCommand.errmsg);
 
 ddlCoordinatorFailPoint.off();

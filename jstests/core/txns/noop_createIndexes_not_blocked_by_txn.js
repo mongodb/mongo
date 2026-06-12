@@ -50,7 +50,11 @@ withTxnAndAutoRetryOnMongos(session, () => {
     assert.commandFailedWithCode(res, ErrorCodes.IndexOptionsConflict);
 
     // This should block and time out because the index does not already exist.
-    res = testDB.runCommand({createIndexes: collName, indexes: [{key: {b: 1}, name: "b_1"}], maxTimeMS: 500});
+    res = testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {b: 1}, name: "b_1"}],
+        maxTimeMS: 500,
+    });
     assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
     // This should block and time out because one of the indexes does not already exist.

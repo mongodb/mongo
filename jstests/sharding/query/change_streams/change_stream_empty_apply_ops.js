@@ -24,7 +24,9 @@ const mongosConn = st.s;
 const db = mongosConn.getDB(dbName);
 const coll = db.getCollection(collName);
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(coll.createIndex({shard: 1}));
 // Shard the test collection and split it into two chunks: one that contains all {shard: 1}
@@ -66,13 +68,15 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 });
 
 // Each change stream should see exactly one update, resulting from the valid write on shard 2.
-[changeStreamCursorColl, changeStreamCursorDB, changeStreamCursorCluster].forEach(function (changeStreamCursor) {
-    assert.soon(() => changeStreamCursor.hasNext());
-    const changeDoc = changeStreamCursor.next();
-    assert.eq(changeDoc.documentKey.shard, 2);
-    assert.eq(changeDoc.operationType, "update");
+[changeStreamCursorColl, changeStreamCursorDB, changeStreamCursorCluster].forEach(
+    function (changeStreamCursor) {
+        assert.soon(() => changeStreamCursor.hasNext());
+        const changeDoc = changeStreamCursor.next();
+        assert.eq(changeDoc.documentKey.shard, 2);
+        assert.eq(changeDoc.operationType, "update");
 
-    assert(!changeStreamCursor.hasNext());
-});
+        assert(!changeStreamCursor.hasNext());
+    },
+);
 
 st.stop();

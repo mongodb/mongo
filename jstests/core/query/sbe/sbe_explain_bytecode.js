@@ -44,12 +44,18 @@ runWithParamsAllNonConfigNodes(db, {"internalQueryFrameworkControl": "trySbeEngi
             ],
             options: {},
         },
-        {pipeline: [{$lookup: {from: "d", localField: "a", foreignField: "a", as: "aa"}}], options: {}},
+        {
+            pipeline: [{$lookup: {from: "d", localField: "a", foreignField: "a", as: "aa"}}],
+            options: {},
+        },
         {
             pipeline: [{$lookup: {from: "d", localField: "a", foreignField: "a", as: "aa"}}],
             options: {allowDiskUse: false},
         },
-        {pipeline: [{$lookup: {from: "d", localField: "a", foreignField: "b", as: "ab"}}], options: {}},
+        {
+            pipeline: [{$lookup: {from: "d", localField: "a", foreignField: "b", as: "ab"}}],
+            options: {},
+        },
     ];
     for (const tc of testCases) {
         const explain = db.c.explain("internal").aggregate(tc.pipeline, tc.options);
@@ -58,7 +64,10 @@ runWithParamsAllNonConfigNodes(db, {"internalQueryFrameworkControl": "trySbeEngi
         const slotBasedPlan = winningPlan.slotBasedPlan;
         if (getEngine(explain) === "sbe") {
             jsTest.log({"slotBasedPlan stages": slotBasedPlan.stages});
-            assert(slotBasedPlan.stages.includes("stackSize"), "slotBasedPlan stages should have bytecode");
+            assert(
+                slotBasedPlan.stages.includes("stackSize"),
+                "slotBasedPlan stages should have bytecode",
+            );
         }
     }
 
@@ -70,7 +79,10 @@ runWithParamsAllNonConfigNodes(db, {"internalQueryFrameworkControl": "trySbeEngi
         const slotBasedPlan = winningPlan.slotBasedPlan;
         if (getEngine(explain) === "sbe") {
             jsTest.log({"slotBasedPlan stages": slotBasedPlan.stages});
-            assert(slotBasedPlan.stages.includes("stackSize"), "slotBasedPlan stages should have bytecode");
+            assert(
+                slotBasedPlan.stages.includes("stackSize"),
+                "slotBasedPlan stages should have bytecode",
+            );
         }
     }
 });

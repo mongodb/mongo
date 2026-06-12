@@ -461,7 +461,10 @@ export class DatasetSharded extends DatasetManyFields {
         const db = this.shardedTest.s.getDB(dbName);
 
         assert.commandWorked(
-            this.shardedTest.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}),
+            this.shardedTest.s.adminCommand({
+                enableSharding: dbName,
+                primaryShard: primaryShard.shardName,
+            }),
         );
 
         let collName = this.collection();
@@ -473,7 +476,10 @@ export class DatasetSharded extends DatasetManyFields {
 
         db.createCollection(collName);
         assert.commandWorked(
-            this.shardedTest.s.adminCommand({shardCollection: `${dbName}.${collName}`, key: shardKey}),
+            this.shardedTest.s.adminCommand({
+                shardCollection: `${dbName}.${collName}`,
+                key: shardKey,
+            }),
         );
 
         return db;

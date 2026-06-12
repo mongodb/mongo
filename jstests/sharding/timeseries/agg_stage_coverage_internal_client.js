@@ -44,7 +44,10 @@ for (let i = 0; i < 10; i++) {
 }
 
 const tests = [
-    {stage: "$_internalDensify", pipeline: [{$_internalDensify: {field: "value", range: {step: 10, bounds: "full"}}}]},
+    {
+        stage: "$_internalDensify",
+        pipeline: [{$_internalDensify: {field: "value", range: {step: 10, bounds: "full"}}}],
+    },
     {
         stage: "$mergeCursors",
         pipeline: [
@@ -83,18 +86,26 @@ tests.forEach((test) => {
 
     const result = cursor.cursor.firstBatch;
     if (test.zeroDocsReturned) {
-        assert.eq(result.length, 0, test.stage + " expected to return zero documents on timeseries collections.");
+        assert.eq(
+            result.length,
+            0,
+            test.stage + " expected to return zero documents on timeseries collections.",
+        );
         return;
     }
     assert(
         result.length > 0,
-        test.stage + " expected to return documents on timeseries collections. Received: " + tojson(cursor),
+        test.stage +
+            " expected to return documents on timeseries collections. Received: " +
+            tojson(cursor),
     );
     // Confirm the documents were not bucket documents. We will just look at the first document
     // and ensure there is no "control.min.time" field which all bucket documents have.
     assert(
         !result[0].hasOwnProperty("control"),
-        test.stage + " expected to not return bucket documents on timeseries collections. Received: " + tojson(cursor),
+        test.stage +
+            " expected to not return bucket documents on timeseries collections. Received: " +
+            tojson(cursor),
     );
 });
 

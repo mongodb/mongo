@@ -33,7 +33,10 @@ function sendLargeHello(conn, shouldFail) {
         ? Number(ssNetworkMetricsBefore.totalMessageSizeErrorPreAuth) + 1
         : Number(ssNetworkMetricsBefore.totalMessageSizeErrorPreAuth);
     let ssNetworkMetricsAfter = connAdmin.runCommand({serverStatus: 1}).metrics.network;
-    assert.eq(expectedTotalMessageSizeErrorPreAuth, Number(ssNetworkMetricsAfter.totalMessageSizeErrorPreAuth));
+    assert.eq(
+        expectedTotalMessageSizeErrorPreAuth,
+        Number(ssNetworkMetricsAfter.totalMessageSizeErrorPreAuth),
+    );
     assert.eq(Number(ssNetworkMetricsAfter.totalMessageSizeErrorPostAuth), 0);
 }
 

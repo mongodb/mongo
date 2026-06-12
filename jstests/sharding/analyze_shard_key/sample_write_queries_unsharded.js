@@ -34,7 +34,9 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st
 assert.commandWorked(mongosDB.createCollection(collName));
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}),
+);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];
@@ -121,7 +123,9 @@ const shardNames = [st.rs0.name];
 
     // 'explain' queries should not get sampled.
     assert.commandWorked(
-        mongosDB.runCommand({explain: {update: collName, updates: [{q: {x: 101}, u: [{$set: {y: 101}}]}]}}),
+        mongosDB.runCommand({
+            explain: {update: collName, updates: [{q: {x: 101}, u: [{$set: {y: 101}}]}]},
+        }),
     );
 }
 
@@ -172,7 +176,9 @@ const shardNames = [st.rs0.name];
     });
 
     // 'explain' queries should not get sampled.
-    assert.commandWorked(mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: 301}, limit: 1}]}}));
+    assert.commandWorked(
+        mongosDB.runCommand({explain: {delete: collName, deletes: [{q: {x: 301}, limit: 1}]}}),
+    );
 }
 
 {
@@ -206,7 +212,9 @@ const shardNames = [st.rs0.name];
 
     // 'explain' queries should not get sampled.
     assert.commandWorked(
-        mongosDB.runCommand({explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}),
+        mongosDB.runCommand({
+            explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}},
+        }),
     );
 }
 

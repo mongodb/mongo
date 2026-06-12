@@ -26,7 +26,10 @@ testDB.system.profile.drop();
 assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.createCollection("system.profile"));
 assert.eq(false, testDB.system.profile.stats().capped);
-assert.commandFailedWithCode(testDB.system.profile.convertToCapped(1024 * 1024), ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.system.profile.convertToCapped(1024 * 1024),
+    ErrorCodes.BadValue,
+);
 assert.eq(false, testDB.system.profile.stats().capped);
 
 // Basic write operations should fail.
@@ -40,8 +43,12 @@ assert.writeError(testDB.system.profile.remove({}));
 // Using findAndModify to write to "system.profile" should fail.
 assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.createCollection("system.profile"));
-assert.commandFailed(testDB.system.profile.runCommand("findAndModify", {query: {}, update: {a: 1}}));
-assert.commandFailed(testDB.system.profile.runCommand("findAndModify", {query: {}, update: {a: 1}, upsert: true}));
+assert.commandFailed(
+    testDB.system.profile.runCommand("findAndModify", {query: {}, update: {a: 1}}),
+);
+assert.commandFailed(
+    testDB.system.profile.runCommand("findAndModify", {query: {}, update: {a: 1}, upsert: true}),
+);
 assert.commandFailed(testDB.system.profile.runCommand("findAndModify", {query: {}, remove: true}));
 
 // Using mapReduce to write to "system.profile" should fail.
@@ -68,10 +75,16 @@ assert.commandFailed(testDB.foo.runCommand("aggregate", {pipeline: [{$out: "syst
 assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.createCollection("system.profile"));
 assert.commandFailed(
-    testDB.adminCommand({renameCollection: testDB.system.profile.getFullName(), to: testDB.foo.getFullName()}),
+    testDB.adminCommand({
+        renameCollection: testDB.system.profile.getFullName(),
+        to: testDB.foo.getFullName(),
+    }),
 );
 assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.createCollection("foo"));
 assert.commandFailed(
-    testDB.adminCommand({renameCollection: testDB.foo.getFullName(), to: testDB.system.profile.getFullName()}),
+    testDB.adminCommand({
+        renameCollection: testDB.foo.getFullName(),
+        to: testDB.system.profile.getFullName(),
+    }),
 );

@@ -4,7 +4,9 @@ const coll = db.jstests_aggregation_upperlower;
 coll.drop();
 assert.commandWorked(coll.insert({}));
 function assertResult(expectedUpper, expectedLower, string) {
-    const result = coll.aggregate({$project: {upper: {$toUpper: string}, lower: {$toLower: string}}}).toArray()[0];
+    const result = coll
+        .aggregate({$project: {upper: {$toUpper: string}, lower: {$toLower: string}}})
+        .toArray()[0];
     assert.eq(expectedUpper, result.upper);
     assert.eq(expectedLower, result.lower);
 }
@@ -75,7 +77,11 @@ assert.commandWorked(
     }),
 );
 assertResult("-_AB", "-_ab", "$string");
-assertResult("ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789", "abcdefghijklmnopqrstuvwxyz123456789", "$longString");
+assertResult(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789",
+    "abcdefghijklmnopqrstuvwxyz123456789",
+    "$longString",
+);
 assertResult("2090845886852", "2090845886852", "$numberLong");
 assertResult("42", "42", "$numberInt");
 assertResult("HELLO WORLD", "hello world", "$nested.str");

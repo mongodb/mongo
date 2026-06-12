@@ -10,7 +10,9 @@ const db = conn.getDB("test");
 // Disable MatchExpression optimization so that we can craft simple queries that can be answered
 // with a nested SORT_MERGE plan. If we allow optimization, then all of the nested $or predicates
 // will be optimized away (all child predicates will be raised to children of the top level $or).
-assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}),
+);
 
 const collName = jsTestName();
 
@@ -74,14 +76,16 @@ const sortPatterns = [
     // Basic case.
     {
         sort: {a: 1, b: 1},
-        cmpFn: (docOne, docTwo) => docOne.a < docTwo.a || (docOne.a === docTwo.a && docOne.b <= docTwo.b),
+        cmpFn: (docOne, docTwo) =>
+            docOne.a < docTwo.a || (docOne.a === docTwo.a && docOne.b <= docTwo.b),
     },
 
     // Verify that an index key pattern which doesn't match the order of the sort pattern can still
     // be used to satisfy the sort.
     {
         sort: {b: -1, a: 1},
-        cmpFn: (docOne, docTwo) => docOne.b > docTwo.b || (docOne.b === docTwo.b && docOne.a <= docTwo.a),
+        cmpFn: (docOne, docTwo) =>
+            docOne.b > docTwo.b || (docOne.b === docTwo.b && docOne.a <= docTwo.a),
     },
 ];
 

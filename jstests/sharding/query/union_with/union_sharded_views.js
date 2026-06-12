@@ -58,7 +58,9 @@ assert.eq(
 // We do not assert the specific code because this will throw IDLUnknownField in multiversion tests,
 // and ParseFailure in latest version.
 assert.throws(() =>
-    fdbSourceSharded.aggregate([{$unionWith: {db: "test", coll: sourceUnsharded.getName()}}]).itcount(),
+    fdbSourceSharded
+        .aggregate([{$unionWith: {db: "test", coll: sourceUnsharded.getName()}}])
+        .itcount(),
 );
 assert.eq(
     sourceUnsharded.aggregate([{$unionWith: sourceSharded.getName()}]).itcount(),
@@ -66,16 +68,30 @@ assert.eq(
 );
 // We do not assert the specific code because this will throw IDLUnknownField in multiversion tests,
 // and ParseFailure in latest version.
-assert.throws(() => sourceUnsharded.aggregate([{$unionWith: {db: "fdb", coll: fdbSourceSharded.getName()}}]).itcount());
+assert.throws(() =>
+    sourceUnsharded
+        .aggregate([{$unionWith: {db: "fdb", coll: fdbSourceSharded.getName()}}])
+        .itcount(),
+);
 
 // Now create an identity view on top of each collection and expect to get the same results.
 const identityUnsharded = db.identity_unsharded;
 assert.commandWorked(
-    db.runCommand({create: identityUnsharded.getName(), viewOn: sourceUnsharded.getName(), pipeline: []}),
+    db.runCommand({
+        create: identityUnsharded.getName(),
+        viewOn: sourceUnsharded.getName(),
+        pipeline: [],
+    }),
 );
 
 const identitySharded = db.identity_sharded;
-assert.commandWorked(db.runCommand({create: identitySharded.getName(), viewOn: sourceSharded.getName(), pipeline: []}));
+assert.commandWorked(
+    db.runCommand({
+        create: identitySharded.getName(),
+        viewOn: sourceSharded.getName(),
+        pipeline: [],
+    }),
+);
 
 assert.eq(identitySharded.aggregate().itcount(), shardedData.length);
 assert.eq(identityUnsharded.aggregate().itcount(), unshardedData.length);
@@ -204,16 +220,19 @@ assert(
 function testQueryOverUnionedData(unionedView) {
     assert(resultsEq(unionedView.find().toArray(), shardedData.concat(unshardedData)));
     assert(
-        resultsEq(unionedView.aggregate([{$group: {_id: "$shardKey", count: {$sum: 1}}}]).toArray(), [
-            {_id: null, count: unshardedData.length},
-            {_id: -100, count: 2},
-            {_id: -10, count: 2},
-            {_id: -1, count: 1},
-            {_id: 0, count: 1},
-            {_id: 1, count: 1},
-            {_id: 10, count: 2},
-            {_id: 100, count: 2},
-        ]),
+        resultsEq(
+            unionedView.aggregate([{$group: {_id: "$shardKey", count: {$sum: 1}}}]).toArray(),
+            [
+                {_id: null, count: unshardedData.length},
+                {_id: -100, count: 2},
+                {_id: -10, count: 2},
+                {_id: -1, count: 1},
+                {_id: 0, count: 1},
+                {_id: 1, count: 1},
+                {_id: 10, count: 2},
+                {_id: 100, count: 2},
+            ],
+        ),
     );
 }
 assert.commandWorked(

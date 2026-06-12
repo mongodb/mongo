@@ -89,7 +89,9 @@ try {
     let compactJoin = startParallelShell(() => {
         jsTestLog("Starting the compact command, which should stall on a failpoint...");
         assert.commandFailedWithCode(
-            db.getSiblingDB(TestData.dbName).runCommand({"compact": "testColl", "comment": TestData.comment}),
+            db
+                .getSiblingDB(TestData.dbName)
+                .runCommand({"compact": "testColl", "comment": TestData.comment}),
             ErrorCodes.Interrupted,
         );
     }, conn.port);
@@ -102,7 +104,10 @@ try {
     assert.soon(function () {
         const ops = testDB
             .getSiblingDB("admin")
-            .aggregate([{$currentOp: {allUsers: true}}, {$match: {"command.comment": TestData.comment}}])
+            .aggregate([
+                {$currentOp: {allUsers: true}},
+                {$match: {"command.comment": TestData.comment}},
+            ])
             .toArray();
         if (ops.length == 0) {
             return false;
@@ -121,7 +126,9 @@ try {
     compactJoin();
 
     // Make sure that WT::compact did not skip because of too little data.
-    assert(!checkLog.checkContainsOnce(testDB, "there is no useful work to do - skipping compaction"));
+    assert(
+        !checkLog.checkContainsOnce(testDB, "there is no useful work to do - skipping compaction"),
+    );
 } finally {
     if (fpOn) {
         jsTestLog("Release the failpoint");

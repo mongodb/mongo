@@ -31,7 +31,9 @@ assert.commandWorked(
 
 // 'animals' is used as the local collection for $lookup.
 let animals = testDB.getCollection("animals");
-assert.commandWorked(animals.insert({_id: "dog", locationId: "doghouse", colors: ["chartreuse", "taupe"]}));
+assert.commandWorked(
+    animals.insert({_id: "dog", locationId: "doghouse", colors: ["chartreuse", "taupe"]}),
+);
 assert.commandWorked(animals.insert({_id: "bull", locationId: "bullpen", colors: ["red", "blue"]}));
 assert.commandWorked(animals.insert({_id: "trout", colors: ["mauve"]})); // no "locationId" field, so no $lookup matches
 
@@ -235,7 +237,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_07: Test that a $match with $geoIntersects works as expected when absorbed by a $lookup.
@@ -275,7 +279,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
+expected = [
+    {_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_08: Test that a $match with $type works as expected when absorbed by a $lookup.
@@ -300,7 +306,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_09: Test that a $match with $jsonSchema works as expected although ineligible for absorbtion
@@ -334,7 +342,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
+expected = [
+    {_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_10: Test that a more complex $match with $jsonSchema works as expected although ineligible
@@ -360,7 +370,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
+expected = [
+    {_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_11: Test that $match with a $jsonSchema property that will internally translate to a match
@@ -391,7 +403,9 @@ result = testDB.animals
     ])
     .toArray();
 
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_12: Test that $match with a $jsonSchema property that will internally translate to a match
@@ -421,7 +435,9 @@ result = testDB.animals
     ])
     .toArray();
 
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_13: Test that $match with a $jsonSchema property that will internally translate to a match
@@ -442,14 +458,21 @@ result = testDB.animals
         {
             $match: {
                 $jsonSchema: {
-                    properties: {"location.extra": {type: "object", properties: {"breeds": {type: "string"}}}},
+                    properties: {
+                        "location.extra": {
+                            type: "object",
+                            properties: {"breeds": {type: "string"}},
+                        },
+                    },
                 },
             },
         },
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
+expected = [
+    {_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_14: Test that a $match with $alwaysTrue works as expected although ineligible for absorbtion
@@ -523,7 +546,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_17: Regression test for SERVER-99121. This depends on our current behavior where we optimize
@@ -552,7 +577,9 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);
 
 // TEST_18: Similar to test 17, but with more $match stages to absorb.
@@ -579,5 +606,7 @@ result = testDB.animals
         {$project: {"location.extra": false, "colors": false}},
     ])
     .toArray();
-expected = [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+expected = [
+    {_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}},
+];
 assert.eq(result, expected);

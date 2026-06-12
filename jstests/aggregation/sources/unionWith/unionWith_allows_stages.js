@@ -50,7 +50,10 @@ checkResults(
         aggregate: collA.getName(),
         pipeline: [
             {
-                $unionWith: {coll: textColl.getName(), pipeline: [{$match: {$text: {$search: "random"}}}]},
+                $unionWith: {
+                    coll: textColl.getName(),
+                    pipeline: [{$match: {$text: {$search: "random"}}}],
+                },
             },
             {$sort: {_id: 1}},
         ],
@@ -90,7 +93,10 @@ assert.commandFailedWithCode(
         pipeline: [
             {$match: {val: {$exists: false}}},
             {
-                $unionWith: {coll: textColl.getName(), pipeline: [{$match: {val: "foo"}}, {$indexStats: {}}]},
+                $unionWith: {
+                    coll: textColl.getName(),
+                    pipeline: [{$match: {val: "foo"}}, {$indexStats: {}}],
+                },
             },
         ],
         cursor: {},

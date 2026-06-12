@@ -28,7 +28,9 @@ function setupTest(reshardingTest, namespace, timeout) {
     const topology = DiscoverTopology.findConnectedNodes(mongos);
     const coordinator = new Mongo(topology.configsvr.nodes[0]);
     assert.commandWorked(
-        coordinator.getDB("admin").adminCommand({setParameter: 1, reshardingCriticalSectionTimeoutMillis: timeout}),
+        coordinator
+            .getDB("admin")
+            .adminCommand({setParameter: 1, reshardingCriticalSectionTimeoutMillis: timeout}),
     );
 
     assert.commandWorked(
@@ -42,7 +44,11 @@ function setupTest(reshardingTest, namespace, timeout) {
 }
 
 // This test will not timeout.
-const successReshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+const successReshardingTest = new ReshardingTest({
+    numDonors: 2,
+    numRecipients: 2,
+    reshardInPlace: true,
+});
 const noTimeoutMillis = 8000;
 let namespace = `reshardingDb.coll${noTimeoutMillis}`;
 
@@ -60,7 +66,11 @@ successReshardingTest.withReshardingInBackground({
 successReshardingTest.teardown();
 
 // This test will timeout.
-const failureReshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+const failureReshardingTest = new ReshardingTest({
+    numDonors: 2,
+    numRecipients: 2,
+    reshardInPlace: true,
+});
 const shouldTimeoutMillis = 0;
 namespace = `reshardingDb.coll${shouldTimeoutMillis}`;
 

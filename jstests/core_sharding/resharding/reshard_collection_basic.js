@@ -19,7 +19,9 @@ import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
 const shardNames = getShardNames(db);
-let presetReshardedChunks = [{recipientShardId: shardNames[0], min: {newKey: MinKey}, max: {newKey: MaxKey}}];
+let presetReshardedChunks = [
+    {recipientShardId: shardNames[0], min: {newKey: MinKey}, max: {newKey: MaxKey}},
+];
 const collName = jsTestName();
 const dbName = db.getName();
 const ns = dbName + "." + collName;
@@ -49,10 +51,10 @@ assert.commandFailedWithCode(
 assert.commandWorked(db.adminCommand({enableSharding: dbName}));
 
 jsTest.log("Fail if collection is unsharded.");
-assert.commandFailedWithCode(db.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}), [
-    ErrorCodes.NamespaceNotSharded,
-    ErrorCodes.NamespaceNotFound,
-]);
+assert.commandFailedWithCode(
+    db.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
+    [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
+);
 
 assert.commandWorked(db.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
@@ -118,13 +120,23 @@ assert.commandFailedWithCode(
 );
 
 jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
-assert.commandFailedWithCode(db.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
+assert.commandFailedWithCode(
+    db.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}),
+    4952606,
+);
 
-jsTest.log("Fail if authoritative tags exist in config.tags collection and zones are not provided.");
+jsTest.log(
+    "Fail if authoritative tags exist in config.tags collection and zones are not provided.",
+);
 const existingZoneName = "x1";
 assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: existingZoneName}));
 assert.commandWorked(
-    db.adminCommand({updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: 5}, zone: existingZoneName}),
+    db.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {oldKey: 0},
+        max: {oldKey: 5},
+        zone: existingZoneName,
+    }),
 );
 
 assert.commandFailedWithCode(
@@ -156,10 +168,10 @@ assert.commandFailedWithCode(
 // to support moveCollection.
 if (!TestData.implicitlyTrackUnshardedCollectionOnCreation) {
     jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
-    assert.commandFailedWithCode(db.getSiblingDB("test").system.resharding.mycoll.insert({_id: 1, a: 1}), [
-        ErrorCodes.NamespaceNotFound,
-        ErrorCodes.NamespaceNotSharded,
-    ]);
+    assert.commandFailedWithCode(
+        db.getSiblingDB("test").system.resharding.mycoll.insert({_id: 1, a: 1}),
+        [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded],
+    );
 }
 
 // TODO SERVER-103461 Remove version check when 9.0 becomes last LTS.
@@ -169,7 +181,9 @@ let binVersion = assert.commandWorked(
     }),
 ).version;
 if (MongoRunner.compareBinVersions(binVersion, "8.2") >= 0) {
-    jsTest.log("Fail if using forceRedistribution and provide a different key than the existing shard key.");
+    jsTest.log(
+        "Fail if using forceRedistribution and provide a different key than the existing shard key.",
+    );
     assert.commandFailedWithCode(
         db.adminCommand({
             reshardCollection: ns,
@@ -193,16 +207,30 @@ reshardCmdTest.assertReshardCollOk(
 );
 
 jsTest.log("Succeed base case.");
-reshardCmdTest.assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}, 1);
+reshardCmdTest.assertReshardCollOk(
+    {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1},
+    1,
+);
 
 jsTest.log("Succeed with compound shard key.");
-reshardCmdTest.assertReshardCollOk({reshardCollection: ns, key: {newKey: 1, oldKey: 1}, numInitialChunks: 2}, 2);
+reshardCmdTest.assertReshardCollOk(
+    {reshardCollection: ns, key: {newKey: 1, oldKey: 1}, numInitialChunks: 2},
+    2,
+);
 
 jsTest.log("Succeed if unique is specified and is false.");
-reshardCmdTest.assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, unique: false, numInitialChunks: 1}, 1);
+reshardCmdTest.assertReshardCollOk(
+    {reshardCollection: ns, key: {newKey: 1}, unique: false, numInitialChunks: 1},
+    1,
+);
 
-jsTest.log("Succeed if _presetReshardedChunks is provided and test commands are enabled (default).");
-reshardCmdTest.assertReshardCollOkWithPreset({reshardCollection: ns, key: {newKey: 1}}, presetReshardedChunks);
+jsTest.log(
+    "Succeed if _presetReshardedChunks is provided and test commands are enabled (default).",
+);
+reshardCmdTest.assertReshardCollOkWithPreset(
+    {reshardCollection: ns, key: {newKey: 1}},
+    presetReshardedChunks,
+);
 
 presetReshardedChunks = createChunks(shardNames, "newKey", 0, numInitialDocs).map((chunk) => {
     chunk["recipientShardId"] = chunk["shard"];
@@ -231,7 +259,10 @@ reshardCmdTest.assertReshardCollOkWithPreset(
     presetReshardedChunks,
 );
 
-jsTest.log("Succeed if the zone provided is assigned to a shard but not a range for the source" + " collection.");
+jsTest.log(
+    "Succeed if the zone provided is assigned to a shard but not a range for the source" +
+        " collection.",
+);
 reshardCmdTest.assertReshardCollOk(
     {
         reshardCollection: ns,
@@ -286,7 +317,12 @@ if (featureFlagReshardingNumSamplesPerChunkEnabled) {
 jsTest.log("Succeed if zones are not empty.");
 assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: existingZoneName}));
 assert.commandWorked(
-    db.adminCommand({updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: 5}, zone: existingZoneName}),
+    db.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {oldKey: 0},
+        max: {oldKey: 5},
+        zone: existingZoneName,
+    }),
 );
 reshardCmdTest.assertReshardCollOk(
     {
@@ -307,7 +343,9 @@ binVersion = assert.commandWorked(
     }),
 ).version;
 if (MongoRunner.compareBinVersions(binVersion, "8.2") >= 0) {
-    jsTestLog("Succeed if hashed shard key without hashed prefix and numInitialChunks is respected.");
+    jsTestLog(
+        "Succeed if hashed shard key without hashed prefix and numInitialChunks is respected.",
+    );
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {oldKey: 1, newKey: "hashed"}, numInitialChunks: 5},
         5,
@@ -355,7 +393,10 @@ if (featureFlagRelaxedMode) {
     );
 }
 
-const featureFlagReshardingVerification = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
+const featureFlagReshardingVerification = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "ReshardingVerification",
+);
 if (featureFlagReshardingVerification) {
     jsTest.log("Succeed if 'performVerification' parameter is set to true.");
 

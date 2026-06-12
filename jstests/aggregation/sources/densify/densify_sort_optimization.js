@@ -80,7 +80,11 @@ const testCases = [
     [
         [
             {
-                $densify: {field: "val", range: {step: 1, bounds: "full"}, partitionByFields: ["random"]},
+                $densify: {
+                    field: "val",
+                    range: {step: 1, bounds: "full"},
+                    partitionByFields: ["random"],
+                },
             },
             {$sort: {val: 1}},
         ],
@@ -225,7 +229,11 @@ const testCases = [
                 },
             },
             {
-                $setWindowFields: {partitionBy: "$random", sortBy: {"val": 1}, output: {val: {$sum: "$val"}}},
+                $setWindowFields: {
+                    partitionBy: "$random",
+                    sortBy: {"val": 1},
+                    output: {val: {$sum: "$val"}},
+                },
             },
             {$sort: {random: 1, val: 1}},
         ],
@@ -243,7 +251,10 @@ const testCases = [
                     "partitionBy": "$random",
                     "sortBy": {"val": 1},
                     "output": {
-                        "val": {"$sum": "$val", "window": {"documents": ["unbounded", "unbounded"]}},
+                        "val": {
+                            "$sum": "$val",
+                            "window": {"documents": ["unbounded", "unbounded"]},
+                        },
                     },
                 },
             },
@@ -280,6 +291,13 @@ for (let i = 0; i < testCases.length; i++) {
             result = getExplainedPipelineFromAggregation(db, coll, testCases[i][0]);
             return anyEq(result, testCases[i][1]);
         },
-        () => "Test case " + i + " failed.\n" + "Expected:\n" + tojson(testCases[i][1]) + "\nGot:\n" + tojson(result),
+        () =>
+            "Test case " +
+            i +
+            " failed.\n" +
+            "Expected:\n" +
+            tojson(testCases[i][1]) +
+            "\nGot:\n" +
+            tojson(result),
     );
 }

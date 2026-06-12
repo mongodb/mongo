@@ -69,7 +69,10 @@ proxyServer.start();
         config: 1,
         shards: 1,
         mongosOptions: {
-            setParameter: {loadBalancerPort: egressPort, clientSourceAuthenticationRestrictionMode: "origin"},
+            setParameter: {
+                loadBalancerPort: egressPort,
+                clientSourceAuthenticationRestrictionMode: "origin",
+            },
         },
     };
     const fixture = new ShardingTest(opts);
@@ -83,7 +86,10 @@ proxyServer.start();
         config: 1,
         shards: 1,
         mongosOptions: {
-            setParameter: {loadBalancerPort: egressPort, clientSourceAuthenticationRestrictionMode: "peer"},
+            setParameter: {
+                loadBalancerPort: egressPort,
+                clientSourceAuthenticationRestrictionMode: "peer",
+            },
         },
     };
     const fixture = new ShardingTest(opts);

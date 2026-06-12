@@ -31,7 +31,11 @@ let parallelInsert = startParallelShell(
 for (let i = 0; i < 1000; i++) {
     coll.update(
         {
-            loc: {$within: {$center: [[Random.rand() * 180, Random.rand() * 180], Random.rand() * 50]}},
+            loc: {
+                $within: {
+                    $center: [[Random.rand() * 180, Random.rand() * 180], Random.rand() * 50],
+                },
+            },
         },
         {$set: {v: big}},
         false,

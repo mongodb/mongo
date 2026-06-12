@@ -34,7 +34,10 @@ const checkServerStats = function () {
     while (true) {
         // Failpoint returns status failure.
         assert.commandWorked(
-            st.s0.adminCommand({"configureFailPoint": "statusFailureTestHealthObserver", "mode": "alwaysOn"}),
+            st.s0.adminCommand({
+                "configureFailPoint": "statusFailureTestHealthObserver",
+                "mode": "alwaysOn",
+            }),
         );
 
         assert.soon(() => {
@@ -48,11 +51,16 @@ const checkServerStats = function () {
         });
 
         assert.commandWorked(
-            st.s0.adminCommand({"configureFailPoint": "statusFailureTestHealthObserver", "mode": "off"}),
+            st.s0.adminCommand({
+                "configureFailPoint": "statusFailureTestHealthObserver",
+                "mode": "off",
+            }),
         );
 
         assert.soon(() => {
-            result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+            result = assert.commandWorked(
+                st.s0.adminCommand({serverStatus: 1, health: {details: true}}),
+            ).health;
             return result.state == "Ok";
         });
 
@@ -60,7 +68,8 @@ const checkServerStats = function () {
         // Wait for: at least kWaitForPassedChecksCount checks completed.
         if (
             result.testObserver.totalChecks >= kWaitForCompletedChecksCount &&
-            result.testObserver.totalChecks - result.testObserver.totalChecksWithFailure >= kWaitForPassedChecksCount
+            result.testObserver.totalChecks - result.testObserver.totalChecksWithFailure >=
+                kWaitForPassedChecksCount
         ) {
             break;
         }

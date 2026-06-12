@@ -17,9 +17,15 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
-import {assertCollectionValid, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {
+    assertCollectionValid,
+    assertCollectionsMatch,
+} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
-import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
+import {
+    getFcParams,
+    getFcAssertArgs,
+} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 const fcParams = getFcParams();
 const fcAssertArgs = getFcAssertArgs();
 
@@ -213,7 +219,10 @@ describe("Basic comparative PBT for timeseries inserts", () => {
                         assertCollectionsMatch(tsColl, ctrlColl);
                         assertCollectionValid(tsColl);
                         stats = cmds.commands.reduce(commandMeasurementStatsReducer, stats);
-                        stats = tsColl.find().toArray().reduce(measurementsQueryStatsReducer, stats);
+                        stats = tsColl
+                            .find()
+                            .toArray()
+                            .reduce(measurementsQueryStatsReducer, stats);
                         stats = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl)
                             .find()
                             .rawData()

@@ -2,7 +2,10 @@
  * Shared utility functions for $vectorSearch, $search, and $searchMeta IFR flag retry tests.
  * Provides helpers for metrics, test data, collection/view setup, and mongotmock configuration.
  */
-import {getParameter, setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    getParameter,
+    setParameterOnAllNonConfigNodes,
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
@@ -22,7 +25,9 @@ export const kTestDbName = "test";
 export const kTestCollName = "testColl";
 export const kTestViewName = "testView";
 export const kTestIndexName = "vector_index";
-export const kTestViewPipeline = [{$addFields: {enriched: {$concat: ["$title", " - ", {$toString: "$_id"}]}}}];
+export const kTestViewPipeline = [
+    {$addFields: {enriched: {$concat: ["$title", " - ", {$toString: "$_id"}]}}},
+];
 export const kTestData = [
     {_id: 1, title: "Doc1", embedding: [1.0, 0.0, 0.0]},
     {_id: 2, title: "Doc2", embedding: [0.0, 1.0, 0.0]},
@@ -210,7 +215,9 @@ function createSearchIndex(testDb, mongotMock, namespace) {
         indexesCreated: [{id: "index-Id", name: kTestIndexName}],
     };
     mongotMock.setMockSearchIndexCommandResponse(createIndexResponse);
-    assert.commandWorked(testDb.runCommand({createSearchIndexes: namespace, indexes: [testVectorSearchIndexSpec]}));
+    assert.commandWorked(
+        testDb.runCommand({createSearchIndexes: namespace, indexes: [testVectorSearchIndexSpec]}),
+    );
 }
 
 export function createTestCollectionAndIndex(conn, mongotMock, shardingTest = null) {
@@ -338,7 +345,11 @@ export function setUpMongotMockForVectorSearch(
     return cursorId;
 }
 
-export function setupMockVectorSearchResponsesForHybridSearch(conn, mongotMock, shardingTest = null) {
+export function setupMockVectorSearchResponsesForHybridSearch(
+    conn,
+    mongotMock,
+    shardingTest = null,
+) {
     const queryVector = [0.5, 0.5, 0.5];
     const path = "embedding";
     const numCandidates = 10;
@@ -412,12 +423,20 @@ export function runHybridSearchTests(conn, mongotMock, featureFlagValue, shardin
         queries: [
             () => {
                 assert.commandWorked(
-                    testDb.runCommand({aggregate: kTestCollName, pipeline: rankFusionPipeline, cursor: {}}),
+                    testDb.runCommand({
+                        aggregate: kTestCollName,
+                        pipeline: rankFusionPipeline,
+                        cursor: {},
+                    }),
                 );
             },
             () => {
                 assert.commandWorked(
-                    testDb.runCommand({aggregate: kTestCollName, pipeline: scoreFusionPipeline, cursor: {}}),
+                    testDb.runCommand({
+                        aggregate: kTestCollName,
+                        pipeline: scoreFusionPipeline,
+                        cursor: {},
+                    }),
                 );
             },
         ],

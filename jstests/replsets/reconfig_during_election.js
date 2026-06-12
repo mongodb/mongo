@@ -22,7 +22,9 @@ const candidate = rst.getSecondary();
 
 jsTestLog("Step down");
 
-const failPoint = configureFailPoint(candidate, "electionHangsBeforeUpdateMemberState", {waitForMillis: 10 * 1000});
+const failPoint = configureFailPoint(candidate, "electionHangsBeforeUpdateMemberState", {
+    waitForMillis: 10 * 1000,
+});
 
 // The incumbent sends replSetStepUp to the candidate for election handoff.
 assert.commandWorked(
@@ -44,10 +46,10 @@ config.version++;
 // command before it succeeds. Failing due to interruption on stepup or the automatic reconfig on
 // stepup is acceptable here because we are testing that the reconfig command does not cause the
 // server to invariant.
-assert.commandWorkedOrFailedWithCode(candidate.adminCommand({replSetReconfig: config, force: true}), [
-    ErrorCodes.InterruptedDueToReplStateChange,
-    ErrorCodes.ConfigurationInProgress,
-]);
+assert.commandWorkedOrFailedWithCode(
+    candidate.adminCommand({replSetReconfig: config, force: true}),
+    [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.ConfigurationInProgress],
+);
 
 failPoint.off();
 

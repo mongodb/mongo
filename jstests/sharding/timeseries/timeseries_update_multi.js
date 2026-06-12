@@ -170,7 +170,11 @@ const requestConfigurations = {
     metaTimeFilterOneShard: {
         updateList: [
             {
-                q: {[metaField]: 2, [timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(2), f: 2},
+                q: {
+                    [metaField]: 2,
+                    [timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(2),
+                    f: 2,
+                },
                 u: {$set: {f: 1000}},
                 multi: true,
             },
@@ -348,11 +352,8 @@ function runTest(collConfig, reqConfig, insertFn) {
     assert.commandWorked(testDB.runCommand(updateCommand));
 
     // Checks that the query was routed to the correct shards and gets profile entries if so.
-    const [primaryEntries, otherEntries] = assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(
-        reqConfig,
-        primaryDB,
-        otherDB,
-    );
+    const [primaryEntries, otherEntries] =
+        assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(reqConfig, primaryDB, otherDB);
 
     // Ensures that the collection contains only expected documents.
     const matchingPred = reqConfig.expectedUpdates.findQuery;
@@ -361,7 +362,10 @@ function runTest(collConfig, reqConfig, insertFn) {
         .sort({_id: 1})
         .toArray()
         .map((x) => x._id);
-    const updatedDocs = coll.find(matchingPred, {time: 1, hostid: 1, f: 1}).sort({_id: 1}).toArray();
+    const updatedDocs = coll
+        .find(matchingPred, {time: 1, hostid: 1, f: 1})
+        .sort({_id: 1})
+        .toArray();
 
     reqConfig.expectedUpdates.expectedMatchingIds.sort();
 

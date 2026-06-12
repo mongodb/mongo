@@ -35,7 +35,9 @@ export const $config = (function () {
         function init(db, collName) {
             // Insert some data into 'data_coll_*' collections.
             for (let i = 0; i < this.dataCollectionCount; ++i) {
-                assert.commandWorked(db.getCollection(this.getDataCollectionName(i)).insert({a: 1}));
+                assert.commandWorked(
+                    db.getCollection(this.getDataCollectionName(i)).insert({a: 1}),
+                );
             }
         }
 
@@ -72,8 +74,14 @@ export const $config = (function () {
 
     var transitions = {
         init: {createIndexesOnEmptyCollection: 0.8, createIndexesOnDataCollection: 0.2},
-        createIndexesOnEmptyCollection: {createIndexesOnEmptyCollection: 0.8, createIndexesOnDataCollection: 0.2},
-        createIndexesOnDataCollection: {createIndexesOnEmptyCollection: 0.8, createIndexesOnDataCollection: 0.2},
+        createIndexesOnEmptyCollection: {
+            createIndexesOnEmptyCollection: 0.8,
+            createIndexesOnDataCollection: 0.2,
+        },
+        createIndexesOnDataCollection: {
+            createIndexesOnEmptyCollection: 0.8,
+            createIndexesOnDataCollection: 0.2,
+        },
     };
 
     function teardown(db, collName, cluster) {
@@ -115,9 +123,20 @@ export const $config = (function () {
 
         // Check each ident is present on all nodes.
         for (let ident in identCounts) {
-            assert.eq(identCounts[ident], numNodes, `Ident ${ident} doesn't exist on all nodes in the replica set`);
+            assert.eq(
+                identCounts[ident],
+                numNodes,
+                `Ident ${ident} doesn't exist on all nodes in the replica set`,
+            );
         }
     }
 
-    return {threadCount: 5, iterations: 100, data: data, states: states, transitions: transitions, teardown: teardown};
+    return {
+        threadCount: 5,
+        iterations: 100,
+        data: data,
+        states: states,
+        transitions: transitions,
+        teardown: teardown,
+    };
 })();

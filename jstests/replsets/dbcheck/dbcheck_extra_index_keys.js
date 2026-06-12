@@ -35,7 +35,10 @@ import {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     replSet.startSet();
@@ -74,7 +77,13 @@ import {
         return actualNumDocs;
     }
 
-    function checkNumBatchesAndSnapshots(healthLog, nDocsChecked, batchSize, snapshotSize, inconsistentBatch = false) {
+    function checkNumBatchesAndSnapshots(
+        healthLog,
+        nDocsChecked,
+        batchSize,
+        snapshotSize,
+        inconsistentBatch = false,
+    ) {
         const expectedNumBatches = Math.ceil(nDocsChecked / batchSize);
 
         let query = logQueries.infoBatchQuery;
@@ -88,10 +97,12 @@ import {
             let expectedNumSnapshots = expectedNumBatches;
             if (snapshotSize < batchSize) {
                 const snapshotsPerBatch = Math.ceil(batchSize / snapshotSize);
-                const lastBatchSize = nDocsChecked % batchSize == 0 ? batchSize : nDocsChecked % batchSize;
+                const lastBatchSize =
+                    nDocsChecked % batchSize == 0 ? batchSize : nDocsChecked % batchSize;
                 const lastBatchSnapshots = Math.ceil(lastBatchSize / snapshotSize);
 
-                expectedNumSnapshots = (expectedNumBatches - 1) * snapshotsPerBatch + lastBatchSnapshots;
+                expectedNumSnapshots =
+                    (expectedNumBatches - 1) * snapshotsPerBatch + lastBatchSnapshots;
             }
             checkNumSnapshots(debugBuild, expectedNumSnapshots);
         }
@@ -134,7 +145,10 @@ import {
         };
         if (start != null) {
             if (docSuffix) {
-                dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
+                dbCheckParameters = {
+                    ...dbCheckParameters,
+                    start: {a: start.toString() + docSuffix},
+                };
             } else {
                 dbCheckParameters = {...dbCheckParameters, start: {a: start}};
             }
@@ -217,7 +231,10 @@ import {
         };
         if (start != null) {
             if (docSuffix) {
-                dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
+                dbCheckParameters = {
+                    ...dbCheckParameters,
+                    start: {a: start.toString() + docSuffix},
+                };
             } else {
                 dbCheckParameters = {...dbCheckParameters, start: {a: start}};
             }
@@ -242,7 +259,9 @@ import {
             checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, nDocsChecked);
         }
 
-        jsTestLog("Checking secondary for record not found error, should have 0 since secondary skips reverse lookup");
+        jsTestLog(
+            "Checking secondary for record not found error, should have 0 since secondary skips reverse lookup",
+        );
         checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 
         jsTestLog("Checking for correct number of batches on primary");
@@ -286,12 +305,20 @@ import {
         replSet.awaitReplication();
         assert.eq(primaryColl.find({}).count(), nDocs);
 
-        const skipUpdatingIndexDocumentPrimary = configureFailPoint(primaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
-        const skipUpdatingIndexDocumentSecondary = configureFailPoint(secondaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
+        const skipUpdatingIndexDocumentPrimary = configureFailPoint(
+            primaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
+        const skipUpdatingIndexDocumentSecondary = configureFailPoint(
+            secondaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
 
         jsTestLog("Updating docs to remove index key field");
 
@@ -309,7 +336,10 @@ import {
         };
         if (start != null) {
             if (docSuffix) {
-                dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
+                dbCheckParameters = {
+                    ...dbCheckParameters,
+                    start: {a: start.toString() + docSuffix},
+                };
             } else {
                 dbCheckParameters = {...dbCheckParameters, start: {a: start}};
             }
@@ -379,9 +409,13 @@ import {
         assert.eq(primaryColl.find({}).count(), nDocs);
 
         // Set up inconsistency.
-        const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+            primaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting docs");
         assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -398,7 +432,10 @@ import {
         };
         if (start != null) {
             if (docSuffix) {
-                dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
+                dbCheckParameters = {
+                    ...dbCheckParameters,
+                    start: {a: start.toString() + docSuffix},
+                };
             } else {
                 dbCheckParameters = {...dbCheckParameters, start: {a: start}};
             }
@@ -479,9 +516,13 @@ import {
         assert.eq(primaryColl.find({}).count(), nDocs);
 
         // Set up inconsistency.
-        const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1b_1",
-        });
+        const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+            primaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1b_1",
+            },
+        );
         jsTestLog("Deleting docs");
         assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -498,7 +539,10 @@ import {
         };
         if (start != null) {
             if (docSuffix) {
-                dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
+                dbCheckParameters = {
+                    ...dbCheckParameters,
+                    start: {a: start.toString() + docSuffix},
+                };
             } else {
                 dbCheckParameters = {...dbCheckParameters, start: {a: start}};
             }
@@ -582,9 +626,13 @@ import {
         assert.eq(primaryColl.find({}).count(), nDocs);
 
         // Set up inconsistency.
-        const skipUnindexingDocumentWhenDeleted = configureFailPoint(secondaryDB, "skipUnindexingDocumentWhenDeleted", {
-            indexName: "a_1",
-        });
+        const skipUnindexingDocumentWhenDeleted = configureFailPoint(
+            secondaryDB,
+            "skipUnindexingDocumentWhenDeleted",
+            {
+                indexName: "a_1",
+            },
+        );
         jsTestLog("Deleting docs");
         assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -600,7 +648,10 @@ import {
         };
         if (start != null) {
             if (docSuffix) {
-                dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix}};
+                dbCheckParameters = {
+                    ...dbCheckParameters,
+                    start: {a: start.toString() + docSuffix},
+                };
             } else {
                 dbCheckParameters = {...dbCheckParameters, start: {a: start}};
             }
@@ -629,11 +680,46 @@ import {
         resetSnapshotSize(replSet);
     }
 
-    function runMainTests(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
+    function runMainTests(
+        nDocs,
+        batchSize,
+        snapshotSize,
+        skipLookupForExtraKeys,
+        docSuffix,
+        start = null,
+        end = null,
+    ) {
         [{}, {clusteredIndex: {key: {_id: 1}, unique: true}}].forEach((collOpts) => {
-            noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, collOpts, start, end);
-            recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, collOpts, start, end);
-            recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, collOpts, start, end);
+            noExtraIndexKeys(
+                nDocs,
+                batchSize,
+                snapshotSize,
+                skipLookupForExtraKeys,
+                docSuffix,
+                collOpts,
+                start,
+                end,
+            );
+            recordDoesNotMatch(
+                nDocs,
+                batchSize,
+                snapshotSize,
+                skipLookupForExtraKeys,
+                docSuffix,
+                collOpts,
+                start,
+                end,
+            );
+            recordNotFound(
+                nDocs,
+                batchSize,
+                snapshotSize,
+                skipLookupForExtraKeys,
+                docSuffix,
+                collOpts,
+                start,
+                end,
+            );
             hashingInconsistentExtraKeyOnPrimary(
                 nDocs,
                 batchSize,
@@ -655,7 +741,15 @@ import {
                 end,
             );
 
-            hashingInconsistentExtraKeyOnSecondary(nDocs, batchSize, snapshotSize, docSuffix, collOpts, start, end);
+            hashingInconsistentExtraKeyOnSecondary(
+                nDocs,
+                batchSize,
+                snapshotSize,
+                docSuffix,
+                collOpts,
+                start,
+                end,
+            );
         });
     }
 
@@ -663,13 +757,31 @@ import {
     // "2", "3", etc.), and long string entries ("1aaaaaaaaaa")
     [null, "", "aaaaaaaaaa"].forEach((docSuffix) => {
         // Test with docs < batch size
-        runMainTests(10, defaultMaxDocsPerBatch, defaultSnapshotSize, false /*skipLookupForExtraKeys*/, docSuffix);
+        runMainTests(
+            10,
+            defaultMaxDocsPerBatch,
+            defaultSnapshotSize,
+            false /*skipLookupForExtraKeys*/,
+            docSuffix,
+        );
 
         // Test with docs > batch size.
-        runMainTests(1000, defaultMaxDocsPerBatch, defaultSnapshotSize, false /*skipLookupForExtraKeys*/, docSuffix);
+        runMainTests(
+            1000,
+            defaultMaxDocsPerBatch,
+            defaultSnapshotSize,
+            false /*skipLookupForExtraKeys*/,
+            docSuffix,
+        );
 
         // Test with snapshot size < batch size
-        runMainTests(1000, 99 /* batchSize */, 19 /* snapshotSize */, false /*skipLookupForExtraKeys*/, docSuffix);
+        runMainTests(
+            1000,
+            99 /* batchSize */,
+            19 /* snapshotSize */,
+            false /*skipLookupForExtraKeys*/,
+            docSuffix,
+        );
 
         // Pass in start/end parameters with full range.
         runMainTests(
@@ -778,10 +890,19 @@ import {
     );
 
     // Test with skipLookupForExtraKeys: true
-    runMainTests(1000, 99 /* batchSize */, 19 /* snapshotSize */, true /*skipLookupForExtraKeys*/, null /*docSuffix*/);
+    runMainTests(
+        1000,
+        99 /* batchSize */,
+        19 /* snapshotSize */,
+        true /*skipLookupForExtraKeys*/,
+        null /*docSuffix*/,
+    );
 
     // TODO SERVER-79846:
     // * Test progress meter/stats are correct
 
-    replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+    replSet.stopSet(undefined /* signal */, false /* forRestart */, {
+        skipCheckDBHashes: true,
+        skipValidation: true,
+    });
 })();

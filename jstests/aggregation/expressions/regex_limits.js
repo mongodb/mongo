@@ -14,13 +14,21 @@ coll.drop();
 assert.commandWorked(coll.insert({z: "c".repeat(25000) + "d".repeat(25000) + "e"}));
 
 function testRegexAgg(inputObj, expectedOutputForFindAll) {
-    const resultFindAll = coll.aggregate([{"$project": {_id: 0, "matches": {"$regexFindAll": inputObj}}}]).toArray();
+    const resultFindAll = coll
+        .aggregate([{"$project": {_id: 0, "matches": {"$regexFindAll": inputObj}}}])
+        .toArray();
     assert.eq(resultFindAll, [{"matches": expectedOutputForFindAll}]);
 
-    const resultFind = coll.aggregate([{"$project": {_id: 0, "matches": {"$regexFind": inputObj}}}]).toArray();
-    assert.eq(resultFind, [{"matches": expectedOutputForFindAll.length == 0 ? null : expectedOutputForFindAll[0]}]);
+    const resultFind = coll
+        .aggregate([{"$project": {_id: 0, "matches": {"$regexFind": inputObj}}}])
+        .toArray();
+    assert.eq(resultFind, [
+        {"matches": expectedOutputForFindAll.length == 0 ? null : expectedOutputForFindAll[0]},
+    ]);
 
-    const resultMatch = coll.aggregate([{"$project": {_id: 0, "matches": {"$regexMatch": inputObj}}}]).toArray();
+    const resultMatch = coll
+        .aggregate([{"$project": {_id: 0, "matches": {"$regexMatch": inputObj}}}])
+        .toArray();
     assert.eq(resultMatch, [{"matches": expectedOutputForFindAll.length != 0}]);
 }
 
@@ -43,7 +51,9 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
     const anchoredPatternMaxLen = "^" + patternMaxLen;
 
     // Test that a regex with maximum allowable pattern length can find a document.
-    testRegexAgg({input: "$z", regex: anchoredPatternMaxLen}, [{match: patternMaxLen, "idx": 0, "captures": []}]);
+    testRegexAgg({input: "$z", regex: anchoredPatternMaxLen}, [
+        {match: patternMaxLen, "idx": 0, "captures": []},
+    ]);
 
     // Test that a regex pattern exceeding the limit fails. A pattern length of 32765 is
     // disallowed in all versions in multiversion tests.

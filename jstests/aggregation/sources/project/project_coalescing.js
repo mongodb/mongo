@@ -18,13 +18,15 @@ const fieldArb = fc.constantFrom("_id", "a", "b", "c", "d");
 const projectFieldsArb = fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 5});
 // To make a valid $project, we need a list of fields, a boolean for whether the _id field is
 // included, and a boolean for whether the non-_id fields are included (if the projection inclusive)
-const projectArb = fc.tuple(projectFieldsArb, fc.boolean(), fc.boolean()).map(([fields, idIncluded, isInclusive]) => {
-    const projectList = {};
-    for (const field of fields) {
-        projectList[field] = field === "_id" ? idIncluded : isInclusive;
-    }
-    return {$project: projectList};
-});
+const projectArb = fc
+    .tuple(projectFieldsArb, fc.boolean(), fc.boolean())
+    .map(([fields, idIncluded, isInclusive]) => {
+        const projectList = {};
+        for (const field of fields) {
+            projectList[field] = field === "_id" ? idIncluded : isInclusive;
+        }
+        return {$project: projectList};
+    });
 
 // A pipeline is [$project, $project, ...]
 const pipelineModel = fc.array(projectArb, {minLength: 1, maxLength: 5});
@@ -55,7 +57,9 @@ function getFullSpec(projSpec) {
     // always be at the front since we sorted the keys, so let's just take the last one.
     const nonIdField = projKeys[projKeys.length - 1];
     const isInclusive = projSpec[nonIdField];
-    const fullSpec = isInclusive ? {_id: 1, a: 0, b: 0, c: 0, d: 0} : {_id: 1, a: 1, b: 1, c: 1, d: 1};
+    const fullSpec = isInclusive
+        ? {_id: 1, a: 0, b: 0, c: 0, d: 0}
+        : {_id: 1, a: 1, b: 1, c: 1, d: 1};
     for (const key of projKeys) {
         fullSpec[key] = projSpec[key];
     }

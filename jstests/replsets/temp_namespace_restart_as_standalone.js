@@ -46,21 +46,31 @@ rst.awaitReplication();
 // Verify that the temporary collection exists on the primary and has temp=true.
 let primaryCollectionInfos = primaryDB.getCollectionInfos({name: "temp_collection"});
 assert.eq(1, primaryCollectionInfos.length, "'temp_collection' wasn't created on the primary");
-assert.eq("temp_collection", primaryCollectionInfos[0].name, "'temp_collection' wasn't created on the primary");
+assert.eq(
+    "temp_collection",
+    primaryCollectionInfos[0].name,
+    "'temp_collection' wasn't created on the primary",
+);
 assert.eq(
     true,
     primaryCollectionInfos[0].options.temp,
-    "'temp_collection' wasn't created as temporary on the primary: " + tojson(primaryCollectionInfos[0].options),
+    "'temp_collection' wasn't created as temporary on the primary: " +
+        tojson(primaryCollectionInfos[0].options),
 );
 
 // Verify that the temporary collection exists on the secondary and has temp=true.
 let secondaryCollectionInfos = secondaryDB.getCollectionInfos({name: "temp_collection"});
 assert.eq(1, secondaryCollectionInfos.length, "'temp_collection' wasn't created on the secondary");
-assert.eq("temp_collection", secondaryCollectionInfos[0].name, "'temp_collection' wasn't created on the secondary");
+assert.eq(
+    "temp_collection",
+    secondaryCollectionInfos[0].name,
+    "'temp_collection' wasn't created on the secondary",
+);
 assert.eq(
     true,
     secondaryCollectionInfos[0].options.temp,
-    "'temp_collection' wasn't created as temporary on the secondary: " + tojson(secondaryCollectionInfos[0].options),
+    "'temp_collection' wasn't created as temporary on the secondary: " +
+        tojson(secondaryCollectionInfos[0].options),
 );
 
 // Shut down the secondary and restart it as a stand-alone mongod.
@@ -109,7 +119,10 @@ rst.start(secondaryNodeId, {}, restart);
 // Verify that writes are replicated to the temporary collection and can successfully be applied
 // by the secondary after having restarted it.
 assert.commandWorked(
-    primaryDB.temp_collection.insert({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+    primaryDB.temp_collection.insert(
+        {},
+        {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+    ),
 );
 
 rst.stopSet();

@@ -10,7 +10,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const basename = "initial_sync_rename_collection";
 
 jsTestLog("Bring up set");
-const rst = new ReplSetTest({name: basename, nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});
+const rst = new ReplSetTest({
+    name: basename,
+    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+});
 rst.startSet();
 rst.initiate();
 
@@ -20,7 +23,11 @@ const primaryColl = primaryDB.coll;
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 jsTestLog("Create a collection (with a UUID) and insert a document.");
@@ -57,7 +64,11 @@ function ResyncWithFailpoint(failpointName, failpointData) {
     assert.commandWorked(primaryColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
     const newCollInfo = primaryDB.getCollectionInfos({name: primaryColl.getName()})[0];
     assert(collInfo.info.uuid, "recreated collection expected to have a UUID: " + tojson(collInfo));
-    assert.neq(collInfo.info.uuid, newCollInfo.info.uuid, "recreated collection expected to have different UUID");
+    assert.neq(
+        collInfo.info.uuid,
+        newCollInfo.info.uuid,
+        "recreated collection expected to have different UUID",
+    );
 
     jsTestLog("Disable failpoint and resume initial sync");
     assert.commandWorked(secondary.adminCommand({configureFailPoint: failpointName, mode: "off"}));

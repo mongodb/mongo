@@ -45,7 +45,14 @@ const kDefaultWriteConcern = TestData.hasOwnProperty("defaultWriteConcern")
           wtimeout: 5 * 60 * 1000 + 321, // 300321ms
       };
 
-function runCommandWithReadAndWriteConcerns(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithReadAndWriteConcerns(
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
@@ -155,7 +162,9 @@ function runCommandWithReadAndWriteConcerns(conn, dbName, commandName, commandOb
                     bsonWoCompare({_: readConcern.level}, {_: "local"}) !== 0 &&
                     bsonWoCompare({_: readConcern.level}, {_: "available"}) !== 0)
             ) {
-                throw new Error("Cowardly refusing to override read concern of command: " + tojson(commandObj));
+                throw new Error(
+                    "Cowardly refusing to override read concern of command: " + tojson(commandObj),
+                );
             }
         }
 
@@ -180,7 +189,9 @@ function runCommandWithReadAndWriteConcerns(conn, dbName, commandName, commandOb
                     bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcern.w}) !== 0 &&
                     bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)
             ) {
-                throw new Error("Cowardly refusing to override write concern of command: " + tojson(commandObj));
+                throw new Error(
+                    "Cowardly refusing to override write concern of command: " + tojson(commandObj),
+                );
             }
         }
 
@@ -192,6 +203,8 @@ function runCommandWithReadAndWriteConcerns(conn, dbName, commandName, commandOb
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_read_and_write_concerns.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/set_read_and_write_concerns.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithReadAndWriteConcerns);

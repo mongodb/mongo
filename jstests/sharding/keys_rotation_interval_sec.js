@@ -25,7 +25,12 @@ keys.toArray().forEach(function (key, i) {
     assert.lte(
         bsonWoCompare(key.expiresAt, maxExpireTime),
         0,
-        "key document " + i + ": " + tojson(key) + "expiresAt value is greater than: " + tojson(maxExpireTime),
+        "key document " +
+            i +
+            ": " +
+            tojson(key) +
+            "expiresAt value is greater than: " +
+            tojson(maxExpireTime),
     );
 });
 st.stop();

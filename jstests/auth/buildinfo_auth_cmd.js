@@ -36,7 +36,9 @@ function assertResult(expect, result, context) {
 
 function runTestcase(adminConn, test, authEnabled) {
     if (test.mode !== null) {
-        assert.commandWorked(adminConn.adminCommand({setParameter: 1, buildInfoAuthMode: test.mode}));
+        assert.commandWorked(
+            adminConn.adminCommand({setParameter: 1, buildInfoAuthMode: test.mode}),
+        );
     }
 
     const conn = new Mongo(adminConn.host);

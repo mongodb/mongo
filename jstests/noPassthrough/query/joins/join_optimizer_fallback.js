@@ -52,9 +52,13 @@ assert.commandWorked(collLeft.createIndex({lk: 1}));
 assert.commandWorked(collRight.createIndex({rk: 1}));
 
 function assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount) {
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}),
+    );
     assert.eq(coll.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+    );
     assert.eq(coll.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
 }
 
@@ -62,7 +66,10 @@ function assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expecte
 function runTestCaseIneligiblePipeline({coll = coll1, pipeline, aggOptions = {}, expectedCount}) {
     assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
     const explain = coll.explain().aggregate(pipeline, aggOptions);
-    assert(!joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
+    assert(
+        !joinOptUsed(explain),
+        "Expected join optimizer and actual usage differ: " + tojson(explain),
+    );
 }
 
 // This helper is for test cases where the prefix is eligible for join opt but the suffix is not.
@@ -77,7 +84,10 @@ function runTestCaseIneligibleSuffix({
     const explain = coll.explain().aggregate(pipeline, aggOptions);
 
     // Since the prefix is join eligible we should see the usedJoinOptimization flag in the explain.
-    assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
+    assert(
+        joinOptUsed(explain),
+        "Expected join optimizer and actual usage differ: " + tojson(explain),
+    );
     let stages = getAllPlanStages(getWinningPlanFromExplain(explain));
 
     // Make sure we see the amount of join nodes in the prefix that we expected.
@@ -95,7 +105,10 @@ function runTestCaseIneligibleSuffix({
 function runTestCaseEligiblePipeline({coll = coll1, pipeline, aggOptions = {}, expectedCount}) {
     assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
     const explain = coll.explain().aggregate(pipeline, aggOptions);
-    assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
+    assert(
+        joinOptUsed(explain),
+        "Expected join optimizer and actual usage differ: " + tojson(explain),
+    );
 }
 
 // Cross-db $lookup (eg join collections on different databases) is ineligible for optimization.
@@ -222,7 +235,15 @@ runTestCaseIneligiblePipeline({
 // Fallback if $lookup sub-pipeline contains a $sort.
 runTestCaseIneligiblePipeline({
     pipeline: [
-        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a", pipeline: [{$sort: {a: 1}}]}},
+        {
+            $lookup: {
+                from: coll12.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$sort: {a: 1}}],
+            },
+        },
         {$unwind: "$x"},
     ],
     expectedCount: 1,
@@ -361,7 +382,9 @@ runTestCaseEligiblePipeline({
             $lookup: {
                 from: coll13.getName(),
                 let: {a: "$a", a12: "$coll12.a"},
-                pipeline: [{$match: {$expr: {$and: [{$eq: ["$a", "$$a"]}, {$eq: ["$a", "$$a12"]}]}}}],
+                pipeline: [
+                    {$match: {$expr: {$and: [{$eq: ["$a", "$$a"]}, {$eq: ["$a", "$$a12"]}]}}},
+                ],
                 as: "coll13",
             },
         },
@@ -507,7 +530,9 @@ runTestCaseIneligibleSuffix({
                 let: {
                     "a": "$a",
                 },
-                pipeline: [{$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}], $expr: {$eq: ["$$a", "$a"]}}}],
+                pipeline: [
+                    {$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}], $expr: {$eq: ["$$a", "$a"]}}},
+                ],
                 as: "coll13",
             },
         },
@@ -535,7 +560,15 @@ runTestCaseIneligibleSuffix({
                 let: {
                     "a": "$a",
                 },
-                pipeline: [{$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}], $expr: {$eq: ["$$a", "$a"]}, d: "foo"}}],
+                pipeline: [
+                    {
+                        $match: {
+                            $or: [{a: 1}, {a: 2}, {a: {$gt: 12}}],
+                            $expr: {$eq: ["$$a", "$a"]},
+                            d: "foo",
+                        },
+                    },
+                ],
                 as: "coll13",
             },
         },
@@ -559,7 +592,14 @@ runTestCaseIneligibleSuffix({
     // localField/foreignField syntax: a.0 (numeric) = a.
     runTestCaseIneligiblePipeline({
         pipeline: [
-            {$lookup: {from: collNumeric.getName(), localField: "a", foreignField: "a.0", as: "joined"}},
+            {
+                $lookup: {
+                    from: collNumeric.getName(),
+                    localField: "a",
+                    foreignField: "a.0",
+                    as: "joined",
+                },
+            },
             {$unwind: "$joined"},
         ],
         expectedCount: 1,
@@ -642,9 +682,13 @@ runTestCaseIneligibleSuffix({
 
 // Verifies the pipeline produces stable results with join opt toggled and that join opt is engaged.
 function assertResultsStableAndJoinOptUsed(pipeline, expected) {
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}),
+    );
     assert.sameMembers(expected, collBase.aggregate(pipeline).toArray());
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+    );
     assert.sameMembers(expected, collBase.aggregate(pipeline).toArray());
     const explain = collBase.explain().aggregate(pipeline);
     assert(joinOptUsed(explain), "Expected join optimization to be used", {explain});
@@ -657,7 +701,14 @@ for (const systemVar of ["$$NOW", "$$ROOT", "$$CURRENT"]) {
         [
             {$lookup: {from: collLeft.getName(), localField: "lk", foreignField: "lk", as: "left"}},
             {$unwind: "$left"},
-            {$lookup: {from: collRight.getName(), localField: "rk", foreignField: "rk", as: "right"}},
+            {
+                $lookup: {
+                    from: collRight.getName(),
+                    localField: "rk",
+                    foreignField: "rk",
+                    as: "right",
+                },
+            },
             {$unwind: "$right"},
             {$match: {$expr: {$eq: [systemVar, "$left.a"]}}},
         ],
@@ -708,7 +759,13 @@ for (const systemVar of ["$$NOW", "$$ROOT", "$$CURRENT"]) {
                 $lookup: {
                     from: collRight.getName(),
                     let: {rk: "$rk"},
-                    pipeline: [{$match: {$expr: {$and: [{$eq: ["$$rk", "$rk"]}, {$eq: [systemVar, "$b"]}]}}}],
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {$and: [{$eq: ["$$rk", "$rk"]}, {$eq: [systemVar, "$b"]}]},
+                            },
+                        },
+                    ],
                     as: "right",
                 },
             },
@@ -727,7 +784,9 @@ assertResultsStableAndJoinOptUsed(
             $lookup: {
                 from: collRight.getName(),
                 let: {rk: "$rk"},
-                pipeline: [{$match: {$expr: {$and: [{$eq: ["$$rk", "$rk"]}, {$eq: ["$$NOW.x", "$b"]}]}}}],
+                pipeline: [
+                    {$match: {$expr: {$and: [{$eq: ["$$rk", "$rk"]}, {$eq: ["$$NOW.x", "$b"]}]}}},
+                ],
                 as: "right",
             },
         },

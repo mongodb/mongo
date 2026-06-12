@@ -47,7 +47,10 @@ const runTest = function (dropDatabase) {
     const files = listFiles(rst.getDbPath(primary));
     assert(
         !files.some((file) => file.baseName === dbToDropName),
-        "Database directory " + dbToDropName + " found even though it should have been removed: " + tojson(files),
+        "Database directory " +
+            dbToDropName +
+            " found even though it should have been removed: " +
+            tojson(files),
     );
 };
 

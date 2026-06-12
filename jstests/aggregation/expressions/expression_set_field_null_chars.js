@@ -18,7 +18,10 @@ assert.commandWorked(coll.insert({_id: 1, foo: "bar"}));
 // Asserts $setField and $unsetField with the given 'field' argument fail with one of the given
 // 'codes' when used in various commands.
 function assertSetFieldFailsWithCode({field, codes}) {
-    const setFieldExpressions = [{$setField: {field, input: {}, value: true}}, {$unsetField: {field, input: {}}}];
+    const setFieldExpressions = [
+        {$setField: {field, input: {}, value: true}},
+        {$unsetField: {field, input: {}}},
+    ];
 
     for (const setFieldExpression of setFieldExpressions) {
         const errorMsg = tojson(setFieldExpression);
@@ -63,7 +66,9 @@ function assertSetFieldFailsWithCode({field, codes}) {
         const bulkWriteRes = assert.commandWorked(
             db.adminCommand({
                 bulkWrite: 1,
-                ops: [{update: 0, filter: {_id: 1}, updateMods: [{$replaceWith: setFieldExpression}]}],
+                ops: [
+                    {update: 0, filter: {_id: 1}, updateMods: [{$replaceWith: setFieldExpression}]},
+                ],
                 nsInfo: [{ns: `${db.getName()}.${coll.getName()}`}],
             }),
         );

@@ -32,7 +32,9 @@ let conn = MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftS
 assert.neq(null, conn, "failed to start mongod with valid maxAcceptableLogicalClockDriftSecs");
 MongoRunner.stopMongod(conn);
 
-conn = MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftSecs: 60 * 60 * 24 * 365 * 10}}); // 10 years.
+conn = MongoRunner.runMongod({
+    setParameter: {maxAcceptableLogicalClockDriftSecs: 60 * 60 * 24 * 365 * 10},
+}); // 10 years.
 assert.neq(null, conn, "failed to start mongod with valid maxAcceptableLogicalClockDriftSecs");
 MongoRunner.stopMongod(conn);
 
@@ -51,7 +53,9 @@ let lt = res.$clusterTime;
 
 // Try to advance cluster time by more than the max acceptable drift, which should fail the rate
 // limiter.
-let tooFarTime = Object.assign({}, lt, {clusterTime: new Timestamp(lt.clusterTime.getTime() + maxDriftValue * 2, 0)});
+let tooFarTime = Object.assign({}, lt, {
+    clusterTime: new Timestamp(lt.clusterTime.getTime() + maxDriftValue * 2, 0),
+});
 assert.commandFailedWithCode(
     testDB.runCommand({hello: 1, $clusterTime: tooFarTime}),
     ErrorCodes.ClusterTimeFailsRateLimiter,

@@ -17,7 +17,10 @@ import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/i
 
 const dbName = "test";
 
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}}});
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}},
+});
 rst.startSet();
 rst.initiate();
 

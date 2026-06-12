@@ -40,7 +40,9 @@ assert.commandWorked(sessionColl.update({_id: 1}, {$unset: {"b": 1}}));
 assert.commandWorked(sessionColl.update({_id: 1}, {$set: {"c": largeArray}}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-const recoveryTimestamp = assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]})).operationTime;
+const recoveryTimestamp = assert.commandWorked(
+    testColl.runCommand("insert", {documents: [{_id: 2}]}),
+).operationTime;
 
 jsTestLog("Holding back the stable timestamp to right after the prepareTimestamp");
 

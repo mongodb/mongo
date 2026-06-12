@@ -51,7 +51,10 @@ function assertResults(expectedResults, matchSpec) {
     // Check where matching is folded in to DocumentSourceCursor.
     assertEqualResultsUnordered(findResults, coll.aggregate(matchStage).toArray());
     // Check where matching is not folded in to DocumentSourceCursor.
-    assertEqualResultsUnordered(findResults, coll.aggregate({$project: identityProjection}, matchStage).toArray());
+    assertEqualResultsUnordered(
+        findResults,
+        coll.aggregate({$project: identityProjection}, matchStage).toArray(),
+    );
 }
 
 // Invalid matcher syntax.
@@ -153,7 +156,14 @@ function checkMatchResults(indexed) {
     assertResults(null, {a: {$exists: true}});
     assertResults(null, {a: {$exists: false}});
     assertResults(
-        [{_id: 0}, {_id: 1, a: null}, {_id: 2, a: []}, {_id: 3, a: 0}, {_id: 4, a: [[]]}, {_id: 5, a: [2, 2, 2]}],
+        [
+            {_id: 0},
+            {_id: 1, a: null},
+            {_id: 2, a: []},
+            {_id: 3, a: 0},
+            {_id: 4, a: [[]]},
+            {_id: 5, a: [2, 2, 2]},
+        ],
         {x: null},
     );
     assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y": null});

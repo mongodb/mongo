@@ -41,7 +41,9 @@ let w = 0;
  * source will be a valid sync source for the syncing node.
  */
 syncFrom = function (syncingNode, desiredSyncSource, rst) {
-    let syncFromHost = TestData.usePriorityPorts ? desiredSyncSource.priorityHost : desiredSyncSource.name;
+    let syncFromHost = TestData.usePriorityPorts
+        ? desiredSyncSource.priorityHost
+        : desiredSyncSource.name;
     jsTestLog("Forcing " + syncingNode.name + " to sync from " + syncFromHost);
 
     // Ensure that 'desiredSyncSource' doesn't already have the dummy write sitting around from
@@ -214,7 +216,8 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
     };
 
     assert.soon(function () {
-        const newVersion = assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version + 1;
+        const newVersion =
+            assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version + 1;
         reconfigCommand.replSetReconfig.version = newVersion;
         let res = admin.runCommand(reconfigCommand);
 
@@ -223,7 +226,9 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
         // node.
         if (!res.ok && res.code === ErrorCodes.NodeNotFound) {
             print(
-                "Replset reconfig failed because quorum check failed. Retry reconfig once. " + "Error: " + tojson(res),
+                "Replset reconfig failed because quorum check failed. Retry reconfig once. " +
+                    "Error: " +
+                    tojson(res),
             );
             res = admin.runCommand(reconfigCommand);
         }
@@ -231,7 +236,8 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
         // Always retry on these errors, even if we already retried on NodeNotFound.
         if (
             !res.ok &&
-            (res.code === ErrorCodes.ConfigurationInProgress || res.code === ErrorCodes.CurrentConfigNotCommittedYet)
+            (res.code === ErrorCodes.ConfigurationInProgress ||
+                res.code === ErrorCodes.CurrentConfigNotCommittedYet)
         ) {
             print("Replset reconfig failed since another configuration is in progress. Retry.");
             // Retry.
@@ -241,10 +247,13 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
         // Always retry on NewReplicaSetConfigurationIncompatible, if the current config version is
         // higher than the requested one.
         if (!res.ok && res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
-            const curVersion = assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version;
+            const curVersion = assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config
+                .version;
             if (curVersion >= newVersion) {
                 print(
-                    "Replset reconfig failed since the config version was too low. Retry. " + "Error: " + tojson(res),
+                    "Replset reconfig failed since the config version was too low. Retry. " +
+                        "Error: " +
+                        tojson(res),
                 );
                 // Retry.
                 return false;
@@ -325,9 +334,12 @@ function autoReconfig(rst, targetConfig) {
     const memberIndex = (cfg, id) => cfg.members.findIndex((m) => m._id === id);
     const memberInConfig = (cfg, id) => cfg.members.find((m) => m._id === id);
     const getMember = (cfg, id) => cfg.members[memberIndex(cfg, id)];
-    const getVotes = (cfg, id) => (getMember(cfg, id).hasOwnProperty("votes") ? getMember(cfg, id).votes : 1);
+    const getVotes = (cfg, id) =>
+        getMember(cfg, id).hasOwnProperty("votes") ? getMember(cfg, id).votes : 1;
 
-    print(`autoReconfig: source config: ${tojson(sourceConfig)}, target config: ${tojson(targetConfig)}`);
+    print(
+        `autoReconfig: source config: ${tojson(sourceConfig)}, target config: ${tojson(targetConfig)}`,
+    );
 
     // All the members in the target that aren't in the source.
     let membersToAdd = targetConfig.members.filter((m) => !memberInConfig(sourceConfig, m._id));
@@ -335,7 +347,9 @@ function autoReconfig(rst, targetConfig) {
     let membersToRemove = sourceConfig.members.filter((m) => !memberInConfig(targetConfig, m._id));
     // All the members that appear in both the source and target and have changed.
     let membersToUpdate = targetConfig.members.filter(
-        (m) => memberInConfig(sourceConfig, m._id) && bsonWoCompare(m, memberInConfig(sourceConfig, m._id)) !== 0,
+        (m) =>
+            memberInConfig(sourceConfig, m._id) &&
+            bsonWoCompare(m, memberInConfig(sourceConfig, m._id)) !== 0,
     );
 
     // Sort the members to ensure that we do updates that remove a node's vote first.
@@ -473,7 +487,13 @@ awaitOpTime = function (catchingUpNode, latestOpTimeNode) {
             }
         },
         function () {
-            let message = "Node " + catchingUpNode + " only reached optime " + tojson(ts) + " not " + tojson(opTime);
+            let message =
+                "Node " +
+                catchingUpNode +
+                " only reached optime " +
+                tojson(ts) +
+                " not " +
+                tojson(opTime);
             if (ex) {
                 message += "; last attempt failed with exception " + tojson(ex);
             }
@@ -505,7 +525,10 @@ waitUntilAllNodesCaughtUp = function (rs, timeout) {
                 let otherNode = rsStatus.members[i];
 
                 // Must be in PRIMARY or SECONDARY state.
-                if (otherNode.state != ReplSetTest.State.PRIMARY && otherNode.state != ReplSetTest.State.SECONDARY) {
+                if (
+                    otherNode.state != ReplSetTest.State.PRIMARY &&
+                    otherNode.state != ReplSetTest.State.SECONDARY
+                ) {
                     return false;
                 }
 
@@ -541,7 +564,11 @@ waitUntilAllNodesCaughtUp = function (rs, timeout) {
 waitForState = function (node, state) {
     assert.soonNoExcept(function () {
         assert.commandWorked(
-            node.adminCommand({replSetTest: 1, waitForMemberState: state, timeoutMillis: 60 * 1000 * 5}),
+            node.adminCommand({
+                replSetTest: 1,
+                waitForMemberState: state,
+                timeoutMillis: 60 * 1000 * 5,
+            }),
         );
         return true;
     });
@@ -683,7 +710,11 @@ getFirstOplogEntry = function (server, opts = {}) {
     let firstEntry;
     assert.soon(() => {
         try {
-            let firstEntryQuery = server.getDB("local").oplog.rs.find().sort({$natural: 1}).limit(1);
+            let firstEntryQuery = server
+                .getDB("local")
+                .oplog.rs.find()
+                .sort({$natural: 1})
+                .limit(1);
             if (opts.readConcern) {
                 firstEntryQuery = firstEntryQuery.readConcern(opts.readConcern);
             }
@@ -751,7 +782,10 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function (rst, node) {
     const latestOpOnOldPrimary = getLatestOp(oldPrimary);
 
     // New primary wins immediately, but needs to catch up.
-    const newPrimary = rst.stepUp(node, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
+    const newPrimary = rst.stepUp(node, {
+        awaitReplicationBeforeStepUp: false,
+        awaitWritablePrimary: false,
+    });
     const latestOpOnNewPrimary = getLatestOp(newPrimary);
     // Check this node is not writable.
     assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
@@ -771,7 +805,8 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function (rst, node) {
  */
 isConfigCommitted = function (node) {
     let adminDB = node.getDB("admin");
-    return assert.commandWorked(adminDB.runCommand({replSetGetConfig: 1, commitmentStatus: true})).commitmentStatus;
+    return assert.commandWorked(adminDB.runCommand({replSetGetConfig: 1, commitmentStatus: true}))
+        .commitmentStatus;
 };
 
 /**
@@ -808,7 +843,9 @@ isSameConfigContent = function (configA, configB) {
  * include 'newlyAdded' fields.
  */
 getConfigWithNewlyAdded = function (node) {
-    return assert.commandWorked(node.adminCommand({replSetGetConfig: 1, $_internalIncludeNewlyAdded: true}));
+    return assert.commandWorked(
+        node.adminCommand({replSetGetConfig: 1, $_internalIncludeNewlyAdded: true}),
+    );
 };
 
 /**
@@ -821,7 +858,10 @@ isMemberNewlyAdded = function (node, memberIndex) {
     const allMembers = memberIndex === undefined;
     assert(
         allMembers || (memberIndex >= 0 && memberIndex < config.members.length),
-        "memberIndex should be between 0 and " + (config.members.length - 1) + ", but memberIndex is " + memberIndex,
+        "memberIndex should be between 0 and " +
+            (config.members.length - 1) +
+            ", but memberIndex is " +
+            memberIndex,
     );
 
     let hasNewlyAdded = (index) => {
@@ -852,7 +892,13 @@ waitForNewlyAddedRemovalForNodeToBeCommitted = function (node, memberIndex, forc
 
 assertVoteCount = function (
     node,
-    {votingMembersCount, majorityVoteCount, writableVotingMembersCount, writeMajorityCount, totalMembersCount},
+    {
+        votingMembersCount,
+        majorityVoteCount,
+        writableVotingMembersCount,
+        writeMajorityCount,
+        totalMembersCount,
+    },
 ) {
     const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
     assert.eq(status["votingMembersCount"], votingMembersCount, status);

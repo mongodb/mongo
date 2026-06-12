@@ -65,7 +65,9 @@ describe("upgrade to constraint preconditions", function () {
     it("fails if validator is also changed in the same collMod", function () {
         create({validator, validationLevel: "strict"});
         assert.commandWorked(collMod({prepareConstraintValidationLevel: true}));
-        assert.commandFailed(collMod({validationLevel: "constraint", validator: {b: {$exists: true}}}));
+        assert.commandFailed(
+            collMod({validationLevel: "constraint", validator: {b: {$exists: true}}}),
+        );
     });
 
     it("fails if validationAction is warn", function () {
@@ -84,7 +86,9 @@ describe("upgrade to constraint preconditions", function () {
     it("succeeds when validationAction is errorAndLog", function () {
         create({validator, validationLevel: "strict"});
         assert.commandWorked(collMod({prepareConstraintValidationLevel: true}));
-        assert.commandWorked(collMod({validationLevel: "constraint", validationAction: "errorAndLog"}));
+        assert.commandWorked(
+            collMod({validationLevel: "constraint", validationAction: "errorAndLog"}),
+        );
     });
 });
 
@@ -104,7 +108,11 @@ describe("prepareConstraintValidationLevel is cleared after upgrade to constrain
         create({validator, validationLevel: "strict"});
         // Insert a non-conforming document while bypass is still allowed (flag not yet set).
         assert.commandWorked(
-            testDb.runCommand({insert: collName, documents: [{b: 1}], bypassDocumentValidation: true}),
+            testDb.runCommand({
+                insert: collName,
+                documents: [{b: 1}],
+                bypassDocumentValidation: true,
+            }),
         );
         assert.commandWorked(collMod({prepareConstraintValidationLevel: true}));
         assert.eq(getOptions().prepareConstraintValidationLevel, true);
@@ -122,7 +130,9 @@ describe("prepareConstraintValidationLevel is cleared after upgrade to constrain
 
         // Sending both in a single collMod: the upgrade should succeed and the flag should
         // be cleared, not re-set to true.
-        assert.commandWorked(collMod({validationLevel: "constraint", prepareConstraintValidationLevel: true}));
+        assert.commandWorked(
+            collMod({validationLevel: "constraint", prepareConstraintValidationLevel: true}),
+        );
         assert(!getOptions().prepareConstraintValidationLevel);
     });
 
@@ -160,7 +170,11 @@ describe("prepareConstraintValidationLevel blocks operations", function () {
     });
 
     it("blocks bypassDocumentValidation; setting the flag to false re-enables it", function () {
-        const res = testDb.runCommand({insert: collName, documents: [{a: 1}], bypassDocumentValidation: true});
+        const res = testDb.runCommand({
+            insert: collName,
+            documents: [{a: 1}],
+            bypassDocumentValidation: true,
+        });
         assert.commandFailed(res);
         // The error (either top-level or in writeErrors) must mention the flag and how to clear it.
         const resStr = tojson(res);
@@ -172,7 +186,11 @@ describe("prepareConstraintValidationLevel blocks operations", function () {
 
         assert.commandWorked(collMod({prepareConstraintValidationLevel: false}));
         assert.commandWorked(
-            testDb.runCommand({insert: collName, documents: [{a: 1}], bypassDocumentValidation: true}),
+            testDb.runCommand({
+                insert: collName,
+                documents: [{a: 1}],
+                bypassDocumentValidation: true,
+            }),
         );
     });
 });
@@ -186,7 +204,11 @@ describe("manually setting prepareConstraintValidationLevel to false re-enables 
         // validator changes (e.g. to relax the validator before retrying).
         create({validator, validationLevel: "strict"});
         assert.commandWorked(
-            testDb.runCommand({insert: collName, documents: [{b: 1}], bypassDocumentValidation: true}),
+            testDb.runCommand({
+                insert: collName,
+                documents: [{b: 1}],
+                bypassDocumentValidation: true,
+            }),
         );
         assert.commandWorked(collMod({prepareConstraintValidationLevel: true}));
         // Upgrade fails because the collection contains a non-conforming document.
@@ -202,7 +224,11 @@ describe("manually setting prepareConstraintValidationLevel to false re-enables 
         // bypassDocumentValidation (e.g. to clean up the bad document before retrying).
         create({validator, validationLevel: "strict"});
         assert.commandWorked(
-            testDb.runCommand({insert: collName, documents: [{b: 1}], bypassDocumentValidation: true}),
+            testDb.runCommand({
+                insert: collName,
+                documents: [{b: 1}],
+                bypassDocumentValidation: true,
+            }),
         );
         assert.commandWorked(collMod({prepareConstraintValidationLevel: true}));
         // Upgrade fails because the collection contains a non-conforming document.
@@ -210,7 +236,11 @@ describe("manually setting prepareConstraintValidationLevel to false re-enables 
 
         assert.commandWorked(collMod({prepareConstraintValidationLevel: false}));
         assert.commandWorked(
-            testDb.runCommand({insert: collName, documents: [{a: 1}], bypassDocumentValidation: true}),
+            testDb.runCommand({
+                insert: collName,
+                documents: [{a: 1}],
+                bypassDocumentValidation: true,
+            }),
         );
     });
 });
@@ -229,11 +259,15 @@ describe("prepareConstraintValidationLevel is blocked on unsupported collection 
     it("is blocked on views", function () {
         assert.commandWorked(testDb.createCollection(srcName));
         assert.commandWorked(testDb.createView(viewName, srcName, []));
-        assert.commandFailed(testDb.runCommand({collMod: viewName, prepareConstraintValidationLevel: true}));
+        assert.commandFailed(
+            testDb.runCommand({collMod: viewName, prepareConstraintValidationLevel: true}),
+        );
     });
 
     it("is blocked on timeseries collections", function () {
         assert.commandWorked(testDb.createCollection(tsName, {timeseries: {timeField: "t"}}));
-        assert.commandFailed(testDb.runCommand({collMod: tsName, prepareConstraintValidationLevel: true}));
+        assert.commandFailed(
+            testDb.runCommand({collMod: tsName, prepareConstraintValidationLevel: true}),
+        );
     });
 });

@@ -20,7 +20,10 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
-import {blockProcessingTestCases, generateMetaVals} from "jstests/libs/query/block_processing_test_cases.js";
+import {
+    blockProcessingTestCases,
+    generateMetaVals,
+} from "jstests/libs/query/block_processing_test_cases.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeStatus,
@@ -134,7 +137,8 @@ TimeseriesTest.run((insert) => {
         // We have to allow time series queries to run in SBE.
         FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe") &&
         // Either we have SBE full or the SBE BlockHashAgg flag.
-        (sbeStatus == kSbeFullyEnabled || FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SbeBlockHashAgg"));
+        (sbeStatus == kSbeFullyEnabled ||
+            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SbeBlockHashAgg"));
 
     function runTests(allowDiskUse, forceIncreasedSpilling) {
         assert.commandWorked(
@@ -211,11 +215,17 @@ TimeseriesTest.run((insert) => {
 
             function testcaseAndExplainFn(description) {
                 return () =>
-                    description + " for test case '" + name + "' failed with explain " + tojson(singleNodeQueryPlanner);
+                    description +
+                    " for test case '" +
+                    name +
+                    "' failed with explain " +
+                    tojson(singleNodeQueryPlanner);
             }
 
             const hasSbePlan = engineUsed === "sbe";
-            const sbePlan = hasSbePlan ? singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages : null;
+            const sbePlan = hasSbePlan
+                ? singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages
+                : null;
 
             if (usesBlockProcessing) {
                 // Verify that we have an SBE plan, and verify that "block_group" appears in the

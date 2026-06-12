@@ -24,7 +24,9 @@ let st = new ShardingTest({
     },
 });
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.TestColl", key: {Counter: 1}}));
 
 var db = st.s0.getDB("TestDB");
@@ -55,7 +57,9 @@ function checkDocuments() {
     let count = coll.find().count();
 
     if (docsFound.length != docsInserted) {
-        print("Inserted " + docsInserted + " count : " + count + " doc count : " + docsFound.length);
+        print(
+            "Inserted " + docsInserted + " count : " + count + " doc count : " + docsFound.length,
+        );
 
         let allFoundDocsSorted = docsFound.sort(function (a, b) {
             return a.Counter - b.Counter;
@@ -72,7 +76,10 @@ function checkDocuments() {
 
         st.printShardingStatus();
 
-        assert(false, "Inserted number of documents does not match the actual: " + tojson(missingValueInfo));
+        assert(
+            false,
+            "Inserted number of documents does not match the actual: " + tojson(missingValueInfo),
+        );
     }
 }
 

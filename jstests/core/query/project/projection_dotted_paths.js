@@ -129,5 +129,9 @@ assert.eq(resultDoc, {x: {y: {y: null, z: null}, z: null}});
     assert.commandWorked(coll.insert({a: {x: 1, b: {x: 2}}, b: {c: 3}}));
 
     assert(arrayEq(coll.find({}, {_id: 0, "a": "$p", "b.c": "$q"}).toArray(), [{b: {}}]));
-    assert(arrayEq(coll.find({}, {_id: 0, "a.x": "$a.x", "a.b.x": "$a.x"}).toArray(), [{a: {x: 1, b: {x: 1}}}]));
+    assert(
+        arrayEq(coll.find({}, {_id: 0, "a.x": "$a.x", "a.b.x": "$a.x"}).toArray(), [
+            {a: {x: 1, b: {x: 1}}},
+        ]),
+    );
 }

@@ -65,7 +65,11 @@ let res = assert.commandFailedWithCode(
     PrepareHelpers.commitTransaction(session2, prepareTimestamp),
     ErrorCodes.InvalidOptions,
 );
-assert.includes(res.errmsg, "cannot be run before its prepare oplog entry has been majority committed", res);
+assert.includes(
+    res.errmsg,
+    "cannot be run before its prepare oplog entry has been majority committed",
+    res,
+);
 assert.eq(testColl.find().itcount(), 1);
 assert.eq(testColl.count(), 1);
 

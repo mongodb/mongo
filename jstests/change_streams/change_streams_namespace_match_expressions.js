@@ -252,7 +252,9 @@ runTest(
     [
         {
             $match: {
-                "ns.coll": new RegExp("^(" + RegExp.escape(kCollName) + "|" + RegExp.escape(kCollNameOther) + ")$"),
+                "ns.coll": new RegExp(
+                    "^(" + RegExp.escape(kCollName) + "|" + RegExp.escape(kCollNameOther) + ")$",
+                ),
             },
         },
     ],

@@ -33,12 +33,18 @@ const coll = reshardingTest.createUnshardedCollection({
 const db = coll.getDB();
 
 const metaIndexName = "meta_x_1";
-assert.commandWorked(coll.createIndex({"mFld.x": 1}, {name: metaIndexName, collation: {locale: "simple"}}));
+assert.commandWorked(
+    coll.createIndex({"mFld.x": 1}, {name: metaIndexName, collation: {locale: "simple"}}),
+);
 const preReshardingMetaIndexSpec = coll.getIndexes().filter((idx) => idx.name === metaIndexName);
 
 const measurementIndexName = "a_1";
-assert.commandWorked(coll.createIndex({a: 1}, {name: measurementIndexName, collation: {locale: "simple"}}));
-const preReshardingMeasurementIndexSpec = coll.getIndexes().filter((idx) => idx.name === measurementIndexName);
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: measurementIndexName, collation: {locale: "simple"}}),
+);
+const preReshardingMeasurementIndexSpec = coll
+    .getIndexes()
+    .filter((idx) => idx.name === measurementIndexName);
 
 // Insert some docs
 assert.commandWorked(
@@ -77,24 +83,26 @@ assert.eq(timeseriesCollDocPostResharding.unsplittable, true);
 
 assert.eq(
     5,
-    getTimeseriesCollForRawOps(db, st.rs2.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs2.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     0,
-    getTimeseriesCollForRawOps(db, st.rs0.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs0.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(8, coll.countDocuments({}));
 
 const postReshardingMetaIndexSpec = coll.getIndexes().filter((idx) => idx.name === metaIndexName);
 assert.eq(preReshardingMetaIndexSpec, postReshardingMetaIndexSpec);
 
-const postReshardingMeasurementIndexSpec = coll.getIndexes().filter((idx) => idx.name === measurementIndexName);
+const postReshardingMeasurementIndexSpec = coll
+    .getIndexes()
+    .filter((idx) => idx.name === measurementIndexName);
 assert.eq(preReshardingMeasurementIndexSpec, postReshardingMeasurementIndexSpec);
 
 reshardingTest.teardown();

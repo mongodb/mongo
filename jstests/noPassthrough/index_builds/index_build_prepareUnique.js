@@ -28,7 +28,12 @@ assert.commandWorked(coll.insert({a: 123}));
 
 // Waits after the side write tracker is installed.
 const fp = configureFailPoint(primary, "hangAfterSettingUpIndexBuild");
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {prepareUnique: true});
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    {a: 1},
+    {prepareUnique: true},
+);
 
 fp.wait();
 // Inserts the document with the duplicate key.

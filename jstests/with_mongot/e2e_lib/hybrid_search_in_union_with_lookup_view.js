@@ -158,7 +158,10 @@ export function runHybridSearchInUnionWithLookupViewTopAndSubTest(
     const lookupPipeline = buildLookupPassthroughPipeline(subViewName, hybridSearchPipeline);
 
     // Test $unionWith
-    const expectedUnionWithResults = coll.aggregate([...topLevelViewPipeline, ...unionWithPipeline]);
+    const expectedUnionWithResults = coll.aggregate([
+        ...topLevelViewPipeline,
+        ...unionWithPipeline,
+    ]);
     const unionWithResults = topLevelView.aggregate(unionWithPipeline);
     assertDocArrExpectedFuzzy(expectedUnionWithResults.toArray(), unionWithResults.toArray());
 

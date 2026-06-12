@@ -15,10 +15,23 @@ const coll = db.wildcard_index_count;
 coll.drop();
 
 assert.commandWorked(
-    coll.insert([{a: 3}, {a: null}, {a: [-1, 0]}, {a: [4, -3, 5]}, {}, {a: {b: 4}}, {a: []}, {a: [[], {}]}, {a: {}}]),
+    coll.insert([
+        {a: 3},
+        {a: null},
+        {a: [-1, 0]},
+        {a: [4, -3, 5]},
+        {},
+        {a: {b: 4}},
+        {a: []},
+        {a: [[], {}]},
+        {a: {}},
+    ]),
 );
 
-const wildcardIndexes = [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": -1, b: -1}, wildcardProjection: {b: 0}}];
+const wildcardIndexes = [
+    {keyPattern: {"$**": 1}},
+    {keyPattern: {"$**": -1, b: -1}, wildcardProjection: {b: 0}},
+];
 
 for (const indexSpec of wildcardIndexes) {
     const option = {};

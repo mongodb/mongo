@@ -36,7 +36,9 @@ export class Fixture {
         this.db[this.tsCollName].drop();
 
         this.db.createCollection(this.ctrlCollName);
-        this.db.createCollection(this.tsCollName, {timeseries: {timeField: this.timeField, metaField: this.metaField}});
+        this.db.createCollection(this.tsCollName, {
+            timeseries: {timeField: this.timeField, metaField: this.metaField},
+        });
 
         this.ctrlColl = this.db.getCollection(this.ctrlCollName);
         this.tsColl = this.db.getCollection(this.tsCollName);
@@ -54,7 +56,10 @@ export class Fixture {
                         .property(programArb, aggregationsArb, (cmds, pipelines) => {
                             const model = makeEmptyModel(this.ctrlColl, this.bucketColl);
                             fc.modelRun(
-                                () => ({model: model, real: {tsColl: this.tsColl, ctrlColl: this.ctrlColl}}),
+                                () => ({
+                                    model: model,
+                                    real: {tsColl: this.tsColl, ctrlColl: this.ctrlColl},
+                                }),
                                 cmds,
                             );
                             for (const pipeline of pipelines) {
@@ -70,12 +75,22 @@ export class Fixture {
                                 .toArray();
                             for (const geoPoint of geoPoints) {
                                 const intersectPipeline = [
-                                    {$match: {[this.geoField]: {$geoIntersects: {$geometry: geoPoint}}}},
+                                    {
+                                        $match: {
+                                            [this.geoField]: {
+                                                $geoIntersects: {$geometry: geoPoint},
+                                            },
+                                        },
+                                    },
                                 ];
-                                assert.gt(this.tsColl.aggregate(intersectPipeline).toArray().length, 0, {
-                                    error: "Point not found in aggregation",
-                                    geoPoint,
-                                });
+                                assert.gt(
+                                    this.tsColl.aggregate(intersectPipeline).toArray().length,
+                                    0,
+                                    {
+                                        error: "Point not found in aggregation",
+                                        geoPoint,
+                                    },
+                                );
                             }
                         })
                         .beforeEach(() => this.beforeHook()),

@@ -26,7 +26,9 @@ function assertFindResultsEq(regex, expected) {
         .find({text: {$regex: regex}})
         .sort({_id: 1})
         .toArray();
-    const errfn = `Regex query ${tojson(regex)} returned ${tojson(res)} ` + `but expected ${tojson(expected)}`;
+    const errfn =
+        `Regex query ${tojson(regex)} returned ${tojson(res)} ` +
+        `but expected ${tojson(expected)}`;
     assert.eq(res, expected, errfn);
 }
 

@@ -22,7 +22,9 @@ let st = new ShardingTest({
 });
 
 let kDbName = "test";
-assert.commandWorked(st.s.adminCommand({enablesharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 const largeString = "X".repeat(10000);
 
 function shardCollectionCreateJumboChunk() {
@@ -87,12 +89,17 @@ function migrateJumboChunk(failpointOn) {
 
     // Now set "forceJumbo: true" in config.settings.
     assert.commandWorked(
-        st.s.getDB("config").settings.update({_id: "balancer"}, {$set: {attemptToBalanceJumboChunks: true}}, true),
+        st.s
+            .getDB("config")
+            .settings.update({_id: "balancer"}, {$set: {attemptToBalanceJumboChunks: true}}, true),
     );
 
     if (failpointOn) {
         assert.commandWorked(
-            st.shard0.adminCommand({configureFailPoint: "migrateThreadHangAtStep2", mode: "alwaysOn"}),
+            st.shard0.adminCommand({
+                configureFailPoint: "migrateThreadHangAtStep2",
+                mode: "alwaysOn",
+            }),
         );
     }
 
@@ -119,11 +126,21 @@ function migrateJumboChunk(failpointOn) {
 
     if (!failpointOn) {
         assert.lte(diff(), 5);
-        assert.eq(st.shard0.shardName, jumboChunk.shard, "jumbo chunk " + tojson(jumboChunk) + " was not moved");
+        assert.eq(
+            st.shard0.shardName,
+            jumboChunk.shard,
+            "jumbo chunk " + tojson(jumboChunk) + " was not moved",
+        );
     } else {
         assert.eq(diff(), 6);
-        assert.eq(st.shard1.shardName, jumboChunk.shard, "jumbo chunk " + tojson(jumboChunk) + " was moved");
-        assert.commandWorked(st.shard0.adminCommand({configureFailPoint: "migrateThreadHangAtStep2", mode: "off"}));
+        assert.eq(
+            st.shard1.shardName,
+            jumboChunk.shard,
+            "jumbo chunk " + tojson(jumboChunk) + " was moved",
+        );
+        assert.commandWorked(
+            st.shard0.adminCommand({configureFailPoint: "migrateThreadHangAtStep2", mode: "off"}),
+        );
     }
 }
 
@@ -135,13 +152,21 @@ st.s.getDB(kDbName).foo.drop();
 // Turn on the 'failTooMuchMemoryUsed' failpoint, which is meant to mock the transfer mods queue
 // growing to large. This will cause a migration scheduled by the balancer to fail, but not a manual
 // migration.
-assert.commandWorked(st.shard0.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "alwaysOn"}));
-assert.commandWorked(st.shard1.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "alwaysOn"}));
+assert.commandWorked(
+    st.shard0.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "alwaysOn"}),
+);
+assert.commandWorked(
+    st.shard1.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "alwaysOn"}),
+);
 
 migrateJumboChunk(true);
 
-assert.commandWorked(st.shard0.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "off"}));
-assert.commandWorked(st.shard1.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "off"}));
+assert.commandWorked(
+    st.shard0.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "off"}),
+);
+assert.commandWorked(
+    st.shard1.adminCommand({configureFailPoint: "failTooMuchMemoryUsed", mode: "off"}),
+);
 
 // Test that the balancer will correctly move all chunks including a jumbo chunk off of a draining
 // shard.
@@ -157,6 +182,10 @@ let jumboChunk = findChunksUtil.findOneChunkByNs(st.getDB("config"), "test.foo",
     min: {$lte: {x: 0}},
     max: {$gt: {x: 0}},
 });
-assert.eq(st.shard0.shardName, jumboChunk.shard, "jumbo chunk " + tojson(jumboChunk) + " was not moved");
+assert.eq(
+    st.shard0.shardName,
+    jumboChunk.shard,
+    "jumbo chunk " + tojson(jumboChunk) + " was not moved",
+);
 
 st.stop();

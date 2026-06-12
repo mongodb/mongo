@@ -32,11 +32,16 @@ export function getDiagnosticLogs({description, logFile}) {
 // messages.
 export function assertOnDiagnosticLogContents({description, logFile, expectedDiagnosticInfo}) {
     const commandDiagnostics = getDiagnosticLogs({description, logFile});
-    assert(commandDiagnostics.length > 0, `${description}: no log line containing command diagnostics`);
+    assert(
+        commandDiagnostics.length > 0,
+        `${description}: no log line containing command diagnostics`,
+    );
 
     let errorStr = "";
     for (let logLine of commandDiagnostics) {
-        const missingDiagnostics = expectedDiagnosticInfo.filter((diagnosticInfo) => !logLine.includes(diagnosticInfo));
+        const missingDiagnostics = expectedDiagnosticInfo.filter(
+            (diagnosticInfo) => !logLine.includes(diagnosticInfo),
+        );
 
         // Found a match!
         if (missingDiagnostics.length == 0) {
@@ -45,7 +50,11 @@ export function assertOnDiagnosticLogContents({description, logFile, expectedDia
 
         errorStr += `Missing ${missingDiagnostics} in log line: ${logLine}. `;
     }
-    assert(false, `${description}: Failed to find a log line containing all expected diagnostic info. ` + errorStr);
+    assert(
+        false,
+        `${description}: Failed to find a log line containing all expected diagnostic info. ` +
+            errorStr,
+    );
 }
 
 export const planExecutorAlwaysFails = {

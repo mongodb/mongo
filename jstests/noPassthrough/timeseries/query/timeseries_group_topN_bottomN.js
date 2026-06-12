@@ -5,8 +5,12 @@
  */
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
-const classicConn = MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}});
-const bpConn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
+const classicConn = MongoRunner.runMongod({
+    setParameter: {internalQueryFrameworkControl: "forceClassicEngine"},
+});
+const bpConn = MongoRunner.runMongod({
+    setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true},
+});
 
 assert.neq(null, classicConn, "classicConn mongod was unable to start up");
 assert.neq(null, bpConn, "bpConn mongod was unable to start up");
@@ -135,7 +139,11 @@ for (const accumulator of ["$topN", "$bottomN"]) {
                 $group: {
                     _id: null,
                     acc: {
-                        [accumulator]: {n: nVal, sortBy: {[sortBy]: sortDir, _id: 1}, output: ["$_id"]},
+                        [accumulator]: {
+                            n: nVal,
+                            sortBy: {[sortBy]: sortDir, _id: 1},
+                            output: ["$_id"],
+                        },
                     },
                 },
             });
@@ -145,14 +153,19 @@ for (const accumulator of ["$topN", "$bottomN"]) {
 
     // Complex sortBy.
     for (const sortBy of complexSortBys) {
-        groupStages.push({$group: {_id: null, acc: {[accumulator]: {n: 40, sortBy: sortBy, output: ["$_id"]}}}});
+        groupStages.push({
+            $group: {_id: null, acc: {[accumulator]: {n: 40, sortBy: sortBy, output: ["$_id"]}}},
+        });
     }
 
     // Complex group and sortBy.
     for (const group of complexGroups) {
         for (const sortBy of complexSortBys) {
             groupStages.push({
-                $group: {_id: group, acc: {[accumulator]: {n: 50, sortBy: sortBy, output: ["$_id"]}}},
+                $group: {
+                    _id: group,
+                    acc: {[accumulator]: {n: 50, sortBy: sortBy, output: ["$_id"]}},
+                },
             });
         }
     }
@@ -179,7 +192,10 @@ groupStages.push({
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
     assert.commandWorked(
-        bpDb.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}),
+        bpDb.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling,
+        }),
     );
     let pipe = 0;
     for (const groupStage of groupStages) {

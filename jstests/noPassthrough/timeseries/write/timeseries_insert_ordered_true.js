@@ -14,7 +14,9 @@ const metaFieldName = "m";
 
 coll.drop();
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 const docs = [
@@ -44,7 +46,8 @@ assert.docEq(docs.slice(0, 3), coll.find().sort({_id: 1}).toArray());
 assert.eq(
     getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
     2,
-    "Expected 2 buckets but found: " + tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()),
+    "Expected 2 buckets but found: " +
+        tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()),
 );
 
 fp1.off();
@@ -56,7 +59,8 @@ assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
 assert.eq(
     getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
     3,
-    "Expected 3 buckets but found: " + tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()),
+    "Expected 3 buckets but found: " +
+        tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()),
 );
 
 MongoRunner.stopMongod(conn);

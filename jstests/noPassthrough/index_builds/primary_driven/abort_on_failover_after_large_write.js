@@ -27,7 +27,11 @@ const indexName = "x_1";
 const primaryDB = primary.getDB(dbName);
 const coll = primaryDB.getCollection(collName);
 
-const requiredFlags = ["PrimaryDrivenIndexBuilds", "ContainerWrites", "ResumablePrimaryDrivenIndexBuilds"];
+const requiredFlags = [
+    "PrimaryDrivenIndexBuilds",
+    "ContainerWrites",
+    "ResumablePrimaryDrivenIndexBuilds",
+];
 for (const flag of requiredFlags) {
     if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, flag)) {
         jsTest.log.info("Skipping: featureFlag" + flag + " is disabled");
@@ -38,7 +42,9 @@ for (const flag of requiredFlags) {
 
 // Force spills during the scan so the build persists resumable index state.
 for (const node of rst.nodes) {
-    assert.commandWorked(node.adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: 1}));
+    assert.commandWorked(
+        node.adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: 1}),
+    );
 }
 
 jsTest.log.info("1. Insert seed data");
@@ -51,9 +57,13 @@ rst.awaitReplication();
 
 jsTest.log.info("2. Start index build, paused before scanning");
 const holdFp = configureFailPoint(primary, "hangBeforeBuildingIndex");
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), indexSpec, {name: indexName}, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    indexSpec,
+    {name: indexName},
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, indexName);
 
 jsTest.log.info("3. Insert a large document to trigger the tearable side write abort sentinel");
@@ -67,7 +77,9 @@ rst.awaitReplication();
 
 jsTest.log.info("4. Configure load fail point, then release the hold");
 // The build proceeds through the scan and pauses during load.
-const loadFp = configureFailPoint(primary, "hangIndexBuildDuringBulkLoadPhase", {indexNames: [indexName]});
+const loadFp = configureFailPoint(primary, "hangIndexBuildDuringBulkLoadPhase", {
+    indexNames: [indexName],
+});
 holdFp.off();
 loadFp.wait();
 

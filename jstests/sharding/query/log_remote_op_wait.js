@@ -32,7 +32,9 @@ st.shardColl(
     true,
 );
 
-assert.commandWorked(coll.insert(Array.from({length: 100}, (_, i) => ({_id: i, shard: (i % 2) + 1, x: i}))));
+assert.commandWorked(
+    coll.insert(Array.from({length: 100}, (_, i) => ({_id: i, shard: (i % 2) + 1, x: i}))),
+);
 
 // We want a pipeline that:
 // 1. Requires a mergerPart. Otherwise, the entire query might get passed through to one shard, and
@@ -93,7 +95,9 @@ cursor.next();
 cursor.hasNext();
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines = [...iterateMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: pipelineComment})];
+    const lines = [
+        ...iterateMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: pipelineComment}),
+    ];
     const line = lines.find((line) => line.match(/command.{1,4}getMore/));
     assert(line, "Failed to find a getMore log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
@@ -121,7 +125,11 @@ const csCursor = coll.watch([], {comment: watchComment});
 assert(!csCursor.hasNext());
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: watchComment, command: "getMore"});
+    const line = findMatchingLogLine(mongosLog.log, {
+        msg: "Slow query",
+        comment: watchComment,
+        command: "getMore",
+    });
     assert(line, "Failed to find a log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
     const workingMillis = getWorkingMillis(line);
@@ -148,7 +156,12 @@ coll.aggregate(pipeline2, {allowDiskUse: true, comment: pipelineComment2}).next(
     const shard0Log = assert.commandWorked(st.shard0.adminCommand({getLog: "global"}));
     const shard1Log = assert.commandWorked(st.shard1.adminCommand({getLog: "global"}));
     const bothShardsLogLines = shard0Log.log.concat(shard1Log.log);
-    const lines = [...iterateMatchingLogLines(bothShardsLogLines, {msg: "Slow query", comment: pipelineComment2})];
+    const lines = [
+        ...iterateMatchingLogLines(bothShardsLogLines, {
+            msg: "Slow query",
+            comment: pipelineComment2,
+        }),
+    ];
     // The line we want is whichever had a $mergeCursors stage.
     const line = lines.find((line) => line.match(/mergeCursors/));
     assert(line, `Failed to find a log line mentioning 'mergeCursors': ${lines}`);

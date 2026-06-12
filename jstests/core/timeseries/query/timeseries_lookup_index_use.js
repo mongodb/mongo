@@ -65,7 +65,11 @@ function assertLookupUsesIndex(coll, pipeline, expectedResults) {
             // zero. We cannot validate index usage in this case.
             continue;
         }
-        assert.eq(stage.collectionScans, 0, "Expected no collection scans in $lookup: " + tojson(stage));
+        assert.eq(
+            stage.collectionScans,
+            0,
+            "Expected no collection scans in $lookup: " + tojson(stage),
+        );
         assert.gt(stage.indexesUsed.length, 0, "Expected index use in $lookup: " + tojson(stage));
     }
 }

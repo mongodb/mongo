@@ -13,7 +13,11 @@ rst.initiate();
 const password = "test_password";
 rst.getPrimary()
     .getDB("admin")
-    .createUser({user: "userAdmin", pwd: password, roles: [{db: "admin", role: "userAdminAnyDatabase"}]});
+    .createUser({
+        user: "userAdmin",
+        pwd: password,
+        roles: [{db: "admin", role: "userAdminAnyDatabase"}],
+    });
 rst.restart(0, {auth: "", keyFile: "jstests/libs/key1"});
 
 const db = rst.getPrimary().getDB("test");
@@ -52,14 +56,18 @@ const adminDB = db.getSiblingDB("admin");
     db.createRole({
         role: "change_stream_only",
         roles: [],
-        privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["changeStream"]}],
+        privileges: [
+            {resource: {db: db.getName(), collection: coll.getName()}, actions: ["changeStream"]},
+        ],
     });
 
     // Create some privileges at the database level.
     db.createRole({
         role: "db_write",
         roles: [],
-        privileges: [{resource: {db: db.getName(), collection: ""}, actions: ["insert", "update", "remove"]}],
+        privileges: [
+            {resource: {db: db.getName(), collection: ""}, actions: ["insert", "update", "remove"]},
+        ],
     });
     db.createRole({
         role: "db_find_only",
@@ -69,7 +77,9 @@ const adminDB = db.getSiblingDB("admin");
     db.createRole({
         role: "db_find_and_change_stream",
         roles: [],
-        privileges: [{resource: {db: db.getName(), collection: ""}, actions: ["find", "changeStream"]}],
+        privileges: [
+            {resource: {db: db.getName(), collection: ""}, actions: ["find", "changeStream"]},
+        ],
     });
     db.createRole({
         role: "db_change_stream_only",
@@ -81,7 +91,9 @@ const adminDB = db.getSiblingDB("admin");
     adminDB.createRole({
         role: "admin_db_write",
         roles: [],
-        privileges: [{resource: {db: db.getName(), collection: ""}, actions: ["insert", "update", "remove"]}],
+        privileges: [
+            {resource: {db: db.getName(), collection: ""}, actions: ["insert", "update", "remove"]},
+        ],
     });
     adminDB.createRole({
         role: "admin_db_find_only",
@@ -146,7 +158,12 @@ const adminDB = db.getSiblingDB("admin");
 
     // Create some users at the database level. Use the name of the role as the name of the
     // user, except for the built-in roles.
-    for (let role of ["db_write", "db_find_only", "db_find_and_change_stream", "db_change_stream_only"]) {
+    for (let role of [
+        "db_write",
+        "db_find_only",
+        "db_find_and_change_stream",
+        "db_change_stream_only",
+    ]) {
         db.createUser({user: role, pwd: password, roles: [role]});
     }
     db.createUser({user: "db_read", pwd: password, roles: ["read"]});
@@ -165,12 +182,20 @@ const adminDB = db.getSiblingDB("admin");
 
     // Create some users with privileges on all databases. Use the name of the role as the name
     // of the user, except for the built-in roles.
-    for (let role of ["any_db_find_only", "any_db_find_and_change_stream", "any_db_change_stream_only"]) {
+    for (let role of [
+        "any_db_find_only",
+        "any_db_find_and_change_stream",
+        "any_db_change_stream_only",
+    ]) {
         adminDB.createUser({user: role, pwd: password, roles: [role]});
     }
 
     // Create some users on the whole cluster. Use the name of the role as the name of the user.
-    for (let role of ["cluster_find_only", "cluster_find_and_change_stream", "cluster_change_stream_only"]) {
+    for (let role of [
+        "cluster_find_only",
+        "cluster_find_and_change_stream",
+        "cluster_change_stream_only",
+    ]) {
         adminDB.createUser({user: role, pwd: password, roles: [role]});
     }
 
@@ -199,12 +224,19 @@ const adminDB = db.getSiblingDB("admin");
         {db: adminDB, name: "cluster_find_and_change_stream"},
         {db: adminDB, name: "cluster_change_stream_only"},
     ]) {
-        jsTestLog(`Testing user ${tojson(userWithoutPrivileges)} cannot open a change stream ` + `on a collection`);
+        jsTestLog(
+            `Testing user ${tojson(userWithoutPrivileges)} cannot open a change stream ` +
+                `on a collection`,
+        );
         const db = userWithoutPrivileges.db;
         assert(db.auth(userWithoutPrivileges.name, password));
 
         assert.commandFailedWithCode(
-            coll.getDB().runCommand({aggregate: coll.getName(), pipeline: [{$changeStream: {}}], cursor: {}}),
+            coll.getDB().runCommand({
+                aggregate: coll.getName(),
+                pipeline: [{$changeStream: {}}],
+                cursor: {},
+            }),
             ErrorCodes.Unauthorized,
         );
 
@@ -218,7 +250,10 @@ const adminDB = db.getSiblingDB("admin");
         {db: db, name: "db_read"},
         {db: adminDB, name: "any_db_find_and_change_stream"},
     ]) {
-        jsTestLog(`Testing user ${tojson(userWithPrivileges)} _can_ open a change stream on a` + ` collection`);
+        jsTestLog(
+            `Testing user ${tojson(userWithPrivileges)} _can_ open a change stream on a` +
+                ` collection`,
+        );
         const db = userWithPrivileges.db;
         assert(db.auth(userWithPrivileges.name, password));
 
@@ -252,7 +287,8 @@ const adminDB = db.getSiblingDB("admin");
         {db: adminDB, name: "cluster_change_stream_only"},
     ]) {
         jsTestLog(
-            `Testing user ${tojson(userWithoutPrivileges)} cannot open a change stream` + ` on the whole database`,
+            `Testing user ${tojson(userWithoutPrivileges)} cannot open a change stream` +
+                ` on the whole database`,
         );
         const db = userWithoutPrivileges.db;
         assert(db.auth(userWithoutPrivileges.name, password));
@@ -271,7 +307,10 @@ const adminDB = db.getSiblingDB("admin");
         {db: db, name: "db_read"},
         {db: adminDB, name: "any_db_find_and_change_stream"},
     ]) {
-        jsTestLog(`Testing user ${tojson(userWithPrivileges)} _can_ open a change stream on` + ` the whole database`);
+        jsTestLog(
+            `Testing user ${tojson(userWithPrivileges)} _can_ open a change stream on` +
+                ` the whole database`,
+        );
         const db = userWithPrivileges.db;
         assert(db.auth(userWithPrivileges.name, password));
 
@@ -307,7 +346,8 @@ const adminDB = db.getSiblingDB("admin");
         {db: adminDB, name: "cluster_find_and_change_stream"},
     ]) {
         jsTestLog(
-            `Testing user ${tojson(userWithoutPrivileges)} cannot open a change stream` + ` on the whole cluster`,
+            `Testing user ${tojson(userWithoutPrivileges)} cannot open a change stream` +
+                ` on the whole cluster`,
         );
         const db = userWithoutPrivileges.db;
         assert(db.auth(userWithoutPrivileges.name, password));
@@ -326,7 +366,10 @@ const adminDB = db.getSiblingDB("admin");
 
     // Test that a user with the required privileges can open a change stream.
     for (let userWithPrivileges of [{db: adminDB, name: "any_db_find_and_change_stream"}]) {
-        jsTestLog(`Testing user ${tojson(userWithPrivileges)} _can_ open a change stream` + ` on the whole cluster`);
+        jsTestLog(
+            `Testing user ${tojson(userWithPrivileges)} _can_ open a change stream` +
+                ` on the whole cluster`,
+        );
         const db = userWithPrivileges.db;
         assert(db.auth(userWithPrivileges.name, password));
 

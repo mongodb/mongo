@@ -11,7 +11,16 @@ let md = MongoRunner.runMongod({
     tlsAllowConnectionsWithoutCertificates: "",
 });
 
-let mongo = runMongoProgram("mongo", "--port", md.port, "--tls", "--tlsCAFile", getX509Path("ca.pem"), "--eval", ";");
+let mongo = runMongoProgram(
+    "mongo",
+    "--port",
+    md.port,
+    "--tls",
+    "--tlsCAFile",
+    getX509Path("ca.pem"),
+    "--eval",
+    ";",
+);
 
 // 0 is the exit code for success
 assert(mongo == 0);
@@ -41,7 +50,16 @@ let md2 = MongoRunner.runMongod({
     tlsCAFile: getX509Path("ca.pem"),
 });
 
-mongo = runMongoProgram("mongo", "--port", md2.port, "--tls", "--tlsCAFile", getX509Path("ca.pem"), "--eval", ";");
+mongo = runMongoProgram(
+    "mongo",
+    "--port",
+    md2.port,
+    "--tls",
+    "--tlsCAFile",
+    getX509Path("ca.pem"),
+    "--eval",
+    ";",
+);
 
 // 1 is the exit code for failure
 assert(mongo == 1);

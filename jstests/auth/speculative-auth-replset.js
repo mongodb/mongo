@@ -84,7 +84,8 @@ admin.auth("admin", "pwd");
 assert.commandWorked(admin.setLogLevel(3, "accessControl"));
 
 function getMechStats(db) {
-    return assert.commandWorked(db.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+    return assert.commandWorked(db.runCommand({serverStatus: 1})).security.authentication
+        .mechanisms;
 }
 
 // Capture statistics after a fresh instantiation of a 1-node replica set.
@@ -195,7 +196,8 @@ Object.keys(initialMechStats).forEach(function (mech) {
     assert.retry(
         function () {
             const logCount = ingressLogCounts.cluster;
-            const mechStatCount = newMechStats["SCRAM-SHA-256"].ingress.clusterAuthenticate.successful;
+            const mechStatCount =
+                newMechStats["SCRAM-SHA-256"].ingress.clusterAuthenticate.successful;
             if (logCount == mechStatCount) {
                 return true;
             }

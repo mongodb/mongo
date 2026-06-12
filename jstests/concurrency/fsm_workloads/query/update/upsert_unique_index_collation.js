@@ -15,7 +15,9 @@ export const $config = (function () {
 
     const states = {
         delete: function (db, collName) {
-            assert.commandWorked(db[collName].remove({uniqueKey: this.getUniqueKey()}, {justOne: true}));
+            assert.commandWorked(
+                db[collName].remove({uniqueKey: this.getUniqueKey()}, {justOne: true}),
+            );
         },
         upsert: function (db, collName) {
             const uniqueKey = this.getUniqueKey();
@@ -42,7 +44,10 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         db[collName].drop();
         assert.commandWorked(
-            db[collName].createIndex({uniqueKey: 1}, {unique: 1, collation: {locale: "en", strength: 2}}),
+            db[collName].createIndex(
+                {uniqueKey: 1},
+                {unique: 1, collation: {locale: "en", strength: 2}},
+            ),
         );
 
         // Creating an unique index on a key other than _id can result in DuplicateKey errors for
@@ -65,7 +70,8 @@ export const $config = (function () {
             assert.commandWorked(
                 db.adminCommand({
                     setParameter: 1,
-                    reshardingOplogBatchTaskCount: this.originalReshardingOplogBatchTaskCount[db.getMongo().host],
+                    reshardingOplogBatchTaskCount:
+                        this.originalReshardingOplogBatchTaskCount[db.getMongo().host],
                 }),
             );
         });

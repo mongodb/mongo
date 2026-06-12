@@ -9,7 +9,11 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getWinningPlanFromExplain, getExecutionStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    getExecutionStages,
+    getPlanStages,
+} from "jstests/libs/query/analyze_plan.js";
 
 function getHashJoinStages(explain) {
     const execStages = getExecutionStages(explain);
@@ -27,20 +31,44 @@ function joinOptimizerUsedHashJoin(explain) {
 function verifySpillingStats(hashJoinStages, shouldSpill) {
     for (const hashJoinStage of hashJoinStages) {
         if (shouldSpill) {
-            assert.eq(hashJoinStage.usedDisk, true, `Expected usedDisk=true: ${tojson(hashJoinStage)}`);
+            assert.eq(
+                hashJoinStage.usedDisk,
+                true,
+                `Expected usedDisk=true: ${tojson(hashJoinStage)}`,
+            );
             assert.gt(hashJoinStage.spills, 0, `Expected spills > 0: ${tojson(hashJoinStage)}`);
-            assert.gt(hashJoinStage.spilledRecords, 0, `Expected spilledRecords > 0: ${tojson(hashJoinStage)}`);
-            assert.gt(hashJoinStage.spilledBytes, 0, `Expected spilledBytes > 0: ${tojson(hashJoinStage)}`);
+            assert.gt(
+                hashJoinStage.spilledRecords,
+                0,
+                `Expected spilledRecords > 0: ${tojson(hashJoinStage)}`,
+            );
+            assert.gt(
+                hashJoinStage.spilledBytes,
+                0,
+                `Expected spilledBytes > 0: ${tojson(hashJoinStage)}`,
+            );
             assert.gt(
                 hashJoinStage.spilledDataStorageSize,
                 0,
                 `Expected spilledDataStorageSize > 0: ${tojson(hashJoinStage)}`,
             );
         } else {
-            assert.eq(hashJoinStage.usedDisk, false, `Expected usedDisk=false: ${tojson(hashJoinStage)}`);
+            assert.eq(
+                hashJoinStage.usedDisk,
+                false,
+                `Expected usedDisk=false: ${tojson(hashJoinStage)}`,
+            );
             assert.eq(hashJoinStage.spills, 0, `Expected spills = 0: ${tojson(hashJoinStage)}`);
-            assert.eq(hashJoinStage.spilledRecords, 0, `Expected spilledRecords = 0: ${tojson(hashJoinStage)}`);
-            assert.eq(hashJoinStage.spilledBytes, 0, `Expected spilledBytes = 0: ${tojson(hashJoinStage)}`);
+            assert.eq(
+                hashJoinStage.spilledRecords,
+                0,
+                `Expected spilledRecords = 0: ${tojson(hashJoinStage)}`,
+            );
+            assert.eq(
+                hashJoinStage.spilledBytes,
+                0,
+                `Expected spilledBytes = 0: ${tojson(hashJoinStage)}`,
+            );
             assert.eq(
                 hashJoinStage.spilledDataStorageSize,
                 0,
@@ -50,7 +78,9 @@ function verifySpillingStats(hashJoinStages, shouldSpill) {
     }
 }
 
-const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true, featureFlagPathArrayness: true}});
+const conn = MongoRunner.runMongod({
+    setParameter: {allowDiskUseByDefault: true, featureFlagPathArrayness: true},
+});
 const db = conn.getDB(jsTestName());
 
 const coll1 = db[jsTestName() + "_1"];
@@ -101,7 +131,11 @@ function testJoinSpilling(coll, lookupPipeline, shouldSpill) {
     // Disable join optimization and run again to verify the results.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
     const resultsWithoutJoinOptimization = coll.aggregate(lookupPipeline).toArray();
-    assert.eq(resultsWithoutJoinOptimization.length, 100, "Expected 100 results from non-optimized join");
+    assert.eq(
+        resultsWithoutJoinOptimization.length,
+        100,
+        "Expected 100 results from non-optimized join",
+    );
 
     // Verify results are the same with and without join optimization.
     assertArrayEq({actual: results, expected: resultsWithoutJoinOptimization});

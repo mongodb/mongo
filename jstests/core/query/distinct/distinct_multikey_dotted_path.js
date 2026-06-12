@@ -14,7 +14,11 @@
  *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
-import {getAggPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.distinct_multikey;
 coll.drop();

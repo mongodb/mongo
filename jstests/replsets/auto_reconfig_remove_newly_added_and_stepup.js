@@ -10,13 +10,21 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
+import {
+    assertVoteCount,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: 1,
+    settings: {chainingAllowed: false},
+    useBridge: true,
+});
 rst.startSet();
 rst.initiate();
 
@@ -82,6 +90,9 @@ assertVoteCount(primary, {
 jsTestLog("Making sure the config term has been updated");
 assert.eq(primary, rst.getPrimary());
 const configAfterTermBump = assert.commandWorked(primaryDb.adminCommand({replSetGetConfig: 1}));
-assert.eq(2, configAfterTermBump.config.term, () => [tojson(configBeforeTermBump), tojson(configAfterTermBump)]);
+assert.eq(2, configAfterTermBump.config.term, () => [
+    tojson(configBeforeTermBump),
+    tojson(configAfterTermBump),
+]);
 
 rst.stopSet();

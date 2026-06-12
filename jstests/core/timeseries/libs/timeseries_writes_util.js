@@ -6,7 +6,11 @@ import {
     getTimeseriesCollForDDLOps,
     runTimeseriesChunkCommand,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getExecutionStages, getPlanStage, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {
+    getExecutionStages,
+    getPlanStage,
+    getQueryPlanner,
+} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export const timeFieldName = "time";
@@ -138,7 +142,11 @@ export function prepareShardedCollection({
     splitPoint,
 }) {
     if (!dbToUse) {
-        assert.neq(null, testDB, "testDB must be initialized before calling prepareShardedCollection");
+        assert.neq(
+            null,
+            testDB,
+            "testDB must be initialized before calling prepareShardedCollection",
+        );
         dbToUse = testDB;
     }
 
@@ -155,13 +163,17 @@ export function prepareShardedCollection({
         shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
     }
     assert.commandWorked(coll.createIndex(shardKey));
-    assert.commandWorked(dbToUse.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+    assert.commandWorked(
+        dbToUse.adminCommand({shardCollection: coll.getFullName(), key: shardKey}),
+    );
 
     if (!splitPoint) {
         splitPoint = includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
     }
     // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
-    assert.commandWorked(runTimeseriesChunkCommand(dbToUse, {split: coll.getFullName(), middle: splitPoint}));
+    assert.commandWorked(
+        runTimeseriesChunkCommand(dbToUse, {split: coll.getFullName(), middle: splitPoint}),
+    );
 
     assert.commandWorked(
         runTimeseriesChunkCommand(dbToUse, {
@@ -190,7 +202,16 @@ export function makeFindOneAndRemoveCommand(coll, filter, fields, sort, collatio
     return findAndModifyCmd;
 }
 
-export function makeFindOneAndUpdateCommand(coll, filter, update, returnNew, upsert, fields, sort, collation) {
+export function makeFindOneAndUpdateCommand(
+    coll,
+    filter,
+    update,
+    returnNew,
+    upsert,
+    fields,
+    sort,
+    collation,
+) {
     assert(filter !== undefined && update !== undefined);
     let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, update: update};
     if (returnNew !== undefined) {
@@ -247,7 +268,12 @@ export function verifyExplain({
     nUpserted,
 }) {
     jsTestLog(`Explain: ${tojson(explain)}`);
-    assert(opType === "updateOne" || opType === "deleteOne" || opType === "updateMany" || opType === "deleteMany");
+    assert(
+        opType === "updateOne" ||
+            opType === "deleteOne" ||
+            opType === "updateMany" ||
+            opType === "deleteMany",
+    );
 
     if (!rootStageName) {
         rootStageName = "TS_MODIFY";
@@ -258,7 +284,11 @@ export function verifyExplain({
     );
 
     let foundStage = getPlanStage(explain.queryPlanner.winningPlan, rootStageName);
-    assert.neq(null, foundStage, `The root ${rootStageName} stage not found in the plan: ${tojson(explain)}`);
+    assert.neq(
+        null,
+        foundStage,
+        `The root ${rootStageName} stage not found in the plan: ${tojson(explain)}`,
+    );
     if (rootStageName === "PROJECTION_DEFAULT") {
         assert.eq(
             "TS_MODIFY",
@@ -269,8 +299,16 @@ export function verifyExplain({
     }
 
     assert.eq(opType, foundStage.opType, `TS_MODIFY opType is wrong: ${tojson(foundStage)}`);
-    assert.eq(bucketFilter, foundStage.bucketFilter, `TS_MODIFY bucketFilter is wrong: ${tojson(foundStage)}`);
-    assert.eq(residualFilter, foundStage.residualFilter, `TS_MODIFY residualFilter is wrong: ${tojson(foundStage)}`);
+    assert.eq(
+        bucketFilter,
+        foundStage.bucketFilter,
+        `TS_MODIFY bucketFilter is wrong: ${tojson(foundStage)}`,
+    );
+    assert.eq(
+        residualFilter,
+        foundStage.residualFilter,
+        `TS_MODIFY residualFilter is wrong: ${tojson(foundStage)}`,
+    );
 
     const execStages = getExecutionStages(explain);
     assert.eq(rootStageName, execStages[0].stage, `The root stage is wrong: ${tojson(execStages)}`);
@@ -278,7 +316,11 @@ export function verifyExplain({
     if (tsModifyStage.stage === "PROJECTION_DEFAULT") {
         tsModifyStage = tsModifyStage.inputStage;
     }
-    assert.eq("TS_MODIFY", tsModifyStage.stage, `Can't find TS_MODIFY stage: ${tojson(execStages)}`);
+    assert.eq(
+        "TS_MODIFY",
+        tsModifyStage.stage,
+        `Can't find TS_MODIFY stage: ${tojson(execStages)}`,
+    );
 
     if (nBucketsUnpacked !== undefined) {
         assert.eq(
@@ -288,7 +330,11 @@ export function verifyExplain({
         );
     }
     if (nReturned !== undefined) {
-        assert.eq(nReturned, tsModifyStage.nReturned, `Got wrong nReturned ${tojson(tsModifyStage)}`);
+        assert.eq(
+            nReturned,
+            tsModifyStage.nReturned,
+            `Got wrong nReturned ${tojson(tsModifyStage)}`,
+        );
     }
     if (nMatched !== undefined) {
         assert.eq(
@@ -498,7 +544,11 @@ export function testFindOneAndRemove({
     const shouldRetryWrites = session.getOptions().shouldRetryWrites();
     // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
     if (coll.getDB().getSession().getOptions().shouldRetryWrites()) {
-        assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd),
+            7308305,
+            `cmd = ${tojson(findAndModifyCmd)}`,
+        );
         return;
     }
 
@@ -633,7 +683,10 @@ export function testFindOneAndUpdate({
     const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
     jsTestLog(`findAndModify update result: ${tojson(res)}`);
     if (upsert) {
-        assert(nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1), "nUpserted must be 0 or 1");
+        assert(
+            nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1),
+            "nUpserted must be 0 or 1",
+        );
 
         assert.eq(1, res.lastErrorObject.n, tojson(res));
         if (returnNew !== undefined) {
@@ -693,7 +746,12 @@ export function getRelevantProfilerEntries(db, coll, requestType) {
     return db.system.profile.find(profilerFilter).toArray();
 }
 
-export function verifyThatRequestIsRoutedToCorrectShard(coll, requestType, writeType, dataBearingShard) {
+export function verifyThatRequestIsRoutedToCorrectShard(
+    coll,
+    requestType,
+    writeType,
+    dataBearingShard,
+) {
     assert(primaryShard && otherShard, "The sharded cluster must be initialized");
     assert(
         dataBearingShard === "primary" ||
@@ -702,7 +760,10 @@ export function verifyThatRequestIsRoutedToCorrectShard(coll, requestType, write
             dataBearingShard === "any",
         "Invalid shard: " + dataBearingShard,
     );
-    assert(writeType === "twoPhaseProtocol" || writeType === "targeted", "Invalid write type: " + writeType);
+    assert(
+        writeType === "twoPhaseProtocol" || writeType === "targeted",
+        "Invalid write type: " + writeType,
+    );
     assert(
         requestType === "findAndModify" || requestType === "delete" || requestType === "update",
         "Invalid request type: " + requestType,
@@ -761,10 +822,14 @@ export function verifyThatRequestIsRoutedToCorrectShard(coll, requestType, write
                 writeType,
                 "Expected data bearing shard to be 'any' only for 'twoPhaseProtocol' mode",
             );
-            return primaryEntries.length === 2 ? [primaryEntries, otherEntries] : [otherEntries, primaryEntries];
+            return primaryEntries.length === 2
+                ? [primaryEntries, otherEntries]
+                : [otherEntries, primaryEntries];
         }
 
-        return dataBearingShard === "primary" ? [primaryEntries, otherEntries] : [otherEntries, primaryEntries];
+        return dataBearingShard === "primary"
+            ? [primaryEntries, otherEntries]
+            : [otherEntries, primaryEntries];
     })();
 
     if (writeType === "twoPhaseProtocol") {
@@ -919,7 +984,10 @@ export function testFindOneAndRemoveOnShardedCollection({
         if (deletedDoc) {
             // Note: To figure out the expected result documents, we need to know the _id of the
             // deleted document.
-            assert(deletedDoc.hasOwnProperty("_id"), `deletedDoc must have _id but got ${tojson(deletedDoc)}`);
+            assert(
+                deletedDoc.hasOwnProperty("_id"),
+                `deletedDoc must have _id but got ${tojson(deletedDoc)}`,
+            );
             assert.docEq(deletedDoc, res.value, tojson(res));
             expectedResultDocs = initialDocList.filter((doc) => doc._id !== deletedDoc._id);
         } else if (nDeleted === 1) {
@@ -943,7 +1011,11 @@ export function testFindOneAndRemoveOnShardedCollection({
         );
     } else {
         // TODO SERVER-76583: Remove this test.
-        assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd),
+            7308305,
+            `cmd = ${tojson(findAndModifyCmd)}`,
+        );
     }
 }
 
@@ -1036,7 +1108,9 @@ export function testFindOneAndUpdateOnShardedCollection({
         // plan part.
         assert(
             writeType !== "twoPhaseProtocol" ||
-                (nBucketsUnpacked === undefined && nMatched === undefined && nModified === undefined),
+                (nBucketsUnpacked === undefined &&
+                    nMatched === undefined &&
+                    nModified === undefined),
             "Can't verify stats for the two-phase protocol.",
         );
 
@@ -1073,7 +1147,10 @@ export function testFindOneAndUpdateOnShardedCollection({
     })();
     jsTestLog(`findAndModify update result: ${tojson(res)}`);
     if (upsert) {
-        assert(nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1), "nUpserted must be 0 or 1");
+        assert(
+            nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1),
+            "nUpserted must be 0 or 1",
+        );
 
         assert.eq(1, res.lastErrorObject.n, tojson(res));
         if (returnNew !== undefined) {

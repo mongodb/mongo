@@ -28,14 +28,25 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             assert.gte(transactionDocument.parameters.txnNumber, 0);
             assert.eq(transactionDocument.parameters.autocommit, false);
             if (transactionDocument.parameters.readConcern !== undefined) {
-                assert(acceptableReadConcernLevels.includes(transactionDocument.parameters.readConcern.level));
+                assert(
+                    acceptableReadConcernLevels.includes(
+                        transactionDocument.parameters.readConcern.level,
+                    ),
+                );
             }
             if (transactionDocument.globalReadTimestamp !== undefined) {
                 assert.gt(transactionDocument.globalReadTimestamp, Timestamp(0, 0));
             }
-            assert.gt(ISODate(transactionDocument.startWallClockTime), ISODate("1970-01-01T00:00:00.000Z"));
+            assert.gt(
+                ISODate(transactionDocument.startWallClockTime),
+                ISODate("1970-01-01T00:00:00.000Z"),
+            );
 
-            assert.hasFields(transactionDocument, ["timeOpenMicros", "timeActiveMicros", "timeInactiveMicros"]);
+            assert.hasFields(transactionDocument, [
+                "timeOpenMicros",
+                "timeActiveMicros",
+                "timeInactiveMicros",
+            ]);
             const timeOpen = Number(transactionDocument["timeOpenMicros"]);
             const timeActive = Number(transactionDocument["timeActiveMicros"]);
             const timeInactive = Number(transactionDocument["timeInactiveMicros"]);

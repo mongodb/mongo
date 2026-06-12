@@ -16,7 +16,10 @@
  * ]
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {CursorList} from "jstests/libs/query/change_stream_util.js";
 import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
@@ -62,14 +65,18 @@ describe("change stream cursor metrics profiler / slow query output", function (
         let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
 
         // Enable profiling at level 1 with slowms: 0 so every operation is profiled.
-        assert.commandWorked(testDB.runCommand({profile: 1, filter: {"originatingCommand.comment": comment}}));
+        assert.commandWorked(
+            testDB.runCommand({profile: 1, filter: {"originatingCommand.comment": comment}}),
+        );
 
         try {
             runGetMore(cursor);
 
             let profileEntry;
             assert.soon(() => {
-                profileEntry = testDB.system.profile.findOne({"originatingCommand.comment": comment});
+                profileEntry = testDB.system.profile.findOne({
+                    "originatingCommand.comment": comment,
+                });
                 return profileEntry !== null;
             }, "Expected a profiler entry for the change stream getMore");
 

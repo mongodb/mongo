@@ -40,14 +40,23 @@ assert.soonNoExcept(function () {
 // still enabled to guarantee there are no keys.
 for (let i = 0; i < st.configRS.nodes.length; i++) {
     assert.commandWorked(
-        st.configRS.nodes[i].adminCommand({"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}),
+        st.configRS.nodes[i].adminCommand({
+            "configureFailPoint": "disableKeyGeneration",
+            "mode": "alwaysOn",
+        }),
     );
 }
 let res = st.configRS.getPrimary().getDB("admin").system.keys.remove({purpose: "HMAC"});
 assert(res.nRemoved >= 2);
-assert(st.s.getDB("admin").system.keys.count() == 0, "expected there to be no keys on the config server");
+assert(
+    st.s.getDB("admin").system.keys.count() == 0,
+    "expected there to be no keys on the config server",
+);
 st.configRS.stopSet(null /* signal */, true /* forRestart */);
-st.configRS.startSet({restart: true, setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"}});
+st.configRS.startSet({
+    restart: true,
+    setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"},
+});
 
 // Limit the max time between refreshes on the config server, so new keys are created quickly.
 st.configRS.getPrimary().adminCommand({
@@ -59,7 +68,10 @@ st.configRS.getPrimary().adminCommand({
 // Disable the failpoint.
 for (let i = 0; i < st.configRS.nodes.length; i++) {
     assert.commandWorked(
-        st.configRS.nodes[i].adminCommand({"configureFailPoint": "disableKeyGeneration", "mode": "off"}),
+        st.configRS.nodes[i].adminCommand({
+            "configureFailPoint": "disableKeyGeneration",
+            "mode": "off",
+        }),
     );
 }
 

@@ -4,7 +4,11 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 /**
  * Hang specific commands before starting their execution on a given node
  */
-export const hangCommandBeforeExecution = function (node, commandToFail, hangInternalCommands = true) {
+export const hangCommandBeforeExecution = function (
+    node,
+    commandToFail,
+    hangInternalCommands = true,
+) {
     let failPointData = {
         failCommands: [commandToFail],
         blockConnection: true,
@@ -55,6 +59,8 @@ export const failCommandsWithWriteConcernError = function (rst, commandsToFail) 
 
 export const turnOffFailCommand = function (rst) {
     rst.nodes.forEach(function (node) {
-        assert.commandWorked(node.getDB("admin").runCommand({configureFailPoint: "failCommand", mode: "off"}));
+        assert.commandWorked(
+            node.getDB("admin").runCommand({configureFailPoint: "failCommand", mode: "off"}),
+        );
     });
 };

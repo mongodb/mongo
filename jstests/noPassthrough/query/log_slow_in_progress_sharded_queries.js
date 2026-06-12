@@ -52,12 +52,17 @@ assert.eq(
 );
 assertSlowInProgressQueryLogged(db, "Index Scan");
 
-assert.eq(kDocCount, coll.aggregate([{$match: {a: {$gte: 0}}}], {comment: "Agg Index Scan"}).itcount());
+assert.eq(
+    kDocCount,
+    coll.aggregate([{$match: {a: {$gte: 0}}}], {comment: "Agg Index Scan"}).itcount(),
+);
 assertSlowInProgressQueryLogged(db, "Agg Index Scan");
 
 assert.eq(
     kDocCount,
-    db.aggregate([{$documents: docs}, {$match: {a: {$gte: 0}}}], {comment: "Agg Documents"}).itcount(),
+    db
+        .aggregate([{$documents: docs}, {$match: {a: {$gte: 0}}}], {comment: "Agg Documents"})
+        .itcount(),
 );
 assertSlowInProgressQueryLogged(db, "Agg Documents");
 

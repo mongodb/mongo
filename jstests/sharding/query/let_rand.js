@@ -173,7 +173,9 @@ assert.commandWorked(
     }),
 );
 
-const groups = coll.aggregate([{$group: {_id: "$x", nums: {$push: "$i"}}}, {$sort: {_id: 1}}]).toArray();
+const groups = coll
+    .aggregate([{$group: {_id: "$x", nums: {$push: "$i"}}}, {$sort: {_id: 1}}])
+    .toArray();
 groups[0].nums.sort();
 groups[1].nums.sort();
 

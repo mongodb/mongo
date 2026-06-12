@@ -35,7 +35,8 @@ export function assertReleaseMemoryFailedWithCode(result, cursorId, codes) {
             assert.contains(
                 releaseMemoryError.status.code,
                 codes,
-                "the following release memory error contains an unexpected error code: " + tojson(releaseMemoryError),
+                "the following release memory error contains an unexpected error code: " +
+                    tojson(releaseMemoryError),
             );
             return;
         }

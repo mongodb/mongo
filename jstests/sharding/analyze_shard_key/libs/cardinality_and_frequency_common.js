@@ -12,39 +12,41 @@ export function assertAggregateQueryPlans(mongodConns, dbName, collName, comment
     mongodConns.forEach((conn) => {
         const profilerColl = conn.getDB(dbName).system.profile;
 
-        profilerColl.find({"command.aggregate": collName, "command.comment": comment}).forEach((doc) => {
-            if (doc.hasOwnProperty("ok") && doc.ok === 0) {
-                return;
-            }
-
-            const firstStage = doc.command.pipeline[0];
-
-            if (firstStage.hasOwnProperty("$collStats")) {
-                return;
-            }
-
-            numEntries++;
-            if (firstStage.hasOwnProperty("$match") || firstStage.hasOwnProperty("$limit")) {
-                // This corresponds to the aggregation that the analyzeShardKey command runs
-                // to look up documents for a shard key with a unique or hashed supporting
-                // index. For both cases, it should fetch at most 'numMostCommonValues'
-                // documents.
-                assert(doc.hasOwnProperty("planSummary"), doc);
-                assert.lte(doc.docsExamined, numMostCommonValues, doc);
-            } else {
-                // This corresponds to the aggregation that the analyzeShardKey command runs
-                // when analyzing a shard key with a non-unique supporting index.
-                if (!firstStage.hasOwnProperty("$mergeCursors")) {
-                    assert(doc.hasOwnProperty("planSummary"), doc);
-                    assert(doc.planSummary.includes("IXSCAN"), doc);
+        profilerColl
+            .find({"command.aggregate": collName, "command.comment": comment})
+            .forEach((doc) => {
+                if (doc.hasOwnProperty("ok") && doc.ok === 0) {
+                    return;
                 }
 
-                // Verify that it fetched at most 'numMostCommonValues' documents.
-                assert.lte(doc.docsExamined, numMostCommonValues, doc);
-                // Verify that it opted out of shard filtering.
-                assert.eq(doc.readConcern.level, "available", doc);
-            }
-        });
+                const firstStage = doc.command.pipeline[0];
+
+                if (firstStage.hasOwnProperty("$collStats")) {
+                    return;
+                }
+
+                numEntries++;
+                if (firstStage.hasOwnProperty("$match") || firstStage.hasOwnProperty("$limit")) {
+                    // This corresponds to the aggregation that the analyzeShardKey command runs
+                    // to look up documents for a shard key with a unique or hashed supporting
+                    // index. For both cases, it should fetch at most 'numMostCommonValues'
+                    // documents.
+                    assert(doc.hasOwnProperty("planSummary"), doc);
+                    assert.lte(doc.docsExamined, numMostCommonValues, doc);
+                } else {
+                    // This corresponds to the aggregation that the analyzeShardKey command runs
+                    // when analyzing a shard key with a non-unique supporting index.
+                    if (!firstStage.hasOwnProperty("$mergeCursors")) {
+                        assert(doc.hasOwnProperty("planSummary"), doc);
+                        assert(doc.planSummary.includes("IXSCAN"), doc);
+                    }
+
+                    // Verify that it fetched at most 'numMostCommonValues' documents.
+                    assert.lte(doc.docsExamined, numMostCommonValues, doc);
+                    // Verify that it opted out of shard filtering.
+                    assert.eq(doc.readConcern.level, "available", doc);
+                }
+            });
     });
 
     if (expectEntries) {

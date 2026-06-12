@@ -34,7 +34,11 @@ let primary = replTest.getPrimary();
 
 // The default WC is majority and fsyncLock will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 let ret = primary.getDB("admin").fsyncLock();
@@ -65,7 +69,11 @@ for (var i = 0; i < docNum; i++) {
 // This is what we are testing. Previously this would block. After the fix
 // this should work just fine.
 let secondary0count = secondaries[0].getDB("foo").bar.find().itcount();
-assert.eq(secondary0count, 100, "Doc count in fsync lock wrong. Expected (=100), found " + secondary0count);
+assert.eq(
+    secondary0count,
+    100,
+    "Doc count in fsync lock wrong. Expected (=100), found " + secondary0count,
+);
 assert(secondaries[0].getDB("admin").fsyncUnlock().ok);
 
 // The secondary should have equal or more documents than what it had before.

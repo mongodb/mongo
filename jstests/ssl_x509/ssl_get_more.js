@@ -1,7 +1,10 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CLUSTER_CERT, requireTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
-const x509_options = Object.extend(requireTLS, {tlsClusterFile: CLUSTER_CERT, clusterAuthMode: "x509"});
+const x509_options = Object.extend(requireTLS, {
+    tlsClusterFile: CLUSTER_CERT,
+    clusterAuthMode: "x509",
+});
 
 const st = new ShardingTest({
     shards: 1,
@@ -27,7 +30,9 @@ coll.createIndex({x: 1});
 coll.createIndex({y: 1});
 
 for (let i = 0; i < 10; i++) {
-    const res = assert.commandWorked(db.runCommand({listIndexes: coll.getName(), cursor: {batchSize: 0}}));
+    const res = assert.commandWorked(
+        db.runCommand({listIndexes: coll.getName(), cursor: {batchSize: 0}}),
+    );
     const cursor = new DBCommandCursor(db, res);
     assert.eq(3, cursor.itcount());
 }

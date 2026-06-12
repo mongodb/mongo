@@ -12,7 +12,10 @@ coll.drop();
 assert.commandWorked(coll.insert(doc));
 
 function testExpr(expression, expected) {
-    assert.eq(coll.aggregate([{$project: {_id: 0, output: expression}}]).toArray()[0].output, expected);
+    assert.eq(
+        coll.aggregate([{$project: {_id: 0, output: expression}}]).toArray()[0].output,
+        expected,
+    );
 }
 
 let args = {n: 3, input: [5, 4, 3, 2, 1]};

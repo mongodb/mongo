@@ -27,8 +27,12 @@ export class ReshardCollectionCmdTest {
         this._ns = this._dbName + "." + this._collName;
         this._numInitialDocs = testConfig.numInitialDocs;
         this._skipDirectShardChecks =
-            testConfig.skipDirectShardChecks != undefined ? testConfig.skipDirectShardChecks : false;
-        this._skipCollectionSetup = testConfig.skipCollectionSetup ? testConfig.skipCollectionSetup : false;
+            testConfig.skipDirectShardChecks != undefined
+                ? testConfig.skipDirectShardChecks
+                : false;
+        this._skipCollectionSetup = testConfig.skipCollectionSetup
+            ? testConfig.skipCollectionSetup
+            : false;
         // TODO SERVER-107180 remove '_timeseries' variable
         // and all its usages after 9.0 becomes last LTS
         this._timeseries = testConfig.timeseries;
@@ -70,7 +74,9 @@ export class ReshardCollectionCmdTest {
     _verifyChunksMatchExpected(numExpectedChunks, presetExpectedChunks) {
         const db = this._mongos.getDB(this._dbName);
         let collEntry = this._mongos.getDB("config")["collections"].findOne({
-            _id: this._timeseries ? getTimeseriesCollForDDLOps(db, db[this._collName]).getFullName() : this._ns,
+            _id: this._timeseries
+                ? getTimeseriesCollForDDLOps(db, db[this._collName]).getFullName()
+                : this._ns,
         });
         let chunkQuery = {uuid: collEntry.uuid};
 
@@ -125,8 +131,14 @@ export class ReshardCollectionCmdTest {
         assert.eq(doesExist, expectedToExist);
     }
 
-    _verifyTemporaryReshardingCollectionExistsWithCorrectOptions(shardKey, expectedRecipientShards) {
-        const tempReshardingCollName = this._constructTemporaryReshardingCollName(this._dbName, this._collName);
+    _verifyTemporaryReshardingCollectionExistsWithCorrectOptions(
+        shardKey,
+        expectedRecipientShards,
+    ) {
+        const tempReshardingCollName = this._constructTemporaryReshardingCollName(
+            this._dbName,
+            this._collName,
+        );
         this._verifyCollectionExistenceForConn(tempReshardingCollName, false, this._mongos);
 
         if (!this._skipDirectShardChecks) {
@@ -147,7 +159,12 @@ export class ReshardCollectionCmdTest {
     _verifyAllShardingCollectionsRemoved(tempReshardingCollName) {
         assert.eq(0, this._mongos.getDB(this._dbName)[tempReshardingCollName].find().itcount());
         assert.eq(0, this._mongosConfig.reshardingOperations.find({ns: this._ns}).itcount());
-        assert.eq(0, this._mongosConfig.collections.find({_id: this._ns, reshardingFields: {$exists: true}}).itcount());
+        assert.eq(
+            0,
+            this._mongosConfig.collections
+                .find({_id: this._ns, reshardingFields: {$exists: true}})
+                .itcount(),
+        );
 
         if (!this._skipDirectShardChecks) {
             assert.eq(
@@ -216,7 +233,9 @@ export class ReshardCollectionCmdTest {
     _verifyShardKey(expectedShardKey) {
         const db = this._mongos.getDB(this._dbName);
 
-        const coll = this._timeseries ? getTimeseriesCollForDDLOps(db, db[this._collName]) : db[this._collName];
+        const coll = this._timeseries
+            ? getTimeseriesCollForDDLOps(db, db[this._collName])
+            : db[this._collName];
         const shardKey = coll.getShardKey();
         assert.eq(shardKey, expectedShardKey);
     }
@@ -229,13 +248,18 @@ export class ReshardCollectionCmdTest {
 
     // Suites that run stepdowns can cause commands to fail due to retryable errors, so in those cases we should retry the command.
     isStepdownRetryableError(error) {
-        return TestData.runningWithShardStepdowns && error.code === ErrorCodes.FailedToSatisfyReadPreference;
+        return (
+            TestData.runningWithShardStepdowns &&
+            error.code === ErrorCodes.FailedToSatisfyReadPreference
+        );
     }
 
     assertReshardCollOkWithPreset(commandObj, presetReshardedChunks) {
         if (!this._skipCollectionSetup) {
             const oldShardKey = {oldKey: 1};
-            assert.commandWorked(this._mongos.adminCommand({shardCollection: this._ns, key: oldShardKey}));
+            assert.commandWorked(
+                this._mongos.adminCommand({shardCollection: this._ns, key: oldShardKey}),
+            );
             this._verifyShardKey(oldShardKey);
         }
 
@@ -250,7 +274,10 @@ export class ReshardCollectionCmdTest {
         assert.commandWorked(bulk.execute());
 
         commandObj._presetReshardedChunks = presetReshardedChunks;
-        const tempReshardingCollName = this._constructTemporaryReshardingCollName(this._dbName, this._collName);
+        const tempReshardingCollName = this._constructTemporaryReshardingCollName(
+            this._dbName,
+            this._collName,
+        );
 
         assert.soon(() => {
             try {
@@ -293,10 +320,18 @@ export class ReshardCollectionCmdTest {
      * @param {Object[]} expectedZones Expected zones for the collection after reshardCollection.
      * @param {Function} additionalSetup Additional setup needed, taking the class object as input.
      */
-    assertReshardCollOk(commandObj, expectedChunkNum, expectedChunks, expectedZones, additionalSetup) {
+    assertReshardCollOk(
+        commandObj,
+        expectedChunkNum,
+        expectedChunks,
+        expectedZones,
+        additionalSetup,
+    ) {
         if (!this._skipCollectionSetup) {
             const oldShardKey = {oldKey: 1};
-            assert.commandWorked(this._mongos.adminCommand({shardCollection: this._ns, key: oldShardKey}));
+            assert.commandWorked(
+                this._mongos.adminCommand({shardCollection: this._ns, key: oldShardKey}),
+            );
             this._verifyShardKey(oldShardKey);
         }
 
@@ -314,7 +349,10 @@ export class ReshardCollectionCmdTest {
         }
 
         const indexes = this._mongos.getDB(this._dbName).getCollection(this._collName).getIndexes();
-        const tempReshardingCollName = this._constructTemporaryReshardingCollName(this._dbName, this._collName);
+        const tempReshardingCollName = this._constructTemporaryReshardingCollName(
+            this._dbName,
+            this._collName,
+        );
 
         const startTime = Date.now();
 
@@ -337,7 +375,9 @@ export class ReshardCollectionCmdTest {
         if ("rewriteCollection" in commandObj) {
             // If this is a rewriteCollection command then it doesn't include a shard key, so we need to use the existing shard key for all checks.
             const db = this._mongos.getDB(this._dbName);
-            const coll = this._timeseries ? getTimeseriesCollForDDLOps(db, db[this._collName]) : db[this._collName];
+            const coll = this._timeseries
+                ? getTimeseriesCollForDDLOps(db, db[this._collName])
+                : db[this._collName];
             commandShardKey = coll.getShardKey();
         } else {
             this._verifyShardKey(commandShardKey);
@@ -350,7 +390,11 @@ export class ReshardCollectionCmdTest {
             );
         }
 
-        this._verifyTagsDocumentsAfterOperationCompletes(this._ns, Object.keys(commandShardKey), expectedZones);
+        this._verifyTagsDocumentsAfterOperationCompletes(
+            this._ns,
+            Object.keys(commandShardKey),
+            expectedZones,
+        );
 
         this._verifyChunksMatchExpected(expectedChunkNum, expectedChunks);
 

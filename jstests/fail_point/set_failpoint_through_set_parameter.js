@@ -27,7 +27,9 @@ configRS.initiate();
 
 // Setting a failpoint via --setParameter fails if enableTestCommands is not on.
 TestData.enableTestCommands = false;
-assertStartupFails(() => MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}));
+assertStartupFails(() =>
+    MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}),
+);
 assertStartupFails(() =>
     MongoRunner.runMongos({
         setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
@@ -37,7 +39,9 @@ assertStartupFails(() =>
 TestData.enableTestCommands = true;
 
 // Passing an invalid failpoint payload fails.
-assertStartupFails(() => MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload)}));
+assertStartupFails(() =>
+    MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload)}),
+);
 assertStartupFails(() =>
     MongoRunner.runMongos({
         setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload),
@@ -46,7 +50,9 @@ assertStartupFails(() =>
 );
 
 // Valid startup configurations succeed.
-let mongod = MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)});
+let mongod = MongoRunner.runMongod({
+    setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
+});
 assertStartupSucceeds(mongod);
 MongoRunner.stopMongod(mongod);
 
@@ -57,7 +63,9 @@ let mongos = MongoRunner.runMongos({
 assertStartupSucceeds(mongos);
 MongoRunner.stopMongos(mongos);
 
-mongod = MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayloadWithData)});
+mongod = MongoRunner.runMongod({
+    setParameter: "failpoint.dummy=" + tojson(validFailpointPayloadWithData),
+});
 assertStartupSucceeds(mongod);
 
 mongos = MongoRunner.runMongos({

@@ -29,7 +29,9 @@ function runAggregationAndDowngradeFCV(coll, adminDB) {
     assert.eq(coll.aggregate(pipeline).toArray(), [{"count": 1}]);
 
     // Downgrade the feature compatibility version to 8.0.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     checkFCV(adminDB, lastLTSFCV);
 
     // Run the pipeline again. The profile filter is persisted, which is validated later in the
@@ -66,7 +68,9 @@ function testProfileCommand(conn, isMongos) {
         );
     }
 
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 }
 
 function checkGlobalProfilerIsUpdated({testDB, oldFilter, newFilter}) {
@@ -110,7 +114,9 @@ function testGlobalFilterCommand(conn, isMongos) {
         );
     }
 
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 }
 
 (function testReplicaSet() {

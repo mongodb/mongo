@@ -41,10 +41,15 @@ const prohibitedCommands = [
  */
 const assertCommandsSucceedAfterReshardingOpFinishes = (database) => {
     prohibitedCommands.forEach((command) => {
-        jsTest.log(`Testing that ${tojson(command)} succeeds after the resharding operation finishes.`);
+        jsTest.log(
+            `Testing that ${tojson(command)} succeeds after the resharding operation finishes.`,
+        );
         if (command.hasOwnProperty("dropIndexes")) {
             // TODO (SERVER-107148): Always assert that dropIndexes command succeeds once 9.0 is LTS.
-            assert.commandWorkedOrFailedWithCode(database.runCommand(command), ErrorCodes.IndexNotFound);
+            assert.commandWorkedOrFailedWithCode(
+                database.runCommand(command),
+                ErrorCodes.IndexNotFound,
+            );
         } else {
             assert.commandWorked(database.runCommand(command));
         }
@@ -130,7 +135,9 @@ const withReshardingInBackground = (
     reshardingTest.withReshardingInBackground(
         {
             newShardKeyPattern: {newKey: 1},
-            newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+            newChunks: [
+                {min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
+            ],
         },
         duringReshardingFn,
         {expectedErrorCode: expectedErrorCode, afterReshardingFn: afterReshardingFn},
@@ -144,7 +151,10 @@ let awaitAbort;
 withReshardingInBackground(
     () => {
         waitUntilReshardingInitializedOnDonor();
-        assert.neq(null, mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace}));
+        assert.neq(
+            null,
+            mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace}),
+        );
         awaitAbort = startParallelShell(
             funWithArgs(function (sourceNamespace) {
                 db.adminCommand({abortReshardCollection: sourceNamespace});
@@ -154,7 +164,9 @@ withReshardingInBackground(
         // Wait for the coordinator to remove coordinator document from config.reshardingOperations
         // as a result of the recipients and donors transitioning to done due to abort.
         assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
+            const coordinatorDoc = mongos
+                .getCollection("config.reshardingOperations")
+                .findOne({ns: sourceNamespace});
 
             return coordinatorDoc === null || coordinatorDoc.state === "aborting";
         });
@@ -172,10 +184,16 @@ withReshardingInBackground(
     () => {
         waitUntilReshardingInitializedOnDonor();
 
-        jsTest.log("About to test that the admin commands do not work while the resharding operation is in progress.");
+        jsTest.log(
+            "About to test that the admin commands do not work while the resharding operation is in progress.",
+        );
 
         assert.commandFailedWithCode(
-            mongos.adminCommand({moveChunk: sourceNamespace, find: {oldKey: -10}, to: donorShardNames[1]}),
+            mongos.adminCommand({
+                moveChunk: sourceNamespace,
+                find: {oldKey: -10},
+                to: donorShardNames[1],
+            }),
             [ErrorCodes.ConflictingOperationInProgress],
         );
         assert.commandFailedWithCode(
@@ -188,7 +206,9 @@ withReshardingInBackground(
     {
         setup: () => {
             assert.commandWorked(mongos.adminCommand({enableSharding: otherDatabaseName}));
-            assert.commandWorked(mongos.adminCommand({shardCollection: otherNamespace, key: {oldKey: 1}}));
+            assert.commandWorked(
+                mongos.adminCommand({shardCollection: otherNamespace, key: {oldKey: 1}}),
+            );
         },
         afterReshardingFn: () => {
             jsTest.log("Join possible ongoing collMod command");

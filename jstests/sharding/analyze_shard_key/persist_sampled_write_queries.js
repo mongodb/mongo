@@ -42,11 +42,18 @@ function testWriteCmd(rst, cmdOpts, testCase) {
         testCase.expectSampling,
     );
 
-    jsTest.log(`Testing test case ${tojson(testCase)} with ${tojson({dbName, collName, originalCmdObj})}`);
+    jsTest.log(
+        `Testing test case ${tojson(testCase)} with ${tojson({dbName, collName, originalCmdObj})}`,
+    );
     assert.commandWorked(primaryDB.runCommand(originalCmdObj));
 
     if (testCase.expectSampling) {
-        QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+        QuerySamplingUtil.assertSoonSampledQueryDocuments(
+            primary,
+            ns,
+            collectionUuid,
+            expectedSampledQueryDocs,
+        );
     } else {
         // To verify that no writes occurred, wait for one interval before asserting.
         sleep(queryAnalysisWriterIntervalSecs * 1000);

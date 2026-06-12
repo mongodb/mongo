@@ -37,7 +37,11 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
         );
 
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: collName, pipeline: [{$project: {"a": "$$CLUSTER_TIME"}}], cursor: {}}),
+            testDB.runCommand({
+                aggregate: collName,
+                pipeline: [{$project: {"a": "$$CLUSTER_TIME"}}],
+                cursor: {},
+            }),
             10071200,
             "system variable $$CLUSTER_TIME is not available in standalone mode",
         );

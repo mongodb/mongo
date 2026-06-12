@@ -15,7 +15,9 @@ TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     Random.setRandomSeed();
 

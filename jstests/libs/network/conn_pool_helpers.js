@@ -47,14 +47,24 @@ export function launchFinds(conn, threads, {times, readPref, shouldFail}) {
  * @param {string} connPoolStatsCmd - Optionally supplies a command to run instead of connPoolStats.
  * @returns {number} - The updated check number.
  */
-export function assertHasConnPoolStats(conn, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
+export function assertHasConnPoolStats(
+    conn,
+    allHosts,
+    args,
+    checkNum,
+    connPoolStatsCmd = undefined,
+) {
     checkNum++;
     jsTestLog("Check #" + checkNum + ": " + tojson(args));
     let {ready = 0, pending = 0, active = 0, hosts = allHosts, isAbsent, checkStatsFunc} = args;
     checkStatsFunc = checkStatsFunc
         ? checkStatsFunc
         : function (stats) {
-              return stats.available == ready && stats.refreshing == pending && stats.inUse + stats.leased == active;
+              return (
+                  stats.available == ready &&
+                  stats.refreshing == pending &&
+                  stats.inUse + stats.leased == active
+              );
           };
 
     function checkStats(res, host) {

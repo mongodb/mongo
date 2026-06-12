@@ -81,7 +81,9 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     plan = coll.explain().aggregate([{$match: {_id: 22}}]);
     // Make sure the plan uses Express
     assert(isIdhackOrExpress(db, plan));
-    assert.commandWorked(db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}),
+    );
 }
 
 {

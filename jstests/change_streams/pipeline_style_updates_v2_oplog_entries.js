@@ -29,7 +29,10 @@ assert.commandWorked(
     }),
 );
 
-const changeStreamCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+const changeStreamCursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: db.t1,
+});
 // Test change stream with 'fullDocument' set.
 const fullDocCursor = cst.startWatchingChanges({
     pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
@@ -103,7 +106,9 @@ jsTestLog("Testing pipeline-based update with $replaceRoot");
 //  "arrayForSubdiff": [kGiantStr, {"a": kMediumStr, "b": 3}],
 //  "giantStr": kGiantStr,
 //  }.
-assert.commandWorked(db.t1.update({_id: 100}, [{$replaceRoot: {newRoot: {_id: 100, "giantStr": kGiantStr}}}]));
+assert.commandWorked(
+    db.t1.update({_id: 100}, [{$replaceRoot: {newRoot: {_id: 100, "giantStr": kGiantStr}}}]),
+);
 expected = {
     documentKey: {_id: 100},
     ns: {db: "test", coll: "t1"},

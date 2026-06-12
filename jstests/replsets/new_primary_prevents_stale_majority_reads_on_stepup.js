@@ -96,7 +96,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     failpoint.off();
 
     // Do a write. This is needed to trigger us to update the current committed snapshot.
-    assert.commandWorked(newPrimary.getDB(jsTestName()).runCommand({insert: collectionName, documents: [{x: 2}]}));
+    assert.commandWorked(
+        newPrimary.getDB(jsTestName()).runCommand({insert: collectionName, documents: [{x: 2}]}),
+    );
 
     parallelResult();
     rst.stopSet();

@@ -58,7 +58,9 @@ function getNewColl() {
     assert.commandWorked(src.createIndexes([{a: 1}, {b: 1}]));
 
     assert.commandWorked(existingDst.insert({a: 100}));
-    assert.commandFailed(db.adminCommand({renameCollection: src.getFullName(), to: existingDst.getFullName()}));
+    assert.commandFailed(
+        db.adminCommand({renameCollection: src.getFullName(), to: existingDst.getFullName()}),
+    );
 
     const originalNumberOfIndexes = src.getIndexes().length;
     assert.commandWorked(src.renameCollection(dstName));
@@ -102,9 +104,10 @@ function getNewColl() {
     const sameColl = getNewColl();
     assert.commandWorked(sameColl.insert({a: 1}));
 
-    assert.commandFailedWithCode(sameColl.renameCollection(sameColl.getName(), true /* dropTarget */), [
-        ErrorCodes.IllegalOperation,
-    ]);
+    assert.commandFailedWithCode(
+        sameColl.renameCollection(sameColl.getName(), true /* dropTarget */),
+        [ErrorCodes.IllegalOperation],
+    );
 
     assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not lose data");
 

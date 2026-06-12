@@ -27,7 +27,10 @@ const syncSource = rollbackTest.transitionToSyncSourceOperationsBeforeRollback()
 // This failpoint is used to make sure that we have started rollback before turning on
 // 'failCommand'. Otherwise, we would be failing the 'find' command that we issue against
 // the sync source before we decide to go into rollback.
-const rollbackHangBeforeStartFailPoint = configureFailPoint(rollbackNode, "rollbackHangBeforeStart");
+const rollbackHangBeforeStartFailPoint = configureFailPoint(
+    rollbackNode,
+    "rollbackHangBeforeStart",
+);
 
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 

@@ -87,7 +87,9 @@ assert(t.drop());
 assert.commandWorked(t.createIndex({"array.name": 1}));
 assert.commandWorked(t.insert({"array": [{"123a": {"name": "old"}}]}));
 assert(t.findOne({"array.123a.name": "old"}));
-assert.commandWorked(t.update({"array.123a.name": "old"}, {$set: {"array.$.123a": {"name": "new"}}}));
+assert.commandWorked(
+    t.update({"array.123a.name": "old"}, {$set: {"array.$.123a": {"name": "new"}}}),
+);
 assert(t.findOne({"array.123a.name": "new"}));
 assert(!t.findOne({"array.123a.name": "old"}));
 
@@ -107,7 +109,9 @@ assert(t.drop());
 assert.commandWorked(t.createIndex({"array.name": 1}));
 assert.commandWorked(t.insert({"array": [{"123a": {"name": "old"}}]}));
 assert(t.findOne({"array.123a.name": "old"}));
-assert.commandWorked(t.update({"array.123a.name": "old"}, {$set: {"array.0.123a": {"name": "new"}}}));
+assert.commandWorked(
+    t.update({"array.123a.name": "old"}, {$set: {"array.0.123a": {"name": "new"}}}),
+);
 assert(t.findOne({"array.123a.name": "new"}));
 assert(!t.findOne({"array.123a.name": "old"}));
 

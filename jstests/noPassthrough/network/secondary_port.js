@@ -64,7 +64,11 @@ describe("secondary port on a single-node replica set", function () {
         const secondaryConn = new Mongo(`${this.host}:${secondaryPort}`);
         const secondaryDB = secondaryConn.getDB(dbName);
         const doc = secondaryDB.getCollection(collName).findOne({_id: 1});
-        assert.neq(doc, null, "document inserted via main port should be readable via secondary port");
+        assert.neq(
+            doc,
+            null,
+            "document inserted via main port should be readable via secondary port",
+        );
         assert.eq(doc.x, "fromMainPort");
 
         mainConn.close();

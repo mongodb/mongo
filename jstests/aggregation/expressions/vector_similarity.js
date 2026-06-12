@@ -125,14 +125,20 @@ const coll = db[jsTestName()];
                     {
                         $project: {
                             computedRaw: {[operator]: ["$left", "$right"]},
-                            computedNormalized: {[operator]: {vectors: ["$left", "$right"], score: true}},
+                            computedNormalized: {
+                                [operator]: {vectors: ["$left", "$right"], score: true},
+                            },
                         },
                     },
                 ])
                 .toArray();
 
             assert.eq(result.length, 1, `${operator} result should return one document`);
-            assert.close(result[0].computedRaw, testCase[expectedRawKey], `${operator} raw score mismatch`);
+            assert.close(
+                result[0].computedRaw,
+                testCase[expectedRawKey],
+                `${operator} raw score mismatch`,
+            );
             assert.close(
                 result[0].computedNormalized,
                 testCase[expectedNormalizedKey],
@@ -156,7 +162,11 @@ const coll = db[jsTestName()];
                 ])
                 .toArray();
 
-            assert.eq(resultBinData.length, 1, `${operator} binData result should return one document`);
+            assert.eq(
+                resultBinData.length,
+                1,
+                `${operator} binData result should return one document`,
+            );
             assert.close(
                 resultBinData[0].computedRaw,
                 testCase[expectedRawKey],

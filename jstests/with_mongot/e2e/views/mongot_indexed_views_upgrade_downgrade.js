@@ -16,7 +16,9 @@ coll.drop();
 assert.commandWorked(coll.insertMany([{_id: 1, state: "NY", text: "hello new york"}]));
 
 const addFieldsViewName = "addFieldsView";
-assert.commandWorked(testDb.createView(addFieldsViewName, coll.getName(), [{$addFields: {country: "USA"}}]));
+assert.commandWorked(
+    testDb.createView(addFieldsViewName, coll.getName(), [{$addFields: {country: "USA"}}]),
+);
 const addFieldsView = testDb[addFieldsViewName];
 
 const identityViewName = "identityView";
@@ -30,7 +32,9 @@ const searchIndexDef = {
 const vectorSearchIndexDef = {
     name: "index",
     type: "vectorSearch",
-    definition: {fields: [{type: "vector", numDimensions: 10, path: "path", similarity: "euclidean"}]},
+    definition: {
+        fields: [{type: "vector", numDimensions: 10, path: "path", similarity: "euclidean"}],
+    },
 };
 
 const adminDB = testDb.getMongo().getDB("admin");
@@ -66,7 +70,12 @@ function dropAllV4_2dsphereIndexes() {
 
                     if (has2dsphere && index["2dsphereIndexVersion"] === 4) {
                         jsTest.log.info(
-                            "Dropping v4 2dsphere index: " + index.name + " on collection " + dbName + "." + collName,
+                            "Dropping v4 2dsphere index: " +
+                                index.name +
+                                " on collection " +
+                                dbName +
+                                "." +
+                                collName,
                         );
                         assert.commandWorked(coll.dropIndex(index.name));
                     }
@@ -81,7 +90,9 @@ function upgradeDowngradeFCV(commands) {
     dropAllV4_2dsphereIndexes();
 
     // Downgrade to lastLTSFCV (8.0).
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
 
     // On 8.0 single node, search index commands on views should be blocked.
     if (!FixtureHelpers.isMongos(testDb)) {
@@ -90,21 +101,31 @@ function upgradeDowngradeFCV(commands) {
             ErrorCodes.QueryFeatureNotAllowed,
         );
         assert.commandFailedWithCode(
-            testDb.runCommand({createSearchIndexes: addFieldsViewName, indexes: [vectorSearchIndexDef]}),
+            testDb.runCommand({
+                createSearchIndexes: addFieldsViewName,
+                indexes: [vectorSearchIndexDef],
+            }),
             ErrorCodes.QueryFeatureNotAllowed,
         );
     }
 
     // All commands should be blocked on 8.0.
     for (const command of commands) {
-        assert.commandFailedWithCode(testDb.runCommand(command), ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            testDb.runCommand(command),
+            ErrorCodes.OptionNotSupportedOnView,
+        );
     }
 
     // An identity view search aggregation *should work* on 8.0.
-    assert.commandWorked(testDb.runCommand({aggregate: identityViewName, pipeline: searchPipeline, cursor: {}}));
+    assert.commandWorked(
+        testDb.runCommand({aggregate: identityViewName, pipeline: searchPipeline, cursor: {}}),
+    );
 
     // Upgrade to latestFCV.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // All commands should work on latestFCV.
     for (const command of commands) {
@@ -155,7 +176,15 @@ upgradeDowngradeFCV([
                 $lookup: {
                     from: coll.getName(),
                     as: "lookup",
-                    pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: searchPipeline}}],
+                    pipeline: [
+                        {
+                            $lookup: {
+                                from: addFieldsViewName,
+                                as: "lookup",
+                                pipeline: searchPipeline,
+                            },
+                        },
+                    ],
                 },
             },
         ],
@@ -181,7 +210,9 @@ upgradeDowngradeFCV([
             {
                 $unionWith: {
                     coll: coll.getName(),
-                    pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: vectorSearchPipeline}}],
+                    pipeline: [
+                        {$unionWith: {coll: addFieldsViewName, pipeline: vectorSearchPipeline}},
+                    ],
                 },
             },
         ],

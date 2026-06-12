@@ -37,7 +37,9 @@ describe("change streams preimages removal", function () {
         const disableFailpoint = configureFailPoint(primary, "disableChangeStreamPreImagesRemover");
 
         const db = primary.getDB(jsTestName());
-        const coll = assertDropAndRecreateCollection(db, jsTestName(), {changeStreamPreAndPostImages: {enabled: true}});
+        const coll = assertDropAndRecreateCollection(db, jsTestName(), {
+            changeStreamPreAndPostImages: {enabled: true},
+        });
 
         const n = 10;
         for (let i = 0; i < n; ++i) {
@@ -61,7 +63,10 @@ describe("change streams preimages removal", function () {
         );
 
         // Make pre-images removal job fail with "NotWritablePrimary".
-        const notWritablePrimaryFailpoint = configureFailPoint(primary, "preImagesRemovalFailsWithNotWritablePrimary");
+        const notWritablePrimaryFailpoint = configureFailPoint(
+            primary,
+            "preImagesRemovalFailsWithNotWritablePrimary",
+        );
 
         // Re-renable pre-images removal job
         disableFailpoint.off();

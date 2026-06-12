@@ -63,7 +63,9 @@ export const $config = (function () {
             const targetFCV = fcvValues[Random.randInt(2)];
             jsTest.log.info("Executing FCV state, setting to:" + targetFCV);
             try {
-                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+                assert.commandWorked(
+                    db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+                );
             } catch (e) {
                 if (handleRandomSetFCVErrors(e, targetFCV)) return;
                 throw e;
@@ -137,7 +139,9 @@ export const $config = (function () {
         // by spending a bigger fraction on time of setFCV on timeseries upgrade/downgrade.
         for (let i = 0; i < numCollections; i++) {
             const coll = getCollection(db, i);
-            assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t"}}));
+            assert.commandWorked(
+                db.createCollection(coll.getName(), {timeseries: {timeField: "t"}}),
+            );
             assert.commandWorked(coll.insertMany(expectedDocs));
         }
 
@@ -158,7 +162,9 @@ export const $config = (function () {
             configureFailPoint(adminDb, "hangBeforePublishingCatalogUpdates", {}, "off");
         });
 
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
 
     return {

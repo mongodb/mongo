@@ -37,7 +37,9 @@ assert(primary == conns[0], "conns[0] assumed to be primary");
 assert(a_conn.host == primary.host);
 
 // create an oplog entry with an insert
-assert.commandWorked(A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 replTest.stop(BID);
 
 print("******************** starting load for 30 secs *********************");

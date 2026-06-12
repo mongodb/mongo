@@ -3,7 +3,10 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 
 function checkBsonSize() {
-    assert.eq(Object.bsonsize(coll.findOne()), coll.aggregate([{$project: {s: {$bsonSize: "$$CURRENT"}}}]).next().s);
+    assert.eq(
+        Object.bsonsize(coll.findOne()),
+        coll.aggregate([{$project: {s: {$bsonSize: "$$CURRENT"}}}]).next().s,
+    );
 }
 
 checkBsonSize();
@@ -47,7 +50,8 @@ checkExpectsDocument([{x: 1}, {y: 2}]);
 
 // SERVER-79019: $bsonSize must work on intermediate pipeline results larger than 16MiB.
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 const is90OrHigher = MongoRunner.compareBinVersions(lastLTSFCV, "9.0") >= 0;
 if (!isMultiversion || is90OrHigher) {
     const largeColl = db.agg_expr_bsonSize_large;
@@ -61,7 +65,10 @@ if (!isMultiversion || is90OrHigher) {
     // making the total document size exceed 16MB. Then apply $bsonSize to $$ROOT.
     // The $project output is a small document with just the computed size value.
     const result = largeColl
-        .aggregate([{$addFields: {b: {$concat: ["$a", "-"]}}}, {$project: {_id: 0, size: {$bsonSize: "$$ROOT"}}}])
+        .aggregate([
+            {$addFields: {b: {$concat: ["$a", "-"]}}},
+            {$project: {_id: 0, size: {$bsonSize: "$$ROOT"}}},
+        ])
         .toArray();
 
     assert.eq(1, result.length);

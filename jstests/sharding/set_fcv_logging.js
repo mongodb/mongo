@@ -69,7 +69,9 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
     } else if (serverType === "shardedCluster") {
         assert.soon(
             () => {
-                let matchRes = rawMongoProgramOutput('"serverType"').match(/\"serverType\":"config server"/g);
+                let matchRes = rawMongoProgramOutput('"serverType"').match(
+                    /\"serverType\":"config server"/g,
+                );
                 return matchRes != null && matchRes.length == status;
             },
             "should have " + status + " log(s) with serverType: config server",
@@ -81,13 +83,17 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
         if (nExpectedLogs > 0) {
             assert.soon(
                 () => {
-                    let matchRes = rawMongoProgramOutput('"serverType"').match(/\"serverType\":\"shard server\"/g);
+                    let matchRes = rawMongoProgramOutput('"serverType"').match(
+                        /\"serverType\":\"shard server\"/g,
+                    );
                     return matchRes != null && matchRes.length === nExpectedLogs;
                 },
                 "should have " + nExpectedLogs + " log(s) with serverType: shard server",
             );
         } else {
-            let matchRes = rawMongoProgramOutput('"serverType"').match(/\"serverType\":"shard server"/g);
+            let matchRes = rawMongoProgramOutput('"serverType"').match(
+                /\"serverType\":"shard server"/g,
+            );
             assert(matchRes == null, "should not have log containing shard server");
         }
     }
@@ -127,23 +133,35 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     // 1.1. Test that setFCV (downgrade) fails before moving to the transitional FCV:
     // should have log 6744300 (called), but not 6744301 (transitioning) or 6744302 (successful).
     jsTest.log("Case 1.1. Logs should show that downgrade has only reached 'called' stage.");
-    assert.commandWorked(conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "alwaysOn"}),
+    );
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     assertLogs(SetFCVStatus.called, "downgrade", serverType, numShardServers);
-    assert.commandWorked(conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}));
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}),
+    );
 
     // 1.2. Test that setFCV (downgrade) fails before finishing downgrading:
     // should have log 6744300 (called), 6744301 (transitioning), but not 6744302 (successful).
     jsTest.log("Case 1.2. Logs should show that downgrade has only reached 'downgrading' stage.");
-    assert.commandWorked(conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+    );
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     assertLogs(SetFCVStatus.transitioning, "downgrade", serverType, numShardServers);
     assert.commandWorked(conn.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
 
     // 1.3. Test that setFCV (downgrade) succeeds:
     // should have all three logs 6744300 (called), 6744301 (transitioning), 6744302 (successful).
     jsTest.log("Case 1.3. Logs should show that downgrade has reached 'downgraded' stage.");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     assertLogs(SetFCVStatus.successful, "downgrade", serverType, numShardServers);
 
     /* 2. Testing logging for upgrade */
@@ -151,36 +169,61 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     // 2.1. Test that setFCV (upgrade) fails before moving to the transitional FCV:
     // should have log 6744300 (called), but not 6744301 (transitioning) or 6744302 (successful).
     jsTest.log("Case 2.1. Logs should show that upgrade has only reached 'called' stage.");
-    assert.commandWorked(conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "alwaysOn"}),
+    );
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     assertLogs(SetFCVStatus.called, "upgrade", serverType, numShardServers);
-    assert.commandWorked(conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}));
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}),
+    );
 
     // 2.2. Test that setFCV (upgrade) fails before finishing upgrading:
     // should have log 6744300 (called), 6744301 (transitioning), but not 6744302 (successful).
     jsTest.log("Case 2.2. Logs should show that upgrade has only reached 'upgrading' stage.");
-    assert.commandWorked(conn.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}),
+    );
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     assertLogs(SetFCVStatus.transitioning, "upgrade", serverType, numShardServers);
     assert.commandWorked(conn.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}));
 
     // 2.3. Test that setFCV (upgrade) succeeds:
     // should have all three logs 6744300 (called), 6744301 (transitioning), 6744302 (successful).
     jsTest.log("Case 2.3. Logs should show that upgrade has reached 'upgraded' stage.");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     assertLogs(SetFCVStatus.successful, "upgrade", serverType, numShardServers);
 
     // 2.4. Shouldn't log anything because we have already upgraded to latestFCV.
-    jsTest.log("Case 2.4. Logs should not contain fcv upgrade because it is already in upgraded state.");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    jsTest.log(
+        "Case 2.4. Logs should not contain fcv upgrade because it is already in upgraded state.",
+    );
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     // Ensure none of the logs have been output.
-    assertLogs(0 /* status: no fcv change */, "upgrade", 0 /* serverType */, 0 /* numShardServers */);
+    assertLogs(
+        0 /* status: no fcv change */,
+        "upgrade",
+        0 /* serverType */,
+        0 /* numShardServers */,
+    );
 }
 
 function runStandaloneTest() {
     // A 'latest' binary standalone should default to 'latestFCV'.
     const conn = MongoRunner.runMongod({binVersion: latest});
-    assert.neq(null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable to start up with version=" + latest + " and no data files",
+    );
     const adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
 
@@ -199,7 +242,12 @@ function runReplicaSetTest() {
     checkFCV(primaryAdminDB, latestFCV);
 
     jsTest.log("Checking for correct FCV logging on a replica set.");
-    assertLogsWithFailpoints(primary, primaryAdminDB, "replica set/maintenance mode", 0 /*numShardServers*/);
+    assertLogsWithFailpoints(
+        primary,
+        primaryAdminDB,
+        "replica set/maintenance mode",
+        0 /*numShardServers*/,
+    );
 
     rst.stopSet();
 }
@@ -227,7 +275,12 @@ function runShardingTest() {
     jsTest.log("Checking for correct FCV logging on a sharded cluster.");
     // One of the shards is the config server in config shard mode.
     const numShardServers = TestData.configShard ? 1 : 2;
-    assertLogsWithFailpoints(st.configRS.getPrimary(), mongosAdminDB, "shardedCluster", numShardServers);
+    assertLogsWithFailpoints(
+        st.configRS.getPrimary(),
+        mongosAdminDB,
+        "shardedCluster",
+        numShardServers,
+    );
 
     st.stop();
 }

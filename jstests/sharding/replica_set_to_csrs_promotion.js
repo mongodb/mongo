@@ -346,7 +346,9 @@ describe("transitions", function () {
         });
 
         let mongos = MongoRunner.runMongos({configdb: this.rs.getURL()});
-        assert.commandWorked(mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}));
+        assert.commandWorked(
+            mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}),
+        );
 
         this.doRollingRestart(this.rs, {
             replSet: "replica_set_to_csrs_promotion",

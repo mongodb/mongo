@@ -41,7 +41,9 @@ function doTest(commitOrAbort) {
     assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(
+        primary.getDB("test"),
+    );
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     jsTestLog("Get transaction entry from config.transactions");
@@ -50,7 +52,8 @@ function doTest(commitOrAbort) {
     assert.lte(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
 
     const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
     if (isMultiversion) {
         delete txnEntry.affectedNamespaces;
     }

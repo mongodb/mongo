@@ -25,17 +25,20 @@ let res;
 let collObj;
 
 // Detect if collections are implicitly sharded
-const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+const isImplicitlyShardedCollection =
+    typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
 // Disable implicit re-create on drop for sharded suites (which are those suites that implicitly shard collections on create)
 function dropCollection(coll) {
     if (isImplicitlyShardedCollection) {
-        const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+        const originalImplicitlyShardOnCreateCollectionOnly =
+            TestData.implicitlyShardOnCreateCollectionOnly;
         try {
             TestData.implicitlyShardOnCreateCollectionOnly = true;
             assert(coll.drop());
         } finally {
-            TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+            TestData.implicitlyShardOnCreateCollectionOnly =
+                originalImplicitlyShardOnCreateCollectionOnly;
         }
     } else {
         assert(coll.drop());
@@ -200,7 +203,9 @@ jsTest.log('Test basic usage of "cursor.batchSize" option');
     );
 }
 
-jsTest.log('listCollections accepts an empty object for "cursor" (same as not specifying "cursor" at all)');
+jsTest.log(
+    'listCollections accepts an empty object for "cursor" (same as not specifying "cursor" at all)',
+);
 // We do not test for objsLeftInBatch() here, since the default batch size for this command
 // is not specified.
 {
@@ -273,7 +278,10 @@ jsTest.log("Test that batches are limited to ~16 MB");
         $jsonSchema: {
             bsonType: "object",
             properties: {
-                stringWith4mbDescription: {bsonType: "string", description: "x".repeat(3 * 1024 * 1024)},
+                stringWith4mbDescription: {
+                    bsonType: "string",
+                    description: "x".repeat(3 * 1024 * 1024),
+                },
             },
         },
     };
@@ -289,7 +297,9 @@ jsTest.log("Test that batches are limited to ~16 MB");
 
     // Filter out resharding temporal collections, which may exist when the balancer is moving
     // collections in background.
-    cursor = getListCollectionsCursor(mydb, {filter: {name: {$not: {$regex: /system\.resharding/}}}});
+    cursor = getListCollectionsCursor(mydb, {
+        filter: {name: {$not: {$regex: /system\.resharding/}}},
+    });
     assert(cursor.hasNext());
     const firstBatchSize = cursor.objsLeftInBatch();
     assert.gt(firstBatchSize, 0);

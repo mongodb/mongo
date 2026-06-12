@@ -21,10 +21,18 @@ describe("mergeAllChunksOnShard global commit is idempotent", function () {
         this.ns = this.dbName + "." + this.collName;
 
         // Let mergeAllChunksOnShard merge chunks no matter how recently they were created.
-        configureFailPoint(this.st.rs0.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPoint(
+            this.st.rs0.getPrimary(),
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
 
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
         assert.commandWorked(this.st.s.adminCommand({shardCollection: this.ns, key: {x: 1}}));
 
@@ -42,9 +50,17 @@ describe("mergeAllChunksOnShard global commit is idempotent", function () {
         // mergeAllChunksFailAfterCommit makes _configSvrCommitMergeAllPrecomputedChunksOnShard always
         // fail after the commit of the transaction. The coordinator will retry and the second time
         // around, the command will simply return through the retry branch.
-        const fp = configureFailPoint(this.st.configRS.getPrimary(), "mergeAllChunksFailAfterCommit");
+        const fp = configureFailPoint(
+            this.st.configRS.getPrimary(),
+            "mergeAllChunksFailAfterCommit",
+        );
 
-        assert.commandWorked(this.st.s.adminCommand({mergeAllChunksOnShard: this.ns, shard: this.st.shard0.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                mergeAllChunksOnShard: this.ns,
+                shard: this.st.shard0.shardName,
+            }),
+        );
 
         // Check that the command succeeded.
         const shard0Chunks = findChunksUtil

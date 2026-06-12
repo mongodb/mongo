@@ -84,7 +84,12 @@ describe("WriteConflictRetryLimitExceeded", function () {
         // With the limit off, the op either succeeds after WT retries or hits maxTimeMS.
         // The error code must never be WriteConflictRetryLimitExceeded.
         if (!res.ok && res.code) {
-            assert.neq(res.code, ErrorCodes.WriteConflictRetryLimitExceeded, "limit fired despite limitMax=0", {res});
+            assert.neq(
+                res.code,
+                ErrorCodes.WriteConflictRetryLimitExceeded,
+                "limit fired despite limitMax=0",
+                {res},
+            );
             assert.eq(
                 res.code,
                 ErrorCodes.MaxTimeMSExpired,
@@ -94,12 +99,21 @@ describe("WriteConflictRetryLimitExceeded", function () {
         }
         if (res.writeErrors) {
             for (const we of res.writeErrors) {
-                assert.neq(we.code, ErrorCodes.WriteConflictRetryLimitExceeded, "limit fired despite limitMax=0", {
-                    writeError: we,
-                });
+                assert.neq(
+                    we.code,
+                    ErrorCodes.WriteConflictRetryLimitExceeded,
+                    "limit fired despite limitMax=0",
+                    {
+                        writeError: we,
+                    },
+                );
             }
         }
-        assert.eq(getMetrics().hits, beforeHits, "limitHit counter must not move when feature is disabled");
+        assert.eq(
+            getMetrics().hits,
+            beforeHits,
+            "limitHit counter must not move when feature is disabled",
+        );
     });
 
     it("write hitting the limit surfaces WriteConflictRetryLimitExceeded with the expected categories", function () {
@@ -139,7 +153,9 @@ describe("WriteConflictRetryLimitExceeded", function () {
         });
         disableWceStorm();
         assert.commandFailedWithCode(res, ErrorCodes.WriteConflictRetryLimitExceeded);
-        assert(!res.cursor, "bulkWrite must surface the error command-level, not via cursor", {res});
+        assert(!res.cursor, "bulkWrite must surface the error command-level, not via cursor", {
+            res,
+        });
     });
 
     it("findAndModify surfaces WriteConflictRetryLimitExceeded with no special handleError-style plumbing", function () {
@@ -187,10 +203,15 @@ describe("WriteConflictRetryLimitExceeded", function () {
         disableWceStorm();
         assert.commandFailedWithCode(res, ErrorCodes.WriteConflictRetryLimitExceeded);
         const after = getMetrics().hits;
-        assert.gt(after, before, "writeConflictRetryLimitHit counter should increment after a capped op", {
-            before,
+        assert.gt(
             after,
-        });
+            before,
+            "writeConflictRetryLimitHit counter should increment after a capped op",
+            {
+                before,
+                after,
+            },
+        );
     });
 
     it("skipWriteConflictRetries failpoint takes precedence over the limit", function () {

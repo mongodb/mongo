@@ -9,7 +9,10 @@ t.drop();
 t.save({});
 
 function assertSubstring(expected, str, offset, len) {
-    assert.eq(expected, t.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a);
+    assert.eq(
+        expected,
+        t.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a,
+    );
 }
 
 function assertArgsException(args) {
@@ -134,7 +137,12 @@ assertException("$w", "$a", "$g");
 assertException("$w", "$g", "$a");
 
 // String coercion fails.
-assertErrorCode(t, [{$project: {a: {$substrCP: [new Map(), "$a", "$b"]}}}], 16007, "string coercion failed");
+assertErrorCode(
+    t,
+    [{$project: {a: {$substrCP: [new Map(), "$a", "$b"]}}}],
+    16007,
+    "string coercion failed",
+);
 
 // Computed operands.
 assertSubstring("cde", "$z", {$add: ["$b", "$b"]}, {$add: ["$c", "$d"]});
@@ -149,7 +157,11 @@ assert.eq(
                 a: {
                     $substrBytes: [
                         {
-                            $substrBytes: [{$substrBytes: [{$substrBytes: ["abcdefghij", 1, 6]}, 2, 5]}, 0, 3],
+                            $substrBytes: [
+                                {$substrBytes: [{$substrBytes: ["abcdefghij", 1, 6]}, 2, 5]},
+                                0,
+                                3,
+                            ],
                         },
                         1,
                         1,

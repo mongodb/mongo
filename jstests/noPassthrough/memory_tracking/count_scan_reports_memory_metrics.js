@@ -22,8 +22,12 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}),
+);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -40,7 +44,11 @@ const pipeline = [{$match: {a: {$gte: 0}}}, {$count: "n"}];
 
 const preliminaryExplain = coll.explain("executionStats").aggregate(pipeline);
 const countScanStages = getAggPlanStages(preliminaryExplain, "COUNT_SCAN");
-assert.gt(countScanStages.length, 0, "Expected query to use COUNT_SCAN stage with forceClassicEngine");
+assert.gt(
+    countScanStages.length,
+    0,
+    "Expected query to use COUNT_SCAN stage with forceClassicEngine",
+);
 
 runMemoryStatsTest({
     db,

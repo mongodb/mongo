@@ -38,7 +38,8 @@ function doassert(msg, obj) {
     if (typeof msg == "object") msg = tojson(msg);
 
     if (jsTest.options().traceExceptions) {
-        if (typeof msg == "string" && msg.indexOf("assert") == 0) print(new Date().toISOString() + " " + msg);
+        if (typeof msg == "string" && msg.indexOf("assert") == 0)
+            print(new Date().toISOString() + " " + msg);
         else print(new Date().toISOString() + " assert: " + msg);
     }
 
@@ -192,7 +193,9 @@ function _validateAssertionMessage(msg, attr) {
                 _doassert("msg function cannot expect any parameters.");
             }
         } else if (typeof msg !== "string" && typeof msg !== "object") {
-            _doassert("msg parameter must be a string, function or object. Found type: " + typeof msg);
+            _doassert(
+                "msg parameter must be a string, function or object. Found type: " + typeof msg,
+            );
         }
     }
     if (attr) {
@@ -351,11 +354,15 @@ assert.docEq = function (expectedDoc, actualDoc, msg, attr) {
         return;
     }
 
-    _doassert(msg, "expected document {expectedDoc} and actual document {actualDoc} are not equal", {
-        expectedDoc,
-        actualDoc,
-        ...attr,
-    });
+    _doassert(
+        msg,
+        "expected document {expectedDoc} and actual document {actualDoc} are not equal",
+        {
+            expectedDoc,
+            actualDoc,
+            ...attr,
+        },
+    );
 };
 
 /**
@@ -552,7 +559,8 @@ assert.contains = function (element, arr, msg, attr) {
 
     for (let i = 0; i < arr.length; i++) {
         const comp = arr[i];
-        const satisfied = comp == element || (comp != null && element != null && friendlyEqual(comp, element));
+        const satisfied =
+            comp == element || (comp != null && element != null && friendlyEqual(comp, element));
         if (satisfied) {
             return;
         }
@@ -583,7 +591,8 @@ assert.doesNotContain = function (element, arr, msg, attr) {
 
     for (let i = 0; i < arr.length; i++) {
         const comp = arr[i];
-        const match = comp == element || (comp != null && element != null && friendlyEqual(comp, element));
+        const match =
+            comp == element || (comp != null && element != null && friendlyEqual(comp, element));
         if (match) {
             _doassert(msg, "{element} is in {arr}", {element, arr, ...attr});
         }
@@ -769,7 +778,14 @@ assert.soonNoExcept = function (func, msg, timeout, interval, {runHangAnalyzer =
  *     "Expected 0 pinned cursors, but have " + tojson(db.serverStatus().metrics.cursor),
  *     10);
  */
-assert.retry = function (func, msg, num_attempts, intervalMS = 0, {runHangAnalyzer = true} = {}, attr) {
+assert.retry = function (
+    func,
+    msg,
+    num_attempts,
+    intervalMS = 0,
+    {runHangAnalyzer = true} = {},
+    attr,
+) {
     let attempts_made = 0;
     while (attempts_made < num_attempts) {
         if (func()) {
@@ -819,7 +835,14 @@ assert.retry = function (func, msg, num_attempts, intervalMS = 0, {runHangAnalyz
  *     return true;
  * }, "Setting jumbo flag update failed on config server", 10);
  */
-assert.retryNoExcept = function (func, msg, num_attempts, intervalMS, {runHangAnalyzer = true} = {}, attr) {
+assert.retryNoExcept = function (
+    func,
+    msg,
+    num_attempts,
+    intervalMS,
+    {runHangAnalyzer = true} = {},
+    attr,
+) {
     const safeFunc = _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
     assert.retry(safeFunc, msg, num_attempts, intervalMS, {runHangAnalyzer}, attr);
 };
@@ -1035,7 +1058,11 @@ assert.throwsWithCode = function (func, expectedCode, params, msg, attr) {
         expectedCode = [expectedCode];
     }
     if (!expectedCode.some((ec) => error.code == ec)) {
-        _doassert(msg, `[{code}] and [{expectedCode}] are not equal`, {code: error.code, expectedCode, ...attr});
+        _doassert(msg, `[{code}] and [{expectedCode}] are not equal`, {
+            code: error.code,
+            expectedCode,
+            ...attr,
+        });
     }
     return error;
 };
@@ -1235,7 +1262,11 @@ function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernEr
         // A WriteCommandError implies ok:0.
         // Error objects may have a `code` property added (e.g.
         // DBCollection.prototype.mapReduce) without a `ok` property.
-        _doassert(msg, makeFailPrefix(res), {res, originalCommand: res._commandObj, connection: res._mongo});
+        _doassert(msg, makeFailPrefix(res), {
+            res,
+            originalCommand: res._commandObj,
+            connection: res._mongo,
+        });
     } else if (res.hasOwnProperty("ok")) {
         // Handle raw command responses or cases like MapReduceResult which extend command
         // response.
@@ -1246,7 +1277,11 @@ function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernEr
             })
         ) {
             _runHangAnalyzerForSpecificFailureTypes(res);
-            _doassert(msg, makeFailPrefix(res), {res, originalCommand: res._commandObj, connection: res._mongo});
+            _doassert(msg, makeFailPrefix(res), {
+                res,
+                originalCommand: res._commandObj,
+                connection: res._mongo,
+            });
         }
     } else if (res.hasOwnProperty("acknowledged")) {
         // CRUD api functions return plain js objects with an acknowledged property.
@@ -1488,7 +1523,10 @@ assert.commandWorkedIgnoringWriteConcernErrors = function (res, msg) {
  * assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
  */
 assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors = function (res, msg) {
-    return _assertCommandWorked(res, msg, {ignoreWriteConcernErrors: true, ignoreWriteErrors: true});
+    return _assertCommandWorked(res, msg, {
+        ignoreWriteConcernErrors: true,
+        ignoreWriteErrors: true,
+    });
 };
 
 /**
@@ -1571,7 +1609,11 @@ assert.writeOK = function (res, msg, {ignoreWriteConcernErrors} = {}) {
         } else if (!ignoreWriteConcernErrors && res.hasWriteConcernError()) {
             errMsg = "write concern failed with errors";
         }
-    } else if (res instanceof WriteCommandError || res instanceof WriteError || res instanceof BulkWriteError) {
+    } else if (
+        res instanceof WriteCommandError ||
+        res instanceof WriteError ||
+        res instanceof BulkWriteError
+    ) {
         errMsg = "write command failed";
     } else {
         if (!res || !res.ok) {
@@ -1681,7 +1723,11 @@ assert.writeErrorWithCode = function (res, expectedCode, msg) {
             errMsg =
                 "found code(s) {writeErrorCodes} does not match any of the expected codes {expectedCode}. Original command response: {res}";
             _runHangAnalyzerForSpecificFailureTypes(res);
-            _doassert(msg, errMsg, {res, expectedCode, writeErrorCodes: Array.from(writeErrorCodes)});
+            _doassert(msg, errMsg, {
+                res,
+                expectedCode,
+                writeErrorCodes: Array.from(writeErrorCodes),
+            });
         }
     }
 
@@ -2179,9 +2225,24 @@ assert.soonRetryOnAcceptableErrors = function (
  *     return primaryInfo.hasOwnProperty("ismaster") && primaryInfo.ismaster;
  * });
  */
-assert.soonRetryOnNetworkErrors = function (func, msg, timeout, interval, {runHangAnalyzer = true} = {}, attr) {
+assert.soonRetryOnNetworkErrors = function (
+    func,
+    msg,
+    timeout,
+    interval,
+    {runHangAnalyzer = true} = {},
+    attr,
+) {
     let acceptableErrors = Array.from(ErrorCodes.NetworkError);
-    assert.soonRetryOnAcceptableErrors(func, acceptableErrors, msg, timeout, interval, runHangAnalyzer, attr);
+    assert.soonRetryOnAcceptableErrors(
+        func,
+        acceptableErrors,
+        msg,
+        timeout,
+        interval,
+        runHangAnalyzer,
+        attr,
+    );
 };
 
 export {doassert, sortDoc, assert, formatErrorMsg};

@@ -167,7 +167,12 @@ function runUnshardedTests() {
                     db: dbName,
                     collectionUUID: collUUID,
                 }),
-                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
+                response: mongotResponseForBatch(
+                    mongotResponseBatch,
+                    NumberLong(0),
+                    coll.getFullName(),
+                    1,
+                ),
             },
         ];
 
@@ -188,14 +193,22 @@ function runUnshardedTests() {
 
         const batchOne = [
             {
-                storedSource: {title: "The Shawshank Redemption", genre: "Drama", director: "Frank Darabont"},
+                storedSource: {
+                    title: "The Shawshank Redemption",
+                    genre: "Drama",
+                    director: "Frank Darabont",
+                },
                 $searchRootDocumentId: docOneSearchRootDocId,
             },
         ];
 
         const batchTwo = [
             {
-                storedSource: {title: "The Godfather", genre: "Crime", director: "Francis Ford Coppola"},
+                storedSource: {
+                    title: "The Godfather",
+                    genre: "Crime",
+                    director: "Francis Ford Coppola",
+                },
                 $searchRootDocumentId: docTwoSearchRootDocId,
             },
         ];
@@ -325,7 +338,12 @@ function runUnshardedTests() {
                     db: dbName,
                     collectionUUID: collUUID,
                 }),
-                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
+                response: mongotResponseForBatch(
+                    mongotResponseBatch,
+                    NumberLong(0),
+                    coll.getFullName(),
+                    1,
+                ),
             },
         ];
 
@@ -360,7 +378,12 @@ function runUnshardedTests() {
                         db: dbName,
                         collectionUUID: collUUID,
                     }),
-                    response: mongotResponseForBatch(responseWithInvalidIdType, NumberLong(0), coll.getFullName(), 1),
+                    response: mongotResponseForBatch(
+                        responseWithInvalidIdType,
+                        NumberLong(0),
+                        coll.getFullName(),
+                        1,
+                    ),
                 },
             ];
 
@@ -384,7 +407,12 @@ function runUnshardedTests() {
                         db: dbName,
                         collectionUUID: collUUID,
                     }),
-                    response: mongotResponseForBatch(responseWithMissing, NumberLong(0), coll.getFullName(), 1),
+                    response: mongotResponseForBatch(
+                        responseWithMissing,
+                        NumberLong(0),
+                        coll.getFullName(),
+                        1,
+                    ),
                 },
             ];
 
@@ -449,7 +477,12 @@ function runUnshardedTests() {
                     db: dbName,
                     collectionUUID: collUUID,
                 }),
-                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
+                response: mongotResponseForBatch(
+                    mongotResponseBatch,
+                    NumberLong(0),
+                    coll.getFullName(),
+                    1,
+                ),
             },
         ];
 
@@ -483,7 +516,9 @@ function runShardedTests() {
 
     const mongos = st.s;
     const testDB = mongos.getDB(dbName);
-    assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+    );
 
     const testColl = testDB.getCollection(collName);
     const collNS = testColl.getFullName();
@@ -622,7 +657,13 @@ function runShardedTests() {
             {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
+        mockPlanShardedSearchResponse(
+            testColl.getName(),
+            mongotQuery,
+            dbName,
+            undefined,
+            stWithMock,
+        );
 
         const result = testColl.aggregate(pipeline).toArray();
         assert.gt(result.length, 0, "Should return movie results");
@@ -705,7 +746,13 @@ function runShardedTests() {
             {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
+        mockPlanShardedSearchResponse(
+            testColl.getName(),
+            mongotQuery,
+            dbName,
+            undefined,
+            stWithMock,
+        );
 
         const err = assert.throws(() => testColl.aggregate(pipeline).toArray());
         assert.commandFailedWithCode(err, ErrorCodes.InvalidIdField);
@@ -785,7 +832,13 @@ function runShardedTests() {
             {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
+        mockPlanShardedSearchResponse(
+            testColl.getName(),
+            mongotQuery,
+            dbName,
+            undefined,
+            stWithMock,
+        );
 
         const result = testColl.aggregate(pipeline).toArray();
         assert.gt(result.length, 0, "Should return director results");

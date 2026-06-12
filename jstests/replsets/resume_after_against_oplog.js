@@ -28,7 +28,9 @@ const testData = [
     {_id: 1, ans: 42},
     {_id: 2, ans: 42},
 ];
-testData.forEach((doc) => assert.commandWorked(node.getDB(dbName).getCollection(collName).insert([doc])));
+testData.forEach((doc) =>
+    assert.commandWorked(node.getDB(dbName).getCollection(collName).insert([doc])),
+);
 
 const localDb = node.getDB("local");
 const kNullTS = new Timestamp(0, 0);
@@ -139,7 +141,9 @@ jsTestLog("Running initial tailable query on the oplog");
     const cursorId = res.cursor.id;
 
     jsTest.log("Ensure that postBatchResumeToken attribute is returned for getMore command");
-    const resGetMore1 = assert.commandWorked(localDb.runCommand({getMore: cursorId, collection: "oplog.rs"}));
+    const resGetMore1 = assert.commandWorked(
+        localDb.runCommand({getMore: cursorId, collection: "oplog.rs"}),
+    );
 
     assert.eq(resGetMore1.cursor.nextBatch.length, 2, resGetMore1);
     assert.eq(resGetMore1.cursor.nextBatch[0].o._id, 1, resGetMore1);
@@ -149,7 +153,9 @@ jsTestLog("Running initial tailable query on the oplog");
     const resumeToken2 = assertExpectedResumeTokenFormat(resGetMore1);
     assert.eq(timestampCmp(resumeToken2.ts, resumeToken1.ts), 1, resGetMore1);
 
-    jsTest.log("Ensure that postBatchResumeToken attribute is returned for getMore command with no results");
+    jsTest.log(
+        "Ensure that postBatchResumeToken attribute is returned for getMore command with no results",
+    );
     const resGetMore2 = assert.commandWorked(
         localDb.runCommand({getMore: cursorId, collection: "oplog.rs", maxTimeMS: 100}),
     );
@@ -316,7 +322,9 @@ jsTestLog("Running query on the oplog with an empty batch");
     const cursorId = res.cursor.id;
 
     jsTest.log("Run a getMore that should return data");
-    const resGetMore1 = assert.commandWorked(localDb.runCommand({getMore: cursorId, collection: "oplog.rs"}));
+    const resGetMore1 = assert.commandWorked(
+        localDb.runCommand({getMore: cursorId, collection: "oplog.rs"}),
+    );
 
     assert.eq(resGetMore1.cursor.nextBatch.length, 3, resGetMore1);
     assert.eq(resGetMore1.cursor.nextBatch[0].o._id, 0, resGetMore1);

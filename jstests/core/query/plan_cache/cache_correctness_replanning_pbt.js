@@ -42,7 +42,11 @@ const controlColl = db.cache_correctness_replanning_pbt_control;
 const experimentColl = db.cache_correctness_replanning_pbt_experiment;
 const correctnessProperty = createReplanningCacheCorrectnessProperty(controlColl, experimentColl);
 
-const indexesModel = getIndexesModel({isTS: TestData.isTimeseriesTestSuite, minNumIndexes: 10, maxNumIndexes: 30});
+const indexesModel = getIndexesModel({
+    isTS: TestData.isTimeseriesTestSuite,
+    minNumIndexes: 10,
+    maxNumIndexes: 30,
+});
 const aggModel = getQueryAndOptionsModel().filter(
     // Older versions suffer from SERVER-101007
     ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),

@@ -19,7 +19,9 @@ class ConvertTest {
     getFormatField() {
         // The "format" field is not supported in FCVs prior to 8.0. Hence the we must not use it in
         // the pipelines unless the workload is guaranteed to not run on older FCVs.
-        return this.requiresFCV80 || this.requiresFCV81 || this.requiresFCV83 ? {format: "$format"} : {};
+        return this.requiresFCV80 || this.requiresFCV81 || this.requiresFCV83
+            ? {format: "$format"}
+            : {};
     }
 
     getByteOrderField() {
@@ -94,7 +96,11 @@ class ConvertTest {
                             then: {
                                 $convert: {
                                     input: {
-                                        $convert: {input: "$output", to: "$inputType", ...baseField},
+                                        $convert: {
+                                            input: "$output",
+                                            to: "$inputType",
+                                            ...baseField,
+                                        },
                                     },
                                     to: "$outputType",
                                     ...baseField,
@@ -269,7 +275,15 @@ class ConvertTest {
             function () {
                 coll.aggregate([
                     {
-                        $project: {output: {$convert: {to: "string", input: {$divide: [1, 0]}, onError: "ERROR"}}},
+                        $project: {
+                            output: {
+                                $convert: {
+                                    to: "string",
+                                    input: {$divide: [1, 0]},
+                                    onError: "ERROR",
+                                },
+                            },
+                        },
                     },
                 ]);
             },

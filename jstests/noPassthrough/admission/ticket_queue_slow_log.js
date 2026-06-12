@@ -114,6 +114,9 @@ const predicate = new RegExp(
         `"(execution|ingress)":{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}` +
         `.*"(execution|ingress)":{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}`,
 );
-assert(checkLog.checkContainsOnce(primary, predicate), "Could not find log containing " + predicate);
+assert(
+    checkLog.checkContainsOnce(primary, predicate),
+    "Could not find log containing " + predicate,
+);
 
 rst.stopSet();

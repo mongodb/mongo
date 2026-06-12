@@ -31,12 +31,18 @@ const runTest = (indexDefinition) => {
     // However, compounding with an array of 20 elements will exceed the number of keys (11*20 >
     // 200) and should fail
     assert.commandFailed(
-        coll.insert({x: polygon, y: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]}),
+        coll.insert({
+            x: polygon,
+            y: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+        }),
     );
 
     // Now let's set a failpoint to relax the constraint so we can insert some bad documents.
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "relaxIndexMaxNumGeneratedKeysPerDocument", mode: "alwaysOn"}),
+        testDB.adminCommand({
+            configureFailPoint: "relaxIndexMaxNumGeneratedKeysPerDocument",
+            mode: "alwaysOn",
+        }),
     );
 
     assert.commandWorked(
@@ -57,12 +63,18 @@ const runTest = (indexDefinition) => {
     // And let's disable the failpoint again. At this point, the documents inserted above simulate
     // old documents inserted prior to SERVER-61184.
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "relaxIndexMaxNumGeneratedKeysPerDocument", mode: "off"}),
+        testDB.adminCommand({
+            configureFailPoint: "relaxIndexMaxNumGeneratedKeysPerDocument",
+            mode: "off",
+        }),
     );
 
     // Confirm we cannot continue to insert bad documents.
     assert.commandFailed(
-        coll.insert({x: polygon, y: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]}),
+        coll.insert({
+            x: polygon,
+            y: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+        }),
     );
 
     // We should also get a warning when we try to validate.

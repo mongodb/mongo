@@ -28,7 +28,14 @@ st.adminCommand({shardCollection: "test.user", key: {x: 1}});
 assert.commandWorked(st.s.adminCommand({split: "test.user", middle: {x: 0}}));
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
-let joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, "test.user", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s.host,
+    {x: 0},
+    null,
+    "test.user",
+    st.shard1.shardName,
+);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -78,7 +85,9 @@ const changeDocToChunkNotMigrated = {
     txnNumber: NumberLong(37),
 };
 
-const changeDocToNotMigratedResult = assert.commandWorked(testDB.runCommand(changeDocToChunkNotMigrated));
+const changeDocToNotMigratedResult = assert.commandWorked(
+    testDB.runCommand(changeDocToChunkNotMigrated),
+);
 
 const changeDocToChunkMigrated = {
     findAndModify: "user",
@@ -102,7 +111,9 @@ const findAndModifyNotMigrated = {
     txnNumber: NumberLong(37),
 };
 
-const findAndModifyNotMigratedResult = assert.commandWorked(testDB.runCommand(findAndModifyNotMigrated));
+const findAndModifyNotMigratedResult = assert.commandWorked(
+    testDB.runCommand(findAndModifyNotMigrated),
+);
 
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 joinMoveChunk();
@@ -128,27 +139,42 @@ assert.eq(findAndModifyResult.lastErrorObject, findAndModifyRetryResult.lastErro
 
 assert.eq(1, testDB.user.findOne({x: 30}).y);
 
-let changeDocToNotMigratedRetryResult = assert.commandWorked(testDB.runCommand(changeDocToChunkNotMigrated));
+let changeDocToNotMigratedRetryResult = assert.commandWorked(
+    testDB.runCommand(changeDocToChunkNotMigrated),
+);
 
 assert.eq(changeDocToNotMigratedResult.ok, changeDocToNotMigratedRetryResult.ok);
 assert.eq(changeDocToNotMigratedResult.value, changeDocToNotMigratedRetryResult.value);
-assert.eq(changeDocToNotMigratedResult.lastErrorObject, changeDocToNotMigratedRetryResult.lastErrorObject);
+assert.eq(
+    changeDocToNotMigratedResult.lastErrorObject,
+    changeDocToNotMigratedRetryResult.lastErrorObject,
+);
 
 assert.eq(1, testDB.user.find({x: -120}).itcount());
 
-let changeDocToMigratedRetryResult = assert.commandWorked(testDB.runCommand(changeDocToChunkMigrated));
+let changeDocToMigratedRetryResult = assert.commandWorked(
+    testDB.runCommand(changeDocToChunkMigrated),
+);
 
 assert.eq(changeDocToMigratedResult.ok, changeDocToMigratedRetryResult.ok);
 assert.eq(changeDocToMigratedResult.value, changeDocToMigratedRetryResult.value);
-assert.eq(changeDocToMigratedResult.lastErrorObject, changeDocToMigratedRetryResult.lastErrorObject);
+assert.eq(
+    changeDocToMigratedResult.lastErrorObject,
+    changeDocToMigratedRetryResult.lastErrorObject,
+);
 
 assert.eq(1, testDB.user.find({x: 120}).itcount());
 
-let findAndModifyNotMigratedRetryResult = assert.commandWorked(testDB.runCommand(findAndModifyNotMigrated));
+let findAndModifyNotMigratedRetryResult = assert.commandWorked(
+    testDB.runCommand(findAndModifyNotMigrated),
+);
 
 assert.eq(findAndModifyNotMigratedResult.ok, findAndModifyNotMigratedRetryResult.ok);
 assert.eq(findAndModifyNotMigratedResult.value, findAndModifyNotMigratedRetryResult.value);
-assert.eq(findAndModifyNotMigratedResult.lastErrorObject, findAndModifyNotMigratedRetryResult.lastErrorObject);
+assert.eq(
+    findAndModifyNotMigratedResult.lastErrorObject,
+    findAndModifyNotMigratedRetryResult.lastErrorObject,
+);
 
 assert.eq(1, testDB.user.findOne({x: -30}).y);
 

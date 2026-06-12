@@ -61,7 +61,9 @@ export var TimeseriesTest = class {
             }
         }
 
-        let bucketIndexes = getTimeseriesCollForRawOps(db, coll).getIndexes(getRawOperationSpec(db));
+        let bucketIndexes = getTimeseriesCollForRawOps(db, coll).getIndexes(
+            getRawOperationSpec(db),
+        );
         for (const index of bucketIndexes) {
             if (index.name === indexName) {
                 sawIndex = true;
@@ -69,7 +71,10 @@ export var TimeseriesTest = class {
             }
         }
 
-        assert(sawIndex, `Index with name: ${indexName} is missing: ${tojson({userIndexes, bucketIndexes})}`);
+        assert(
+            sawIndex,
+            `Index with name: ${indexName} is missing: ${tojson({userIndexes, bucketIndexes})}`,
+        );
 
         assert.commandWorked(coll.dropIndexes(indexName));
     }
@@ -117,7 +122,10 @@ export var TimeseriesTest = class {
             metadata.options.storageEngine &&
             metadata.options.storageEngine.wiredTiger &&
             metadata.options.storageEngine.wiredTiger.configString;
-        return tsMixedSchemaOptionNewFormat == "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
+        return (
+            tsMixedSchemaOptionNewFormat ==
+            "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)"
+        );
     }
 
     // TODO SERVER-68058 remove this helper.
@@ -224,11 +232,19 @@ export var TimeseriesTest = class {
                     datacenter: TimeseriesTest.getRandomElem(dataCenters[regionIndex]),
                     hostname: "host_" + i,
                     hostid: i,
-                    os: TimeseriesTest.getRandomElem(["Ubuntu15.10", "Ubuntu16.10", "Ubuntu16.04LTS"]),
+                    os: TimeseriesTest.getRandomElem([
+                        "Ubuntu15.10",
+                        "Ubuntu16.10",
+                        "Ubuntu16.04LTS",
+                    ]),
                     rack: Random.randInt(100).toString(),
                     region: regions[regionIndex],
                     service: Random.randInt(20).toString(),
-                    service_environment: TimeseriesTest.getRandomElem(["production", "staging", "test"]),
+                    service_environment: TimeseriesTest.getRandomElem([
+                        "production",
+                        "staging",
+                        "test",
+                    ]),
                     service_version: Random.randInt(2).toString(),
                     team: TimeseriesTest.getRandomElem(["CHI", "LON", "NYC", "SF"]),
                 },
@@ -268,7 +284,11 @@ export var TimeseriesTest = class {
             // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
             if (!isViewlessTimeseriesOnlySuite(db)) {
                 return coll
-                    .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
+                    .aggregate([
+                        {"$collStats": {storageStats: {}}},
+                        {$project: {shard: 1}},
+                        {$sort: {shard: 1}},
+                    ])
                     .toArray()
                     .map((doc) => doc.shard);
             }
@@ -383,7 +403,9 @@ export var TimeseriesTest = class {
         // Tests that hint() cannot be used when the index is hidden.
         assert.commandWorked(coll.hideIndex(indexName));
         assert.commandFailedWithCode(
-            assert.throws(() => getTimeseriesCollForRawOps(db, coll).find().rawData().hint(indexName).toArray()),
+            assert.throws(() =>
+                getTimeseriesCollForRawOps(db, coll).find().rawData().hint(indexName).toArray(),
+            ),
             ErrorCodes.BadValue,
         );
         assert.commandFailedWithCode(
@@ -545,8 +567,22 @@ export var TimeseriesTest = class {
         assert.soon(function () {
             return errorIdList.some(
                 (errorId) =>
-                    checkLog.checkContainsWithCountJson(conn, errorId, attrsMatcherBuckets, 1, null, relaxMatch) ||
-                    checkLog.checkContainsWithCountJson(conn, errorId, attrsMatcherView, 1, null, relaxMatch),
+                    checkLog.checkContainsWithCountJson(
+                        conn,
+                        errorId,
+                        attrsMatcherBuckets,
+                        1,
+                        null,
+                        relaxMatch,
+                    ) ||
+                    checkLog.checkContainsWithCountJson(
+                        conn,
+                        errorId,
+                        attrsMatcherView,
+                        1,
+                        null,
+                        relaxMatch,
+                    ),
             );
         }, `Could not find log entries containing any of the following ids: ${errorIdList}, and attrs: ${attrsMatcherBuckets} or attrs: ${attrsMatcherView}`);
     }

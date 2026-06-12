@@ -30,7 +30,11 @@ export const $config = (function () {
         // overhead
         doc.padding = "";
         let paddingLength = size - Object.bsonsize(doc);
-        assert.lte(0, paddingLength, "document is already bigger than " + size + " bytes: " + tojson(doc));
+        assert.lte(
+            0,
+            paddingLength,
+            "document is already bigger than " + size + " bytes: " + tojson(doc),
+        );
         doc.padding = getStringOfLength(paddingLength);
         assert.eq(size, Object.bsonsize(doc));
         return doc;

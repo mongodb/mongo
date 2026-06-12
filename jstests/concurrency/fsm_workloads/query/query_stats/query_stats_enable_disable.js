@@ -24,18 +24,24 @@ import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/s
 
 export const $config = (function () {
     function setCacheSize(db, cacheSize) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: cacheSize}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: cacheSize}),
+        );
     }
 
     function setRateLimit(db, rateLimit) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: rateLimit}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: rateLimit}),
+        );
     }
 
     function runQueryStats({db, options}) {
         try {
             // Use a small batch size to ensure these operations open up a cursor and use
             // multiple getMores - this will better stress odd concurrency states.
-            const cursor = db.getSiblingDB("admin").aggregate([{$queryStats: options}], {batchSize: 1});
+            const cursor = db
+                .getSiblingDB("admin")
+                .aggregate([{$queryStats: options}], {batchSize: 1});
             // Can't assert much in particular about the results.
             assert.gte(cursor.itcount(), 0);
         } catch (e) {
@@ -63,7 +69,10 @@ export const $config = (function () {
         enableViaRateLimit: (db, collName) => setRateLimit(db, -1),
 
         runOneQuery: function runOneQuery(db, collName) {
-            assert.eq(null, db[collName].findOne({["field" + Random.randInt(nDifferentShapes)]: 42}));
+            assert.eq(
+                null,
+                db[collName].findOne({["field" + Random.randInt(nDifferentShapes)]: 42}),
+            );
         },
 
         runQueryStatsWithHmac: (db, collName) => runQueryStats({db: db, options: hmacOptions}),

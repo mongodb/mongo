@@ -13,7 +13,9 @@ import {getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/query/plan_cache_utils.js";
 import {checkSbeFullyEnabled, checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
-const conn = MongoRunner.runMongod({setParameter: {featureFlagGetExecutorDeferredEngineChoice: true}});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagGetExecutorDeferredEngineChoice: true},
+});
 const db = conn.getDB("test");
 
 // This test requires us to use classic sometimes, which SBE full overrides.

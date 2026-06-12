@@ -174,7 +174,9 @@ for (const resultDoc of results) {
             const delta = Math.abs(expectedValue - resultValue);
             matches =
                 delta === 0 ||
-                delta / Math.min(Math.abs(expectedValue) + Math.abs(resultValue), Number.MAX_VALUE) < epsilon;
+                delta /
+                    Math.min(Math.abs(expectedValue) + Math.abs(resultValue), Number.MAX_VALUE) <
+                    epsilon;
         } else {
             matches = expectedValue === resultValue;
         }
@@ -252,7 +254,10 @@ assert.commandWorked(
 );
 
 results = coll
-    .aggregate([{$project: {ln: {$ln: "$x"}, log10: {$log10: "$x"}, sqrt: {$sqrt: "$x"}}}, {$sort: {_id: 1}}])
+    .aggregate([
+        {$project: {ln: {$ln: "$x"}, log10: {$log10: "$x"}, sqrt: {$sqrt: "$x"}}},
+        {$sort: {_id: 1}},
+    ])
     .toArray();
 
 assert.eq(results, [

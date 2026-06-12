@@ -43,24 +43,96 @@ const timeFilter = {t: {$gt: new Date(1000), $lte: new Date(3000000)}};
 const pointQueryMatch = [{$match: {"m.a": 5, "m.b": 5, "m.c": 5, ...timeFilter}}];
 
 // Sort matches index direction: forward scan.
-runRewritesTest({"m.a": 1, "m.b": 1, "m.c": 1, t: -1}, index, index, forwardIxscan, coll, true, pointQueryMatch);
+runRewritesTest(
+    {"m.a": 1, "m.b": 1, "m.c": 1, t: -1},
+    index,
+    index,
+    forwardIxscan,
+    coll,
+    true,
+    pointQueryMatch,
+);
 
 // Sort is fully reversed from index: backward scan.
-runRewritesTest({"m.a": -1, "m.b": -1, "m.c": -1, t: 1}, index, index, backwardIxscan, coll, false, pointQueryMatch);
+runRewritesTest(
+    {"m.a": -1, "m.b": -1, "m.c": -1, t: 1},
+    index,
+    index,
+    backwardIxscan,
+    coll,
+    false,
+    pointQueryMatch,
+);
 
 // All meta fields have point predicates so only t direction determines the scan:
 // t:1 requires a backward scan since the index has t:-1
-runRewritesTest({"m.a": 1, "m.b": 1, "m.c": 1, t: 1}, index, index, backwardIxscan, coll, false, pointQueryMatch);
-runRewritesTest({"m.a": -1, "m.b": 1, "m.c": -1, t: -1}, index, index, forwardIxscan, coll, true, pointQueryMatch);
+runRewritesTest(
+    {"m.a": 1, "m.b": 1, "m.c": 1, t: 1},
+    index,
+    index,
+    backwardIxscan,
+    coll,
+    false,
+    pointQueryMatch,
+);
+runRewritesTest(
+    {"m.a": -1, "m.b": 1, "m.c": -1, t: -1},
+    index,
+    index,
+    forwardIxscan,
+    coll,
+    true,
+    pointQueryMatch,
+);
 
 // Point queries on m.a and m.c, only sort on m.b has to match index traversal direction
 const pointQueryMatchOnAC = [{$match: {"m.a": 5, "m.c": 5, ...timeFilter}}];
 // m.b has correct direction, m.a and m.c wrong but shouldn't affect traversal
-runRewritesTest({"m.a": -1, "m.b": 1, "m.c": 1, t: -1}, index, index, forwardIxscan, coll, true, pointQueryMatchOnAC);
-runRewritesTest({"m.a": -1, "m.b": -1, "m.c": 1, t: 1}, index, index, backwardIxscan, coll, false, pointQueryMatchOnAC);
+runRewritesTest(
+    {"m.a": -1, "m.b": 1, "m.c": 1, t: -1},
+    index,
+    index,
+    forwardIxscan,
+    coll,
+    true,
+    pointQueryMatchOnAC,
+);
+runRewritesTest(
+    {"m.a": -1, "m.b": -1, "m.c": 1, t: 1},
+    index,
+    index,
+    backwardIxscan,
+    coll,
+    false,
+    pointQueryMatchOnAC,
+);
 // m.b has wrong direction, m.a or m.c wrong
-runDoesntRewriteTest({"m.a": 1, "m.b": -1, "m.c": -1, t: -1}, index, index, coll, pointQueryMatchOnAC);
-runDoesntRewriteTest({"m.a": 1, "m.b": 1, "m.c": -1, t: 1}, index, index, coll, pointQueryMatchOnAC);
+runDoesntRewriteTest(
+    {"m.a": 1, "m.b": -1, "m.c": -1, t: -1},
+    index,
+    index,
+    coll,
+    pointQueryMatchOnAC,
+);
+runDoesntRewriteTest(
+    {"m.a": 1, "m.b": 1, "m.c": -1, t: 1},
+    index,
+    index,
+    coll,
+    pointQueryMatchOnAC,
+);
 // m.b has wrong direction, m.a and m.c both correct
-runDoesntRewriteTest({"m.a": 1, "m.b": -1, "m.c": 1, t: -1}, index, index, coll, pointQueryMatchOnAC);
-runDoesntRewriteTest({"m.a": -1, "m.b": 1, "m.c": -1, t: 1}, index, index, coll, pointQueryMatchOnAC);
+runDoesntRewriteTest(
+    {"m.a": 1, "m.b": -1, "m.c": 1, t: -1},
+    index,
+    index,
+    coll,
+    pointQueryMatchOnAC,
+);
+runDoesntRewriteTest(
+    {"m.a": -1, "m.b": 1, "m.c": -1, t: 1},
+    index,
+    index,
+    coll,
+    pointQueryMatchOnAC,
+);

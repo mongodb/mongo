@@ -16,8 +16,9 @@ coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
-const collections = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: coll.getName()}})).cursor
-    .firstBatch;
+const collections = assert.commandWorked(
+    db.runCommand({listCollections: 1, filter: {name: coll.getName()}}),
+).cursor.firstBatch;
 assert.eq(1, collections.length);
 const collectionDocument = collections[0];
 

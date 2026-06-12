@@ -27,7 +27,9 @@ function setup() {
     });
 
     // Create a sharded collection with two chunks: [-inf, 50), [50, inf)
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 
@@ -55,7 +57,9 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans, 
 }
 
 (() => {
-    jsTestLog("Test normal case where the pending field has been removed and the orphans are deleted");
+    jsTestLog(
+        "Test normal case where the pending field has been removed and the orphans are deleted",
+    );
     let st = setup();
 
     let testDB = st.s.getDB(dbName);
@@ -63,7 +67,12 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans, 
 
     // Move chunk [50, inf) to shard1.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: {x: 50},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     let shard0Coll = st.shard0.getCollection(ns);
@@ -90,7 +99,11 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans, 
     assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
 
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
-    const shardVersion = ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
+    const shardVersion = ShardVersioningUtil.getShardVersion(
+        st.shard0,
+        ns,
+        true /* waitForRefresh */,
+    );
     writeRangeDeletionTask(collectionUuid, st.shard0, false, orphanCount, shardVersion);
 
     // Step down current primary.
@@ -118,7 +131,12 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans, 
 
     // Move chunk [50, inf) to shard1.
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}),
+        st.s.adminCommand({
+            moveChunk: ns,
+            find: {x: 50},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     let shard0Coll = st.shard0.getCollection(ns);
@@ -131,7 +149,11 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans, 
     }
 
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
-    const shardVersion = ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
+    const shardVersion = ShardVersioningUtil.getShardVersion(
+        st.shard0,
+        ns,
+        true /* waitForRefresh */,
+    );
     writeRangeDeletionTask(collectionUuid, st.shard0, true, orphanCount, shardVersion);
 
     const expectedNumDocsTotal = 0;

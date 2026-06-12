@@ -114,11 +114,18 @@ RollbackOps(rollbackNode);
 // Check collection rename oplog entry.
 {
     const replTest = rollbackTest.getTestFixture();
-    const ops = replTest.dumpOplog(rollbackNode, {ns: "test.$cmd", "o.renameCollection": "test.z", "o.to": "test.x"});
+    const ops = replTest.dumpOplog(rollbackNode, {
+        ns: "test.$cmd",
+        "o.renameCollection": "test.z",
+        "o.to": "test.x",
+    });
     assert.eq(1, ops.length);
     const op = ops[0];
     assert(op.hasOwnProperty("o2"), "expected o2 field in rename oplog entry: " + tojson(op));
-    assert(op.o2.hasOwnProperty("numRecords"), "expected count in rename oplog entry: " + tojson(op));
+    assert(
+        op.o2.hasOwnProperty("numRecords"),
+        "expected count in rename oplog entry: " + tojson(op),
+    );
     assert.eq(4, op.o2.numRecords, "incorrect count in rename oplog entry: " + tojson(op));
 }
 

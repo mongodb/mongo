@@ -16,14 +16,20 @@
  *   requires_getmore,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
-const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+);
+const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries
+    .bucketMaxSpanSeconds;
 
 // Create a descending time index to allow sorting by control.max.t
 assert.commandWorked(coll.createIndex({t: -1}));
@@ -50,7 +56,10 @@ assert.commandWorked(coll.createIndex({t: -1}));
         "Expected more than one bucket",
     );
 
-    TimeseriesTest.ensureDataIsDistributedIfSharded(coll, new Date(+start + (batchSize / 2) * intervalMillis));
+    TimeseriesTest.ensureDataIsDistributedIfSharded(
+        coll,
+        new Date(+start + (batchSize / 2) * intervalMillis),
+    );
 }
 
 const unpackStage = getAggPlanStages(coll.explain().aggregate(), "$_internalUnpackBucket")[0];
@@ -59,9 +68,17 @@ function assertSorted(result, ascending) {
     let prev = ascending ? {t: -Infinity} : {t: Infinity};
     for (const doc of result) {
         if (ascending) {
-            assert.lte(+prev.t, +doc.t, "Found two docs not in ascending time order: " + tojson({prev, doc}));
+            assert.lte(
+                +prev.t,
+                +doc.t,
+                "Found two docs not in ascending time order: " + tojson({prev, doc}),
+            );
         } else {
-            assert.gte(+prev.t, +doc.t, "Found two docs not in descending time order: " + tojson({prev, doc}));
+            assert.gte(
+                +prev.t,
+                +doc.t,
+                "Found two docs not in descending time order: " + tojson({prev, doc}),
+            );
         }
 
         prev = doc;
@@ -84,7 +101,11 @@ function runTest(ascending) {
     {
         const reference = getTimeseriesCollForRawOps(coll)
             .aggregate(
-                [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: {t: ascending ? 1 : -1}}],
+                [
+                    unpackStage,
+                    {$_internalInhibitOptimization: {}},
+                    {$sort: {t: ascending ? 1 : -1}},
+                ],
                 kRawOperationSpec,
             )
             .toArray();
@@ -104,7 +125,12 @@ function runTest(ascending) {
             assertSorted(opt, ascending);
             assert.eq(reference, opt);
         } else {
-            checkAgainstReference(reference, [{$sort: {t: ascending ? 1 : -1}}], {"t": -1}, ascending);
+            checkAgainstReference(
+                reference,
+                [{$sort: {t: ascending ? 1 : -1}}],
+                {"t": -1},
+                ascending,
+            );
         }
     }
 
@@ -112,7 +138,12 @@ function runTest(ascending) {
     {
         const naive = getTimeseriesCollForRawOps(coll)
             .aggregate(
-                [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: {t: ascending ? 1 : -1}}, {$limit: 100}],
+                [
+                    unpackStage,
+                    {$_internalInhibitOptimization: {}},
+                    {$sort: {t: ascending ? 1 : -1}},
+                    {$limit: 100},
+                ],
                 kRawOperationSpec,
             )
             .toArray();
@@ -127,7 +158,9 @@ function runTest(ascending) {
                     {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "min"} : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
+                            bound: ascending
+                                ? {base: "min"}
+                                : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
                             limit: 100,
                         },
                     },
@@ -147,7 +180,9 @@ function runTest(ascending) {
                     {
                         $_internalBoundedSort: {
                             sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds} : {base: "max"},
+                            bound: ascending
+                                ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                                : {base: "max"},
                             limit: 100,
                         },
                     },

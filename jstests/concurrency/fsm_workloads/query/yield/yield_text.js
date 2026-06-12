@@ -19,7 +19,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.query = function text(db, collName) {
         let word = this.words[Random.randInt(this.words.length)];
 
-        let cursor = db[collName].find({$text: {$search: word}, yield_text: {$exists: true}}).batchSize(this.batchSize);
+        let cursor = db[collName]
+            .find({$text: {$search: word}, yield_text: {$exists: true}})
+            .batchSize(this.batchSize);
 
         let verifier = function textVerifier(doc, prevDoc) {
             return doc.yield_text.indexOf(word) !== -1;

@@ -48,13 +48,17 @@ assert.eq(projectOnlyPipeline({idVal: "$link.$id"}), [{_id: 0, idVal: "id0"}]);
 assert.eq(projectOnlyPipeline({idVal: "$linkArray.$id"}), [{_id: 0, idVal: ["id0", "id1"]}]);
 
 assert.eq(projectOnlyPipeline({idVal: "$link.$db"}), [{_id: 0, idVal: db.getName()}]);
-assert.eq(projectOnlyPipeline({idVal: "$linkArray.$db"}), [{_id: 0, idVal: [db.getName(), db.getName()]}]);
+assert.eq(projectOnlyPipeline({idVal: "$linkArray.$db"}), [
+    {_id: 0, idVal: [db.getName(), db.getName()]},
+]);
 
 // Use a DBRef sub-field in an expression.
 assert.eq(projectOnlyPipeline({idLen: {$strLenCP: "$link.$id"}}), [{_id: 0, idLen: "id0".length}]);
 
 // Project away DBRef values.
-assert.eq(projectOnlyPipeline({link: {$ref: 0}, linkArray: 0}), [{_id: 0, link: {$id: "id0", $db: db.getName()}}]);
+assert.eq(projectOnlyPipeline({link: {$ref: 0}, linkArray: 0}), [
+    {_id: 0, link: {$id: "id0", $db: db.getName()}},
+]);
 
 assert.eq(projectOnlyPipeline({link: 0, linkArray: {$id: 0}}), [
     {
@@ -95,21 +99,35 @@ assert.eq(
 );
 
 // Do a count (using $group) on a DBRef field.
-assert.eq(coll.aggregate({$group: {_id: "$link.$db", count: {$sum: 1}}}).toArray(), [{_id: db.getName(), count: 1}]);
+assert.eq(coll.aggregate({$group: {_id: "$link.$db", count: {$sum: 1}}}).toArray(), [
+    {_id: db.getName(), count: 1},
+]);
 
 // Refer to a DBRef field in an accumulator.
-assert.eq(coll.aggregate({$group: {_id: "$link.$db", count: {$sum: {$size: "$linkArray.$ref"}}}}).toArray(), [
-    {_id: db.getName(), count: 2},
-]);
+assert.eq(
+    coll
+        .aggregate({$group: {_id: "$link.$db", count: {$sum: {$size: "$linkArray.$ref"}}}})
+        .toArray(),
+    [{_id: db.getName(), count: 2}],
+);
 
 // Use $lookup with a DBRef.
 
 // Equality match version.
 const lookupEqualityPipeline = [
-    {$lookup: {from: otherColl.getName(), localField: "link.$id", foreignField: "_id", as: "joinedField"}},
+    {
+        $lookup: {
+            from: otherColl.getName(),
+            localField: "link.$id",
+            foreignField: "_id",
+            as: "joinedField",
+        },
+    },
     {$project: {link: 0, linkArray: 0}},
 ];
-assert.eq(coll.aggregate(lookupEqualityPipeline).toArray(), [{_id: 0, joinedField: [{_id: "id0", x: 1}]}]);
+assert.eq(coll.aggregate(lookupEqualityPipeline).toArray(), [
+    {_id: 0, joinedField: [{_id: "id0", x: 1}]},
+]);
 
 // Foreign pipeline.
 const lookupSubPipePipeline = [
@@ -142,18 +160,30 @@ assert(
 
     // id0 -> id1 -> id2 -> id0
     assert.commandWorked(
-        graphLookupColl.insert({_id: "id0", link: new DBRef(graphLookupColl.getName(), "id1", db.getName())}),
+        graphLookupColl.insert({
+            _id: "id0",
+            link: new DBRef(graphLookupColl.getName(), "id1", db.getName()),
+        }),
     );
     assert.commandWorked(
-        graphLookupColl.insert({_id: "id1", link: new DBRef(graphLookupColl.getName(), "id2", db.getName())}),
+        graphLookupColl.insert({
+            _id: "id1",
+            link: new DBRef(graphLookupColl.getName(), "id2", db.getName()),
+        }),
     );
     assert.commandWorked(
-        graphLookupColl.insert({_id: "id2", link: new DBRef(graphLookupColl.getName(), "id0", db.getName())}),
+        graphLookupColl.insert({
+            _id: "id2",
+            link: new DBRef(graphLookupColl.getName(), "id0", db.getName()),
+        }),
     );
 
     // id3 -> id4
     assert.commandWorked(
-        graphLookupColl.insert({_id: "id3", link: new DBRef(graphLookupColl.getName(), "id4", db.getName())}),
+        graphLookupColl.insert({
+            _id: "id3",
+            link: new DBRef(graphLookupColl.getName(), "id4", db.getName()),
+        }),
     );
     assert.commandWorked(graphLookupColl.insert({_id: "id4", link: null}));
 
@@ -217,7 +247,11 @@ thirdColl
                 on: "link.$ref",
                 whenMatched: [
                     {
-                        $project: {"link.$ref": "otherRef", "link.$id": "otherId", "link.$db": "otherDB"},
+                        $project: {
+                            "link.$ref": "otherRef",
+                            "link.$id": "otherId",
+                            "link.$db": "otherDB",
+                        },
                     },
                 ],
                 whenNotMatched: "discard",

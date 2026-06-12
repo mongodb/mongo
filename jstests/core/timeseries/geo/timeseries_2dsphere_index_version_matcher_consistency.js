@@ -85,7 +85,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V3 2dsphere index: matcher uses V3 so bucket with ambiguous loc is kept", function () {
         this.resetCollection({"2dsphereIndexVersion": 3});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 1, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 1, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([{$match: {loc: {$geoWithin: {$geometry: polygonAroundZeroZero}}}}])
@@ -100,7 +102,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V4 2dsphere index: matcher uses V4 so bucket with ambiguous loc is kept", function () {
         this.resetCollection({"2dsphereIndexVersion": 4});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 2, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 2, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([{$match: {loc: {$geoWithin: {$geometry: polygonAroundTenTen}}}}])
@@ -115,7 +119,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("No index (collection scan): matcher uses default V4 semantics", function () {
         this.resetCollection();
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 3, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 3, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([{$match: {loc: {$geoWithin: {$geometry: polygonAroundTenTen}}}}])
@@ -130,7 +136,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V4 index: polygon around (0,0) must not match ambiguous doc", function () {
         this.resetCollection({"2dsphereIndexVersion": 4});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 4, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 4, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([{$match: {loc: {$geoWithin: {$geometry: polygonAroundZeroZero}}}}])
@@ -144,7 +152,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V3 index: polygon around (10,10) must not match ambiguous doc", function () {
         this.resetCollection({"2dsphereIndexVersion": 3});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 5, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 5, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([{$match: {loc: {$geoWithin: {$geometry: polygonAroundTenTen}}}}])
@@ -159,13 +169,18 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V3 index with $and: geo + meta filter uses V3 for event filter", function () {
         this.resetCollection({"2dsphereIndexVersion": 3});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 6, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 6, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([
                 {
                     $match: {
-                        $and: [{loc: {$geoWithin: {$geometry: polygonAroundZeroZero}}}, {[metaFieldName]: {s: 1}}],
+                        $and: [
+                            {loc: {$geoWithin: {$geometry: polygonAroundZeroZero}}},
+                            {[metaFieldName]: {s: 1}},
+                        ],
                     },
                 },
             ])
@@ -181,18 +196,27 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V4 index with $and: geo + meta filter uses V4 for event filter", function () {
         this.resetCollection({"2dsphereIndexVersion": 4});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 7, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 7, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([
                 {
                     $match: {
-                        $and: [{loc: {$geoWithin: {$geometry: polygonAroundTenTen}}}, {[metaFieldName]: {s: 1}}],
+                        $and: [
+                            {loc: {$geoWithin: {$geometry: polygonAroundTenTen}}},
+                            {[metaFieldName]: {s: 1}},
+                        ],
                     },
                 },
             ])
             .toArray();
-        assert.eq(results.length, 1, "With V4 index, $and with geo must parse event loc as (10,10)");
+        assert.eq(
+            results.length,
+            1,
+            "With V4 index, $and with geo must parse event loc as (10,10)",
+        );
         assert.docEq(ambiguousLoc, results[0].loc);
     });
 
@@ -202,7 +226,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V3 index with $or: ambiguous doc matches first branch (polygon around 0,0)", function () {
         this.resetCollection({"2dsphereIndexVersion": 3});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 8, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 8, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([
@@ -216,7 +242,11 @@ describe("2dsphere index version / matcher consistency", function () {
                 },
             ])
             .toArray();
-        assert.eq(results.length, 1, "With V3 index, $or must use V3 for event filter so first branch (0,0) matches");
+        assert.eq(
+            results.length,
+            1,
+            "With V3 index, $or must use V3 for event filter so first branch (0,0) matches",
+        );
         assert.docEq(ambiguousLoc, results[0].loc);
     });
 
@@ -226,7 +256,9 @@ describe("2dsphere index version / matcher consistency", function () {
     it("V4 index with $or: ambiguous doc matches second branch (polygon around 10,10)", function () {
         this.resetCollection({"2dsphereIndexVersion": 4});
         assert.commandWorked(
-            this.coll.insert([{[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 9, loc: ambiguousLoc}]),
+            this.coll.insert([
+                {[timeFieldName]: now, [metaFieldName]: {s: 1}, _id: 9, loc: ambiguousLoc},
+            ]),
         );
         const results = this.coll
             .aggregate([

@@ -17,8 +17,12 @@ const mongosDB = st.s.getDB(dbName);
 assert.commandWorked(st.s.adminCommand({shardCollection: sampledNsSharded, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {x: 1000}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 0}, to: st.shard1.shardName}));
-assert.commandWorked(st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 1000}, to: st.shard2.name}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 0}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 1000}, to: st.shard2.name}),
+);
 assert.commandWorked(mongosDB.getCollection(collNameNotSampled).insert([{a: 0}]));
 
 // Repeatedly issues 'targetNumPerSec' $lookups for 'durationMs'.
@@ -34,7 +38,9 @@ function runNestedAggregateCmdsOnRepeat(
     const db = mongos.getDB(dbName);
     const cmdObj = {
         aggregate: localCollName,
-        pipeline: [{$lookup: {from: foreignCollName, as: "joined", pipeline: [{$match: {x: {$gte: 0}}}]}}],
+        pipeline: [
+            {$lookup: {from: foreignCollName, as: "joined", pipeline: [{$match: {x: {$gte: 0}}}]}},
+        ],
         cursor: {},
     };
     const periodMs = 1000.0 / targetNumPerSec;

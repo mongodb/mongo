@@ -57,7 +57,11 @@ jsTestLog("Primary on port " + primary.port + " hangs up on unacknowledged write
         "network error from " + name,
     );
 
-    assert.includes(result.toString(), "network error while attempting to run command 'hello'", "after " + name);
+    assert.includes(
+        result.toString(),
+        "network error while attempting to run command 'hello'",
+        "after " + name,
+    );
 });
 
 // Unacknowledged write in progress when a stepdown occurs provokes a hangup.

@@ -48,7 +48,12 @@ function dropView(viewName) {
 // Test $graphLookup from view with extension when no graph connections exist.
 {
     const viewName = makeViewName("empty_graph_view");
-    assert.commandWorked(testDb.createView(viewName, collName, [{$testBar: {noop: true}}, {$match: {x: {$gt: 1000}}}]));
+    assert.commandWorked(
+        testDb.createView(viewName, collName, [
+            {$testBar: {noop: true}},
+            {$match: {x: {$gt: 1000}}},
+        ]),
+    );
 
     const pipeline = [
         {$sort: {_id: 1}},
@@ -75,7 +80,10 @@ function dropView(viewName) {
 {
     const viewName = makeViewName("empty_union_view");
     assert.commandWorked(
-        testDb.createView(viewName, foreignCollName, [{$testBar: {noop: true}}, {$match: {data: "NONEXISTENT"}}]),
+        testDb.createView(viewName, foreignCollName, [
+            {$testBar: {noop: true}},
+            {$match: {data: "NONEXISTENT"}},
+        ]),
     );
 
     const pipeline = [{$sort: {_id: 1}}, {$unionWith: viewName}];
@@ -90,7 +98,12 @@ function dropView(viewName) {
 // Test $facet with empty results from view with extension.
 {
     const viewName = makeViewName("empty_facet_view");
-    assert.commandWorked(testDb.createView(viewName, collName, [{$testBar: {noop: true}}, {$match: {x: {$gt: 1000}}}]));
+    assert.commandWorked(
+        testDb.createView(viewName, collName, [
+            {$testBar: {noop: true}},
+            {$match: {x: {$gt: 1000}}},
+        ]),
+    );
 
     const pipeline = [
         {
@@ -132,7 +145,9 @@ function dropView(viewName) {
 // =============================================================================
 {
     const viewName = makeViewName("deep_nest");
-    assert.commandWorked(testDb.createView(viewName, foreignCollName, [{$testBar: {noop: true}}, {$limit: 1}]));
+    assert.commandWorked(
+        testDb.createView(viewName, foreignCollName, [{$testBar: {noop: true}}, {$limit: 1}]),
+    );
 
     // 4 levels of nesting.
     const pipeline = [

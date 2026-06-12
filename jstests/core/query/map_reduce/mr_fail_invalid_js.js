@@ -48,7 +48,9 @@ const outputColl = db.mr_fail_invalid_js_out;
     // change dynamically on certain passthroughts.
     // TODO SERVER-94931 - remove fail branch.
     try {
-        assert.commandWorked(coll.mapReduce(singleInvalidPathMapFn, reduceFn, {out: {merge: outputColl.getName()}}));
+        assert.commandWorked(
+            coll.mapReduce(singleInvalidPathMapFn, reduceFn, {out: {merge: outputColl.getName()}}),
+        );
     } catch (e) {
         assert.commandFailedWithCode(e, [51132]);
     }
@@ -128,7 +130,9 @@ const outputColl = db.mr_fail_invalid_js_out;
 
     // Test that things are still in an ok state and the next mapReduce can succeed.
     outputColl.drop();
-    assert.commandWorked(coll.mapReduce(goodMapFn, goodReduceFn, {out: {merge: outputColl.getName()}}));
+    assert.commandWorked(
+        coll.mapReduce(goodMapFn, goodReduceFn, {out: {merge: outputColl.getName()}}),
+    );
     assert.eq(
         [
             {_id: 1, value: 1},

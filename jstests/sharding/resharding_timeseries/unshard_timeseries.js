@@ -64,17 +64,17 @@ assert.eq(timeseriesCollDocPostResharding.unsplittable, true);
 
 assert.eq(
     4,
-    getTimeseriesCollForRawOps(db, st.rs2.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs2.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(
     0,
-    getTimeseriesCollForRawOps(db, st.rs0.getPrimary().getCollection(coll.getFullName())).countDocuments(
-        {},
-        getRawOperationSpec(db),
-    ),
+    getTimeseriesCollForRawOps(
+        db,
+        st.rs0.getPrimary().getCollection(coll.getFullName()),
+    ).countDocuments({}, getRawOperationSpec(db)),
 );
 assert.eq(4, coll.countDocuments({}));
 

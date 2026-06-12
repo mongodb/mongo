@@ -28,14 +28,20 @@ if (checkJoinOptimizationStatus(db)) {
     quit();
 }
 
-const frameworkControl = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}));
-const forceClassicEngineSet = frameworkControl.internalQueryFrameworkControl === "forceClassicEngine";
+const frameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+);
+const forceClassicEngineSet =
+    frameworkControl.internalQueryFrameworkControl === "forceClassicEngine";
 const trySbeEngineSet = frameworkControl.internalQueryFrameworkControl === "trySbeEngine";
 const ffSbeFull = FeatureFlagUtil.isPresentAndEnabled(db, "SbeFull");
 const ffSbeTransformStages = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 const ffSbeNonLeadingMatch = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
 const ffSbeEqLookupUnwind = FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwind");
-const ffGetExecutorDeferredEngineChoice = FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice");
+const ffGetExecutorDeferredEngineChoice = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "GetExecutorDeferredEngineChoice",
+);
 const sbeFullyEnabled = ffSbeFull || trySbeEngineSet;
 
 const coll = db.coll;
@@ -106,7 +112,9 @@ const neutralProject = {$project: {array: 0}};
 const match = {$match: {array: 1}};
 // If $group doesn't depend on the whole document, a projection is inserted in the data access plan. So using $$CURRENT here prevents this stage from altering the plan shapes.
 const group = {$group: {_id: "$$CURRENT"}};
-const lookup = {$lookup: {from: foreignColl.getName(), as: "array", localField: "a", foreignField: "a"}};
+const lookup = {
+    $lookup: {from: foreignColl.getName(), as: "array", localField: "a", foreignField: "a"},
+};
 const lookupUnwind = [lookup, {$unwind: "$array"}];
 
 // The deferred exec path only enables certain LU plan shapes.
@@ -222,12 +230,18 @@ const aggregationTests = [
     {
         agg: [lookup, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape)],
+        pushDownPattern: [
+            true,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+        ],
     },
     {
         agg: [group, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape)],
+        pushDownPattern: [
+            true,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+        ],
     },
     {
         agg: [lookup, match, lookupUnwind],

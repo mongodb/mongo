@@ -22,7 +22,8 @@ function getReplannedMetric() {
 
 function getReplannedPlanIsCachedPlanMetric() {
     const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
-    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType].replanned_plan_is_cached_plan;
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType]
+        .replanned_plan_is_cached_plan;
 }
 
 function getInactiveCachedPlansReplacedMetric() {
@@ -197,7 +198,9 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // cached planning and multi-planning.
     for (let i = 0; i < 10; ++i) {
         for (let j = 0; j < 110; ++j) {
-            assert.commandWorked(coll.insert({notSelectiveKey: 10, selectiveKey: i, tiebreak: kTieBreakHigh}));
+            assert.commandWorked(
+                coll.insert({notSelectiveKey: 10, selectiveKey: i, tiebreak: kTieBreakHigh}),
+            );
         }
     }
 
@@ -206,7 +209,11 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // this special, non-matching document is inspected before the documents which do match the
     // filter.
     assert.commandWorked(
-        coll.insert({notSelectiveKey: 55, selectiveKey: kSpecialSelectiveKey, tiebreak: kTieBreakLow}),
+        coll.insert({
+            notSelectiveKey: 55,
+            selectiveKey: kSpecialSelectiveKey,
+            tiebreak: kTieBreakLow,
+        }),
     );
 
     // Now we run a query using the special value of 'selectiveKey' until the plan gets cached. We
@@ -228,7 +235,12 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     }
 
     assert.eq(entry.isActive, true, entry);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(
+        isSbePlanCacheEnabled,
+        entry,
+        "selectiveKey_1_tiebreak_1",
+        planCacheShapeHash,
+    );
 
     // Clear the plan cache for the collection.
     coll.getPlanCache().clear();
@@ -240,13 +252,22 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 
     entry = getCachedPlanForQuery(db, coll, filterOnSelectiveKey);
     assert.eq(entry.isActive, true, entry);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(
+        isSbePlanCacheEnabled,
+        entry,
+        "selectiveKey_1_tiebreak_1",
+        planCacheShapeHash,
+    );
 
     // The new cache entry's plan should have used fewer works (and examined fewer keys) compared
     // to the old cache entry's, since the query on the special value is slightly less efficient.
     assert.lt(entry.works, specialValueCacheEntryWorks, entry);
     if (!isSbePlanCacheEnabled) {
-        assert.lt(entry.creationExecStats[0].totalKeysExamined, specialValueCacheEntryKeysExamined, entry);
+        assert.lt(
+            entry.creationExecStats[0].totalKeysExamined,
+            specialValueCacheEntryKeysExamined,
+            entry,
+        );
     }
 
     // Now run the query on the "special" value again and check that replanning does not happen
@@ -256,7 +277,12 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // Check that the cache entry hasn't changed.
     const entryAfterRunningSpecialQuery = getCachedPlanForQuery(db, coll, filterOnSelectiveKey);
     assert.eq(entryAfterRunningSpecialQuery.isActive, true);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(
+        isSbePlanCacheEnabled,
+        entry,
+        "selectiveKey_1_tiebreak_1",
+        planCacheShapeHash,
+    );
 
     assert.eq(entry.works, entryAfterRunningSpecialQuery.works, entryAfterRunningSpecialQuery);
     if (!isSbePlanCacheEnabled) {

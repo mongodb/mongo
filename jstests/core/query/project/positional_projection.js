@@ -138,7 +138,12 @@ testSingleDocument(
 
 // Test that only relevant part of specified path is extracted even in case of multiple nested
 // arrays.
-testSingleDocument({x: 1}, {"a.b.c.$": 1}, {x: [1], a: [{b: [[[{c: 1, d: 2}]]]}]}, {a: [{b: [[[{c: 1}]]]}]});
+testSingleDocument(
+    {x: 1},
+    {"a.b.c.$": 1},
+    {x: [1], a: [{b: [[[{c: 1, d: 2}]]]}]},
+    {a: [{b: [[[{c: 1}]]]}]},
+);
 
 // Test that if path specified for positional projection operator does not contain array, it is
 // returned unchanged.
@@ -151,7 +156,12 @@ testSingleDocument(
     },
 );
 
-testSingleDocument({x: {$gt: 0}}, {"a.b.c.$": 1}, {x: [-1, 1, 2], a: {b: {c: 123}}}, {a: {b: {c: 123}}});
+testSingleDocument(
+    {x: {$gt: 0}},
+    {"a.b.c.$": 1},
+    {x: [-1, 1, 2], a: {b: {c: 123}}},
+    {a: {b: {c: 123}}},
+);
 
 // Test that positional projection is applied to the first array on the dotted path.
 // NOTE: Even though the positional projection is specified for the path 'a.b.c', it is applied to
@@ -320,9 +330,19 @@ testSingleDocument(
 );
 
 // Positional projection must use the index from the last child of $and operator.
-testSingleDocument({$and: [{a: 1}, {a: 2}, {a: 3}]}, {"b.$": 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [6]});
+testSingleDocument(
+    {$and: [{a: 1}, {a: 2}, {a: 3}]},
+    {"b.$": 1},
+    {a: [1, 2, 3], b: [4, 5, 6]},
+    {b: [6]},
+);
 
-testSingleDocument({$and: [{a: 3}, {a: 2}, {a: 1}]}, {"b.$": 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [4]});
+testSingleDocument(
+    {$and: [{a: 3}, {a: 2}, {a: 1}]},
+    {"b.$": 1},
+    {a: [1, 2, 3], b: [4, 5, 6]},
+    {b: [4]},
+);
 
 // Positional projection must use the first matching index both for $in, and for $or
 // equivalent to an $in.
@@ -330,9 +350,19 @@ testSingleDocument({a: {$in: [2, 3]}}, {"b.$": 1}, {a: [1, 2, 3], b: [4, 5, 6]},
 testSingleDocument({$or: [{a: 2}, {a: 3}]}, {"b.$": 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [5]});
 
 // SERVER-61839: Test out some cases involving $exists and $type where we've had bugs in the past.
-testSingleDocument({a: {$elemMatch: {y: {$exists: true}}}}, {"a.$": 1}, {a: [{y: 1}, {y: 2}]}, {a: [{y: 1}]});
+testSingleDocument(
+    {a: {$elemMatch: {y: {$exists: true}}}},
+    {"a.$": 1},
+    {a: [{y: 1}, {y: 2}]},
+    {a: [{y: 1}]},
+);
 
-testSingleDocument({a: {$elemMatch: {y: {$type: ["array"]}}}}, {"a.$": 1}, {a: [{y: 1}, {y: []}]}, {a: [{y: []}]});
+testSingleDocument(
+    {a: {$elemMatch: {y: {$type: ["array"]}}}},
+    {"a.$": 1},
+    {a: [{y: 1}, {y: []}]},
+    {a: [{y: []}]},
+);
 
 testSingleDocument(
     {a: {$elemMatch: {y: {$type: ["array", "double"]}}}},

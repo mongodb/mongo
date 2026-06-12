@@ -28,7 +28,11 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     assert.doesNotThrow(() =>
         coll.aggregate([
             {
-                $merge: {into: coll.getName(), whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode},
+                $merge: {
+                    into: coll.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
             },
         ]),
     );
@@ -53,7 +57,13 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     assert.doesNotThrow(() =>
         coll.aggregate([
             {$lookup: {from: "bar", as: "x", localField: "f_id", foreignField: "_id"}},
-            {$merge: {into: "bar", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}},
+            {
+                $merge: {
+                    into: "bar",
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
         ]),
     );
 
@@ -107,7 +117,13 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
                     y: [{$lookup: {from: "TARGET", as: "y", pipeline: []}}],
                 },
             },
-            {$merge: {into: "TARGET", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}},
+            {
+                $merge: {
+                    into: "TARGET",
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
         ]),
     );
     assert.doesNotThrow(() =>
@@ -118,16 +134,30 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
                     y: [{$lookup: {from: "TARGET", as: "y", pipeline: []}}],
                 },
             },
-            {$merge: {into: "TARGET", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}},
+            {
+                $merge: {
+                    into: "TARGET",
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
         ]),
     );
 
     // Test that $merge works when the resolved namespace of a view is the same as the output
     // collection.
-    assert.commandWorked(testDB.runCommand({create: "view_on_TARGET", viewOn: "TARGET", pipeline: []}));
+    assert.commandWorked(
+        testDB.runCommand({create: "view_on_TARGET", viewOn: "TARGET", pipeline: []}),
+    );
     assert.doesNotThrow(() =>
         testDB.view_on_TARGET.aggregate([
-            {$merge: {into: "TARGET", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}},
+            {
+                $merge: {
+                    into: "TARGET",
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
         ]),
     );
     assert.doesNotThrow(() =>
@@ -140,7 +170,9 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
                             $lookup: {
                                 from: "yet_another",
                                 as: "y",
-                                pipeline: [{$lookup: {from: "view_on_TARGET", as: "z", pipeline: []}}],
+                                pipeline: [
+                                    {$lookup: {from: "view_on_TARGET", as: "z", pipeline: []}},
+                                ],
                             },
                         },
                     ],
@@ -167,7 +199,13 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
 
     const nestedPipeline = generateNestedPipeline("lookup", 20).concat([
-        {$merge: {into: "lookup", whenMatched: whenMatchedMode, whenNotMatched: whenNotMatchedMode}},
+        {
+            $merge: {
+                into: "lookup",
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode,
+            },
+        },
     ]);
     assert.doesNotThrow(() => coll.aggregate(nestedPipeline));
 

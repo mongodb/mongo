@@ -18,7 +18,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const getServerParameterValue = (cluster, paramName) => {
         let value;
         cluster.executeOnMongodNodes((db) => {
-            value = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[paramName];
+            value = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[
+                paramName
+            ];
         });
         return value;
     };
@@ -39,9 +41,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.setup = function (db, collName, cluster) {
         this.originalParams = {
-            algorithm: getServerParameterValue(cluster, "executionControlConcurrencyAdjustmentAlgorithm"),
-            deprioritizationGate: getServerParameterValue(cluster, "executionControlDeprioritizationGate"),
-            heuristicDeprioritization: getServerParameterValue(cluster, "executionControlHeuristicDeprioritization"),
+            algorithm: getServerParameterValue(
+                cluster,
+                "executionControlConcurrencyAdjustmentAlgorithm",
+            ),
+            deprioritizationGate: getServerParameterValue(
+                cluster,
+                "executionControlDeprioritizationGate",
+            ),
+            heuristicDeprioritization: getServerParameterValue(
+                cluster,
+                "executionControlHeuristicDeprioritization",
+            ),
             backgroundTasksDeprioritization: getServerParameterValue(
                 cluster,
                 "executionControlBackgroundTasksDeprioritization",
@@ -82,11 +93,19 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.setHeuristicDeprioritization = function (db, collName) {
-        setServerParameter(db, "executionControlHeuristicDeprioritization", Random.randInt(2) === 1);
+        setServerParameter(
+            db,
+            "executionControlHeuristicDeprioritization",
+            Random.randInt(2) === 1,
+        );
     };
 
     $config.states.setBackgroundTasksDeprioritization = function (db, collName) {
-        setServerParameter(db, "executionControlBackgroundTasksDeprioritization", Random.randInt(2) === 1);
+        setServerParameter(
+            db,
+            "executionControlBackgroundTasksDeprioritization",
+            Random.randInt(2) === 1,
+        );
     };
 
     const statesProbability = {

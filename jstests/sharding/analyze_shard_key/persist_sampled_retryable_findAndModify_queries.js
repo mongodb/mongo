@@ -44,7 +44,12 @@ function testRetryExecutedWrite(rst) {
     const originalRes = assert.commandWorked(db.runCommand(originalCmdObj));
     assert.eq(originalRes.lastErrorObject.n, 1, originalRes);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 
     // Retry with the same sampleId.
     const retryCmdObj0 = originalCmdObj;
@@ -54,7 +59,12 @@ function testRetryExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 
     // Retry with a different sampleId.
     const retryCmdObj1 = Object.assign({}, originalCmdObj);
@@ -65,7 +75,12 @@ function testRetryExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 }
 
 function testRetryUnExecutedWrite(rst) {
@@ -103,7 +118,12 @@ function testRetryUnExecutedWrite(rst) {
     // The findAndModify fails after it has been added to the sample buffer.
     assert.commandFailedWithCode(db.runCommand(originalCmdObj), ErrorCodes.InternalError);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 
     fp.off();
 
@@ -115,7 +135,12 @@ function testRetryUnExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(
+        primary,
+        ns,
+        collectionUuid,
+        expectedSampledQueryDocs,
+    );
 }
 
 const st = new ShardingTest({

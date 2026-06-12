@@ -25,7 +25,9 @@ assert.commandWorked(db.runCommand({create: collName}));
 assert.commandWorked(db[collName].createIndex({a: 1}));
 
 jsTestLog("Cloning as capped should work with replicatedRecordIds and preserve the option.");
-assert.commandWorked(db.runCommand({cloneCollectionAsCapped: collName, toCollection: cappedCollName, size: 2000}));
+assert.commandWorked(
+    db.runCommand({cloneCollectionAsCapped: collName, toCollection: cappedCollName, size: 2000}),
+);
 let collectionOptions = db[cappedCollName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
 assert(
@@ -41,7 +43,10 @@ jsTestLog("Converting to capped should work with recordIdsReplicated.");
 assert.commandWorked(db.runCommand({convertToCapped: collName, size: 2000}));
 collectionOptions = db[collName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
-assert(hasRecordIdsReplicated(db, collName), "collection should have recordIdsReplicated set after convertToCapped");
+assert(
+    hasRecordIdsReplicated(db, collName),
+    "collection should have recordIdsReplicated set after convertToCapped",
+);
 indexes = db[collName].getIndexes();
 assert.eq(indexes.length, 1, indexes);
 

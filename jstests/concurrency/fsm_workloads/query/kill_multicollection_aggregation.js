@@ -24,7 +24,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * is successful) in 'this.cursor'.
      */
     $config.data.runAggregation = function runAggregation(db, collName, pipeline) {
-        let res = db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
+        let res = db.runCommand({
+            aggregate: collName,
+            pipeline: pipeline,
+            cursor: {batchSize: this.batchSize},
+        });
 
         if (res.ok) {
             this.cursor = new DBCommandCursor(db, res, this.batchSize);
@@ -160,7 +164,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // likely for the "killCursors" command to need to handle destroying the underlying
         // PlanExecutor.
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}),
+            );
         });
 
         // Use the workload name as part of the database name, since the workload name is assumed to
@@ -178,7 +184,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
             // Restore DocumentSourceCursor batch size to the default.
             assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}),
+                db.adminCommand({
+                    setParameter: 1,
+                    internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024,
+                }),
             );
         });
     };

@@ -27,7 +27,9 @@ describe("Tests for priority port usage within JS test helpers", function () {
             rs.nodes.forEach((conn) => {
                 const cfg = conn.getDB("local").system.replset.findOne();
                 const allHosts = cfg.members.map((x) => x.host);
-                assert.commandWorked(conn.adminCommand({dropConnections: 1, hostAndPort: allHosts}));
+                assert.commandWorked(
+                    conn.adminCommand({dropConnections: 1, hostAndPort: allHosts}),
+                );
             });
         };
     });
@@ -134,12 +136,17 @@ describe("Tests for priority port usage within JS test helpers", function () {
         const rs = new ReplSetTest({nodes: [{priorityPort: allocatePort()}, {}, {}]});
         rs.startSet();
 
-        jsTest.log.info("Initiate should fail because we specify priority ports which are not open on the secondaries");
+        jsTest.log.info(
+            "Initiate should fail because we specify priority ports which are not open on the secondaries",
+        );
         let config = rs.getReplSetConfig();
         config.members[1].priorityPort = 27022;
         config.members[2].priorityPort = 27023;
 
-        assert.commandFailedWithCode(rs.nodes[0].adminCommand({replSetInitiate: config}), ErrorCodes.NodeNotFound);
+        assert.commandFailedWithCode(
+            rs.nodes[0].adminCommand({replSetInitiate: config}),
+            ErrorCodes.NodeNotFound,
+        );
 
         rs.stopSet();
     });
@@ -149,13 +156,18 @@ describe("Tests for priority port usage within JS test helpers", function () {
         rs.startSet();
         rs.initiate();
 
-        jsTest.log.info("Initiate should fail because we specify priority ports which are not open on the secondaries");
+        jsTest.log.info(
+            "Initiate should fail because we specify priority ports which are not open on the secondaries",
+        );
         let config = rs.getReplSetConfigFromNode();
         config.members[1].priorityPort = 27022;
         config.members[2].priorityPort = 27023;
         config.version += 1;
 
-        assert.commandFailedWithCode(rs.getPrimary().adminCommand({replSetReconfig: config}), ErrorCodes.NodeNotFound);
+        assert.commandFailedWithCode(
+            rs.getPrimary().adminCommand({replSetReconfig: config}),
+            ErrorCodes.NodeNotFound,
+        );
 
         rs.stopSet();
     });
@@ -169,7 +181,10 @@ describe("Tests for priority port usage within JS test helpers", function () {
 
         jsTest.log.info("Initiate should fail because we can only connect on the priority ports");
         let config = rs.getReplSetConfig();
-        assert.commandFailedWithCode(rs.nodes[0].adminCommand({replSetInitiate: config}), ErrorCodes.NodeNotFound);
+        assert.commandFailedWithCode(
+            rs.nodes[0].adminCommand({replSetInitiate: config}),
+            ErrorCodes.NodeNotFound,
+        );
 
         rs.stopSet();
     });
@@ -187,7 +202,10 @@ describe("Tests for priority port usage within JS test helpers", function () {
 
         jsTest.log.info("Reconfig should fail because we can only connect on the priority ports");
         config.version += 1;
-        assert.commandFailedWithCode(rs.getPrimary().adminCommand({replSetReconfig: config}), ErrorCodes.NodeNotFound);
+        assert.commandFailedWithCode(
+            rs.getPrimary().adminCommand({replSetReconfig: config}),
+            ErrorCodes.NodeNotFound,
+        );
 
         fps.off();
         rs.stopSet();
@@ -210,7 +228,9 @@ describe("Tests for priority port usage within JS test helpers", function () {
             usePriorityPorts: true,
         });
         let nodes = rs.startSet();
-        let failFastResolution = configureFailPoint(nodes[0], "failIsSelfCheck", {fastPathOnly: true});
+        let failFastResolution = configureFailPoint(nodes[0], "failIsSelfCheck", {
+            fastPathOnly: true,
+        });
         rs.initiate();
         failFastResolution.off();
 

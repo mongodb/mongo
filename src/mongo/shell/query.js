@@ -35,9 +35,13 @@ DBQuery.prototype.help = function () {
     print("\t.hint({...})");
     print("\t.readConcern(<level>)");
     print("\t.readPref(<mode>, <tagset>)");
-    print("\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit");
+    print(
+        "\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit",
+    );
     print("\t.size() - total # of objects cursor would return, honors skip,limit");
-    print("\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}");
+    print(
+        "\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}",
+    );
     print("\t.min({...})");
     print("\t.max({...})");
     print("\t.maxTimeMS(<n>)");
@@ -690,7 +694,9 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     if (cmdResult.cursor.id) {
         // Note that setting this._cursorid to 0 should be accompanied by
         // this._cursorHandle.zeroCursorId().
-        this._cursorHandle = this._db.getMongo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
+        this._cursorHandle = this._db
+            .getMongo()
+            .cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
     }
 }
 
@@ -767,14 +773,21 @@ DBCommandCursor.prototype._runGetMoreCommand = function () {
     assert.commandWorked(cmdRes, () => "getMore command failed: " + tojson(cmdRes));
 
     if (this._ns !== cmdRes.cursor.ns) {
-        throw Error("unexpected collection in getMore response: " + this._ns + " != " + cmdRes.cursor.ns);
+        throw Error(
+            "unexpected collection in getMore response: " + this._ns + " != " + cmdRes.cursor.ns,
+        );
     }
 
     if (!cmdRes.cursor.id.compare(NumberLong("0"))) {
         this._cursorHandle.zeroCursorId();
         this._cursorid = NumberLong("0");
     } else if (this._cursorid.compare(cmdRes.cursor.id)) {
-        throw Error("unexpected cursor id: " + this._cursorid.toString() + " != " + cmdRes.cursor.id.toString());
+        throw Error(
+            "unexpected cursor id: " +
+                this._cursorid.toString() +
+                " != " +
+                cmdRes.cursor.id.toString(),
+        );
     }
 
     // If the command result represents a change stream cursor, update our postBatchResumeToken.
@@ -867,7 +880,9 @@ DBCommandCursor.prototype.help = function () {
     print(
         "\t.getResumeToken() - for a change stream cursor, obtains the most recent valid resume token, if it exists.",
     );
-    print("\t.getChangeStreamVersion() - for a change stream cursor, obtains the change stream version, if it exists.");
+    print(
+        "\t.getChangeStreamVersion() - for a change stream cursor, obtains the change stream version, if it exists.",
+    );
     print("\t.getClusterTime() - returns the read timestamp for snapshot reads.");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
     print("\t.close()");

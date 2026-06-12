@@ -9,7 +9,10 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 let featureFlagEnabled = null;
 function isFeatureFlagEnabled(conn) {
     if (featureFlagEnabled === null) {
-        featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(conn, "ChangeStreamPreciseShardTargeting");
+        featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            conn,
+            "ChangeStreamPreciseShardTargeting",
+        );
     }
     return featureFlagEnabled;
 }
@@ -27,9 +30,19 @@ function isChangeStreamCommandV2WithoutIgnoreRemovedShards(cmdObj) {
     );
 }
 
-function runChangeStreamWithIgnoreRemovedShards(conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+function runChangeStreamWithIgnoreRemovedShards(
+    conn,
+    _dbName,
+    _commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     // TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
-    if (isChangeStreamCommandV2WithoutIgnoreRemovedShards(commandObj) && isFeatureFlagEnabled(conn)) {
+    if (
+        isChangeStreamCommandV2WithoutIgnoreRemovedShards(commandObj) &&
+        isFeatureFlagEnabled(conn)
+    ) {
         commandObj.pipeline[0].$changeStream["ignoreRemovedShards"] = true;
     }
     return func.apply(conn, makeFuncArgs(commandObj));

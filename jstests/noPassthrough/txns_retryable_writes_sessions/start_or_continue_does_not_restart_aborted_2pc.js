@@ -26,25 +26,35 @@ const foreignNs = dbName + "." + foreignColl;
 
 const st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: MinKey}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: foreignNs, find: {_id: MinKey}, to: st.shard1.shardName}),
+);
 st.refreshCatalogCacheForNs(st.s, foreignNs);
 assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
 assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
 
 // Pre-populate local (so the $lookup has input) and pre-warm shard0's catalog cache for foreign so
 // the in-txn $lookup doesn't trigger a refresh that snapshot read concern would reject.
-assert.commandWorked(st.s.getDB(dbName)[localColl].insert({_id: 1, key: "Y"}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.getDB(dbName)[localColl].insert({_id: 1, key: "Y"}, {writeConcern: {w: "majority"}}),
+);
 st.s
     .getDB(dbName)
-    [localColl].aggregate([{$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}}])
+    [localColl].aggregate([
+        {$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}},
+    ])
     .toArray();
 
 // shard1 reaper period ~= (tll * 500ms) clamped to [1s, 60s]; tll=1 -> ~1s. shard0 stays default,
 // so only shard1's participant expires.
 const shard1Primary = st.rs1.getPrimary();
-assert.commandWorked(shard1Primary.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 1}));
+assert.commandWorked(
+    shard1Primary.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 1}),
+);
 
 const lsid = {id: UUID()};
 const txnNumber = NumberLong(1);
@@ -86,7 +96,9 @@ assert.soon(
 // refuse the restart instead of silently resurrecting it.
 const aggRes = mongosDB.runCommand({
     aggregate: localColl,
-    pipeline: [{$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}}],
+    pipeline: [
+        {$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}},
+    ],
     cursor: {},
     lsid: lsid,
     txnNumber: txnNumber,
@@ -124,7 +136,9 @@ const foreignIds = st.s
     .sort({_id: 1})
     .toArray()
     .map((d) => d._id);
-assert(!localIds.includes("X"), "X must NOT be committed (the whole transaction aborted)", {localIds});
+assert(!localIds.includes("X"), "X must NOT be committed (the whole transaction aborted)", {
+    localIds,
+});
 assert(!foreignIds.includes("Y"), "Y must NOT be committed", {foreignIds});
 
 st.stop();

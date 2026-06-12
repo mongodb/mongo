@@ -95,7 +95,17 @@ describe("$vectorSearch query stats", function () {
         assert.commandWorked(
             db.runCommand({
                 aggregate: collName,
-                pipeline: [{$vectorSearch: {index: "index_3", path: "x", queryVector: [], numCandidates: 1, limit: 1}}],
+                pipeline: [
+                    {
+                        $vectorSearch: {
+                            index: "index_3",
+                            path: "x",
+                            queryVector: [],
+                            numCandidates: 1,
+                            limit: 1,
+                        },
+                    },
+                ],
                 cursor: {},
             }),
         );

@@ -22,14 +22,19 @@ const db = st.s.getDB(jsTestName());
 const coll = db.getCollection("coll");
 const primaryShard = st.shard0;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}),
+);
 
 {
     jsTestLog("Test an hypothetical failure right after the collection is locally capped.");
     assert.commandWorked(db.runCommand({create: coll.getName()}));
     assert(!coll.isCapped());
 
-    const failpoint = configureFailPoint(primaryShard, "convertToCappedFailAfterCappingTheCollection");
+    const failpoint = configureFailPoint(
+        primaryShard,
+        "convertToCappedFailAfterCappingTheCollection",
+    );
 
     const waitForConvertToCapped = startParallelShell(
         funWithArgs(
@@ -60,7 +65,10 @@ assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primarySha
     assert.commandWorked(db.runCommand({create: coll.getName()}));
     assert(!coll.isCapped());
 
-    const failpoint = configureFailPoint(primaryShard, "convertToCappedFailBeforeCappingTheCollection");
+    const failpoint = configureFailPoint(
+        primaryShard,
+        "convertToCappedFailBeforeCappingTheCollection",
+    );
 
     // If the collection hasn't been capped when the error rises, there is no need to for the
     // coordinator to retry the operation, so it finishes returning the error received from the data

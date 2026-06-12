@@ -47,7 +47,9 @@ function isPresent(stageResult, dbName) {
 }
 
 function commandWorked(db, expectedDbs) {
-    assert.commandWorked(db.runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+    );
     let stageResult = db.aggregate([{$listClusterCatalog: {}}]).toArray();
     expectedDbs.forEach((dbName) => {
         assert(
@@ -58,9 +60,10 @@ function commandWorked(db, expectedDbs) {
 }
 
 function notAuthorized(db) {
-    assert.commandFailedWithCode(db.runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}), [
-        ErrorCodes.Unauthorized,
-    ]);
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        [ErrorCodes.Unauthorized],
+    );
 }
 
 // Setup The test
@@ -124,7 +127,11 @@ jsTest.log("Test read privileges for $listClusterCatalog on a user db");
     const kUserReadPriv = "user_read_priv";
     runAsSuperUser(() => {
         assert.commandWorked(
-            db1.runCommand({createUser: kUserReadPriv, pwd: "pwd", roles: [{role: "read", db: kDb1}]}),
+            db1.runCommand({
+                createUser: kUserReadPriv,
+                pwd: "pwd",
+                roles: [{role: "read", db: kDb1}],
+            }),
         );
     });
     authAndRun(db1, kUserReadPriv, () => {
@@ -144,7 +151,9 @@ jsTest.log("Test read role for $listClusterCatalog on the admin db");
 {
     const kUserReadPriv = "user_read_priv2";
     runAsSuperUser(() => {
-        assert.commandWorked(adminDb.runCommand({createUser: kUserReadPriv, pwd: "pwd", roles: ["read"]}));
+        assert.commandWorked(
+            adminDb.runCommand({createUser: kUserReadPriv, pwd: "pwd", roles: ["read"]}),
+        );
     });
     authAndRun(adminDb, kUserReadPriv, () => {
         notAuthorized(db1);
@@ -217,7 +226,11 @@ jsTest.log("Test `listCollections` privileges for $listClusterCatalog on 1 db");
     const kUserListCollsPriv = "user_list_collections_priv";
     runAsSuperUser(() => {
         assert.commandWorked(
-            db1.runCommand({createUser: kUserListCollsPriv, pwd: "pwd", roles: [kListCollectionsRole]}),
+            db1.runCommand({
+                createUser: kUserListCollsPriv,
+                pwd: "pwd",
+                roles: [kListCollectionsRole],
+            }),
         );
     });
     authAndRun(db1, kUserListCollsPriv, () => {

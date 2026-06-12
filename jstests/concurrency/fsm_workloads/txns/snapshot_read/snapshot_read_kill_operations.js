@@ -14,7 +14,10 @@
  */
 
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
-import {abortTransaction, cleanupOnLastIteration} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
+import {
+    abortTransaction,
+    cleanupOnLastIteration,
+} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
 import {
     doSnapshotFind,
     doSnapshotGetMore,

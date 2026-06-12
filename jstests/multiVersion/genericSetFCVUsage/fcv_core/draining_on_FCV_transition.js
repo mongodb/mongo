@@ -33,7 +33,9 @@ const testDB = primary.getDB(dbName);
  * Returns true if the Server is upgrading or downgrading (i.e. on a transitional FCV).
  */
 function isUpgradingOrDowngrading() {
-    const fcv = assert.commandWorked(testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+    const fcv = assert.commandWorked(
+        testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+    );
     return fcv.featureCompatibilityVersion.targetVersion !== undefined;
 }
 
@@ -45,16 +47,24 @@ function runFCVTransitionToUpgradingOrDowngradingAndDraining(targetFCV, beforeTr
     try {
         // Force setFCV to fail after the kUpgrading/kDowngrading draining,
         // but before the transition to fully upgraded/downgraded.
-        assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
-        assert.commandWorked(primary.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}));
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+        );
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}),
+        );
 
         beforeTransitionCallback();
 
         return testDB.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true});
     } finally {
         assert(isUpgradingOrDowngrading());
-        assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
-        assert.commandWorked(primary.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}));
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}),
+        );
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}),
+        );
     }
 }
 
@@ -68,7 +78,10 @@ function runFCVTransitionToUpgradedOrDowngradedAndDraining(targetFCV, beforeTran
         const setFcvThread = new Thread(
             function (host, targetFCV) {
                 const conn = new Mongo(host);
-                return conn.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true});
+                return conn.adminCommand({
+                    setFeatureCompatibilityVersion: targetFCV,
+                    confirm: true,
+                });
             },
             primary.host,
             targetFCV,
@@ -94,7 +107,9 @@ function runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) 
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     jsTestLog(`Set the initial featureCompatibilityVersion to ${initialFCV}.`);
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}),
+    );
 
     const sessionOptions = {causalConsistency: false};
     const session = testDB.getMongo().startSession(sessionOptions);
@@ -106,7 +121,9 @@ function runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) 
             session.startTransaction({readConcern: {level: "snapshot"}});
             assert.commandWorked(sessionDB[collName].insert({_id: "insert-1"}));
 
-            jsTestLog("Attempt to drop the collection. This should fail due to the open transaction.");
+            jsTestLog(
+                "Attempt to drop the collection. This should fail due to the open transaction.",
+            );
             assert.commandFailedWithCode(
                 testDB.runCommand({drop: collName, maxTimeMS: 1000}),
                 ErrorCodes.MaxTimeMSExpired,
@@ -122,10 +139,15 @@ function runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) 
     assert.commandWorked(testDB.runCommand({drop: collName}));
 
     jsTestLog("Test that committing the transaction fails, since it was aborted.");
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.commitTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 
     jsTestLog("Restore the featureCompatibilityVersion to latest.");
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     session.endSession();
     testDB[collName].drop({writeConcern: {w: "majority"}});
@@ -136,7 +158,9 @@ function runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) {
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     jsTestLog(`Set the initial featureCompatibilityVersion to ${initialFCV}.`);
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}),
+    );
 
     const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);
@@ -156,30 +180,44 @@ function runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) {
                 // lock is currently held by prepare, so that will block. We use a failpoint to make that
                 // command fail immediately when it tries to get the lock.
                 assert.commandWorked(
-                    primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}),
+                    primary.adminCommand({
+                        configureFailPoint: "failNonIntentLocksIfWaitNeeded",
+                        mode: "alwaysOn",
+                    }),
                 );
             }),
             ErrorCodes.LockTimeout,
         );
     } finally {
-        assert.commandWorked(primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
+        assert.commandWorked(
+            primary.adminCommand({
+                configureFailPoint: "failNonIntentLocksIfWaitNeeded",
+                mode: "off",
+            }),
+        );
     }
 
     jsTestLog("Commit the prepared transaction.");
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     jsTestLog("Restore the featureCompatibilityVersion to latest.");
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     session.endSession();
     testDB[collName].drop({writeConcern: {w: "majority"}});
 }
 
 function runAwaitOperationsWithOFCV(initialFCV, targetFCV, runSetFCVFn) {
-    jsTestLog(`Starting await for operations with Operation FCV test from ${initialFCV} to ${targetFCV}.`);
+    jsTestLog(
+        `Starting await for operations with Operation FCV test from ${initialFCV} to ${targetFCV}.`,
+    );
 
     jsTestLog(`Set the initial featureCompatibilityVersion to ${initialFCV}.`);
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}),
+    );
 
     let hangCreateFp, createThread;
     try {
@@ -187,7 +225,10 @@ function runAwaitOperationsWithOFCV(initialFCV, targetFCV, runSetFCVFn) {
             runSetFCVFn(targetFCV, function beforeTransition() {
                 jsTestLog("Start a transaction.");
                 // Start creating a collection, but hang it before it acquires locks
-                hangCreateFp = configureFailPoint(primary, "hangCreateCollectionBeforeLockAcquisition");
+                hangCreateFp = configureFailPoint(
+                    primary,
+                    "hangCreateCollectionBeforeLockAcquisition",
+                );
                 createThread = new Thread(
                     function (host, dbName, collName) {
                         const conn = new Mongo(host);
@@ -203,34 +244,66 @@ function runAwaitOperationsWithOFCV(initialFCV, targetFCV, runSetFCVFn) {
                 // This fail point makes setFCV fail immediately if it has to wait for operations
                 // with an Operation FCV, rather than waiting indefinitely.
                 assert.commandWorked(
-                    primary.adminCommand({configureFailPoint: "immediatelyTimeOutWaitForStaleOFCV", mode: "alwaysOn"}),
+                    primary.adminCommand({
+                        configureFailPoint: "immediatelyTimeOutWaitForStaleOFCV",
+                        mode: "alwaysOn",
+                    }),
                 );
             }),
             ErrorCodes.ExceededTimeLimit,
         );
     } finally {
         assert.commandWorked(
-            primary.adminCommand({configureFailPoint: "immediatelyTimeOutWaitForStaleOFCV", mode: "off"}),
+            primary.adminCommand({
+                configureFailPoint: "immediatelyTimeOutWaitForStaleOFCV",
+                mode: "off",
+            }),
         );
         hangCreateFp?.off();
         createThread?.join();
     }
 
     jsTestLog("Restore the featureCompatibilityVersion to latest.");
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     testDB[collName].drop({writeConcern: {w: "majority"}});
 }
 
 function runTest(initialFCV, targetFCV) {
-    runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradingOrDowngradingAndDraining);
-    runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradedOrDowngradedAndDraining);
+    runAwaitPreparedTransactionsTest(
+        initialFCV,
+        targetFCV,
+        runFCVTransitionToUpgradingOrDowngradingAndDraining,
+    );
+    runAwaitPreparedTransactionsTest(
+        initialFCV,
+        targetFCV,
+        runFCVTransitionToUpgradedOrDowngradedAndDraining,
+    );
 
-    runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradingOrDowngradingAndDraining);
-    runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradedOrDowngradedAndDraining);
+    runAbortUnpreparedTransactionsTest(
+        initialFCV,
+        targetFCV,
+        runFCVTransitionToUpgradingOrDowngradingAndDraining,
+    );
+    runAbortUnpreparedTransactionsTest(
+        initialFCV,
+        targetFCV,
+        runFCVTransitionToUpgradedOrDowngradedAndDraining,
+    );
 
-    runAwaitOperationsWithOFCV(initialFCV, targetFCV, runFCVTransitionToUpgradingOrDowngradingAndDraining);
-    runAwaitOperationsWithOFCV(initialFCV, targetFCV, runFCVTransitionToUpgradedOrDowngradedAndDraining);
+    runAwaitOperationsWithOFCV(
+        initialFCV,
+        targetFCV,
+        runFCVTransitionToUpgradingOrDowngradingAndDraining,
+    );
+    runAwaitOperationsWithOFCV(
+        initialFCV,
+        targetFCV,
+        runFCVTransitionToUpgradedOrDowngradedAndDraining,
+    );
 }
 
 runTest(latestFCV, lastLTSFCV);

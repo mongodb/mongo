@@ -6,9 +6,17 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
     // Check if the command is an aggregate command with a $changeStream pipeline.
-    if (cmdName === "aggregate" && typeof cmdObj === "object" && cmdObj.hasOwnProperty("pipeline")) {
+    if (
+        cmdName === "aggregate" &&
+        typeof cmdObj === "object" &&
+        cmdObj.hasOwnProperty("pipeline")
+    ) {
         const pipeline = cmdObj.pipeline;
-        if (Array.isArray(pipeline) && pipeline.length && pipeline[0].hasOwnProperty("$changeStream")) {
+        if (
+            Array.isArray(pipeline) &&
+            pipeline.length &&
+            pipeline[0].hasOwnProperty("$changeStream")
+        ) {
             // Now check if the command was started from within the ChangeStreamTest fixture.
             if (!globalThis.isInsideChangeStreamTestFixture) {
                 // Not started from within the ChangeStreamTest fixture. This is disallowed.

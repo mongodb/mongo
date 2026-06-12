@@ -30,7 +30,10 @@ assert.commandWorked(sessionColl.insertMany(expectedDocuments));
 // Skip the execution of the test from suites that directly set a read concern via
 // jstests/libs/override_methods/set_read_and_write_concerns.js if it is not supported in
 // causal consistency.
-if (TestData.defaultReadConcernLevel === "available" || TestData.defaultReadConcernLevel === "linearizable") {
+if (
+    TestData.defaultReadConcernLevel === "available" ||
+    TestData.defaultReadConcernLevel === "linearizable"
+) {
     jsTestLog(
         "Skipping the test find_on_secondary.js because the read concern " +
             TestData.defaultReadConcernLevel +

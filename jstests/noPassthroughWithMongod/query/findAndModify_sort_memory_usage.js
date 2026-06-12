@@ -14,7 +14,9 @@ let result = db.adminCommand({getParameter: 1, internalQueryMaxBlockingSortMemor
 assert.commandWorked(result);
 let oldSortLimit = result.internalQueryMaxBlockingSortMemoryUsageBytes;
 let newSortLimit = 1024 * 1024;
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: newSortLimit}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: newSortLimit}),
+);
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: false}));
 
 try {
@@ -34,7 +36,12 @@ try {
 
     // Verify that an unindexed sort of this data succeeds with findAndModify (which should be
     // requesting a top-K sort).
-    result = coll.runCommand({findAndModify: coll.getName(), query: {}, update: {$set: {c: 1}}, sort: {b: 1}});
+    result = coll.runCommand({
+        findAndModify: coll.getName(),
+        query: {},
+        update: {$set: {c: 1}},
+        sort: {b: 1},
+    });
     assert.commandWorked(result);
     assert.neq(result.value, null);
     assert.eq(result.value.b, 0);
@@ -42,6 +49,9 @@ try {
     // Restore the orginal sort memory limit.
     assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: oldSortLimit}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxBlockingSortMemoryUsageBytes: oldSortLimit,
+        }),
     );
 }

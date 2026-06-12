@@ -106,8 +106,12 @@ function testShardKeys(collName, hashedKey) {
     // shard key to target by.
     assert.commandWorked(coll.update({}, {$set: {x: 1}}, {multi: false}));
     assert.commandWorked(coll.update({_id: {$gt: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
-    assert.commandWorked(coll.update({$or: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
-    assert.commandWorked(coll.update({$and: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$or: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}),
+    );
+    assert.commandWorked(
+        coll.update({$and: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}),
+    );
     assert.commandWorked(coll.update({"_id.x": ObjectId()}, {$set: {x: 1}}, {multi: false}));
 
     // Make sure we can extract exact shard key from certain queries
@@ -128,17 +132,27 @@ function testShardKeys(collName, hashedKey) {
     assert.commandWorked(coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}));
 
     // Note: {key:-1} and {key:-2} fall on shard0 for both hashed and ascending shardkeys.
-    assert.commandWorked(coll.update({$or: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
-    assert.commandWorked(coll.update({$and: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$or: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}),
+    );
+    assert.commandWorked(
+        coll.update({$and: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}),
+    );
 
     // Run the two phase broadcast write protocol for multi: false writes without a proper _id or
     // shard key to target by.
     assert.commandWorked(coll.update({key: {$gt: MinKey}}, {$set: {x: 1}}, {multi: false}));
-    assert.commandWorked(coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}),
+    );
 
     // Make sure failed shard key or _id extraction doesn't affect the other
-    assert.commandWorked(coll.update({"_id.x": ObjectId(), key: 1}, {$set: {x: 1}}, {multi: false}));
-    assert.commandWorked(coll.update({_id: ObjectId(), "key.x": 1}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({"_id.x": ObjectId(), key: 1}, {$set: {x: 1}}, {multi: false}),
+    );
+    assert.commandWorked(
+        coll.update({_id: ObjectId(), "key.x": 1}, {$set: {x: 1}}, {multi: false}),
+    );
 
     // Can unset shard key with op style update.
     assert.commandWorked(coll.insert({_id: 11, key: 1}));
@@ -199,7 +213,9 @@ function testNestedShardKeys(collName, hashedKey) {
 
     // Can unset shard key with pipeline style update.
     assert.commandWorked(coll.insert({_id: 13, skey: {skey: 1}}));
-    assert.commandWorked(sessionColl.update({_id: 13, "skey.skey": 1}, [{$unset: "skey"}, {$set: {x: 1}}]));
+    assert.commandWorked(
+        sessionColl.update({_id: 13, "skey.skey": 1}, [{$unset: "skey"}, {$set: {x: 1}}]),
+    );
     assert.docEq({_id: 13, x: 1}, sessionColl.findOne({_id: 13}));
 
     //

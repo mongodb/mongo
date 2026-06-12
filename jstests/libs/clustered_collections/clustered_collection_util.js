@@ -6,7 +6,10 @@ import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 export var ClusteredCollectionUtil = class {
     static areAllCollectionsClustered(conn) {
-        const res = conn.adminCommand({getParameter: 1, "failpoint.clusterAllCollectionsByDefault": 1});
+        const res = conn.adminCommand({
+            getParameter: 1,
+            "failpoint.clusterAllCollectionsByDefault": 1,
+        });
         if (res.ok) return res["failpoint.clusterAllCollectionsByDefault"].mode;
         else return false;
     }
@@ -42,9 +45,15 @@ export var ClusteredCollectionUtil = class {
     }
 
     static validateListCollectionsNotClustered(db, collName) {
-        const listColls = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+        const listColls = assert.commandWorked(
+            db.runCommand({listCollections: 1, filter: {name: collName}}),
+        );
         const listCollsOptions = listColls.cursor.firstBatch[0].options;
-        assert.eq(listCollsOptions.clusteredIndex, undefined, "Expected clusteredIndex to be undefined");
+        assert.eq(
+            listCollsOptions.clusteredIndex,
+            undefined,
+            "Expected clusteredIndex to be undefined",
+        );
     }
 
     static validateListIndexesNonClustered(db, collName) {
@@ -60,7 +69,9 @@ export var ClusteredCollectionUtil = class {
     // listCollections contains the correct information about the clusteredIndex.
     static validateListCollections(db, collName, createOptions) {
         const fullCreateOptions = ClusteredCollectionUtil.constructFullCreateOptions(createOptions);
-        const listColls = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+        const listColls = assert.commandWorked(
+            db.runCommand({listCollections: 1, filter: {name: collName}}),
+        );
         const listCollsOptions = listColls.cursor.firstBatch[0].options;
         assert(listCollsOptions.clusteredIndex);
         assert.docEq(fullCreateOptions.clusteredIndex, listCollsOptions.clusteredIndex);
@@ -83,10 +94,16 @@ export var ClusteredCollectionUtil = class {
         let extraData = {clustered: true};
         // ttl is not stored on the clusteredIndex but on the collection info. Therefore, we have to
         // add it back in this check to match the getIndexes output.
-        if (typeof createOptions.expireAfterSeconds !== "undefined" && createOptions.expireAfterSeconds !== null) {
+        if (
+            typeof createOptions.expireAfterSeconds !== "undefined" &&
+            createOptions.expireAfterSeconds !== null
+        ) {
             extraData.expireAfterSeconds = createOptions.expireAfterSeconds;
         }
-        const expectedListIndexesOutput = Object.extend(extraData, fullCreateOptions.clusteredIndex);
+        const expectedListIndexesOutput = Object.extend(
+            extraData,
+            fullCreateOptions.clusteredIndex,
+        );
         assert.docEq(expectedListIndexesOutput, index);
     }
 
@@ -95,7 +112,9 @@ export var ClusteredCollectionUtil = class {
         const coll = db[collName];
         const clusterKeyString = new String(clusterKey);
 
-        assert.commandWorked(db.createCollection(collName, {clusteredIndex: {key: {[clusterKey]: 1}, unique: true}}));
+        assert.commandWorked(
+            db.createCollection(collName, {clusteredIndex: {key: {[clusterKey]: 1}, unique: true}}),
+        );
 
         // Expect that duplicates are rejected.
         for (let len of lengths) {
@@ -158,7 +177,10 @@ export var ClusteredCollectionUtil = class {
         assert.commandWorked(coll.dropIndex({a: 1}));
 
         // This key is too large.
-        assert.commandFailedWithCode(coll.insert({[clusterKey]: "x".repeat(9 * 1024 * 1024), a: 11}), 5894900);
+        assert.commandFailedWithCode(
+            coll.insert({[clusterKey]: "x".repeat(9 * 1024 * 1024), a: 11}),
+            5894900,
+        );
 
         // Look up using the secondary index on {a: 1}
         assert.commandWorked(coll.createIndex({a: 1}));
@@ -190,7 +212,10 @@ export var ClusteredCollectionUtil = class {
         // No support for numeric type differentiation.
         assert.commandWorked(coll.insert({[clusterKey]: 42.0}));
         assert.commandFailedWithCode(coll.insert({[clusterKey]: 42}), ErrorCodes.DuplicateKey);
-        assert.commandFailedWithCode(coll.insert({[clusterKey]: NumberLong("42")}), ErrorCodes.DuplicateKey);
+        assert.commandFailedWithCode(
+            coll.insert({[clusterKey]: NumberLong("42")}),
+            ErrorCodes.DuplicateKey,
+        );
         assert.eq(1, coll.find({[clusterKey]: 42.0}).itcount());
         assert.eq(1, coll.find({[clusterKey]: 42}).itcount());
         assert.eq(1, coll.find({[clusterKey]: NumberLong("42")}).itcount());

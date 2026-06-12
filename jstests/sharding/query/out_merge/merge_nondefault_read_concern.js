@@ -13,7 +13,9 @@ assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()})
 
 const baseMergeCommand = {
     aggregate: "source",
-    pipeline: [{$merge: {into: "target", on: "_id", whenMatched: "replace", whenNotMatched: "insert"}}],
+    pipeline: [
+        {$merge: {into: "target", on: "_id", whenMatched: "replace", whenNotMatched: "insert"}},
+    ],
     cursor: {},
 };
 
@@ -25,7 +27,9 @@ withReadConcern.readConcern = {
 assert.commandWorked(mongosDB.runCommand(withReadConcern));
 
 // Test with global override.
-assert.commandWorked(mongosDB.adminCommand({"setDefaultRWConcern": 1, "defaultReadConcern": {level: "majority"}}));
+assert.commandWorked(
+    mongosDB.adminCommand({"setDefaultRWConcern": 1, "defaultReadConcern": {level: "majority"}}),
+);
 assert.commandWorked(mongosDB.runCommand(baseMergeCommand));
 
 st.stop();

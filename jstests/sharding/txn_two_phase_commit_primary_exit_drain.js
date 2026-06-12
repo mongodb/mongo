@@ -33,12 +33,18 @@ const setUp = function () {
     // shard0: [-inf, 0)
     // shard1: [0, 10)
     // shard2: [10, +inf)
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}),
+    );
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}),
+    );
 
     // Start a new transaction by inserting a document onto each shard.
     assert.commandWorked(
@@ -76,7 +82,9 @@ const testCommitProtocol = function () {
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
     const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
 
-    assert.commandWorked(coordinatorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(
+        coordinatorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+    );
     // The replSetFreeze command will cause the node to run for primary on its own.
     assert.commandWorked(coordinatorPrimary.adminCommand({replSetFreeze: 0}));
 

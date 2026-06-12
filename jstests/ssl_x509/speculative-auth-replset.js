@@ -35,7 +35,8 @@ const admin = rst.getPrimary().getDB("admin");
 admin.createUser({user: "admin", pwd: "pwd", roles: ["root"]});
 
 function getMechStats(db) {
-    return assert.commandWorked(db.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+    return assert.commandWorked(db.runCommand({serverStatus: 1})).security.authentication
+        .mechanisms;
 }
 
 authutil.assertAuthenticate(rst.getPrimary(), "$external", {

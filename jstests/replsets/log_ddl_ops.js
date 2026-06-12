@@ -31,15 +31,18 @@ rst.awaitReplication();
 
 assert.commandWorked(testDB.createCollection(collectionName));
 assert.commandWorked(testDB.getCollection(collectionName).createIndex({x: 1}));
-assert.commandWorked(testDB.runCommand({collMod: collectionName, index: {keyPattern: {x: 1}, hidden: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collectionName, index: {keyPattern: {x: 1}, hidden: true}}),
+);
 assert.commandWorked(testDB.getCollection(collectionName).dropIndex({x: 1}));
 
 const newCollectionName = "log_collection_renamed";
 
 assert.commandWorked(
-    primary
-        .getDB("admin")
-        .runCommand({renameCollection: `${name}.${collectionName}`, to: `${name}.${newCollectionName}`}),
+    primary.getDB("admin").runCommand({
+        renameCollection: `${name}.${collectionName}`,
+        to: `${name}.${newCollectionName}`,
+    }),
 );
 assert.commandWorked(testDB.runCommand({drop: newCollectionName}));
 assert.commandWorked(testDB.runCommand({dropDatabase: 1}));
@@ -71,7 +74,15 @@ for (const code of primaryLogCodes) {
     checkLog.contains(primary, code, 1 * 1000);
 }
 
-const opsLogged = ["createIndexes", "create", "collMod", "dropDatabase", "drop", "dropIndexes", "renameCollection"];
+const opsLogged = [
+    "createIndexes",
+    "create",
+    "collMod",
+    "dropDatabase",
+    "drop",
+    "dropIndexes",
+    "renameCollection",
+];
 
 for (const op of opsLogged) {
     checkLog.contains(secondary, new RegExp(`7360109.*${op}`), 1 * 1000); // OplogBatcher message

@@ -49,14 +49,21 @@ export function setupTestDatabase(conn, dbName, optPrimaryShard = null) {
     const newDb = conn.getSiblingDB(dbName);
     assert.commandWorked(newDb.dropDatabase());
     const createCmd =
-        optPrimaryShard !== null ? {enablesharding: dbName, primaryShard: optPrimaryShard} : {enablesharding: dbName};
+        optPrimaryShard !== null
+            ? {enablesharding: dbName, primaryShard: optPrimaryShard}
+            : {enablesharding: dbName};
 
     assert.commandWorked(conn.adminCommand(createCmd));
     return newDb;
 }
 
 // Basic check of the tracking state for a namespace on the sharding catalog.
-export function verifyCollectionTrackingState(conn, nss, expectedToBeTracked, expectedToBeUnsplittable = false) {
+export function verifyCollectionTrackingState(
+    conn,
+    nss,
+    expectedToBeTracked,
+    expectedToBeUnsplittable = false,
+) {
     const configDB = conn.getSiblingDB("config");
     const matchingCollDocs = configDB.collections.find({_id: nss}).toArray();
     if (expectedToBeTracked) {

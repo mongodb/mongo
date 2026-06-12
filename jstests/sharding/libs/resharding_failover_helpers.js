@@ -66,7 +66,10 @@ export function runRetryAfterFailover(config) {
         return getUUIDFromConfigCollections(mongos, tempCollection.getFullName());
     };
 
-    let pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
+    let pauseBeforeCloningFP = configureFailPoint(
+        configsvr,
+        "reshardingPauseCoordinatorBeforeCloning",
+    );
 
     // Fulfilled once the first reshardCollection command creates the temporary collection.
     let expectedUUIDAfterReshardingCompletes = undefined;
@@ -145,7 +148,10 @@ export function runRetryAfterFailover(config) {
     // Try it again but let it succeed this time.
     jsTestLog("Trying resharding with new UUID: " + newReshardingUUID);
     reshardingTest.retryOnceOnNetworkError(() => {
-        pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
+        pauseBeforeCloningFP = configureFailPoint(
+            configsvr,
+            "reshardingPauseCoordinatorBeforeCloning",
+        );
     });
     reshardingTest.withReshardingInBackground(
         {
@@ -247,7 +253,10 @@ export function runFailoverDuringAbort(config) {
         donor,
         "reshardingDonorFailsBeforeObtainingTimestamp",
     );
-    const hangBeforeRemovingRecipientDocFp = configureFailPoint(recipient, "removeRecipientDocFailpoint");
+    const hangBeforeRemovingRecipientDocFp = configureFailPoint(
+        recipient,
+        "removeRecipientDocFailpoint",
+    );
 
     reshardingTest.withReshardingInBackground(
         {
@@ -257,13 +266,17 @@ export function runFailoverDuringAbort(config) {
         () => {
             hangBeforeRemovingRecipientDocFp.wait();
 
-            const recipientDoc = recipient.getCollection("config.localReshardingOperations.recipient").findOne({
-                ns: config.getRecipientDocNs(sourceCollection),
-            });
+            const recipientDoc = recipient
+                .getCollection("config.localReshardingOperations.recipient")
+                .findOne({
+                    ns: config.getRecipientDocNs(sourceCollection),
+                });
             assert(recipientDoc != null);
             assert(recipientDoc.mutableState.state === "done");
             assert(recipientDoc.mutableState.abortReason != null);
-            assert(recipientDoc.mutableState.abortReason.code === ErrorCodes.ReshardCollectionAborted);
+            assert(
+                recipientDoc.mutableState.abortReason.code === ErrorCodes.ReshardCollectionAborted,
+            );
 
             reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
             const recipientRS = reshardingTest.getReplSetForShard(recipientShardNames[0]);
@@ -322,7 +335,10 @@ export function runBuildingIndexFailover(config) {
     // Create an index on the shard key field.
     assert.commandWorked(mongos.getCollection(ns).insert(config.documents));
     assert.commandWorked(mongos.getCollection(ns).createIndex(config.indexKey));
-    const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
+    const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(
+        recipient,
+        "hangAfterInitializingIndexBuild",
+    );
 
     reshardingTest.withReshardingInBackground(
         {
@@ -344,7 +360,9 @@ export function runBuildingIndexFailover(config) {
         {
             afterReshardingFn: () => {
                 const indexes = mongos.getDB("reshardingDb").getCollection("coll").getIndexes();
-                const haveNewShardKeyIndex = indexes.some((index) => config.newShardKeyIndexField in index["key"]);
+                const haveNewShardKeyIndex = indexes.some(
+                    (index) => config.newShardKeyIndexField in index["key"],
+                );
                 assert.eq(haveNewShardKeyIndex, true);
             },
         },
@@ -372,7 +390,11 @@ export function runBuildingIndexFailover(config) {
  *   @param {Function} [config.postReshardingFn] - Optional (mongos) => void, run before teardown.
  */
 export function runFailoverShutdownBasic(config) {
-    const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, enableElections: true});
+    const reshardingTest = new ReshardingTest({
+        numDonors: 2,
+        numRecipients: 2,
+        enableElections: true,
+    });
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;

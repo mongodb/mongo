@@ -70,7 +70,10 @@ let checkSocket = function (serverHandle, path) {
     assert(fileExists(path), `${start.toISOString()}: ${path} does not exist`);
 
     let conn = new Mongo(path);
-    assert.commandWorked(conn.getDB("admin").runCommand("ping"), `Expected ping command to succeed for ${path}`);
+    assert.commandWorked(
+        conn.getDB("admin").runCommand("ping"),
+        `Expected ping command to succeed for ${path}`,
+    );
     checkConnectionAcceptedLog(serverHandle, path);
 };
 
@@ -182,7 +185,13 @@ if (jsTestOptions().shellGRPC) {
 if (jsTestOptions().shellGRPC) {
     var grpcPort = allocatePort();
     var sockName = `socketdir/mongodb-grpc-${grpcPort}.sock`;
-    testSockOptions(undefined, sockName, {unixSocketPrefix: socketPrefix, grpcPort: grpcPort}, ",", true);
+    testSockOptions(
+        undefined,
+        sockName,
+        {unixSocketPrefix: socketPrefix, grpcPort: grpcPort},
+        ",",
+        true,
+    );
 } else {
     var port = allocatePort();
     var sockName = `socketdir/mongodb-${port}.sock`;

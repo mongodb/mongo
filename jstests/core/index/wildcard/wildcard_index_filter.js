@@ -28,13 +28,25 @@ function getFilters() {
 
 // Sets an index filter given a query shape then confirms that the expected index was used to
 // answer a query.
-function assertExpectedIndexAnswersQueryWithFilter(filterQuery, filterIndexes, query, expectedIndexName, hint) {
+function assertExpectedIndexAnswersQueryWithFilter(
+    filterQuery,
+    filterIndexes,
+    query,
+    expectedIndexName,
+    hint,
+) {
     // Clear existing cache filters.
     assert.commandWorked(coll.runCommand("planCacheClearFilters"), "planCacheClearFilters failed");
 
     // Make sure that the filter is set correctly.
-    assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: filterQuery, indexes: filterIndexes}));
-    assert.eq(1, getFilters().length, "no change in query settings after successfully setting index filters");
+    assert.commandWorked(
+        coll.runCommand("planCacheSetFilter", {query: filterQuery, indexes: filterIndexes}),
+    );
+    assert.eq(
+        1,
+        getFilters().length,
+        "no change in query settings after successfully setting index filters",
+    );
 
     // Check that expectedIndex index was used over another index.
     let explain;
@@ -86,7 +98,12 @@ const indexAB = {
 assert.commandWorked(coll.createIndex(indexAB));
 
 // Filtering on $** index. $** index is used over another index for compound query.
-assertExpectedIndexAnswersQueryWithFilter({a: "a", b: "b"}, [indexWildcard], {a: "a", b: "b"}, "$**_1");
+assertExpectedIndexAnswersQueryWithFilter(
+    {a: "a", b: "b"},
+    [indexWildcard],
+    {a: "a", b: "b"},
+    "$**_1",
+);
 
 // Filtering on regular compound index. Check that $** index is not used over another index
 // for compound query.

@@ -22,7 +22,10 @@ import {
 
 const overrideInternalWriteConcernTimeout = {
     setParameter: {
-        "failpoint.overrideInternalWriteConcernTimeout": tojson({mode: "alwaysOn", data: {wtimeoutMillis: 5000}}),
+        "failpoint.overrideInternalWriteConcernTimeout": tojson({
+            mode: "alwaysOn",
+            data: {wtimeoutMillis: 5000},
+        }),
     },
 };
 const stOtherOptions = {
@@ -34,7 +37,9 @@ const stOtherOptions = {
 
 let st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
 
-assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}),
+);
 
 jsTest.log("Testing all commands on an unsharded collection.");
 checkWriteConcernBehaviorForAllCommands(

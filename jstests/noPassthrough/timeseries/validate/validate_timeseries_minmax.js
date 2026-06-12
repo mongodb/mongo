@@ -172,7 +172,11 @@ function setUpCollection(db, data) {
     // compressed bucket with the decompressed bucket.
     const bucketDoc = getTimeseriesCollForRawOps(db, collection).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
-    getTimeseriesCollForRawOps(db, collection).replaceOne({_id: bucketDoc._id}, bucketDoc, getRawOperationSpec(db));
+    getTimeseriesCollForRawOps(db, collection).replaceOne(
+        {_id: bucketDoc._id},
+        bucketDoc,
+        getRawOperationSpec(db),
+    );
 
     const result = assert.commandWorked(collection.validate());
     assert(result.valid, tojson(result));
@@ -187,7 +191,9 @@ describe("Test 'control.min' and 'control.max' match the uncompressed documents 
 
         // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
         assert.commandWorked(
-            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+            this.conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
         );
     });
 
@@ -572,7 +578,11 @@ describe("Test 'control.min' and 'control.max' match the uncompressed documents 
     afterEach(function () {
         if (this.expectValidationFailure) {
             const coll = this.db.getCollection(collName);
-            const record = getTimeseriesCollForRawOps(this.db, coll).find().rawData().toArray().at(-1);
+            const record = getTimeseriesCollForRawOps(this.db, coll)
+                .find()
+                .rawData()
+                .toArray()
+                .at(-1);
             TimeseriesTest.checkForDocumentValidationFailureLog(coll, record);
         }
     });

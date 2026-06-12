@@ -5,7 +5,12 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
-import {PrefixField, SubstringField, SuffixAndPrefixField, SuffixField} from "jstests/fle2/libs/qe_text_search_util.js";
+import {
+    PrefixField,
+    SubstringField,
+    SuffixAndPrefixField,
+    SuffixField,
+} from "jstests/fle2/libs/qe_text_search_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "qe_text_downgrade_test";
@@ -77,7 +82,11 @@ function testBinaryDowngrade(queryTypeConfig) {
 
     // Downgrade should fail because of basic_text
     assert.commandFailedWithCode(
-        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true, writeConcern: {w: 1}}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+            writeConcern: {w: 1},
+        }),
         ErrorCodes.CannotDowngrade,
     );
 
@@ -85,7 +94,11 @@ function testBinaryDowngrade(queryTypeConfig) {
     edb.basic_text.drop();
 
     assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true, writeConcern: {w: 1}}),
+        adminDB.runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+            writeConcern: {w: 1},
+        }),
     );
 
     // Downgrade should now succeed

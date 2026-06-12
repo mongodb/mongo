@@ -27,7 +27,15 @@ import {
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
-const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
+const docs = [
+    doc1_a_nofields,
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc5_b_f104,
+    doc6_c_f105,
+    doc7_c_f106,
+];
 
 Random.setRandomSeed();
 
@@ -50,7 +58,11 @@ const testBucketDelete = function (queryField) {
     assert.eq(1, res.lastErrorObject.n, `findAndModify failed: ${tojson(res)}`);
 
     const newBucketDocs = getTimeseriesCollForRawOps(coll.getDB(), coll).find().rawData().toArray();
-    assert.eq(orgBucketDocs.length - 1, newBucketDocs.length, `Wrong number of buckets left: ${tojson(newBucketDocs)}`);
+    assert.eq(
+        orgBucketDocs.length - 1,
+        newBucketDocs.length,
+        `Wrong number of buckets left: ${tojson(newBucketDocs)}`,
+    );
     assert(!newBucketDocs.find((e) => e === orgBucketDocs[bucketDocIdx]), tojson(newBucketDocs));
 };
 testBucketDelete("_id");
@@ -81,14 +93,21 @@ const testBucketMetaUpdate = function (queryField) {
     });
 
     const newBucketDocs = getTimeseriesCollForRawOps(coll.getDB(), coll).find().rawData().toArray();
-    assert.eq(orgBucketDocs.length, newBucketDocs.length, `Wrong number of buckets left: ${tojson(newBucketDocs)}`);
+    assert.eq(
+        orgBucketDocs.length,
+        newBucketDocs.length,
+        `Wrong number of buckets left: ${tojson(newBucketDocs)}`,
+    );
     assert(!newBucketDocs.find((e) => e === orgBucketDocs[bucketDocIdx]), tojson(newBucketDocs));
 };
 testBucketMetaUpdate("_id");
 testBucketMetaUpdate("meta");
 
 const testBucketMetaUpdateToOwningShardChange = function (queryField) {
-    const coll = prepareShardedCollection({collName: "testBucketMetaUpdateToOwningShardChange", initialDocList: docs});
+    const coll = prepareShardedCollection({
+        collName: "testBucketMetaUpdateToOwningShardChange",
+        initialDocList: docs,
+    });
 
     const orgBucketDocs = getTimeseriesCollForRawOps(coll.getDB(), coll).find().rawData().toArray();
     const bucketDocIdx = orgBucketDocs.findIndex((e) => e.meta === "C");
@@ -110,7 +129,11 @@ const testBucketMetaUpdateToOwningShardChange = function (queryField) {
         assert.eq("A", res.value.meta, `Wrong meta field: ${tojson(res)}`);
     });
     const newBucketDocs = getTimeseriesCollForRawOps(coll.getDB(), coll).find().rawData().toArray();
-    assert.eq(orgBucketDocs.length, newBucketDocs.length, `Wrong number of buckets left: ${tojson(newBucketDocs)}`);
+    assert.eq(
+        orgBucketDocs.length,
+        newBucketDocs.length,
+        `Wrong number of buckets left: ${tojson(newBucketDocs)}`,
+    );
     assert(!newBucketDocs.find((e) => e === orgBucketDocs[bucketDocIdx]), tojson(newBucketDocs));
 };
 

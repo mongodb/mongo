@@ -12,7 +12,10 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, it, beforeEach, before, afterEach, after} from "jstests/libs/mochalite.js";
-import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertCreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {
     ChangeStreamTest,
     ensureShardDistribution,
@@ -63,7 +66,9 @@ describe("$changeStream v2", function () {
 
     beforeEach(function () {
         // Enable sharding on the the test database and ensure that the primary is shard0.
-        assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+        );
     });
 
     afterEach(function () {
@@ -141,7 +146,9 @@ describe("$changeStream v2", function () {
         assertOpenCursors(st, [], true, commentFilter);
 
         // Create a collection and test events are handled properly.
-        assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+        );
         assertCreateCollection(db, coll.getName());
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
         coll.insert([{_id: -1, a: -1}]);
@@ -187,12 +194,16 @@ describe("$changeStream v2", function () {
 
         // Create a second collection.
         const db2 = st.s.getDB(jsTestName() + "_2");
-        assert.commandWorked(db.adminCommand({enableSharding: db2.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            db.adminCommand({enableSharding: db2.getName(), primaryShard: st.shard0.shardName}),
+        );
 
         const coll2Name = `${jsTestName()}` + "_2";
         const coll2 = db2.getCollection(coll2Name);
         assertCreateCollection(db2, coll2.getName());
-        assert.commandWorked(db2.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(
+            db2.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}),
+        );
         awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
             csTest.assertNoChange(csCursor);
         });

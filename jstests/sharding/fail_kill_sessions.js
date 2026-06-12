@@ -11,7 +11,10 @@ import {
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function runTest({st, numShards, closeConnection}) {
-    const hostArray = Array.from({length: numShards}, (_, i) => st["rs" + i].getPrimary().host).sort();
+    const hostArray = Array.from(
+        {length: numShards},
+        (_, i) => st["rs" + i].getPrimary().host,
+    ).sort();
 
     const data = {
         errorCode: ErrorCodes.CommandFailed,

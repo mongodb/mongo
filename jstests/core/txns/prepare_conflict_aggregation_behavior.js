@@ -41,7 +41,10 @@ assert.commandWorked(sessionColl.update({_id: 1}, {a: 1}));
 assert.commandWorked(sessionOutColl.update({_id: 0}, {a: 1}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-jsTestLog("Test that reads from an aggregation pipeline with $merge don't block on prepare" + " conflicts");
+jsTestLog(
+    "Test that reads from an aggregation pipeline with $merge don't block on prepare" +
+        " conflicts",
+);
 testColl.aggregate([
     {$addFields: {b: 1}},
     {$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}},
@@ -57,7 +60,10 @@ assert.commandWorked(sessionOutColl.update({_id: 1}, {_id: 1, a: 1}));
 prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Test that writes from an aggregation pipeline block on prepare conflicts");
-let pipeline = [{$addFields: {c: 1}}, {$merge: {into: outCollName, whenMatched: "replace", whenNotMatched: "insert"}}];
+let pipeline = [
+    {$addFields: {c: 1}},
+    {$merge: {into: outCollName, whenMatched: "replace", whenNotMatched: "insert"}},
+];
 assert.commandFailedWithCode(
     testDB.runCommand({
         aggregate: collName,

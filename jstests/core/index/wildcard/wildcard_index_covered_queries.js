@@ -13,7 +13,11 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getPlanStages, getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isIndexOnly,
+} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
@@ -41,7 +45,10 @@ function assertWildcardProvidesCoveredSolution(query, proj, shouldFailToCover = 
     assert.eq(isIndexOnly(coll.getDB(), winningPlan), !shouldFailToCover);
 
     // Verify that the query covered by the $** index produces the same results as a COLLSCAN.
-    assertArrayEq(coll.find(query, proj).toArray(), coll.find(query, proj).hint({$natural: 1}).toArray());
+    assertArrayEq(
+        coll.find(query, proj).toArray(),
+        coll.find(query, proj).hint({$natural: 1}).toArray(),
+    );
 }
 
 // Create a new collection and build a $** index on it.
@@ -82,7 +89,10 @@ for (const indexSpec of wildcardIndexes) {
     assertWildcardProvidesCoveredSolution({"a.b": {$in: [0, 50, 100, 150]}}, {_id: 0, "a.b": 1});
 
     // Verify that the $** index can cover an $in query for string values.
-    assertWildcardProvidesCoveredSolution({"a.c": {$in: ["0", "50", "100", "150"]}}, {_id: 0, "a.c": 1});
+    assertWildcardProvidesCoveredSolution(
+        {"a.c": {$in: ["0", "50", "100", "150"]}},
+        {_id: 0, "a.c": 1},
+    );
 
     // Verify that the compound wildcard index can cover a query on all fields in the index.
     assertWildcardProvidesCoveredSolution(
@@ -94,9 +104,15 @@ for (const indexSpec of wildcardIndexes) {
     // Verify that attempting to project the virtual $_path field from the $** keyPattern will
     // produce an error, as it is a dollar-prefixed name.
     const shouldFailToCover = true;
-    const err = assert.throws(() => coll.find({d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}).toArray());
+    const err = assert.throws(() =>
+        coll.find({d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}).toArray(),
+    );
     assert.commandFailedWithCode(err, 16410);
 
     // Verify that predicates which produce inexact-fetch bounds are not covered by a $** index.
-    assertWildcardProvidesCoveredSolution({d: {$elemMatch: {$eq: 50}}}, {_id: 0, d: 1}, shouldFailToCover);
+    assertWildcardProvidesCoveredSolution(
+        {d: {$elemMatch: {$eq: 50}}},
+        {_id: 0, d: 1},
+        shouldFailToCover,
+    );
 }

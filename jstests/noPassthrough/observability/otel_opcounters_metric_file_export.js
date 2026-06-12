@@ -39,7 +39,12 @@ describe("OTel opcounters metric file export", function () {
         this.coll = this.db.getCollection(jsTestName());
 
         // Warm up: ensure at least one export has occurred before any test reads metrics.
-        assert.soon(() => getLatestMetrics(metricsDir) !== null, "No initial metrics export", 30000, 500);
+        assert.soon(
+            () => getLatestMetrics(metricsDir) !== null,
+            "No initial metrics export",
+            30000,
+            500,
+        );
     });
 
     after(function () {
@@ -48,7 +53,8 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.inserts on insert operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.inserts"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.inserts"]?.value ?? 0;
 
         assert.commandWorked(this.coll.insert({a: 1}));
         assert.commandWorked(this.coll.insert([{b: 2}, {c: 3}]));
@@ -63,7 +69,8 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.queries on find operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.queries"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.queries"]?.value ?? 0;
 
         this.coll.find({}).toArray();
 
@@ -77,7 +84,8 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.updates on update operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.updates"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.updates"]?.value ?? 0;
 
         assert.commandWorked(this.coll.update({a: 1}, {$set: {a: 99}}));
 
@@ -91,7 +99,8 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.deletes on remove operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.deletes"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.deletes"]?.value ?? 0;
 
         assert.commandWorked(this.coll.remove({a: 99}));
 
@@ -110,7 +119,8 @@ describe("OTel opcounters metric file export", function () {
         }
 
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.getMores"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.getMores"]?.value ?? 0;
 
         this.coll
             .find({x: {$exists: true}})
@@ -130,7 +140,8 @@ describe("OTel opcounters metric file export", function () {
         // their own (e.g. ping, serverStatus). 'aggregate', 'find', getMore, and write ops all
         // suppress this counter and increment their own specific counters instead.
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.commands"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.commands"]?.value ?? 0;
 
         assert.commandWorked(this.db.runCommand({ping: 1}));
 
@@ -147,7 +158,8 @@ describe("OTel opcounters metric file export", function () {
         // 'find' increments 'queries' but NOT 'aggregates'; the two are fully exclusive.
         // Neither aggregate nor find increments 'commands'.
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.aggregates"]?.value ?? 0;
+        const initial =
+            getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.aggregates"]?.value ?? 0;
 
         this.coll.aggregate([{$match: {}}]).toArray();
         this.coll.aggregate([{$match: {}}, {$count: "n"}]).toArray();

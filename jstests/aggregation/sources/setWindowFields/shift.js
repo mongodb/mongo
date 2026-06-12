@@ -26,7 +26,13 @@ function verifyResults(results, valueFunction) {
         const correctDoc = valueFunction(i, Object.assign({}, origDocs[i]));
         assert(
             documentEq(correctDoc, results[i]),
-            "Got: " + tojson(results[i]) + "\nExpected: " + tojson(correctDoc) + "\n at position " + i + "\n",
+            "Got: " +
+                tojson(results[i]) +
+                "\nExpected: " +
+                tojson(correctDoc) +
+                "\n at position " +
+                i +
+                "\n",
         );
     }
 }
@@ -51,7 +57,10 @@ function runShiftQueryWithoutDefault(shiftBy) {
     return coll
         .aggregate([
             {
-                $setWindowFields: {sortBy: {one: 1}, output: {a: {$shift: {by: shiftBy, output: "$one"}}}},
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$shift: {by: shiftBy, output: "$one"}}},
+                },
             },
             {$sort: {_id: 1}},
         ])
@@ -109,7 +118,10 @@ function runShiftQueryDescending(shiftBy) {
     return coll
         .aggregate([
             {
-                $setWindowFields: {sortBy: {one: -1}, output: {a: {$shift: {by: shiftBy, output: "$one"}}}},
+                $setWindowFields: {
+                    sortBy: {one: -1},
+                    output: {a: {$shift: {by: shiftBy, output: "$one"}}},
+                },
             },
             {$sort: {_id: 1}},
         ])
@@ -237,7 +249,10 @@ assert.commandWorked(coll.insert([{_id: 1}, {_id: 2}]));
 result = coll
     .aggregate([
         {
-            $setWindowFields: {sortBy: {_id: 1}, output: {a: {$shift: {output: "$b", by: 1, default: "c"}}}},
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {a: {$shift: {output: "$b", by: 1, default: "c"}}},
+            },
         },
     ])
     .toArray();
@@ -266,7 +281,14 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     coll.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$setWindowFields: {sortBy: {one: 1}, output: {a: {$shift: {by: "1", output: "$one"}}}}}],
+        pipeline: [
+            {
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$shift: {by: "1", output: "$one"}}},
+                },
+            },
+        ],
         cursor: {},
     }),
     ErrorCodes.FailedToParse,
@@ -278,7 +300,10 @@ assert.commandFailedWithCode(
         aggregate: coll.getName(),
         pipeline: [
             {
-                $setWindowFields: {sortBy: {one: 1}, output: {a: {$shift: {by: {$sum: [1, 1]}, output: "$one"}}}},
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$shift: {by: {$sum: [1, 1]}, output: "$one"}}},
+                },
             },
         ],
         cursor: {},
@@ -290,7 +315,14 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     coll.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$setWindowFields: {sortBy: {one: 1}, output: {a: {$shift: {by: 1.1, output: "$one"}}}}}],
+        pipeline: [
+            {
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$shift: {by: 1.1, output: "$one"}}},
+                },
+            },
+        ],
         cursor: {},
     }),
     ErrorCodes.FailedToParse,
@@ -300,7 +332,14 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     coll.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$setWindowFields: {sortBy: {one: 1}, output: {a: {$shift: {by: 1.0, output: "$one"}}}}}],
+        pipeline: [
+            {
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$shift: {by: 1.0, output: "$one"}}},
+                },
+            },
+        ],
         cursor: {},
     }),
 );
@@ -321,7 +360,10 @@ assert.commandFailedWithCode(
         aggregate: coll.getName(),
         pipeline: [
             {
-                $setWindowFields: {sortBy: {one: 1}, output: {a: {$shift: {by: 1, output: "$one", default: "$one"}}}},
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$shift: {by: 1, output: "$one", default: "$one"}}},
+                },
             },
         ],
         cursor: {},

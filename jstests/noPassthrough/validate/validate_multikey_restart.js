@@ -36,7 +36,11 @@ assert.eq(1, docs[0]._id, "unexpected document content in collection: " + tojson
 
 jsTestLog("Checking multikey query before restart");
 let multikeyQueryDocs = testColl.find({a: {$in: [4, 5, 6]}}).toArray();
-assert.eq(1, multikeyQueryDocs.length, "too many docs in multikey query result: " + tojson(multikeyQueryDocs));
+assert.eq(
+    1,
+    multikeyQueryDocs.length,
+    "too many docs in multikey query result: " + tojson(multikeyQueryDocs),
+);
 assert.eq(
     1,
     multikeyQueryDocs[0]._id,
@@ -57,7 +61,11 @@ assert.eq(1, docs[0]._id, "unexpected document content in collection: " + tojson
 
 jsTestLog("Checking multikey query after restart");
 multikeyQueryDocs = testColl.find({a: {$in: [4, 5, 6]}}).toArray();
-assert.eq(1, multikeyQueryDocs.length, "too many docs in multikey query result: " + tojson(multikeyQueryDocs));
+assert.eq(
+    1,
+    multikeyQueryDocs.length,
+    "too many docs in multikey query result: " + tojson(multikeyQueryDocs),
+);
 assert.eq(
     1,
     multikeyQueryDocs[0]._id,

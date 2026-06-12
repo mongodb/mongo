@@ -33,7 +33,9 @@ const injectionNotAllowedErrorCode = 5491300;
 
 const addFieldsViewName = "addFieldsView";
 const addFieldsViewPipeline = [{$addFields: {number: 4}}];
-assert.commandWorked(testDb.createView(addFieldsViewName, playerColl.getName(), addFieldsViewPipeline));
+assert.commandWorked(
+    testDb.createView(addFieldsViewName, playerColl.getName(), addFieldsViewPipeline),
+);
 
 const matchViewName = "matchView";
 const matchViewPipeline = [{$match: {name: "Sacramento Kings"}}];
@@ -43,17 +45,11 @@ const injectingViewTest = function (coll) {
     assert.commandFailedWithCode(
         testDb.runCommand({
             aggregate: coll,
-            pipeline: [{$search: {view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}}],
-            cursor: {},
-        }),
-        [injectionNotAllowedErrorCode],
-    );
-    assert.commandFailedWithCode(
-        testDb.runCommand({
-            aggregate: coll,
             pipeline: [
                 {
-                    $vectorSearch: {view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}},
+                    $search: {
+                        view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline},
+                    },
                 },
             ],
             cursor: {},
@@ -65,7 +61,23 @@ const injectingViewTest = function (coll) {
             aggregate: coll,
             pipeline: [
                 {
-                    $searchMeta: {view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}},
+                    $vectorSearch: {
+                        view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline},
+                    },
+                },
+            ],
+            cursor: {},
+        }),
+        [injectionNotAllowedErrorCode],
+    );
+    assert.commandFailedWithCode(
+        testDb.runCommand({
+            aggregate: coll,
+            pipeline: [
+                {
+                    $searchMeta: {
+                        view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline},
+                    },
                 },
             ],
             cursor: {},

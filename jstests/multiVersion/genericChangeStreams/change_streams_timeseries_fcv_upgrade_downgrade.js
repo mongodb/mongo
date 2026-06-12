@@ -51,7 +51,11 @@ function withChangeStreamTest(db, fn) {
     }
 }
 
-function openChangeStreamCursor(cst, collName, {watchMode, comment, rawData, version = "v2", ...spec}) {
+function openChangeStreamCursor(
+    cst,
+    collName,
+    {watchMode, comment, rawData, version = "v2", ...spec},
+) {
     if (watchMode === ChangeStreamWatchMode.kCluster) {
         spec.allChangesForCluster = true;
     }
@@ -291,10 +295,21 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                     }
 
                     return db1Name == db2Name
-                        ? [new CreateDatabaseCommand({dbName: db1Name, primaryShard: db1PrimaryShard})]
+                        ? [
+                              new CreateDatabaseCommand({
+                                  dbName: db1Name,
+                                  primaryShard: db1PrimaryShard,
+                              }),
+                          ]
                         : [
-                              new CreateDatabaseCommand({dbName: db1Name, primaryShard: db1PrimaryShard}),
-                              new CreateDatabaseCommand({dbName: db2Name, primaryShard: db2PrimaryShard}),
+                              new CreateDatabaseCommand({
+                                  dbName: db1Name,
+                                  primaryShard: db1PrimaryShard,
+                              }),
+                              new CreateDatabaseCommand({
+                                  dbName: db2Name,
+                                  primaryShard: db2PrimaryShard,
+                              }),
                           ];
                 })();
 
@@ -439,13 +454,17 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                             showSystemEvents: true,
                             rawData,
                         };
-                        const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
-                            showSystemEvents: true,
-                            allowToRunOnSystemNS: true,
-                            startAtOperationTime: initClusterTime,
-                            rawData,
-                            watchMode: ChangeStreamWatchMode.kCollection,
-                        });
+                        const cursor = openChangeStreamCursor(
+                            cst,
+                            scenario.colls.ts1.bucketsNss.coll,
+                            {
+                                showSystemEvents: true,
+                                allowToRunOnSystemNS: true,
+                                startAtOperationTime: initClusterTime,
+                                rawData,
+                                watchMode: ChangeStreamWatchMode.kCollection,
+                            },
+                        );
                         return {cursor, watchCtx};
                     },
                 });
@@ -456,17 +475,23 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                     withDowngradedBinary(function () {
                         const dbForCst = testHelper.getConn().getDB(testDB1Name);
                         withChangeStreamTest(dbForCst, (cst) => {
-                            const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
-                                showSystemEvents: true,
-                                allowToRunOnSystemNS: true,
-                                startAtOperationTime: initClusterTime,
-                                watchMode: ChangeStreamWatchMode.kCollection,
-                                // NOTE: downgraded binary does not accept version field.
-                                version: null,
-                            });
+                            const cursor = openChangeStreamCursor(
+                                cst,
+                                scenario.colls.ts1.bucketsNss.coll,
+                                {
+                                    showSystemEvents: true,
+                                    allowToRunOnSystemNS: true,
+                                    startAtOperationTime: initClusterTime,
+                                    watchMode: ChangeStreamWatchMode.kCollection,
+                                    // NOTE: downgraded binary does not accept version field.
+                                    version: null,
+                                },
+                            );
 
                             const cmds = scenario.phases.preFCVUpgrade;
-                            const expectedChanges = cmds.flatMap((cmd) => cmd.getChangeEvents(watchMode));
+                            const expectedChanges = cmds.flatMap((cmd) =>
+                                cmd.getChangeEvents(watchMode),
+                            );
                             cst.assertNextChangesEqual({cursor, expectedChanges});
                             cst.assertNoChange(cursor);
                         });
@@ -474,7 +499,10 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                 }
             });
 
-            for (const [rawData, openAfterRunningCmds] of crossProduct([true, false], [true, false])) {
+            for (const [rawData, openAfterRunningCmds] of crossProduct(
+                [true, false],
+                [true, false],
+            )) {
                 // As part of this test, we open a change stream over a database that has timeseries collections
                 // and expect to see an insert, followed by rename and subsequent inserts after FCV upgrade
                 // (if change stream was opened with rawData: true).
@@ -501,19 +529,24 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                             {
                                 cmds: scenario.phases.preFCVUpgrade,
                                 unordered: false,
-                                assertCursors: () => assertOpenCursorsOnAllShards(expectedConfigCursor),
+                                assertCursors: () =>
+                                    assertOpenCursorsOnAllShards(expectedConfigCursor),
                             },
                             {
                                 cmds: scenario.phases.fcvUpgrade,
                                 unordered: true,
-                                assertCursors: () => assertOpenCursorsOnAllShards(expectedConfigCursor),
+                                assertCursors: () =>
+                                    assertOpenCursorsOnAllShards(expectedConfigCursor),
                             },
                             {
                                 cmds: scenario.phases.postFCVUpgrade,
                                 unordered: false,
                                 assertCursors: () => {
                                     if (openAfterRunningCmds) {
-                                        assertOpenCursorsOnShards([db1PrimaryShard], false /* expectedConfigCursor */);
+                                        assertOpenCursorsOnShards(
+                                            [db1PrimaryShard],
+                                            false /* expectedConfigCursor */,
+                                        );
                                     } else {
                                         assertOpenCursorsOnAllShards(expectedConfigCursor);
                                     }
@@ -620,10 +653,21 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                     }
 
                     return db1Name == db2Name
-                        ? [new CreateDatabaseCommand({dbName: db1Name, primaryShard: db1PrimaryShard})]
+                        ? [
+                              new CreateDatabaseCommand({
+                                  dbName: db1Name,
+                                  primaryShard: db1PrimaryShard,
+                              }),
+                          ]
                         : [
-                              new CreateDatabaseCommand({dbName: db1Name, primaryShard: db1PrimaryShard}),
-                              new CreateDatabaseCommand({dbName: db2Name, primaryShard: db2PrimaryShard}),
+                              new CreateDatabaseCommand({
+                                  dbName: db1Name,
+                                  primaryShard: db1PrimaryShard,
+                              }),
+                              new CreateDatabaseCommand({
+                                  dbName: db2Name,
+                                  primaryShard: db2PrimaryShard,
+                              }),
                           ];
                 })();
 
@@ -755,16 +799,20 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                             showSystemEvents: true,
                             rawData,
                         };
-                        const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.regularNss.coll, {
-                            showSystemEvents: true,
-                            allowToRunOnSystemNS: true,
-                            startAtOperationTime: initClusterTime,
-                            rawData,
-                            // TODO: SERVER-124882 Revisit FCV upgrade/downgrade for change streams over timeseries collections.
-                            version: "v1",
-                            comment,
-                            watchMode: ChangeStreamWatchMode.kCollection,
-                        });
+                        const cursor = openChangeStreamCursor(
+                            cst,
+                            scenario.colls.ts1.regularNss.coll,
+                            {
+                                showSystemEvents: true,
+                                allowToRunOnSystemNS: true,
+                                startAtOperationTime: initClusterTime,
+                                rawData,
+                                // TODO: SERVER-124882 Revisit FCV upgrade/downgrade for change streams over timeseries collections.
+                                version: "v1",
+                                comment,
+                                watchMode: ChangeStreamWatchMode.kCollection,
+                            },
+                        );
                         return {cursor, watchCtx};
                     },
                     comment,
@@ -903,7 +951,9 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                 regularNss: makeNss(testDB1Name, ts1CollName),
                 bucketsNss: makeNss(testDB1Name, `system.buckets.${ts1CollName}`),
             };
-            const tsColl = assertCreateCollection(db, ts1CollName, {timeseries: {timeField: "t", metaField: "m"}});
+            const tsColl = assertCreateCollection(db, ts1CollName, {
+                timeseries: {timeField: "t", metaField: "m"},
+            });
 
             function insertData(marker) {
                 assert.commandWorked(tsColl.insert({t: ISODate(), m: marker, v: marker}));
@@ -920,9 +970,10 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                 insertData("preUpgrade");
                 new FCVUpgradeCommand({timeseriesCollections: [ts1]}).execute(testHelper.getConn());
                 insertData("postUpgrade/preDowngrade");
-                new FCVDowngradeCommand({timeseriesCollections: [ts1], targetFCV: downgradeFCV}).execute(
-                    testHelper.getConn(),
-                );
+                new FCVDowngradeCommand({
+                    timeseriesCollections: [ts1],
+                    targetFCV: downgradeFCV,
+                }).execute(testHelper.getConn());
                 insertData("postDowngrade");
 
                 // Assert that no timeseries insert events were observed.
@@ -968,7 +1019,10 @@ for (const [downgradeFCV, testHelper] of crossProduct(
             const st = testHelper.getShardingTest();
             if (testHelper.isShardedCluster()) {
                 assert.commandWorked(
-                    adminDB.runCommand({enableSharding: testDB1Name, primaryShard: st.shard0.shardName}),
+                    adminDB.runCommand({
+                        enableSharding: testDB1Name,
+                        primaryShard: st.shard0.shardName,
+                    }),
                 );
             }
 
@@ -982,7 +1036,9 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                 regularNss: makeNss(testDB1Name, ts1CollName),
                 bucketsNss: makeNss(testDB1Name, `system.buckets.${ts1CollName}`),
             };
-            const tsColl = assertCreateCollection(db, ts1CollName, {timeseries: {timeField: "t", metaField: "m"}});
+            const tsColl = assertCreateCollection(db, ts1CollName, {
+                timeseries: {timeField: "t", metaField: "m"},
+            });
 
             function insertData(_id, marker, date = ISODate()) {
                 assert.commandWorked(tsColl.insert({_id, t: date, m: marker, v: marker}));
@@ -1113,7 +1169,12 @@ for (const [downgradeFCV, testHelper] of crossProduct(
         it("will no longer emit time-series events after the downgrade, with rawData: true enabled before the downgrade", function () {
             const st = testHelper.getShardingTest();
             if (testHelper.isShardedCluster()) {
-                assert.commandWorked(adminDB.runCommand({enableSharding: testDB1Name, primaryShard: db1PrimaryShard}));
+                assert.commandWorked(
+                    adminDB.runCommand({
+                        enableSharding: testDB1Name,
+                        primaryShard: db1PrimaryShard,
+                    }),
+                );
             }
 
             const watchMode = ChangeStreamWatchMode.kDb;
@@ -1126,7 +1187,9 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                 regularNss: makeNss(testDB1Name, ts1CollName),
                 bucketsNss: makeNss(testDB1Name, `system.buckets.${ts1CollName}`),
             };
-            const tsColl = assertCreateCollection(db, ts1CollName, {timeseries: {timeField: "t", metaField: "m"}});
+            const tsColl = assertCreateCollection(db, ts1CollName, {
+                timeseries: {timeField: "t", metaField: "m"},
+            });
 
             function insertData(_id, marker, date = ISODate()) {
                 assert.commandWorked(tsColl.insert({_id, t: date, m: marker, v: marker}));
@@ -1229,7 +1292,11 @@ for (const [downgradeFCV, testHelper] of crossProduct(
                 if (testHelper.isShardedCluster()) {
                     // The stream was reopened as v1 after RetryChangeStream, so the cursor ID must differ.
                     const v1CursorId = cursor.id;
-                    assert.neq(v1CursorId, v2CursorId, "cursor should have been reopened after FCV downgrade");
+                    assert.neq(
+                        v1CursorId,
+                        v2CursorId,
+                        "cursor should have been reopened after FCV downgrade",
+                    );
                 }
             });
         });

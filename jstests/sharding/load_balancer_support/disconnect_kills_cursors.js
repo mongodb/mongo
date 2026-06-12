@@ -11,10 +11,14 @@ function setupShardedCollection(st, dbName, collName) {
     const fullNss = dbName + "." + collName;
     const admin = st.s.getDB("admin");
     // Shard collection; ensure docs on each shard
-    assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
     assert.commandWorked(admin.runCommand({shardCollection: fullNss, key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: fullNss, middle: {_id: 0}}));
-    assert.commandWorked(admin.runCommand({moveChunk: fullNss, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: fullNss, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     // Insert some docs on each shard
     let coll = admin.getSiblingDB(dbName).getCollection(collName);
@@ -28,9 +32,10 @@ function setupShardedCollection(st, dbName, collName) {
 function openCursor(mongosHost, dbName, collName, countdownLatch, identifyingComment) {
     const newDBConn = new Mongo(mongosHost).getDB(dbName);
     assert.commandWorked(
-        newDBConn
-            .getSiblingDB("admin")
-            .adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}),
+        newDBConn.getSiblingDB("admin").adminCommand({
+            configureFailPoint: "clientIsConnectedToLoadBalancerPort",
+            mode: "alwaysOn",
+        }),
     );
     assert.commandWorked(
         newDBConn
@@ -56,7 +61,14 @@ const identifyingComment = "loadBalancedDisconnectComment";
 setupShardedCollection(st, dbName, collName);
 let countdownLatch = new CountDownLatch(1);
 
-let cursorOpeningThread = new Thread(openCursor, st.s.host, dbName, collName, countdownLatch, identifyingComment);
+let cursorOpeningThread = new Thread(
+    openCursor,
+    st.s.host,
+    dbName,
+    collName,
+    countdownLatch,
+    identifyingComment,
+);
 cursorOpeningThread.start();
 
 let idleCursor = {};
@@ -96,6 +108,10 @@ assert.soon(() => {
     return numCursorsFoundWithId == 0;
 });
 
-assert.commandWorked(admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}));
-assert.commandWorked(admin.adminCommand({configureFailPoint: "clientIsLoadBalancedPeer", mode: "off"}));
+assert.commandWorked(
+    admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}),
+);
+assert.commandWorked(
+    admin.adminCommand({configureFailPoint: "clientIsLoadBalancedPeer", mode: "off"}),
+);
 st.stop();

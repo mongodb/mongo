@@ -26,7 +26,9 @@ const db = st.s.getDB(dbName);
 const adminDB = st.s.getDB("admin");
 
 assert(FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections"));
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Checks if system.buckets.<collName> exists, indicating legacy (viewful) format.
 function isLegacyTimeseriesFormat(collName) {

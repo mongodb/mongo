@@ -41,7 +41,12 @@ const txnParams = {
 };
 
 // --- Test 1: Command successfully drops specified indexes ---
-let dropCmd = {_shardsvrDropIndexesParticipant: collName, index: "x_1", dbName: dbName, ...txnParams};
+let dropCmd = {
+    _shardsvrDropIndexesParticipant: collName,
+    index: "x_1",
+    dbName: dbName,
+    ...txnParams,
+};
 
 assert.commandWorked(st.shard0.getDB(dbName).runCommand(dropCmd));
 assertShardHasIndexes(st, dbName, collName, ["_id_"]);

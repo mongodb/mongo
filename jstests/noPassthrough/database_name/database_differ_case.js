@@ -31,5 +31,8 @@ assert.commandWorked(primary.getDB("admin").adminCommand({replSetStepDown: 30}))
 awaitFailPoint.off();
 awaitDrop();
 
-assert.commandFailedWithCode(rst.getPrimary().getDB("TEST").createCollection("a"), ErrorCodes.DatabaseDifferCase);
+assert.commandFailedWithCode(
+    rst.getPrimary().getDB("TEST").createCollection("a"),
+    ErrorCodes.DatabaseDifferCase,
+);
 rst.stopSet();

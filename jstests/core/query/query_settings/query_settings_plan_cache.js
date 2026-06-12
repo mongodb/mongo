@@ -111,10 +111,14 @@ runQueryAndAssertPlanCache(undefined /* expectedQuerySettings */);
 const settings = {
     indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: [indexA, indexB]},
 };
-const planCacheKeyHashWithQuerySettings = qsutils.withQuerySettings(querySettingsQuery, settings, () =>
-    runQueryAndAssertPlanCache(settings),
+const planCacheKeyHashWithQuerySettings = qsutils.withQuerySettings(
+    querySettingsQuery,
+    settings,
+    () => runQueryAndAssertPlanCache(settings),
 );
 
 // Ensure that once query settings are removed, a different plan cache entry is used.
-const planCacheKeyHashWithoutQuerySettings = runQueryAndAssertPlanCache(undefined /* expectedQuerySettings */);
+const planCacheKeyHashWithoutQuerySettings = runQueryAndAssertPlanCache(
+    undefined /* expectedQuerySettings */,
+);
 assert.neq(planCacheKeyHashWithoutQuerySettings, planCacheKeyHashWithQuerySettings);

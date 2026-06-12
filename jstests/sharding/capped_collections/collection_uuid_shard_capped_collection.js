@@ -18,7 +18,11 @@ assert.commandWorked(mongos.adminCommand({enableSharding: db.getName()}));
 // not correspond to the collection.
 const nonexistentUUID = UUID();
 let res = assert.commandFailedWithCode(
-    mongos.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}, collectionUUID: nonexistentUUID}),
+    mongos.adminCommand({
+        shardCollection: coll.getFullName(),
+        key: {_id: 1},
+        collectionUUID: nonexistentUUID,
+    }),
     ErrorCodes.CollectionUUIDMismatch,
 );
 assert.eq(res.db, db.getName());

@@ -29,8 +29,12 @@ function isAuthoritativeShardsEnabled() {
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 // Set up two unsharded collections in different databases with shard0 as their primary.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}),
+);
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);
@@ -56,8 +60,12 @@ session.startTransaction();
 // Run first statement on different database so distinct still triggers a SDV.
 const dbName2 = "test2";
 const sessionDB2 = session.getDatabase(dbName2);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName}));
-assert.commandWorked(st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}),
+);
 
 assert.commandWorked(sessionDB2.runCommand({find: collName, filter: {_id: 0}}));
 
@@ -81,8 +89,12 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 const otherDbName = "other_test";
 const otherCollName = "bar";
 
-assert.commandWorked(st.s.adminCommand({enableSharding: otherDbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.getDB(otherDbName)[otherCollName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: otherDbName, primaryShard: st.shard0.shardName}),
+);
+assert.commandWorked(
+    st.s.getDB(otherDbName)[otherCollName].insert({_id: 0}, {writeConcern: {w: "majority"}}),
+);
 
 const sessionOtherDB = session.getDatabase(otherDbName);
 
@@ -98,7 +110,9 @@ assert.commandWorked(sessionDB.runCommand({distinct: collName, key: "_id", query
 
 // Targets the new database on Shard0 which is stale, so a database versioned request should
 // trigger SDV.
-assert.commandWorked(sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}));
+assert.commandWorked(
+    sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}),
+);
 
 assert.commandWorked(session.commitTransaction_forTesting());
 
@@ -116,7 +130,10 @@ if (!isAuthoritativeShardsEnabled()) {
     // Disable database metadata refreshes on the stale shard so it will indefinitely return a stale
     // version error.
     assert.commandWorked(
-        st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "alwaysOn"}),
+        st.rs0.getPrimary().adminCommand({
+            configureFailPoint: "skipDatabaseVersionMetadataRefresh",
+            mode: "alwaysOn",
+        }),
     );
 
     session.startTransaction();
@@ -133,11 +150,20 @@ if (!isAuthoritativeShardsEnabled()) {
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     // Verify all shards aborted the transaction.
-    assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assertNoSuchTransactionOnAllShards(
+        st,
+        session.getSessionId(),
+        session.getTxnNumber_forTesting(),
+    );
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 
     assert.commandWorked(
-        st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}),
+        st.rs0
+            .getPrimary()
+            .adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}),
     );
 }
 

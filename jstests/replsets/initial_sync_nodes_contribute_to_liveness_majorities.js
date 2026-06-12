@@ -61,7 +61,9 @@ let primaryReplSetStatus = assert.commandWorked(primary.adminCommand({replSetGet
 assert.eq(1, primaryReplSetStatus.term);
 
 // Step down the primary and prevent it from running for elections with a high freeze timeout.
-assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(
+    primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+);
 waitForState(primary, ReplSetTest.State.SECONDARY);
 
 // Unfreeze the primary so that it can run for election. It should immediately run for election as
@@ -84,7 +86,9 @@ assert.eq(2, initialSyncSecondaryReplSetStatus.electionParticipantMetrics.electi
 
 // The disconnected secondary did not vote in the last election, so its electionParticipantMetrics
 // field should not be set.
-const disconnectedSecondaryReplSetStatus = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+const disconnectedSecondaryReplSetStatus = assert.commandWorked(
+    secondary.adminCommand({replSetGetStatus: 1}),
+);
 assert.eq(undefined, disconnectedSecondaryReplSetStatus.electionParticipantMetrics);
 
 // Since the primary sends a shut down command to all secondaries in `rst.stopSet()`, we reconnect
@@ -92,7 +96,10 @@ assert.eq(undefined, disconnectedSecondaryReplSetStatus.electionParticipantMetri
 secondary.reconnect(primary);
 
 assert.commandWorked(
-    initialSyncSecondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+    initialSyncSecondary.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeFinish",
+        mode: "off",
+    }),
 );
 waitForState(initialSyncSecondary, ReplSetTest.State.SECONDARY);
 

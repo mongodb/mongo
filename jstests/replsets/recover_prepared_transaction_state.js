@@ -61,7 +61,9 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
 
 // Prevent the stable timestamp from moving beyond the following prepared transactions so
 // that when we replay the oplog from the stable timestamp, we correctly recover them.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+);
 
 // The following transactions will be prepared before the common point, so they must be in
 // prepare after rollback recovery.
@@ -92,7 +94,9 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
 } finally {
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}),
+    );
 }
 
 // Make sure there are two transactions in the transactions table after rollback recovery.
@@ -136,7 +140,11 @@ assert.commandFailedWithCode(
 // Make sure that writing to a document that was updated in the first prepared transaction
 // causes a write conflict.
 assert.commandFailedWithCode(
-    sessionDB1.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    sessionDB1.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: {$set: {a: 2}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 
@@ -181,7 +189,11 @@ assert.commandFailedWithCode(
 // Make sure that writing to a document that was updated in the second prepared transaction
 // causes a write conflict.
 assert.commandFailedWithCode(
-    sessionDB2.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {b: 3}}}], maxTimeMS: 5 * 1000}),
+    sessionDB2.runCommand({
+        update: collName,
+        updates: [{q: {_id: 2}, u: {$set: {b: 3}}}],
+        maxTimeMS: 5 * 1000,
+    }),
     ErrorCodes.MaxTimeMSExpired,
 );
 

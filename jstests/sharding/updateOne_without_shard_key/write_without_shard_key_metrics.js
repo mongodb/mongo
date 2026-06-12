@@ -82,7 +82,8 @@ assert.eq(0, mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdCoun
 const testCases = [
     {
         // This will increase updateOneNonTargetedShardedCount by 1.
-        logMessage: "Running non-targeted updateOne command on sharded collection without shard key.",
+        logMessage:
+            "Running non-targeted updateOne command on sharded collection without shard key.",
         collName: testColl,
         insertDocs: [{_id: 0, x: 0, a: 0}],
         resultDocs: [{_id: 0, x: 0, a: 5}],
@@ -94,7 +95,8 @@ const testCases = [
     {
         // This will increase updateOneNonTargetedShardedCount by 1 because it is a
         // updateOneOpStyleBroadcastWithExactID.
-        logMessage: "Running targeted updateOne command on sharded collection without shard key but _id is specified.",
+        logMessage:
+            "Running targeted updateOne command on sharded collection without shard key but _id is specified.",
         collName: testColl,
         insertDocs: [{_id: 1, x: 1}],
         resultDocs: [{_id: 1, x: 1, b: 1}],
@@ -137,7 +139,8 @@ const testCases = [
     },
     {
         // This will increase deleteOneNonTargetedShardedCount by 1.
-        logMessage: "Running non-targeted deleteOne command on sharded collection without shard key.",
+        logMessage:
+            "Running non-targeted deleteOne command on sharded collection without shard key.",
         collName: testColl,
         insertDocs: [{_id: 5, x: 3, y: 0}],
         cmdObj: {
@@ -147,7 +150,8 @@ const testCases = [
     },
     {
         // This will increase deleteOneNonTargetedShardedCount by 1.
-        logMessage: "Running targeted deleteOne command on sharded collection without shard key but _id is specified.",
+        logMessage:
+            "Running targeted deleteOne command on sharded collection without shard key but _id is specified.",
         collName: testColl,
         insertDocs: [{_id: 6, x: -3}],
         cmdObj: {
@@ -184,7 +188,8 @@ const testCases = [
     },
     {
         // This will increase findAndModifyNonTargetedShardedCount by 1.
-        logMessage: "Running non-targeted findAndModify command on sharded collection without shard key.",
+        logMessage:
+            "Running non-targeted findAndModify command on sharded collection without shard key.",
         collName: testColl,
         insertDocs: [{_id: 10, x: -5, e: 5}],
         resultDocs: [{_id: 10, x: -5, e: 10, f: 15}],
@@ -229,19 +234,28 @@ const testCases = [
         collName: unshardedColl,
         insertDocs: [{_id: 14, x: -7, h: 0}],
         resultDocs: [{_id: 14, x: -7, h: 25}],
-        cmdObj: {findAndModify: unshardedCollName, query: {_id: 14}, update: {_id: 14, x: -7, h: 25}},
+        cmdObj: {
+            findAndModify: unshardedCollName,
+            query: {_id: 14},
+            update: {_id: 14, x: -7, h: 25},
+        },
     },
     {
         // This will increase updateOneNonTargetedShardedCount by 1.
-        logMessage: "Running a single update where no document matches on the query and {upsert: true}",
+        logMessage:
+            "Running a single update where no document matches on the query and {upsert: true}",
         collName: testColl,
         insertDocs: [],
         resultDocs: [{_id: 50, x: -50}],
-        cmdObj: {update: collectionName, updates: [{q: {k: 50}, u: {_id: 50, x: -50}, upsert: true}]},
+        cmdObj: {
+            update: collectionName,
+            updates: [{q: {k: 50}, u: {_id: 50, x: -50}, upsert: true}],
+        },
     },
     {
         // This will increase updateOneTargetedShardedCount by 1.
-        logMessage: "Running a single update where no document matches on the query and {upsert: true} with shard key",
+        logMessage:
+            "Running a single update where no document matches on the query and {upsert: true} with shard key",
         collName: testColl,
         insertDocs: [],
         resultDocs: [{_id: 51, x: 51, k: 51}],

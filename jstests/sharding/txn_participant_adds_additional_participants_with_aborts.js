@@ -58,7 +58,9 @@ function setupShardingTest() {
     st.rs1.nodes.forEach(setServerParams);
     st.rs2.nodes.forEach(setServerParams);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     return st;
 }
@@ -76,8 +78,12 @@ function setupCollections(st) {
     // shard2: x: [0, +inf)
     assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: st.shard1.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: st.shard2.shardName}),
+    );
 
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
@@ -100,8 +106,12 @@ function setupCollections(st) {
  * Drops collections from previous test.
  */
 function dropCollections(st) {
-    assert.commandWorked(st.s.getDB(dbName).runCommand({drop: localColl, writeConcern: {w: "majority"}}));
-    assert.commandWorked(st.s.getDB(dbName).runCommand({drop: foreignColl, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({drop: localColl, writeConcern: {w: "majority"}}),
+    );
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({drop: foreignColl, writeConcern: {w: "majority"}}),
+    );
 }
 
 const st = setupShardingTest();
@@ -120,7 +130,9 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     const txnNum = 1;
     const sessionId = session.getSessionId();
 
-    const initialMongosTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const initialMongosTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     const initialMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
     });
@@ -130,7 +142,11 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     // participants contacted by mongos.
     const fpHangAgg = [];
     shardsWithForeignColl.forEach((shard) => {
-        fpHangAgg.push(configureFailPoint(st.shard1, "hangAfterAcquiringCollectionCatalog", {collection: foreignColl}));
+        fpHangAgg.push(
+            configureFailPoint(st.shard1, "hangAfterAcquiringCollectionCatalog", {
+                collection: foreignColl,
+            }),
+        );
     });
 
     // Start the aggregation in another thread.
@@ -141,7 +157,12 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
             aggregate: collName,
             pipeline: [
                 {
-                    $lookup: {from: foreignCollName, localField: "_id", foreignField: "x", as: "result"},
+                    $lookup: {
+                        from: foreignCollName,
+                        localField: "_id",
+                        foreignField: "x",
+                        as: "result",
+                    },
                 },
                 {$sort: {"_id": 1}},
             ],
@@ -173,7 +194,9 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     const expectedMongosTargetedShards = initialMongosTxnMetrics.totalContactedParticipants + 1;
     fpHangAgg.forEach((fp) => {
         fp.wait();
-        let midpointTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+        let midpointTxnMetrics = assert.commandWorked(
+            st.s.adminCommand({serverStatus: 1}),
+        ).transactions;
         assert.gte(midpointTxnMetrics.totalContactedParticipants, expectedMongosTargetedShards);
         fp.off();
     });
@@ -192,7 +215,9 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     );
 
     // Check transaction metrics.
-    const finalMongosTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const finalMongosTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     const finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
     });
@@ -219,7 +244,9 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     const txnNum = 1;
     const sessionId = session.getSessionId();
 
-    const initialMongosTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const initialMongosTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     const initialMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
     });
@@ -252,7 +279,9 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     fpShard1FailCommand.off();
 
     // Check transaction metrics.
-    const finalMongosTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const finalMongosTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     const finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
     });
@@ -289,16 +318,24 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     // shard1: _id: [0, +inf)
     assert.commandWorked(st.s.adminCommand({shardCollection: localNs, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: localNs, middle: {_id: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: localNs, find: {_id: -10}, to: st.shard0.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: localNs, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: localNs, find: {_id: -10}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: localNs, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     // Create a sharded collection, "bar", with the following chunks:
     // shard0: x: [-inf, 0)
     // shard2: x: [0, +inf)
     assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: st.shard0.shardName}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: st.shard2.shardName}),
+    );
 
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
@@ -347,14 +384,19 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
 
     const expectedParticipants = [st.shard0, st.shard1];
 
-    const initialMongosTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const initialMongosTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     const initialMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
     });
 
     // Set a failpoint on shard1 so that after adding shard2 for the aggregate command, it does not
     // respond to mongos.
-    const fpHangShard1 = configureFailPoint(st.shard1, "hangWhenSubRouterHandlesResponseFromAddedParticipant");
+    const fpHangShard1 = configureFailPoint(
+        st.shard1,
+        "hangWhenSubRouterHandlesResponseFromAddedParticipant",
+    );
     // Set a failpoint on shard0 so that it does not respond to mongos for the aggregate command
     // until after shard1 has hung.
     const fpHangShard0 = configureFailPoint(st.shard0, "getMoreHangAfterPinCursor");
@@ -362,14 +404,27 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     const waitForAbort = new CountDownLatch(2);
 
     // Start the aggregation in another thread.
-    const runAggRequest = (mongosConn, dbName, collName, foreignCollName, sessionId, txnNum, latch) => {
+    const runAggRequest = (
+        mongosConn,
+        dbName,
+        collName,
+        foreignCollName,
+        sessionId,
+        txnNum,
+        latch,
+    ) => {
         let mongos = new Mongo(mongosConn);
         const lsid = eval("(" + sessionId + ")");
         let aggCmd = {
             aggregate: collName,
             pipeline: [
                 {
-                    $lookup: {from: foreignCollName, localField: "_id", foreignField: "x", as: "result"},
+                    $lookup: {
+                        from: foreignCollName,
+                        localField: "_id",
+                        foreignField: "x",
+                        as: "result",
+                    },
                 },
                 {$limit: NumberInt(200)},
             ],
@@ -432,7 +487,9 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     aggRequestThread.join();
 
     // Get and verify transaction metrics, including that all shards aborted.
-    const finalMongosTxnMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+    const finalMongosTxnMetrics = assert.commandWorked(
+        st.s.adminCommand({serverStatus: 1}),
+    ).transactions;
     let finalMongodTxnMetrics = allParticipants.map((shard) => {
         return assert.commandWorked(shard.adminCommand({serverStatus: 1})).transactions;
     });

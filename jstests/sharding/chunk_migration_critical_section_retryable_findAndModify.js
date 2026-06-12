@@ -29,14 +29,22 @@ const testDB = st.s.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
 // Create a sharded collection with shard0 as the primary shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(testColl.insert({_id: 1, x: 1, counter: 0}));
 
 const donorPrimary = st.rs0.getPrimary();
 
-const pauseSessionFetcherFp = configureFailPoint(donorPrimary, "pauseChunkMigrationSessionOplogFetching");
-const hangBeforeCriticalSectionFp = configureFailPoint(donorPrimary, "hangBeforeEnteringCriticalSection");
+const pauseSessionFetcherFp = configureFailPoint(
+    donorPrimary,
+    "pauseChunkMigrationSessionOplogFetching",
+);
+const hangBeforeCriticalSectionFp = configureFailPoint(
+    donorPrimary,
+    "hangBeforeEnteringCriticalSection",
+);
 
 jsTest.log("Starting moveChunk");
 const moveChunkThread = new Thread(
@@ -51,7 +59,9 @@ const moveChunkThread = new Thread(
 moveChunkThread.start();
 
 // Perform an insert so there is an oplog entry for the donor to fetch and send to the recipient.
-assert.commandWorked(testDB.runCommand({insert: collName, documents: [{_id: 2, x: 1, counter: 0}]}));
+assert.commandWorked(
+    testDB.runCommand({insert: collName, documents: [{_id: 2, x: 1, counter: 0}]}),
+);
 
 jsTest.log("Waiting for the session oplog fetcher on the donor to pause");
 pauseSessionFetcherFp.wait();
@@ -81,13 +91,17 @@ assert.eq(initialRes.value._id, 1, initialRes);
 
 const cacheColl = donorPrimary.getCollection("config.cache.collections");
 const collDocBefore = cacheColl.findOne({_id: ns});
-const criticalSectionCounterBefore = collDocBefore ? collDocBefore.enterCriticalSectionCounter || 0 : 0;
+const criticalSectionCounterBefore = collDocBefore
+    ? collDocBefore.enterCriticalSectionCounter || 0
+    : 0;
 
 jsTest.log("Unpause migration and wait for the critical section to start");
 hangBeforeCriticalSectionFp.off();
 assert.soon(() => {
     const collDocAfter = cacheColl.findOne({_id: ns});
-    const criticalSectionCounterAfter = collDocAfter ? collDocAfter.enterCriticalSectionCounter || 0 : 0;
+    const criticalSectionCounterAfter = collDocAfter
+        ? collDocAfter.enterCriticalSectionCounter || 0
+        : 0;
     return criticalSectionCounterAfter > criticalSectionCounterBefore;
 }, "Critical section did not start (enterCriticalSectionCounter did not increment)");
 

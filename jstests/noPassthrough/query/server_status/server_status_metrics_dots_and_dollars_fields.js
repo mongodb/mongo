@@ -38,7 +38,10 @@ runCommandAndCheckInsertCount(
         ),
     1,
 );
-runCommandAndCheckInsertCount(() => coll.insertMany([{"$dollar-field": 1}, {"$dollar-field": 1}, {"$$-field": 1}]), 3);
+runCommandAndCheckInsertCount(
+    () => coll.insertMany([{"$dollar-field": 1}, {"$dollar-field": 1}, {"$$-field": 1}]),
+    3,
+);
 // An upsert findAndModify command because no match document was found.
 runCommandAndCheckInsertCount(
     () =>
@@ -91,7 +94,11 @@ runCommandAndCheckUpdateCount(
                     u: [
                         {
                             $replaceWith: {
-                                $setField: {field: {$literal: "$ab"}, input: {$literal: {"a.b": "b"}}, value: 12345},
+                                $setField: {
+                                    field: {$literal: "$ab"},
+                                    input: {$literal: {"a.b": "b"}},
+                                    value: 12345,
+                                },
                             },
                         },
                     ],

@@ -171,7 +171,11 @@ assert.commandFailedWithCode(
         aggregate: inColl.getName(),
         pipeline: [
             {
-                $merge: {into: targetCollRange.getName(), whenMatched: "replace", whenNotMatched: "insert"},
+                $merge: {
+                    into: targetCollRange.getName(),
+                    whenMatched: "replace",
+                    whenNotMatched: "insert",
+                },
             },
         ],
         cursor: {},

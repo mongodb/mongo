@@ -35,7 +35,9 @@ assert.commandWorked(
         ]),
 );
 
-const databaseVersion = assert.commandWorked(st.s.adminCommand({getDatabaseVersion: dbName})).dbVersion;
+const databaseVersion = assert.commandWorked(
+    st.s.adminCommand({getDatabaseVersion: dbName}),
+).dbVersion;
 
 function assertCoordinateMultiUpdateReturns(connection, code) {
     const response = connection.adminCommand({

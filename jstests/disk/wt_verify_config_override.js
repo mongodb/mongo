@@ -49,7 +49,9 @@ assert.commandWorked(coll.validate({full: true, wiredtigerVerifyConfigurationOve
 clearRawMongoProgramOutput();
 
 // Here's a real one.
-assert.commandWorked(coll.validate({full: true, wiredtigerVerifyConfigurationOverride: "dump_tree_shape"}));
+assert.commandWorked(
+    coll.validate({full: true, wiredtigerVerifyConfigurationOverride: "dump_tree_shape"}),
+);
 
 // Check for the kinds of additional logs that are printed when "dump_tree_shape" is in the config.
 const waitForLogsTimeoutMs = 10 * 1000;

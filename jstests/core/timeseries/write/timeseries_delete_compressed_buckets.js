@@ -46,7 +46,9 @@ function prepareCompressedBucket() {
     coll = db.getCollection(collNamePrefix + count++);
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     // Insert enough documents to trigger bucket compression.
@@ -63,9 +65,17 @@ function prepareCompressedBucket() {
     assert.commandWorked(coll.insert(docs));
 
     // Check the buckets to make sure it generated what we expect.
-    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(coll)
+        .find()
+        .rawData()
+        .sort({"control.min._id": 1})
+        .toArray();
     assert.eq(2, bucketDocs.length, tojson(bucketDocs));
-    assert.eq(0, bucketDocs[0].control.min.f, "Expected first bucket to start at 0. " + tojson(bucketDocs));
+    assert.eq(
+        0,
+        bucketDocs[0].control.min.f,
+        "Expected first bucket to start at 0. " + tojson(bucketDocs),
+    );
     assert.eq(
         bucketMaxCount - 1,
         bucketDocs[0].control.max.f,
@@ -98,7 +108,11 @@ if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && FixtureHelpers.isMongos
 } else {
     assert.eq(numDocs / 2, result.deletedCount);
 }
-assert.eq(coll.countDocuments({str: "even"}), 0, "Expected records matching the filter to be deleted.");
+assert.eq(
+    coll.countDocuments({str: "even"}),
+    0,
+    "Expected records matching the filter to be deleted.",
+);
 assert.eq(
     coll.countDocuments({str: "odd"}),
     numDocs / 2,

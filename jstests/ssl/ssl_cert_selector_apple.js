@@ -16,8 +16,10 @@ import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 requireSSLProvider("apple", function () {
-    const CLIENT = "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
-    const SERVER = "CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+    const CLIENT =
+        "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+    const SERVER =
+        "CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
     const INVALID = null;
 
     function getCertificateSHA1BySubject(subject) {
@@ -39,11 +41,19 @@ requireSSLProvider("apple", function () {
 
     // Using the thumbprint of the certificate stored in the keychain should always work as a
     // selector. Uppercase everything so we don't fail on unmatching case.
-    const trusted_server_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Server").toUpperCase();
-    const trusted_client_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Client").toUpperCase();
+    const trusted_server_thumbprint = getCertificateSHA1BySubject(
+        "Trusted Kernel Test Server",
+    ).toUpperCase();
+    const trusted_client_thumbprint = getCertificateSHA1BySubject(
+        "Trusted Kernel Test Client",
+    ).toUpperCase();
 
-    const expected_server_thumbprint = cat(getX509Path("trusted-server.pem.digest.sha1")).toUpperCase();
-    const expected_client_thumbprint = cat(getX509Path("trusted-client.pem.digest.sha1")).toUpperCase();
+    const expected_server_thumbprint = cat(
+        getX509Path("trusted-server.pem.digest.sha1"),
+    ).toUpperCase();
+    const expected_client_thumbprint = cat(
+        getX509Path("trusted-client.pem.digest.sha1"),
+    ).toUpperCase();
 
     // If we fall into this case, our trusted certificates are not installed on the machine's
     // certificate keychain. This probably means that certificates have just been renewed, but have
@@ -56,10 +66,16 @@ requireSSLProvider("apple", function () {
             "macOS host has an unexpected version of the trusted server certificate (trusted-server.pem) or trusted client certificate (trusted-client.pem) installed.",
         );
         jsTest.log.error(
-            "Expecting server thumbprint: " + expected_server_thumbprint + ", got: " + trusted_server_thumbprint,
+            "Expecting server thumbprint: " +
+                expected_server_thumbprint +
+                ", got: " +
+                trusted_server_thumbprint,
         );
         jsTest.log.error(
-            "Expecting client thumbprint: " + expected_client_thumbprint + ", got: " + trusted_client_thumbprint,
+            "Expecting client thumbprint: " +
+                expected_client_thumbprint +
+                ", got: " +
+                trusted_client_thumbprint,
         );
     }
 

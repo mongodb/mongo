@@ -115,7 +115,10 @@ export function getLatestQueryStatsEntry(
         collName: "",
     },
 ) {
-    let sortedEntries = getQueryStats(conn, Object.merge({customSort: {"metrics.latestSeenTimestamp": -1}}, options));
+    let sortedEntries = getQueryStats(
+        conn,
+        Object.merge({customSort: {"metrics.latestSeenTimestamp": -1}}, options),
+    );
     assert.neq([], sortedEntries);
     return sortedEntries[0];
 }
@@ -369,8 +372,14 @@ export function assertExpectedResults({
     );
 
     const firstResponseExecMicros = getCursorMetrics(metrics).firstResponseExecMicros;
-    const {firstSeenTimestamp, latestSeenTimestamp, lastExecutionMicros, totalExecMicros, workingTimeMillis, cpuNanos} =
-        metrics;
+    const {
+        firstSeenTimestamp,
+        latestSeenTimestamp,
+        lastExecutionMicros,
+        totalExecMicros,
+        workingTimeMillis,
+        cpuNanos,
+    } = metrics;
 
     // The tests can't predict exact timings, so just assert these three fields have been set (are
     // non-zero).
@@ -525,7 +534,8 @@ export function assertAggregatedMetricsSingleExec(
         assertAggregatedMetric(queryStatSection, "keysExamined", numericMetric(keysExamined));
 
         if (writes) {
-            const {nMatched, nUpserted, nModified, nDeleted, nInserted, nUpdateOps, nDeleteOps} = writes;
+            const {nMatched, nUpserted, nModified, nDeleted, nInserted, nUpdateOps, nDeleteOps} =
+                writes;
             const writesSection = getWriteMetrics(results.metrics);
             assertAggregatedMetric(writesSection, "nMatched", numericMetric(nMatched));
             assertAggregatedMetric(writesSection, "nUpserted", numericMetric(nUpserted));
@@ -543,7 +553,11 @@ export function assertAggregatedMetricsSingleExec(
         assertAggregatedBoolean(queryStatSection, "usedDisk", booleanMetric(usedDisk));
         assertAggregatedBoolean(queryStatSection, "hasSortStage", booleanMetric(hasSortStage));
         assertAggregatedBoolean(queryStatSection, "fromPlanCache", booleanMetric(fromPlanCache));
-        assertAggregatedBoolean(queryStatSection, "fromMultiPlanner", booleanMetric(fromMultiPlanner));
+        assertAggregatedBoolean(
+            queryStatSection,
+            "fromMultiPlanner",
+            booleanMetric(fromMultiPlanner),
+        );
     }
 }
 
@@ -559,7 +573,9 @@ export function resetQueryStatsStore(conn, queryStatsStoreSize) {
     // Set the cache size to 0MB to clear the queryStats store, and then reset to
     // queryStatsStoreSize.
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: queryStatsStoreSize}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: queryStatsStoreSize}),
+    );
 }
 
 /**
@@ -689,7 +705,10 @@ export function runCommandAndValidateQueryStats({
 
     // Every field in queryShape is in shapeFields or is the base of a path in shapeFields.
     for (const field in entry.key.queryShape) {
-        assert(shapeFieldsPrefixes.includes(field), `Unexpected field ${field} in shape for ${commandName}`);
+        assert(
+            shapeFieldsPrefixes.includes(field),
+            `Unexpected field ${field} in shape for ${commandName}`,
+        );
     }
 
     // Every path in keyFields is in the key.
@@ -699,7 +718,10 @@ export function runCommandAndValidateQueryStats({
             // TODO SERVER-76263 collectionType is not yet available on mongos.
             continue;
         }
-        assert(hasValueAtPath(entry.key, field), `Key: ${tojson(entry.key)} is missing field ${field}`);
+        assert(
+            hasValueAtPath(entry.key, field),
+            `Key: ${tojson(entry.key)} is missing field ${field}`,
+        );
         keyFieldsPrefixes.push(field.split(".")[0]);
     }
 
@@ -728,10 +750,14 @@ export function runCommandAndValidateQueryStats({
         if (commandObj.explain) {
             compareQueryShapeHash(result);
         } else if (commandName == "aggregate") {
-            const explainResult = assert.commandWorked(testDB.runCommand({...commandObj, explain: true}));
+            const explainResult = assert.commandWorked(
+                testDB.runCommand({...commandObj, explain: true}),
+            );
             compareQueryShapeHash(explainResult);
         } else {
-            const explainResult = assert.commandWorked(testDB.runCommand({explain: {...commandObj}}));
+            const explainResult = assert.commandWorked(
+                testDB.runCommand({explain: {...commandObj}}),
+            );
             compareQueryShapeHash(explainResult);
         }
     }
@@ -998,7 +1024,11 @@ export function exhaustCursorAndGetQueryStats({conn, cmd, key, expectedDocs}) {
     if (batchSize < expectedDocs) {
         assert.neq(0, cursor.id, "Cursor unexpectedly exhausted in initial batch");
     } else if (batchSize > expectedDocs) {
-        assert.eq(0, cursor.id, "Initial batch unexpectedly wasn't sufficient to exhaust the cursor");
+        assert.eq(
+            0,
+            cursor.id,
+            "Initial batch unexpectedly wasn't sufficient to exhaust the cursor",
+        );
     }
 
     while (cursor.id != 0) {
@@ -1016,7 +1046,11 @@ export function exhaustCursorAndGetQueryStats({conn, cmd, key, expectedDocs}) {
     assert.eq(allResults.length, expectedDocs);
 
     const execCountPost = getExecCount(testDB, namespace);
-    assert.eq(execCountPost, execCountPre + 1, "Didn't find query stats for namespace " + namespace);
+    assert.eq(
+        execCountPost,
+        execCountPre + 1,
+        "Didn't find query stats for namespace " + namespace,
+    );
 
     const queryStats = getSingleQueryStatsEntryForNs(conn, namespace);
     jsTest.log.info("Query Stats", {queryStats});
@@ -1080,14 +1114,20 @@ export function runOnReplsetAndShardedCluster(callbackFn) {
         const st = new ShardingTest(
             Object.assign({
                 shards: 2,
-                other: {mongosOptions: getQueryStatsServerParameters(), rsOptions: getQueryStatsServerParameters()},
+                other: {
+                    mongosOptions: getQueryStatsServerParameters(),
+                    rsOptions: getQueryStatsServerParameters(),
+                },
             }),
         );
 
         const testDB = st.s.getDB("test");
         // Enable sharding separate from per-test setup to avoid calling enableSharding repeatedly.
         assert.commandWorked(
-            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+            testDB.adminCommand({
+                enableSharding: testDB.getName(),
+                primaryShard: st.shard0.shardName,
+            }),
         );
 
         callbackFn(st.s, st);
@@ -1100,7 +1140,13 @@ export function runOnReplsetAndShardedCluster(callbackFn) {
  * Given a query stats entry, and stats that the entry should have, this function checks that the
  * entry is the result of a change stream request and that the metrics are what are expected.
  */
-export function checkChangeStreamEntry({queryStatsEntry, db, collectionName, numExecs, numDocsReturned}) {
+export function checkChangeStreamEntry({
+    queryStatsEntry,
+    db,
+    collectionName,
+    numExecs,
+    numDocsReturned,
+}) {
     assert.eq(collectionName, queryStatsEntry.key.queryShape.cmdNs.coll);
 
     // Confirm entry is a change stream request.
@@ -1215,7 +1261,9 @@ export function resetUpdateTestCollections({
     const unshardedColl = routerDB[unshardedCollName];
     unshardedColl.drop();
     assert.commandWorked(unshardedColl.insert(testDocuments));
-    assert.commandWorked(routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}));
+    assert.commandWorked(
+        routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}),
+    );
 
     // Reset sharded collection.
     const shardedColl = routerDB[shardedCollName];
@@ -1227,11 +1275,15 @@ export function resetUpdateTestCollections({
     shardedColl.createIndex(shardKey);
 
     // Shard the sharded collection.
-    assert.commandWorked(routerDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}));
+    assert.commandWorked(
+        routerDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}),
+    );
 
     // Optionally split and move chunks to distribute data across shards.
     if (splitMiddle && st) {
-        assert.commandWorked(routerDB.adminCommand({split: shardedColl.getFullName(), middle: splitMiddle}));
+        assert.commandWorked(
+            routerDB.adminCommand({split: shardedColl.getFullName(), middle: splitMiddle}),
+        );
         assert.commandWorked(
             routerDB.adminCommand({
                 moveChunk: shardedColl.getFullName(),
@@ -1300,7 +1352,12 @@ export function getSlowQueryLogs(testDB, queryComment, options = {}) {
                         return false;
                     }
                 } else {
-                    if (!(entry.attr.type === "command" && entry.attr.command[commandType] !== undefined)) {
+                    if (
+                        !(
+                            entry.attr.type === "command" &&
+                            entry.attr.command[commandType] !== undefined
+                        )
+                    ) {
                         return false;
                     }
                 }

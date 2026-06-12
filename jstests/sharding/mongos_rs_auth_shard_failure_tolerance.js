@@ -60,16 +60,22 @@ st.stopBalancer();
 assert.commandWorked(admin.runCommand({setParameter: 1, traceExceptions: true}));
 
 // Create the unsharded database with shard0 primary
-assert.commandWorked(st.s.adminCommand({enableSharding: "fooUnsharded", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "fooUnsharded", primaryShard: st.shard0.shardName}),
+);
 // Create the sharded database with shard1 primary
-assert.commandWorked(st.s.adminCommand({enableSharding: "fooSharded", primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: "fooSharded", primaryShard: st.shard1.shardName}),
+);
 
 let collSharded = mongos.getCollection("fooSharded.barSharded");
 let collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
 
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
-assert.commandWorked(admin.runCommand({moveChunk: collSharded.toString(), find: {_id: -1}, to: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({moveChunk: collSharded.toString(), find: {_id: -1}, to: st.shard0.shardName}),
+);
 
 st.printShardingStatus();
 const dbUser = "dbUser";

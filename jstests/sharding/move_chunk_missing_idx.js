@@ -26,19 +26,25 @@ testDB.adminCommand({split: "test.user", middle: {x: 0}});
 testDB.adminCommand({split: "test.user", middle: {x: 10}});
 
 // Collection does not exist, no chunk, index missing case at destination case.
-assert.commandWorked(testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}),
+);
 
 // Drop index since last moveChunk created this.
 st.rs0.getPrimary().getDB("test").user.dropIndex({a: 1, b: 1});
 
 // Collection exist but empty, index missing at destination case.
-assert.commandWorked(testDB.adminCommand({moveChunk: "test.user", find: {x: 10}, to: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: "test.user", find: {x: 10}, to: st.shard0.shardName}),
+);
 
 // Drop index since last moveChunk created this.
 st.rs0.getPrimary().getDB("test").user.dropIndex({a: 1, b: 1});
 
 // Collection not empty, index missing at destination case.
 testDB.user.insert({x: 10});
-assert.commandFailed(testDB.adminCommand({moveChunk: "test.user", find: {x: -10}, to: st.shard0.shardName}));
+assert.commandFailed(
+    testDB.adminCommand({moveChunk: "test.user", find: {x: -10}, to: st.shard0.shardName}),
+);
 
 st.stop();

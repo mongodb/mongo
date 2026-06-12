@@ -21,8 +21,12 @@ coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), numericOrdering));
 
-assert.commandWorked(coll.createIndex({filterFieldA: 1, sortFieldA: 1, sortFieldB: 1}, numericOrdering));
-assert.commandWorked(coll.createIndex({filterFieldA: 1, sortFieldA: -1, sortFieldB: -1}, numericOrdering));
+assert.commandWorked(
+    coll.createIndex({filterFieldA: 1, sortFieldA: 1, sortFieldB: 1}, numericOrdering),
+);
+assert.commandWorked(
+    coll.createIndex({filterFieldA: 1, sortFieldA: -1, sortFieldB: -1}, numericOrdering),
+);
 assert.commandWorked(coll.createIndex({sortFieldA: 1, sortFieldB: 1}, numericOrdering));
 
 assert.commandWorked(
@@ -71,7 +75,12 @@ function runTest(sorts, filters) {
             let res = coll.find(filter).sort(sortInfo.sortPattern).toArray();
             assert(
                 isSorted(res, sortInfo.cmpFunction),
-                () => "Assertion failed for filter: " + filter + "\n" + "sort pattern " + sortInfo.sortPattern,
+                () =>
+                    "Assertion failed for filter: " +
+                    filter +
+                    "\n" +
+                    "sort pattern " +
+                    sortInfo.sortPattern,
             );
 
             // Check that there are no duplicates.

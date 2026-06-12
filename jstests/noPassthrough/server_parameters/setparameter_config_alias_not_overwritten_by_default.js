@@ -3,7 +3,9 @@
 
 const defaultsConn = MongoRunner.runMongod();
 function getDefaultValue(parameterName) {
-    const res = assert.commandWorked(defaultsConn.adminCommand({getParameter: 1, [parameterName]: 1}));
+    const res = assert.commandWorked(
+        defaultsConn.adminCommand({getParameter: 1, [parameterName]: 1}),
+    );
     return res[parameterName];
 }
 

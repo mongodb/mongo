@@ -43,7 +43,14 @@ const failpointHangBeforeRunning = configureFailPoint(testDB, "hangBeforeRunning
 
 // Create the index and start the build. Set commitQuorum of 2 nodes explicitly, otherwise as only
 // primary is voter, it would immediately commit.
-const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {}, {}, /*commitQuorum: */ 2);
+const createIdx = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    {a: 1},
+    {},
+    {},
+    /*commitQuorum: */ 2,
+);
 
 failpointHangBeforeRunning.wait();
 
@@ -52,7 +59,9 @@ const disableFailpointAfterDrop = startParallelShell(function () {
     checkLog.containsJson(db, 465611);
 
     // Unblock index build thread.
-    assert.commandWorked(db.adminCommand({"configureFailPoint": "hangBeforeRunningIndexBuild", "mode": "off"}));
+    assert.commandWorked(
+        db.adminCommand({"configureFailPoint": "hangBeforeRunningIndexBuild", "mode": "off"}),
+    );
 }, testDB.getMongo().port);
 
 assert.commandWorked(coll.dropIndexes());

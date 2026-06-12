@@ -28,7 +28,9 @@ const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.shardName}),
+);
 let coll = mongosDB.sharded_agg_cleanup_on_error;
 
 for (let i = 0; i < 10; i++) {
@@ -86,7 +88,11 @@ function assertFailsAndCleansUpCursors({pipeline, errCode}) {
 try {
     // Set up a fail point which causes getMore to hang on shard 1.
     assert.commandWorked(
-        shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}),
+        shard1DB.adminCommand({
+            configureFailPoint: kFailPointName,
+            mode: "alwaysOn",
+            data: kFailpointOptions,
+        }),
     );
 
     // Issue an aggregation that will fail during a getMore on shard 0, and make sure that
@@ -134,7 +140,10 @@ try {
     assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.total == 0);
 } finally {
     assert.commandWorked(
-        mongosDB.adminCommand({configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor", mode: "off"}),
+        mongosDB.adminCommand({
+            configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor",
+            mode: "off",
+        }),
     );
 }
 

@@ -54,7 +54,9 @@ function setupMocks(searchMetaValue) {
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
     cursorId = NumberLong(cursorId + 1);
 }
 

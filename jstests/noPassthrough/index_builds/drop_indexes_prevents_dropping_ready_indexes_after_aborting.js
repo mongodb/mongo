@@ -63,10 +63,14 @@ let timesEntered = res.count;
 TestData.dbName = dbName;
 TestData.collName = collName;
 
-jsTestLog("Aborting index build on {a: 1} and hanging dropIndexes while yielding the collection lock");
+jsTestLog(
+    "Aborting index build on {a: 1} and hanging dropIndexes while yielding the collection lock",
+);
 let awaitDropIndexes = startParallelShell(() => {
     assert.commandFailedWithCode(
-        db.getSiblingDB(TestData.dbName).runCommand({dropIndexes: TestData.collName, index: ["a_1"]}),
+        db
+            .getSiblingDB(TestData.dbName)
+            .runCommand({dropIndexes: TestData.collName, index: ["a_1"]}),
         ErrorCodes.BackgroundOperationInProgressForNamespace,
     );
 }, primary.port);

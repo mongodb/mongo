@@ -29,7 +29,9 @@ db[timeseriesCollName].drop();
 // The tests expect that memory metrics appear right after memory is used. Decrease the threshold
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
 // limit.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
+);
 
 assert.commandWorked(
     db.createCollection(timeseriesCollName, {
@@ -71,7 +73,11 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
 }
 
 {
-    const pipelineWithLimit = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}, {$limit: nDocs / 10}];
+    const pipelineWithLimit = [
+        {$_internalInhibitOptimization: {}},
+        {$sort: {time: -1}},
+        {$limit: nDocs / 10},
+    ];
 
     runMemoryStatsTest({
         db: db,
@@ -91,7 +97,10 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
 {
     // Set maxMemory low to force spill to disk.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit,
+        }),
     );
     runMemoryStatsTest({
         db: db,

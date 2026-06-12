@@ -44,14 +44,22 @@ assert.eq(
 assert.eq(
     [4, 6, 5, 1, 3, 2, 7, 9, 8],
     coll
-        .aggregate([{$sort: {word1: 1, word2: -1}}, {$project: {_id: 1}}, {$group: {_id: null, out: {$push: "$_id"}}}])
+        .aggregate([
+            {$sort: {word1: 1, word2: -1}},
+            {$project: {_id: 1}},
+            {$group: {_id: null, out: {$push: "$_id"}}},
+        ])
         .toArray()[0].out,
 );
 assert.eq(
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
     coll
         .aggregate(
-            [{$sort: {word1: 1, word2: -1}}, {$project: {_id: 1}}, {$group: {_id: null, out: {$push: "$_id"}}}],
+            [
+                {$sort: {word1: 1, word2: -1}},
+                {$project: {_id: 1}},
+                {$group: {_id: null, out: {$push: "$_id"}}},
+            ],
             frenchAccentOrdering,
         )
         .toArray()[0].out,
@@ -61,14 +69,22 @@ assert.eq(
 assert.eq(
     [8, 9, 7, 2, 3, 1, 5, 6, 4],
     coll
-        .aggregate([{$sort: {word1: -1, word2: 1}}, {$project: {_id: 1}}, {$group: {_id: null, out: {$push: "$_id"}}}])
+        .aggregate([
+            {$sort: {word1: -1, word2: 1}},
+            {$project: {_id: 1}},
+            {$group: {_id: null, out: {$push: "$_id"}}},
+        ])
         .toArray()[0].out,
 );
 assert.eq(
     [9, 8, 7, 6, 5, 4, 3, 2, 1],
     coll
         .aggregate(
-            [{$sort: {word1: -1, word2: 1}}, {$project: {_id: 1}}, {$group: {_id: null, out: {$push: "$_id"}}}],
+            [
+                {$sort: {word1: -1, word2: 1}},
+                {$project: {_id: 1}},
+                {$group: {_id: null, out: {$push: "$_id"}}},
+            ],
             frenchAccentOrdering,
         )
         .toArray()[0].out,

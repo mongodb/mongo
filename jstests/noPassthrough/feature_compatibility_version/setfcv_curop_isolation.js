@@ -18,14 +18,20 @@ const adminDB = primary.getDB("admin");
 
 // Downgrade so the subsequent upgrade has real work to do (the
 // _cleanUpIndexCatalogMetadataOnUpgrade step iterates every collection via collMod).
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 // Pause setFCV right after _upgradeServerMetadata completes.
 const fp = configureFailPoint(primary, "hangWhileUpgrading");
 
 const awaitSetFCV = startParallelShell(
     funWithArgs(function (fcv) {
-        assert.commandWorked(db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));
+        assert.commandWorked(
+            db
+                .getSiblingDB("admin")
+                .runCommand({setFeatureCompatibilityVersion: fcv, confirm: true}),
+        );
     }, latestFCV),
     primary.port,
 );
@@ -41,7 +47,11 @@ try {
         .toArray();
     assert.eq(1, ops.length, `expected exactly one setFCV op in progress: ${tojson(ops)}`);
 
-    assert.eq("admin.$cmd", ops[0].ns, "setFCV CurOp namespace leaked from a collMod sub-operation: " + tojson(ops[0]));
+    assert.eq(
+        "admin.$cmd",
+        ops[0].ns,
+        "setFCV CurOp namespace leaked from a collMod sub-operation: " + tojson(ops[0]),
+    );
 } finally {
     fp.off();
     awaitSetFCV();

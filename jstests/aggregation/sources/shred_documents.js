@@ -10,14 +10,21 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
-coll.insertMany([{a: 1, obj: {a: 1}, arr: [{a: 1}]}, {a: 2, obj: {a: 1}, arr: [{a: 1}]}, {}, {a: 3}]);
+coll.insertMany([
+    {a: 1, obj: {a: 1}, arr: [{a: 1}]},
+    {a: 2, obj: {a: 1}, arr: [{a: 1}]},
+    {},
+    {a: 3},
+]);
 coll.createIndex({a: 1});
 assert.commandFailedWithCode(
     assert.throws(() => coll.aggregate({$_internalShredDocuments: 1})),
     7997500,
 );
 assert.commandFailedWithCode(
-    assert.throws(() => coll.aggregate({$_internalShredDocuments: {burnEvidence: true, paperType: "legal"}})),
+    assert.throws(() =>
+        coll.aggregate({$_internalShredDocuments: {burnEvidence: true, paperType: "legal"}}),
+    ),
     7997501,
 );
 
@@ -40,7 +47,11 @@ assertNoop(addFieldGroup, 0);
 assertNoop(addFieldGroup, 1);
 assertNoop(addFieldGroup, 2);
 
-const matchExcludeGroup = [{$match: {a: 1}}, {$project: {obj: 0}}, {$group: {_id: {a: "$a", b: "$b", obj: "$obj"}}}];
+const matchExcludeGroup = [
+    {$match: {a: 1}},
+    {$project: {obj: 0}},
+    {$group: {_id: {a: "$a", b: "$b", obj: "$obj"}}},
+];
 assertNoop(matchExcludeGroup, 0);
 assertNoop(matchExcludeGroup, 1);
 assertNoop(matchExcludeGroup, 2);

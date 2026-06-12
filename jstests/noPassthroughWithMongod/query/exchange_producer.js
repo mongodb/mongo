@@ -87,7 +87,11 @@ assert.eq(0, numDocs % numConsumers);
         db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
-            exchange: {policy: "roundrobin", consumers: NumberInt(numConsumers), bufferSize: NumberInt(1024)},
+            exchange: {
+                policy: "roundrobin",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+            },
             cursor: {batchSize: 0},
         }),
     );
@@ -111,7 +115,11 @@ assert.eq(0, numDocs % numConsumers);
         db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
-            exchange: {policy: "broadcast", consumers: NumberInt(numConsumers), bufferSize: NumberInt(1024)},
+            exchange: {
+                policy: "broadcast",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+            },
             cursor: {batchSize: 0},
         }),
     );
@@ -204,7 +212,13 @@ assert.eq(0, numDocs % numConsumers);
                 consumers: NumberInt(numConsumers),
                 bufferSize: NumberInt(1024),
                 key: {"c.d": 1},
-                boundaries: [{"c.d": MinKey}, {"c.d": 2500}, {"c.d": 5000}, {"c.d": 7500}, {"c.d": MaxKey}],
+                boundaries: [
+                    {"c.d": MinKey},
+                    {"c.d": 2500},
+                    {"c.d": 5000},
+                    {"c.d": 7500},
+                    {"c.d": MaxKey},
+                ],
                 consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
             },
             cursor: {batchSize: 0},
@@ -235,7 +249,13 @@ assert.eq(0, numDocs % numConsumers);
                 consumers: NumberInt(numConsumers),
                 bufferSize: NumberInt(1024),
                 key: {"e.f": 1},
-                boundaries: [{"e.f": MinKey}, {"e.f": 2500}, {"e.f": 5000}, {"e.f": 7500}, {"e.f": MaxKey}],
+                boundaries: [
+                    {"e.f": MinKey},
+                    {"e.f": 2500},
+                    {"e.f": 5000},
+                    {"e.f": 7500},
+                    {"e.f": MaxKey},
+                ],
                 consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
             },
             cursor: {batchSize: 0},
@@ -261,7 +281,9 @@ assert.eq(0, numDocs % numConsumers);
 (function testRangeFailLoad() {
     const kFailPointName = "exchangeFailLoadNextBatch";
     try {
-        assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}),
+        );
 
         let res = assert.commandWorked(
             db.runCommand({
@@ -286,7 +308,9 @@ assert.eq(0, numDocs % numConsumers);
         // After the first consumer sees an error, each subsequent consumer should see an
         // 'ExchangePassthrough' error.
         for (let i = 0; i < numConsumers - 1; ++i) {
-            parallelShells.push(failingConsumer(res.cursors[i + 1], ErrorCodes.ExchangePassthrough));
+            parallelShells.push(
+                failingConsumer(res.cursors[i + 1], ErrorCodes.ExchangePassthrough),
+            );
         }
         for (let i = 0; i < numConsumers - 1; ++i) {
             parallelShells[i]();

@@ -25,8 +25,13 @@ function verifyConfigTxnsFormat(replSet, options) {
     for (const node of replSet.nodes) {
         const configTxns = node.getDB("config");
         if (options.clustered)
-            ClusteredCollectionUtil.validateListCollections(configTxns, "transactions", clusteredOptions);
-        else ClusteredCollectionUtil.validateListCollectionsNotClustered(configTxns, "transactions");
+            ClusteredCollectionUtil.validateListCollections(
+                configTxns,
+                "transactions",
+                clusteredOptions,
+            );
+        else
+            ClusteredCollectionUtil.validateListCollectionsNotClustered(configTxns, "transactions");
     }
 }
 
@@ -43,7 +48,9 @@ function openAndCloseTransactions(primaryOrRouter, startIdx, endIdx, transaction
         };
 
     const coll = primaryOrRouter.getDB(dbName)[collName];
-    assert.commandWorked(coll.insert({_id: "pretransaction" + startIdx, x: 0}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        coll.insert({_id: "pretransaction" + startIdx, x: 0}, {writeConcern: {w: "majority"}}),
+    );
     for (let txnNum = startIdx; txnNum < endIdx; txnNum++) {
         const session = primaryOrRouter.startSession({causalConsistency: false});
         session.startTransaction();
@@ -186,11 +193,17 @@ function testShardsWithDifferentConfigTxnsFormats() {
     const collName = "testColl";
     const ns = dbName + "." + collName;
     assert.commandWorked(shardedCluster.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(shardedCluster.s.adminCommand({movePrimary: dbName, to: shardedCluster.shard0.shardName}));
+    assert.commandWorked(
+        shardedCluster.s.adminCommand({movePrimary: dbName, to: shardedCluster.shard0.shardName}),
+    );
     assert.commandWorked(shardedCluster.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(shardedCluster.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(
-        shardedCluster.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: shardedCluster.shard1.shardName}),
+        shardedCluster.s.adminCommand({
+            moveChunk: ns,
+            find: {_id: 0},
+            to: shardedCluster.shard1.shardName,
+        }),
     );
 
     // Open transactions whose documents will hit both shards, and then close them out.
@@ -207,6 +220,8 @@ testRestartSecondaryWithDifferentExpectedConfigTxnsFormat();
 testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat(); // logical initial sync
 // File copy based sync requires the wired tiger storage engine; skip if using something else.
 if (storageEngine == "wiredTiger") {
-    testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat({initialSyncMethod: "fileCopyBased"});
+    testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat({
+        initialSyncMethod: "fileCopyBased",
+    });
 }
 testShardsWithDifferentConfigTxnsFormats();

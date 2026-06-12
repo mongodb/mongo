@@ -112,7 +112,11 @@ assertExpectedDocAnswersWildcardIndexQuery(
 );
 
 // A conjunction of {$type: 'object'} and $eq should match the given object.
-assertExpectedDocAnswersWildcardIndexQuery({a: {b: "foo"}}, {$and: [{"a": {$type: "object"}}, {"a.b": "foo"}]}, true);
+assertExpectedDocAnswersWildcardIndexQuery(
+    {a: {b: "foo"}},
+    {$and: [{"a": {$type: "object"}}, {"a.b": "foo"}]},
+    true,
+);
 
 // A $type of 'array' will match an empty array.
 assertExpectedDocAnswersWildcardIndexQuery({a: [[]]}, {a: {$type: "array"}}, true, {
@@ -156,10 +160,18 @@ assertExpectedDocAnswersWildcardIndexQuery({a: new BinData(0, "")}, {a: {$type: 
 assertExpectedDocAnswersWildcardIndexQuery({a: new Timestamp()}, {a: {$type: "timestamp"}}, true);
 
 // A $type of 'timestamp' will match a timestamp value.
-assertExpectedDocAnswersWildcardIndexQuery({a: new Timestamp(0x80008000, 0)}, {a: {$type: "timestamp"}}, true);
+assertExpectedDocAnswersWildcardIndexQuery(
+    {a: new Timestamp(0x80008000, 0)},
+    {a: {$type: "timestamp"}},
+    true,
+);
 
 // A $type of 'date' won't match a timestamp value.
-assertExpectedDocAnswersWildcardIndexQuery({a: new Timestamp(0x80008000, 0)}, {a: {$type: "date"}}, false);
+assertExpectedDocAnswersWildcardIndexQuery(
+    {a: new Timestamp(0x80008000, 0)},
+    {a: {$type: "date"}},
+    false,
+);
 
 // A $type of 'date' will match a date value.
 assertExpectedDocAnswersWildcardIndexQuery({a: new Date()}, {a: {$type: "date"}}, true);

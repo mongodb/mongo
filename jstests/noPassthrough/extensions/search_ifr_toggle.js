@@ -5,7 +5,10 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -59,12 +62,19 @@ withExtensions({"libsearch_extension.so": {}}, (conn) => {
 
     // Toggles correctly with a more complex pipeline.
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
-    const complexPipeline = [{$search: {}}, {$match: {_id: {$in: [0, 2]}}}, {$project: {text: 1, _id: 0}}];
+    const complexPipeline = [
+        {$search: {}},
+        {$match: {_id: {$in: [0, 2]}}},
+        {$project: {text: 1, _id: 0}},
+    ];
     assertArrayEq({
         actual: coll.aggregate(complexPipeline).toArray(),
         expected: [],
     });
 
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: false}));
-    assert.throwsWithCode(() => coll.aggregate(complexPipeline).toArray(), ErrorCodes.SearchNotEnabled);
+    assert.throwsWithCode(
+        () => coll.aggregate(complexPipeline).toArray(),
+        ErrorCodes.SearchNotEnabled,
+    );
 });

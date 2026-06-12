@@ -49,7 +49,9 @@ function discoverNodesAndCheck(theDB, checkFunction) {
                 } else if (result !== mode) {
                     // SBE mode not consistent in all nodes, test could fail due to unexpected SBE
                     // mode so quit the test.
-                    jsTestLog("Skipping test because SBE configuration is not consistent across hosts!");
+                    jsTestLog(
+                        "Skipping test because SBE configuration is not consistent across hosts!",
+                    );
                     quit();
                 }
             } catch (e) {
@@ -98,7 +100,10 @@ export function checkSbeStatus(theDB) {
         if (frameworkControl == "forceClassicEngine") {
             // Always overrides anything else.
             return kSbeDisabled;
-        } else if (TestData.setParameters.featureFlagSbeFull && TestData.setParameters.featureFlagSbeFull == "true") {
+        } else if (
+            TestData.setParameters.featureFlagSbeFull &&
+            TestData.setParameters.featureFlagSbeFull == "true"
+        ) {
             // Otherwise, if this feature flag is enabled, we ignore the query knob.
             return kFeatureFlagSbeFullEnabled;
         } else if (frameworkControl === "trySbeEngine") {
@@ -244,7 +249,11 @@ export function checkSbeFullyEnabled(theDB) {
  */
 export function checkSbeRestrictedOrFullyEnabled(theDB) {
     const status = checkSbeStatus(theDB);
-    return status === kSbeRestricted || status === kSbeFullyEnabled || status == kFeatureFlagSbeFullEnabled;
+    return (
+        status === kSbeRestricted ||
+        status === kSbeFullyEnabled ||
+        status == kFeatureFlagSbeFullEnabled
+    );
 }
 
 /**

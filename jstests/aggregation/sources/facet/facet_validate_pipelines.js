@@ -19,7 +19,12 @@ assert.commandWorked(
 
 let pipeline = [{"$facet": {"x": [{"$facet": {"y": []}}]}}];
 
-assertErrCodeAndErrMsgContains(coll, pipeline, 40600, "$facet is not allowed to be used within a $facet stage");
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    40600,
+    "$facet is not allowed to be used within a $facet stage",
+);
 
 pipeline = [
     {
@@ -34,7 +39,10 @@ pipeline = [
                         "pipeline": [
                             {
                                 "$facet": {
-                                    "result": [{"$match": {"c": {"$exists": true}}}, {"$project": {"a": 1, "b": 1}}],
+                                    "result": [
+                                        {"$match": {"c": {"$exists": true}}},
+                                        {"$project": {"a": 1, "b": 1}},
+                                    ],
                                 },
                             },
                         ],
@@ -58,7 +66,10 @@ pipeline = [
         $facet: {
             "result_out": [
                 {
-                    $unionWith: {coll: "foreign_coll", pipeline: [{$facet: {"result_in": [{$project: {"a": 1}}]}}]},
+                    $unionWith: {
+                        coll: "foreign_coll",
+                        pipeline: [{$facet: {"result_in": [{$project: {"a": 1}}]}}],
+                    },
                 },
             ],
         },

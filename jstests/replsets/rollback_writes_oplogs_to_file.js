@@ -17,7 +17,9 @@ function runRollbackOplogsTest(shouldCreateRollbackFiles) {
     const rollbackNode = rollbackTest.getPrimary();
     const secondTermPrimary = rollbackTest.getSecondary();
     assert.commandWorked(
-        rollbackNode.getDB("admin").adminCommand({setParameter: 1, createRollbackDataFiles: shouldCreateRollbackFiles}),
+        rollbackNode
+            .getDB("admin")
+            .adminCommand({setParameter: 1, createRollbackDataFiles: shouldCreateRollbackFiles}),
     );
     assert.commandWorked(
         secondTermPrimary

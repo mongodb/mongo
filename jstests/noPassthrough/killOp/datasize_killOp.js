@@ -41,7 +41,11 @@ const awaitShell = startParallelShell(
 failpoint.wait();
 
 // Find the command opid and kill it.
-const opId = waitForCommand("dataSizeCmd", (op) => op["command"]["dataSize"] == dbName + ".foo", db);
+const opId = waitForCommand(
+    "dataSizeCmd",
+    (op) => op["command"]["dataSize"] == dbName + ".foo",
+    db,
+);
 assert.commandWorked(db.killOp(opId));
 
 // The command is not killed just yet. It will be killed, after releasing the failpoint.

@@ -10,7 +10,12 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function runTest({forcePooledConnectionsDropped, withUUID, configShard}) {
-    const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true, configShard});
+    const reshardingTest = new ReshardingTest({
+        numDonors: 2,
+        numRecipients: 2,
+        reshardInPlace: true,
+        configShard,
+    });
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;
@@ -52,10 +57,14 @@ function runTest({forcePooledConnectionsDropped, withUUID, configShard}) {
 
     function checkCoordinatorDoc() {
         assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
+            const coordinatorDoc = mongos
+                .getCollection("config.reshardingOperations")
+                .findOne({ns: sourceNamespace});
 
             return (
-                coordinatorDoc === null || coordinatorDoc.state === "aborting" || coordinatorDoc.state === "quiesced"
+                coordinatorDoc === null ||
+                coordinatorDoc.state === "aborting" ||
+                coordinatorDoc.state === "quiesced"
             );
         });
     }
@@ -109,7 +118,12 @@ function runTest({forcePooledConnectionsDropped, withUUID, configShard}) {
                 pauseBeforeMarkKeepOpen.wait();
 
                 jsTestLog("Set hitDropConnections failpoint");
-                let hitDropConnections = configureFailPoint(config, "finishedDropConnections", {}, {times: 1});
+                let hitDropConnections = configureFailPoint(
+                    config,
+                    "finishedDropConnections",
+                    {},
+                    {times: 1},
+                );
                 pauseBeforeCloseCxns.off();
 
                 waitForFailpoint("Hit finishedDropConnections", 1);
@@ -164,7 +178,9 @@ function runTest({forcePooledConnectionsDropped, withUUID, configShard}) {
             );
             awaitShell = startParallelShell(
                 funWithArgs(function (latestFCV) {
-                    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+                    assert.commandWorked(
+                        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+                    );
                 }, latestFCV),
                 mongos.port,
             );

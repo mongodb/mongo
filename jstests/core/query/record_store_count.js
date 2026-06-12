@@ -58,9 +58,16 @@ function testExplainAndExpectStage({expectedStages, unexpectedStages, hintIndex}
     checkPlan(explain.queryPlanner.winningPlan, expectedStages, unexpectedStages);
 }
 
-if ((!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) || !FixtureHelpers.isSharded(coll)) {
+if (
+    (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) ||
+    !FixtureHelpers.isSharded(coll)
+) {
     // In an unsharded collection we can use the COUNT_SCAN stage.
-    testExplainAndExpectStage({expectedStages: ["COUNT_SCAN"], unexpectedStages: [], hintIndex: {x: 1}});
+    testExplainAndExpectStage({
+        expectedStages: ["COUNT_SCAN"],
+        unexpectedStages: [],
+        hintIndex: {x: 1},
+    });
     quit();
 }
 

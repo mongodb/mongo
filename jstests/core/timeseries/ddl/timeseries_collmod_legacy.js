@@ -26,7 +26,9 @@ const bucketingValueMax = 86400 * 365; // Seconds in a year.
 const idlInvalidValueError = 51024;
 
 coll.drop();
-assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time", granularity: "seconds"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "time", granularity: "seconds"}}),
+);
 
 // This test cannot use the index with the key {'time': 1}, since that is the same as the implicitly
 // created shard key and thus we cannot hide the index. We will use a different index here to avoid
@@ -44,7 +46,12 @@ assert.commandFailedWithCode(
 );
 
 // Successfully hides a time-series secondary index.
-assert.commandWorked(db.runCommand({"collMod": collName, "index": {"keyPattern": {[indexField]: 1}, "hidden": true}}));
+assert.commandWorked(
+    db.runCommand({
+        "collMod": collName,
+        "index": {"keyPattern": {[indexField]: 1}, "hidden": true},
+    }),
+);
 
 // Hiding the internal clustered index fails, since the index is not exposed to users.
 assert.commandFailedWithCode(
@@ -59,13 +66,16 @@ assert.commandFailedWithCode(
 );
 
 // Tries to set the validator for a time-series collection using the buckets namespace.
-assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "validator": {required: ["time"]}}), [
-    ErrorCodes.InvalidNamespace,
-    // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
-    // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
-    // returns InvalidNamespace.
-    ErrorCodes.InvalidOptions,
-]);
+assert.commandFailedWithCode(
+    db.runCommand({"collMod": bucketsCollName, "validator": {required: ["time"]}}),
+    [
+        ErrorCodes.InvalidNamespace,
+        // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
+        // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
+        // returns InvalidNamespace.
+        ErrorCodes.InvalidOptions,
+    ],
+);
 
 // Tries to set the validationLevel for a time-series collection.
 assert.commandFailedWithCode(
@@ -74,13 +84,16 @@ assert.commandFailedWithCode(
 );
 
 // Tries to set the validationLevel for a time-series collection using the buckets namespace.
-assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "validationLevel": "moderate"}), [
-    ErrorCodes.InvalidNamespace,
-    // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
-    // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
-    // returns InvalidNamespace.
-    ErrorCodes.InvalidOptions,
-]);
+assert.commandFailedWithCode(
+    db.runCommand({"collMod": bucketsCollName, "validationLevel": "moderate"}),
+    [
+        ErrorCodes.InvalidNamespace,
+        // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
+        // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
+        // returns InvalidNamespace.
+        ErrorCodes.InvalidOptions,
+    ],
+);
 
 // Tries to set the validationAction for a time-series collection.
 assert.commandFailedWithCode(
@@ -89,13 +102,16 @@ assert.commandFailedWithCode(
 );
 
 // Tries to set the validationLevel for a time-series collection using the buckets namespace.
-assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "validationAction": "warn"}), [
-    ErrorCodes.InvalidNamespace,
-    // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
-    // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
-    // returns InvalidNamespace.
-    ErrorCodes.InvalidOptions,
-]);
+assert.commandFailedWithCode(
+    db.runCommand({"collMod": bucketsCollName, "validationAction": "warn"}),
+    [
+        ErrorCodes.InvalidNamespace,
+        // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
+        // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
+        // returns InvalidNamespace.
+        ErrorCodes.InvalidOptions,
+    ],
+);
 
 // Tries to modify the view for a time-series collection.
 assert.commandFailedWithCode(
@@ -107,7 +123,9 @@ assert.commandFailedWithCode(
 assert.commandWorked(db.runCommand({"collMod": collName, "expireAfterSeconds": 60}));
 
 // Successfully sets the granularity to a higher value for a time-series collection.
-assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}),
+);
 
 // Tries to set current granularity to a lower value.
 assert.commandFailedWithCode(
@@ -120,24 +138,33 @@ assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granula
 
 // collMod against the underlying buckets collection should fail: not allowed to target the buckets
 // collection.
-assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "timeseries": {"granularity": "hours"}}), [
-    ErrorCodes.InvalidNamespace,
-    // Error code thrown by collmod coordinator.
-    //
-    // TODO SERVER-105548 remove the following error code once 9.0 becomes last LTS
-    // Currently needed for multiversion compatibility. Since 8.2 we throw InvalidNamespace also
-    // on sharded clusters.
-    6201808,
-]);
+assert.commandFailedWithCode(
+    db.runCommand({"collMod": bucketsCollName, "timeseries": {"granularity": "hours"}}),
+    [
+        ErrorCodes.InvalidNamespace,
+        // Error code thrown by collmod coordinator.
+        //
+        // TODO SERVER-105548 remove the following error code once 9.0 becomes last LTS
+        // Currently needed for multiversion compatibility. Since 8.2 we throw InvalidNamespace also
+        // on sharded clusters.
+        6201808,
+    ],
+);
 
 // Tries to set one seconds parameter without the other (bucketMaxSpanSeconds or
 // bucketRoundingSeconds).
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "timeseries": {"bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}}),
+    db.runCommand({
+        "collMod": collName,
+        "timeseries": {"bucketMaxSpanSeconds": bucketMaxSpanSecondsHours},
+    }),
     ErrorCodes.InvalidOptions,
 );
 assert.commandFailedWithCode(
-    db.runCommand({"collMod": collName, "timeseries": {"bucketRoundingSeconds": bucketRoundingSecondsHours}}),
+    db.runCommand({
+        "collMod": collName,
+        "timeseries": {"bucketRoundingSeconds": bucketRoundingSecondsHours},
+    }),
     ErrorCodes.InvalidOptions,
 );
 
@@ -268,7 +295,9 @@ assert.commandWorked(
 // Successfully sets granularity from a collection created with custom maxSpanSeconds and
 // bucketRoundingSeconds since the default values for 'minutes' are greater than the previous
 // seconds.
-assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}),
+);
 
 // Fails to set bucketMaxSpanSeconds and bucketRoundingSeconds past the bucketing limit.
 assert.commandFailedWithCode(
@@ -286,7 +315,10 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     db.runCommand({
         "collMod": collName,
-        "timeseries": {"bucketMaxSpanSeconds": bucketingValueMax, "bucketRoundingSeconds": bucketingValueMax},
+        "timeseries": {
+            "bucketMaxSpanSeconds": bucketingValueMax,
+            "bucketRoundingSeconds": bucketingValueMax,
+        },
     }),
 );
 

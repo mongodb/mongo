@@ -53,7 +53,10 @@ for (let i = 0; i < 22; i++) {
             passed = true;
         } catch (e) {
             print(e);
-            assert(!passed, "Should be able to shard collection with no unique index if unique not specified.");
+            assert(
+                !passed,
+                "Should be able to shard collection with no unique index if unique not specified.",
+            );
         }
     }
     if (i == 3) {
@@ -100,7 +103,10 @@ for (let i = 0; i < 22; i++) {
             s.adminCommand({shardcollection: "" + coll, key: {num: 1}, unique: true});
         } catch (e) {
             print(e);
-            assert(false, "Should be able to shard collection with no unique index but with a unique prefix index.");
+            assert(
+                false,
+                "Should be able to shard collection with no unique index but with a unique prefix index.",
+            );
         }
 
         printjson(coll.getIndexes());

@@ -85,11 +85,15 @@ assert.throws(function () {
 //
 // SERVER-56928 Make sure we can't do a $near search with invalid min/max distance.
 assert.throws(function () {
-    coll.findOne({geo: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}, $minDistance: NaN}}});
+    coll.findOne({
+        geo: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}, $minDistance: NaN}},
+    });
 });
 
 assert.throws(function () {
-    coll.findOne({geo: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}, $maxDistance: NaN}}});
+    coll.findOne({
+        geo: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}, $maxDistance: NaN}},
+    });
 });
 
 const invalidValues = [NaN, -NaN, Infinity, -Infinity];

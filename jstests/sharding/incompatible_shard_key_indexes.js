@@ -104,7 +104,10 @@ describe("testing incompatible shard key indexes", function () {
 
                 // Create the incompatible index.
                 assert.commandWorked(
-                    this.coll.createIndex(incompatibleShardKeyIndex.key, incompatibleShardKeyIndex.options),
+                    this.coll.createIndex(
+                        incompatibleShardKeyIndex.key,
+                        incompatibleShardKeyIndex.options,
+                    ),
                 );
             });
 
@@ -112,7 +115,10 @@ describe("testing incompatible shard key indexes", function () {
                 this.coll.insert({skey: 33});
 
                 assert.commandFailedWithCode(
-                    this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: shardKeyPattern}),
+                    this.st.s.adminCommand({
+                        shardCollection: this.coll.getFullName(),
+                        key: shardKeyPattern,
+                    }),
                     [ErrorCodes.InvalidOptions],
                 );
             });
@@ -124,7 +130,10 @@ describe("testing incompatible shard key indexes", function () {
                     this.coll.remove({});
                 }
 
-                const res = this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: shardKeyPattern});
+                const res = this.st.s.adminCommand({
+                    shardCollection: this.coll.getFullName(),
+                    key: shardKeyPattern,
+                });
 
                 if (!incompatibleShardKeyIndex.canCoexistWithShardKeyIndex) {
                     assert.commandFailedWithCode(res, [
@@ -144,7 +153,11 @@ describe("testing incompatible shard key indexes", function () {
 
                 assert.neq(shardKeyIndex, null, "shard key index was not created");
                 assert.neq(incompatibleIndex, null, "incompatible index is missing");
-                assert.neq(incompatibleIndex, shardKeyIndex, "shard key index mustn't be the incompatible index");
+                assert.neq(
+                    incompatibleIndex,
+                    shardKeyIndex,
+                    "shard key index mustn't be the incompatible index",
+                );
             });
 
             it("can't drop or hide last compatible shard key index", () => {
@@ -160,7 +173,10 @@ describe("testing incompatible shard key indexes", function () {
                 }
                 assert.commandWorked(this.coll.createIndex(compatibleShardKeyIndex));
                 assert.commandWorked(
-                    this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: compatibleShardKeyIndex}),
+                    this.st.s.adminCommand({
+                        shardCollection: this.coll.getFullName(),
+                        key: compatibleShardKeyIndex,
+                    }),
                 );
 
                 // Attemt to drop or hide the last compatible shard key index.
@@ -168,7 +184,10 @@ describe("testing incompatible shard key indexes", function () {
                     this.coll.dropIndex(compatibleShardKeyIndex),
                     ErrorCodes.CannotDropShardKeyIndex,
                 );
-                assert.commandFailedWithCode(this.coll.hideIndex(compatibleShardKeyIndex), ErrorCodes.InvalidOptions);
+                assert.commandFailedWithCode(
+                    this.coll.hideIndex(compatibleShardKeyIndex),
+                    ErrorCodes.InvalidOptions,
+                );
 
                 // Attempt to drop all indexes and check that the compatible shard key index still exist.
                 this.coll.dropIndexes();
@@ -180,7 +199,10 @@ describe("testing incompatible shard key indexes", function () {
             it("reshardCollection will attempt to create a shard key index", () => {
                 // Shard the collection first with shard key {_id: 1}.
                 assert.commandWorked(
-                    this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: {"_id": 1}}),
+                    this.st.s.adminCommand({
+                        shardCollection: this.coll.getFullName(),
+                        key: {"_id": 1},
+                    }),
                 );
 
                 // Attempt to reshard the collection to shard key 'shardKeyPattern'.
@@ -213,7 +235,11 @@ describe("testing incompatible shard key indexes", function () {
 
                 assert.neq(shardKeyIndex, null, "shard key index was not created");
                 assert.neq(incompatibleIndex, null, "incompatible index is missing");
-                assert.neq(incompatibleIndex, shardKeyIndex, "shard key index mustn't be the incompatible index");
+                assert.neq(
+                    incompatibleIndex,
+                    shardKeyIndex,
+                    "shard key index mustn't be the incompatible index",
+                );
             });
 
             it("can't call refineCollectionShardKey with only an incompatible shard key index", () => {
@@ -229,7 +255,10 @@ describe("testing incompatible shard key indexes", function () {
                 // Make sure the collection is sharded on 'shardKeyPattern'.
                 this.coll.createIndex(shardKeyPattern);
                 assert.commandWorked(
-                    this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: shardKeyPattern}),
+                    this.st.s.adminCommand({
+                        shardCollection: this.coll.getFullName(),
+                        key: shardKeyPattern,
+                    }),
                 );
 
                 // Attempt to refine the shard key to the incompatible shard key index.

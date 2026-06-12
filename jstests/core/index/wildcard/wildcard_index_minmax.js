@@ -47,19 +47,34 @@ for (const indexSpec of wildcardIndexes) {
 
     // Throws error for $** index min/max.
     assert.commandFailedWithCode(
-        db.runCommand({find: coll.getName(), min: {"a": 0.5}, max: {"a": 1.5}, hint: indexSpec.keyPattern}),
+        db.runCommand({
+            find: coll.getName(),
+            min: {"a": 0.5},
+            max: {"a": 1.5},
+            hint: indexSpec.keyPattern,
+        }),
         51174,
     );
 
     // Throws error for $** index min with filter of a different value.
     assert.commandFailedWithCode(
-        db.runCommand({find: coll.getName(), filter: {"a": 2}, min: {"a": 1}, hint: indexSpec.keyPattern}),
+        db.runCommand({
+            find: coll.getName(),
+            filter: {"a": 2},
+            min: {"a": 1},
+            hint: indexSpec.keyPattern,
+        }),
         51174,
     );
 
     // Throws error for $** index max with filter of a different value.
     assert.commandFailedWithCode(
-        db.runCommand({find: coll.getName(), filter: {"a": 1}, max: {"a": 1.5}, hint: indexSpec.keyPattern}),
+        db.runCommand({
+            find: coll.getName(),
+            filter: {"a": 1},
+            max: {"a": 1.5},
+            hint: indexSpec.keyPattern,
+        }),
         51174,
     );
 
@@ -77,13 +92,23 @@ for (const indexSpec of wildcardIndexes) {
 
     // Throws error for $** index min with filter of the same value.
     assert.commandFailedWithCode(
-        db.runCommand({find: coll.getName(), filter: {"a": 1}, min: {"a": 1}, hint: indexSpec.keyPattern}),
+        db.runCommand({
+            find: coll.getName(),
+            filter: {"a": 1},
+            min: {"a": 1},
+            hint: indexSpec.keyPattern,
+        }),
         51174,
     );
 
     // Throws error for $** index max with filter of the same value.
     assert.commandFailedWithCode(
-        db.runCommand({find: coll.getName(), filter: {"a": 1}, max: {"a": 1}, hint: indexSpec.keyPattern}),
+        db.runCommand({
+            find: coll.getName(),
+            filter: {"a": 1},
+            max: {"a": 1},
+            hint: indexSpec.keyPattern,
+        }),
         51174,
     );
 

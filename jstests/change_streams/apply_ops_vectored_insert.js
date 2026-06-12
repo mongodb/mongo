@@ -95,7 +95,10 @@ expectedChanges.push({
 //
 
 // Verify that the stream returns the expected sequence of changes.
-cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({
+    cursor: changeStream,
+    expectedChanges: expectedChanges,
+});
 
 // Single collection change stream should also be invalidated by the drop.
 cst.assertNextChangesEqualWithDeploymentAwareness({
@@ -127,7 +130,10 @@ changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {startAtOperationTime: testStartTime}}, {$project: {"lsid.uid": 0}}],
     collection: 1,
 });
-cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({
+    cursor: changeStream,
+    expectedChanges: expectedChanges,
+});
 
 //
 // Test behavior of whole-cluster change streams with apply ops.
@@ -151,6 +157,9 @@ changeStream = cst.startWatchingChanges({
     ],
     collection: 1,
 });
-cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({
+    cursor: changeStream,
+    expectedChanges: expectedChanges,
+});
 
 cst.cleanUp();

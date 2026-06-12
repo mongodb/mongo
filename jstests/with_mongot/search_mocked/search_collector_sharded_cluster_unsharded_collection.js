@@ -21,7 +21,9 @@ const st = stWithMock.st;
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 // Ensure db's primary shard is shard1 so we only set the correct mongot to have history.
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.name}),
+);
 
 const testColl = testDB.getCollection(collName);
 
@@ -84,7 +86,10 @@ const searchCmd = {
     mongosMongot.setMockResponses(historyObj, NumberLong(123));
 }
 
-let cursor = testColl.aggregate([{$search: mongotQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}], {cursor: {}});
+let cursor = testColl.aggregate(
+    [{$search: mongotQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}],
+    {cursor: {}},
+);
 
 const expected = [
     {"_id": 2, "meta": {value: 1}},

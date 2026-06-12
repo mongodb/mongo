@@ -21,7 +21,10 @@ const testGetSetAppExemptions = () => {
 
     // run getParameter to verify the exemptions were set correctly.
     const getParamRes = assert.commandWorked(
-        standalone.adminCommand({getParameter: 1, ingressRequestRateLimiterApplicationExemptions: 1}),
+        standalone.adminCommand({
+            getParameter: 1,
+            ingressRequestRateLimiterApplicationExemptions: 1,
+        }),
     );
     assert.eq(getParamRes.ingressRequestRateLimiterApplicationExemptions, kExemptions);
 
@@ -35,7 +38,10 @@ const testGetSetAppExemptions = () => {
     );
 
     const getParamRes2 = assert.commandWorked(
-        standalone.adminCommand({getParameter: 1, ingressRequestRateLimiterApplicationExemptions: 1}),
+        standalone.adminCommand({
+            getParameter: 1,
+            ingressRequestRateLimiterApplicationExemptions: 1,
+        }),
     );
     assert.eq(getParamRes2.ingressRequestRateLimiterApplicationExemptions, newExemptions);
 
@@ -58,7 +64,11 @@ const testAppExemptionsWorkInReplSet = () => {
                 ingressRequestAdmissionBurstCapacitySecs: Math.round(1.0 / kSlowestRefreshRateSecs),
                 // At first, lets just exempt the replication clients and an appName for the shell connection.
                 ingressRequestRateLimiterApplicationExemptions: {
-                    appNames: [kRateLimiterExemptAppName, "OplogFetcher", "NetworkInterfaceTL-Repl"],
+                    appNames: [
+                        kRateLimiterExemptAppName,
+                        "OplogFetcher",
+                        "NetworkInterfaceTL-Repl",
+                    ],
                 },
                 ingressRequestRateLimiterEnabled: false, // kept disabled during repl set setup
             },
@@ -79,7 +89,9 @@ const testAppExemptionsWorkInReplSet = () => {
     admin.createUser({user: kUser, pwd: kPass, roles: ["root"]});
 
     authenticateConnection(primary);
-    assert.commandWorked(primary.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: true}));
+    assert.commandWorked(
+        primary.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: true}),
+    );
 
     // Ensure that running a command from a non-exempt appName is rate limited.
     primary.getDB("test").runCommand({ping: 1}); // Consume the single token.
@@ -90,7 +102,9 @@ const testAppExemptionsWorkInReplSet = () => {
     );
 
     // Create an exempt client to run commands from.
-    const exemptClient = new Mongo(`mongodb://${primary.host}/?appName=${kRateLimiterExemptAppName}`);
+    const exemptClient = new Mongo(
+        `mongodb://${primary.host}/?appName=${kRateLimiterExemptAppName}`,
+    );
     authenticateConnection(exemptClient);
 
     const initialStats = getRateLimiterStats(exemptClient);

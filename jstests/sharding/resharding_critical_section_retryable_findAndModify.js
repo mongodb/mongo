@@ -29,7 +29,9 @@ const testDB = st.s.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
 // Make shard0 the primary shard for the test database.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Create the test collection and insert a document.
 assert.commandWorked(testColl.insert({_id: 1, x: 1, counter: 0}));
@@ -58,10 +60,17 @@ moveCollThread.start();
 jsTest.log("Waiting for resharding to pause before blocking writes");
 pauseBeforeStartingCriticalSectionFp.wait();
 
-jsTest.log("Waiting for the oplog fetcher on the recipient to pause after fetching some oplog entries");
-const pauseOplogFetcherFp = configureFailPoint(recipientPrimary, "pauseReshardingOplogFetcherAfterConsuming");
+jsTest.log(
+    "Waiting for the oplog fetcher on the recipient to pause after fetching some oplog entries",
+);
+const pauseOplogFetcherFp = configureFailPoint(
+    recipientPrimary,
+    "pauseReshardingOplogFetcherAfterConsuming",
+);
 // Perform an insert so there is an oplog entry for the recipient to fetch.
-assert.commandWorked(testDB.runCommand({insert: collName, documents: [{_id: 2, x: 2, counter: 0}]}));
+assert.commandWorked(
+    testDB.runCommand({insert: collName, documents: [{_id: 2, x: 2, counter: 0}]}),
+);
 pauseOplogFetcherFp.wait();
 
 jsTest.log("Performing findAndModify as a retryable write");
@@ -87,7 +96,10 @@ assert.eq(initialRes.value._id, 1, initialRes);
 jsTest.log("Unpause resharding and wait for the critical section to start");
 pauseBeforeStartingCriticalSectionFp.off();
 assert.soon(() => {
-    const docs = donorPrimary.getCollection("config.collection_critical_sections").find({_id: ns}).toArray();
+    const docs = donorPrimary
+        .getCollection("config.collection_critical_sections")
+        .find({_id: ns})
+        .toArray();
     return docs.length > 0;
 }, "Critical section did not start");
 

@@ -16,7 +16,11 @@ function makeShutdownByCrashFn(crashHow) {
     return function (conn) {
         let admin = conn.getDB("admin");
         assert.commandWorked(
-            admin.runCommand({configureFailPoint: "crashOnShutdown", mode: "alwaysOn", data: {how: crashHow}}),
+            admin.runCommand({
+                configureFailPoint: "crashOnShutdown",
+                mode: "alwaysOn",
+                data: {how: crashHow},
+            }),
         );
         admin.shutdownServer();
     };

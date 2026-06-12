@@ -19,7 +19,9 @@ export function runTest(mongod) {
         collections.forEach((collName) => {
             // truncateRange only works when there is a clustered index, so create one.
             assert.commandWorked(
-                mongod.getDB(dbName).createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+                mongod
+                    .getDB(dbName)
+                    .createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
             );
             assert.commandWorked(mongod.getDB(dbName).getCollection(collName).insertMany(docs));
 
@@ -72,7 +74,12 @@ export function runTest(mongod) {
             collections.forEach((collName) => {
                 assert(admin.auth("admin", "pass"));
                 const db = admin.getSiblingDB(dbName);
-                const docs = db.getCollection(collName).find().sort({_id: 1}).showRecordId().toArray();
+                const docs = db
+                    .getCollection(collName)
+                    .find()
+                    .sort({_id: 1})
+                    .showRecordId()
+                    .toArray();
                 admin.logout();
 
                 admin.auth(test.user, "pass");

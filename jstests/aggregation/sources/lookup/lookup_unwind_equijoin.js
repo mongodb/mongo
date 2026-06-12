@@ -12,7 +12,10 @@
  * data in these tests is small and that enables HJ as long as 'allowDiskUse' is 'true').
  */
 
-import {JoinAlgorithm, setupCollections} from "jstests/aggregation/sources/lookup/lookup_equijoin_semantics_lib.js";
+import {
+    JoinAlgorithm,
+    setupCollections,
+} from "jstests/aggregation/sources/lookup/lookup_equijoin_semantics_lib.js";
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 // No-op if 'currentJoinAlgorithm' is not INLJ.
@@ -257,7 +260,8 @@ function runTests(testConfig) {
             matches: [],
         });
         runTest(testConfig, {
-            testDescription: "Missing in local, top-level field in foreign. preserveNullAndEmptyArrays=true",
+            testDescription:
+                "Missing in local, top-level field in foreign. preserveNullAndEmptyArrays=true",
             localRecords: localDocs,
             localField: "a",
             foreignRecords: foreignDocs,

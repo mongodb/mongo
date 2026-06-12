@@ -81,7 +81,9 @@ jsTestLog({
 });
 
 jsTestLog("Resuming initial sync.");
-assert.commandWorked(node1.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    node1.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 rst.awaitSecondaryNodes(null, [node1]);
 
 let initialSyncedNode = rst.getSecondary();
@@ -130,6 +132,11 @@ jsTestLog({
 // There should be two sessions/image entries on the initial syncing node, and both should be
 // flagged as invalidated.
 assert.eq(2, initialSyncedNode.getDB("config")["image_collection"].count({invalidated: true}));
-assert.eq(2, initialSyncedNode.getDB("config")["image_collection"].count({invalidatedReason: "initial sync"}));
+assert.eq(
+    2,
+    initialSyncedNode
+        .getDB("config")
+        ["image_collection"].count({invalidatedReason: "initial sync"}),
+);
 
 rst.stopSet();

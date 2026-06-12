@@ -23,7 +23,9 @@ export var reInitiateSetWithSecondary = function (replSet, secondaryConfig) {
 
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
-    assert.commandWorked(secondary.adminCommand({configureFailPoint: "skipClearInitialSyncState", mode: "alwaysOn"}));
+    assert.commandWorked(
+        secondary.adminCommand({configureFailPoint: "skipClearInitialSyncState", mode: "alwaysOn"}),
+    );
 
     replSet.reInitiate();
 
@@ -38,7 +40,9 @@ export var reInitiateSetWithSecondary = function (replSet, secondaryConfig) {
 // non-local databases.
 export var turnOffHangBeforeCopyingDatabasesFailPoint = function (secondary) {
     assert.commandWorked(
-        secondary.getDB("admin").runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+        secondary
+            .getDB("admin")
+            .runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
     );
 };
 

@@ -40,7 +40,11 @@ describe("saslSupportedMechs with disabled SCRAM-SHA-256", function () {
                 saslSupportedMechs: "admin.admin",
             }),
         );
-        assert(Array.isArray(res.saslSupportedMechs), "saslSupportedMechs should be an array for a known user", {res});
+        assert(
+            Array.isArray(res.saslSupportedMechs),
+            "saslSupportedMechs should be an array for a known user",
+            {res},
+        );
         assert(
             !res.saslSupportedMechs.includes("SCRAM-SHA-256"),
             "saslSupportedMechs must not contain the disabled SCRAM-SHA-256",
@@ -102,6 +106,10 @@ describe("saslSupportedMechs with disabled SCRAM-SHA-256", function () {
             selectedMech,
             "client must not fall back to the disabled SCRAM-SHA-256 for an unknown user",
         );
-        assert.eq("SCRAM-SHA-1", selectedMech, "client must select the enabled SCRAM-SHA-1 for an unknown user");
+        assert.eq(
+            "SCRAM-SHA-1",
+            selectedMech,
+            "client must select the enabled SCRAM-SHA-1 for an unknown user",
+        );
     });
 });

@@ -26,10 +26,18 @@ function checkElemMatch(index, document, query) {
 }
 
 // Two constraints within a nested $elemMatch expression.
-checkElemMatch({"a.b.c": 1}, {a: [{b: [{c: 1}]}]}, {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $lte: 1}}}}}});
+checkElemMatch(
+    {"a.b.c": 1},
+    {a: [{b: [{c: 1}]}]},
+    {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $lte: 1}}}}}},
+);
 
 // Two constraints within a nested $elemMatch expression, one of which contains the other.
-checkElemMatch({"a.b.c": 1}, {a: [{b: [{c: 2}]}]}, {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $in: [2]}}}}}});
+checkElemMatch(
+    {"a.b.c": 1},
+    {a: [{b: [{c: 2}]}]},
+    {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $in: [2]}}}}}},
+);
 
 // Two nested $elemMatch expressions.
 checkElemMatch(
@@ -48,4 +56,8 @@ checkElemMatch(
 );
 
 // $elemMatch is applied directly to a top level field.
-checkElemMatch({"a.b.c": 1}, {a: [{b: [{c: [1]}]}]}, {a: {$elemMatch: {"b.c": {$elemMatch: {$gte: 1, $lte: 1}}}}});
+checkElemMatch(
+    {"a.b.c": 1},
+    {a: [{b: [{c: [1]}]}]},
+    {a: {$elemMatch: {"b.c": {$elemMatch: {$gte: 1, $lte: 1}}}}},
+);

@@ -48,7 +48,10 @@ const explainRes = assert.commandWorked(
     db.runCommand({explain: {count: coll.getName(), query: kFilterA}, verbosity: "queryPlanner"}),
 );
 if (getPlanStage(explainRes.queryPlanner.winningPlan, "COUNT_SCAN") === null) {
-    jsTest.log.info("Skipping test: COUNT_SCAN stage not found. " + "This stage is only used by the classic engine.");
+    jsTest.log.info(
+        "Skipping test: COUNT_SCAN stage not found. " +
+            "This stage is only used by the classic engine.",
+    );
     quit();
 }
 

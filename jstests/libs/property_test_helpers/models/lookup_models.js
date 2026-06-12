@@ -2,7 +2,10 @@
  * $lookup models for our core property tests.
  */
 
-import {getAssignableFieldArb, nonEmptyFieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    getAssignableFieldArb,
+    nonEmptyFieldArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 export function getEqLookupArb(from) {

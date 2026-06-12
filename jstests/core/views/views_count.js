@@ -24,7 +24,11 @@ assert.commandWorked(bulk.execute());
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "identityView", viewOn: "coll"}));
 assert.commandWorked(
-    viewsDB.runCommand({create: "greaterThanThreeView", viewOn: "coll", pipeline: [{$match: {x: {$gt: 3}}}]}),
+    viewsDB.runCommand({
+        create: "greaterThanThreeView",
+        viewOn: "coll",
+        pipeline: [{$match: {x: {$gt: 3}}}],
+    }),
 );
 assert.commandWorked(
     viewsDB.runCommand({
@@ -77,7 +81,9 @@ if (explainPlan.hasOwnProperty("stages")) {
 assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
 assert(!explainPlan.hasOwnProperty("executionStats"));
 
-explainPlan = assert.commandWorked(lessThanSevenView.explain("executionStats").count({x: {$gte: 5}}));
+explainPlan = assert.commandWorked(
+    lessThanSevenView.explain("executionStats").count({x: {$gte: 5}}),
+);
 explainPlan = getSingleNodeExplain(explainPlan);
 if (explainPlan.hasOwnProperty("stages")) {
     explainPlan = explainPlan.stages[0].$cursor;
@@ -91,7 +97,9 @@ assert.eq(
 );
 assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
 
-explainPlan = assert.commandWorked(lessThanSevenView.explain("allPlansExecution").count({x: {$gte: 5}}));
+explainPlan = assert.commandWorked(
+    lessThanSevenView.explain("allPlansExecution").count({x: {$gte: 5}}),
+);
 explainPlan = getSingleNodeExplain(explainPlan);
 if (explainPlan.hasOwnProperty("stages")) {
     explainPlan = explainPlan.stages[0].$cursor;

@@ -38,7 +38,9 @@ function assertHasPlanCacheKeys(obj) {
 
     const comment = "validateProfilerOutput";
     // Run twice so the second execution recovers the plan from cache and reports 'planCacheKey'.
-    [...Array(2)].forEach(() => assert.eq(0, coll.aggregate([{$match: {a: 1}}], {comment}).itcount()));
+    [...Array(2)].forEach(() =>
+        assert.eq(0, coll.aggregate([{$match: {a: 1}}], {comment}).itcount()),
+    );
 
     db.setProfilingLevel(0);
     const entry = getLatestProfilerEntry(db, {"command.comment": comment});
@@ -64,7 +66,9 @@ function assertHasPlanCacheKeys(obj) {
     assert.eq(0, coll.aggregate([{$match: query}]).itcount());
 
     const planCacheKey = getPlanCacheKeyFromShape({query, collection: coll, db});
-    const allPlanCacheEntries = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}]).toArray();
+    const allPlanCacheEntries = coll
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}])
+        .toArray();
     assert.eq(allPlanCacheEntries.length, 1, allPlanCacheEntries);
     const entry = allPlanCacheEntries[0];
     assert.eq(entry.version, "1", entry);

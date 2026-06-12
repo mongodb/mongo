@@ -15,7 +15,8 @@ export function ValidationTest(conn, _dbName) {
     const listCollectionRes = assert.commandWorked(
         db.runCommand({listCollections: 1, filter: {name: testBasicCollName}}),
     );
-    const isClusteredColl = listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
+    const isClusteredColl =
+        listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 
     // Create an FLE collection.
     if (isEnterpriseShell()) {
@@ -32,13 +33,17 @@ export function ValidationTest(conn, _dbName) {
             ],
         };
         assert.commandWorked(
-            client.createEncryptionCollection(testFLECollName, {encryptedFields: sampleEncryptedFields}),
+            client.createEncryptionCollection(testFLECollName, {
+                encryptedFields: sampleEncryptedFields,
+            }),
         );
     }
 
     // Create a view.
     const testViewName = "testView";
-    assert.commandWorked(db.runCommand({create: testViewName, viewOn: testBasicCollName, pipeline: []}));
+    assert.commandWorked(
+        db.runCommand({create: testViewName, viewOn: testBasicCollName, pipeline: []}),
+    );
 
     // Make the regular collection the default test collection.
     const collName = testBasicCollName;
@@ -118,7 +123,11 @@ export function ValidationTest(conn, _dbName) {
             shardKey: {a: 1},
         },
         {
-            indexOptions: {key: {"a": 1}, name: "a_partial", partialFilterExpression: {c: {$gt: 5}}},
+            indexOptions: {
+                key: {"a": 1},
+                name: "a_partial",
+                partialFilterExpression: {c: {$gt: 5}},
+            },
             shardKey: {a: 1},
         },
         {
@@ -148,10 +157,12 @@ export function runInvalidNamespaceTestsForConfigure(conn, optionalDbName) {
     const validationTest = ValidationTest(conn, optionalDbName);
     for (let {dbName, collName, isView} of validationTest.invalidNamespaceTestCases) {
         jsTest.log(
-            `Testing that the configureQueryAnalyzer command fails if the namespace is invalid ${tojson({
-                dbName,
-                collName,
-            })}`,
+            `Testing that the configureQueryAnalyzer command fails if the namespace is invalid ${tojson(
+                {
+                    dbName,
+                    collName,
+                },
+            )}`,
         );
         const aggCmdObj = {
             configureQueryAnalyzer: dbName + "." + collName,

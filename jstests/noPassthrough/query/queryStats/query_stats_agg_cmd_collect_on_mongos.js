@@ -115,7 +115,9 @@ const db = mongos.getDB("test");
     const cursor1 = coll.aggregate([{$match: {v: {$gt: 0, $lt: 5}}}], {cursor: {batchSize: 1}}); // returns 1 doc
     const cursor2 = coll.aggregate([{$match: {v: {$gt: 0, $lt: 2}}}], {cursor: {batchSize: 1}}); // returns 1 doc
 
-    assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
+    assert.commandWorked(
+        db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}),
+    );
     const queryStats = getLatestQueryStatsEntry(db, {collName: coll.getName()});
     assertExpectedResults({
         results: queryStats,

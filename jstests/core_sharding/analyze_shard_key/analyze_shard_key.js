@@ -28,7 +28,10 @@ const shardNames = db.adminCommand({listShards: 1}).shards.map((shard) => shard.
     testNonExistingCollection(dbName, testCases);
     testExistingUnshardedCollection(dbName, mongos, testCases);
     if (shardNames.length < 2) {
-        print(jsTestName() + " testExistingShardedCollection will not run; at least 2 shards are required.");
+        print(
+            jsTestName() +
+                " testExistingShardedCollection will not run; at least 2 shards are required.",
+        );
     } else {
         testExistingShardedCollection(dbName, mongos, testCases);
     }

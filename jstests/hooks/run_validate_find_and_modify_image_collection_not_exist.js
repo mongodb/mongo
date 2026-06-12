@@ -36,7 +36,10 @@ if (topology.type === Topology.kReplicaSet) {
         const shardHost = shard.type === Topology.kStandalone ? shard.mongod : shard.primary;
         const shardConn = newMongoWithRetry(shardHost);
         try {
-            checkConfigImageCollectionNotExist(shardConn, "shard " + shardName + " (" + shardHost + ")");
+            checkConfigImageCollectionNotExist(
+                shardConn,
+                "shard " + shardName + " (" + shardHost + ")",
+            );
         } finally {
             shardConn.close();
         }

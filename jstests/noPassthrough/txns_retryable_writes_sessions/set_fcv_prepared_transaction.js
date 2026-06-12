@@ -23,7 +23,9 @@ const ns = dbName + "." + collName;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 function runTxn(mongosHost, dbName, collName) {
@@ -53,14 +55,18 @@ function runTxn(mongosHost, dbName, collName) {
             autocommit: false,
         }),
     );
-    assert.commandWorked(mongosConn.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+    assert.commandWorked(
+        mongosConn.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}),
+    );
     jsTest.log("Committed the cross-shard transaction");
 }
 
 function runSetFCV(primaryHost) {
     const primaryConn = new Mongo(primaryHost);
     jsTest.log("Starting a setFCV command on " + primaryHost);
-    assert.commandWorked(primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     jsTest.log("Completed the setFCV command");
 }
 

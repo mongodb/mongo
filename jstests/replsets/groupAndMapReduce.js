@@ -84,7 +84,10 @@ let doTest = function (signal) {
         print("Calling mr() to collection with secondaryOk=false, must fail");
         try {
             secondary.getDB("foo").foo.mapReduce(map, reduce, "output");
-            assert(false, "mapReduce() to collection succeeded on secondary with secondaryOk=false");
+            assert(
+                false,
+                "mapReduce() to collection succeeded on secondary with secondaryOk=false",
+            );
         } catch (e) {
             print("Received exception: " + e);
         }

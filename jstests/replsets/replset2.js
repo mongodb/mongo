@@ -105,11 +105,17 @@ let doTest = function (signal) {
     } catch (e) {
         let errstr = "ERROR: " + e;
         errstr += "\nMaster oplog findOne:\n";
-        errstr += tojson(primary.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += tojson(
+            primary.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next(),
+        );
         errstr += "\nSecondary 0 oplog findOne:\n";
-        errstr += tojson(secondaries[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += tojson(
+            secondaries[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next(),
+        );
         errstr += "\nSecondary 1 oplog findOne:\n";
-        errstr += tojson(secondaries[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += tojson(
+            secondaries[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next(),
+        );
         assert(false, errstr);
     }
 

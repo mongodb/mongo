@@ -9,7 +9,9 @@ coll.drop();
 //                                          {validator: {"$expr": {$gt: ["$ts", "$$NOW"]}}}));
 
 assert.commandWorked(
-    db.createCollection("coll_doc_validation_with_now_variable", {validator: {"$expr": {$lt: ["$ts", "$$NOW"]}}}),
+    db.createCollection("coll_doc_validation_with_now_variable", {
+        validator: {"$expr": {$lt: ["$ts", "$$NOW"]}},
+    }),
 );
 
 assert.commandWorked(coll.insert({"ts": new Date(1589617694938)}));

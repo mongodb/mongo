@@ -34,7 +34,13 @@ const MigrationRetryConfig = {
     retryJitterMS: TestData.migrationRetryJitterMS || 0,
 };
 
-function _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs) {
+function _runAndExhaustQueryWithRetryUponMigration(
+    conn,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     let queryResponse;
     let attempt = 0;
     const lsid = commandObj["lsid"];
@@ -48,14 +54,21 @@ function _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj
 
             queryResponse = func.apply(conn, makeFuncArgs(commandObj));
 
-            if (commandName === "explain" && RetryableWritesUtil.shouldRetryExplainCommand(queryResponse)) {
+            if (
+                commandName === "explain" &&
+                RetryableWritesUtil.shouldRetryExplainCommand(queryResponse)
+            ) {
                 jsTest.log(`Retrying failed explain command`);
                 return stopRetrying;
             }
 
             let latestBatchResponse = queryResponse;
 
-            while (latestBatchResponse.ok === 1 && latestBatchResponse.cursor && latestBatchResponse.cursor.id != 0) {
+            while (
+                latestBatchResponse.ok === 1 &&
+                latestBatchResponse.cursor &&
+                latestBatchResponse.cursor.id != 0
+            ) {
                 const ns = queryResponse.cursor.ns;
                 const collName = getCollectionNameFromFullNamespace(ns);
 
@@ -99,7 +112,11 @@ function _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj
 
             return stopRetrying;
         },
-        () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(queryResponse),
+        () =>
+            "Timed out while retrying command '" +
+            tojson(commandObj) +
+            "', response: " +
+            tojson(queryResponse),
     );
 
     return queryResponse;
@@ -112,7 +129,9 @@ function _hasRetryableWriteError(response) {
     if (!response || response.ok !== 1 || !response.writeErrors) {
         return false;
     }
-    const errors = Array.isArray(response.writeErrors) ? response.writeErrors : [response.writeErrors];
+    const errors = Array.isArray(response.writeErrors)
+        ? response.writeErrors
+        : [response.writeErrors];
     return errors.some((we) => MigrationRetryConfig.ddlErrors.has(we.code));
 }
 
@@ -173,7 +192,11 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
             jsTest.log.info("Done retrying " + commandName);
             return kNoRetry;
         },
-        () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(commandResponse),
+        () =>
+            "Timed out while retrying command '" +
+            tojson(commandObj) +
+            "', response: " +
+            tojson(commandResponse),
         undefined,
         interval,
     );
@@ -181,10 +204,24 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
     return commandResponse;
 }
 
-function runCommandWithRetryUponMigration(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithRetryUponMigration(
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     // These are the query commands that will be retried when failing due to a concurrent chunk or
     // collection migrations.
-    const kQueryCommands = new Set(["find", "aggregate", "listIndexes", "count", "distinct", "explain"]);
+    const kQueryCommands = new Set([
+        "find",
+        "aggregate",
+        "listIndexes",
+        "count",
+        "distinct",
+        "explain",
+    ]);
 
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
@@ -193,12 +230,25 @@ function runCommandWithRetryUponMigration(conn, dbName, commandName, commandObj,
     // A transaction can either be issued by the test file or injected by a suite override.
     const inTransaction =
         commandObj.hasOwnProperty("autocommit") ||
-        (TestData.networkErrorAndTxnOverrideConfig && TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions);
+        (TestData.networkErrorAndTxnOverrideConfig &&
+            TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions);
 
     if (!inTransaction && kQueryCommands.has(commandName)) {
-        return _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs);
+        return _runAndExhaustQueryWithRetryUponMigration(
+            conn,
+            commandName,
+            commandObj,
+            func,
+            makeFuncArgs,
+        );
     } else if (MigrationRetryConfig.ddlCommands.has(commandName)) {
-        return _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs);
+        return _runDDLCommandWithRetryUponMigration(
+            conn,
+            commandName,
+            commandObj,
+            func,
+            makeFuncArgs,
+        );
     } else {
         return func.apply(conn, makeFuncArgs(commandObj));
     }

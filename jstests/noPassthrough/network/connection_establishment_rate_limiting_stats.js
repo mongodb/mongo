@@ -55,7 +55,10 @@ const testRateLimiterStats = (conn) => {
     }
 
     assert.soon(() => {
-        const {connections: cstats, ingressSessionEstablishmentQueues: qstats} = getLimiterStats(conn, {log: false});
+        const {connections: cstats, ingressSessionEstablishmentQueues: qstats} = getLimiterStats(
+            conn,
+            {log: false},
+        );
 
         jsTestLog("stats: " + tojson({cstats, qstats}));
 
@@ -73,7 +76,11 @@ const testRateLimiterStats = (conn) => {
             // There is a correspondence between the connections stats and the session
             // establishment queue stats, because they use the same underlying rate limiter.
             () => equal(cstats["establishmentRateLimit"]["rejected"], qstats["rejectedAdmissions"]),
-            () => equal(cstats["queuedForEstablishment"], qstats["addedToQueue"] - qstats["removedFromQueue"]),
+            () =>
+                equal(
+                    cstats["queuedForEstablishment"],
+                    qstats["addedToQueue"] - qstats["removedFromQueue"],
+                ),
             // Somebody either waited or was admitted immediately, so there is an average wait
             // time.
             () => qstats["averageTimeQueuedMicros"] >= 0,

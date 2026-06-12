@@ -42,7 +42,11 @@ function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
     let actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
     assert(
         actualNumLiveCursors == expectedNumLiveCursors,
-        "actual num live cursors (" + actualNumLiveCursors + ") != exptected (" + expectedNumLiveCursors + ")",
+        "actual num live cursors (" +
+            actualNumLiveCursors +
+            ") != exptected (" +
+            expectedNumLiveCursors +
+            ")",
     );
 }
 

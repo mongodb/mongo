@@ -13,7 +13,14 @@ function checkEqual(name, key, value) {
     assert.eq(
         t.find().count(),
         i + n,
-        "checkEqual " + name + " $in + $nin != total | " + i + " + " + n + " != " + t.find().count(),
+        "checkEqual " +
+            name +
+            " $in + $nin != total | " +
+            i +
+            " + " +
+            n +
+            " != " +
+            t.find().count(),
     );
 }
 

@@ -43,7 +43,9 @@ const unstableInnerPipeline = [{$project: {v: {$_testApiVersion: {unstable: true
 assert.commandFailedWithCode(
     db.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}},
+        ],
         cursor: {},
         apiStrict: true,
         apiVersion: "1",
@@ -66,7 +68,9 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     db.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}},
+        ],
         cursor: {},
         apiStrict: false,
         apiVersion: "1",
@@ -88,7 +92,9 @@ const deprecatedInnerPipeline = [{$project: {v: {$_testApiVersion: {deprecated: 
 assert.commandFailedWithCode(
     db.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}},
+        ],
         cursor: {},
         apiDeprecationErrors: true,
         apiVersion: "1",
@@ -111,7 +117,9 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     db.runCommand({
         aggregate: collName,
-        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+        pipeline: [
+            {$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}},
+        ],
         cursor: {},
         apiDeprecationErrors: false,
         apiVersion: "1",
@@ -129,7 +137,15 @@ assert.commandWorked(
 
 // Create a view with {apiStrict: true}.
 db.view.drop();
-assert.commandWorked(db.runCommand({create: "view", viewOn: collName, pipeline: [], apiStrict: true, apiVersion: "1"}));
+assert.commandWorked(
+    db.runCommand({
+        create: "view",
+        viewOn: collName,
+        pipeline: [],
+        apiStrict: true,
+        apiVersion: "1",
+    }),
+);
 // find() on views should work normally if 'apiStrict' is true.
 assert.commandWorked(db.runCommand({find: "view", apiStrict: true, apiVersion: "1"}));
 

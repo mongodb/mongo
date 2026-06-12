@@ -56,7 +56,10 @@ function assertQueryPlanForFindContainsExpressIxscan(query = {}, msg = "") {
     assert(!planHasStage(db, explain, "COLLSCAN")), msg + tojson(explain);
 }
 
-assertQueryPlanForAggDoesNotContainFilter([{$match: {$expr: true}}], "{$expr: true} should be optimized away");
+assertQueryPlanForAggDoesNotContainFilter(
+    [{$match: {$expr: true}}],
+    "{$expr: true} should be optimized away",
+);
 
 assertQueryPlanForFindDoesNotContainFilter({$expr: true}, "{$expr: true} should be optimized away");
 
@@ -67,7 +70,10 @@ assertQueryPlanForFindContainsEOF(
     "expressions that optimize to false should be optimized away",
 );
 
-assertQueryPlanForFindContainsEOF({$expr: {$const: null}}, "$expr containing falsy constant should be optimized away");
+assertQueryPlanForFindContainsEOF(
+    {$expr: {$const: null}},
+    "$expr containing falsy constant should be optimized away",
+);
 
 assertQueryPlanForFindContainsEOF(
     {$and: [{$expr: false}, {_id: 15}]},
@@ -119,7 +125,9 @@ assertQueryPlanForFindContainsFilter(
     "{$expr: '$foo'} refers to a field and should not be optimized away",
 );
 
-const explainAggregate = coll.explain().aggregate([{$match: {$expr: "foo"}}, {$match: {$expr: "$foo"}}]);
+const explainAggregate = coll
+    .explain()
+    .aggregate([{$match: {$expr: "foo"}}, {$match: {$expr: "$foo"}}]);
 assert.eq(
     getWinningPlanFromExplain(explainAggregate).filter,
     {$expr: "$foo"},

@@ -17,7 +17,9 @@ const collName = jsTestName();
 
 const coll = testDB[collName];
 coll.drop();
-assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}),
+);
 
 // BSON values are ordered by (normalized type) and then value.
 // Since the array type is greater than numeric types [2,3] will be the max and 4 will be the min.
@@ -54,11 +56,15 @@ const bucket = {
 };
 
 // Manually set the flag.
-assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}),
+);
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(coll), true);
 
 // Insert mixed data into the collection.
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)),
+);
 
 /**
  * If mixed schema rewrites do not work, this will get rewritten to a predicate on control.min under

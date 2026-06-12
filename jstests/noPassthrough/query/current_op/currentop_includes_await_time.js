@@ -17,7 +17,9 @@ coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName(), {capped: true, size: 1024}));
 assert.commandWorked(coll.insert({_id: 1}));
 
-let cmdRes = assert.commandWorked(testDB.runCommand({find: coll.getName(), tailable: true, awaitData: true}));
+let cmdRes = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), tailable: true, awaitData: true}),
+);
 
 TestData.commandResult = cmdRes;
 let cleanupShell = startParallelShell(function () {

@@ -15,11 +15,16 @@ const latest = "latest";
 function revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, originalFCV, targetFCV) {
     const isOriginallyDowngrade = MongoRunner.compareBinVersions(originalFCV, targetFCV) === 1;
     const failPointName = isOriginallyDowngrade ? "failDowngrading" : "failUpgrading";
-    if (!FeatureFlagUtil.isPresentAndEnabled(conn, "UpgradingToDowngrading") && !isOriginallyDowngrade) {
+    if (
+        !FeatureFlagUtil.isPresentAndEnabled(conn, "UpgradingToDowngrading") &&
+        !isOriginallyDowngrade
+    ) {
         return;
     }
     // Startup: set initial FCV.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}),
+    );
     let fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog("1) Current FCV (should be original FCV):");
     printjson(fcvDoc);
@@ -27,7 +32,9 @@ function revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, originalFCV, targe
 
     // Should be stuck in transitional state using failpoint.
     assert.commandWorked(conn.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+    );
     fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog("2) Current FCV (should be transitional state):");
     printjson(fcvDoc);
@@ -35,7 +42,9 @@ function revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, originalFCV, targe
 
     // Reset failpoint, check FCV is reverted back to original state.
     assert.commandWorked(conn.adminCommand({configureFailPoint: failPointName, mode: "off"}));
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV, confirm: true}),
+    );
     let newFcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog("3) Current FCV (should be reverted to original FCV):");
     printjson(newFcvDoc);
@@ -47,7 +56,9 @@ function revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, originalFCV, targe
     }
 
     // Reset FCV to latest for consistency across tests.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 }
 function runTests(conn, adminDB) {
     revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, latestFCV, lastLTSFCV);
@@ -58,7 +69,11 @@ function runTests(conn, adminDB) {
 
 function runStandaloneTest() {
     const conn = MongoRunner.runMongod({binVersion: latest});
-    assert.neq(null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+    assert.neq(
+        null,
+        conn,
+        "mongod was unable to start up with version=" + latest + " and no data files",
+    );
     const adminDB = conn.getDB("admin");
 
     runTests(conn, adminDB);
@@ -80,7 +95,9 @@ function runReplicaSetTest() {
 
 // Check that resuming the same interrupted setFCV transition reuses the same changeTimestamp.
 function testConfigServerFCVTimestampIsSameOnResume() {
-    const st = new ShardingTest({shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}]}}});
+    const st = new ShardingTest({
+        shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}]}},
+    });
     const mongosAdminDB = st.s.getDB("admin");
     const configPrimary = st.configRS.getPrimary();
     const shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
@@ -91,11 +108,19 @@ function testConfigServerFCVTimestampIsSameOnResume() {
     let fcvDoc;
     let newFcvDoc;
     // 1) Calling downgrade twice (one with failpoint).
-    assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}),
+    );
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     fcvDoc = mongosAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
-    assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(
+        configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}),
+    );
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
     newFcvDoc = mongosAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     checkFCV(mongosAdminDB, lastLTSFCV);
     if (FeatureFlagUtil.isEnabled(st.s, "SymmetricFCV")) {
@@ -107,11 +132,19 @@ function testConfigServerFCVTimestampIsSameOnResume() {
     }
 
     // 2) Calling upgrade twice (one with failpoint).
-    assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        configPrimary.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}),
+    );
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     fcvDoc = mongosAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
-    assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}));
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        configPrimary.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}),
+    );
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
     newFcvDoc = mongosAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     checkFCV(mongosAdminDB, latestFCV);
     if (FeatureFlagUtil.isEnabled(st.s, "SymmetricFCV")) {
@@ -131,7 +164,9 @@ function testConfigServerFCVTimestampIsSameOnResume() {
 // or downgrade to lastLTS/lastContinuous and assert all servers/router in the cluster have the same
 // fcv.
 function setAndCheckFCV(FCV, adminDBs) {
-    assert.commandWorked(adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: FCV, confirm: true}));
+    assert.commandWorked(
+        adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: FCV, confirm: true}),
+    );
     checkFCV(adminDBs.mongos, FCV);
     checkFCV(adminDBs.config, FCV);
     checkFCV(adminDBs.shard0, FCV);
@@ -150,17 +185,27 @@ function testBothShardsFail(originalFCV, targetFCV, adminDBs) {
     setAndCheckFCV(originalFCV, adminDBs);
 
     const failPointName = isDowngrade ? "failDowngrading" : "failUpgrading";
-    assert.commandWorked(adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
-    assert.commandWorked(adminDBs.shard1.runCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
+    assert.commandWorked(
+        adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "alwaysOn"}),
+    );
+    assert.commandWorked(
+        adminDBs.shard1.runCommand({configureFailPoint: failPointName, mode: "alwaysOn"}),
+    );
 
-    assert.commandFailed(adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandFailed(
+        adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+    );
 
     checkFCV(adminDBs.config, effectiveFCV, targetFCV);
     checkFCV(adminDBs.shard0, effectiveFCV, targetFCV);
     checkFCV(adminDBs.shard1, effectiveFCV, targetFCV);
 
-    assert.commandWorked(adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "off"}));
-    assert.commandWorked(adminDBs.shard1.runCommand({configureFailPoint: failPointName, mode: "off"}));
+    assert.commandWorked(
+        adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "off"}),
+    );
+    assert.commandWorked(
+        adminDBs.shard1.runCommand({configureFailPoint: failPointName, mode: "off"}),
+    );
 
     setAndCheckFCV(originalFCV, adminDBs);
 
@@ -186,7 +231,9 @@ function testConfigFails(originalFCV, targetFCV, adminDBs) {
         }),
     );
 
-    assert.commandFailed(adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandFailed(
+        adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+    );
 
     checkFCV(adminDBs.config, effectiveFCV, targetFCV);
     checkFCV(adminDBs.shard0, originalFCV);
@@ -216,17 +263,30 @@ function testMixedFailures(originalFCV, targetFCV, adminDBs) {
     setAndCheckFCV(originalFCV, adminDBs);
 
     const failPointName = isDowngrade ? "failDowngrading" : "failUpgrading";
-    assert.commandWorked(adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
-    assert.commandWorked(adminDBs.shard1.runCommand({configureFailPoint: "failBeforeTransitioning", mode: "alwaysOn"}));
+    assert.commandWorked(
+        adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "alwaysOn"}),
+    );
+    assert.commandWorked(
+        adminDBs.shard1.runCommand({
+            configureFailPoint: "failBeforeTransitioning",
+            mode: "alwaysOn",
+        }),
+    );
 
-    assert.commandFailed(adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandFailed(
+        adminDBs.mongos.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+    );
 
     checkFCV(adminDBs.config, effectiveFCV, targetFCV);
     checkFCV(adminDBs.shard0, effectiveFCV, targetFCV);
     checkFCV(adminDBs.shard1, originalFCV);
 
-    assert.commandWorked(adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "off"}));
-    assert.commandWorked(adminDBs.shard1.runCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}));
+    assert.commandWorked(
+        adminDBs.shard0.runCommand({configureFailPoint: failPointName, mode: "off"}),
+    );
+    assert.commandWorked(
+        adminDBs.shard1.runCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}),
+    );
 
     setAndCheckFCV(originalFCV, adminDBs);
 

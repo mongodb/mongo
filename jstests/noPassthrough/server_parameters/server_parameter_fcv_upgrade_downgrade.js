@@ -37,20 +37,32 @@ function runDowngradeUpgradeTestForSP(conn, isMongod) {
 
         const changed = assert.commandWorked(admin.runCommand({getParameter: 1, [sp]: 1}));
         assert.eq(changed[sp], updateVal);
-        assertParamExistenceInGetParamStar(assert.commandWorked(admin.runCommand({getParameter: "*"})), sp, true);
+        assertParamExistenceInGetParamStar(
+            assert.commandWorked(admin.runCommand({getParameter: "*"})),
+            sp,
+            true,
+        );
 
         // Downgrade FCV and ensure we can't get or set if the server knows the FCV (i.e. not
         // mongos)
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         if (isMongod) {
             assertGetFailed(admin.runCommand({getParameter: 1, [sp]: 1}));
             assertSetFailed(admin.runCommand({setParameter: 1, [sp]: secondUpdateVal}));
         }
-        assertParamExistenceInGetParamStar(assert.commandWorked(admin.runCommand({getParameter: "*"})), sp, !isMongod);
+        assertParamExistenceInGetParamStar(
+            assert.commandWorked(admin.runCommand({getParameter: "*"})),
+            sp,
+            !isMongod,
+        );
 
         // Upgrade FCV and ensure get and set work, and that the value is NOT reset to default, as
         // this is a non-cluster parameter
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
         const afterUpgrade = assert.commandWorked(admin.runCommand({getParameter: 1, [sp]: 1}));
         assert.eq(afterUpgrade[sp], updateVal);
 
@@ -59,7 +71,11 @@ function runDowngradeUpgradeTestForSP(conn, isMongod) {
         const changedAgain = assert.commandWorked(admin.runCommand({getParameter: 1, [sp]: 1}));
         assert.eq(changedAgain[sp], secondUpdateVal);
 
-        assertParamExistenceInGetParamStar(assert.commandWorked(admin.runCommand({getParameter: "*"})), sp, true);
+        assertParamExistenceInGetParamStar(
+            assert.commandWorked(admin.runCommand({getParameter: "*"})),
+            sp,
+            true,
+        );
     }
 }
 
@@ -103,7 +119,9 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
         }
 
         // Downgrade FCV and ensure we can't set or get.
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
 
         assertGetFailed(admin.runCommand({getClusterParameter: sp}));
         assertSetFailed(admin.runCommand({setClusterParameter: {[sp]: {intData: updateVal + 1}}}));
@@ -119,7 +137,9 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
         }
 
         // Upgrade FCV and ensure get and set work, and that the value is reset to default
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
         const afterUpgrade = assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
         assert.eq(val(afterUpgrade), initval);
 
@@ -149,7 +169,10 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
 
 {
     jsTest.log("START replset");
-    const rst = new ReplSetTest({nodes: 3, nodeOptions: {setParameter: {featureFlagBlender: true}}});
+    const rst = new ReplSetTest({
+        nodes: 3,
+        nodeOptions: {setParameter: {featureFlagBlender: true}},
+    });
     rst.startSet();
     rst.initiate();
     runDowngradeUpgradeTestForSP(rst.getPrimary(), true /* isMongod */);
@@ -180,7 +203,12 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
     }
     // mongos is unaware of FCV
     runDowngradeUpgradeTestForSP(s.s0, false /* isMongod */);
-    runDowngradeUpgradeTestForCWSP(s.s0, false /* isMongod */, false /* isStandalone */, verifyParameterState);
+    runDowngradeUpgradeTestForCWSP(
+        s.s0,
+        false /* isMongod */,
+        false /* isStandalone */,
+        verifyParameterState,
+    );
     s.stop();
     jsTest.log("END sharding");
 }

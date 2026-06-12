@@ -8,7 +8,9 @@ const t = db[jsTestName()];
 function f(n, dir) {
     assert.commandWorked(t.createIndex({x: dir || 1}));
     for (let i = 0; i < n; i++)
-        assert.commandWorked(t.save({x: 3, z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}));
+        assert.commandWorked(
+            t.save({x: 3, z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}),
+        );
 
     assert.eq(n, t.find().count());
     assert.commandWorked(t.remove({x: 3}));

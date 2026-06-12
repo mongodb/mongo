@@ -19,7 +19,9 @@ const testDB = st.s.getDB(dbName);
 // Set up a sharded collection with the following chunks:
 // shard0: [MinKey, 0]
 // shard1: [0, MaxKey]
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
@@ -40,12 +42,18 @@ withRetryOnTransientTxnErrorIncrementTxnNum(parentTxnNumber, (txnNumber) => {
             autocommit: false,
         }),
     );
-    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, NumberLong(txnNumber))));
+    assert.commandWorked(
+        testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, NumberLong(txnNumber))),
+    );
 });
 
 // Move the chunk [MinKey, 0] from shard0 to shard1 and then back to shard0.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}),
+);
 
 // Performs a non-retryable write against the chunk [0, MaxKey] in the same session. At this point
 // shard1 has an active retryable write in that the session because of the dead-end sentinel noop
@@ -67,11 +75,15 @@ withRetryOnTransientTxnErrorIncrementTxnNum(nonRetryableWriteTxnNumber, (txnNumb
         }),
     );
     assert.commandWorked(
-        testDB.adminCommand(makeCommitTransactionCmdObj(nonRetryableWriteChildLsid, NumberLong(txnNumber))),
+        testDB.adminCommand(
+            makeCommitTransactionCmdObj(nonRetryableWriteChildLsid, NumberLong(txnNumber)),
+        ),
     );
 });
 
 // Move the chunk [MinKey, 0] from shard0 and shard1. The migration should succeed.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}),
+);
 
 st.stop();

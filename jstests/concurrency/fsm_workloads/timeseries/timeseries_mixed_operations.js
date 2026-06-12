@@ -39,7 +39,10 @@ export const $config = (function () {
 
             // Cache the collection name and command options to use for rawData in order to prevent
             // the workload threads from having to re-determine them during their execution.
-            this.collNameForRawOps = getTimeseriesCollForRawOps(db, this.getCollectionName(collName));
+            this.collNameForRawOps = getTimeseriesCollForRawOps(
+                db,
+                this.getCollectionName(collName),
+            );
             this.rawOperationSpec = getRawOperationSpec(db);
         },
 

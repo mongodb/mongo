@@ -37,11 +37,17 @@ export var waitForLock = function (mongo, name) {
         100,
     );
 
-    jsTest.log.info("Acquired lock", {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
+    jsTest.log.info("Acquired lock", {
+        lock: {_id: name, ts: ts},
+        curr: lockColl.findOne({_id: name}),
+    });
 
     // Set the state back to 0
     let unlock = function () {
-        jsTest.log.info("Releasing lock", {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
+        jsTest.log.info("Releasing lock", {
+            lock: {_id: name, ts: ts},
+            curr: lockColl.findOne({_id: name}),
+        });
         lockColl.update({_id: name, ts: ts}, {$set: {state: 0}});
     };
 
@@ -69,7 +75,9 @@ export var isFinished = function (mongo, name) {
  * Sets the result of a background op
  */
 export var setResult = function (mongo, name, result, err) {
-    mongo.getCollection("config.testResult").update({_id: name}, {_id: name, result: result, err: err}, true);
+    mongo
+        .getCollection("config.testResult")
+        .update({_id: name}, {_id: name, result: result, err: err}, true);
 };
 
 /**
@@ -81,7 +89,9 @@ export var getResult = function (mongo, name) {
 
 export var startParallelOps = function (mongo, proc, args, context) {
     let procName = proc.name + "-" + new ObjectId();
-    let seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join("")).getTimestamp().getTime();
+    let seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join(""))
+        .getTimestamp()
+        .getTime();
 
     // Make sure we aren't finished before we start
     setFinished(mongo, procName, false);
@@ -273,7 +283,9 @@ export function moveOps(collName, options) {
         let toShard = shards[Random.randInt(shards.length)]._id;
 
         try {
-            jsTest.log.info({res: admin.runCommand({moveChunk: collName, find: findKey, to: toShard})});
+            jsTest.log.info({
+                res: admin.runCommand({moveChunk: collName, find: findKey, to: toShard}),
+            });
         } catch (e) {
             jsTest.log.info({error: e});
         }

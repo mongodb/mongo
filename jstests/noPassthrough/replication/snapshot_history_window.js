@@ -26,7 +26,9 @@ const primary = replSet.getPrimary();
 const primaryDB = primary.getDB("test");
 
 const historyWindowSecs = 10;
-assert.commandWorked(primaryDB.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: historyWindowSecs}));
+assert.commandWorked(
+    primaryDB.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: historyWindowSecs}),
+);
 
 const insertTimestamp = assert.commandWorked(
     primaryDB.runCommand({insert: collName, documents: [{_id: 0}]}),
@@ -53,21 +55,33 @@ while (Date.now() - startTime < testWindowMS) {
     if (res.operationTime.t - insertTimestamp.t > historyWindowSecs - testMarginSecs) {
         // Too close to the window and we may get a false positive failure. Give up this test. This
         // can happen on slow machines.
-        jsTestLog("Skipping test with operationTime: " + tojson(res.operationTime) + " res: " + tojson(res));
+        jsTestLog(
+            "Skipping test with operationTime: " +
+                tojson(res.operationTime) +
+                " res: " +
+                tojson(res),
+        );
         if (res.code === ErrorCodes.SnapshotTooOld) {
             numSnapshotTooOld++;
         }
         break;
     } else {
         // Otherwise, test that the snapshot read is still valid.
-        assert.commandWorked(res, "failed to read at snapshot " + tojson(insertTimestamp) + " res: " + tojson(res));
+        assert.commandWorked(
+            res,
+            "failed to read at snapshot " + tojson(insertTimestamp) + " res: " + tojson(res),
+        );
     }
 
     // Perform writes to advance stable timestamp and oldest timestamp. We use majority writeConcern
     // so that we can make sure the stable timestamp and the oldest timestamp are updated after each
     // insert.
     assert.commandWorked(
-        primaryDB.runCommand({insert: collName, documents: [{_id: nextId}], writeConcern: {w: "majority"}}),
+        primaryDB.runCommand({
+            insert: collName,
+            documents: [{_id: nextId}],
+            writeConcern: {w: "majority"},
+        }),
     );
     nextId++;
 
@@ -79,12 +93,19 @@ const historyExpirationTime = startTime + historyWindowSecs * 1000;
 sleep(historyExpirationTime + testMarginMS - Date.now());
 // Perform another majority write to advance the stable timestamp and the oldest timestamp again.
 assert.commandWorked(
-    primaryDB.runCommand({insert: collName, documents: [{_id: nextId}], writeConcern: {w: "majority"}}),
+    primaryDB.runCommand({
+        insert: collName,
+        documents: [{_id: nextId}],
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Test that reading from a snapshot at insertTimestamp returns SnapshotTooOld.
 assert.commandFailedWithCode(
-    primaryDB.runCommand({find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}),
+    primaryDB.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: insertTimestamp},
+    }),
     ErrorCodes.SnapshotTooOld,
 );
 numSnapshotTooOld++;

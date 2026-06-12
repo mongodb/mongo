@@ -33,7 +33,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         exactIdDelete(db, this.getCurrentOrPreviousLatchCollName(collName), this.session);
     };
     $config.states.multiDelete = function (db, collName, connCache) {
-        multiDelete(db, this.getCurrentOrPreviousLatchCollName(collName), this.session, this.tid, this.partitionSize);
+        multiDelete(
+            db,
+            this.getCurrentOrPreviousLatchCollName(collName),
+            this.session,
+            this.tid,
+            this.partitionSize,
+        );
     };
     $config.states.verifyDocuments = function (db, collName, connCache) {
         verifyDocuments(db, this.getCurrentOrPreviousLatchCollName(collName), this.tid);

@@ -70,7 +70,11 @@ function testResultSizeLimitKnob() {
 testResultSizeLimitKnob();
 
 function assertFieldPositive(fieldName, filteredExplain, fullExplain) {
-    assert.gt(filteredExplain[fieldName], 0, `Expected ${fieldName} > 0. Found: ` + tojson(fullExplain));
+    assert.gt(
+        filteredExplain[fieldName],
+        0,
+        `Expected ${fieldName} > 0. Found: ` + tojson(fullExplain),
+    );
 }
 
 function runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling = true) {

@@ -17,7 +17,10 @@ import {
 
 checkPlatformCompatibleWithExtensions();
 
-const extensionNames = generateExtensionConfigs(["libfoo_mongo_extension.so", "libbar_mongo_extension.so"]);
+const extensionNames = generateExtensionConfigs([
+    "libfoo_mongo_extension.so",
+    "libbar_mongo_extension.so",
+]);
 
 try {
     // Test loading a single extension in mongod and mongos.
@@ -30,11 +33,19 @@ try {
     // extensions concatenated with commas), so that is the expected result. The options are parsed
     // correctly internally, and this is tested more in extensions_parameter.js.
     expectedResult = {
-        "parsed": {"processManagement": {"loadExtensions": [extensionNames[0] + "," + extensionNames[1]]}},
+        "parsed": {
+            "processManagement": {"loadExtensions": [extensionNames[0] + "," + extensionNames[1]]},
+        },
     };
     // Test passing multiple extensions as array.
-    testGetCmdLineOptsMongod({loadExtensions: [extensionNames[0], extensionNames[1]]}, expectedResult);
-    testGetCmdLineOptsMongos({loadExtensions: [extensionNames[0], extensionNames[1]]}, expectedResult);
+    testGetCmdLineOptsMongod(
+        {loadExtensions: [extensionNames[0], extensionNames[1]]},
+        expectedResult,
+    );
+    testGetCmdLineOptsMongos(
+        {loadExtensions: [extensionNames[0], extensionNames[1]]},
+        expectedResult,
+    );
 
     // Test loading via config file.
     const extensionFooConfig = writeJSONConfigFile("enables_single_extension", {
@@ -68,8 +79,14 @@ try {
             "processManagement": {"loadExtensions": [extensionNames[0], extensionNames[1]]},
         },
     };
-    testGetCmdLineOptsMongod({config: extensionFooConfig, loadExtensions: extensionNames[1]}, expectedResult);
-    testGetCmdLineOptsMongos({config: extensionFooConfig, loadExtensions: extensionNames[1]}, expectedResult);
+    testGetCmdLineOptsMongod(
+        {config: extensionFooConfig, loadExtensions: extensionNames[1]},
+        expectedResult,
+    );
+    testGetCmdLineOptsMongos(
+        {config: extensionFooConfig, loadExtensions: extensionNames[1]},
+        expectedResult,
+    );
 } finally {
     deleteExtensionConfigs(extensionNames);
 }

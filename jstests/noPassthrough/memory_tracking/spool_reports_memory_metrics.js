@@ -26,7 +26,9 @@ const db = conn.getDB("test");
 const collName = jsTestName();
 const coll = db[collName];
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+);
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
 
 // Set up test collection.
@@ -36,7 +38,9 @@ const numDocsPerBucket = 4;
 
 function setUpCollectionForTest() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}),
+    );
 
     let docs = [];
     for (const bucket of buckets) {
@@ -56,13 +60,22 @@ function setUpCollectionForTest() {
     jsTest.log.info("Running spool test with no spilling: " + tojson(updateCommand));
 
     const memoryLimitBytes = 100 * 1024 * 1024;
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: memoryLimitBytes}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: 10 * memoryLimitBytes}),
+        db.adminCommand({setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: memoryLimitBytes}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxSpoolDiskUsageBytes: 10 * memoryLimitBytes,
+        }),
     );
 
     setUpCollectionForTest();
-    runMemoryStatsTestForTimeseriesUpdateCommand({db: db, collName: collName, commandObj: updateCommand});
+    runMemoryStatsTestForTimeseriesUpdateCommand({
+        db: db,
+        collName: collName,
+        commandObj: updateCommand,
+    });
 }
 
 {
@@ -75,12 +88,20 @@ function setUpCollectionForTest() {
 
     // The spool stage will spill 32-byte record ids in this instance. Set a limit just under that
     // size so that we will need to spill on every other record.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: 50}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: 10 * 50}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: 50}),
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxSpoolDiskUsageBytes: 10 * 50}),
+    );
 
     setUpCollectionForTest();
 
-    runMemoryStatsTestForTimeseriesUpdateCommand({db: db, collName: collName, commandObj: updateCommand});
+    runMemoryStatsTestForTimeseriesUpdateCommand({
+        db: db,
+        collName: collName,
+        commandObj: updateCommand,
+    });
 }
 
 // Clean up.

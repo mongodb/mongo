@@ -20,7 +20,10 @@ assert.doesNotThrow(() => {
 });
 
 assert.commandWorked(
-    testDB.adminCommand({renameCollection: dbName + "." + sourceCollection, to: dbName + "." + destCollection}),
+    testDB.adminCommand({
+        renameCollection: dbName + "." + sourceCollection,
+        to: dbName + "." + destCollection,
+    }),
 );
 assert.throws(() => {
     getTop(testDB.getCollection(sourceCollection));

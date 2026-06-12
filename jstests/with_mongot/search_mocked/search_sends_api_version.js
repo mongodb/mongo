@@ -56,13 +56,20 @@ const cursorId = NumberLong(123);
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+    );
 }
 
 // The command should succeed. We don't care about the results, if the command succeeded mongotmock
 // received the apiVersion.
 assert.commandWorked(
-    coll.runCommand({aggregate: coll.getName(), apiVersion: "1", pipeline: [{$search: searchQuery}], cursor: {}}),
+    coll.runCommand({
+        aggregate: coll.getName(),
+        apiVersion: "1",
+        pipeline: [{$search: searchQuery}],
+        cursor: {},
+    }),
 );
 
 MongoRunner.stopMongod(conn);

@@ -81,7 +81,9 @@ assertStats(db, (stats) => {
 
 lastStats = db.serverStatus().indexStats;
 
-assert.commandWorked(db.testColl.createIndex({hashed: "hashed", p: 1}, {partialFilterExpression: {p: 1}}));
+assert.commandWorked(
+    db.testColl.createIndex({hashed: "hashed", p: 1}, {partialFilterExpression: {p: 1}}),
+);
 assert.commandWorked(db.testColl.insert({hashed: 1, p: 1}));
 assert.eq(1, db.testColl.find({hashed: 1}).hint({hashed: "hashed", p: 1}).itcount());
 assertStats(db, (stats) => {
@@ -97,7 +99,9 @@ assertStats(db, (stats) => {
 
 lastStats = db.serverStatus().indexStats;
 
-assert.commandWorked(db.testColl.createIndex({a: 1}, {expireAfterSeconds: 3600, collation: {locale: "en"}}));
+assert.commandWorked(
+    db.testColl.createIndex({a: 1}, {expireAfterSeconds: 3600, collation: {locale: "en"}}),
+);
 let now = new Date();
 assert.commandWorked(db.testColl.insert({a: now}));
 assert.eq(1, db.testColl.find({a: now}).itcount());

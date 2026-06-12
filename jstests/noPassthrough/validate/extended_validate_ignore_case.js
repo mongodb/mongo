@@ -19,15 +19,25 @@ let resLower = Object.entries(
     assert.commandWorked(coll.validate({collHash: true, hashPrefixes: "abcdef".split("")})).partial,
 );
 assert.gt(resUpper.length, 0, resUpper);
-assert.sameMembers(resLower, resUpper, `Got different results. Lower: ${tojson(resLower)}, Upper: ${tojson(resUpper)}`);
+assert.sameMembers(
+    resLower,
+    resUpper,
+    `Got different results. Lower: ${tojson(resLower)}, Upper: ${tojson(resUpper)}`,
+);
 
 // Assert that we get the same output when revealing hashed IDs regardless of case.
 resUpper = Object.entries(
-    assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "ABCDEF".split("")})).revealedIds,
+    assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "ABCDEF".split("")}))
+        .revealedIds,
 );
 resLower = Object.entries(
-    assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "abcdef".split("")})).revealedIds,
+    assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "abcdef".split("")}))
+        .revealedIds,
 );
-assert.sameMembers(resLower, resUpper, `Got different results. Lower: ${tojson(resLower)}, Upper: ${tojson(resUpper)}`);
+assert.sameMembers(
+    resLower,
+    resUpper,
+    `Got different results. Lower: ${tojson(resLower)}, Upper: ${tojson(resUpper)}`,
+);
 
 MongoRunner.stopMongod(conn);

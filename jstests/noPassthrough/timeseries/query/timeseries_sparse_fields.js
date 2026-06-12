@@ -22,7 +22,8 @@ db.createCollection(collName, {timeseries: {timeField: timeField}});
 const coll = db.getCollection(collName);
 
 const shallowCompare = (obj1, obj2) =>
-    Object.keys(obj1).length === Object.keys(obj2).length && Object.keys(obj1).every((key) => obj1[key] === obj2[key]);
+    Object.keys(obj1).length === Object.keys(obj2).length &&
+    Object.keys(obj1).every((key) => obj1[key] === obj2[key]);
 
 const measurements = [
     {a: 1},
@@ -38,7 +39,9 @@ const measurements = [
 ];
 
 for (const measurement of measurements) {
-    assert.commandWorked(coll.insert({[timeField]: ISODate("2024-02-20T00:00:00.000Z"), ...measurement}));
+    assert.commandWorked(
+        coll.insert({[timeField]: ISODate("2024-02-20T00:00:00.000Z"), ...measurement}),
+    );
 }
 
 // All measurements land in the same bucket.
@@ -62,7 +65,9 @@ assert.commandWorked(getTimeseriesCollForRawOps(db, coll).remove({}, getRawOpera
 
 const reversedMeasurements = measurements.reverse();
 for (const measurement of reversedMeasurements) {
-    assert.commandWorked(coll.insert({[timeField]: ISODate("2024-02-20T00:00:00.000Z"), ...measurement}));
+    assert.commandWorked(
+        coll.insert({[timeField]: ISODate("2024-02-20T00:00:00.000Z"), ...measurement}),
+    );
 }
 
 // All measurements land in the same bucket.

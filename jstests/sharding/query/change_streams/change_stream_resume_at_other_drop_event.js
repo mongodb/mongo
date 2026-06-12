@@ -62,7 +62,9 @@ describe("sharded change stream observes multiple invalidate events", () => {
         const shards = assert.commandWorked(st.s.adminCommand({listShards: 1})).shards;
 
         // DB primary pinned to shard 0.
-        assert.commandWorked(st.s.adminCommand({enableSharding: kDBName, primaryShard: shards[0].shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: kDBName, primaryShard: shards[0].shardName}),
+        );
 
         // Create unsplittable collection on shard 0.
         assert.commandWorked(

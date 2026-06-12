@@ -61,7 +61,9 @@ assert.eq(agg_timestamp.toArray(), [
 
 // Clear db for timestamp comparison tests
 assert(coll.drop());
-assert.commandWorked(coll.insertOne({time: new Timestamp(1341337661, 1), time2: new Timestamp(1341337661, 2)}));
+assert.commandWorked(
+    coll.insertOne({time: new Timestamp(1341337661, 1), time2: new Timestamp(1341337661, 2)}),
+);
 agg_timestamp = coll.aggregate({
     $project: {
         _id: 0,
@@ -74,6 +76,12 @@ agg_timestamp = coll.aggregate({
         ne: {$ne: ["$time", "$time2"]},
     },
 });
-let agg_timestampresult = [{cmp: -1, eq: false, gt: false, gte: false, lt: true, lte: true, ne: true}];
+let agg_timestampresult = [
+    {cmp: -1, eq: false, gt: false, gte: false, lt: true, lte: true, ne: true},
+];
 // Assert the results are as expected
-assert.eq(agg_timestamp.toArray(), agg_timestampresult, "agg_timestamp failed comparing two timestamps");
+assert.eq(
+    agg_timestamp.toArray(),
+    agg_timestampresult,
+    "agg_timestamp failed comparing two timestamps",
+);

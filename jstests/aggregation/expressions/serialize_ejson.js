@@ -153,7 +153,9 @@ describe("$serializeEJSON", () => {
         assert.neq(-1, err.message.indexOf("$serializeEJSON found an unknown argument: foo"));
     });
     it("rejects non-boolean relaxed parameter", () => {
-        assert.doesNotThrow(() => coll.findOne({}, {a: {$serializeEJSON: {input: {}, relaxed: true}}}));
+        assert.doesNotThrow(() =>
+            coll.findOne({}, {a: {$serializeEJSON: {input: {}, relaxed: true}}}),
+        );
         const err = assert.throwsWithCode(
             () => coll.findOne({}, {a: {$serializeEJSON: {input: {}, relaxed: 1}}}),
             ErrorCodes.BadValue,
@@ -168,17 +170,25 @@ describe("$serializeEJSON", () => {
         }
 
         assert.doesNotThrow(() => serializeTest(mqlNestedJSON(maxBSONDepth, 1), true));
-        assert.throwsWithCode(() => serializeTest(mqlNestedJSON(maxBSONDepth, 1), false), ErrorCodes.ConversionFailure);
+        assert.throwsWithCode(
+            () => serializeTest(mqlNestedJSON(maxBSONDepth, 1), false),
+            ErrorCodes.ConversionFailure,
+        );
     });
     it("uses onError on bad input", () => {
         const badInput = mqlNestedJSON(maxBSONDepth, 1);
-        const res = coll.findOne({}, {a: {$serializeEJSON: {input: badInput, relaxed: false, onError: "depth limit"}}});
+        const res = coll.findOne(
+            {},
+            {a: {$serializeEJSON: {input: badInput, relaxed: false, onError: "depth limit"}}},
+        );
         assert.eq(res.a, "depth limit");
     });
     it("supports roundtrip using $toString", () => {
         const mqlEJSONRoundtrip = (input, relaxed) => ({
             // BSON -> EJSON -> string -> EJSON -> BSON
-            $deserializeEJSON: {input: {$toObject: {$toString: {$serializeEJSON: {input, relaxed}}}}},
+            $deserializeEJSON: {
+                input: {$toObject: {$toString: {$serializeEJSON: {input, relaxed}}}},
+            },
         });
         populateCollection(serializeSuccessTests);
         const results = coll
@@ -216,7 +226,12 @@ const deserializeSuccessTests = [
     },
 ];
 
-const deserializeFailTests = [{$numberLong: 1}, {$numberLong: "bad"}, {$numberLong: "--1"}, {$numberLong: "Infinity"}];
+const deserializeFailTests = [
+    {$numberLong: 1},
+    {$numberLong: "bad"},
+    {$numberLong: "--1"},
+    {$numberLong: "Infinity"},
+];
 
 describe("$deserializeEJSON", () => {
     it("works with various inputs", () => {
@@ -257,7 +272,10 @@ describe("$deserializeEJSON", () => {
         coll.insert({input: {$symbol: "value"}});
         const res = coll.findOne(
             {},
-            {value: {$deserializeEJSON: {input: "$input"}}, type: {$type: {$deserializeEJSON: {input: "$input"}}}},
+            {
+                value: {$deserializeEJSON: {input: "$input"}},
+                type: {$type: {$deserializeEJSON: {input: "$input"}}},
+            },
         );
         assert.eq("symbol", res.type);
         assert.eq("value", res.value);
@@ -273,7 +291,10 @@ describe("$deserializeEJSON", () => {
     it("uses onError on bad input", () => {
         for (let test of deserializeFailTests) {
             const res = assert.doesNotThrow(() =>
-                coll.findOne({}, {a: {$deserializeEJSON: {input: {$literal: test}, onError: "failed"}}}),
+                coll.findOne(
+                    {},
+                    {a: {$deserializeEJSON: {input: {$literal: test}, onError: "failed"}}},
+                ),
             );
             assert.eq(res.a, "failed");
         }

@@ -28,10 +28,14 @@ const ns = kDbName + "." + collName;
 const mongos = st.s0;
 
 jsTestLog("Create collection, shard, split, move chunk to shard1, insert some docs.");
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 assert.commandWorked(mongos.adminCommand({split: ns, middle: {oldKey: 0}}));
-assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {oldKey: 0}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongos.adminCommand({moveChunk: ns, find: {oldKey: 0}, to: st.shard1.shardName}),
+);
 
 let bulk = mongos.getDB(kDbName).getCollection(collName).initializeOrderedBulkOp();
 for (let x = -500; x < 500; x++) {

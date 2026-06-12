@@ -15,7 +15,9 @@ import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
 let coll = db.getCollection("coll");
 coll.drop();
 
-assert.commandWorked(db.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(20)}));
+assert.commandWorked(
+    db.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(20)}),
+);
 
 // Test that replies size limit is hit when bulkWriteMaxRepliesSize is set and ordered = false
 let res = db.adminCommand({
@@ -33,7 +35,12 @@ assert.commandWorked(res);
 assert.eq(res.nErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, n: 0, code: ErrorCodes.ExceededMemoryLimit});
+cursorEntryValidator(res.cursor.firstBatch[1], {
+    ok: 0,
+    idx: 1,
+    n: 0,
+    code: ErrorCodes.ExceededMemoryLimit,
+});
 assert(!res.cursor.firstBatch[2]);
 
 // Test that replies size limit is hit when bulkWriteMaxRepliesSize is set and ordered = true
@@ -52,9 +59,16 @@ assert.commandWorked(res);
 assert.eq(res.nErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, n: 0, code: ErrorCodes.ExceededMemoryLimit});
+cursorEntryValidator(res.cursor.firstBatch[1], {
+    ok: 0,
+    idx: 1,
+    n: 0,
+    code: ErrorCodes.ExceededMemoryLimit,
+});
 assert(!res.cursor.firstBatch[2]);
 
 coll.drop();
 
-assert.commandWorked(db.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(30 * 1024 * 1024)}));
+assert.commandWorked(
+    db.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(30 * 1024 * 1024)}),
+);

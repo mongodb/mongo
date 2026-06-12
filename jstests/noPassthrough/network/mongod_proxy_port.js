@@ -16,7 +16,12 @@ function startWithProxyPort(port, proxy) {
 }
 
 function listenerPortConflict(port, proxy) {
-    const res = MongoRunner.runMongod({port: port, waitForConnect: false, "proxyPort": proxy, useLogFiles: true});
+    const res = MongoRunner.runMongod({
+        port: port,
+        waitForConnect: false,
+        "proxyPort": proxy,
+        useLogFiles: true,
+    });
     assert.soon(function () {
         try {
             let ret = checkProgram(res.pid);

@@ -26,7 +26,10 @@ validateAggPlanCacheUse(coll, [
 ]);
 
 section("$group on shard key with $first/$last");
-validateAggPlanCacheUse(coll, [{$sort: {shardKey: -1}}, {$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}}]);
+validateAggPlanCacheUse(coll, [
+    {$sort: {shardKey: -1}},
+    {$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}},
+]);
 
 validateAggPlanCacheUse(coll, [
     {$sort: {shardKey: 1, notShardKey: 1}},

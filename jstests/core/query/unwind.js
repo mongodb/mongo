@@ -36,7 +36,11 @@ const testCases = [
 
     // 'a' is null.
     {input: {_id: 0, a: null}, query: {path: "$a"}, output: []},
-    {input: {_id: 0, a: null}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: null}]},
+    {
+        input: {_id: 0, a: null},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: null}],
+    },
     {input: {_id: 0, a: null}, query: {path: "$a", includeArrayIndex: "i"}, output: []},
     {
         input: {_id: 0, a: null},
@@ -51,7 +55,11 @@ const testCases = [
 
     // 'a' is empty array.
     {input: {_id: 0, a: []}, query: {path: "$a"}, output: []},
-    {input: {_id: 0, a: []}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0}]},
+    {
+        input: {_id: 0, a: []},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0}],
+    },
     {input: {_id: 0, a: []}, query: {path: "$a", includeArrayIndex: "i"}, output: []},
     {
         input: {_id: 0, a: []},
@@ -66,8 +74,16 @@ const testCases = [
 
     // 'a' is 1.
     {input: {_id: 0, a: 1}, query: {path: "$a"}, output: [{_id: 0, a: 1}]},
-    {input: {_id: 0, a: 1}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: 1}]},
-    {input: {_id: 0, a: 1}, query: {path: "$a", includeArrayIndex: "i"}, output: [{_id: 0, a: 1, i: null}]},
+    {
+        input: {_id: 0, a: 1},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: 1}],
+    },
+    {
+        input: {_id: 0, a: 1},
+        query: {path: "$a", includeArrayIndex: "i"},
+        output: [{_id: 0, a: 1, i: null}],
+    },
     {
         input: {_id: 0, a: 1},
         query: {path: "$a", preserveNullAndEmptyArrays: true, includeArrayIndex: "i"},
@@ -81,8 +97,16 @@ const testCases = [
 
     // 'a' is empty document.
     {input: {_id: 0, a: {}}, query: {path: "$a"}, output: [{_id: 0, a: {}}]},
-    {input: {_id: 0, a: {}}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: {}}]},
-    {input: {_id: 0, a: {}}, query: {path: "$a", includeArrayIndex: "i"}, output: [{_id: 0, a: {}, i: null}]},
+    {
+        input: {_id: 0, a: {}},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: {}}],
+    },
+    {
+        input: {_id: 0, a: {}},
+        query: {path: "$a", includeArrayIndex: "i"},
+        output: [{_id: 0, a: {}, i: null}],
+    },
     {
         input: {_id: 0, a: {}},
         query: {path: "$a", preserveNullAndEmptyArrays: true, includeArrayIndex: "i"},
@@ -96,8 +120,16 @@ const testCases = [
 
     // 'a' is array containing null.
     {input: {_id: 0, a: [null]}, query: {path: "$a"}, output: [{_id: 0, a: null}]},
-    {input: {_id: 0, a: [null]}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: null}]},
-    {input: {_id: 0, a: [null]}, query: {path: "$a", includeArrayIndex: "i"}, output: [{_id: 0, a: null, i: 0}]},
+    {
+        input: {_id: 0, a: [null]},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: null}],
+    },
+    {
+        input: {_id: 0, a: [null]},
+        query: {path: "$a", includeArrayIndex: "i"},
+        output: [{_id: 0, a: null, i: 0}],
+    },
     {
         input: {_id: 0, a: [null]},
         query: {path: "$a", preserveNullAndEmptyArrays: true, includeArrayIndex: "i"},
@@ -111,8 +143,16 @@ const testCases = [
 
     // 'a' is array containing empty array.
     {input: {_id: 0, a: [[]]}, query: {path: "$a"}, output: [{_id: 0, a: []}]},
-    {input: {_id: 0, a: [[]]}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: []}]},
-    {input: {_id: 0, a: [[]]}, query: {path: "$a", includeArrayIndex: "i"}, output: [{_id: 0, a: [], i: 0}]},
+    {
+        input: {_id: 0, a: [[]]},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: []}],
+    },
+    {
+        input: {_id: 0, a: [[]]},
+        query: {path: "$a", includeArrayIndex: "i"},
+        output: [{_id: 0, a: [], i: 0}],
+    },
     {
         input: {_id: 0, a: [[]]},
         query: {path: "$a", preserveNullAndEmptyArrays: true, includeArrayIndex: "i"},
@@ -126,8 +166,16 @@ const testCases = [
 
     // 'a' is array containing 1.
     {input: {_id: 0, a: [1]}, query: {path: "$a"}, output: [{_id: 0, a: 1}]},
-    {input: {_id: 0, a: [1]}, query: {path: "$a", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: 1}]},
-    {input: {_id: 0, a: [1]}, query: {path: "$a", includeArrayIndex: "i"}, output: [{_id: 0, a: 1, i: 0}]},
+    {
+        input: {_id: 0, a: [1]},
+        query: {path: "$a", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: 1}],
+    },
+    {
+        input: {_id: 0, a: [1]},
+        query: {path: "$a", includeArrayIndex: "i"},
+        output: [{_id: 0, a: 1, i: 0}],
+    },
     {
         input: {_id: 0, a: [1]},
         query: {path: "$a", preserveNullAndEmptyArrays: true, includeArrayIndex: "i"},
@@ -170,7 +218,11 @@ const dottedPathTestCases = [
 
     // 'a.b' is missing.
     {input: {_id: 0, a: {}}, query: {path: "$a.b"}, output: []},
-    {input: {_id: 0, a: {}}, query: {path: "$a.b", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: {}}]},
+    {
+        input: {_id: 0, a: {}},
+        query: {path: "$a.b", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: {}}],
+    },
     {input: {_id: 0, a: {}}, query: {path: "$a.b", includeArrayIndex: "i"}, output: []},
     {
         input: {_id: 0, a: {}},
@@ -204,7 +256,11 @@ const dottedPathTestCases = [
 
     // 'a.b' is empty array.
     {input: {_id: 0, a: {b: []}}, query: {path: "$a.b"}, output: []},
-    {input: {_id: 0, a: {b: []}}, query: {path: "$a.b", preserveNullAndEmptyArrays: true}, output: [{_id: 0, a: {}}]},
+    {
+        input: {_id: 0, a: {b: []}},
+        query: {path: "$a.b", preserveNullAndEmptyArrays: true},
+        output: [{_id: 0, a: {}}],
+    },
     {input: {_id: 0, a: {b: []}}, query: {path: "$a.b", includeArrayIndex: "i"}, output: []},
     {
         input: {_id: 0, a: {b: []}},
@@ -224,7 +280,11 @@ const dottedPathTestCases = [
         query: {path: "$a.b", preserveNullAndEmptyArrays: true},
         output: [{_id: 0, a: {b: 1}}],
     },
-    {input: {_id: 0, a: {b: 1}}, query: {path: "$a.b", includeArrayIndex: "i"}, output: [{_id: 0, a: {b: 1}, i: null}]},
+    {
+        input: {_id: 0, a: {b: 1}},
+        query: {path: "$a.b", includeArrayIndex: "i"},
+        output: [{_id: 0, a: {b: 1}, i: null}],
+    },
     {
         input: {_id: 0, a: {b: 1}},
         query: {path: "$a.b", preserveNullAndEmptyArrays: true, includeArrayIndex: "i"},

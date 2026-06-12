@@ -48,7 +48,10 @@ const explainRes = assert.commandWorked(
     }),
 );
 if (getPlanStage(explainRes.queryPlanner.winningPlan, "UPDATE") === null) {
-    jsTest.log.info("Skipping test: UPDATE stage not found. " + "This stage is only used by the classic engine.");
+    jsTest.log.info(
+        "Skipping test: UPDATE stage not found. " +
+            "This stage is only used by the classic engine.",
+    );
     quit();
 }
 

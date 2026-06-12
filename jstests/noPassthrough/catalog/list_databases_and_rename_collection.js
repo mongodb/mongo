@@ -25,11 +25,20 @@ testDB.dropDatabase();
 jsTestLog("Verify database exists.");
 let cmdRes = listRenameDB.adminCommand(listDatabasesCmd);
 assert.commandWorked(cmdRes, "expected " + tojson(listDatabasesCmd) + " to be successful.");
-assert(cmdRes.hasOwnProperty("databases"), "expected " + tojson(cmdRes) + " to have a databases property.");
-assert(cmdRes.databases.map((d) => d.name).includes(dbName), "expected " + tojson(cmdRes) + " to include " + dbName);
+assert(
+    cmdRes.hasOwnProperty("databases"),
+    "expected " + tojson(cmdRes) + " to have a databases property.",
+);
+assert(
+    cmdRes.databases.map((d) => d.name).includes(dbName),
+    "expected " + tojson(cmdRes) + " to include " + dbName,
+);
 
 jsTestLog("Start parallel shell");
-let renameShell = startParallelShell(funWithArgs(doRenames, dbName, collName, otherName), conn.port);
+let renameShell = startParallelShell(
+    funWithArgs(doRenames, dbName, collName, otherName),
+    conn.port,
+);
 
 // Wait until we receive confirmation that the parallel shell has started.
 assert.soon(() => conn.getDB("test").await_data.findOne({_id: "signal parent shell"}) !== null);
@@ -40,7 +49,10 @@ while (conn.getDB("test").await_data.findOne({_id: "rename has ended"}) == null)
         cmdRes = listRenameDB.adminCommand(listDatabasesCmd);
         assert.commandWorked(cmdRes, "expected " + tojson(listDatabasesCmd) + " to be successful.");
         // Database should always exist.
-        assert(cmdRes.hasOwnProperty("databases"), "expected " + tojson(cmdRes) + " to have a databases property.");
+        assert(
+            cmdRes.hasOwnProperty("databases"),
+            "expected " + tojson(cmdRes) + " to have a databases property.",
+        );
         assert(
             cmdRes.databases.map((d) => d.name).includes(dbName),
             "expected " + tojson(cmdRes) + " to include " + dbName,

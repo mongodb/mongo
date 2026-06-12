@@ -86,7 +86,12 @@ function assertActionAuthorized(actionFunc, isAuthorized) {
         assert.eq(
             ex.code,
             unauthorized,
-            "expected operation should fail with code: " + unauthorized + ", found: " + ex.code + ", details: " + ex,
+            "expected operation should fail with code: " +
+                unauthorized +
+                ", found: " +
+                ex.code +
+                ", details: " +
+                ex,
         );
     }
 }
@@ -132,7 +137,12 @@ function verifyChangeStreamEvents(authDb, resumeToken) {
 
 // Start a replica-set test with one-node and authentication enabled. Connect to the primary node
 // and create users.
-const replSetTest = new ReplSetTest({name: "shard", nodes: 1, useHostName: true, waitForKeys: false});
+const replSetTest = new ReplSetTest({
+    name: "shard",
+    nodes: 1,
+    useHostName: true,
+    waitForKeys: false,
+});
 replSetTest.startSet({keyFile: keyFile});
 replSetTest.initiate();
 const primary = replSetTest.getPrimary();
@@ -159,21 +169,30 @@ testPrimary.logout();
 // User 'clusterAdmin' should not be authorized to find the pre-images and open change-streams with
 // pre-and-post images.
 let clusterAdminPrimary = login(primary, "clusterAdmin");
-assertActionAuthorized(verifyChangeStreamEvents.bind(null, clusterAdminPrimary, csResumeToken), false);
+assertActionAuthorized(
+    verifyChangeStreamEvents.bind(null, clusterAdminPrimary, csResumeToken),
+    false,
+);
 assertActionAuthorized(findPreImage.bind(null, clusterAdminPrimary), false);
 clusterAdminPrimary.logout();
 
 // User 'admin' should not be authorized to find the pre-images and open change-streams with
 // pre-and-post images.
 let adminPrimary = login(primary, "admin");
-assertActionAuthorized(verifyChangeStreamEvents.bind(null, clusterAdminPrimary, csResumeToken), false);
+assertActionAuthorized(
+    verifyChangeStreamEvents.bind(null, clusterAdminPrimary, csResumeToken),
+    false,
+);
 assertActionAuthorized(findPreImage.bind(null, adminPrimary), false);
 adminPrimary.logout();
 
 // User 'root' should be authorized to find the pre-images and open change-streams with pre-and-post
 // images.
 let rootPrimary = login(primary, "root");
-assertActionAuthorized(verifyChangeStreamEvents.bind(null, clusterAdminPrimary, csResumeToken), true);
+assertActionAuthorized(
+    verifyChangeStreamEvents.bind(null, clusterAdminPrimary, csResumeToken),
+    true,
+);
 assertActionAuthorized(findPreImage.bind(null, rootPrimary), true);
 rootPrimary.logout();
 

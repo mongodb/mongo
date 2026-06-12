@@ -131,7 +131,11 @@ for (let i = 0; i < types.length; i++) {
     let c = db[shortName];
     s.adminCommand({shardcollection: longName, key: makeObjectDotted(1)});
 
-    assert.eq(1, findChunksUtil.findChunksByNs(s.config, longName).count(), curT.name + " sanity check A");
+    assert.eq(
+        1,
+        findChunksUtil.findChunksByNs(s.config, longName).count(),
+        curT.name + " sanity check A",
+    );
 
     let unsorted = Array.shuffle(Object.extend([], curT.values));
     c.insert(makeObject(unsorted[0]));
@@ -158,9 +162,17 @@ for (let i = 0; i < types.length; i++) {
     assert.eq(3, secondary[shortName].find().toArray().length, curT.name + " secondary count");
 
     assert.eq(6, c.find().toArray().length, curT.name + " total count");
-    assert.eq(6, c.find().sort(makeObjectDotted(1)).toArray().length, curT.name + " total count sorted");
+    assert.eq(
+        6,
+        c.find().sort(makeObjectDotted(1)).toArray().length,
+        curT.name + " total count sorted",
+    );
 
-    assert.eq(6, c.find().sort(makeObjectDotted(1)).count(), curT.name + " total count with count()");
+    assert.eq(
+        6,
+        c.find().sort(makeObjectDotted(1)).count(),
+        curT.name + " total count with count()",
+    );
 
     assert.eq(
         2,
@@ -205,13 +217,21 @@ for (let i = 0; i < types.length; i++) {
     }
     assert.eq(6, count, curT.name + " total count with stats() sum");
 
-    assert.eq(curT.values, c.find().sort(makeObjectDotted(1)).toArray().map(getKey), curT.name + " sort 1");
+    assert.eq(
+        curT.values,
+        c.find().sort(makeObjectDotted(1)).toArray().map(getKey),
+        curT.name + " sort 1",
+    );
     assert.eq(
         curT.values,
         c.find(makeInQuery()).sort(makeObjectDotted(1)).toArray().map(getKey),
         curT.name + " sort 1 - $in",
     );
-    assert.eq(curT.values.reverse(), c.find().sort(makeObjectDotted(-1)).toArray().map(getKey), curT.name + " sort 2");
+    assert.eq(
+        curT.values.reverse(),
+        c.find().sort(makeObjectDotted(-1)).toArray().map(getKey),
+        curT.name + " sort 2",
+    );
 
     assert.eq(0, c.find({xx: 17}).sort({zz: 1}).count(), curT.name + " xx 0a ");
     assert.eq(0, c.find({xx: 17}).sort(makeObjectDotted(1)).count(), curT.name + " xx 0b ");
@@ -222,7 +242,9 @@ for (let i = 0; i < types.length; i++) {
     assert.eq(1, c.find({xx: {$exists: true}}).count(), curT.name + " xx 2 ");
     assert.eq(curT.values[3], getKey(c.findOne({xx: 17})), curT.name + " xx 3 ");
 
-    assert.commandWorked(c.update(makeObjectDotted(curT.values[3]), {$set: {xx: 17}}, {upsert: true}));
+    assert.commandWorked(
+        c.update(makeObjectDotted(curT.values[3]), {$set: {xx: 17}}, {upsert: true}),
+    );
 
     assert.commandWorked(c.createIndex({_id: 1}));
 

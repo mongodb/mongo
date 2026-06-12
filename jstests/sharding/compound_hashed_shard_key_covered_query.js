@@ -7,7 +7,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 const coll = st.s.getDB(kDbName)["coll"];
 
 /**
@@ -41,8 +43,12 @@ function validateFindCmdOutputAndPlan({
 //
 // Test to validate that the orphan documents are correctly rejected during shard filter analysis.
 //
-assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: "hashed", c: 1}}));
-assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {a: 0, b: NumberLong(0), c: MinKey}}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: "hashed", c: 1}}),
+);
+assert.commandWorked(
+    st.s.adminCommand({split: coll.getFullName(), middle: {a: 0, b: NumberLong(0), c: MinKey}}),
+);
 
 // Postive hashed values of 'b' should go to 'shard1DB' and negative value should go to 'shard0DB'
 assert.commandWorked(
@@ -100,9 +106,13 @@ coll.drop();
 // Tests to validate covering behaviour in the presense of various indexes.
 //
 assert.commandWorked(
-    st.s.getDB("config").adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: "hashed", c: 1}}),
+    st.s
+        .getDB("config")
+        .adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: "hashed", c: 1}}),
 );
-assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {a: 0, b: MinKey, c: MinKey}}));
+assert.commandWorked(
+    st.s.adminCommand({split: coll.getFullName(), middle: {a: 0, b: MinKey, c: MinKey}}),
+);
 
 // Postive numbers of 'a' should go to 'shard1DB' and negative numbers should go to 'shard0DB'
 assert.commandWorked(
@@ -118,7 +128,9 @@ assert.commandWorked(
 
 for (let i = 20; i < 40; i++) {
     assert.commandWorked(coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
-    assert.commandWorked(coll.insert({a: -i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
+    assert.commandWorked(
+        coll.insert({a: -i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}),
+    );
 }
 
 // Verify that the query can be covered if neither the query nor the project uses hashed field.

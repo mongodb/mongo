@@ -91,7 +91,9 @@ describe("metadata field name collision", () => {
     it("all metadata fields survive together in one document", () => {
         const doc = Object.fromEntries(kMetadataFieldNames.map((f, i) => [f, i]));
         doc.regular = "e";
-        const actual = db.aggregate([{$documents: [{}]}, {$replaceWith: {$literal: doc}}]).toArray();
+        const actual = db
+            .aggregate([{$documents: [{}]}, {$replaceWith: {$literal: doc}}])
+            .toArray();
         assertArrayEq({actual, expected: [doc]});
     });
 });

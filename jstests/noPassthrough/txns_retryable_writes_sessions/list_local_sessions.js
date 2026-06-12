@@ -75,8 +75,14 @@ try {
         });
     assert.eq(myArray.length, 1);
 
-    print("sessions returned from $listLocalSessions filtered by user:          [ " + myArray + " ]");
-    print("sessions returned from un-filtered $listLocalSessions for this user: [ " + resultArrayMine + " ]");
+    print(
+        "sessions returned from $listLocalSessions filtered by user:          [ " + myArray + " ]",
+    );
+    print(
+        "sessions returned from un-filtered $listLocalSessions for this user: [ " +
+            resultArrayMine +
+            " ]",
+    );
 
     assert.eq(
         0,

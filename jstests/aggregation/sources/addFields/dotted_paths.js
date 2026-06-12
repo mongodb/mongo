@@ -66,7 +66,11 @@ initObj["arrayField"] = {
     newSubPath: {b: "newValue"},
 };
 let expectedSubObj = {newSubPath: {b: "newValue"}};
-initObj["arrayField"] = [expectedSubObj, Object.assign({subField: [2, {}]}, expectedSubObj), [expectedSubObj]];
+initObj["arrayField"] = [
+    expectedSubObj,
+    Object.assign({subField: [2, {}]}, expectedSubObj),
+    [expectedSubObj],
+];
 assertAddFieldsResult({"arrayField.newSubPath.b": {$literal: "newValue"}}, initObj);
 assertAddFieldsResult({"arrayField.newSubPath.b": "newValue"}, initObj);
 
@@ -74,7 +78,11 @@ assertAddFieldsResult({"arrayField.newSubPath.b": "newValue"}, initObj);
 expectedSubObj = {
     newSubPath: {b: valueWithNestedObject},
 };
-initObj["arrayField"] = [expectedSubObj, Object.assign({subField: [2, {}]}, expectedSubObj), [expectedSubObj]];
+initObj["arrayField"] = [
+    expectedSubObj,
+    Object.assign({subField: [2, {}]}, expectedSubObj),
+    [expectedSubObj],
+];
 assertAddFieldsResult({"arrayField.newSubPath.b": valueWithNestedObject}, initObj);
 assertAddFieldsResult({"arrayField.newSubPath.b": {$literal: valueWithNestedObject}}, initObj);
 

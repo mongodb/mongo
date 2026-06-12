@@ -12,7 +12,10 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
@@ -70,7 +73,9 @@ function validateShowSystemEventsFalse() {
     });
 
     // Migrate a chunk, then insert a new document.
-    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}),
+    );
     assert.commandWorked(db[collName].insert({_id: numDocs + 1}));
 
     // Confirm that we don't observe the migrateLastChunkFromShard event in the stream, but only see
@@ -102,7 +107,9 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
     });
 
     // Migrate a chunk from one shard to another.
-    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}),
+    );
 
     // Confirm that we observe the migrateLastChunkFromShard event, and obtain its resume token.
     const migrateResumeToken = assertMigrateEventObserved(cursor, expectedOutput);
@@ -114,7 +121,11 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
     // Resume after the migrate event and confirm we see the subsequent insert.
     pipeline = [
         {
-            $changeStream: {showExpandedEvents: true, showSystemEvents: true, resumeAfter: migrateResumeToken},
+            $changeStream: {
+                showExpandedEvents: true,
+                showSystemEvents: true,
+                resumeAfter: migrateResumeToken,
+            },
         },
     ];
     cursor = test.startWatchingChanges({pipeline: pipeline, collection: collParam});

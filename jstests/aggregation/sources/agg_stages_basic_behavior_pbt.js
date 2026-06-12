@@ -21,7 +21,11 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
-import {getAggPipelineArb, getSortArb, limitArb} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    getAggPipelineArb,
+    getSortArb,
+    limitArb,
+} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -131,12 +135,11 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
     // Create an agg model that ends with the stage we're testing. The bag does not have to be
     // deterministic because these properties should always hold.
     const startOfPipelineArb = getAggPipelineArb({deterministicBag: false});
-    const aggModel = fc.record({startOfPipeline: startOfPipelineArb, lastStage: stageArb}).map(function ({
-        startOfPipeline,
-        lastStage,
-    }) {
-        return {"pipeline": [...startOfPipeline, lastStage], "options": {}};
-    });
+    const aggModel = fc
+        .record({startOfPipeline: startOfPipelineArb, lastStage: stageArb})
+        .map(function ({startOfPipeline, lastStage}) {
+            return {"pipeline": [...startOfPipeline, lastStage], "options": {}};
+        });
 
     // Run the property with a regular collection.
     testProperty(

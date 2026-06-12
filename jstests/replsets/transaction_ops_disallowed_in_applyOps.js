@@ -62,7 +62,11 @@ PrepareHelpers.commitTransaction(primarySession, prepareTs);
 
 txnNum = primarySession.getTxnNumber_forTesting();
 let preparedAndCommittedTxnOps = oplog.find({"lsid.id": sessionId, txnNumber: txnNum}).toArray();
-assert.eq(preparedAndCommittedTxnOps.length, 3, "unexpected op count: " + tojson(preparedAndCommittedTxnOps));
+assert.eq(
+    preparedAndCommittedTxnOps.length,
+    3,
+    "unexpected op count: " + tojson(preparedAndCommittedTxnOps),
+);
 
 // Run a prepared transaction that aborts.
 primarySession.startTransaction();
@@ -73,7 +77,11 @@ assert.commandWorked(primarySession.abortTransaction_forTesting());
 
 txnNum = primarySession.getTxnNumber_forTesting();
 let preparedAndAbortedTxnOps = oplog.find({"lsid.id": sessionId, txnNumber: txnNum}).toArray();
-assert.eq(preparedAndAbortedTxnOps.length, 3, "unexpected op count: " + tojson(preparedAndAbortedTxnOps));
+assert.eq(
+    preparedAndAbortedTxnOps.length,
+    3,
+    "unexpected op count: " + tojson(preparedAndAbortedTxnOps),
+);
 
 // Clear out any documents that may have been created in the collection.
 assert.commandWorked(primarySessionColl.remove({}));

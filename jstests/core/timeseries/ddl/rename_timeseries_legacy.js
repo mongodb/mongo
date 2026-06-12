@@ -106,7 +106,9 @@ function runSystemBucketsTests(targetDbName) {
         );
     }
     {
-        jsTest.log("Renaming a simple collection to a bucket collection without timeseries options fails");
+        jsTest.log(
+            "Renaming a simple collection to a bucket collection without timeseries options fails",
+        );
         setupEnv();
         assert.commandWorked(db.createCollection(collName));
         const res = db.adminCommand({
@@ -116,7 +118,9 @@ function runSystemBucketsTests(targetDbName) {
         assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
     }
     {
-        jsTest.log("Renaming a timeseries collection using the main namespace with a target bucket collection fail");
+        jsTest.log(
+            "Renaming a timeseries collection using the main namespace with a target bucket collection fail",
+        );
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
         assert.commandFailedWithCode(
@@ -151,7 +155,9 @@ function runSystemBucketsTests(targetDbName) {
             }) == 0;
         // Rename across db is not supported for sharded collections
         if (dbName == targetDbName || isUnsharded) {
-            jsTest.log("Renaming a timeseries bucket collection to another bucket collection works");
+            jsTest.log(
+                "Renaming a timeseries bucket collection to another bucket collection works",
+            );
             checkSuccesfulRename(dbName, collName, targetDbName, "newColl");
         } else {
             jsTest.log("Renaming a sharded timeseries bucket collection to a different db fails");

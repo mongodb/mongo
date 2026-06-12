@@ -32,10 +32,14 @@ function checkResult({expectedResult, pipeline}) {
 (function testAccessingDroppedMetaField() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
-    assert.commandWorked(coll.insert({_id: 42, [timeFieldName]: ISODate(), [metaFieldName]: 1, a: "a"}));
+    assert.commandWorked(
+        coll.insert({_id: 42, [timeFieldName]: ISODate(), [metaFieldName]: 1, a: "a"}),
+    );
 
     checkResult({
         pipeline: [{$project: {_id: 1}}, {$project: {x: `$${metaFieldName}`}}],
@@ -53,7 +57,9 @@ function checkResult({expectedResult, pipeline}) {
 
 (function testAccessingDroppedTimeField() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     assert.commandWorked(coll.insert({_id: 42, [timeFieldName]: ISODate(), a: "a"}));
 
@@ -73,7 +79,9 @@ function checkResult({expectedResult, pipeline}) {
 
 (function testAccessingDroppedMeasurementField() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     assert.commandWorked(coll.insert({_id: 42, [timeFieldName]: ISODate(), a: "a"}));
 
@@ -98,7 +106,9 @@ function checkResult({expectedResult, pipeline}) {
 (function testEmptyIncludeSet() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     assert.commandWorked(
@@ -145,13 +155,22 @@ function checkResult({expectedResult, pipeline}) {
 (function testProjectRedefinesField() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     const docDate = ISODate();
 
     assert.commandWorked(
-        coll.insert({_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, a: {b: 1}, b: 3, c: [{}, {}]}),
+        coll.insert({
+            _id: 0,
+            [timeFieldName]: docDate,
+            [metaFieldName]: 4,
+            a: {b: 1},
+            b: 3,
+            c: [{}, {}],
+        }),
     );
     let result = [];
 
@@ -172,7 +191,10 @@ function checkResult({expectedResult, pipeline}) {
 
     // Same as above, but keep the rest of the document.
     result = coll.aggregate([{$set: {b: `$${metaFieldName}`}}]).toArray();
-    assert.docEq([{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, a: {b: 1}, b: 4, c: [{}, {}]}], result);
+    assert.docEq(
+        [{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, a: {b: 1}, b: 4, c: [{}, {}]}],
+        result,
+    );
 
     // Check that nested meta project is not overwritten by the unpacked value.
     result = coll.aggregate([{$project: {"a.b": `$${metaFieldName}`}}]).toArray();
@@ -196,11 +218,17 @@ function checkResult({expectedResult, pipeline}) {
 
     // Make sure the time field can be overwritten by the meta field correctly.
     result = coll.aggregate([{$set: {[timeFieldName]: `$${metaFieldName}`}}]).toArray();
-    assert.docEq([{_id: 0, [timeFieldName]: 4, [metaFieldName]: 4, a: {b: 1}, b: 3, c: [{}, {}]}], result);
+    assert.docEq(
+        [{_id: 0, [timeFieldName]: 4, [metaFieldName]: 4, a: {b: 1}, b: 3, c: [{}, {}]}],
+        result,
+    );
 
     // Check that the time field can be overwritten by the an unpacked field correctly.
     result = coll.aggregate([{$set: {[timeFieldName]: "$b"}}]).toArray();
-    assert.docEq([{_id: 0, [timeFieldName]: 3, [metaFieldName]: 4, a: {b: 1}, b: 3, c: [{}, {}]}], result);
+    assert.docEq(
+        [{_id: 0, [timeFieldName]: 3, [metaFieldName]: 4, a: {b: 1}, b: 3, c: [{}, {}]}],
+        result,
+    );
 
     // Make sure the time field can be overwritten by a constant correctly.
     result = coll.aggregate([{$project: {[timeFieldName]: {$const: 5}}}]).toArray();
@@ -208,11 +236,17 @@ function checkResult({expectedResult, pipeline}) {
 
     // Test that a pushed down meta field projection can correctly be excluded.
     result = coll.aggregate([{$set: {b: `$${metaFieldName}`}}, {$unset: "a"}]).toArray();
-    assert.docEq([{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, b: 4, c: [{}, {}]}], result);
+    assert.docEq(
+        [{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, b: 4, c: [{}, {}]}],
+        result,
+    );
 
     // Exclude behavior for time field.
     result = coll.aggregate([{$set: {b: `$${timeFieldName}`}}, {$unset: "a"}]).toArray();
-    assert.docEq([{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, b: docDate, c: [{}, {}]}], result);
+    assert.docEq(
+        [{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, b: docDate, c: [{}, {}]}],
+        result,
+    );
 
     // Exclude behavior for consecutive projects.
     result = coll.aggregate([{$set: {b: `$${metaFieldName}`}}, {$unset: metaFieldName}]).toArray();
@@ -220,7 +254,10 @@ function checkResult({expectedResult, pipeline}) {
 
     // Test that an exclude does not overwrite meta field pushdown.
     result = coll.aggregate([{$unset: "b"}, {$set: {b: `$${metaFieldName}`}}]).toArray();
-    assert.docEq([{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, a: {b: 1}, b: 4, c: [{}, {}]}], result);
+    assert.docEq(
+        [{_id: 0, [timeFieldName]: docDate, [metaFieldName]: 4, a: {b: 1}, b: 4, c: [{}, {}]}],
+        result,
+    );
 })();
 
 // Test that a field reference in a $project stage refers to the stage's input document rather than
@@ -228,7 +265,9 @@ function checkResult({expectedResult, pipeline}) {
 (function testProjectRedefinesAndUsesField() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     const timestamp = new Date("2019-10-11T14:39:18.670Z");
@@ -244,12 +283,16 @@ function checkResult({expectedResult, pipeline}) {
 
     // Redefining and using the top-level 'metaField' in the same stage should use the field from
     // the upstream (unpack) stage.
-    result = coll.aggregate([{$project: {_id: 0, [metaFieldName]: "$b", x: `$${metaFieldName}`}}]).toArray();
+    result = coll
+        .aggregate([{$project: {_id: 0, [metaFieldName]: "$b", x: `$${metaFieldName}`}}])
+        .toArray();
     assert.docEq([{[metaFieldName]: "b", x: metaFieldValue}], result);
 
     // Redefining and using the 'timeField' in the same stage should use the field from the upstream
     // (unpack) stage.
-    result = coll.aggregate([{$project: {_id: 0, [timeFieldName]: "$b", x: `$${timeFieldName}`}}]).toArray();
+    result = coll
+        .aggregate([{$project: {_id: 0, [timeFieldName]: "$b", x: `$${timeFieldName}`}}])
+        .toArray();
     assert.docEq([{[timeFieldName]: "b", x: timestamp}], result);
 
     // Redefining and using a top-level measurement field in the same stage should use the field
@@ -273,7 +316,9 @@ function checkResult({expectedResult, pipeline}) {
 (function testAddFieldsRedefinesAndUsesField() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     const timestamp = new Date("2019-10-11T14:39:18.670Z");
@@ -288,23 +333,39 @@ function checkResult({expectedResult, pipeline}) {
 
     // Redefining and using the top-level 'metaField' in the same stage should use the field from
     // the upstream (unpack) stage.
-    result = coll.aggregate([{$addFields: {[metaFieldName]: "$a", x: `$${metaFieldName}`}}]).toArray();
-    assert.docEq([{_id: 42, [timeFieldName]: timestamp, [metaFieldName]: "a", a: "a", x: metaFieldValue}], result);
+    result = coll
+        .aggregate([{$addFields: {[metaFieldName]: "$a", x: `$${metaFieldName}`}}])
+        .toArray();
+    assert.docEq(
+        [{_id: 42, [timeFieldName]: timestamp, [metaFieldName]: "a", a: "a", x: metaFieldValue}],
+        result,
+    );
 
     // Redefining and using the 'timeField' in the same stage should use the field from the upstream
     // (unpack) stage.
-    result = coll.aggregate([{$addFields: {[timeFieldName]: "$a", x: `$${timeFieldName}`}}]).toArray();
-    assert.docEq([{_id: 42, [timeFieldName]: "a", [metaFieldName]: metaFieldValue, a: "a", x: timestamp}], result);
+    result = coll
+        .aggregate([{$addFields: {[timeFieldName]: "$a", x: `$${timeFieldName}`}}])
+        .toArray();
+    assert.docEq(
+        [{_id: 42, [timeFieldName]: "a", [metaFieldName]: metaFieldValue, a: "a", x: timestamp}],
+        result,
+    );
 
     // Redefining and using a top-level measurement field in the same stage should use the field
     // from the upstream (unpack) stage.
     result = coll.aggregate([{$addFields: {a: "$_id", x: "$a"}}]).toArray();
-    assert.docEq([{_id: 42, [timeFieldName]: timestamp, [metaFieldName]: metaFieldValue, a: 42, x: "a"}], result);
+    assert.docEq(
+        [{_id: 42, [timeFieldName]: timestamp, [metaFieldName]: metaFieldValue, a: 42, x: "a"}],
+        result,
+    );
 
     // Redefining and using a measurement field in an expression in the same stage should use the
     // field from the upstream (unpack) stage.
     result = coll.aggregate([{$addFields: {a: "$_id", x: {$toUpper: "$a"}}}]).toArray();
-    assert.docEq([{_id: 42, [timeFieldName]: timestamp, [metaFieldName]: metaFieldValue, a: 42, x: "A"}], result);
+    assert.docEq(
+        [{_id: 42, [timeFieldName]: timestamp, [metaFieldName]: metaFieldValue, a: 42, x: "A"}],
+        result,
+    );
 })();
 
 // Test that an includes projection that doesn't include previously included computed meta fields
@@ -312,10 +373,16 @@ function checkResult({expectedResult, pipeline}) {
 (function testIncludeComputedMetaFieldThenProjectWithoutComputedMetaField() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
-    const doc = {_id: 0, [timeFieldName]: ISODate("2024-01-01T00:00:00.000Z"), [metaFieldName]: {field: "A"}};
+    const doc = {
+        _id: 0,
+        [timeFieldName]: ISODate("2024-01-01T00:00:00.000Z"),
+        [metaFieldName]: {field: "A"},
+    };
     assert.commandWorked(coll.insert(doc));
     let result = {};
 
@@ -358,12 +425,17 @@ function checkResult({expectedResult, pipeline}) {
     assert.docEq([{[metaFieldName]: {field: "A"}, "_id": 0}], result);
 
     // Testing with $project after $project.
-    result = coll.aggregate([{$project: {[metaFieldName]: 1}}, {$project: {[timeFieldName]: 1}}]).toArray();
+    result = coll
+        .aggregate([{$project: {[metaFieldName]: 1}}, {$project: {[timeFieldName]: 1}}])
+        .toArray();
     assert.docEq([{"_id": 0}], result);
 
     // Testing with $set.
     result = coll
-        .aggregate([{$set: {[metaFieldName]: `$${metaFieldName}.field`}}, {$project: {[timeFieldName]: 1}}])
+        .aggregate([
+            {$set: {[metaFieldName]: `$${metaFieldName}.field`}},
+            {$project: {[timeFieldName]: 1}},
+        ])
         .toArray();
     assert.docEq([{"_id": 0, [timeFieldName]: ISODate("2024-01-01T00:00:00Z")}], result);
 
@@ -395,7 +467,10 @@ function checkResult({expectedResult, pipeline}) {
         ])
         .toArray();
 
-    assert.docEq([{"_id": 0, newTime: ISODate("2024-01-01T00:00:00.000Z"), [timeFieldName]: "A"}], result);
+    assert.docEq(
+        [{"_id": 0, newTime: ISODate("2024-01-01T00:00:00.000Z"), [timeFieldName]: "A"}],
+        result,
+    );
 
     // Test adding fields and including one of them.
     result = coll
@@ -413,19 +488,34 @@ function checkResult({expectedResult, pipeline}) {
 (function testIncludeComputedMetaFieldThenExcludeComputedMetaField() {
     coll.drop();
     assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
-    const doc = {_id: 0, [timeFieldName]: ISODate("2024-01-01T00:00:00.000Z"), [metaFieldName]: {field: "A"}};
+    const doc = {
+        _id: 0,
+        [timeFieldName]: ISODate("2024-01-01T00:00:00.000Z"),
+        [metaFieldName]: {field: "A"},
+    };
     assert.commandWorked(coll.insert(doc));
     let result = {};
 
     // Excluded '_computedMetaProjField' should not be included.
     result = coll
-        .aggregate([{$addFields: {hello: {$dateFromParts: {year: `$${metaFieldName}.none`}}}}, {$project: {hello: 0}}])
+        .aggregate([
+            {$addFields: {hello: {$dateFromParts: {year: `$${metaFieldName}.none`}}}},
+            {$project: {hello: 0}},
+        ])
         .toArray();
     assert.docEq(
-        [{"_id": 0, [timeFieldName]: ISODate("2024-01-01T00:00:00Z"), [metaFieldName]: {"field": "A"}}],
+        [
+            {
+                "_id": 0,
+                [timeFieldName]: ISODate("2024-01-01T00:00:00Z"),
+                [metaFieldName]: {"field": "A"},
+            },
+        ],
         result,
     );
 
@@ -459,12 +549,17 @@ function checkResult({expectedResult, pipeline}) {
     assert.docEq([{[metaFieldName]: {field: "A"}, "_id": 0}], result);
 
     // Testing with exclude $project after include $project.
-    result = coll.aggregate([{$project: {[metaFieldName]: 1}}, {$project: {[metaFieldName]: 0}}]).toArray();
+    result = coll
+        .aggregate([{$project: {[metaFieldName]: 1}}, {$project: {[metaFieldName]: 0}}])
+        .toArray();
     assert.docEq([{"_id": 0}], result);
 
     // Testing with $set.
     result = coll
-        .aggregate([{$set: {[metaFieldName]: `$${metaFieldName}.field`}}, {$project: {[metaFieldName]: 0}}])
+        .aggregate([
+            {$set: {[metaFieldName]: `$${metaFieldName}.field`}},
+            {$project: {[metaFieldName]: 0}},
+        ])
         .toArray();
     assert.docEq([{[timeFieldName]: ISODate("2024-01-01T00:00:00Z"), "_id": 0}], result);
 
@@ -477,7 +572,14 @@ function checkResult({expectedResult, pipeline}) {
         ])
         .toArray();
     assert.docEq(
-        [{[timeFieldName]: ISODate("2024-01-01T00:00:00Z"), [metaFieldName]: {"field": "A"}, "_id": 0, "bye": null}],
+        [
+            {
+                [timeFieldName]: ISODate("2024-01-01T00:00:00Z"),
+                [metaFieldName]: {"field": "A"},
+                "_id": 0,
+                "bye": null,
+            },
+        ],
         result,
     );
 
@@ -490,7 +592,14 @@ function checkResult({expectedResult, pipeline}) {
         ])
         .toArray();
     assert.docEq(
-        [{[timeFieldName]: ISODate("2024-01-01T00:00:00Z"), [metaFieldName]: {"field": "A"}, "_id": 0, "bye": "A"}],
+        [
+            {
+                [timeFieldName]: ISODate("2024-01-01T00:00:00Z"),
+                [metaFieldName]: {"field": "A"},
+                "_id": 0,
+                "bye": "A",
+            },
+        ],
         result,
     );
 
@@ -503,7 +612,14 @@ function checkResult({expectedResult, pipeline}) {
         ])
         .toArray();
     assert.docEq(
-        [{[timeFieldName]: ISODate("2024-01-01T00:00:00Z"), [metaFieldName]: {"field": "A"}, "_id": 0, "a": "a"}],
+        [
+            {
+                [timeFieldName]: ISODate("2024-01-01T00:00:00Z"),
+                [metaFieldName]: {"field": "A"},
+                "_id": 0,
+                "a": "a",
+            },
+        ],
         result,
     );
 })();

@@ -24,13 +24,23 @@ describe("Geo key-extraction structured ExtraInfo (timeseries insert path)", fun
     before(function () {
         coll = db[jsTestName()];
         coll.drop();
-        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}),
+        );
         assert.commandWorked(coll.createIndex({"loc": "2dsphere"}, {"2dsphereIndexVersion": 3}));
     });
 
     it("attaches GeoKeyExtractionFailureTimeseriesInfo", function () {
-        const we = insertExpectingFailure({time: new Date(), loc: {type: "Point", coordinates: ["bad", 0]}});
-        assert.eq(we.code, ErrorCodes.GeoKeyExtractionFailedTimeseries, "writeError code mismatch", {we});
+        const we = insertExpectingFailure({
+            time: new Date(),
+            loc: {type: "Point", coordinates: ["bad", 0]},
+        });
+        assert.eq(
+            we.code,
+            ErrorCodes.GeoKeyExtractionFailedTimeseries,
+            "writeError code mismatch",
+            {we},
+        );
         // On timeseries, failingPath reflects the bucket schema the index operates on
         // (data.<measurement>), not the user-facing measurement name.
         assert.eq(we.failingPath, "data.loc", "failingPath mismatch", {we});
@@ -52,7 +62,12 @@ describe("Geo key-extraction structured ExtraInfo (timeseries insert path)", fun
                 ],
             },
         });
-        assert.eq(we.code, ErrorCodes.GeoKeyExtractionFailedTimeseries, "writeError code mismatch", {we});
+        assert.eq(
+            we.code,
+            ErrorCodes.GeoKeyExtractionFailedTimeseries,
+            "writeError code mismatch",
+            {we},
+        );
         assert.eq(we.failingPath, "data.loc", "failingPath mismatch", {we});
         assert(we.underlyingReason.includes("only support point data"), "expected reason", {we});
         assert.eq(we.failingElement.type, "LineString", "failingElement.type mismatch", {we});

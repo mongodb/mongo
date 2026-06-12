@@ -41,7 +41,9 @@ describe("$vectorSearch shard filtering", function () {
         shardNames = getShardNames(testDb.getMongo());
         assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
 
-        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}));
+        assert.commandWorked(
+            testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: shardNames[0]}),
+        );
 
         testColl.drop();
 
@@ -60,8 +62,12 @@ describe("$vectorSearch shard filtering", function () {
 
         // Shard the test collection, split it at {shardKey: 10}, and move the higher chunk to shard1.
         assert.commandWorked(testColl.createIndex({shardKey: 1}));
-        assert.commandWorked(testDb.adminCommand({shardCollection: testColl.getFullName(), key: {shardKey: 1}}));
-        assert.commandWorked(testDb.adminCommand({split: testColl.getFullName(), middle: {shardKey: 10}}));
+        assert.commandWorked(
+            testDb.adminCommand({shardCollection: testColl.getFullName(), key: {shardKey: 1}}),
+        );
+        assert.commandWorked(
+            testDb.adminCommand({split: testColl.getFullName(), middle: {shardKey: 10}}),
+        );
 
         // 'waitForDelete' is set to 'true' so that range deletion completes before we insert our orphan.
         assert.commandWorked(
@@ -87,19 +93,30 @@ describe("$vectorSearch shard filtering", function () {
 
         // Insert an orphan document into shard 0 which is not owned by that shard.
         assert.commandWorked(
-            shard0Conn.getDB(testDb.getName())[collName].insert({_id: 15, shardKey: 100, x: [0.99, 1.99, 2.99]}),
+            shard0Conn
+                .getDB(testDb.getName())
+                [collName].insert({_id: 15, shardKey: 100, x: [0.99, 1.99, 2.99]}),
         );
 
         // Insert a document into shard 0 which doesn't have a shard key. This document should not be
         // skipped when mongot returns a result indicating that it matched the text query. The server
         // should not crash and the operation should not fail.
-        assert.commandWorked(shard0Conn.getDB(testDb.getName())[collName].insert({_id: 16, x: [0.95, 1.95, 2.95]}));
+        assert.commandWorked(
+            shard0Conn.getDB(testDb.getName())[collName].insert({_id: 16, x: [0.95, 1.95, 2.95]}),
+        );
 
         createSearchIndex(testColl, {
             name: vectorSearchIndex,
             type: "vectorSearch",
             definition: {
-                fields: [{type: "vector", path: path, numDimensions: queryVector.length, similarity: "cosine"}],
+                fields: [
+                    {
+                        type: "vector",
+                        path: path,
+                        numDimensions: queryVector.length,
+                        similarity: "cosine",
+                    },
+                ],
             },
         });
     });
@@ -126,7 +143,9 @@ describe("$vectorSearch shard filtering", function () {
     });
 
     it("filters orphans with getMore batching", function () {
-        const results = testColl.aggregate([{$vectorSearch: vectorSearchQuery}], {cursor: {batchSize: 2}}).toArray();
+        const results = testColl
+            .aggregate([{$vectorSearch: vectorSearchQuery}], {cursor: {batchSize: 2}})
+            .toArray();
 
         const resultIds = results.map((doc) => doc._id).sort((a, b) => a - b);
         assert(!resultIds.includes(15));
@@ -147,8 +166,12 @@ describe("$vectorSearch shard filtering", function () {
 
         // Set up base coll to test shard filtering works within subpipelines. Shard base collection.
         assert.commandWorked(baseColl.createIndex({_id: 1}));
-        assert.commandWorked(testDb.adminCommand({shardCollection: baseColl.getFullName(), key: {_id: 1}}));
-        assert.commandWorked(testDb.adminCommand({split: baseColl.getFullName(), middle: {_id: 150}}));
+        assert.commandWorked(
+            testDb.adminCommand({shardCollection: baseColl.getFullName(), key: {_id: 1}}),
+        );
+        assert.commandWorked(
+            testDb.adminCommand({split: baseColl.getFullName(), middle: {_id: 150}}),
+        );
         assert.commandWorked(
             testDb.adminCommand({
                 moveChunk: baseColl.getFullName(),

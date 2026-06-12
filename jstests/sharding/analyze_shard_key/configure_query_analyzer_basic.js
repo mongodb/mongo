@@ -84,7 +84,10 @@ const dbNameBase = "testDb";
         ErrorCodes.IllegalOperation,
     );
     // Verify that the error message is as expected.
-    assert.eq(configureRes.errmsg, "Cannot run configureQueryAnalyzer command directly against a shardsvr mongod");
+    assert.eq(
+        configureRes.errmsg,
+        "Cannot run configureQueryAnalyzer command directly against a shardsvr mongod",
+    );
 
     st.stop();
 }
@@ -131,12 +134,20 @@ if (!TestData.auth) {
 
     // Prepare an authenticated user for testing.
     // Must be authenticated as a user with ActionType::useTenant in order to use security token
-    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}),
+    );
     assert(adminDb.auth("admin", "pwd"));
 
     // The configureQueryAnalyzer command is not supported even on primary mongod.
     const testCases = [];
-    testCases.push(Object.assign({conn: primary, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}));
+    testCases.push(
+        Object.assign({
+            conn: primary,
+            isSupported: false,
+            expectedErrorCode: ErrorCodes.IllegalOperation,
+        }),
+    );
     testNonExistingCollection(testCases, "admin", dbNameBase);
 
     rst.stopSet();
@@ -146,7 +157,9 @@ if (!TestData.auth) {
     const mongod = MongoRunner.runMongod();
 
     // The configureQueryAnalyzer command is not supported on standalone mongod.
-    const testCases = [{conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}];
+    const testCases = [
+        {conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation},
+    ];
     testNonExistingCollection(testCases, dbNameBase);
 
     MongoRunner.stopMongod(mongod);

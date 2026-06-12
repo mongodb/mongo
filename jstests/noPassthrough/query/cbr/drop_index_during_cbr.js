@@ -63,7 +63,9 @@ import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
         // Set the yield hang now, scoped to our collection. The next yield will be inside
         // the sampling executor.
-        const fpYield = configureFailPoint(db, "setYieldAllLocksHang", {namespace: coll.getFullName()});
+        const fpYield = configureFailPoint(db, "setYieldAllLocksHang", {
+            namespace: coll.getFullName(),
+        });
 
         fpBeforeSampling.off();
 
@@ -160,7 +162,9 @@ if (!checkSbeCompletelyDisabled(null)) {
 
     fpBeforeSampling.wait();
 
-    const fpYield = configureFailPoint(sbeAdminDB, "setYieldAllLocksHang", {namespace: sbeColl.getFullName()});
+    const fpYield = configureFailPoint(sbeAdminDB, "setYieldAllLocksHang", {
+        namespace: sbeColl.getFullName(),
+    });
     fpBeforeSampling.off();
     fpYield.wait();
 
@@ -188,11 +192,20 @@ if (!checkSbeCompletelyDisabled(null)) {
     const primaryAdminDB = primary.getDB("admin");
 
     assert.commandWorked(
-        primaryAdminDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        primaryAdminDB.adminCommand({
+            setParameter: 1,
+            internalQueryFrameworkControl: "forceClassicEngine",
+        }),
     );
-    assert.commandWorked(primaryAdminDB.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
-    assert.commandWorked(primaryAdminDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    assert.commandWorked(primaryAdminDB.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 0}));
+    assert.commandWorked(
+        primaryAdminDB.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+    );
+    assert.commandWorked(
+        primaryAdminDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+    );
+    assert.commandWorked(
+        primaryAdminDB.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 0}),
+    );
     setCBRConfig(primaryAdminDB, {internalQueryCBRCEMode: "samplingCE"});
 
     const snapshotDB = primary.getDB("snapshotCBRTest");
@@ -228,7 +241,9 @@ if (!checkSbeCompletelyDisabled(null)) {
     // Start a concurrent dropIndexes.
     const awaitDrop = startParallelShell(() => {
         assert.commandWorked(
-            db.getSiblingDB("snapshotCBRTest").runCommand({dropIndexes: "snapshotCBRTest", index: "a_1"}),
+            db
+                .getSiblingDB("snapshotCBRTest")
+                .runCommand({dropIndexes: "snapshotCBRTest", index: "a_1"}),
         );
     }, primary.port);
 

@@ -24,7 +24,10 @@
  */
 
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
@@ -285,7 +288,8 @@ function runFlatExamples(coll, isTimeseries) {
             () => coll.aggregate(pipeline).toArray(),
             [
                 // Must not specify 'query' for $geoNear on a time-series collection; use $match instead
-                1938439, 5860207,
+                1938439,
+                5860207,
             ],
         );
     } else {
@@ -543,7 +547,8 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             () => coll.aggregate(pipeline).toArray(),
             [
                 // Must not specify 'query' for $geoNear on a time-series collection; use $match instead
-                1938439, 5860207,
+                1938439,
+                5860207,
             ],
         );
     } else {
@@ -635,7 +640,9 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     // There are three different ways to specify a spherical query.
 
     // GeoJSON, implicitly uses spherical geometry.
-    runSphereExamples(coll, isTimeseries, has2dsphereIndex, 1, {near: {type: "Point", coordinates: [180, 0]}});
+    runSphereExamples(coll, isTimeseries, has2dsphereIndex, 1, {
+        near: {type: "Point", coordinates: [180, 0]},
+    });
 
     // GeoJSON, with explicit spherical: true.
     runSphereExamples(coll, isTimeseries, has2dsphereIndex, 1, {

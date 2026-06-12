@@ -64,7 +64,9 @@ const binaryTestCases = [
 binaryTestCases.forEach(function (testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
-    const result = coll.aggregate({$project: {computed: {$multiply: ["$left", "$right"]}}}).toArray();
+    const result = coll
+        .aggregate({$project: {computed: {$multiply: ["$left", "$right"]}}})
+        .toArray();
 
     assert.eq(result.length, 1);
     assert.eq(result[0].computed, testCase.expected);
@@ -192,7 +194,11 @@ const errorTestCases = [
 errorTestCases.forEach(function (testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
-    assertErrorCode(coll, {$project: {computed: {$multiply: ["$left", "$right"]}}}, testCase.errorCodes);
+    assertErrorCode(
+        coll,
+        {$project: {computed: {$multiply: ["$left", "$right"]}}},
+        testCase.errorCodes,
+    );
 
     assert(coll.drop());
 });

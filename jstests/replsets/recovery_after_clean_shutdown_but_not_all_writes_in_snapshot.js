@@ -19,7 +19,11 @@ let primaryDB = rst.getPrimary().getDB(dbName);
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
 assert.commandWorked(
-    primaryDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primaryDB.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const wMajority = {
@@ -49,7 +53,9 @@ rst.awaitLastOpCommitted();
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
 nodes.forEach((node) =>
-    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+    ),
 );
 const w1 = {
     writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
@@ -74,7 +80,9 @@ primaryDB = rst.getPrimary().getDB(dbName);
 
 // Perform a majority write to ensure that both nodes agree on the majority commit point.
 const collCreatedAfterRestart = "createdAfterRestart";
-assert.commandWorked(primaryDB[collCreatedAfterRestart].insert({_id: "insertedAfterRestart", wMajority}));
+assert.commandWorked(
+    primaryDB[collCreatedAfterRestart].insert({_id: "insertedAfterRestart", wMajority}),
+);
 
 // Fast metadata count should be correct after restart in the face of a clean shutdown.
 rst.stopSet();

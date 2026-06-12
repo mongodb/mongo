@@ -7,14 +7,20 @@ let s = new ShardingTest({shards: 2});
 // implicitly create them both
 assert.eq(
     undefined,
-    assert.commandWorked(s.s0.adminCommand({listDatabases: 1, nameOnly: 1})).databases.find((dbInfo) => {
-        return dbInfo.name === "NewUnshardedDB";
-    }),
+    assert
+        .commandWorked(s.s0.adminCommand({listDatabases: 1, nameOnly: 1}))
+        .databases.find((dbInfo) => {
+            return dbInfo.name === "NewUnshardedDB";
+        }),
 );
 
 let newlyCreatedDb = s.getDB("NewUnshardedDB");
 assert.eq(0, newlyCreatedDb.unsharded_coll.find({}).itcount());
-newlyCreatedDb.unsharded_coll.findAndModify({query: {_id: 1}, update: {$set: {Value: "Value"}}, upsert: true});
+newlyCreatedDb.unsharded_coll.findAndModify({
+    query: {_id: 1},
+    update: {$set: {Value: "Value"}},
+    upsert: true,
+});
 assert.eq(1, newlyCreatedDb.unsharded_coll.find({}).itcount());
 
 // Tests with sharded database
@@ -28,7 +34,11 @@ let numObjs = 20;
 // Pre-split the collection
 assert.commandWorked(s.s0.adminCommand({split: "test.sharded_coll", middle: {_id: numObjs / 2}}));
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.sharded_coll", find: {_id: numObjs / 2}, to: s.shard0.shardName}),
+    s.s0.adminCommand({
+        movechunk: "test.sharded_coll",
+        find: {_id: numObjs / 2},
+        to: s.shard0.shardName,
+    }),
 );
 
 let bulk = db.sharded_coll.initializeUnorderedBulkOp();
@@ -45,9 +55,19 @@ for (var i = 2; i < numObjs; i += 2) {
 }
 
 s.printChunks();
-assert.eq(numObjs / 2, findChunksUtil.countChunksForNs(s.config, "test.sharded_coll"), "Split was incorrect");
-assert.eq(numObjs / 4, findChunksUtil.countChunksForNs(s.config, "test.sharded_coll", {shard: s.shard0.shardName}));
-assert.eq(numObjs / 4, findChunksUtil.countChunksForNs(s.config, "test.sharded_coll", {shard: s.shard1.shardName}));
+assert.eq(
+    numObjs / 2,
+    findChunksUtil.countChunksForNs(s.config, "test.sharded_coll"),
+    "Split was incorrect",
+);
+assert.eq(
+    numObjs / 4,
+    findChunksUtil.countChunksForNs(s.config, "test.sharded_coll", {shard: s.shard0.shardName}),
+);
+assert.eq(
+    numObjs / 4,
+    findChunksUtil.countChunksForNs(s.config, "test.sharded_coll", {shard: s.shard1.shardName}),
+);
 
 // update
 for (var i = 0; i < numObjs; i++) {

@@ -7,7 +7,10 @@
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {getLatestQueryStatsEntry, getQueryStatsServerParameters} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getLatestQueryStatsEntry,
+    getQueryStatsServerParameters,
+} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("query stats on sharded cluster with system variables", function () {
@@ -35,7 +38,9 @@ describe("query stats on sharded cluster with system variables", function () {
         shard1Conn = st.shard1;
 
         // Enable sharding and set up the sharded collection.
-        assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
 
         coll = mongosDB[collName];
         coll.drop();
@@ -51,7 +56,9 @@ describe("query stats on sharded cluster with system variables", function () {
             ]),
         );
         coll.createIndex({x: 1});
-        assert.commandWorked(mongosDB.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
+        assert.commandWorked(
+            mongosDB.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}),
+        );
 
         // Split at x: 0 and move positive chunk to shard1.
         assert.commandWorked(mongosDB.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
@@ -82,7 +89,11 @@ describe("query stats on sharded cluster with system variables", function () {
     }
 
     function validateQueryShapeFind({entry, expectedFilter, expectedLetExpression}) {
-        assert.eq(entry.key.queryShape.filter, expectedFilter, "Unexpected query shape. Received: " + tojson(entry));
+        assert.eq(
+            entry.key.queryShape.filter,
+            expectedFilter,
+            "Unexpected query shape. Received: " + tojson(entry),
+        );
         assert.eq(
             entry.key.queryShape.let,
             expectedLetExpression,
@@ -92,9 +103,12 @@ describe("query stats on sharded cluster with system variables", function () {
 
     it("agg: should only report user defined variables on the shards", function () {
         // Fully execute an aggregation that uses system variables and user-defined variables.
-        coll.aggregate([{$match: {x: {$gte: -2}}}, {$project: {ts: 1, now: "$$NOW", then: "$$then"}}], {
-            let: {then: ISODate("1999-09-30T04:11:10Z")},
-        }).toArray();
+        coll.aggregate(
+            [{$match: {x: {$gte: -2}}}, {$project: {ts: 1, now: "$$NOW", then: "$$then"}}],
+            {
+                let: {then: ISODate("1999-09-30T04:11:10Z")},
+            },
+        ).toArray();
 
         const expectedLetExpression = {"then": "?date"};
 
@@ -130,7 +144,10 @@ describe("query stats on sharded cluster with system variables", function () {
 
     it("find: let expression should be empty if only system variables are defined", function () {
         assert.commandWorked(
-            mongosDB.runCommand({find: collName, filter: {$expr: {$eq: ["$timestamp", "$$CLUSTER_TIME"]}}}),
+            mongosDB.runCommand({
+                find: collName,
+                filter: {$expr: {$eq: ["$timestamp", "$$CLUSTER_TIME"]}},
+            }),
         );
         const expectedFilter = {$expr: {$eq: ["$timestamp", "$$CLUSTER_TIME"]}};
 
@@ -156,7 +173,10 @@ describe("query stats on sharded cluster with system variables", function () {
 
     it("agg: let expression should be empty if only system variables are defined", function () {
         // Fully execute an aggregation that uses system variables.
-        coll.aggregate([{$match: {x: {$gte: -2}}}, {$project: {ts: 1, now: "$$CLUSTER_TIME"}}]).toArray();
+        coll.aggregate([
+            {$match: {x: {$gte: -2}}},
+            {$project: {ts: 1, now: "$$CLUSTER_TIME"}},
+        ]).toArray();
 
         // Validate the query shape on mongos.
         validateQueryShapeAgg({

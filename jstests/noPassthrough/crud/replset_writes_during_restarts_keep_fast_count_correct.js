@@ -39,7 +39,8 @@ const checkBasicCRUD = function (withCollection, _id, isReplSetConnection) {
         additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
     }
 
-    const runWithRetries = (fn) => retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
+    const runWithRetries = (fn) =>
+        retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
 
     const runFindOneWithRetries = (coll, filter) => runWithRetries(() => coll.findOne(filter));
 
@@ -59,7 +60,9 @@ const checkBasicCRUD = function (withCollection, _id, isReplSetConnection) {
     });
 
     withCollection((coll) => {
-        assert.commandWorked(runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
+        assert.commandWorked(
+            runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})),
+        );
         assert.eq(_id, runFindOneWithRetries(coll, {_id: _id})._id);
     });
 };
@@ -119,7 +122,9 @@ for (let i = 0; i < NUM_ITERATIONS; i++) {
         replSet.restart(secondary);
     });
 
-    jsTestLog("Stepping down and restarting current primary and awaiting replica set to elect new primary");
+    jsTestLog(
+        "Stepping down and restarting current primary and awaiting replica set to elect new primary",
+    );
     let primary = replSet.getPrimary();
     primary.adminCommand({replSetStepDown: 600});
     replSet.restart(primary);

@@ -114,7 +114,10 @@ runTest({
             );
         } else {
             // The 'planCacheKey' should be the same as what it was before we dropped the index.
-            assert.eq(getPlanCacheKeyFromExplain(nodeExplain0), getPlanCacheKeyFromExplain(nodeExplain1));
+            assert.eq(
+                getPlanCacheKeyFromExplain(nodeExplain0),
+                getPlanCacheKeyFromExplain(nodeExplain1),
+            );
         }
     },
 });

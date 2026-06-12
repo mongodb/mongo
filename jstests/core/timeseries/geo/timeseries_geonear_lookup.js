@@ -22,7 +22,9 @@ const kMaxDistance = Math.PI * 2.0;
 
 tsColl.drop();
 assert.commandWorked(
-    testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(tsColl.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 assert.commandWorked(tsColl.createIndex({"tags.loc": "2dsphere"}, add2dsphereVersionIfNeeded()));

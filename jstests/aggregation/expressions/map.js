@@ -53,24 +53,41 @@ test({$map: {input: "$simple", in: {$map: {input: "$simple", in: "$$this"}}}}, [
 ]);
 
 // Nested behavior with named inner variable and default outer variable.
-test({$map: {input: "$simple", as: "outer", in: {$map: {input: "$simple", in: {$add: ["$$this", "$$outer"]}}}}}, [
-    [2, 3, 4, 5],
-    [3, 4, 5, 6],
-    [4, 5, 6, 7],
-    [5, 6, 7, 8],
-]);
+test(
+    {
+        $map: {
+            input: "$simple",
+            as: "outer",
+            in: {$map: {input: "$simple", in: {$add: ["$$this", "$$outer"]}}},
+        },
+    },
+    [
+        [2, 3, 4, 5],
+        [3, 4, 5, 6],
+        [4, 5, 6, 7],
+        [5, 6, 7, 8],
+    ],
+);
 
 // can't use default if 'as' is defined
 assertErrorCode(t, {$map: {input: "$simple", as: "value", in: "$$this"}}, 40324);
 
 // can't set ROOT
-assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "ROOT", in: "$$ROOT"}}}}, ErrorCodes.FailedToParse);
+assertErrorCode(
+    t,
+    {$project: {a: {$map: {input: "$simple", as: "ROOT", in: "$$ROOT"}}}},
+    ErrorCodes.FailedToParse,
+);
 
 // error on non-array
 assertErrorCode(t, {$project: {a: {$map: {input: "$notArray", as: "var", in: "$$var"}}}}, 16883);
 
 // parse errors (missing or extra fields)
-assertErrorCode(t, {$project: {a: {$map: {x: 1, input: "$simple", as: "var", in: "$$var"}}}}, 16879);
+assertErrorCode(
+    t,
+    {$project: {a: {$map: {x: 1, input: "$simple", as: "var", in: "$$var"}}}},
+    16879,
+);
 assertErrorCode(t, {$project: {a: {$map: {as: "var", in: "$$var"}}}}, 16880);
 assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "var"}}}}, 16882);
 

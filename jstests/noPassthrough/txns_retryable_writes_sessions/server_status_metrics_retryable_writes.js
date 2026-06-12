@@ -21,7 +21,9 @@ function assertServerStatus(expectedServerStatusMetrics, externalConn, internalC
         externalServerStatus.metrics.query.retryableInternalTransactionCount,
     );
     if (internalConn) {
-        const internalServerStatus = assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
+        const internalServerStatus = assert.commandWorked(
+            internalConn.adminCommand({serverStatus: 1}),
+        );
         assert.eq(
             expectedServerStatusMetrics["internal"]["internalRetryableWriteCount"],
             internalServerStatus.metrics.query.internalRetryableWriteCount,
@@ -64,11 +66,15 @@ function runTest(externalConn, internalConn = undefined) {
         "retryableInternalTransactionCount": 0,
     };
     if (internalConn) {
-        const internalServerStatus = assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
+        const internalServerStatus = assert.commandWorked(
+            internalConn.adminCommand({serverStatus: 1}),
+        );
         expectedServerStatusMetrics["internal"] = {
-            "internalRetryableWriteCount": internalServerStatus.metrics.query.internalRetryableWriteCount,
+            "internalRetryableWriteCount":
+                internalServerStatus.metrics.query.internalRetryableWriteCount,
             "externalRetryableWriteCount": 0,
-            "retryableInternalTransactionCount": internalServerStatus.metrics.query.retryableInternalTransactionCount,
+            "retryableInternalTransactionCount":
+                internalServerStatus.metrics.query.retryableInternalTransactionCount,
         };
     }
 
@@ -80,7 +86,9 @@ function runTest(externalConn, internalConn = undefined) {
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Non-retryable write with session
-    assert.commandWorked(testDB.runCommand({update: coll.getName(), updates: [update], lsid: lsid}));
+    assert.commandWorked(
+        testDB.runCommand({update: coll.getName(), updates: [update], lsid: lsid}),
+    );
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
@@ -155,7 +163,12 @@ function runTest(externalConn, internalConn = undefined) {
     // there are no dangling transactions that hold onto locks that can interfere with the
     // validation hooks that run when the test finishes.
     assert.commandWorked(
-        testDB.adminCommand({abortTransaction: 1, lsid: lsid, txnNumber: txnNumberLsidInTxn, autocommit: false}),
+        testDB.adminCommand({
+            abortTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumberLsidInTxn,
+            autocommit: false,
+        }),
     );
     assert.commandWorked(
         testDB.adminCommand({
@@ -175,7 +188,9 @@ function runTest(externalConn, internalConn = undefined) {
     );
 }
 
-jsTest.log("Tests the retryable write counts in mongos and mongod serverStatus output for a sharded cluster.");
+jsTest.log(
+    "Tests the retryable write counts in mongos and mongod serverStatus output for a sharded cluster.",
+);
 {
     const st = new ShardingTest({shards: 1, mongos: 1});
     const mongos = st.s0;

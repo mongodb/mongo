@@ -116,7 +116,11 @@ function verify(expectedResult, result) {
     assert.eq(undefined, result.name, "name field mismatch:" + tojson(result));
 
     assert.eq(expectedResult.shards, result.shards, "shards field mismatch:" + tojson(result));
-    assert.eq(expectedResult.shardKey, result.shardKey, "shardKey field mismatch:" + tojson(result));
+    assert.eq(
+        expectedResult.shardKey,
+        result.shardKey,
+        "shardKey field mismatch:" + tojson(result),
+    );
     assert.eq(expectedResult.tracked, result.tracked, "tracked field mismatch:" + tojson(result));
     assert.eq(
         expectedResult.balancingEnabled,
@@ -128,11 +132,19 @@ function verify(expectedResult, result) {
         result.autoMergingEnabled,
         "autoMergingEnabled field mismatch:" + tojson(result),
     );
-    assert.eq(expectedResult.chunkSize, result.chunkSize, "chunkSize field mismatch:" + tojson(result));
+    assert.eq(
+        expectedResult.chunkSize,
+        result.chunkSize,
+        "chunkSize field mismatch:" + tojson(result),
+    );
 }
 
 function verifyAgainstListCollections(listCollectionResult, stageResult, specs) {
-    assert.eq(listCollectionResult.length, stageResult.length, "Unxpected number of namespaces reported by the stage");
+    assert.eq(
+        listCollectionResult.length,
+        stageResult.length,
+        "Unxpected number of namespaces reported by the stage",
+    );
 
     listCollectionResult.forEach((expectedResult) => {
         let nss = ns(expectedResult.dbName, expectedResult.name);
@@ -216,12 +228,14 @@ function setupUnshardedCollections(conn, dbName, primaryShard) {
         let nss = ns(dbName, collName);
         if (collName == kTimeseriesCollName) {
             assert.commandWorked(
-                conn
-                    .getDB(dbName)
-                    .createCollection(collName, {timeseries: {metaField: "meta", timeField: "timestamp"}}),
+                conn.getDB(dbName).createCollection(collName, {
+                    timeseries: {metaField: "meta", timeField: "timestamp"},
+                }),
             );
         } else if (collName == kViewCollName) {
-            assert.commandWorked(conn.getDB(dbName).createCollection(collName, {viewOn: "coll1", pipeline: []}));
+            assert.commandWorked(
+                conn.getDB(dbName).createCollection(collName, {viewOn: "coll1", pipeline: []}),
+            );
         } else {
             conn.getDB(dbName).createCollection(collName);
         }
@@ -246,7 +260,10 @@ function setupUnshardedCollections(conn, dbName, primaryShard) {
         assert.eq(getChunkSize(nss), undefined);
 
         if (collName == kTimeseriesCollName) {
-            let bucketNs = getTimeseriesCollForDDLOps(conn, conn.getDB(dbName)[collName]).getFullName();
+            let bucketNs = getTimeseriesCollForDDLOps(
+                conn,
+                conn.getDB(dbName)[collName],
+            ).getFullName();
             assert.eq(isSharded(bucketNs), false);
             assert.eq(isTracked(bucketNs), false);
             assert.eq(getAutoMergingEnabled(bucketNs), undefined);
@@ -276,7 +293,14 @@ function setupShardedCollections(st, dbName, primaryShard) {
     const kNoAutoMerger = "nomerger";
     const kTimeseriesCollName = "timeseries";
     const kDifferentChunkSize = "differentchunksize";
-    const collList = ["coll1", "coll2", kTimeseriesCollName, kUnbalancedColl, kNoAutoMerger, kDifferentChunkSize];
+    const collList = [
+        "coll1",
+        "coll2",
+        kTimeseriesCollName,
+        kUnbalancedColl,
+        kNoAutoMerger,
+        kDifferentChunkSize,
+    ];
 
     // Create all the collections
     collList.forEach((collName) => {
@@ -288,17 +312,21 @@ function setupShardedCollections(st, dbName, primaryShard) {
             shardKey = {meta: 1};
             shardList = [primaryShard];
             assert.commandWorked(
-                mongos
-                    .getDB(dbName)
-                    .createCollection(collName, {timeseries: {metaField: "meta", timeField: "timestamp"}}),
+                mongos.getDB(dbName).createCollection(collName, {
+                    timeseries: {metaField: "meta", timeField: "timestamp"},
+                }),
             );
         }
 
-        assert.commandWorked(mongos.adminCommand({shardCollection: nss, key: shardKey, unique: false}));
+        assert.commandWorked(
+            mongos.adminCommand({shardCollection: nss, key: shardKey, unique: false}),
+        );
 
         if (collName == kUnbalancedColl) {
             // Disable balancing for the collection
-            assert.commandWorked(mongos.getCollection(ns(dbName, kUnbalancedColl)).disableBalancing());
+            assert.commandWorked(
+                mongos.getCollection(ns(dbName, kUnbalancedColl)).disableBalancing(),
+            );
         }
 
         if (collName == kNoAutoMerger) {
@@ -354,7 +382,9 @@ function setupTrackedUnshardedCollections(st, dbName, primaryShard, toShard) {
 
         if (collName == kUnbalancedColl) {
             // Disable balancing for the collection
-            assert.commandWorked(mongos.getCollection(ns(dbName, kUnbalancedColl)).disableBalancing());
+            assert.commandWorked(
+                mongos.getCollection(ns(dbName, kUnbalancedColl)).disableBalancing(),
+            );
         }
 
         if (collName == kNoAutoMerger) {
@@ -370,7 +400,10 @@ function setupTrackedUnshardedCollections(st, dbName, primaryShard, toShard) {
         if (collName == kDifferentChunkSize) {
             // Change default chunk size for the collection
             assert.commandWorked(
-                mongos.adminCommand({configureCollectionBalancing: ns(dbName, kDifferentChunkSize), chunkSize: 64}),
+                mongos.adminCommand({
+                    configureCollectionBalancing: ns(dbName, kDifferentChunkSize),
+                    chunkSize: 64,
+                }),
             );
         }
 
@@ -419,7 +452,9 @@ cachedCatalog.defaultChunkSize = 128;
 jsTest.log("The stage must run collectionless.");
 {
     assert.commandFailedWithCode(
-        mongos.getDB("test").runCommand({aggregate: "foo", pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        mongos
+            .getDB("test")
+            .runCommand({aggregate: "foo", pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
         9621301,
     );
 }
@@ -460,7 +495,9 @@ jsTest.log("The stage must return not empty result for config collections.");
     assert.gt(result.length, 0, result);
 
     result = assert.commandWorked(
-        mongos.getDB("config").runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        mongos
+            .getDB("config")
+            .runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
     ).cursor.firstBatch;
     assert.gt(result.length, 0, result);
 }
@@ -472,7 +509,9 @@ jsTest.log("The stage must return the collection for the specified user db. Case
     let listCollectionResult = runListCollectionsOnDbs(mongos, [kUnshardedDB]);
 
     let stageResult = assert.commandWorked(
-        mongos.getDB(kUnshardedDB).runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        mongos
+            .getDB(kUnshardedDB)
+            .runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
     ).cursor.firstBatch;
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
@@ -484,19 +523,25 @@ jsTest.log("The stage must return the collection for the specified user db. Case
     let listCollectionResult = runListCollectionsOnDbs(mongos, [kShardedDB]);
 
     let stageResult = assert.commandWorked(
-        mongos.getDB(kShardedDB).runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        mongos
+            .getDB(kShardedDB)
+            .runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
     ).cursor.firstBatch;
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
 
-jsTest.log("The stage must return the collection for the specified user db. Case tracked unsharded.");
+jsTest.log(
+    "The stage must return the collection for the specified user db. Case tracked unsharded.",
+);
 {
     setupTrackedUnshardedCollections(st, kTrackedUnshardedDB, kPrimaryShard, kToShard);
 
     let listCollectionResult = runListCollectionsOnDbs(mongos, [kTrackedUnshardedDB]);
 
     let stageResult = assert.commandWorked(
-        mongos.getDB(kTrackedUnshardedDB).runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        mongos
+            .getDB(kTrackedUnshardedDB)
+            .runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
     ).cursor.firstBatch;
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
@@ -504,14 +549,20 @@ jsTest.log("The stage must return the collection for the specified user db. Case
 jsTest.log("The stage must return an empty result if the user database doesn't exist.");
 {
     let result = assert.commandWorked(
-        mongos.getDB(kNotExistent).runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
+        mongos
+            .getDB(kNotExistent)
+            .runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}),
     ).cursor.firstBatch;
     assert.eq(0, result.length, result);
 }
 
 jsTest.log("The stage must return every database if run against the admin db.");
 {
-    let listCollectionResult = runListCollectionsOnDbs(mongos, [kUnshardedDB, kShardedDB, kTrackedUnshardedDB]);
+    let listCollectionResult = runListCollectionsOnDbs(mongos, [
+        kUnshardedDB,
+        kShardedDB,
+        kTrackedUnshardedDB,
+    ]);
 
     let stageResult = assert.commandWorked(
         mongos.getDB("admin").runCommand({
@@ -525,7 +576,11 @@ jsTest.log("The stage must return every database if run against the admin db.");
 
 jsTest.log("The stage must work under any combination of specs.");
 {
-    let listCollectionResult = runListCollectionsOnDbs(mongos, [kUnshardedDB, kShardedDB, kTrackedUnshardedDB]);
+    let listCollectionResult = runListCollectionsOnDbs(mongos, [
+        kUnshardedDB,
+        kShardedDB,
+        kTrackedUnshardedDB,
+    ]);
 
     // Test all the combination of specs.
     let allSpecs = generateSpecCombinations(kSpecsList);
@@ -547,10 +602,18 @@ jsTest.log("The stage must report the correct default chunk size if changed.");
 {
     // Updating the default chunk size
     const newSizeMb = 32;
-    st.config.settings.updateOne({_id: "chunksize"}, {$set: {_id: "chunksize", value: newSizeMb}}, {upsert: true});
+    st.config.settings.updateOne(
+        {_id: "chunksize"},
+        {$set: {_id: "chunksize", value: newSizeMb}},
+        {upsert: true},
+    );
     cachedCatalog.defaultChunkSize = newSizeMb;
 
-    let listCollectionResult = runListCollectionsOnDbs(mongos, [kUnshardedDB, kShardedDB, kTrackedUnshardedDB]);
+    let listCollectionResult = runListCollectionsOnDbs(mongos, [
+        kUnshardedDB,
+        kShardedDB,
+        kTrackedUnshardedDB,
+    ]);
 
     const spec = {balancingConfiguration: true};
     let stageResult = assert.commandWorked(

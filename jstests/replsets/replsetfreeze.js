@@ -57,7 +57,11 @@ replTest.awaitNodesAgreeOnPrimary();
 let primary = replTest.getPrimary();
 
 let secondary = replTest.getSecondary();
-jsTestLog("2: freeze secondary " + secondary.host + " so that it does not run for election for the rest of the test");
+jsTestLog(
+    "2: freeze secondary " +
+        secondary.host +
+        " so that it does not run for election for the rest of the test",
+);
 
 assert.commandWorked(secondary.getDB("admin").runCommand({replSetFreeze: 600}));
 
@@ -86,7 +90,11 @@ while (new Date().getTime() - start < 28 * 1000) {
 
 jsTestLog("6: check for new primary");
 let newPrimary = replTest.getPrimary();
-assert.eq(primary.host, newPrimary.host, "new primary should be the same node as primary that previously stepped down");
+assert.eq(
+    primary.host,
+    newPrimary.host,
+    "new primary should be the same node as primary that previously stepped down",
+);
 
 jsTestLog("7: step down new primary " + primary.host);
 assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));

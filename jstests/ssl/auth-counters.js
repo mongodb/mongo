@@ -19,7 +19,8 @@ external.createUser({user: X509USER, roles: []});
 
 // This test ignores counters for SCRAM-SHA-*.
 // For those, see jstests/auth/auth-counters.js
-const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms[x509];
+const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
+    .mechanisms[x509];
 admin.logout();
 
 function asAdmin(cmd, db = admin) {
@@ -35,9 +36,18 @@ function assertStats() {
 
     try {
         assert.eq(mechStats.ingress.authenticate.total, expected.ingress.authenticate.total);
-        assert.eq(mechStats.ingress.authenticate.successful, expected.ingress.authenticate.successful);
-        assert.eq(mechStats.ingress.clusterAuthenticate.total, expected.ingress.clusterAuthenticate.total);
-        assert.eq(mechStats.ingress.clusterAuthenticate.successful, expected.ingress.clusterAuthenticate.successful);
+        assert.eq(
+            mechStats.ingress.authenticate.successful,
+            expected.ingress.authenticate.successful,
+        );
+        assert.eq(
+            mechStats.ingress.clusterAuthenticate.total,
+            expected.ingress.clusterAuthenticate.total,
+        );
+        assert.eq(
+            mechStats.ingress.clusterAuthenticate.successful,
+            expected.ingress.clusterAuthenticate.successful,
+        );
     } catch (e) {
         print("mechStats: " + tojson(mechStats));
         print("expected: " + tojson(expected));

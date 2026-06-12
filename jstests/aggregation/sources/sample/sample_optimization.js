@@ -84,7 +84,10 @@ for (let i = 0; i < nDocs / sampleSize; i++) {
     let idsThisSample = {};
     results.forEach(function recordId(result) {
         assert.lte(result._id, nDocs, "$sample returned an unknown document");
-        assert(!idsThisSample[result._id], "A single $sample returned the same document twice: " + result._id);
+        assert(
+            !idsThisSample[result._id],
+            "A single $sample returned the same document twice: " + result._id,
+        );
 
         cumulativeSeenIds[result._id] = true;
         idsThisSample[result._id] = true;

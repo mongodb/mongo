@@ -39,9 +39,14 @@ const simpleCollationStream = cst.startWatchingChanges({
 
 // Create the collection with a non-default collation. The stream should continue to use the
 // simple collation.
-caseInsensitiveCollection = assertCreateCollection(db, caseInsensitiveCollection, {collation: caseInsensitive});
+caseInsensitiveCollection = assertCreateCollection(db, caseInsensitiveCollection, {
+    collation: caseInsensitive,
+});
 assert.commandWorked(caseInsensitiveCollection.insert([{_id: "insert_one"}, {_id: "INSERT_TWO"}]));
-cst.assertNextChangesEqual({cursor: simpleCollationStream, expectedChanges: [{docId: "INSERT_TWO"}]});
+cst.assertNextChangesEqual({
+    cursor: simpleCollationStream,
+    expectedChanges: [{docId: "INSERT_TWO"}],
+});
 
 const caseInsensitivePipeline = [
     {$changeStream: {}},
@@ -73,12 +78,19 @@ assert.commandWorked(caseInsensitiveCollection.insert({_id: 1, text: "abc"}));
 // default collation, and should only see the second insert.  'explicitCaseInsensitiveStream'
 // should see both inserts.
 cst.assertNextChangesEqual({cursor: didNotInheritCollationStream, expectedChanges: [{docId: 1}]});
-cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChanges: [{docId: 0}, {docId: 1}]});
+cst.assertNextChangesEqual({
+    cursor: explicitCaseInsensitiveStream,
+    expectedChanges: [{docId: 0}, {docId: 1}],
+});
 
 // Test that the collation does not apply to the scan over the oplog.
-const similarNameCollection = assertDropAndRecreateCollection(db, "cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe", {
-    collation: {locale: "en_US"},
-});
+const similarNameCollection = assertDropAndRecreateCollection(
+    db,
+    "cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe",
+    {
+        collation: {locale: "en_US"},
+    },
+);
 
 // We must recreate the explicitCaseInsensitiveStream and set 'doNotModifyInPassthroughs'. Whole
 // db and cluster-wide streams use the simple collation while scanning the oplog, but they don't
@@ -114,7 +126,10 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
     noCollationCollection = assertCreateCollection(db, noCollationCollection);
     assert.commandWorked(noCollationCollection.insert({_id: 0}));
 
-    cst.assertNextChangesEqual({cursor: streamCreatedBeforeNoCollationCollection, expectedChanges: [{docId: 0}]});
+    cst.assertNextChangesEqual({
+        cursor: streamCreatedBeforeNoCollationCollection,
+        expectedChanges: [{docId: 0}],
+    });
 })();
 
 // Test that creating a collection and explicitly specifying the simple collation does not
@@ -128,10 +143,15 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
         collection: simpleCollationCollection,
     });
 
-    simpleCollationCollection = assertCreateCollection(db, simpleCollationCollection, {collation: {locale: "simple"}});
+    simpleCollationCollection = assertCreateCollection(db, simpleCollationCollection, {
+        collation: {locale: "simple"},
+    });
     assert.commandWorked(simpleCollationCollection.insert({_id: 0}));
 
-    cst.assertNextChangesEqual({cursor: streamCreatedBeforeSimpleCollationCollection, expectedChanges: [{docId: 0}]});
+    cst.assertNextChangesEqual({
+        cursor: streamCreatedBeforeSimpleCollationCollection,
+        expectedChanges: [{docId: 0}],
+    });
 })();
 
 // Test that creating a change stream with a non-default collation, then creating a collection
@@ -171,15 +191,22 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
     germanCollection = assertCreateCollection(db, germanCollection, {collation: {locale: "de"}});
     assert.commandWorked(germanCollection.insert({_id: 0, text: "aBc"}));
 
-    cst.assertNextChangesEqual({cursor: englishCaseInsensitiveStream, expectedChanges: [{docId: 0}]});
+    cst.assertNextChangesEqual({
+        cursor: englishCaseInsensitiveStream,
+        expectedChanges: [{docId: 0}],
+    });
 })();
 
 // Test that creating a change stream with a non-default collation against a collection that has
 // a non-simple default collation will use the collation specified on the operation.
 (function () {
-    const caseInsensitiveCollection = assertDropAndRecreateCollection(db, "change_stream_case_insensitive", {
-        collation: caseInsensitive,
-    });
+    const caseInsensitiveCollection = assertDropAndRecreateCollection(
+        db,
+        "change_stream_case_insensitive",
+        {
+            collation: caseInsensitive,
+        },
+    );
 
     const englishCaseSensitiveStream = cst.startWatchingChanges({
         pipeline: [
@@ -221,7 +248,9 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
 // requiring the user to explicitly specify the collation.
 (function () {
     const collName = "change_stream_case_insensitive";
-    let caseInsensitiveCollection = assertDropAndRecreateCollection(db, collName, {collation: caseInsensitive});
+    let caseInsensitiveCollection = assertDropAndRecreateCollection(db, collName, {
+        collation: caseInsensitive,
+    });
 
     let changeStream = caseInsensitiveCollection.watch([{$match: {"fullDocument.text": "abc"}}], {
         collation: caseInsensitive,
@@ -276,7 +305,9 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
 // resuming a change stream from before a collection drop.
 (function () {
     const collName = "change_stream_case_insensitive";
-    let caseInsensitiveCollection = assertDropAndRecreateCollection(db, collName, {collation: caseInsensitive});
+    let caseInsensitiveCollection = assertDropAndRecreateCollection(db, collName, {
+        collation: caseInsensitive,
+    });
 
     let changeStream = caseInsensitiveCollection.watch([{$match: {"fullDocument.text": "abc"}}], {
         collation: caseInsensitive,
@@ -293,9 +324,13 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
     assert.commandWorked(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
 
     // Recreate the collection with a different collation.
-    caseInsensitiveCollection = assertDropAndRecreateCollection(db, caseInsensitiveCollection.getName(), {
-        collation: {locale: "simple"},
-    });
+    caseInsensitiveCollection = assertDropAndRecreateCollection(
+        db,
+        caseInsensitiveCollection.getName(),
+        {
+            collation: {locale: "simple"},
+        },
+    );
     assert.commandWorked(caseInsensitiveCollection.insert({_id: "new collection", text: "abc"}));
 
     // Verify that the stream sees the insert before the drop and then is exhausted. We won't
@@ -333,7 +368,11 @@ cst.assertNextChangesEqual({cursor: explicitCaseInsensitiveStream, expectedChang
     const cmdRes = assert.commandWorked(
         runCommandChangeStreamPassthroughAware(
             db,
-            {aggregate: collName, pipeline: [{$changeStream: {resumeAfter: resumeToken}}], cursor: {}},
+            {
+                aggregate: collName,
+                pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
+                cursor: {},
+            },
             doNotModifyInPassthroughs,
         ),
     );

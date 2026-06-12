@@ -68,7 +68,9 @@ function normalizeTimeseriesCollectionFormat(listOfCollections) {
     }
 
     // Remove buckets collections since as those can change during viewless timeseries upgrade/downgrade
-    let list = listOfCollections.filter((collEntry) => !collEntry["ns"].includes(".system.buckets."));
+    let list = listOfCollections.filter(
+        (collEntry) => !collEntry["ns"].includes(".system.buckets."),
+    );
 
     // Remove the UUID field, since it is only present for viewless timeseries collections
     // (normalize so that we can compare timeseries collections regardless of the format).
@@ -87,7 +89,10 @@ function normalizeTimeseriesCollectionFormat(listOfCollections) {
     return list;
 }
 
-function compareInternalListCollectionsStageAgainstListCollections(dbTest, expectedNumOfCollections) {
+function compareInternalListCollectionsStageAgainstListCollections(
+    dbTest,
+    expectedNumOfCollections,
+) {
     // Fetch all the collections for the `dbTest` using the `listCollections` command and transform
     // them to the same format used by `$_internalListCollections`.
     let listCollectionsResponse = dbTest.getCollectionInfos().map((entry) => {
@@ -126,12 +131,20 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
         // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
         // internal field that can be inconsistent across shards. $_internalListCollections returns
         // it unconditionally, so remove it before comparing.
-        internalStageResponseAgainstDbTest = removeRecordIdsReplicatedField(internalStageResponseAgainstDbTest);
+        internalStageResponseAgainstDbTest = removeRecordIdsReplicatedField(
+            internalStageResponseAgainstDbTest,
+        );
     }
 
     const internalListCollectionsBuckets = getBucketCollections(internalStageResponseAgainstDbTest);
-    internalStageResponseAgainstDbTest = normalizeTimeseriesCollectionFormat(internalStageResponseAgainstDbTest);
-    assert.eq(expectedNumOfCollections, internalStageResponseAgainstDbTest.length, internalStageResponseAgainstDbTest);
+    internalStageResponseAgainstDbTest = normalizeTimeseriesCollectionFormat(
+        internalStageResponseAgainstDbTest,
+    );
+    assert.eq(
+        expectedNumOfCollections,
+        internalStageResponseAgainstDbTest.length,
+        internalStageResponseAgainstDbTest,
+    );
 
     assert.sameMembers(
         listCollectionsResponse,
@@ -181,7 +194,9 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
         assert.eq(0, internalListCollectionsBuckets.length, tojson(internalListCollectionsBuckets));
     } else if (isViewfulTimeseriesOnlySuite(dbTest)) {
         // We expect as many system.buckets collections as timeseries views
-        const numTimeseries = listCollectionsResponse.filter((collEntry) => collEntry.type == "timeseries").length;
+        const numTimeseries = listCollectionsResponse.filter(
+            (collEntry) => collEntry.type == "timeseries",
+        ).length;
         assert.eq(numTimeseries, listCollectionsBuckets.length, tojson(listCollectionsBuckets));
 
         assert.sameMembers(
@@ -202,7 +217,10 @@ function runTestOnDb(dbTest) {
 
     // Non-existing db
     compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
-    compareInternalListCollectionsStageAgainstListCollections(db.getSiblingDB("non-exising-db"), numCollections);
+    compareInternalListCollectionsStageAgainstListCollections(
+        db.getSiblingDB("non-exising-db"),
+        numCollections,
+    );
 
     // Unsharded standard collection
     assert.commandWorked(dbTest.createCollection("coll1"));
@@ -221,10 +239,14 @@ function runTestOnDb(dbTest) {
 
     // Sharded collections
     if (FixtureHelpers.isMongos(dbTest)) {
-        assert.commandWorked(dbTest.adminCommand({shardCollection: dbTest.getName() + ".collSharded1", key: {x: 1}}));
+        assert.commandWorked(
+            dbTest.adminCommand({shardCollection: dbTest.getName() + ".collSharded1", key: {x: 1}}),
+        );
         compareInternalListCollectionsStageAgainstListCollections(dbTest, ++numCollections);
 
-        assert.commandWorked(dbTest.adminCommand({shardCollection: dbTest.getName() + ".collSharded2", key: {x: 1}}));
+        assert.commandWorked(
+            dbTest.adminCommand({shardCollection: dbTest.getName() + ".collSharded2", key: {x: 1}}),
+        );
         compareInternalListCollectionsStageAgainstListCollections(dbTest, ++numCollections);
 
         // Timeseries-sharded collection
@@ -299,7 +321,9 @@ function runInternalCollectionsTest(dbTest) {
     // db.
     assert.soon(() => {
         const configCollsListCollections = configDB.getCollectionInfos();
-        const configCollsInternalListCollections = configDB.aggregate([{$_internalListCollections: {}}]).toArray();
+        const configCollsInternalListCollections = configDB
+            .aggregate([{$_internalListCollections: {}}])
+            .toArray();
 
         if (configCollsListCollections.length != configCollsInternalListCollections.length) {
             jsTestLog(

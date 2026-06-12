@@ -60,7 +60,9 @@ export const $config = (function () {
                     // When running with stepdowns, balancer or shards killed, we expect to sometimes see
                     // the query killed.
                     const isExpectedError =
-                        (TestData.runningWithShardStepdowns || TestData.runningWithBalancer || TestData.killShards) &&
+                        (TestData.runningWithShardStepdowns ||
+                            TestData.runningWithBalancer ||
+                            TestData.killShards) &&
                         interruptedQueryErrors.includes(e.code);
                     if (!isExpectedError) {
                         throw e;
@@ -71,7 +73,9 @@ export const $config = (function () {
             }
 
             withTxnAndAutoRetry(this.session, () => {
-                const coll_aux = this.session.getDatabase(db.getName()).getCollection(getAuxiliaryCollection(collName));
+                const coll_aux = this.session
+                    .getDatabase(db.getName())
+                    .getCollection(getAuxiliaryCollection(collName));
                 const coll = this.session.getDatabase(db.getName()).getCollection(collName);
 
                 // We analyze the cycle from one direction or another so that we exercise more
@@ -94,12 +98,14 @@ export const $config = (function () {
                         assert.eq(
                             doc.out.length,
                             1,
-                            directionString + `: Failed consistency, document returned was ${JSON.stringify(doc)}`,
+                            directionString +
+                                `: Failed consistency, document returned was ${JSON.stringify(doc)}`,
                         );
                         assert.eq(
                             doc._id,
                             doc.out[0].to,
-                            directionString + `: Failed consistency, document returned was ${JSON.stringify(doc)}`,
+                            directionString +
+                                `: Failed consistency, document returned was ${JSON.stringify(doc)}`,
                         );
                     }
                 }
@@ -119,7 +125,9 @@ export const $config = (function () {
             // ends.
             withTxnAndAutoRetry(this.session, () => {
                 const coll = this.session.getDatabase(db.getName()).getCollection(collName);
-                const coll_aux = this.session.getDatabase(db.getName()).getCollection(getAuxiliaryCollection(collName));
+                const coll_aux = this.session
+                    .getDatabase(db.getName())
+                    .getCollection(getAuxiliaryCollection(collName));
                 const idToModify = Random.randInt(this.numDocs);
                 const docToModify = coll.findOne({_id: idToModify});
 
@@ -165,7 +173,9 @@ export const $config = (function () {
         // otherwise it will be 24 hours during testing.
         this.originalTransactionLifetimeLimitSeconds = {};
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}),
+            );
             this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
 
@@ -237,7 +247,8 @@ export const $config = (function () {
             assert.commandWorked(
                 db.adminCommand({
                     setParameter: 1,
-                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                    transactionLifetimeLimitSeconds:
+                        this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
                 }),
             );
         });

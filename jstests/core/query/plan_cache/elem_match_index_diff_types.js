@@ -41,8 +41,18 @@ function runTest(documentList, arrayFieldName, cachedQuery, notCachedQuery, quer
     assert.commandWorked(coll.createIndex({[arrayFieldName]: 1}, indexCollation));
     assert.commandWorked(coll.createIndex({[arrayFieldName]: -1}, indexCollation));
 
-    const key1 = getPlanCacheKeyFromShape({query: cachedQuery, collection: coll, db: db, ...queryCollation});
-    const key2 = getPlanCacheKeyFromShape({query: notCachedQuery, collection: coll, db: db, ...queryCollation});
+    const key1 = getPlanCacheKeyFromShape({
+        query: cachedQuery,
+        collection: coll,
+        db: db,
+        ...queryCollation,
+    });
+    const key2 = getPlanCacheKeyFromShape({
+        query: notCachedQuery,
+        collection: coll,
+        db: db,
+        ...queryCollation,
+    });
     assert.neq(key1, key2, "Plan cache keys should differ.");
 
     // Sanity check that the test query returns the correct results.

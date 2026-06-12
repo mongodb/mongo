@@ -8,8 +8,14 @@ import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
-import {assertAggregatedMetricsSingleExec, assertExpectedResults} from "jstests/libs/query/query_stats_utils.js";
-import {getQueryStatsUpdateCmd, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
+import {
+    assertAggregatedMetricsSingleExec,
+    assertExpectedResults,
+} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsUpdateCmd,
+    resetQueryStatsStore,
+} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const collName = jsTestName();
@@ -52,12 +58,14 @@ function setupCollection(primaryConnection, shardingTest = null) {
         assert.eq(
             shardedDataDistribution[0].shards[0].numOwnedDocuments,
             docs.length / 2,
-            `Expected ${docs.length / 2} docs on shard 0 in data distribution` + tojson(shardedDataDistribution),
+            `Expected ${docs.length / 2} docs on shard 0 in data distribution` +
+                tojson(shardedDataDistribution),
         );
         assert.eq(
             shardedDataDistribution[0].shards[1].numOwnedDocuments,
             docs.length / 2,
-            `Expected ${docs.length / 2} docs on shard 1 in data distribution` + tojson(shardedDataDistribution),
+            `Expected ${docs.length / 2} docs on shard 1 in data distribution` +
+                tojson(shardedDataDistribution),
         );
     }
 }
@@ -86,7 +94,15 @@ function assertUpdateQueryStatsMetrics(entry) {
         usedDisk: false,
         fromMultiPlanner: false,
         fromPlanCache: false,
-        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
+        writes: {
+            nMatched: 1,
+            nUpserted: 0,
+            nModified: 1,
+            nDeleted: 0,
+            nInserted: 0,
+            nUpdateOps: 1,
+            nDeleteOps: 0,
+        },
     });
     assertExpectedResults({
         results: entry,
@@ -150,7 +166,11 @@ function assertUpdateCommandRecordedOnShardsExceptRouter(primaryConn) {
         const db = getDB(conn);
         const queryStats = getQueryStatsUpdateCmd(db);
         assert.neq(queryStats, [], "Expected query stats entry for update command, but found none");
-        assert.eq(queryStats.length, 1, "Expected exactly one query stats entry for update command");
+        assert.eq(
+            queryStats.length,
+            1,
+            "Expected exactly one query stats entry for update command",
+        );
         const entry = queryStats[0];
         assertUpdateQueryStatsMetrics(entry);
     };

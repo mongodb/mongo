@@ -89,7 +89,10 @@ assertStagesForExplainOfCommand({
 
 // Partial index with filter expression with conjunction.
 assert.commandWorked(
-    coll.createIndex({a: 1}, {name: "a_1_range", "partialFilterExpression": {a: {$gte: 20, $lte: 40}}}),
+    coll.createIndex(
+        {a: 1},
+        {name: "a_1_range", "partialFilterExpression": {a: {$gte: 20, $lte: 40}}},
+    ),
 );
 cmdObj = {
     find: coll.getName(),
@@ -116,7 +119,10 @@ assertNoFetchFilter({coll: coll, cmdObj: cmdObj});
 
 // Filter expression with conjunction on multiple fields.
 assert.commandWorked(
-    coll.createIndex({b: 1}, {name: "b_1_state_open", "partialFilterExpression": {state: "open", b: {$gt: 50}}}),
+    coll.createIndex(
+        {b: 1},
+        {name: "b_1_state_open", "partialFilterExpression": {state: "open", b: {$gt: 50}}},
+    ),
 );
 
 cmdObj = {
@@ -138,7 +144,12 @@ assertStagesForExplainOfCommand({
 });
 
 // Index filter expression with $exists.
-assert.commandWorked(coll.createIndex({a: 1}, {name: "a_1_b_exists", "partialFilterExpression": {b: {$exists: true}}}));
+assert.commandWorked(
+    coll.createIndex(
+        {a: 1},
+        {name: "a_1_b_exists", "partialFilterExpression": {b: {$exists: true}}},
+    ),
+);
 
 cmdObj = {
     find: coll.getName(),
@@ -148,7 +159,9 @@ cmdObj = {
 assertNoFetchFilter({coll: coll, cmdObj: cmdObj});
 
 // Filter expression in a multi-key index.
-assert.commandWorked(coll.createIndex({c: 1}, {name: "c_1_a", partialFilterExpression: {a: {$lte: 30}}}));
+assert.commandWorked(
+    coll.createIndex({c: 1}, {name: "c_1_a", partialFilterExpression: {a: {$lte: 30}}}),
+);
 
 cmdObj = {
     count: coll.getName(),
@@ -170,7 +183,9 @@ cmdObj = {
 assertNoFetchFilter({coll: coll, cmdObj: cmdObj});
 
 // Test that the same filter expression under $elemMatch will not be removed from the fetch filter.
-assert.commandWorked(coll.createIndex({a: 1}, {name: "a_1_state_open", "partialFilterExpression": {state: "open"}}));
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: "a_1_state_open", "partialFilterExpression": {state: "open"}}),
+);
 
 let predicate = {
     a: {$gte: 100},
@@ -185,7 +200,10 @@ assertFetchFilter({coll: coll, predicate: predicate, expectedFilter: fetchFilter
 // Index on $elemMatch predicate. Test that the index filter predicate is removed from the fetch
 // filter while $elemMatch predicate is preserved.
 assert.commandWorked(
-    coll.createIndex({"array.a": 1}, {name: "array_a_1_state_open", "partialFilterExpression": {state: "open"}}),
+    coll.createIndex(
+        {"array.a": 1},
+        {name: "array_a_1_state_open", "partialFilterExpression": {state: "open"}},
+    ),
 );
 
 predicate = {
@@ -214,7 +232,10 @@ assertNoFetchFilter({coll: coll, cmdObj: cmdObj});
 
 // Tests that the query predicate is not removed if it is a subset of an $or index filter.
 assert.commandWorked(
-    coll.createIndex({a: 1}, {name: "a_1_or", "partialFilterExpression": {$or: [{b: {$gte: 80}}, {flag: "true"}]}}),
+    coll.createIndex(
+        {a: 1},
+        {name: "a_1_or", "partialFilterExpression": {$or: [{b: {$gte: 80}}, {flag: "true"}]}},
+    ),
 );
 
 predicate = {
@@ -225,5 +246,7 @@ fetchFilter = {
 };
 assertFetchFilter({coll: coll, predicate: predicate, expectedFilter: fetchFilter, nReturned: 23});
 
-const exp = coll.find({$and: [{a: {$gte: 90}}, {$or: [{b: {$gte: 80}}, {flag: "true"}]}]}).explain();
+const exp = coll
+    .find({$and: [{a: {$gte: 90}}, {$or: [{b: {$gte: 80}}, {flag: "true"}]}]})
+    .explain();
 assert(isIxscan(db, getWinningPlanFromExplain(exp)), "Expected index scan, got " + tojson(exp));

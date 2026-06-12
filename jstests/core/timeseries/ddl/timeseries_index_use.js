@@ -15,7 +15,12 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getAggPlanStages, getPlanStages, getRejectedPlan, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getPlanStages,
+    getRejectedPlan,
+    getRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const generateTest = (useHint) => {
@@ -38,7 +43,10 @@ const generateTest = (useHint) => {
             assert.commandWorked(
                 testDB.createCollection(
                     coll.getName(),
-                    Object.assign({timeseries: {timeField: timeFieldName, metaField: metaFieldName}}, collOpts),
+                    Object.assign(
+                        {timeseries: {timeField: timeFieldName, metaField: metaFieldName}},
+                        collOpts,
+                    ),
                 ),
             );
             // An index on {metaField, timeField} gets built by default on time-series collections.
@@ -53,7 +61,13 @@ const generateTest = (useHint) => {
          * Runs the query and verifies that the expected number of documents are matched.
          * Finally, deletes the created index.
          */
-        const testQueryUsesIndex = function (filter, numMatches, indexSpec, indexOpts = {}, queryOpts = {}) {
+        const testQueryUsesIndex = function (
+            filter,
+            numMatches,
+            indexSpec,
+            indexOpts = {},
+            queryOpts = {},
+        ) {
             assert.commandWorked(
                 coll.createIndex(
                     indexSpec,
@@ -82,7 +96,9 @@ const generateTest = (useHint) => {
                     assert.gt(cursorStages.length, 0, tojson(explain));
                     for (const cursorStage of cursorStages) {
                         for (const rejectedPlan of getRejectedPlans(cursorStage["$cursor"])) {
-                            ixscans = ixscans.concat(getPlanStages(getRejectedPlan(rejectedPlan), "IXSCAN"));
+                            ixscans = ixscans.concat(
+                                getPlanStages(getRejectedPlan(rejectedPlan), "IXSCAN"),
+                            );
                         }
                     }
                 }
@@ -155,8 +171,14 @@ const generateTest = (useHint) => {
         if (!isShardedTimeseries(coll)) {
             // Skip if the collection is implicitly sharded: it may use the implicitly created
             // index.
-            testQueryUsesIndex({[metaFieldName]: {$gte: 2}}, 3, {[metaFieldName]: 1, [timeFieldName]: 1});
-            testQueryUsesIndex({[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName]: 1});
+            testQueryUsesIndex({[metaFieldName]: {$gte: 2}}, 3, {
+                [metaFieldName]: 1,
+                [timeFieldName]: 1,
+            });
+            testQueryUsesIndex({[timeFieldName]: {$lt: timeDate}}, 2, {
+                [timeFieldName]: 1,
+                [metaFieldName]: 1,
+            });
             testQueryUsesIndex({[metaFieldName]: {$lte: 3}, [timeFieldName]: {$gte: timeDate}}, 1, {
                 [metaFieldName]: 1,
                 [timeFieldName]: 1,
@@ -175,7 +197,11 @@ const generateTest = (useHint) => {
         resetCollections();
         assert.commandWorked(
             insert(coll, [
-                {_id: 0, [timeFieldName]: ISODate("1990-01-01 00:00:00.000Z"), [metaFieldName]: {a: 1}},
+                {
+                    _id: 0,
+                    [timeFieldName]: ISODate("1990-01-01 00:00:00.000Z"),
+                    [metaFieldName]: {a: 1},
+                },
                 {
                     _id: 1,
                     [timeFieldName]: ISODate("2000-01-01 00:00:00.000Z"),
@@ -191,24 +217,41 @@ const generateTest = (useHint) => {
 
         // Test indexes on subfields of metaField.
         testQueryUsesIndex({[metaFieldName + ".a"]: {$gt: 3}}, 1, {[metaFieldName + ".a"]: 1});
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$type: "string"}}, 1, {[metaFieldName + ".a"]: -1});
-        testQueryUsesIndex({[metaFieldName + ".b"]: {$gte: 0}}, 1, {[metaFieldName + ".b"]: 1}, {sparse: true});
+        testQueryUsesIndex({[metaFieldName + ".a"]: {$type: "string"}}, 1, {
+            [metaFieldName + ".a"]: -1,
+        });
+        testQueryUsesIndex(
+            {[metaFieldName + ".b"]: {$gte: 0}},
+            1,
+            {[metaFieldName + ".b"]: 1},
+            {sparse: true},
+        );
         testQueryUsesIndex({[metaFieldName]: {$eq: {a: 1}}}, 1, {[metaFieldName]: 1});
-        testQueryUsesIndex({[metaFieldName]: {$in: [{a: 1}, {a: 4, b: 5, loc: [1.0, 2.0]}]}}, 2, {[metaFieldName]: 1});
+        testQueryUsesIndex({[metaFieldName]: {$in: [{a: 1}, {a: 4, b: 5, loc: [1.0, 2.0]}]}}, 2, {
+            [metaFieldName]: 1,
+        });
 
         // Test compound indexes on multiple subfields of metaField.
         testQueryUsesIndex({[metaFieldName + ".a"]: {$lt: 3}}, 1, {
             [metaFieldName + ".a"]: 1,
             [metaFieldName + ".b"]: -1,
         });
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$lt: 5}, [metaFieldName + ".b"]: {$eq: 5}}, 1, {
-            [metaFieldName + ".a"]: -1,
-            [metaFieldName + ".b"]: 1,
-        });
-        testQueryUsesIndex({$or: [{[metaFieldName + ".a"]: {$eq: 1}}, {[metaFieldName + ".a"]: {$eq: "1"}}]}, 2, {
-            [metaFieldName + ".a"]: -1,
-            [metaFieldName + ".b"]: -1,
-        });
+        testQueryUsesIndex(
+            {[metaFieldName + ".a"]: {$lt: 5}, [metaFieldName + ".b"]: {$eq: 5}},
+            1,
+            {
+                [metaFieldName + ".a"]: -1,
+                [metaFieldName + ".b"]: 1,
+            },
+        );
+        testQueryUsesIndex(
+            {$or: [{[metaFieldName + ".a"]: {$eq: 1}}, {[metaFieldName + ".a"]: {$eq: "1"}}]},
+            2,
+            {
+                [metaFieldName + ".a"]: -1,
+                [metaFieldName + ".b"]: -1,
+            },
+        );
         testQueryUsesIndex(
             {[metaFieldName + ".b"]: {$lte: 5}},
             1,
@@ -226,20 +269,38 @@ const generateTest = (useHint) => {
         if (!isShardedTimeseries(coll)) {
             // Skip if the collection is implicitly sharded: it may use the implicitly created
             // index.
-            testQueryUsesIndex({[metaFieldName + ".a"]: {$gte: 2}}, 1, {[metaFieldName + ".a"]: 1, [timeFieldName]: 1});
-            testQueryUsesIndex({[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName + ".a"]: 1});
-            testQueryUsesIndex({[metaFieldName + ".a"]: {$lte: 4}, [timeFieldName]: {$lte: timeDate}}, 2, {
+            testQueryUsesIndex({[metaFieldName + ".a"]: {$gte: 2}}, 1, {
                 [metaFieldName + ".a"]: 1,
                 [timeFieldName]: 1,
             });
-            testQueryUsesIndex({[metaFieldName + ".a"]: {$lte: 4}, [timeFieldName]: {$lte: timeDate}}, 2, {
-                [metaFieldName + ".a"]: 1,
-                [timeFieldName]: -1,
-            });
-            testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: "1"}, [timeFieldName]: {$gt: timeDate}}, 1, {
-                [timeFieldName]: -1,
+            testQueryUsesIndex({[timeFieldName]: {$lt: timeDate}}, 2, {
+                [timeFieldName]: 1,
                 [metaFieldName + ".a"]: 1,
             });
+            testQueryUsesIndex(
+                {[metaFieldName + ".a"]: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
+                2,
+                {
+                    [metaFieldName + ".a"]: 1,
+                    [timeFieldName]: 1,
+                },
+            );
+            testQueryUsesIndex(
+                {[metaFieldName + ".a"]: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
+                2,
+                {
+                    [metaFieldName + ".a"]: 1,
+                    [timeFieldName]: -1,
+                },
+            );
+            testQueryUsesIndex(
+                {[metaFieldName + ".a"]: {$eq: "1"}, [timeFieldName]: {$gt: timeDate}},
+                1,
+                {
+                    [timeFieldName]: -1,
+                    [metaFieldName + ".a"]: 1,
+                },
+            );
         }
 
         // Test wildcard indexes with metaField.
@@ -248,19 +309,29 @@ const generateTest = (useHint) => {
 
         // Test hashed indexes on metaField.
         testQueryUsesIndex({[metaFieldName]: {$eq: {a: 1}}}, 1, {[metaFieldName]: "hashed"});
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: 1}}, 1, {[metaFieldName + ".a"]: "hashed"});
+        testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: 1}}, 1, {
+            [metaFieldName + ".a"]: "hashed",
+        });
         testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: 1}}, 1, {
             [metaFieldName + ".a"]: "hashed",
             [metaFieldName + ".b"]: -1,
         });
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: 1}, [metaFieldName + ".b"]: {$gt: 0}}, 0, {
-            [metaFieldName + ".a"]: "hashed",
-            [metaFieldName + ".b"]: -1,
-        });
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: 1}, [metaFieldName + ".b"]: {$gt: 0}}, 0, {
-            [metaFieldName + ".b"]: -1,
-            [metaFieldName + ".a"]: "hashed",
-        });
+        testQueryUsesIndex(
+            {[metaFieldName + ".a"]: {$eq: 1}, [metaFieldName + ".b"]: {$gt: 0}},
+            0,
+            {
+                [metaFieldName + ".a"]: "hashed",
+                [metaFieldName + ".b"]: -1,
+            },
+        );
+        testQueryUsesIndex(
+            {[metaFieldName + ".a"]: {$eq: 1}, [metaFieldName + ".b"]: {$gt: 0}},
+            0,
+            {
+                [metaFieldName + ".b"]: -1,
+                [metaFieldName + ".a"]: "hashed",
+            },
+        );
 
         // Test geo-type indexes on metaField.
         testQueryUsesIndex(
@@ -285,9 +356,13 @@ const generateTest = (useHint) => {
             1,
             {[metaFieldName + ".loc"]: "2dsphere"},
         );
-        testQueryUsesIndex({[metaFieldName + ".loc"]: {$geoWithin: {$center: [[1.01, 2.01], 0.1]}}}, 1, {
-            [metaFieldName + ".loc"]: "2d",
-        });
+        testQueryUsesIndex(
+            {[metaFieldName + ".loc"]: {$geoWithin: {$center: [[1.01, 2.01], 0.1]}}},
+            1,
+            {
+                [metaFieldName + ".loc"]: "2d",
+            },
+        );
         testAggregationUsesIndex(
             [
                 {
@@ -307,7 +382,11 @@ const generateTest = (useHint) => {
         testAggregationUsesIndex(
             [
                 {
-                    $geoNear: {near: [40.4, -70.4], distanceField: "dist", key: metaFieldName + ".loc"},
+                    $geoNear: {
+                        near: [40.4, -70.4],
+                        distanceField: "dist",
+                        key: metaFieldName + ".loc",
+                    },
                 },
                 {$limit: 1},
             ],
@@ -367,11 +446,17 @@ const generateTest = (useHint) => {
         // Test multikey indexes on subfields of metaFields.
         testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: {b: 1}}}, 1, {[metaFieldName + ".a"]: 1});
         testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: 2}}, 1, {[metaFieldName + ".a"]: 1});
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$gte: {a: 1}}}, 1, {[metaFieldName + ".a"]: -1});
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$gte: 1}, [metaFieldName + ".b"]: {$exists: 1}}, 1, {
+        testQueryUsesIndex({[metaFieldName + ".a"]: {$gte: {a: 1}}}, 1, {
             [metaFieldName + ".a"]: -1,
-            [metaFieldName + ".b"]: 1,
         });
+        testQueryUsesIndex(
+            {[metaFieldName + ".a"]: {$gte: 1}, [metaFieldName + ".b"]: {$exists: 1}},
+            1,
+            {
+                [metaFieldName + ".a"]: -1,
+                [metaFieldName + ".b"]: 1,
+            },
+        );
 
         /********************************* Tests string meta values *******************************/
         const collation = {collation: {locale: "en", strength: 1, numericOrdering: true}};
@@ -399,8 +484,20 @@ const generateTest = (useHint) => {
         );
 
         // Test index on metaField when collection collation matches query collation.
-        testQueryUsesIndex({[metaFieldName]: {$eq: "bye bye"}}, 1, {[metaFieldName]: 1}, {}, collation);
-        testQueryUsesIndex({[metaFieldName]: {$gte: "hello hello"}}, 2, {[metaFieldName]: -1}, {}, collation);
+        testQueryUsesIndex(
+            {[metaFieldName]: {$eq: "bye bye"}},
+            1,
+            {[metaFieldName]: 1},
+            {},
+            collation,
+        );
+        testQueryUsesIndex(
+            {[metaFieldName]: {$gte: "hello hello"}},
+            2,
+            {[metaFieldName]: -1},
+            {},
+            collation,
+        );
 
         resetCollections(collation);
         assert.commandWorked(
@@ -424,8 +521,20 @@ const generateTest = (useHint) => {
         );
 
         // Test index on subfields of metaField when collection collation matches query collation.
-        testQueryUsesIndex({[metaFieldName + ".a"]: {$eq: "bye bye"}}, 1, {[metaFieldName + ".a"]: 1}, {}, collation);
-        testQueryUsesIndex({[metaFieldName + ".b"]: {$gt: "bye bye"}}, 2, {[metaFieldName + ".b"]: -1}, {}, collation);
+        testQueryUsesIndex(
+            {[metaFieldName + ".a"]: {$eq: "bye bye"}},
+            1,
+            {[metaFieldName + ".a"]: 1},
+            {},
+            collation,
+        );
+        testQueryUsesIndex(
+            {[metaFieldName + ".b"]: {$gt: "bye bye"}},
+            2,
+            {[metaFieldName + ".b"]: -1},
+            {},
+            collation,
+        );
 
         /*********************************** Tests $expr predicates *******************************/
         resetCollections();
@@ -444,7 +553,10 @@ const generateTest = (useHint) => {
                     {
                         $match: {
                             $expr: {
-                                $and: [{$gt: ["$" + timeFieldName, timeDate]}, {$eq: ["$" + metaFieldName, 2]}],
+                                $and: [
+                                    {$gt: ["$" + timeFieldName, timeDate]},
+                                    {$eq: ["$" + metaFieldName, 2]},
+                                ],
                             },
                         },
                     },

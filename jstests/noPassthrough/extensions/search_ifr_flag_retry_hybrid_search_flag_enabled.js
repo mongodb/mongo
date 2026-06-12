@@ -13,7 +13,10 @@
  *   featureFlagSearchExtension,
  * ]
  */
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 import {
     createTestView,
     getExtensionSearchUsedCount,
@@ -134,7 +137,8 @@ function runUnionWithOnViewWithSearchInViewDefinitionTests(conn, shardingTest, i
 
     const searchStage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
     const searchViewName = kTestViewName + (isSearchMeta ? "_searchMeta" : "_search");
-    const searchViewExists = testDb.getCollectionInfos({name: searchViewName, type: "view"}).length > 0;
+    const searchViewExists =
+        testDb.getCollectionInfos({name: searchViewName, type: "view"}).length > 0;
     if (!searchViewExists) {
         assert.commandWorked(testDb.createView(searchViewName, kTestCollName, [searchStage]));
     }
@@ -173,4 +177,6 @@ function runTests(conn, shardingTest = null) {
     }
 }
 
-withExtensions({"libsearch_extension.so": {}}, runTests, ["standalone", "sharded"], {shards: kNumShards});
+withExtensions({"libsearch_extension.so": {}}, runTests, ["standalone", "sharded"], {
+    shards: kNumShards,
+});

@@ -55,7 +55,9 @@ addTestDocuments(coll);
 
 // Create time-series collection with a single measurement.
 // We need a non-empty collection to use two-phase index builds.
-assert.commandWorked(primaryDB.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}));
+assert.commandWorked(
+    primaryDB.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}),
+);
 const timeseriesColl = primaryDB.getCollection(timeseriesCollName);
 assert.commandWorked(timeseriesColl.insert({time: ISODate(), x: 1}));
 
@@ -68,7 +70,9 @@ IndexBuildTest.pauseIndexBuilds(primary);
 
 jsTest.log("Beginning index build");
 awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
-awaitIndexTimeseries = IndexBuildTest.startIndexBuild(primary, timeseriesColl.getFullName(), {x: 1});
+awaitIndexTimeseries = IndexBuildTest.startIndexBuild(primary, timeseriesColl.getFullName(), {
+    x: 1,
+});
 
 jsTest.log("Waiting for index build to start on secondary");
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, "i_1");

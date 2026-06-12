@@ -9,7 +9,9 @@ let count = 0;
 // Bypasses DuplicateKey insertion error for testing via failpoint.
 let addDuplicateDocumentsToCol = function (db, coll, doc) {
     jsTestLog("Inserts documents without index entries.");
-    assert.commandWorked(db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}),
+    );
 
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.insert(doc));

@@ -27,7 +27,8 @@ runTimeseriesRetryDeleteAndUpdateTest(
         assert.eq(
             retriedCommandsCount + statementsRetried,
             transactionsServerStatus.retriedCommandsCount,
-            "Incorrect value for retriedCommandsCount in serverStatus: " + tojson(transactionsServerStatus),
+            "Incorrect value for retriedCommandsCount in serverStatus: " +
+                tojson(transactionsServerStatus),
         );
 
         return statementsRetried;
@@ -38,7 +39,8 @@ runTimeseriesRetryDeleteAndUpdateTest(
         assert.eq(
             retriedStatementsCount + statementsRetried,
             transactionsServerStatus.retriedStatementsCount,
-            "Incorrect value for retriedStatementsCount in serverStatus:" + tojson(transactionsServerStatus),
+            "Incorrect value for retriedStatementsCount in serverStatus:" +
+                tojson(transactionsServerStatus),
         );
 
         return statementsRetried;

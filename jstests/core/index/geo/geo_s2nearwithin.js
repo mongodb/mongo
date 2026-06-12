@@ -62,7 +62,11 @@ let res = assert.commandFailedWithCode(
         cursor: {},
         pipeline: [
             {
-                $geoNear: {near: [0, 0], distanceField: "d", query: {geo: {$within: {$center: [[0, 0], 1]}}}},
+                $geoNear: {
+                    near: [0, 0],
+                    distanceField: "d",
+                    query: {geo: {$within: {$center: [[0, 0], 1]}}},
+                },
             },
         ],
     }),

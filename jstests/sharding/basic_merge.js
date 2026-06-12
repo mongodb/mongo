@@ -23,7 +23,9 @@ assert.commandFailed(mongos.adminCommand({mergeChunks: "", bounds: [{a: -1}, {a:
 assert.commandFailed(mongos.adminCommand({mergeChunks: "a.b", bounds: [{a: -1}, {a: 1}]}));
 
 // Fail if collection is unsharded.
-assert.commandFailed(mongos.adminCommand({mergeChunks: kDbName + ".xxx", bounds: [{a: -1}, {a: 1}]}));
+assert.commandFailed(
+    mongos.adminCommand({mergeChunks: kDbName + ".xxx", bounds: [{a: -1}, {a: 1}]}),
+);
 
 // Errors if either bounds is not a valid shard key.
 assert.eq(0, mongos.getDB("config").chunks.count({ns: ns}));
@@ -42,9 +44,23 @@ assert.commandFailed(mongos.adminCommand({mergeChunks: ns, bounds: [{a: -1}, {x:
 assert.commandFailed(mongos.adminCommand({mergeChunks: ns, bounds: [{a: -1}, {a: 10}]}));
 
 // Fail if chunks to be merged are not contiguous on the shard
-assert.commandWorked(st.s0.adminCommand({moveChunk: ns, bounds: [{a: -1}, {a: 0}], to: shard1, _waitForDelete: true}));
+assert.commandWorked(
+    st.s0.adminCommand({
+        moveChunk: ns,
+        bounds: [{a: -1}, {a: 0}],
+        to: shard1,
+        _waitForDelete: true,
+    }),
+);
 assert.commandFailed(st.s0.adminCommand({mergeChunks: ns, bounds: [{a: MinKey()}, {a: MaxKey()}]}));
-assert.commandWorked(st.s0.adminCommand({moveChunk: ns, bounds: [{a: -1}, {a: 0}], to: shard0, _waitForDelete: true}));
+assert.commandWorked(
+    st.s0.adminCommand({
+        moveChunk: ns,
+        bounds: [{a: -1}, {a: 0}],
+        to: shard0,
+        _waitForDelete: true,
+    }),
+);
 
 // Validate metadata
 // There are four chunks [{$minKey, -1}, {-1, 0}, {0, 1}, {1, $maxKey}]
@@ -54,6 +70,9 @@ assert.eq(4, findChunksUtil.countChunksForNs(st.s0.getDB("config"), ns));
 // shard version refresh logic
 assert.commandWorked(st.s1.adminCommand({mergeChunks: ns, bounds: [{a: -1}, {a: 1}]}));
 assert.eq(3, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns));
-assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {min: {a: -1}, max: {a: 1}}));
+assert.eq(
+    1,
+    findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {min: {a: -1}, max: {a: 1}}),
+);
 
 st.stop();

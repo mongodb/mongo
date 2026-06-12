@@ -25,7 +25,10 @@ function makePatternForSetFCV(targetVersion) {
 }
 
 function makePatternForSetParameter(paramName) {
-    return new RegExp(`Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1,"${paramName}":`, "g");
+    return new RegExp(
+        `Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1,"${paramName}":`,
+        "g",
+    );
 }
 
 function countMatches(pattern, output) {
@@ -65,7 +68,9 @@ function testStandalone(
         expectedSetLatestFCV: expectedSetLatestFCV = 0,
     } = {},
 ) {
-    const conn = MongoRunner.runMongod({setParameter: {logComponentVerbosity: tojson({command: 1})}});
+    const conn = MongoRunner.runMongod({
+        setParameter: {logComponentVerbosity: tojson({command: 1})},
+    });
     assert.neq(conn, "mongod was unable to start up");
 
     // Insert a document so the "validate" command has some actual work to do.
@@ -136,7 +141,10 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
 
     let attempts = 0;
     assert.soon(function () {
-        let res = setFCVConn.adminCommand({setFeatureCompatibilityVersion: targetVersion, confirm: true});
+        let res = setFCVConn.adminCommand({
+            setFeatureCompatibilityVersion: targetVersion,
+            confirm: true,
+        });
 
         if (res.ok === 1) {
             assert.commandWorked(res);
@@ -160,9 +168,14 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
                 // previousVersion is written at kEnableTargetFeatures and kCommitAddedFeatures
                 // (symmetric-FCV phases only); at kComplete only downgrades carry it.
                 const isSymmetricPhase =
-                    fcvDoc.phase === "enable_target_features" || fcvDoc.phase === "commit_added_features";
+                    fcvDoc.phase === "enable_target_features" ||
+                    fcvDoc.phase === "commit_added_features";
                 const expectedPreviousVersion =
-                    targetVersion === lastLTSFCV ? latestFCV : isSymmetricPhase ? lastLTSFCV : undefined;
+                    targetVersion === lastLTSFCV
+                        ? latestFCV
+                        : isSymmetricPhase
+                          ? lastLTSFCV
+                          : undefined;
                 checkFCV(
                     conn.getDB("admin"),
                     lastLTSFCV,
@@ -173,10 +186,17 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
 
                 // If the setFCV command was interrupted during the isCleaningServerMetadata
                 // state, complete the FCV transition successfully (downgrade or upgrade).
-                assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: targetVersion, confirm: true}));
+                assert.commandWorked(
+                    conn.adminCommand({
+                        setFeatureCompatibilityVersion: targetVersion,
+                        confirm: true,
+                    }),
+                );
             } else {
                 checkFCV(conn.getDB("admin"), lastLTSFCV, targetVersion);
-                jsTest.log(`Reached partial transition to ${targetVersion} after ${attempts} attempts`);
+                jsTest.log(
+                    `Reached partial transition to ${targetVersion} after ${attempts} attempts`,
+                );
                 return true;
             }
         }
@@ -187,7 +207,8 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
         // interrupted.
         assert.commandWorked(
             conn.adminCommand({
-                setFeatureCompatibilityVersion: targetVersion === lastLTSFCV ? latestFCV : lastLTSFCV,
+                setFeatureCompatibilityVersion:
+                    targetVersion === lastLTSFCV ? latestFCV : lastLTSFCV,
                 confirm: true,
             }),
         );
@@ -202,12 +223,16 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
 }
 
 // testStandaloneInLatestFCV
-testStandalone((conn) => checkFCV(conn.getDB("admin"), latestFCV), {expectedAtTeardownFCV: latestFCV});
+testStandalone((conn) => checkFCV(conn.getDB("admin"), latestFCV), {
+    expectedAtTeardownFCV: latestFCV,
+});
 
 // testStandaloneInLastLTSFCV
 testStandalone(
     (conn) => {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         checkFCV(conn.getDB("admin"), lastLTSFCV);
     },
     {expectedAtTeardownFCV: lastLTSFCV, expectedSetLastLTSFCV: 1, expectedSetLatestFCV: 1},
@@ -224,7 +249,9 @@ testStandalone(
 // testStandaloneWithInterruptedFCVUpgrade
 testStandalone(
     (conn) => {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        );
         forceInterruptedUpgradeOrDowngrade(conn, latestFCV);
     },
     {expectedAtTeardownFCV: lastLTSFCV, expectedSetLastLTSFCV: 1, expectedSetLatestFCV: 1},

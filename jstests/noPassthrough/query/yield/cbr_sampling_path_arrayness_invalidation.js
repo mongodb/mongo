@@ -65,7 +65,9 @@ function getSamplingTechnique(targetColl) {
 function runTest(targetColl, expectedTechnique) {
     assert.commandWorked(testDb.adminCommand({clearLog: "global"}));
     targetColl.getPlanCache().clear();
-    assert.eq(getSamplingTechnique(targetColl), expectedTechnique, "wrong sampling technique", {expectedTechnique});
+    assert.eq(getSamplingTechnique(targetColl), expectedTechnique, "wrong sampling technique", {
+        expectedTechnique,
+    });
 
     // Verify the post-sampling failpoint is reachable without invalidation.
     const afterSampling1 = configureFailPoint(testDb, "hangAfterCBRSamplingGenerateSample");
@@ -90,21 +92,32 @@ function runTest(targetColl, expectedTechnique) {
     assert.commandWorked(testDb.adminCommand({clearLog: "global"}));
     const afterSampling2 = configureFailPoint(testDb, "hangAfterCBRSamplingGenerateSample");
     const fp = configureFailPoint(testDb, "pathArraynessYieldInvalidation");
-    assert.throwsWithCode(() => targetColl.aggregate(pipeline).toArray(), ErrorCodes.QueryPlanKilled);
+    assert.throwsWithCode(
+        () => targetColl.aggregate(pipeline).toArray(),
+        ErrorCodes.QueryPlanKilled,
+    );
     fp.off();
     afterSampling2.off();
     checkLog.containsJson(conn, 11010403, {});
 }
 
-assert.commandWorked(testDb.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
+assert.commandWorked(
+    testDb.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+);
 runTest(coll, "seqScan");
-assert.commandWorked(testDb.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}));
+assert.commandWorked(
+    testDb.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
+);
 
 runTest(smallColl, "fullCollScan");
 
-assert.commandWorked(testDb.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}));
+assert.commandWorked(
+    testDb.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}),
+);
 runTest(coll, "random");
-assert.commandWorked(testDb.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}));
+assert.commandWorked(
+    testDb.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}),
+);
 
 runTest(coll, "chunk");
 

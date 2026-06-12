@@ -30,16 +30,22 @@ describe("view-of-view subpipeline resolution", function () {
         assert.commandWorked(testDB.createView("viewB", "coll", [{$match: {b: true}}]));
 
         // viewA: a == true unioned with viewB => [{_id:1}, {_id:3}, {_id:2}, {_id:3}] (no dedup).
-        assert.commandWorked(testDB.createView("viewA", "coll", [{$match: {a: true}}, {$unionWith: "viewB"}]));
+        assert.commandWorked(
+            testDB.createView("viewA", "coll", [{$match: {a: true}}, {$unionWith: "viewB"}]),
+        );
 
         // viewC: three-level chain. b == false unioned with viewA => 6 docs (no dedup).
-        assert.commandWorked(testDB.createView("viewC", "coll", [{$match: {b: false}}, {$unionWith: "viewA"}]));
+        assert.commandWorked(
+            testDB.createView("viewC", "coll", [{$match: {b: false}}, {$unionWith: "viewA"}]),
+        );
 
         // viewSkip: drops the first doc => 3 of 4.
         assert.commandWorked(testDB.createView("viewSkip", "coll", [{$skip: 1}]));
 
         // viewCount: returns {n: 2}.
-        assert.commandWorked(testDB.createView("viewCount", "coll", [{$match: {b: true}}, {$count: "n"}]));
+        assert.commandWorked(
+            testDB.createView("viewCount", "coll", [{$match: {b: true}}, {$count: "n"}]),
+        );
 
         // viewSkipUnionOuter: coll unioned with viewSkip via a user pipeline. The $set tags the
         // subpipe-side docs so we can isolate them from the outer side (which runs over coll
@@ -98,7 +104,9 @@ describe("view-of-view subpipeline resolution", function () {
         );
 
         // viewActive: hierColl filtered by active==true. Three docs.
-        assert.commandWorked(testDB.createView("viewActive", "hierColl", [{$match: {active: true}}]));
+        assert.commandWorked(
+            testDB.createView("viewActive", "hierColl", [{$match: {active: true}}]),
+        );
 
         // viewGraphLookupOuter: a view that $graphLookup-s against viewActive. The $match
         // active:true is applied at every recursion step, so only active ancestors appear.
@@ -136,7 +144,8 @@ describe("view-of-view subpipeline resolution", function () {
             assert.eq(
                 result.length,
                 8,
-                "coll $unionWith viewA should produce 8 docs but got: " + tojson(result.map((d) => d._id)),
+                "coll $unionWith viewA should produce 8 docs but got: " +
+                    tojson(result.map((d) => d._id)),
             );
         });
 
@@ -152,7 +161,9 @@ describe("view-of-view subpipeline resolution", function () {
         it("does not double-apply $skip on a view-targeted subpipeline", function () {
             // Single-apply: [$skip 1, $match a:true, $set tag] => 1 doc.
             // Double-apply: [$skip 1, $skip 1, $match a:true, $set tag] => 0 docs.
-            const expected = this.testDB.coll.aggregate([{$skip: 1}, {$match: {a: true}}]).toArray().length;
+            const expected = this.testDB.coll
+                .aggregate([{$skip: 1}, {$match: {a: true}}])
+                .toArray().length;
             const result = this.testDB.viewSkipUnionOuter.aggregate([]).toArray();
             const subpipeSide = result.filter((d) => d.tag === "sub").map((d) => d._id);
             assert.eq(
@@ -196,9 +207,17 @@ describe("view-of-view subpipeline resolution", function () {
             // Single-apply: each input gets joined: [{n:2, y:2}].
             // Double-apply: joined: [{n:0, y:0}].
             const result = this.testDB.viewCountLookupOuter.aggregate([]).toArray();
-            assert.eq(result.length, 4, "viewCountLookupOuter should return 4 docs (one per coll doc)");
+            assert.eq(
+                result.length,
+                4,
+                "viewCountLookupOuter should return 4 docs (one per coll doc)",
+            );
             for (const doc of result) {
-                assert.eq(doc.joined.length, 1, "Each doc should have exactly one joined entry; got: " + tojson(doc));
+                assert.eq(
+                    doc.joined.length,
+                    1,
+                    "Each doc should have exactly one joined entry; got: " + tojson(doc),
+                );
                 assert.eq(
                     doc.joined[0].n,
                     2,
@@ -239,7 +258,11 @@ describe("view-of-view subpipeline resolution", function () {
                         tojson(doc),
                 );
                 for (const j of doc.joined) {
-                    assert.eq(j.tag, "sub", "joined doc should carry tag from user pipeline: " + tojson(j));
+                    assert.eq(
+                        j.tag,
+                        "sub",
+                        "joined doc should carry tag from user pipeline: " + tojson(j),
+                    );
                 }
             }
         });
@@ -250,7 +273,9 @@ describe("view-of-view subpipeline resolution", function () {
             // For grandchild1 (active:true, parent:child1), $graphLookup against viewActive
             // should walk through 'child1' and 'root'. Inactive docs in the underlying
             // hierColl must not appear.
-            const result = this.testDB.viewGraphLookupOuter.aggregate([{$match: {_id: "grandchild1"}}]).toArray();
+            const result = this.testDB.viewGraphLookupOuter
+                .aggregate([{$match: {_id: "grandchild1"}}])
+                .toArray();
             assert.eq(result.length, 1, "should match exactly one doc for _id 'grandchild1'");
             const ancestorIds = result[0].ancestors.map((d) => d._id).sort();
             assert.eq(
@@ -259,7 +284,11 @@ describe("view-of-view subpipeline resolution", function () {
                 "grandchild1 should walk through 'child1' and 'root'; got: " + tojson(ancestorIds),
             );
             for (const a of result[0].ancestors) {
-                assert.eq(a.active, true, "graphLookup against viewActive returned inactive doc: " + tojson(a));
+                assert.eq(
+                    a.active,
+                    true,
+                    "graphLookup against viewActive returned inactive doc: " + tojson(a),
+                );
             }
         });
     });

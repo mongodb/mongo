@@ -17,7 +17,10 @@ export function checkCollectionUUIDs(adminDB) {
                 continue;
             }
 
-            assert(collectionInfos[i].info.uuid, "Expect uuid for collection: " + tojson(collectionInfos[i]));
+            assert(
+                collectionInfos[i].info.uuid,
+                "Expect uuid for collection: " + tojson(collectionInfos[i]),
+            );
         }
     });
 }

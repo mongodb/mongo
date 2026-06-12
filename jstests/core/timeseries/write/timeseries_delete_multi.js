@@ -186,7 +186,15 @@ const doc_id_12_time_nometa = {
 // Query on the 'f' field leads to partial/full bucket deletes.
 (function testMultiBucketDelete() {
     testDelete({
-        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
+        initialDocList: [
+            doc1_a_nofields,
+            doc2_a_f101,
+            doc3_a_f102,
+            doc4_b_f103,
+            doc5_b_f104,
+            doc6_c_f105,
+            doc7_c_f106,
+        ],
         deleteList: [
             {
                 q: {f: {$lt: 106}},
@@ -202,7 +210,15 @@ const doc_id_12_time_nometa = {
 // Query on meta results in scanning records that don't match the filter.
 (function testMultiBucketDeleteComplexBucketFilter() {
     testDelete({
-        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
+        initialDocList: [
+            doc1_a_nofields,
+            doc2_a_f101,
+            doc3_a_f102,
+            doc4_b_f103,
+            doc5_b_f104,
+            doc6_c_f105,
+            doc7_c_f106,
+        ],
         deleteList: [
             {
                 q: {f: {$in: [101, 102, 104, 105]}, [metaFieldName]: {$in: ["A", "C"]}},
@@ -227,7 +243,12 @@ const fixedBucketOptions = {
 // deletion.
 (function testFullBucketDelete_NoFilter() {
     testDelete({
-        initialDocList: [doc_id_8_time_f101, doc_id_9_time_f106, doc_id_10_time_nofields, doc_id_11_time_nofields],
+        initialDocList: [
+            doc_id_8_time_f101,
+            doc_id_9_time_f106,
+            doc_id_10_time_nofields,
+            doc_id_11_time_nofields,
+        ],
         deleteList: [
             {
                 q: {[timeFieldName]: {$lt: times[3]}},

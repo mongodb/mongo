@@ -6,7 +6,8 @@ import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_tran
 export var WriteWithoutShardKeyTestUtil = (function () {
     const Configurations = {
         noSession: "Running without a session",
-        sessionNotRetryableWrite: "Running within a session but not as a retryable write or transaction",
+        sessionNotRetryableWrite:
+            "Running within a session but not as a retryable write or transaction",
         sessionRetryableWrite: "Running as a retryable write",
         transaction: "Running as a transaction",
     };
@@ -22,7 +23,9 @@ export var WriteWithoutShardKeyTestUtil = (function () {
         const splitString = nss.split(".");
         const dbName = splitString[0];
 
-        assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}),
+        );
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: shardKey}));
 
         for (let splitPoint of splitPoints) {
@@ -116,7 +119,10 @@ export var WriteWithoutShardKeyTestUtil = (function () {
             assert.eq(expectedResponse.n, res.n);
         } else {
             assert.eq(expectedResponse.lastErrorObject.n, res.lastErrorObject.n);
-            assert.eq(expectedResponse.lastErrorObject.updateExisting, res.lastErrorObject.updateExisting);
+            assert.eq(
+                expectedResponse.lastErrorObject.updateExisting,
+                res.lastErrorObject.updateExisting,
+            );
             assert(typeof res.value !== "undefined");
 
             if (expectedResponse.value) {
@@ -143,7 +149,10 @@ export var WriteWithoutShardKeyTestUtil = (function () {
             assert.eq(expectedRetryResponse.retriedStmtIds, res.retriedStmtIds);
         } else {
             assert.eq(expectedRetryResponse.lastErrorObject.n, res.lastErrorObject.n);
-            assert.eq(expectedRetryResponse.lastErrorObject.updateExisting, res.lastErrorObject.updateExisting);
+            assert.eq(
+                expectedRetryResponse.lastErrorObject.updateExisting,
+                res.lastErrorObject.updateExisting,
+            );
             assert.eq(expectedRetryResponse.retriedStmtId, res.retriedStmtId);
             assert.eq(expectedRetryResponse.value, res.value);
         }
@@ -210,7 +219,12 @@ export var WriteWithoutShardKeyTestUtil = (function () {
 
             // Test that the retryable write response is recovered.
             if (testCase.retryableWriteTest) {
-                retryableWriteTest(dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
+                retryableWriteTest(
+                    dbConn,
+                    newCmdObj,
+                    operationType,
+                    testCase.expectedRetryResponse,
+                );
             }
 
             switch (operationType) {
@@ -223,7 +237,11 @@ export var WriteWithoutShardKeyTestUtil = (function () {
                     );
                     break;
                 case OperationType.findAndModifyUpdate:
-                    validateResultUpdate(allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);
+                    validateResultUpdate(
+                        allMatchedDocs,
+                        testCase.expectedMods,
+                        testCase.replacementDocTest,
+                    );
                     break;
                 case OperationType.deleteOne:
                     validateResultDelete(
@@ -247,7 +265,12 @@ export var WriteWithoutShardKeyTestUtil = (function () {
             // Check that the retryable write response is still recoverable even if the document was
             // removed.
             if (testCase.retryableWriteTest) {
-                retryableWriteTest(dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
+                retryableWriteTest(
+                    dbConn,
+                    newCmdObj,
+                    operationType,
+                    testCase.expectedRetryResponse,
+                );
             }
 
             // Killing the session after the command is done using it to not excessively leave

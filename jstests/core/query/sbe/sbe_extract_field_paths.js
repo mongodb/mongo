@@ -192,7 +192,11 @@ function runTestWithParameter(pipeline, useExtract, numExpectedExtractStages) {
     // Verify extract_field_paths stage exists
     const extractStages = getSbePlanStages(explain, "extract_field_paths");
     if (useExtract) {
-        assert.eq(extractStages.length, numExpectedExtractStages, "Should have extract_field_paths stage(s)");
+        assert.eq(
+            extractStages.length,
+            numExpectedExtractStages,
+            "Should have extract_field_paths stage(s)",
+        );
         for (let extractStage of extractStages) {
             assert.eq(extractStage["stage"], "extract_field_paths", "Stage name should match");
         }
@@ -211,17 +215,27 @@ function run(pipeline, numExpectedExtractStages) {
     assert(resultsEq(resultsWithExtract, resultsWithoutExtract));
 }
 
-const originalFrameworkControl = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-const originalFeatureFlagExtract = db.adminCommand({getParameter: 1, featureFlagExtractFieldPathsSbeStage: 1});
+const originalFrameworkControl = db.adminCommand({
+    getParameter: 1,
+    internalQueryFrameworkControl: 1,
+});
+const originalFeatureFlagExtract = db.adminCommand({
+    getParameter: 1,
+    featureFlagExtractFieldPathsSbeStage: 1,
+});
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+    );
 
     const n = 10;
     const documents = [
         ...(() => {
             const nestedModel = getDocumentModel();
-            const generatedDocs = fc.sample(nestedModel, n).map((doc, index) => Object.assign(doc, {_id: index}));
+            const generatedDocs = fc
+                .sample(nestedModel, n)
+                .map((doc, index) => Object.assign(doc, {_id: index}));
             // Quadratic.
             return generatedDocs.filter(function (item, pos) {
                 return generatedDocs.indexOf(item) == pos;
@@ -243,7 +257,10 @@ try {
 
             // Test $match then $project with covered plan.
             assert.commandWorked(db.c.createIndex({[indexField]: 1}));
-            const coveredIndexPipeline = [{$match: {[indexField]: {$gt: 0}}}, {$project: {x: fp0, _id: 0}}];
+            const coveredIndexPipeline = [
+                {$match: {[indexField]: {$gt: 0}}},
+                {$project: {x: fp0, _id: 0}},
+            ];
             jsTest.log({"coveredIndexPipeline": coveredIndexPipeline});
             run(coveredIndexPipeline, coveredPlanExpectExtractStage ? 1 : 0);
 
@@ -273,7 +290,10 @@ try {
             // Test $group then $project and $project then $group.
             const twoExtractStagePipelines = [
                 {
-                    pipeline: [{$project: {x: fp0, y: fp1}}, {$group: {_id: {path: "$x"}, pathSum: {$sum: "$y"}}}],
+                    pipeline: [
+                        {$project: {x: fp0, y: fp1}},
+                        {$group: {_id: {path: "$x"}, pathSum: {$sum: "$y"}}},
+                    ],
                     numExpectedExtractStages: 1,
                     numExpectedExtractStagesNoDottedPaths: 0,
                 },
@@ -289,10 +309,16 @@ try {
             jsTest.log({"twoExtractStagePipelines": twoExtractStagePipelines});
             for (let i = 0; i < twoExtractStagePipelines.length; i++) {
                 const pipeline = twoExtractStagePipelines[i].pipeline;
-                const numExpectedExtractStages = twoExtractStagePipelines[i].numExpectedExtractStages;
+                const numExpectedExtractStages =
+                    twoExtractStagePipelines[i].numExpectedExtractStages;
                 const numExpectedExtractStagesNoDottedPaths =
                     twoExtractStagePipelines[i].numExpectedExtractStagesNoDottedPaths;
-                run(pipeline, hasDottedPaths ? numExpectedExtractStages : numExpectedExtractStagesNoDottedPaths);
+                run(
+                    pipeline,
+                    hasDottedPaths
+                        ? numExpectedExtractStages
+                        : numExpectedExtractStagesNoDottedPaths,
+                );
             }
         }
     }
@@ -308,7 +334,8 @@ try {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
-            featureFlagExtractFieldPathsSbeStage: originalFeatureFlagExtract.featureFlagExtractFieldPathsSbeStage,
+            featureFlagExtractFieldPathsSbeStage:
+                originalFeatureFlagExtract.featureFlagExtractFieldPathsSbeStage,
         }),
     );
 }

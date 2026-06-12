@@ -19,7 +19,9 @@ function restartAndCheckLogs(conn, primary, replTest, shouldExist) {
         );
     replTest.restart(primary);
     let newPrimaryConn = replTest.getPrimary();
-    const startupWarnings = assert.commandWorked(newPrimaryConn.adminCommand({getLog: "startupWarnings"}));
+    const startupWarnings = assert.commandWorked(
+        newPrimaryConn.adminCommand({getLog: "startupWarnings"}),
+    );
     if (shouldExist) {
         assert(startupWarnings.log.some(includesStartupWarning));
     } else {
@@ -36,7 +38,11 @@ function restartAndCheckLogs(conn, primary, replTest, shouldExist) {
 function runTest(conn, primary, replTest) {
     jsTestLog("No warning should be issued if CWWC is set to {w: 1, wtimeout: 0}.");
     assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+            writeConcern: {w: "majority"},
+        }),
     );
     let res = conn.adminCommand({getDefaultRWConcern: 1});
     assert.eq(res.defaultWriteConcern, {"w": 1, "wtimeout": 0});

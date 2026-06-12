@@ -83,7 +83,11 @@ const doc1 = {
 // The default WC is majority and godinsert command on a secondary is incompatible with
 // wc:majority.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Insert corrupt document for testing via failpoint.
@@ -97,7 +101,9 @@ const insertCorruptDocument = function (db, collName) {
     );
     // Use godinsert to insert into the node directly.
     assert.commandWorked(db.runCommand({godinsert: collName, obj: doc1}));
-    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}),
+    );
 };
 
 function testKDefaultBSONValidation() {
@@ -218,8 +224,16 @@ function testMultipleBatches() {
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidHashQuery, 1);
 
     // Primary and secondary do not terminate after first batch and finish dbCheck successfully.
-    checkHealthLog(primary.getDB("local").system.healthlog, successfulBatchQuery, nDocs / maxDocsPerBatch);
-    checkHealthLog(secondary.getDB("local").system.healthlog, successfulBatchQuery, nDocs / maxDocsPerBatch - 1);
+    checkHealthLog(
+        primary.getDB("local").system.healthlog,
+        successfulBatchQuery,
+        nDocs / maxDocsPerBatch,
+    );
+    checkHealthLog(
+        secondary.getDB("local").system.healthlog,
+        successfulBatchQuery,
+        nDocs / maxDocsPerBatch - 1,
+    );
     // There should be no other error queries.
     checkHealthLog(primary.getDB("local").system.healthlog, errQuery, 0);
     checkHealthLog(secondary.getDB("local").system.healthlog, errQuery, 2);

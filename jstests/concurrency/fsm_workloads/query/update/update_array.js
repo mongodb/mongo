@@ -41,7 +41,10 @@ export const $config = (function () {
             // find the doc and make sure it was updated
             let doc = db[collName].findOne({_id: docIndex});
             assert.neq(null, doc);
-            assert(doc.hasOwnProperty("arr"), 'doc should have contained a field named "arr": ' + tojson(doc));
+            assert(
+                doc.hasOwnProperty("arr"),
+                'doc should have contained a field named "arr": ' + tojson(doc),
+            );
 
             // If the document was invalidated during a yield, then we may not have updated
             // anything. The $push operator always modifies the matched document, so if we
@@ -73,7 +76,10 @@ export const $config = (function () {
                 assert.eq(
                     -1,
                     doc.arr.indexOf(value),
-                    "doc.arr contains removed value (" + value + ") after $pull: " + tojson(doc.arr),
+                    "doc.arr contains removed value (" +
+                        value +
+                        ") after $pull: " +
+                        tojson(doc.arr),
                 );
             }
         }

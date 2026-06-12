@@ -20,13 +20,27 @@ assert.commandWorked(setParameter(db, "internalDocumentSourceCursorBatchSizeByte
 assert.commandWorked(setParameter(db, "internalQueryMaxBlockingSortMemoryUsageBytes", 1));
 // Spilling memory threshold for $group
 assert.commandWorked(setParameter(db, "internalDocumentSourceGroupMaxMemoryBytes", 1));
-assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1));
+assert.commandWorked(
+    setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1),
+);
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", isSbeEnabled ? 129 : 424));
+assert.commandWorked(
+    setParameter(
+        db,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+        isSbeEnabled ? 129 : 424,
+    ),
+);
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
 // Spilling memory threshold for $lookup and $lookup-$unwind
-assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1));
+assert.commandWorked(
+    setParameter(
+        db,
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+        1,
+    ),
+);
 // Spilling memory threshold for $graphLookup
 assert.commandWorked(setParameter(db, "internalDocumentSourceGraphLookupMaxMemoryBytes", 1));
 
@@ -73,7 +87,10 @@ function assertSpillingStats(explain, classicStageName, SBEStageName) {
     const stageName = explain.explainVersion === "1" ? classicStageName : SBEStageName;
 
     const stageExplain = getAggPlanStage(explain, stageName);
-    assert(stageExplain, `Did not find stage \"${stageName}\" in explain output ${tojson(explain)}`);
+    assert(
+        stageExplain,
+        `Did not find stage \"${stageName}\" in explain output ${tojson(explain)}`,
+    );
     assert(
         stageExplain.hasOwnProperty("usedDisk"),
         `Did not find stage "usedDisk" stat in explain output ${tojson(stageExplain)}`,
@@ -99,10 +116,14 @@ function assertSpillingStats(explain, classicStageName, SBEStageName) {
 function testSpillingStats(pipeline, classicStageName, SBEStageName) {
     jsTest.log.info(`Running pipeline`, pipeline);
 
-    const executionStats = db[collName].explain("executionStats").aggregate(pipeline, {"allowDiskUse": true});
+    const executionStats = db[collName]
+        .explain("executionStats")
+        .aggregate(pipeline, {"allowDiskUse": true});
     assertSpillingStats(executionStats, classicStageName, SBEStageName);
 
-    const allPlansExecution = db[collName].explain("allPlansExecution").aggregate(pipeline, {"allowDiskUse": true});
+    const allPlansExecution = db[collName]
+        .explain("allPlansExecution")
+        .aggregate(pipeline, {"allowDiskUse": true});
     assertSpillingStats(allPlansExecution, classicStageName, SBEStageName);
 }
 

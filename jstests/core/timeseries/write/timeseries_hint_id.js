@@ -22,7 +22,9 @@ const testDB = db.getSiblingDB(dbName);
 const coll = testDB.getCollection(collName);
 
 assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
 );
 
 const objA = {
@@ -46,9 +48,15 @@ assert.commandWorked(coll.insert([objA, objB, objC]));
 function runCommandOnTSCollection(commandWithHintObjectValue, commandWithHintStringValue) {
     // No user-facing index exists on the _id field. It only exists on the underlying buckets
     // collection.
-    assert.commandFailedWithCode(testDB.runCommand(commandWithHintObjectValue), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        testDB.runCommand(commandWithHintObjectValue),
+        ErrorCodes.BadValue,
+    );
 
-    assert.commandFailedWithCode(testDB.runCommand(commandWithHintStringValue), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        testDB.runCommand(commandWithHintStringValue),
+        ErrorCodes.BadValue,
+    );
 
     // Create an index on the _id field of the user-facing view collection.
     assert.commandWorked(coll.createIndex({_id: 1}));
@@ -57,7 +65,10 @@ function runCommandOnTSCollection(commandWithHintObjectValue, commandWithHintStr
     // "hint":{"control.min._id":1,"control.max._id":1}) for the buckets collection.
     assert.commandWorked(testDB.runCommand(commandWithHintObjectValue));
 
-    assert.commandFailedWithCode(testDB.runCommand(commandWithHintStringValue), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        testDB.runCommand(commandWithHintStringValue),
+        ErrorCodes.BadValue,
+    );
 
     // Drop the index on the _id field of the user-facing view collection.
     assert.commandWorked(coll.dropIndex({_id: 1}));
@@ -77,7 +88,11 @@ function runCommandOnTSCollection(commandWithHintObjectValue, commandWithHintStr
 
 (function runAggregateCommand() {
     assert.commandWorked(coll.insert([objA]));
-    const matchPipeline = [{$match: {metaFieldName: "a"}}, {$sort: {_id: 1}}, {$project: {_id: 0, time: 0}}];
+    const matchPipeline = [
+        {$match: {metaFieldName: "a"}},
+        {$sort: {_id: 1}},
+        {$project: {_id: 0, time: 0}},
+    ];
     runCommandOnTSCollection(
         {
             aggregate: collName,

@@ -17,7 +17,11 @@ const primary = replTest.getPrimary();
 // from {w: "majority"} to {w: 1}. In order for this reconfig to succeed, we must first
 // set the cluster-wide write concern.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: "majority"},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 jsTestLog("Start arbiter");

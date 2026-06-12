@@ -19,7 +19,9 @@ const dbName = testName;
 const collName = "testcoll";
 const replTest = new ReplSetTest({name: testName, nodes: 1, nodeOptions: {"syncdelay": 5}});
 replTest.startSet();
-replTest.initiate(Object.extend(replTest.getReplSetConfig(), {writeConcernMajorityJournalDefault: false}));
+replTest.initiate(
+    Object.extend(replTest.getReplSetConfig(), {writeConcernMajorityJournalDefault: false}),
+);
 
 const primary = replTest.getPrimary();
 const primaryDB = primary.getDB(dbName);
@@ -29,12 +31,19 @@ TestData.collectionName = collName;
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Turn on checkpoint logging.
 assert.commandWorked(
-    primary.adminCommand({"setParameter": 1, "logComponentVerbosity": {"storage": {"recovery": 2, "verbosity": 1}}}),
+    primary.adminCommand({
+        "setParameter": 1,
+        "logComponentVerbosity": {"storage": {"recovery": 2, "verbosity": 1}},
+    }),
 );
 jsTestLog("Writing data before oplog hole to collection.");
 assert.commandWorked(primaryColl.insert({_id: "a"}));
@@ -47,7 +56,9 @@ const failPoint = configureFailPoint(primaryDB, "hangAfterCollectionInserts", {
 
 const db = primaryDB;
 const joinHungWrite = startParallelShell(() => {
-    assert.commandFailed(db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}));
+    assert.commandFailed(
+        db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}),
+    );
     return 0;
 }, primary.port);
 failPoint.wait();

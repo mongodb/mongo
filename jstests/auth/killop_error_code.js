@@ -27,7 +27,9 @@ function runTest(m, failPointName) {
     t.insertOne({x: 1});
 
     if (!FixtureHelpers.isMongos(db)) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+        );
     }
 
     admin.logout();
@@ -61,19 +63,29 @@ function runTest(m, failPointName) {
 
     jsTest.log.info("Checking that the user cannot kill the op with a custom error code");
     assert.commandFailedWithCode(
-        db.adminCommand({killOp: 1, op: current_op_id, errorCode: ErrorCodes.InterruptedDueToOverload}),
+        db.adminCommand({
+            killOp: 1,
+            op: current_op_id,
+            errorCode: ErrorCodes.InterruptedDueToOverload,
+        }),
         ErrorCodes.Unauthorized,
     );
     db.logout();
 
     db.auth("opAdmin", "opAdmin");
-    jsTest.log.info("Checking that an administrative user can kill the op only with a valid custom error code");
+    jsTest.log.info(
+        "Checking that an administrative user can kill the op only with a valid custom error code",
+    );
     assert.commandFailedWithCode(
         db.adminCommand({killOp: 1, op: current_op_id, errorCode: ErrorCodes.DuplicateKey}),
         ErrorCodes.Unauthorized,
     );
     assert.commandWorked(
-        db.adminCommand({killOp: 1, op: current_op_id, errorCode: ErrorCodes.InterruptedDueToOverload}),
+        db.adminCommand({
+            killOp: 1,
+            op: current_op_id,
+            errorCode: ErrorCodes.InterruptedDueToOverload,
+        }),
     );
     db.logout();
 

@@ -15,7 +15,8 @@ const collName = "collTest";
 const coll = testDb.getCollection(collName);
 
 const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 describe("createIndexes", function () {
     beforeEach(function () {
@@ -40,12 +41,16 @@ describe("createIndexes", function () {
         });
 
         it("does not create any indexes when any spec in the list is malformed", function () {
-            const res = coll.runCommand("createIndexes", {indexes: [{}, {key: {m: 1}, name: "asd"}]});
+            const res = coll.runCommand("createIndexes", {
+                indexes: [{}, {key: {m: 1}, name: "asd"}],
+            });
             assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
         });
 
         it("fails with an unsupported index type", function () {
-            const res = coll.runCommand("createIndexes", {indexes: [{key: {x: "invalid_index_type"}, name: "x_1"}]});
+            const res = coll.runCommand("createIndexes", {
+                indexes: [{key: {x: "invalid_index_type"}, name: "x_1"}],
+            });
             assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
         });
 
@@ -55,12 +60,17 @@ describe("createIndexes", function () {
         });
 
         it("fails with index version v0", function () {
-            const res = coll.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 0}]});
+            const res = coll.runCommand("createIndexes", {
+                indexes: [{key: {d: 1}, name: "d_1", v: 0}],
+            });
             assert.commandFailed(res, "v0 index creation should fail");
         });
 
         it("fails with an invalid top-level field", function () {
-            const res = coll.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1"}], invalidField: 1});
+            const res = coll.runCommand("createIndexes", {
+                indexes: [{key: {e: 1}, name: "e_1"}],
+                invalidField: 1,
+            });
             assert.commandFailedWithCode(res, ErrorCodes.IDLUnknownField);
         });
 
@@ -100,7 +110,9 @@ describe("createIndexes", function () {
     });
 
     it("successfully creates a sparse index and updates the catalog", function () {
-        assert.commandWorked(coll.runCommand("createIndexes", {indexes: [{key: {c: 1}, sparse: true, name: "c_1"}]}));
+        assert.commandWorked(
+            coll.runCommand("createIndexes", {indexes: [{key: {c: 1}, sparse: true, name: "c_1"}]}),
+        );
         IndexUtils.assertIndexes(coll, [{_id: 1}, {c: 1}]);
         assert.eq(1, coll.getIndexes().filter((z) => z.sparse).length);
     });
@@ -162,7 +174,9 @@ describe("createIndexes", function () {
             }
 
             assert.commandWorked(
-                coll.runCommand("createIndexes", {indexes: [{key: {loc: "2d"}, name: "loc_2d", bits: 11.6}]}),
+                coll.runCommand("createIndexes", {
+                    indexes: [{key: {loc: "2d"}, name: "loc_2d", bits: 11.6}],
+                }),
             );
             IndexUtils.assertIndexExists(coll, {loc: "2d"}, {bits: 11});
             assert(

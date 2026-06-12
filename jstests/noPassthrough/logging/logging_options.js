@@ -27,7 +27,10 @@ testGetCmdLineOptsMongod({v: 2}, expectedResult);
 
 jsTest.log('Testing "systemLog.verbosity" config file option');
 expectedResult = {
-    "parsed": {"config": "jstests/libs/config_files/set_verbosity.json", "systemLog": {"verbosity": 5}},
+    "parsed": {
+        "config": "jstests/libs/config_files/set_verbosity.json",
+        "systemLog": {"verbosity": 5},
+    },
 };
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_verbosity.json"}, expectedResult);
 
@@ -45,7 +48,10 @@ expectedResult = {
         },
     },
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_component_verbosity.json"}, expectedResult);
+testGetCmdLineOptsMongod(
+    {config: "jstests/libs/config_files/set_component_verbosity.json"},
+    expectedResult,
+);
 
 // Log output testing
 let baseDir = MongoRunner.dataPath + baseName;

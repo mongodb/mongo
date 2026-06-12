@@ -31,12 +31,30 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
         this.dbName = "drain_in_flight_db";
 
         // Let mergeAllChunksOnShard merge chunks no matter how recently they were created.
-        configureFailPoint(this.st.configRS.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPoint(this.st.rs0.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
-        configureFailPoint(this.st.rs1.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPoint(
+            this.st.configRS.getPrimary(),
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPoint(
+            this.st.rs0.getPrimary(),
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
+        configureFailPoint(
+            this.st.rs1.getPrimary(),
+            "overrideHistoryWindowInSecs",
+            {seconds: -10},
+            "alwaysOn",
+        );
 
         assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
+            this.st.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.st.shard0.shardName,
+            }),
         );
     });
 
@@ -72,7 +90,10 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
         const failpoint = configureFailPoint(shard0Primary, "hangBeforeRunningCoordinatorInstance");
 
         // Start the chunk operation. Its coordinator pauses at the failpoint on shard0.
-        const opShell = startParallelShell(funWithArgs(opFn, this.st.s.host, this.ns, ...opArgs), this.st.s.port);
+        const opShell = startParallelShell(
+            funWithArgs(opFn, this.st.s.host, this.ns, ...opArgs),
+            this.st.s.port,
+        );
 
         // Wait for the coordinator to pause at the failpoint. Polling its state document instead
         // would be racy.
@@ -94,7 +115,15 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
         // When it returns, the shell writes the marker.
         const shardsvrShell = startParallelShell(
             funWithArgs(
-                function (shard0Host, ns, ignoredShardVersion, primaryShardId, markerHost, markerDb, markerColl) {
+                function (
+                    shard0Host,
+                    ns,
+                    ignoredShardVersion,
+                    primaryShardId,
+                    markerHost,
+                    markerDb,
+                    markerColl,
+                ) {
                     const shardConn = new Mongo(shard0Host);
                     assert.commandWorked(
                         shardConn.adminCommand({
@@ -108,7 +137,10 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
                             shardVersion: ignoredShardVersion,
                         }),
                     );
-                    new Mongo(markerHost).getDB(markerDb).getCollection(markerColl).insertOne({_id: "done"});
+                    new Mongo(markerHost)
+                        .getDB(markerDb)
+                        .getCollection(markerColl)
+                        .insertOne({_id: "done"});
                 },
                 shard0Primary.host,
                 this.ns,
@@ -186,7 +218,9 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
 
         this.runDrainScenario(
             function mergeOp(mongosHost, ns) {
-                new Mongo(mongosHost).getDB("admin").runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: 10}]});
+                new Mongo(mongosHost)
+                    .getDB("admin")
+                    .runCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: 10}]});
             },
             [],
             "mergeChunks",
@@ -199,7 +233,9 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
 
         this.runDrainScenario(
             function mergeAllOp(mongosHost, ns, shardName) {
-                new Mongo(mongosHost).getDB("admin").runCommand({mergeAllChunksOnShard: ns, shard: shardName});
+                new Mongo(mongosHost)
+                    .getDB("admin")
+                    .runCommand({mergeAllChunksOnShard: ns, shard: shardName});
             },
             [this.st.shard0.shardName],
             "mergeAllChunks",

@@ -48,7 +48,9 @@ describe("Tests for priority port usage within replication internals", function 
 
         this.setParameterOnNode = function (node) {
             this.parameterNodes.push(node);
-            assert.commandWorked(node.adminCommand({setParameter: 1, disableReplicationUsageOfPriorityPort: true}));
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, disableReplicationUsageOfPriorityPort: true}),
+            );
         };
     });
 
@@ -65,7 +67,9 @@ describe("Tests for priority port usage within replication internals", function 
             fp.off();
         });
         this.parameterNodes.forEach((node) => {
-            assert.commandWorked(node.adminCommand({setParameter: 1, disableReplicationUsageOfPriorityPort: false}));
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, disableReplicationUsageOfPriorityPort: false}),
+            );
         });
         if (this.prioritiesModified) {
             let config = this.rs.getReplSetConfigFromNode();
@@ -112,7 +116,9 @@ describe("Tests for priority port usage within replication internals", function 
         assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
         this.prioritiesModified = true;
 
-        jsTest.log.info("Block off the priority port so that nodes syncing via that port cannot progress");
+        jsTest.log.info(
+            "Block off the priority port so that nodes syncing via that port cannot progress",
+        );
         this.setParameterOnNode(fixedSecondary);
 
         jsTest.log.info("Check that our sync source is on the main port");
@@ -127,7 +133,9 @@ describe("Tests for priority port usage within replication internals", function 
         assert.commandWorked(primary.getDB("test").createCollection("foo"));
         for (let i = 0; i < 100; i++) {
             assert.commandWorked(
-                primary.getDB("test").runCommand({insert: "foo", documents: [{x: i}], writeConcern: {w: 1}}),
+                primary
+                    .getDB("test")
+                    .runCommand({insert: "foo", documents: [{x: i}], writeConcern: {w: 1}}),
             );
         }
 
@@ -170,7 +178,9 @@ describe("Tests for priority port usage within replication internals", function 
     it("Heartbeats via priority port", () => {
         let primary = this.rs.getPrimary();
 
-        jsTest.log.info("Switch the parameter on on the primary and block the secondaries's priority ports");
+        jsTest.log.info(
+            "Switch the parameter on on the primary and block the secondaries's priority ports",
+        );
         this.setParameterOnNode(primary);
         this.rs.getSecondaries().forEach((secondary) => {
             this.disablePriorityPortOnNode(secondary);
@@ -183,8 +193,10 @@ describe("Tests for priority port usage within replication internals", function 
         const heartbeatRequestSentLogID = '"id":4615670';
         assert.soon(() => {
             return (
-                rawMongoProgramOutput(heartbeatResponseReceivedLogID).split("\n").length >= waitForHeartbeats &&
-                rawMongoProgramOutput(heartbeatRequestSentLogID).split("\n").length >= waitForHeartbeats
+                rawMongoProgramOutput(heartbeatResponseReceivedLogID).split("\n").length >=
+                    waitForHeartbeats &&
+                rawMongoProgramOutput(heartbeatRequestSentLogID).split("\n").length >=
+                    waitForHeartbeats
             );
         });
 

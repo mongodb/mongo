@@ -20,7 +20,9 @@ try {
     );
 
     // Incremental Feature Rollout (IFR) flags _should_ be settable at runtime.
-    assert.commandWorked(standalone.adminCommand({setParameter: 1, featureFlagInDevelopmentForTest: false}));
+    assert.commandWorked(
+        standalone.adminCommand({setParameter: 1, featureFlagInDevelopmentForTest: false}),
+    );
     assert.eq(getParameter(standalone, "featureFlagInDevelopmentForTest").value, false);
 } finally {
     MongoRunner.stopMongod(standalone);

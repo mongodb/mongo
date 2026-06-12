@@ -37,18 +37,24 @@ const metricsBefore = db.serverStatus().metrics.query.group;
 
 // Set MaxMemory low to force spill to disk.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: maxMemoryLimitForGroupStage}),
+    db.adminCommand({
+        setParameter: 1,
+        internalDocumentSourceGroupMaxMemoryBytes: maxMemoryLimitForGroupStage,
+    }),
 );
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: maxMemoryLimitForGroupStage,
+        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
+            maxMemoryLimitForGroupStage,
     }),
 );
 
 const result = coll.explain("executionStats").aggregate(pipeline);
 
-const groupStage = isSbeEnabled ? getAggPlanStage(result, "group") : getAggPlanStage(result, "$group");
+const groupStage = isSbeEnabled
+    ? getAggPlanStage(result, "group")
+    : getAggPlanStage(result, "$group");
 
 const metricsAfter = db.serverStatus().metrics.query.group;
 
@@ -70,6 +76,10 @@ assert.eq(
 
 assert.gt(metricsAfter.spilledRecords, metricsBefore.spilledRecords, pipeline);
 
-assert.eq(metricsAfter.spilledRecords, expectedSpilledRecords + metricsBefore.spilledRecords, pipeline);
+assert.eq(
+    metricsAfter.spilledRecords,
+    expectedSpilledRecords + metricsBefore.spilledRecords,
+    pipeline,
+);
 
 MongoRunner.stopMongod(conn);

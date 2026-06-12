@@ -77,28 +77,54 @@ const pipeline = [
 let expectedResults = [
     {
         Species: "Bullfinch (Pyrrhula pyrrhula)",
-        population_trends: {term: {start: 2009, end: 2014}, pct_change: 12, annual: 2.38, trend: "weak increase"},
+        population_trends: {
+            term: {start: 2009, end: 2014},
+            pct_change: 12,
+            annual: 2.38,
+            trend: "weak increase",
+        },
     },
 ];
 
-assert.eq(coll.aggregate(pipeline, {let: {target_trend: "weak increase"}}).toArray(), expectedResults);
+assert.eq(
+    coll.aggregate(pipeline, {let: {target_trend: "weak increase"}}).toArray(),
+    expectedResults,
+);
 
 expectedResults = [
     {
         Species: "Chaffinch (Fringilla coelebs)",
-        population_trends: {term: {start: 2009, end: 2014}, pct_change: -7, annual: -1.49, trend: "weak decline"},
+        population_trends: {
+            term: {start: 2009, end: 2014},
+            pct_change: -7,
+            annual: -1.49,
+            trend: "weak decline",
+        },
     },
     {
         Species: "Song Thrush (Turdus philomelos)",
-        population_trends: {term: {start: 1970, end: 2014}, pct_change: -53, annual: -1.7, trend: "weak decline"},
+        population_trends: {
+            term: {start: 1970, end: 2014},
+            pct_change: -53,
+            annual: -1.7,
+            trend: "weak decline",
+        },
     },
 ];
-assert.eq(coll.aggregate(pipeline, {let: {target_trend: "weak decline"}}).toArray(), expectedResults);
+assert.eq(
+    coll.aggregate(pipeline, {let: {target_trend: "weak decline"}}).toArray(),
+    expectedResults,
+);
 
 // Test that running explain on the agg command works as expected.
 let explain = assert.commandWorked(
     testDB.runCommand({
-        explain: {aggregate: coll.getName(), pipeline, let: {target_trend: "weak decline"}, cursor: {}},
+        explain: {
+            aggregate: coll.getName(),
+            pipeline,
+            let: {target_trend: "weak decline"},
+            cursor: {},
+        },
         verbosity: "executionStats",
     }),
 );
@@ -364,12 +390,15 @@ assert.commandWorked(
     testDB.runCommand({
         delete: coll.getName(),
         let: {target_species: "Song Thrush (Turdus philomelos)"},
-        deletes: [{q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1}],
+        deletes: [
+            {q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1},
+        ],
     }),
 );
 
-result = assert.commandWorked(testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}})).cursor
-    .firstBatch;
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}}),
+).cursor.firstBatch;
 assert.eq(result.length, 0);
 
 assert.commandWorked(coll.insert({_id: 4, Species: "bird_to_remove"}));
@@ -380,7 +409,9 @@ explain = assert.commandWorked(
         explain: {
             delete: coll.getName(),
             let: {target_species: "bird_to_remove"},
-            deletes: [{q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1}],
+            deletes: [
+                {q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1},
+            ],
         },
         verbosity: "executionStats",
     }),
@@ -399,8 +430,9 @@ result = assert.commandWorked(
 );
 assert.eq(result.nRemoved, 1);
 
-result = assert.commandWorked(testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}})).cursor
-    .firstBatch;
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}}),
+).cursor.firstBatch;
 assert.eq(result.length, 0);
 
 // Test that reserved names are not allowed as let variable names.
@@ -416,12 +448,21 @@ assert.eq(result.length, 0);
     const reservedName = caseInfo.name;
     const expectedError = caseInfo.errorCode;
     assert.commandFailedWithCode(
-        testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {[reservedName]: "failure"}}),
+        testDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            cursor: {},
+            let: {[reservedName]: "failure"},
+        }),
         expectedError,
         `Expected an aggregate with the variable ${reservedName} to fail.`,
     );
     assert.commandFailedWithCode(
-        testDB.runCommand({update: coll.getName(), updates: [{q: {}, u: []}], let: {[reservedName]: "failure"}}),
+        testDB.runCommand({
+            update: coll.getName(),
+            updates: [{q: {}, u: []}],
+            let: {[reservedName]: "failure"},
+        }),
         expectedError,
         `Expected a pipeline style update with the variable ${reservedName} to fail.`,
     );
@@ -539,7 +580,10 @@ assert.eq(result.n, 1);
 assert.eq(result.nModified, 1);
 
 result = assert.commandWorked(
-    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Chaffinch (Fringilla coelebs)"]}}}),
+    testDB.runCommand({
+        find: coll.getName(),
+        filter: {$expr: {$eq: ["$Species", "Chaffinch (Fringilla coelebs)"]}},
+    }),
 );
 assert.eq(result.cursor.firstBatch.length, 0);
 
@@ -612,9 +656,13 @@ assert.commandFailedWithCode(
 
 // Test that the .update() shell helper supports let parameters.
 result = assert.commandWorked(
-    coll.update({_id: 3, $expr: {$eq: ["$Species", "$$target_species"]}}, [{$set: {Species: "$$new_name"}}], {
-        let: {target_species: "Pied Piper", new_name: "Chaffinch"},
-    }),
+    coll.update(
+        {_id: 3, $expr: {$eq: ["$Species", "$$target_species"]}},
+        [{$set: {Species: "$$new_name"}}],
+        {
+            let: {target_species: "Pied Piper", new_name: "Chaffinch"},
+        },
+    ),
 );
 assert.eq(result.nMatched, 1);
 assert.eq(result.nModified, 1);

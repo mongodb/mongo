@@ -47,24 +47,34 @@ function testMovePrimary(db) {
 
 for (let i = 0; i < fcvValues.length; i++) {
     // Latest FCV
-    assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Create database `createdBeforeDowngrading` under latest FCV
-    assert.commandWorked(mongos.adminCommand({enableSharding: kBeforeDowngradingDbName, primaryShard: shard0}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: kBeforeDowngradingDbName, primaryShard: shard0}),
+    );
     assert.commandWorked(createdBeforeDowngradingDB.coll.insert({_id: "foo"}));
 
     // Downgrade FCV
-    assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: fcvValues[i], confirm: true}));
+    assert.commandWorked(
+        mongos.adminCommand({setFeatureCompatibilityVersion: fcvValues[i], confirm: true}),
+    );
 
     // Make sure movePrimary works for `createdBeforeDowngrading`
     testMovePrimary(createdBeforeDowngradingDB);
 
     // Create database `createdBeforeUpgrading` under downgraded FCV
-    assert.commandWorked(mongos.adminCommand({enableSharding: kBeforeUpgradingDbName, primaryShard: shard0}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: kBeforeUpgradingDbName, primaryShard: shard0}),
+    );
     assert.commandWorked(createdBeforeUpgradingDB.coll.insert({_id: "foo"}));
 
     // Upgrade FCV
-    assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Make sure movePrimary works (again) for `createdBeforeDowngrading`
     testMovePrimary(createdBeforeDowngradingDB);

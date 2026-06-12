@@ -19,7 +19,9 @@ assertErrorCode(coll, [{"$count": "$x"}], 40158);
 assertErrorCode(coll, [{"$count": "te\u0000st"}], 40159);
 assertErrorCode(coll, [{"$count": "test.string"}], 40160);
 
-assert.commandWorked(coll.insertMany([...Array(1000).keys()].map((i) => ({a: i, condition: i % 2}))));
+assert.commandWorked(
+    coll.insertMany([...Array(1000).keys()].map((i) => ({a: i, condition: i % 2}))),
+);
 
 {
     const pipeline = [{"$count": "test"}];

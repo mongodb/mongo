@@ -8,7 +8,10 @@
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {ChangeStreamTest, isResumableChangeStreamError} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    isResumableChangeStreamError,
+} from "jstests/libs/query/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
@@ -24,7 +27,12 @@ function filterToExpectedKeys(event, expected) {
 }
 
 // Verify the set of events generated for the changestream.
-function verifyEvents({changeStream, cursor, isCollectionChangeStream = false, endOfTransactionChangeEvent = false}) {
+function verifyEvents({
+    changeStream,
+    cursor,
+    isCollectionChangeStream = false,
+    endOfTransactionChangeEvent = false,
+}) {
     let expectedOperationTypes = [
         "create",
         "shardCollection",
@@ -43,7 +51,9 @@ function verifyEvents({changeStream, cursor, isCollectionChangeStream = false, e
     ];
 
     if (isCollectionChangeStream || !endOfTransactionChangeEvent) {
-        expectedOperationTypes = expectedOperationTypes.filter((event) => event !== "endOfTransaction");
+        expectedOperationTypes = expectedOperationTypes.filter(
+            (event) => event !== "endOfTransaction",
+        );
 
         if (isCollectionChangeStream) {
             const startIndex = 5;
@@ -143,7 +153,11 @@ verifyEvents({
     cursor: allClusterCursor,
     endOfTransactionChangeEvent: isEndOfTransactionEnabled,
 });
-verifyEvents({changeStream: dbCS, cursor: dbCursor, endOfTransactionChangeEvent: isEndOfTransactionEnabled});
+verifyEvents({
+    changeStream: dbCS,
+    cursor: dbCursor,
+    endOfTransactionChangeEvent: isEndOfTransactionEnabled,
+});
 verifyEvents({
     changeStream: collCS,
     cursor: collCursor,
@@ -152,7 +166,11 @@ verifyEvents({
 });
 
 // Kill all shards and verify changestream errors.
-killShardAndTestErrorForChangeStream({sharding: st, changeStream: clusterCS, cursor: allClusterCursor});
+killShardAndTestErrorForChangeStream({
+    sharding: st,
+    changeStream: clusterCS,
+    cursor: allClusterCursor,
+});
 killShardAndTestErrorForChangeStream({sharding: st, changeStream: dbCS, cursor: dbCursor});
 killShardAndTestErrorForChangeStream({sharding: st, changeStream: collCS, cursor: collCursor});
 

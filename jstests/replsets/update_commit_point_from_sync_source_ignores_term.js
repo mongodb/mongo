@@ -29,7 +29,11 @@ rst.initiate(config);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const nodeA = rst.nodes[0];
@@ -46,7 +50,10 @@ rst.awaitLastOpCommitted();
 stopServerReplication([nodeB, nodeC, nodeD]);
 assert.commandWorked(nodeA.getDB(dbName)[collName].insert({_id: "term 1, doc 1"}));
 rst.awaitReplication(undefined, undefined, [nodeE]);
-assert.eq(0, nodeE.getDB(dbName)[collName].find({_id: "term 1, doc 1"}).readConcern("majority").itcount());
+assert.eq(
+    0,
+    nodeE.getDB(dbName)[collName].find({_id: "term 1, doc 1"}).readConcern("majority").itcount(),
+);
 
 jsTest.log("Disconnect Node E. Perform a new write.");
 nodeE.disconnect([nodeA, nodeB, nodeC, nodeD]);
@@ -59,7 +66,9 @@ rst.awaitReplication(undefined, undefined, [nodeB]);
 assert.commandWorked(nodeB.adminCommand({replSetStepUp: 1}));
 rst.awaitSecondaryNodes(null, [nodeA]);
 assert.eq(nodeB, rst.getPrimary());
-assert.commandWorked(nodeB.getDB(dbName)[collName].insert({_id: "term 2"}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    nodeB.getDB(dbName)[collName].insert({_id: "term 2"}, {writeConcern: {w: "majority"}}),
+);
 // Node E might sync from Node A or Node B. Ensure they both have the new commit point.
 rst.awaitLastOpCommitted(undefined, [nodeA]);
 
@@ -84,7 +93,12 @@ jsTest.log("Node E now knows that its first write is majority committed.");
 // It does not yet know that {_id: "term 1, doc 2"} is committed. Its last batch was {_id: "term
 // 1, doc 2"}. The sync source's lastOpCommitted was in term 2, so Node E updated its
 // lastOpCommitted to its lastApplied, which did not yet include {_id: "term 1, doc 2"}.
-assert.eq(1, nodeE.getDB(dbName)[collName].find({_id: "term 1, doc 1"}).readConcern("majority").itcount());
+assert.eq(
+    1,
+    nodeE.getDB(dbName)[collName].find({_id: "term 1, doc 1"}).readConcern("majority").itcount(),
+);
 
-assert.commandWorked(nodeE.adminCommand({configureFailPoint: "stopReplProducerOnDocument", mode: "off"}));
+assert.commandWorked(
+    nodeE.adminCommand({configureFailPoint: "stopReplProducerOnDocument", mode: "off"}),
+);
 rst.stopSet();

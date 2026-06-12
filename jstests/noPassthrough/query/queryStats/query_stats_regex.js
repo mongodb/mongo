@@ -31,7 +31,11 @@ assert.commandWorked(bulk.execute());
 {
     coll.find({foo: {$regex: ".*", $options: "m"}}).itcount();
     const queryStats = getLatestQueryStatsEntry(testDB, {collName: coll.getName()});
-    assert.eq({"foo": {"$regex": "?string", "$options": "?string"}}, queryStats.key.queryShape.filter, queryStats);
+    assert.eq(
+        {"foo": {"$regex": "?string", "$options": "?string"}},
+        queryStats.key.queryShape.filter,
+        queryStats,
+    );
 }
 
 MongoRunner.stopMongod(conn);

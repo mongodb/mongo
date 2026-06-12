@@ -100,11 +100,16 @@ const withinPolygon = {
     assert.commandWorked(coll.insert({_id: 2, geo: normalPolygon}));
 
     const indexes = coll.getIndexes();
-    assert(!indexes.some((idx) => idx.key && idx.key.geo === "2dsphere"), "Expected no 2dsphere index");
+    assert(
+        !indexes.some((idx) => idx.key && idx.key.geo === "2dsphere"),
+        "Expected no 2dsphere index",
+    );
 
     // $geoIntersects returns only the normal document — the strict-winding doc is skipped, but
     // the query is functional and returns correct results.
-    const intersectResults = coll.find({geo: {$geoIntersects: {$geometry: queryPolygon}}}).toArray();
+    const intersectResults = coll
+        .find({geo: {$geoIntersects: {$geometry: queryPolygon}}})
+        .toArray();
     assert.eq(intersectResults.length, 1, "$geoIntersects should match only the normal document");
     assert.eq(intersectResults[0]._id, 2, "matched document should be the normal polygon");
 

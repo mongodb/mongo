@@ -21,7 +21,11 @@ assert.commandWorked(
             "student": "Ann Aardvark",
             sickdays: [new Date("2024-05-01"), new Date("2024-08-23")],
         },
-        {"_id": 5, "student": "Zoe Zebra", sickdays: [new Date("2024-02-01"), new Date("2024-05-23")]},
+        {
+            "_id": 5,
+            "student": "Zoe Zebra",
+            sickdays: [new Date("2024-02-01"), new Date("2024-05-23")],
+        },
     ]),
 );
 
@@ -43,7 +47,12 @@ assert.commandWorked(
             name: "What If Cats and Dogs Had Opposable Thumbs? Day",
             date: new Date("2024-01-01"),
         },
-        {_id: 5, year: 2022, name: "National Do a Grouch a Favor Day", date: new Date("2022-02-16")},
+        {
+            _id: 5,
+            year: 2022,
+            name: "National Do a Grouch a Favor Day",
+            date: new Date("2022-02-16"),
+        },
     ]),
 );
 
@@ -55,7 +64,10 @@ const firstThreeMonthsView = testDb[viewName];
 
 const indexConfig = {
     coll: firstThreeMonthsView,
-    definition: {name: "sillyHolidaysInFirstThreeMonthsIx", definition: {"mappings": {"dynamic": true}}},
+    definition: {
+        name: "sillyHolidaysInFirstThreeMonthsIx",
+        definition: {"mappings": {"dynamic": true}},
+    },
 };
 
 const lookupCacheTestCases = (isStoredSource) => {

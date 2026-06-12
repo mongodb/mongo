@@ -342,7 +342,11 @@ function runIndexedUnionWithPipelineTest(conn, coll1) {
             {
                 $unionWith: {
                     coll: coll2.getName(),
-                    pipeline: [{$match: {a: {$lt: "?number"}}}, {$sort: {b: 1}}, {$limit: "?number"}],
+                    pipeline: [
+                        {$match: {a: {$lt: "?number"}}},
+                        {$sort: {b: 1}},
+                        {$limit: "?number"},
+                    ],
                 },
             },
         ],
@@ -498,7 +502,11 @@ function runFacetPipelineTest(conn, coll) {
         ],
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll.getName(),
+        queryShapeExtra: shape,
+    });
 
     // $facet returns a single document.
     const expectedDocs = 1;

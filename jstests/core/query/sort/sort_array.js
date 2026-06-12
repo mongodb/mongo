@@ -35,7 +35,12 @@ function testAggAndFindSort({filter, sort, project, hint, expected, expectBlocki
         assert(!planHasStage(db, explain, "SORT"));
     }
 
-    let pipeline = [{$_internalInhibitOptimization: {}}, {$match: filter}, {$sort: sort}, {$project: project}];
+    let pipeline = [
+        {$_internalInhibitOptimization: {}},
+        {$match: filter},
+        {$sort: sort},
+        {$project: project},
+    ];
     cursor = coll.aggregate(pipeline);
     assert.eq(cursor.toArray(), expected);
     explain = coll.explain().aggregate(pipeline);
@@ -232,7 +237,13 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, d: 3, e: [1, 2, 3]}));
 assert.commandWorked(coll.insert({_id: 1, d: [0, 4, -1], e: 4}));
 assert.commandWorked(coll.createIndex({d: 1, e: 1}));
-testAggAndFindSort({filter: {d: 1}, sort: {e: 1}, project: {_id: 1}, expected: [], expectBlockingSort: false});
+testAggAndFindSort({
+    filter: {d: 1},
+    sort: {e: 1},
+    project: {_id: 1},
+    expected: [],
+    expectBlockingSort: false,
+});
 
 // Test that a multikey index can provide a sort over a non-multikey field.
 coll.drop();
@@ -251,8 +262,12 @@ assert(!planHasStage(db, explain, "SORT"));
 // Test that we can correctly sort by an array field in agg when there are additional fields not
 // involved in the sort pattern.
 coll.drop();
-assert.commandWorked(coll.insert({_id: 0, a: 1, b: {c: 1}, d: [{e: {f: 1, g: [6, 5, 4]}}, {e: {g: [3, 2, 1]}}]}));
-assert.commandWorked(coll.insert({_id: 1, a: 2, b: {c: 2}, d: [{e: {f: 2, g: [5, 4, 3]}}, {e: {g: [2, 1, 0]}}]}));
+assert.commandWorked(
+    coll.insert({_id: 0, a: 1, b: {c: 1}, d: [{e: {f: 1, g: [6, 5, 4]}}, {e: {g: [3, 2, 1]}}]}),
+);
+assert.commandWorked(
+    coll.insert({_id: 1, a: 2, b: {c: 2}, d: [{e: {f: 2, g: [5, 4, 3]}}, {e: {g: [2, 1, 0]}}]}),
+);
 
 testAggAndFindSort({
     filter: {},

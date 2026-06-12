@@ -79,7 +79,10 @@ describe("setQuerySettings commands against", function () {
     });
 
     it("find commands with rawData=true should not apply query settings", function () {
-        assertSetQuerySettingsByQueryValidationFailure(this.qsutils, {...this.findQueryInstance, ...rawDataOpt(true)});
+        assertSetQuerySettingsByQueryValidationFailure(this.qsutils, {
+            ...this.findQueryInstance,
+            ...rawDataOpt(true),
+        });
         // TODO SERVER-112940: Enable this test after the find command is updated to include the rawData parameter in its query shape hash calculation.
         // assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, {...this.findQueryInstance, ...rawDataOpt(true)});
     });
@@ -101,7 +104,10 @@ describe("setQuerySettings commands against", function () {
     });
 
     it("aggregate commands with rawData=true should not apply query settings", function () {
-        assertSetQuerySettingsByQueryValidationFailure(this.qsutils, {...this.aggQueryInstance, ...rawDataOpt(true)});
+        assertSetQuerySettingsByQueryValidationFailure(this.qsutils, {
+            ...this.aggQueryInstance,
+            ...rawDataOpt(true),
+        });
         // TODO SERVER-112940: Enable this test after the aggregate command is updated to include the rawData parameter in its query shape hash calculation.
         // assertQuerySettingsRejectFlagIsNotApplied(this.qsutils, {...this.aggQueryInstance, ...rawDataOpt(true)});
     });

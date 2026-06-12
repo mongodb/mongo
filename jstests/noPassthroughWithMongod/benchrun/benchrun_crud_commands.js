@@ -30,7 +30,9 @@ function executeBenchRun(benchOps) {
 function testInsert(docs, wc) {
     coll.drop();
 
-    let res = executeBenchRun([{ns: coll.getFullName(), op: "insert", doc: docs, writeCmd: true, writeConcern: wc}]);
+    let res = executeBenchRun([
+        {ns: coll.getFullName(), op: "insert", doc: docs, writeCmd: true, writeConcern: wc},
+    ]);
 
     assert.gt(coll.count(), 0);
     assert.eq(coll.findOne({}, {_id: 0}), docs[0]);

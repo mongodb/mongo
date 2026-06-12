@@ -77,7 +77,9 @@ function checkProfilingLogs(primary) {
     };
     assert.commandWorked(db.runCommand(cmd));
     let userProfileDocs = db.system.profile.find({"command.comment": cmd["comment"]}).toArray();
-    let configProfileDocs = configDB.system.profile.find({"command.comment": cmd["comment"]}).toArray();
+    let configProfileDocs = configDB.system.profile
+        .find({"command.comment": cmd["comment"]})
+        .toArray();
     // The write performed by the findAndModify must show up on the `for_profiling` database's
     // `system.profile` collection. And it must not show up in the `config` database, associated
     // with `config.image_collection`.

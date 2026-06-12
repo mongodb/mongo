@@ -69,7 +69,11 @@ function testInvalidParameter() {
         ErrorCodes.InvalidOptions,
     );
     assert.commandFailedWithCode(
-        db.runCommand({dbCheck: colName, validateMode: "extraIndexKeysCheck", skipLookupForExtraKeys: true}),
+        db.runCommand({
+            dbCheck: colName,
+            validateMode: "extraIndexKeysCheck",
+            skipLookupForExtraKeys: true,
+        }),
         ErrorCodes.InvalidOptions,
     );
 
@@ -147,7 +151,10 @@ function testValidParameter() {
     );
 }
 
-const secondaryIndexChecks = FeatureFlagUtil.isPresentAndEnabled(primary, "SecondaryIndexChecksInDbCheck");
+const secondaryIndexChecks = FeatureFlagUtil.isPresentAndEnabled(
+    primary,
+    "SecondaryIndexChecksInDbCheck",
+);
 if (secondaryIndexChecks) {
     testInvalidParameter();
     testValidParameter();

@@ -10,7 +10,9 @@
 import {runTests} from "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
 
 const initFunc = (primary, ns, counterTotal) => {
-    assert.commandWorked(primary.getCollection(ns).insert({_id: 0, counter: 0}, {writeConcern: {w: 5}}));
+    assert.commandWorked(
+        primary.getCollection(ns).insert({_id: 0, counter: 0}, {writeConcern: {w: 5}}),
+    );
 };
 
 const stopReplProducerOnDocumentFunc = (counterMajorityCommitted) => {
@@ -20,7 +22,10 @@ const stopReplProducerOnDocumentFunc = (counterMajorityCommitted) => {
 const opsFunc = (primary, ns, counterTotal, lsid) => {
     assert.commandWorked(
         primary.getCollection(ns).runCommand("update", {
-            updates: Array.from({length: counterTotal}, () => ({q: {_id: 0}, u: {$inc: {counter: 1}}})),
+            updates: Array.from({length: counterTotal}, () => ({
+                q: {_id: 0},
+                u: {$inc: {counter: 1}},
+            })),
             lsid,
             txnNumber: NumberLong(2),
         }),
@@ -37,7 +42,10 @@ const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, ls
 
     assert.commandWorked(
         secondary1.getCollection(ns).runCommand("update", {
-            updates: Array.from({length: counterTotal}, () => ({q: {_id: 0}, u: {$inc: {counter: 1}}})),
+            updates: Array.from({length: counterTotal}, () => ({
+                q: {_id: 0},
+                u: {$inc: {counter: 1}},
+            })),
             lsid,
             txnNumber: NumberLong(2),
             writeConcern: {w: 5},
@@ -50,4 +58,10 @@ const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, ls
     assert.eq(docAfterRetry, {_id: 0, counter: counterTotal});
 };
 
-runTests(initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);
+runTests(
+    initFunc,
+    stopReplProducerOnDocumentFunc,
+    opsFunc,
+    stmtMajorityCommittedFunc,
+    validateFunc,
+);

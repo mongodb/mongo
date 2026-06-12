@@ -23,23 +23,35 @@ function testPrivileges() {
     assert.commandWorked(adminDb.runCommand({createUser: "user_no_priv", pwd: "pwd", roles: []}));
 
     assert.commandWorked(
-        adminDb.runCommand({createUser: "user_priv1", pwd: "pwd", roles: [{role: "role_ok_priv", db: "admin"}]}),
+        adminDb.runCommand({
+            createUser: "user_priv1",
+            pwd: "pwd",
+            roles: [{role: "role_ok_priv", db: "admin"}],
+        }),
     );
 
     assert.commandWorked(
-        adminDb.runCommand({createUser: "user_priv2", pwd: "pwd", roles: [{role: "clusterMonitor", db: "admin"}]}),
+        adminDb.runCommand({
+            createUser: "user_priv2",
+            pwd: "pwd",
+            roles: [{role: "clusterMonitor", db: "admin"}],
+        }),
     );
 
     assert(adminDb.logout());
 
     // User is in a role with privileges to execute the stage
     assert(adminDb.auth("user_priv1", "pwd"));
-    assert.commandWorked(adminDb.runCommand({aggregate: 1, pipeline: [{$shardedDataDistribution: {}}], cursor: {}}));
+    assert.commandWorked(
+        adminDb.runCommand({aggregate: 1, pipeline: [{$shardedDataDistribution: {}}], cursor: {}}),
+    );
     assert(adminDb.logout());
 
     // User is in a role with privileges to execute the stage
     assert(adminDb.auth("user_priv2", "pwd"));
-    assert.commandWorked(adminDb.runCommand({aggregate: 1, pipeline: [{$shardedDataDistribution: {}}], cursor: {}}));
+    assert.commandWorked(
+        adminDb.runCommand({aggregate: 1, pipeline: [{$shardedDataDistribution: {}}], cursor: {}}),
+    );
     assert(adminDb.logout());
 
     // User has no privileges to execute the stage

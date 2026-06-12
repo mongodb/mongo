@@ -21,15 +21,23 @@ skipTestIfViewlessTimeseriesEnabled(db, () => st.stop());
 const coll = db.coll;
 const bucketsColl = db.system.buckets.coll;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+);
 
 configureFailPoint(st.rs0.getPrimary(), "skipCreateTimeseriesBucketsWithoutOptionsCheck");
 
 assert.commandWorked(db.createCollection(bucketsColl.getName()));
 
 // Attempting to shard the collection either directly or through the buckets namespace will fail.
-assert.commandFailedWithCode(db.adminCommand({shardCollection: coll.getFullName(), key: {meta: 1}}), 9934501);
-assert.commandFailedWithCode(db.adminCommand({shardCollection: bucketsColl.getFullName(), key: {meta: 1}}), 5731501);
+assert.commandFailedWithCode(
+    db.adminCommand({shardCollection: coll.getFullName(), key: {meta: 1}}),
+    9934501,
+);
+assert.commandFailedWithCode(
+    db.adminCommand({shardCollection: bucketsColl.getFullName(), key: {meta: 1}}),
+    5731501,
+);
 
 // Attempting to move the collection either directly or through the buckets namespace will fail.
 assert.commandFailedWithCode(

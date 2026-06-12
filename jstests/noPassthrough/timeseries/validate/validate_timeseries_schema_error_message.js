@@ -29,7 +29,9 @@ describe("validate distinguishes time-series bucket vs user-defined schema viola
 
         // Mark a compressed bucket as uncompressed so it fails the strict consistency check.
         assert.commandWorked(
-            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+            this.conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
         );
         getTimeseriesCollForRawOps(this.db, coll).update(
             {},
@@ -37,7 +39,9 @@ describe("validate distinguishes time-series bucket vs user-defined schema viola
             getRawOperationSpec(this.db),
         );
         assert.commandWorked(
-            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
+            this.conn
+                .getDB("admin")
+                .runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
         );
 
         const res = assert.commandWorked(coll.validate());
@@ -69,7 +73,11 @@ describe("validate distinguishes time-series bucket vs user-defined schema viola
         );
 
         assert.commandWorked(
-            this.db.runCommand({insert: collName, documents: [{x: 1}], bypassDocumentValidation: true}),
+            this.db.runCommand({
+                insert: collName,
+                documents: [{x: 1}],
+                bypassDocumentValidation: true,
+            }),
         );
 
         const res = assert.commandWorked(this.db.getCollection(collName).validate());
@@ -87,7 +95,8 @@ describe("validate distinguishes time-series bucket vs user-defined schema viola
         );
         assert(
             !res.warnings.some((w) => w.includes("time-series")),
-            "Should not mention time-series for user schema violation, got: " + tojson(res.warnings),
+            "Should not mention time-series for user schema violation, got: " +
+                tojson(res.warnings),
         );
     });
 });

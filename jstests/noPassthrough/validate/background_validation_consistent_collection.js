@@ -39,7 +39,9 @@ let res = assert.commandWorked(coll.validate({background: true}));
 assert(res.valid);
 assert.eq(2, res.nrecords);
 
-assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}),
+);
 
 assert.commandWorked(coll.remove({_id: 2}));
 assert.commandWorked(

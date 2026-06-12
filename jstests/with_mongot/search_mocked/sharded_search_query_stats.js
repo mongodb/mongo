@@ -3,7 +3,10 @@
  * @tags: [featureFlagQueryStats]
  */
 
-import {getQueryStatsAggCmd, getQueryStatsServerParameters} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsAggCmd,
+    getQueryStatsServerParameters,
+} from "jstests/libs/query/query_stats_utils.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mockPlanShardedSearchResponse,
@@ -30,7 +33,9 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const testColl = testDB.getCollection(collName);
 testColl.drop();
@@ -135,7 +140,13 @@ function testBasicCase(shard0Conn, shard1Conn) {
         {_id: 1, x: "ow"},
     ];
 
-    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+    );
 
     assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
 }

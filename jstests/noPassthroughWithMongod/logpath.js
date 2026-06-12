@@ -79,14 +79,24 @@ if (false) {
         print("------ Skipping fork tests... (Windows)");
     } else {
         print("------ Start mongod with logpath set to new file, fork");
-        var m = MongoRunner.runMongod({port: port[2], dbpath: dbdir, logpath: logdir + logs[1], fork: true});
+        var m = MongoRunner.runMongod({
+            port: port[2],
+            dbpath: dbdir,
+            logpath: logdir + logs[1],
+            fork: true,
+        });
 
         // log should now exist (and no rotations should exist)
         assert.eq(logCount(logs[1], true), 1);
         MongoRunner.stopMongod(m /*port[2]*/);
 
         print("------ Start mongod with logpath set to existing file, fork");
-        m = MongoRunner.runMongod({port: port[3], dbpath: dbdir, logpath: logdir + logs[1], fork: true});
+        m = MongoRunner.runMongod({
+            port: port[3],
+            dbpath: dbdir,
+            logpath: logdir + logs[1],
+            fork: true,
+        });
 
         // log should continue to exist
         assert.eq(logCount(logs[1]), 1);

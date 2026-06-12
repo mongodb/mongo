@@ -118,7 +118,9 @@ describe("sharded transactions with ingress rate limiter active", function () {
         // shard1 so that transactions targeting negative _id values are single-shard and those
         // spanning negative and positive _id values require two-phase commit.
         assert.commandWorked(exemptConn.adminCommand({enableSharding: "test"}));
-        assert.commandWorked(exemptConn.adminCommand({shardCollection: "test.coll", key: {_id: 1}}));
+        assert.commandWorked(
+            exemptConn.adminCommand({shardCollection: "test.coll", key: {_id: 1}}),
+        );
         assert.commandWorked(exemptConn.adminCommand({split: "test.coll", middle: {_id: 0}}));
         assert.commandWorked(
             exemptConn.adminCommand({

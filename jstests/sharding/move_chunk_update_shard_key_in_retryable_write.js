@@ -33,7 +33,9 @@ let st = new ShardingTest({
     mongos: 2,
     shards: 3,
     rs: {nodes: 2},
-    rsOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
+    rsOptions: {
+        setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS},
+    },
 });
 
 const dbName = "test";
@@ -45,7 +47,9 @@ let mongos1TestDB = st.s1.getDB(dbName);
 
 // Create a sharded collection with three chunks:
 //     [-inf, -10), [-10, 10), [10, inf)
-assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -10}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 10}}));
@@ -58,9 +62,15 @@ assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 10}}));
  *     shard2: [10, inf)
  */
 function setUp() {
-    assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: -100}, to: st.shard0.shardName}));
-    assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
-    assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: ns, find: {x: -100}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}),
+    );
 
     flushRoutersAndRefreshShardMetadata(st, {ns});
 }
@@ -160,7 +170,10 @@ function attachTxnFields(cmdObj) {
 
         // Retry the commands. They should run against shard0, which should throw
         // IncompleteTransactionHistory.
-        assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj), ErrorCodes.IncompleteTransactionHistory);
+        assert.commandFailedWithCode(
+            mongos0TestDB.runCommand(updateCmdObj),
+            ErrorCodes.IncompleteTransactionHistory,
+        );
         assert.commandFailedWithCode(
             mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
             ErrorCodes.IncompleteTransactionHistory,
@@ -185,7 +198,11 @@ function attachTxnFields(cmdObj) {
 
             // Move the chunk that contained the original document to shard1.
             assert.commandWorked(
-                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard1.shardName}),
+                st.s0.adminCommand({
+                    moveChunk: ns,
+                    find: {x: shardKeyValueOnShard0},
+                    to: st.shard1.shardName,
+                }),
             );
 
             // Retry the command. This should retry against shard1, which should throw
@@ -219,12 +236,20 @@ function attachTxnFields(cmdObj) {
 
             // Move the chunk that contained the original document to shard1.
             assert.commandWorked(
-                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard1.shardName}),
+                st.s0.adminCommand({
+                    moveChunk: ns,
+                    find: {x: shardKeyValueOnShard0},
+                    to: st.shard1.shardName,
+                }),
             );
 
             // Then move the same chunk that contained the original document to shard2.
             assert.commandWorked(
-                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard2.shardName}),
+                st.s0.adminCommand({
+                    moveChunk: ns,
+                    find: {x: shardKeyValueOnShard0},
+                    to: st.shard2.shardName,
+                }),
             );
 
             // Retry the command. This should retry against shard1, which should throw
@@ -259,7 +284,11 @@ function attachTxnFields(cmdObj) {
             // Move the chunk that contained the original document to shard2, which does not know
             // about the transaction.
             assert.commandWorked(
-                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard2.shardName}),
+                st.s0.adminCommand({
+                    moveChunk: ns,
+                    find: {x: shardKeyValueOnShard0},
+                    to: st.shard2.shardName,
+                }),
             );
 
             // Retry the command. This should retry against shard2, which should throw
@@ -340,7 +369,10 @@ test("config.transactions entries for single-shard transactions which commit dur
         lsid: session.getSessionId(),
         txnNumber: NumberLong(session.getTxnNumber_forTesting()),
     };
-    assert.commandFailedWithCode(mongos0TestDB.runCommand(fakeRetryCmd), ErrorCodes.IncompleteTransactionHistory);
+    assert.commandFailedWithCode(
+        mongos0TestDB.runCommand(fakeRetryCmd),
+        ErrorCodes.IncompleteTransactionHistory,
+    );
 });
 
 {
@@ -458,7 +490,10 @@ test("config.transactions entries for single-shard transactions which commit dur
                 // If the retry is done against a different mongos, it should fail on shard1
                 // when the shard receives a transaction statement with a txnNumber that is already
                 // committed.
-                assert.commandFailedWithCode(mongos1TestDB.runCommand(findAndModifyUpsertCmdObj), 50911);
+                assert.commandFailedWithCode(
+                    mongos1TestDB.runCommand(findAndModifyUpsertCmdObj),
+                    50911,
+                );
             }
         },
     );

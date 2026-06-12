@@ -29,17 +29,21 @@ coll.insert({_id: 1, x: 2, y: 2});
 
 const viewName = "explain_unionwith_view";
 assertDropCollection(db, viewName);
-assert.commandWorked(db.createView(viewName, coll.getName(), [{$match: {x: 1, y: 1}}, {$project: {x: 1, y: 1}}]));
+assert.commandWorked(
+    db.createView(viewName, coll.getName(), [{$match: {x: 1, y: 1}}, {$project: {x: 1, y: 1}}]),
+);
 
 function checkExplainProperties(explainRoot, hasExecutionStats) {
-    const unionWithPipelineExplain = getUnionWithStage(explainRoot, "$unionWith").$unionWith.pipeline[0].$cursor;
+    const unionWithPipelineExplain = getUnionWithStage(explainRoot, "$unionWith").$unionWith
+        .pipeline[0].$cursor;
 
     // Since we have resolved the view in the pipeline we should see the view's $match stage in the
     // 'parsedQuery' of the $cursor stage.
     assert.eq(
         {$and: [{x: {$eq: 1}}, {y: {$eq: 1}}]},
         unionWithPipelineExplain.queryPlanner.parsedQuery,
-        "Did not find the expected parsedQuery for the $unionWith pipeline, the explain is " + tojson(explainRoot),
+        "Did not find the expected parsedQuery for the $unionWith pipeline, the explain is " +
+            tojson(explainRoot),
     );
 
     if (hasExecutionStats) {
@@ -58,7 +62,9 @@ const pipeline = [{$project: {y: 1}}];
 
 // The default verbosity for explain is 'queryPlanner'.
 jsTestLog("Running explain('queryPlanner') on collection:");
-checkExplainProperties(coll.explain().aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]));
+checkExplainProperties(
+    coll.explain().aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
+);
 
 jsTestLog("Running explain('executionStats') on collection:");
 checkExplainProperties(
@@ -68,21 +74,29 @@ checkExplainProperties(
 
 jsTestLog("Running explain('allPlansExecution') on collection:");
 checkExplainProperties(
-    coll.explain("allPlansExecution").aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
+    coll
+        .explain("allPlansExecution")
+        .aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
     true,
 );
 
 jsTestLog("Running explain('queryPlanner') on view:");
-checkExplainProperties(db[viewName].explain().aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]));
+checkExplainProperties(
+    db[viewName].explain().aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
+);
 
 jsTestLog("Running explain('executionStats') on view:");
 checkExplainProperties(
-    db[viewName].explain("executionStats").aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
+    db[viewName]
+        .explain("executionStats")
+        .aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
     true,
 );
 
 jsTestLog("Running explain('allPlansExecution') on view:");
 checkExplainProperties(
-    db[viewName].explain("allPlansExecution").aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
+    db[viewName]
+        .explain("allPlansExecution")
+        .aggregate([{$unionWith: {coll: viewName, pipeline: pipeline}}]),
     true,
 );

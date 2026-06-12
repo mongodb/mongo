@@ -8,7 +8,10 @@
  * ]
  */
 import {section, subSection} from "jstests/libs/query/pretty_md.js";
-import {outputAggregationPlanAndResults, outputDistinctPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
+import {
+    outputAggregationPlanAndResults,
+    outputDistinctPlanAndResults,
+} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -45,9 +48,15 @@ section("Aggregation with multiple choices for index");
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", firstField: {$first: "$b"}}}]);
 
 subSection("$sort influences index selection");
-outputAggregationPlanAndResults(coll, [{$sort: {a: 1}}, {$group: {_id: "$a", firstField: {$first: "$b"}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$sort: {a: 1}},
+    {$group: {_id: "$a", firstField: {$first: "$b"}}},
+]);
 
-outputAggregationPlanAndResults(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", firstField: {$first: "$b"}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$sort: {a: 1, b: 1}},
+    {$group: {_id: "$a", firstField: {$first: "$b"}}},
+]);
 
 section("distinct() with filter on 'a' with available indexes");
 outputDistinctPlanAndResults(coll, "a", {"a": {$lte: 3}});

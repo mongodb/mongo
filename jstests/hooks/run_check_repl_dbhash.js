@@ -66,18 +66,26 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
         try {
             if (topology.configsvr.nodes.length > 1) {
                 topology.configsvr.nodes.forEach((n) => csrsNodes.add(n));
-                const thread = new Thread(checkReplicatedDataHashesThread, topology.configsvr.nodes);
+                const thread = new Thread(
+                    checkReplicatedDataHashesThread,
+                    topology.configsvr.nodes,
+                );
                 threads.push(thread);
                 thread.start();
             } else {
-                print("Skipping data consistency checks for 1-node CSRS: " + tojsononeline(topology));
+                print(
+                    "Skipping data consistency checks for 1-node CSRS: " + tojsononeline(topology),
+                );
             }
 
             for (let shardName of Object.keys(topology.shards)) {
                 const shard = topology.shards[shardName];
 
                 if (shard.type === Topology.kStandalone) {
-                    print("Skipping data consistency checks for stand-alone shard: " + tojsononeline(topology));
+                    print(
+                        "Skipping data consistency checks for stand-alone shard: " +
+                            tojsononeline(topology),
+                    );
                     continue;
                 }
 
@@ -88,14 +96,19 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
                 if (shard.nodes.length > 1) {
                     // we just check the first node
                     if (csrsNodes.has(shard.nodes[0])) {
-                        print("Skipping data consistency for shard since it was already checked in the CSRS");
+                        print(
+                            "Skipping data consistency for shard since it was already checked in the CSRS",
+                        );
                     } else {
                         const thread = new Thread(checkReplicatedDataHashesThread, shard.nodes);
                         threads.push(thread);
                         thread.start();
                     }
                 } else {
-                    print("Skipping data consistency checks for 1-node replica set shard: " + tojsononeline(topology));
+                    print(
+                        "Skipping data consistency checks for 1-node replica set shard: " +
+                            tojsononeline(topology),
+                    );
                 }
             }
         } finally {

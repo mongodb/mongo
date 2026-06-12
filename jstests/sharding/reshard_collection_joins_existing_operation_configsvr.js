@@ -57,7 +57,10 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
+const pauseBeforeCloningFP = configureFailPoint(
+    configsvr,
+    "reshardingPauseCoordinatorBeforeCloning",
+);
 
 const configsvrReshardCollectionThread = makeConfigsvrReshardCollectionThread(
     topology.configsvr.nodes[0],
@@ -79,7 +82,10 @@ reshardingTest.withReshardingInBackground(
         // collection once resharding has completed.
         expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
 
-        const reshardCollectionJoinedFP = configureFailPoint(configsvr, "reshardCollectionJoinedExistingOperation");
+        const reshardCollectionJoinedFP = configureFailPoint(
+            configsvr,
+            "reshardCollectionJoinedExistingOperation",
+        );
 
         configsvrReshardCollectionThread.start();
 
@@ -98,7 +104,10 @@ configsvrReshardCollectionThread.join();
 // Confirm the UUID for the namespace that was resharded is the same as the temporary collection's
 // UUID before the second reshardCollection command was issued.
 assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
-const finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+const finalSourceCollectionUUID = getUUIDFromListCollections(
+    sourceCollection.getDB(),
+    sourceCollection.getName(),
+);
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 reshardingTest.teardown();

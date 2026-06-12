@@ -117,7 +117,9 @@ function checkForIndexes(indexes) {
 }
 checkForIndexes(["b_1", "c_1", "d_1", "e_1", "f_1", "g_1"]);
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 
 rst.awaitReplication();
 rst.awaitSecondaryNodes();

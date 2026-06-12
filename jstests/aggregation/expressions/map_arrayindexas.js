@@ -77,12 +77,20 @@ test({$map: {input: "$a4z", in: {$map: {input: "$a4z", in: "$$IDX"}}}}, [
 ]);
 
 // Nested behavior with named inner variable and default outer variable.
-test({$map: {input: "$a4z", in: {$map: {input: "$a4z", arrayIndexAs: "inner", in: {$add: ["$$IDX", "$$inner"]}}}}}, [
-    [0, 1, 2, 3],
-    [1, 2, 3, 4],
-    [2, 3, 4, 5],
-    [3, 4, 5, 6],
-]);
+test(
+    {
+        $map: {
+            input: "$a4z",
+            in: {$map: {input: "$a4z", arrayIndexAs: "inner", in: {$add: ["$$IDX", "$$inner"]}}},
+        },
+    },
+    [
+        [0, 1, 2, 3],
+        [1, 2, 3, 4],
+        [2, 3, 4, 5],
+        [3, 4, 5, 6],
+    ],
+);
 
 //
 // Test error conditions.

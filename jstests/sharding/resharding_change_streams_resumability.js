@@ -39,7 +39,10 @@ const reshardingDb = mongos.getDB(kDbName);
 const cst = new ChangeStreamTest(reshardingDb);
 
 // Open a change streams cursor on the collection that will be resharded.
-let changeStreamsCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
+let changeStreamsCursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: collName,
+});
 assert.eq([], changeStreamsCursor.firstBatch, "Expected cursor not to have changes, but it did");
 
 // We want to confirm that change streams can see events before, during, and after the resharding
@@ -107,14 +110,23 @@ reshardingTest.withReshardingInBackground(
         reshardingTest.awaitCloneTimestampChosen();
 
         // Open another change streams cursor while the collection is being resharded.
-        changeStreamsCursor2 = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
+        changeStreamsCursor2 = cst.startWatchingChanges({
+            pipeline: [{$changeStream: {}}],
+            collection: collName,
+        });
 
         assert.commandWorked(sourceCollection.insert({_id: 1, oldKey: 1}));
         assert.commandWorked(sourceCollection.insert({_id: 2, oldKey: 2}));
 
         // Assert that both the cursors see the two new inserts.
-        cst.assertNextChangesEqual({cursor: changeStreamsCursor, expectedChanges: midReshardCollectionChanges});
-        cst.assertNextChangesEqual({cursor: changeStreamsCursor2, expectedChanges: midReshardCollectionChanges});
+        cst.assertNextChangesEqual({
+            cursor: changeStreamsCursor,
+            expectedChanges: midReshardCollectionChanges,
+        });
+        cst.assertNextChangesEqual({
+            cursor: changeStreamsCursor2,
+            expectedChanges: midReshardCollectionChanges,
+        });
 
         // Check that we can resume from the token returned before resharding began.
         let resumedCursor = cst.startWatchingChanges({
@@ -132,8 +144,14 @@ assert.commandWorked(sourceCollection.insert({_id: 3, newKey: 3, oldKey: 3}));
 
 // Assert that both the cursor opened before resharding started and the one opened during
 // resharding see the insert after resharding has finished.
-cst.assertNextChangesEqual({cursor: changeStreamsCursor, expectedChanges: [postReshardCollectionChanges[0]]});
-cst.assertNextChangesEqual({cursor: changeStreamsCursor2, expectedChanges: [postReshardCollectionChanges[0]]});
+cst.assertNextChangesEqual({
+    cursor: changeStreamsCursor,
+    expectedChanges: [postReshardCollectionChanges[0]],
+});
+cst.assertNextChangesEqual({
+    cursor: changeStreamsCursor2,
+    expectedChanges: [postReshardCollectionChanges[0]],
+});
 
 // Check that we can resume from both the token returned before resharding began and the token
 // returned during resharding.
@@ -141,7 +159,9 @@ let resumedCursorFromPreOperation = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: preReshardCollectionResumeToken}}],
     collection: collName,
 });
-let midAndPostReshardCollectionChanges = midReshardCollectionChanges.concat(postReshardCollectionChanges);
+let midAndPostReshardCollectionChanges = midReshardCollectionChanges.concat(
+    postReshardCollectionChanges,
+);
 
 let resumedCursorFromMidOperation = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: midReshardCollectionResumeToken}}],
@@ -154,6 +174,9 @@ cst.assertNextChangesEqual({
     cursor: resumedCursorFromPreOperation,
     expectedChanges: midAndPostReshardCollectionChanges,
 });
-cst.assertNextChangesEqual({cursor: resumedCursorFromMidOperation, expectedChanges: postReshardCollectionChanges});
+cst.assertNextChangesEqual({
+    cursor: resumedCursorFromMidOperation,
+    expectedChanges: postReshardCollectionChanges,
+});
 
 reshardingTest.teardown();

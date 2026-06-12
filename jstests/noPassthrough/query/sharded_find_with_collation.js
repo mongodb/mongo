@@ -33,11 +33,21 @@ const setupCollection = ({shardKey, splits}) => {
     let doc = {_id: "a", a: "a"};
 
     assert.commandWorked(
-        db.adminCommand({moveChunk: coll.getFullName(), find: {_id: MinKey, a: MinKey}, to: st.shard0.shardName}),
+        db.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {_id: MinKey, a: MinKey},
+            to: st.shard0.shardName,
+        }),
     );
-    assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: doc, to: st.shard0.shardName}));
     assert.commandWorked(
-        db.adminCommand({moveChunk: coll.getFullName(), find: {_id: MaxKey, a: MaxKey}, to: st.shard1.shardName}),
+        db.adminCommand({moveChunk: coll.getFullName(), find: doc, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {_id: MaxKey, a: MaxKey},
+            to: st.shard1.shardName,
+        }),
     );
 
     // Put data on shard0, that will go into chunk 2.
@@ -84,7 +94,11 @@ function assertShardMergeImpliesShardFilter(queryObj, testInfo) {
         return planHasStage(db, getWinningPlanFromExplain(shard), "SHARDING_FILTER");
     });
 
-    assert(shardFiltered, {msg: "SHARD_MERGE but missing SHARDING_FILTER", explain: explain, testInfo: testInfo});
+    assert(shardFiltered, {
+        msg: "SHARD_MERGE but missing SHARDING_FILTER",
+        explain: explain,
+        testInfo: testInfo,
+    });
 }
 
 const caseInsensitive = {

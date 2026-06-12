@@ -12,7 +12,10 @@ t.createIndex({loc: "2d"});
 let dists = [0.49, 0.51, 1.0];
 for (let idx in dists) {
     let b = db.geod
-        .aggregate([{$geoNear: {near: [1, 0], distanceField: "d", maxDistance: dists[idx]}}, {$limit: 2}])
+        .aggregate([
+            {$geoNear: {near: [1, 0], distanceField: "d", maxDistance: dists[idx]}},
+            {$limit: 2},
+        ])
         .toArray();
     assert.eq(b.length, idx, "B" + idx);
 }

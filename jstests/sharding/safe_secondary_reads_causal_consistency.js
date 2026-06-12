@@ -54,7 +54,9 @@ const runReadCmdWithReadPrefSecondary = (db, collectionName, query, {readConcern
  * @param {String} primaryShardName - Used to ensure the desired shard becomes the primary shard.
  */
 const setupShardedCollection = (shardingTest, dbName, collectionNamespace, primaryShardName) => {
-    assert.commandWorked(shardingTest.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
+    assert.commandWorked(
+        shardingTest.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}),
+    );
 
     assert.commandWorked(
         shardingTest.s.adminCommand({
@@ -150,7 +152,11 @@ st.configRS.awaitLastOpCommitted();
 
 assert.commandWorked(mongos0AlphaDB.adminCommand({flushRouterConfig: 1}));
 assert.commandWorked(
-    mongos0AlphaDB.runCommand({insert: collName1, documents: [{_id: 2}], writeConcern: {w: "majority"}}),
+    mongos0AlphaDB.runCommand({
+        insert: collName1,
+        documents: [{_id: 2}],
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Bump the clusterTime of mongos1 to at least equal to the operationTime T for the
@@ -170,7 +176,10 @@ assert.commandWorked(
     }),
 );
 assert.gt(
-    bsonWoCompare(mongos1AlphaDB.getSession().getOperationTime(), mongos0AlphaDB.getSession().getOperationTime()),
+    bsonWoCompare(
+        mongos1AlphaDB.getSession().getOperationTime(),
+        mongos0AlphaDB.getSession().getOperationTime(),
+    ),
     0,
 );
 

@@ -68,7 +68,9 @@ const tsAggThread = startParallelShell(
         function (dbName, tsCollName, commentObj) {
             const testDB = db.getSiblingDB(dbName);
             const tsColl = testDB[tsCollName];
-            const results = tsColl.aggregate([{$match: {val: {$gt: 0}}}], {"comment": commentObj}).toArray();
+            const results = tsColl
+                .aggregate([{$match: {val: {$gt: 0}}}], {"comment": commentObj})
+                .toArray();
             assert.eq(results.length, 3);
         },
         dbName,

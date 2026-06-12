@@ -139,7 +139,9 @@ const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFl
 // 'lastVersion' can have values "last-lts" and "last-continuous".
 function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []) {
     if (testCases.length === 0) {
-        jsTest.log.info("Skipping setup for tests against " + lastVersion + " since there are none");
+        jsTest.log.info(
+            "Skipping setup for tests against " + lastVersion + " since there are none",
+        );
         return;
     }
 
@@ -149,22 +151,28 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     for (let i = 0; i < featureFlags.length; i++) {
         const command = {"getParameter": 1};
         command[featureFlags[i]] = 1;
-        const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
+        const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]]
+            .value;
         if (!featureEnabled) {
-            jsTest.log.info("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
+            jsTest.log.info(
+                "Skipping test because the " + featureFlags[i] + " feature flag is disabled",
+            );
             MongoRunner.stopMongod(conn);
             return;
         }
     }
 
     // Explicitly set feature compatibility version to the latest version.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     // Test that we are able to create a new view with any of the new features.
     testCases.forEach((pipe, i) =>
         assert.commandWorked(
             testDB.createView("firstView" + i, "coll", pipe),
-            `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` + ` ${latestFCV}`,
+            `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
+                ` ${latestFCV}`,
         ),
     );
 
@@ -174,7 +182,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         assert.commandWorked(testDB.createView("firstView" + i, "coll", []));
         assert.commandWorked(
             testDB.runCommand({collMod: "firstView" + i, viewOn: "coll", pipeline: pipe}),
-            `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` + ` ${latestFCV}`,
+            `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` +
+                ` ${latestFCV}`,
         );
     });
 
@@ -184,7 +193,10 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 
     // Set the feature compatibility version to the last version.
     assert.commandWorked(
-        testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
+        testDB.adminCommand({
+            setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),
+            confirm: true,
+        }),
     );
 
     // Read against an existing view using new query features should fail.
@@ -236,7 +248,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     assert.neq(
         null,
         conn,
-        `version ${MongoRunner.getBinVersionFor(lastVersion)} of mongod was` + " unable to start up",
+        `version ${MongoRunner.getBinVersionFor(lastVersion)} of mongod was` +
+            " unable to start up",
     );
     testDB = conn.getDB(testName);
 
@@ -274,7 +287,9 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     });
 
     // Set the feature compatibility version back to the latest version.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
 
     testCases.forEach(function (pipe, i) {
         assert.commandWorked(
@@ -284,22 +299,30 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         // Test that we are able to create a new view with any of the new features.
         assert.commandWorked(
             testDB.createView("secondView" + i, "coll", pipe),
-            `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` + ` ${latestFCV}`,
+            `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
+                ` ${latestFCV}`,
         );
 
         // Test that we are able to update an existing view to use any of the new features.
-        assert(testDB["secondView" + i].drop(), `Drop of view with pipeline ${tojson(pipe)} failed`);
+        assert(
+            testDB["secondView" + i].drop(),
+            `Drop of view with pipeline ${tojson(pipe)} failed`,
+        );
         assert.commandWorked(testDB.createView("secondView" + i, "coll", []));
         assert.commandWorked(
             testDB.runCommand({collMod: "secondView" + i, viewOn: "coll", pipeline: pipe}),
-            `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` + ` ${latestFCV}`,
+            `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` +
+                ` ${latestFCV}`,
         );
     });
 
     // Set the feature compatibility version to the last version and then restart with
     // internalValidateFeaturesAsPrimary=false.
     assert.commandWorked(
-        testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
+        testDB.adminCommand({
+            setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),
+            confirm: true,
+        }),
     );
     MongoRunner.stopMongod(conn);
 
@@ -308,7 +331,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     assert.neq(
         null,
         conn,
-        `version ${MongoRunner.getBinVersionFor(lastVersion)} of mongod was` + " unable to start up",
+        `version ${MongoRunner.getBinVersionFor(lastVersion)} of mongod was` +
+            " unable to start up",
     );
     testDB = conn.getDB(testName);
 
@@ -322,6 +346,14 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 }
 
 testViewDefinitionFCVBehavior("last-lts", testCasesLastStable);
-testViewDefinitionFCVBehavior("last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
+testViewDefinitionFCVBehavior(
+    "last-lts",
+    testCasesLastStableWithFeatureFlags,
+    featureFlagsToEnable,
+);
 testViewDefinitionFCVBehavior("last-continuous", testCasesLastContinuous);
-testViewDefinitionFCVBehavior("last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
+testViewDefinitionFCVBehavior(
+    "last-continuous",
+    testCasesLastContinuousWithFeatureFlags,
+    featureFlagsToEnable,
+);

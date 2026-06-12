@@ -15,7 +15,9 @@ const ns = dbName + "." + collName;
 const db = st.s.getDB(dbName);
 const coll = db.getCollection(collName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Make the collection have the following chunks:
 // shard0: [MinKey, 0] (-11000 documents)
@@ -32,8 +34,11 @@ for (let i = minVal; i < maxVal; i++) {
 }
 assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: true}));
 
-const listCollectionRes = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-const isClusteredColl = listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
+const listCollectionRes = assert.commandWorked(
+    db.runCommand({listCollections: 1, filter: {name: collName}}),
+);
+const isClusteredColl =
+    listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 const expectedType = isClusteredColl ? "unknown" : "monotonic";
 
 const res0 = assert.commandWorked(

@@ -30,7 +30,10 @@ export function ingressHandshakeMetricsTest(conn, options) {
 
         if (!connectionHealthLoggingOn) {
             assert.commandWorked(
-                conn.adminCommand({setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}),
+                conn.adminCommand({
+                    setParameter: 1,
+                    enableDetailedConnectionHealthMetricLogLines: false,
+                }),
             );
         }
     }
@@ -89,7 +92,9 @@ export function ingressHandshakeMetricsTest(conn, options) {
         const after = getIngressHandshakeMetrics();
 
         // Total time increased by at least as long as we slept.
-        const diffMillis = after.totalTimeToFirstNonAuthCommandMillis - before.totalTimeToFirstNonAuthCommandMillis;
+        const diffMillis =
+            after.totalTimeToFirstNonAuthCommandMillis -
+            before.totalTimeToFirstNonAuthCommandMillis;
         assert.gte(diffMillis, totalDelayMillis);
 
         // Average time to hello will be no larger than average time to completed auth.

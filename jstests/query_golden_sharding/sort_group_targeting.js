@@ -36,10 +36,18 @@ section("$sort + $group for unsharded collection");
 outputAggregationPlanAndResults(coll, [{$sort: {shardKey: 1}}, {$group: {_id: "$shardKey"}}]);
 
 // Move "shard_1*" chunk to "other" shard.
-assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
-assert.commandWorked(shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: "shard1"}}));
 assert.commandWorked(
-    shardingTest.s.adminCommand({moveChunk: coll.getFullName(), find: {shardKey: "shard1_1"}, to: otherShard}),
+    shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}),
+);
+assert.commandWorked(
+    shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: "shard1"}}),
+);
+assert.commandWorked(
+    shardingTest.s.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {shardKey: "shard1_1"},
+        to: otherShard,
+    }),
 );
 
 section("Push down $group preceded by $sort");

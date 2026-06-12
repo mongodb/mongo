@@ -15,7 +15,9 @@ assert(
 );
 assert(
     !ftdcData["serverStatus"]["metrics"].hasOwnProperty("apiVersions"),
-    "'serverStatus.metrics.apiVersions' should be omitted from FTDC data: '" + tojson(ftdcData) + "'",
+    "'serverStatus.metrics.apiVersions' should be omitted from FTDC data: '" +
+        tojson(ftdcData) +
+        "'",
 );
 
 // Make sure that 'apiVersions' section still be returned with serverStatus metrics.

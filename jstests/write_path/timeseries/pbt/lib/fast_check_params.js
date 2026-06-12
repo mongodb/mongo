@@ -13,7 +13,8 @@ export const getFcAssertArgs = () => {
     };
 
     jsTest.log.info("FAST_CHECK_PARAMETERS", {
-        fastCheckParameters: Object.keys(fcParams).length > 0 ? fcParams : "not provided, will use defaults",
+        fastCheckParameters:
+            Object.keys(fcParams).length > 0 ? fcParams : "not provided, will use defaults",
     });
 
     return fcAssertArgs;

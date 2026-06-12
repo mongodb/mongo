@@ -18,7 +18,9 @@
 export const $config = (function () {
     function setup(db, collName) {
         for (let i = 0; i < 200; ++i) {
-            assert.commandWorked(db[collName].insert({_id: i, a: i, one: 1, counter: 0, array: [0, i]}));
+            assert.commandWorked(
+                db[collName].insert({_id: i, a: i, one: 1, counter: 0, array: [0, i]}),
+            );
         }
 
         // Add a validator which checks that field 'a' has value 5 and sum of the elements in field
@@ -70,7 +72,11 @@ export const $config = (function () {
             retryOnRetryableError(
                 () => {
                     assert.commandWorked(
-                        db[collName].update({}, {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}}, {multi: true}),
+                        db[collName].update(
+                            {},
+                            {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}},
+                            {multi: true},
+                        ),
                     );
                 },
                 100,

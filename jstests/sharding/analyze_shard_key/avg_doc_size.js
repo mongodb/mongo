@@ -36,7 +36,9 @@ function testShardedCollection(st) {
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+    );
 
     const coll = st.s.getCollection(ns);
     const currentKey = {currentKey: 1};
@@ -51,7 +53,9 @@ function testShardedCollection(st) {
     // shard0: [MinKey, 0]
     // shard1: [0, MaxKey]
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 0}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName}),
+    );
 
     assert.commandWorked(
         coll.insert([

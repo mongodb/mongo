@@ -82,7 +82,12 @@ const addFieldsBaseCaseTestCases = (isStoredSource) => {
         },
         {$project: {pop: 1, _id: 1}},
     ];
-    validateSearchExplain(addFieldsView, pipelineWithStageAfterSearch, isStoredSource, viewPipeline);
+    validateSearchExplain(
+        addFieldsView,
+        pipelineWithStageAfterSearch,
+        isStoredSource,
+        viewPipeline,
+    );
 
     // =========================================================================================
     // Case 3: Non-search query on a view indexed by mongot, ensuring view transforms are still

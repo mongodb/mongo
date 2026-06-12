@@ -16,7 +16,11 @@ const initialSyncSource = rst.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Add some data to be cloned.
@@ -29,7 +33,10 @@ const initialSyncNode = rst.add({
     setParameter: {
         "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
         "numInitialSyncAttempts": 1,
-        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: initialSyncSource.host}}),
+        "failpoint.forceSyncSourceCandidate": tojson({
+            mode: "alwaysOn",
+            data: {hostAndPort: initialSyncSource.host},
+        }),
     },
 });
 rst.reInitiate();
@@ -49,10 +56,17 @@ const failPointData = {
     nss: "test.test",
 };
 // Set us up to stop right before the given stage.
-const beforeStageFailPoint = configureFailPoint(initialSyncNodeDb, "hangBeforeClonerStage", failPointData);
+const beforeStageFailPoint = configureFailPoint(
+    initialSyncNodeDb,
+    "hangBeforeClonerStage",
+    failPointData,
+);
 // Release the initial failpoint.
 assert.commandWorked(
-    initialSyncNodeDb.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    initialSyncNodeDb.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        mode: "off",
+    }),
 );
 beforeStageFailPoint.wait();
 

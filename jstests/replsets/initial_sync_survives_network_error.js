@@ -18,7 +18,11 @@ const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // Add some data to be cloned.
@@ -45,17 +49,32 @@ function retryStage(rst, {cloner, stage, extraData}) {
     const secondaryDb = secondary.getDB("test");
     const failPointData = Object.merge(extraData || {}, {cloner: cloner, stage: stage});
     // Set us up to stop right before the given stage.
-    const beforeStageFailPoint = configureFailPoint(secondaryDb, "hangBeforeClonerStage", failPointData);
+    const beforeStageFailPoint = configureFailPoint(
+        secondaryDb,
+        "hangBeforeClonerStage",
+        failPointData,
+    );
     // Set us up to stop after the given stage. This will also release the failpoint for the
     // previous stage, if it was set.
-    const afterStageFailPoint = configureFailPoint(secondaryDb, "hangAfterClonerStage", failPointData);
+    const afterStageFailPoint = configureFailPoint(
+        secondaryDb,
+        "hangAfterClonerStage",
+        failPointData,
+    );
     // Release the initial failpoint if set.
     assert.commandWorked(
-        secondaryDb.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+        secondaryDb.adminCommand({
+            configureFailPoint: "initialSyncHangBeforeCopyingDatabases",
+            mode: "off",
+        }),
     );
 
     beforeStageFailPoint.wait();
-    let beforeRetryFailPoint = configureFailPoint(secondaryDb, "hangBeforeRetryingClonerStage", failPointData);
+    let beforeRetryFailPoint = configureFailPoint(
+        secondaryDb,
+        "hangBeforeRetryingClonerStage",
+        failPointData,
+    );
     primary.disconnect(secondary);
     jsTestLog("Testing initial attempt in cloner " + cloner + " stage " + stage);
     beforeStageFailPoint.off();
@@ -74,7 +93,11 @@ function retryStage(rst, {cloner, stage, extraData}) {
         );
         beforeRetryFailPoint.off();
         beforeRBIDFailPoint.wait();
-        beforeRetryFailPoint = configureFailPoint(secondaryDb, "hangBeforeRetryingClonerStage", failPointData);
+        beforeRetryFailPoint = configureFailPoint(
+            secondaryDb,
+            "hangBeforeRetryingClonerStage",
+            failPointData,
+        );
         beforeRBIDFailPoint.off();
     }
     jsTestLog("Testing retries in cloner " + cloner + " stage " + stage + " finished.");
@@ -84,7 +107,11 @@ function retryStage(rst, {cloner, stage, extraData}) {
 }
 retryStage(rst, {cloner: "AllDatabaseCloner", stage: "connect"});
 retryStage(rst, {cloner: "AllDatabaseCloner", stage: "listDatabases"});
-retryStage(rst, {cloner: "DatabaseCloner", stage: "listCollections", extraData: {database: "test"}});
+retryStage(rst, {
+    cloner: "DatabaseCloner",
+    stage: "listCollections",
+    extraData: {database: "test"},
+});
 retryStage(rst, {cloner: "CollectionCloner", stage: "count", extraData: {nss: "test.test"}});
 const afterStageFailPoint = retryStage(rst, {
     cloner: "CollectionCloner",
@@ -94,7 +121,9 @@ const afterStageFailPoint = retryStage(rst, {
 
 jsTestLog("Releasing the oplog fetcher failpoint.");
 assert.commandWorked(
-    secondary.getDB("test").adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+    secondary
+        .getDB("test")
+        .adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
 );
 
 jsTestLog("Releasing the final cloner failpoint.");

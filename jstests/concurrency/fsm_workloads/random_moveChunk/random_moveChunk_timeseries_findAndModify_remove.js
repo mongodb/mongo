@@ -29,7 +29,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             },
         };
         // May delete different measurements from the two collections.
-        const res1 = assert.commandWorked(db.runCommand({findAndModify: collName, query: filter, remove: true}));
+        const res1 = assert.commandWorked(
+            db.runCommand({findAndModify: collName, query: filter, remove: true}),
+        );
         const res2 = assert.commandWorked(
             db.runCommand({findAndModify: this.nonShardCollName, query: filter, remove: true}),
         );

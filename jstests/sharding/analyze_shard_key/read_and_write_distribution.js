@@ -25,7 +25,9 @@ function runAnalyzeShardKeyWithRetry(conn, ns, shardKey) {
     assert.soon(() => {
         res = conn.adminCommand({analyzeShardKey: ns, key: shardKey});
         if (res.code === 28799) {
-            jsTest.log("analyzeShardKey hit transient $sample failure (28799), retrying: " + tojson(res));
+            jsTest.log(
+                "analyzeShardKey hit transient $sample failure (28799), retrying: " + tojson(res),
+            );
             return false;
         }
         return true;
@@ -81,7 +83,9 @@ function assertReadMetricsNonEmptySampleSize(actual, expected, isHashed) {
     } else {
         assert.gte(
             sum(actual.numReadsByRange),
-            expected.numSingleShard + expected.numMultiShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+            expected.numSingleShard +
+                expected.numMultiShard +
+                expected.numScatterGather * analyzeShardKeyNumRanges,
             {actual, expected},
         );
     }
@@ -91,7 +95,10 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assert.eq(actual.sampleSize.total, expected.sampleSize.total, {actual, expected});
     assert.eq(actual.sampleSize.update, expected.sampleSize.update, {actual, expected});
     assert.eq(actual.sampleSize.delete, expected.sampleSize.delete, {actual, expected});
-    assert.eq(actual.sampleSize.findAndModify, expected.sampleSize.findAndModify, {actual, expected});
+    assert.eq(actual.sampleSize.findAndModify, expected.sampleSize.findAndModify, {
+        actual,
+        expected,
+    });
 
     assertApprox(
         actual.percentageOfSingleShardWrites,
@@ -120,7 +127,9 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
     } else {
         assert.gte(
             sum(actual.numWritesByRange),
-            expected.numSingleShard + expected.numMultiShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+            expected.numSingleShard +
+                expected.numMultiShard +
+                expected.numScatterGather * analyzeShardKeyNumRanges,
             {actual, expected},
         );
     }
@@ -150,8 +159,16 @@ function assertMetricsEmptySampleSize(actual) {
 
 function assertMetricsNonEmptySampleSize(actual, expected, isHashed) {
     AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(actual);
-    assertReadMetricsNonEmptySampleSize(actual.readDistribution, expected.readDistribution, isHashed);
-    assertWriteMetricsNonEmptySampleSize(actual.writeDistribution, expected.writeDistribution, isHashed);
+    assertReadMetricsNonEmptySampleSize(
+        actual.readDistribution,
+        expected.readDistribution,
+        isHashed,
+    );
+    assertWriteMetricsNonEmptySampleSize(
+        actual.writeDistribution,
+        expected.writeDistribution,
+        isHashed,
+    );
 }
 
 function assertSoonNoConfigSplitPointDocuments(conn) {
@@ -162,7 +179,9 @@ function assertSoonNoConfigSplitPointDocuments(conn) {
         numTries++;
         if (numTries % 100 == 0) {
             const docs = coll.find().toArray();
-            jsTest.log("Waiting for the spit point documents to get deleted " + tojson({numTries, docs}));
+            jsTest.log(
+                "Waiting for the spit point documents to get deleted " + tojson({numTries, docs}),
+            );
         }
         return coll.find().itcount() === 0;
     });
@@ -178,7 +197,11 @@ function getRandomCount() {
     return AnalyzeShardKeyUtil.getRandInteger(1, 100);
 }
 
-function makeTestCase(sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal}) {
+function makeTestCase(
+    sampledCollName,
+    notSampledCollName,
+    {shardKeyField, isHashed, minVal, maxVal},
+) {
     // Generate commands and populate the expected metrics.
     const cmdObjs = [];
 
@@ -457,7 +480,9 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
 
         res = assert.commandWorked(runAnalyzeShardKeyWithRetry(conn, ns, shardKey));
         const numShardKeyUpdates =
-            (res.writeDistribution.percentageOfShardKeyUpdates * res.writeDistribution.sampleSize.total) / 100;
+            (res.writeDistribution.percentageOfShardKeyUpdates *
+                res.writeDistribution.sampleSize.total) /
+            100;
 
         if (numTries % 100 == 0) {
             jsTest.log(
@@ -478,8 +503,10 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
         }
 
         return (
-            res.readDistribution.sampleSize.total >= testCase.metrics.readDistribution.sampleSize.total &&
-            res.writeDistribution.sampleSize.total >= testCase.metrics.writeDistribution.sampleSize.total &&
+            res.readDistribution.sampleSize.total >=
+                testCase.metrics.readDistribution.sampleSize.total &&
+            res.writeDistribution.sampleSize.total >=
+                testCase.metrics.writeDistribution.sampleSize.total &&
             numShardKeyUpdates >= testCase.metrics.writeDistribution.numShardKeyUpdates
         );
     });
@@ -497,7 +524,9 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     const notSampledCollName = "notSampledColl";
     const sampledNs = dbName + "." + sampledCollName;
     const shardKey = {[shardKeyField]: isHashed ? "hashed" : 1};
-    jsTest.log(`Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${tojson({ns: sampledNs})}`);
+    jsTest.log(
+        `Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${tojson({ns: sampledNs})}`,
+    );
 
     const sampledColl = fixture.conn.getDB(dbName).getCollection(sampledCollName);
     const notSampledColl = fixture.conn.getDB(dbName).getCollection(notSampledCollName);
@@ -536,7 +565,10 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
         .getCollection(notSampledCollName)
         .aggregate([{$lookup: {from: sampledCollName, pipeline: [], as: "out"}}]);
 
-    const sampledCollUuid = QuerySamplingUtil.getCollectionUuid(fixture.conn.getDB(dbName), sampledCollName);
+    const sampledCollUuid = QuerySamplingUtil.getCollectionUuid(
+        fixture.conn.getDB(dbName),
+        sampledCollName,
+    );
 
     // Verify that the analyzeShardKey command returns zeros for the read and write sample size
     // when there are no sampled queries.
@@ -545,12 +577,21 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
 
     // Turn on query sampling and wait for sampling to become active.
     assert.commandWorked(
-        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}),
+        fixture.conn.adminCommand({
+            configureQueryAnalyzer: sampledNs,
+            mode: "full",
+            samplesPerSecond,
+        }),
     );
     fixture.waitForActiveSamplingFn(sampledNs, sampledCollUuid);
 
     // Create and run test queries.
-    const testCase = makeTestCase(sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal});
+    const testCase = makeTestCase(sampledCollName, notSampledCollName, {
+        shardKeyField,
+        isHashed,
+        minVal,
+        maxVal,
+    });
 
     fixture.runCmdsFn(dbName, testCase.cmdObjs);
 
@@ -559,7 +600,9 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     assertMetricsNonEmptySampleSize(res, testCase.metrics, isHashed);
 
     // Turn off query sampling and wait for sampling to become inactive.
-    assert.commandWorked(fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
+    assert.commandWorked(
+        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}),
+    );
     fixture.waitForInactiveSamplingFn(sampledNs, sampledCollUuid);
 
     assert(notSampledColl.drop());
@@ -638,7 +681,9 @@ const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
         setUpCollectionFn: (dbName, collName, isShardedColl) => {
             const ns = dbName + "." + collName;
 
-            assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+            assert.commandWorked(
+                st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+            );
 
             if (isShardedColl) {
                 // Set up the sharded collection. Make it have three chunks:
@@ -648,8 +693,12 @@ const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
                 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
                 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -1000}}));
                 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 1000}}));
-                assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
-                assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
+                assert.commandWorked(
+                    st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}),
+                );
+                assert.commandWorked(
+                    st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}),
+                );
             }
         },
         waitForActiveSamplingFn: (ns, collUuid) => {
@@ -708,7 +757,9 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
         configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
         // We use a sampling filter to prevent internal aggregates run by AnalyzeShardKey from being
         // sampled.
-        configureFailPoint(node, "queryAnalysisSamplerFilterByComment", {comment: eligibleForSamplingCommentReplset});
+        configureFailPoint(node, "queryAnalysisSamplerFilterByComment", {
+            comment: eligibleForSamplingCommentReplset,
+        });
     });
 
     const fixture = {

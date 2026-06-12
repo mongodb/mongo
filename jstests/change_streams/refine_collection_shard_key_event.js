@@ -11,7 +11,10 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({
@@ -71,7 +74,9 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
         aggregateOptions: {cursor: {batchSize: 0}},
     });
 
-    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, akey: 1}}));
+    assert.commandWorked(
+        mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, akey: 1}}),
+    );
 
     // Confirm that we observe the refineCollectionShardKey event, and obtain its resume token.
     const refineResumeToken = assertExpectedEventObserved(cursor, expectedOutput);

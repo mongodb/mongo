@@ -82,7 +82,9 @@ const createInactiveCursor = function (coll) {
     const cursorNotFoundId = NumberLong("123");
 
     const session = db.getMongo().startSession();
-    const cursorCurrentlyPinnedId = createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
+    const cursorCurrentlyPinnedId = createInactiveCursor(
+        session.getDatabase(db.getName())[jsTestName()],
+    );
     const getMoreFailpoint = configureFailPoint(db, "getMoreHangAfterPinCursor");
 
     const joinGetMore = startParallelShell(

@@ -65,16 +65,29 @@ const fooNeBatchSize = 3;
     let cursor2 = coll.find({foo: {$ne: 0}}).batchSize(fooNeBatchSize);
     // Issue one getMore for the first query, so 2 * fooEqBatchSize documents are returned total.
     assert.commandWorked(
-        testDB.runCommand({getMore: cursor1.getId(), collection: coll.getName(), batchSize: fooEqBatchSize}),
+        testDB.runCommand({
+            getMore: cursor1.getId(),
+            collection: coll.getName(),
+            batchSize: fooEqBatchSize,
+        }),
     );
 
     // Kill both cursors so the queryStats metrics are stored.
-    assert.commandWorked(testDB.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
+    assert.commandWorked(
+        testDB.runCommand({
+            killCursors: coll.getName(),
+            cursors: [cursor1.getId(), cursor2.getId()],
+        }),
+    );
 
     // This filters queryStats entires to just the ones entered when running above find queries.
     const queryStatsResults = testDB
         .getSiblingDB("admin")
-        .aggregate([{$queryStats: {}}, {$match: {"key.queryShape.filter.foo": {$exists: true}}}, {$sort: {key: 1}}])
+        .aggregate([
+            {$queryStats: {}},
+            {$match: {"key.queryShape.filter.foo": {$exists: true}}},
+            {$sort: {key: 1}},
+        ])
         .toArray();
     assert.eq(queryStatsResults.length, 2, queryStatsResults);
     assert.eq(queryStatsResults[0].key.queryShape.cmdNs.db, "test");
@@ -88,7 +101,10 @@ const fooNeBatchSize = 3;
     const queryStatsEntry1 = queryStatsResults[1].metrics;
     assert.eq(queryStatsResults[0].metrics.execCount, 1);
     assert.eq(queryStatsResults[1].metrics.execCount, 1);
-    assert.eq(getQueryExecMetrics(queryStatsResults[0].metrics).docsReturned.sum, fooEqBatchSize * 2);
+    assert.eq(
+        getQueryExecMetrics(queryStatsResults[0].metrics).docsReturned.sum,
+        fooEqBatchSize * 2,
+    );
     assert.eq(getQueryExecMetrics(queryStatsResults[1].metrics).docsReturned.sum, fooNeBatchSize);
 
     verifyMetrics(queryStatsResults);

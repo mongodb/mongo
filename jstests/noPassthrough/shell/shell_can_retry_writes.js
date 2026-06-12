@@ -37,7 +37,10 @@ function testCommandCanBeRetried(func, expected = true) {
 
     assert(
         cmdObjSeen.hasOwnProperty("lsid"),
-        "Expected operation " + tojson(cmdObjSeen) + " to have a logical session id: " + func.toString(),
+        "Expected operation " +
+            tojson(cmdObjSeen) +
+            " to have a logical session id: " +
+            func.toString(),
     );
 
     if (expected) {
@@ -130,13 +133,18 @@ testCommandCanBeRetried(function () {
 });
 
 testCommandCanBeRetried(function () {
-    coll.bulkWrite([{insertOne: {document: {_id: 20, b: 3}}}, {insertOne: {document: {_id: 30, b: 4}}}], {
-        ordered: true,
-    });
+    coll.bulkWrite(
+        [{insertOne: {document: {_id: 20, b: 3}}}, {insertOne: {document: {_id: 30, b: 4}}}],
+        {
+            ordered: true,
+        },
+    );
 });
 
 testCommandCanBeRetried(function () {
-    coll.bulkWrite([{insertOne: {document: {_id: 40}}}, {insertOne: {document: {_id: 50}}}], {ordered: false});
+    coll.bulkWrite([{insertOne: {document: {_id: 40}}}, {insertOne: {document: {_id: 50}}}], {
+        ordered: false,
+    });
 });
 
 testCommandCanBeRetried(function () {

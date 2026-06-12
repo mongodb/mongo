@@ -140,7 +140,10 @@ assert.commandWorked(coll.insert({_id: 0, arr: [{}, {}]}));
     assert(
         resultsEq(
             db
-                .aggregate([{$documents: [{_id: 2}, {_id: 4}]}, {$unionWith: {coll: coll.getName(), pipeline: []}}])
+                .aggregate([
+                    {$documents: [{_id: 2}, {_id: 4}]},
+                    {$unionWith: {coll: coll.getName(), pipeline: []}},
+                ])
                 .toArray(),
             [{_id: 2}, {_id: 4}, {_id: 0, arr: [{}, {}]}],
         ),
@@ -241,7 +244,15 @@ assert.throwsWithCode(
                             $lookup: {
                                 from: "foo",
                                 let: {x: "$x", y: "$y"},
-                                pipeline: [{$match: {$expr: {$and: [{$eq: ["$x", "$$x"]}, {$eq: ["$y", "$$y"]}]}}}],
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $and: [{$eq: ["$x", "$$x"]}, {$eq: ["$y", "$$y"]}],
+                                            },
+                                        },
+                                    },
+                                ],
                                 as: "doesnt_matter",
                             },
                         },

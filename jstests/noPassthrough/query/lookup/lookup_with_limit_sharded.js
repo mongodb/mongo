@@ -34,7 +34,9 @@ other.drop();
 function checkUnshardedResults(pipeline, expectedPlanStages, expectedPipeline) {
     const explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
     if (explain.stages) {
-        const queryStages = flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
+        const queryStages = flattenQueryPlanTree(
+            getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner),
+        );
         const pipelineStages = explain.stages.slice(1).map((s) => Object.keys(s)[0]);
         assert.eq(queryStages, expectedPlanStages, explain);
         assert.eq(pipelineStages, expectedPipeline, explain);
@@ -80,7 +82,11 @@ const multiLookupPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5},
 ];
-checkUnshardedResults(multiLookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"], []);
+checkUnshardedResults(
+    multiLookupPipeline,
+    ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"],
+    [],
+);
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.
@@ -111,7 +117,11 @@ const topKSortPipeline = [
 ];
 checkUnshardedResults(topKSortPipeline, ["COLLSCAN", "SORT", "EQ_LOOKUP"], []);
 const explain = getSingleNodeExplain(coll.explain().aggregate(topKSortPipeline));
-assert.eq(getPlanStage(getWinningPlanFromExplain(explain.queryPlanner), "SORT").limitAmount, 5, explain);
+assert.eq(
+    getPlanStage(getWinningPlanFromExplain(explain.queryPlanner), "SORT").limitAmount,
+    5,
+    explain,
+);
 
 // Tests on a sharded collection.
 coll.createIndex({x: 1});

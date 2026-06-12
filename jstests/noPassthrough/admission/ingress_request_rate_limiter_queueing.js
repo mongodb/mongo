@@ -33,7 +33,10 @@ const kSlowRateBurstOneParams = {
 /** Forces the rate limiter's token bucket to be re-clamped to burst=1 at the slow rate. */
 function forceSlowRateBurstOne(exemptConn) {
     assert.commandWorked(
-        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: kBurstOneSecs}),
+        exemptConn.adminCommand({
+            setParameter: 1,
+            ingressRequestAdmissionBurstCapacitySecs: kBurstOneSecs,
+        }),
     );
 }
 
@@ -109,7 +112,8 @@ function killQueuedOpsAndWaitForDrain(exemptConn, beforeStats) {
             }
             const stats = getRateLimiterStats(exemptConn);
             return (
-                stats.addedToQueue - beforeStats.addedToQueue === stats.removedFromQueue - beforeStats.removedFromQueue
+                stats.addedToQueue - beforeStats.addedToQueue ===
+                stats.removedFromQueue - beforeStats.removedFromQueue
             );
         },
         "timed out waiting for queued ingress requests to drain after killAllSessions",
@@ -119,11 +123,15 @@ function killQueuedOpsAndWaitForDrain(exemptConn, beforeStats) {
 }
 
 function testCurrentOpAndServerStatusReportIngressQueue(conn, exemptConn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 5}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 5}),
+    );
 
     const before = getRateLimiterStats(exemptConn);
     const beforeServerStatus = exemptConn.getDB("admin").serverStatus();
-    const beforeQueuesIngress = beforeServerStatus.queues ? beforeServerStatus.queues.ingress : undefined;
+    const beforeQueuesIngress = beforeServerStatus.queues
+        ? beforeServerStatus.queues.ingress
+        : undefined;
 
     const kComment = "testCurrentOpAndServerStatusReportIngressQueue";
     const t = new Thread(
@@ -147,12 +155,21 @@ function testCurrentOpAndServerStatusReportIngressQueue(conn, exemptConn) {
         // (1) $currentOp must surface the queued op as being in the "ingress" queue and report
         // operation-level queue-time stats under queues.ingress.
         const queuedOp = waitForQueuedOp(exemptConn, kComment);
-        assert.eq(queuedOp.currentQueue.name, "ingress", "queued op should report 'ingress' as currentQueue.name", {
-            op: queuedOp,
-        });
-        assert(queuedOp.queues && queuedOp.queues.ingress, "queued op should include queues.ingress metrics", {
-            op: queuedOp,
-        });
+        assert.eq(
+            queuedOp.currentQueue.name,
+            "ingress",
+            "queued op should report 'ingress' as currentQueue.name",
+            {
+                op: queuedOp,
+            },
+        );
+        assert(
+            queuedOp.queues && queuedOp.queues.ingress,
+            "queued op should include queues.ingress metrics",
+            {
+                op: queuedOp,
+            },
+        );
         assert.gte(
             queuedOp.queues.ingress.totalTimeQueuedMicros,
             queuedOp.currentQueue.timeQueuedMicros,
@@ -206,19 +223,29 @@ function testCurrentOpAndServerStatusReportIngressQueue(conn, exemptConn) {
         // (3) serverStatus.queues.ingress should keep exposing ingress queue stats fields.
         const statusWithQueuedOp = exemptConn.getDB("admin").serverStatus();
 
-        const queuesIngress = statusWithQueuedOp.queues ? statusWithQueuedOp.queues.ingress : undefined;
+        const queuesIngress = statusWithQueuedOp.queues
+            ? statusWithQueuedOp.queues.ingress
+            : undefined;
         assert.neq(queuesIngress, undefined, "expected serverStatus.queues.ingress", {
             queues: statusWithQueuedOp.queues,
         });
-        assert(queuesIngress.normalPriority, "serverStatus.queues.ingress should include normalPriority stats", {
-            queuesIngress,
-        });
+        assert(
+            queuesIngress.normalPriority,
+            "serverStatus.queues.ingress should include normalPriority stats",
+            {
+                queuesIngress,
+            },
+        );
         const normalPriorityStats = queuesIngress.normalPriority;
 
         assert.neq(beforeQueuesIngress, undefined, "expected baseline serverStatus.queues.ingress");
-        assert(beforeQueuesIngress.normalPriority, "expected baseline serverStatus.queues.ingress.normalPriority", {
-            beforeQueuesIngress,
-        });
+        assert(
+            beforeQueuesIngress.normalPriority,
+            "expected baseline serverStatus.queues.ingress.normalPriority",
+            {
+                beforeQueuesIngress,
+            },
+        );
         assert(
             normalPriorityStats.hasOwnProperty("totalTimeQueuedMicros"),
             "expected serverStatus.queues.ingress.normalPriority.totalTimeQueuedMicros",
@@ -278,7 +305,9 @@ function testMaxQueueDepthParameterValidation(conn, exemptConn) {
 //       addedToQueue stays zero.
 // ---------------------------------------------------------------------------
 function testQueueDisabledRejectsImmediately(conn, exemptConn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 0}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 0}),
+    );
     forceSlowRateBurstOne(exemptConn);
 
     // Connection setup happens while the client is unauthenticated and is therefore exempt
@@ -294,7 +323,11 @@ function testQueueDisabledRejectsImmediately(conn, exemptConn) {
             "request should be rejected when queue is disabled",
         );
     });
-    assert.eq(statsDelta.addedToQueue, 0, "no requests should enter the queue when maxQueueDepth=0");
+    assert.eq(
+        statsDelta.addedToQueue,
+        0,
+        "no requests should enter the queue when maxQueueDepth=0",
+    );
     assert.gte(statsDelta.rejectedAdmissions, 1, "rejected count should increment");
 }
 
@@ -306,15 +339,21 @@ function testQueueDisabledRejectsImmediately(conn, exemptConn) {
 // and threads can complete without being killed.
 // ---------------------------------------------------------------------------
 function testConcurrentRequestsQueueAndSucceed(conn, exemptConn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 20}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 20}),
+    );
 
     // Disable the slow-rate failpoint that the helper applies at startup.
     disableFractionalRateOverride(exemptConn);
 
     // 10 req/sec with burst=1: 5 concurrent threads each making findOne requests will reliably end up queuing.
     // Set burstCapacitySecs first so the intermediate state still has burst >= 1.
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 0.1}));
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionRatePerSec: 10}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 0.1}),
+    );
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionRatePerSec: 10}),
+    );
 
     const numThreads = 5;
     const threads = [];
@@ -349,7 +388,9 @@ function testConcurrentRequestsQueueAndSucceed(conn, exemptConn) {
 // Test: When the queue is at capacity, requests beyond the limit are rejected.
 // ---------------------------------------------------------------------------
 function testQueueAtCapacityRejectsExcess(conn, exemptConn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 2}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 2}),
+    );
 
     const before = getRateLimiterStats(exemptConn);
 
@@ -363,7 +404,9 @@ function testQueueAtCapacityRejectsExcess(conn, exemptConn) {
                     "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js"
                 );
                 const authConn = makeAuthConn(host);
-                const res = authConn.getDB("test").runCommand({find: "col", filter: {}, maxTimeMS, comment});
+                const res = authConn
+                    .getDB("test")
+                    .runCommand({find: "col", filter: {}, maxTimeMS, comment});
                 if (!res.ok) {
                     // Requests rejected at queue capacity get IngressRequestRateLimitExceeded;
                     // requests that queued and were then killed (by the end of test drain) get
@@ -429,7 +472,9 @@ function testQueueAtCapacityRejectsExcess(conn, exemptConn) {
 // Test: Requests interrupted while waiting in the queue increment interruptedInQueue.
 // ---------------------------------------------------------------------------
 function testInterruptedQueuedRequestsIncrementCounter(conn, exemptConn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 10}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 10}),
+    );
 
     const before = getRateLimiterStats(exemptConn);
 
@@ -504,7 +549,9 @@ function testInterruptedQueuedRequestsIncrementCounter(conn, exemptConn) {
 //       immediate rejections again.
 // ---------------------------------------------------------------------------
 function testDynamicQueueDepthUpdate(conn, exemptConn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 0}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 0}),
+    );
     forceSlowRateBurstOne(exemptConn);
 
     const conn2 = makeAuthConn(conn.host);
@@ -518,7 +565,9 @@ function testDynamicQueueDepthUpdate(conn, exemptConn) {
     );
 
     // Enable queuing.
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 5}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 5}),
+    );
 
     const before = getRateLimiterStats(exemptConn);
 
@@ -551,7 +600,9 @@ function testDynamicQueueDepthUpdate(conn, exemptConn) {
     });
 
     // Disable queuing again.
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 0}));
+    assert.commandWorked(
+        exemptConn.adminCommand({setParameter: 1, ingressRequestAdmissionMaxQueueDepth: 0}),
+    );
 
     assert.commandFailedWithCode(
         conn2.getDB("test").runCommand({find: "col", filter: {}}),

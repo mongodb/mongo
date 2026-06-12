@@ -70,9 +70,13 @@ const caseInsensitive = {locale: "en_US", strength: 2};
     const withOpt = local.aggregate(pipeline, {collation: caseInsensitive}).toArray();
 
     // Validate against running the same pipeline with the optimizer disabled.
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}),
+    );
     const withoutOpt = local.aggregate(pipeline, {collation: caseInsensitive}).toArray();
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+    );
 
     const expected = [
         {_id: 1, matched: 10},

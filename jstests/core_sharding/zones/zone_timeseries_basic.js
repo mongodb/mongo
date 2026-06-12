@@ -21,7 +21,9 @@ import {getShardNames} from "jstests/libs/cluster_helpers/sharded_cluster_fixtur
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 if (!isViewfulTimeseriesOnlySuite(db) && !isViewlessTimeseriesOnlySuite(db)) {
-    jsTest.log.info("Skipping timeseries zone test because the timeseries collection format is not stable.");
+    jsTest.log.info(
+        "Skipping timeseries zone test because the timeseries collection format is not stable.",
+    );
     quit();
 }
 
@@ -92,7 +94,9 @@ describe("Basic timeseries zone sharding test", function () {
     };
 
     const areChunksDistributedByZones = (coll) => {
-        const chunks = findChunksUtil.findChunksByNs(db.getSiblingDB("config"), coll.getFullName()).toArray();
+        const chunks = findChunksUtil
+            .findChunksByNs(db.getSiblingDB("config"), coll.getFullName())
+            .toArray();
         jsTestLog("Chunks: " + tojson(chunks));
 
         const chunksOnShard0 = chunks.filter((c) => c.shard === shardNames[0]);

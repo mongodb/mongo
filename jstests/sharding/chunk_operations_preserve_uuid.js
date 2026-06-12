@@ -15,11 +15,14 @@ function allChunksWithUUID() {
     assert.eq(
         0,
         st.config.chunks.countDocuments(matchChunksWithoutUUID),
-        "Found chunks with wrong UUID " + tojson(st.config.chunks.find(matchChunksWithoutUUID).toArray()),
+        "Found chunks with wrong UUID " +
+            tojson(st.config.chunks.find(matchChunksWithoutUUID).toArray()),
     );
 }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -10}}));

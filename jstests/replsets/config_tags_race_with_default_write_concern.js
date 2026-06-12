@@ -28,7 +28,9 @@ let hangDuringSetRWCFP = configureFailPoint(primary, "hangWhileSettingDefaultRWC
 
 let waitForSetDefaultRWC = startParallelShell(function () {
     jsTestLog("Begin setDefaultRWC.");
-    assert.commandWorked(db.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
+    assert.commandWorked(
+        db.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}),
+    );
     jsTestLog("End setDefaultRWC.");
 }, primary.port);
 

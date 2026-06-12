@@ -49,7 +49,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
                 // return null.
-                assert.neq(doc, null, "findAndModify should have found and updated a matching document");
+                assert.neq(
+                    doc,
+                    null,
+                    "findAndModify should have found and updated a matching document",
+                );
             }
             if (doc !== null) {
                 this.saveDocId(db, collName, doc._id);

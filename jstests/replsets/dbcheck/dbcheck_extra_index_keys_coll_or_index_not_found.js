@@ -31,7 +31,10 @@ import {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+            setParameter: {
+                logComponentVerbosity: tojson({command: 3}),
+                dbCheckHealthLogEveryNBatches: 1,
+            },
         },
     });
     replSet.startSet();
@@ -60,7 +63,10 @@ import {
 
         resetAndInsert(replSet, primaryDB, collName, defaultNumDocs, docSuffix, collOpts);
 
-        const hangBeforeExtraIndexKeysCheck = configureFailPoint(primaryDB, "hangBeforeExtraIndexKeysCheck");
+        const hangBeforeExtraIndexKeysCheck = configureFailPoint(
+            primaryDB,
+            "hangBeforeExtraIndexKeysCheck",
+        );
 
         let dbCheckParameters = {
             validateMode: "extraIndexKeysCheck",
@@ -216,7 +222,10 @@ import {
         );
         replSet.awaitReplication();
 
-        const hangBeforeExtraIndexKeysHashing = configureFailPoint(primaryDB, "hangBeforeExtraIndexKeysHashing");
+        const hangBeforeExtraIndexKeysHashing = configureFailPoint(
+            primaryDB,
+            "hangBeforeExtraIndexKeysHashing",
+        );
 
         let dbCheckParameters = {
             validateMode: "extraIndexKeysCheck",
@@ -260,7 +269,10 @@ import {
         );
         replSet.awaitReplication();
 
-        const hangBeforeExtraIndexKeysHashing = configureFailPoint(primaryDB, "hangBeforeExtraIndexKeysHashing");
+        const hangBeforeExtraIndexKeysHashing = configureFailPoint(
+            primaryDB,
+            "hangBeforeExtraIndexKeysHashing",
+        );
 
         let dbCheckParameters = {
             validateMode: "extraIndexKeysCheck",
@@ -305,7 +317,10 @@ import {
         );
         replSet.awaitReplication();
 
-        const hangBeforeExtraIndexKeysHashing = configureFailPoint(primaryDB, "hangBeforeExtraIndexKeysHashing");
+        const hangBeforeExtraIndexKeysHashing = configureFailPoint(
+            primaryDB,
+            "hangBeforeExtraIndexKeysHashing",
+        );
 
         // First batch should 0, 1, 2, 4, 5. Batch boundaries will be [0, 5].
         let dbCheckParameters = {
@@ -430,12 +445,20 @@ import {
         assert.eq(primaryColl.find({}).count(), nDocs - 1);
 
         // TODO SERVER-80257: Replace using this failpoint with test commands instead.
-        const skipUpdatingIndexDocumentPrimary = configureFailPoint(primaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
-        const skipUpdatingIndexDocumentSecondary = configureFailPoint(secondaryDB, "skipUpdatingIndexDocument", {
-            indexName: "a_1",
-        });
+        const skipUpdatingIndexDocumentPrimary = configureFailPoint(
+            primaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
+        const skipUpdatingIndexDocumentSecondary = configureFailPoint(
+            secondaryDB,
+            "skipUpdatingIndexDocument",
+            {
+                indexName: "a_1",
+            },
+        );
 
         jsTestLog("Updating docs to remove index key field");
         assert.commandWorked(primaryColl.updateMany({}, {$unset: {"a": ""}}));
@@ -525,8 +548,14 @@ import {
         );
         replSet.awaitReplication();
 
-        const primaryHangAfterHashing = configureFailPoint(primaryDB, "primaryHangAfterExtraIndexKeysHashing");
-        const secondaryHangAfterHashing = configureFailPoint(secondaryDB, "secondaryHangAfterExtraIndexKeysHashing");
+        const primaryHangAfterHashing = configureFailPoint(
+            primaryDB,
+            "primaryHangAfterExtraIndexKeysHashing",
+        );
+        const secondaryHangAfterHashing = configureFailPoint(
+            secondaryDB,
+            "secondaryHangAfterExtraIndexKeysHashing",
+        );
 
         let dbCheckParameters = {
             validateMode: "extraIndexKeysCheck",
@@ -577,5 +606,8 @@ import {
         keyNotFoundDuringReverseLookup(10, collOpts);
     });
 
-    replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+    replSet.stopSet(undefined /* signal */, false /* forRestart */, {
+        skipCheckDBHashes: true,
+        skipValidation: true,
+    });
 })();

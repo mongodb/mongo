@@ -42,14 +42,18 @@ const shard0 = st.shard0;
 const shard1 = st.shard1;
 
 // Enable sharding with shard0 as the database primary.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}),
+);
 
 const coll = mongosDB[collName];
 
 // Shard on { x: 1 }, split at x: 0, move [0, +∞) to shard1.
 assert.commandWorked(mongosDB.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 assert.commandWorked(mongosDB.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
-assert.commandWorked(mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {x: 1}, to: shard1.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {x: 1}, to: shard1.shardName}),
+);
 
 // Insert documents: x=-5 lands in (-∞, 0) on shard0; x=5 lands in [0, +∞) on shard1.
 assert.commandWorked(
@@ -126,7 +130,8 @@ function assertShardEntries(shardName, entries, routerHashes, routerEntries) {
     assert.eq(
         entries.length,
         2,
-        `Expected 2 ${shardName} query stats entries (one per originalQueryShapeHash): ` + tojson(entries),
+        `Expected 2 ${shardName} query stats entries (one per originalQueryShapeHash): ` +
+            tojson(entries),
     );
 
     // Both entries share the same shard-level queryShapeHash because the shard-side pipeline
@@ -141,7 +146,8 @@ function assertShardEntries(shardName, entries, routerHashes, routerEntries) {
     assert.neq(
         entries[0].key.originalQueryShapeHash,
         entries[1].key.originalQueryShapeHash,
-        `${shardName} entries should have distinct originalQueryShapeHash values: ` + tojson(entries),
+        `${shardName} entries should have distinct originalQueryShapeHash values: ` +
+            tojson(entries),
     );
 
     // Each originalQueryShapeHash must match one of the router's queryShapeHash values.
@@ -157,8 +163,18 @@ function assertShardEntries(shardName, entries, routerHashes, routerEntries) {
     return originalHashes;
 }
 
-const shard0OriginalHashes = assertShardEntries("shard0", shard0Entries, routerHashes, routerEntries);
-const shard1OriginalHashes = assertShardEntries("shard1", shard1Entries, routerHashes, routerEntries);
+const shard0OriginalHashes = assertShardEntries(
+    "shard0",
+    shard0Entries,
+    routerHashes,
+    routerEntries,
+);
+const shard1OriginalHashes = assertShardEntries(
+    "shard1",
+    shard1Entries,
+    routerHashes,
+    routerEntries,
+);
 
 // Both shards must agree on which originalQueryShapeHash maps to which router query.
 assert.sameMembers(

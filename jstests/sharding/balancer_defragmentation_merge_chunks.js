@@ -168,7 +168,9 @@ jsTest.log("Begin and end defragmentation with balancer off.");
             chunkSize: targetChunkSizeMB,
         }),
     );
-    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1Name}));
+    let beforeStatus = assert.commandWorked(
+        st.s.adminCommand({balancerCollectionStatus: coll1Name}),
+    );
     assert.eq(beforeStatus.balancerCompliant, false);
     assert.eq(beforeStatus.firstComplianceViolation, "defragmentingChunks");
     assert.commandWorked(
@@ -179,7 +181,9 @@ jsTest.log("Begin and end defragmentation with balancer off.");
         }),
     );
     // Phase 3 still has to run
-    let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1Name}));
+    let afterStatus = assert.commandWorked(
+        st.s.adminCommand({balancerCollectionStatus: coll1Name}),
+    );
     assert.eq(afterStatus.balancerCompliant, false);
     assert.eq(afterStatus.firstComplianceViolation, "defragmentingChunks");
     st.startBalancer();
@@ -203,7 +207,9 @@ jsTest.log("Begin and end defragmentation with balancer on");
             chunkSize: targetChunkSizeMB,
         }),
     );
-    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1Name}));
+    let beforeStatus = assert.commandWorked(
+        st.s.adminCommand({balancerCollectionStatus: coll1Name}),
+    );
     assert.eq(beforeStatus.balancerCompliant, false);
     assert.eq(beforeStatus.firstComplianceViolation, "defragmentingChunks");
     assert.commandWorked(
@@ -280,7 +286,9 @@ jsTest.log("Changed uuid causes defragmentation to restart");
     );
     st.startBalancer();
     // Reshard collection
-    assert.commandWorked(db.adminCommand({reshardCollection: nss, key: {key2: 1}, numInitialChunks: 1}));
+    assert.commandWorked(
+        db.adminCommand({reshardCollection: nss, key: {key2: 1}, numInitialChunks: 1}),
+    );
     // Let defragementation run
     configRSFailPoints.off();
     defragmentationUtil.waitForEndOfDefragmentation(st.s, nss);

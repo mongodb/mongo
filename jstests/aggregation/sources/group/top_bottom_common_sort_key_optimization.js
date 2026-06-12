@@ -16,7 +16,12 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getCallerName} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {getAggPlanStages, getEngine, getPlanStages, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getEngine,
+    getPlanStages,
+    getSingleNodeExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());

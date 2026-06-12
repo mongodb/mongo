@@ -25,7 +25,9 @@ function runTest(db, cmd, logFailpoint, failpointName) {
     // Check that the command succeeds when passed a valid topologyVersion and maxAwaitTimeMS. In
     // this case, use the topologyVersion from the previous command response. The topologyVersion
     // field is expected to be of the form {processId: <ObjectId>, counter: <long>}.
-    assert.commandWorked(db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 0}));
+    assert.commandWorked(
+        db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 0}),
+    );
 
     // Ensure the command waits for at least maxAwaitTimeMS before returning, and doesn't appear in
     // slow query log even if it takes many seconds.
@@ -37,7 +39,9 @@ function runTest(db, cmd, logFailpoint, failpointName) {
     // the command runs.
     const timesEnteredBeforeRunningCommand = configureFailPoint(db, logFailpoint).timesEntered;
 
-    assert.commandWorked(db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 20000}));
+    assert.commandWorked(
+        db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 20000}),
+    );
     let commandDuration = new Date() - now;
     // Allow for some clock imprecision between the server and the jstest.
     assert.gte(
@@ -53,7 +57,9 @@ function runTest(db, cmd, logFailpoint, failpointName) {
 
     // Check that the command appears in the slow query log if it's unexpectedly slow.
     function runHelloCommand(cmd, topologyVersionField) {
-        assert.commandWorked(db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 1}));
+        assert.commandWorked(
+            db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 1}),
+        );
         jsTestLog(`${cmd} completed in parallel shell`);
     }
 
@@ -62,7 +68,10 @@ function runTest(db, cmd, logFailpoint, failpointName) {
     // Use a skip of 1, since the parallel shell runs hello when it starts.
     const helloFailpoint = configureFailPoint(db, failpointName, {}, {skip: 1});
     const logFailPoint = configureFailPoint(db, logFailpoint);
-    const awaitHello = startParallelShell(funWithArgs(runHelloCommand, cmd, topologyVersionField), db.getMongo().port);
+    const awaitHello = startParallelShell(
+        funWithArgs(runHelloCommand, cmd, topologyVersionField),
+        db.getMongo().port,
+    );
     helloFailpoint.wait();
     sleep(1000); // Make the command hang for a second in the parallel shell.
     helloFailpoint.off();
@@ -93,7 +102,10 @@ function runTest(db, cmd, logFailpoint, failpointName) {
     assert.commandWorked(
         db.runCommand({
             [cmd]: 1,
-            topologyVersion: {processId: ObjectId(), counter: NumberLong(topologyVersionField.counter + 1)},
+            topologyVersion: {
+                processId: ObjectId(),
+                counter: NumberLong(topologyVersionField.counter + 1),
+            },
             maxAwaitTimeMS: 0,
         }),
     );
@@ -184,7 +196,10 @@ function runTest(db, cmd, logFailpoint, failpointName) {
     // A client following the awaitable hello/isMaster protocol must include topologyVersion in
     // their request if and only if they include maxAwaitTimeMS. Check that the command fails if
     // there is a topologyVersion but no maxAwaitTimeMS field.
-    assert.commandFailedWithCode(db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField}), [31368, 51760]);
+    assert.commandFailedWithCode(
+        db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField}),
+        [31368, 51760],
+    );
 
     // Check that the command fails if there is a maxAwaitTimeMS field but no topologyVersion.
     assert.commandFailedWithCode(db.runCommand({[cmd]: 1, maxAwaitTimeMS: 0}), [31368, 51760]);
@@ -229,9 +244,24 @@ replTest.startSet();
 replTest.initiate();
 // Set slowMs threshold to 500ms.
 assert.commandWorked(replTest.getPrimary().getDB("admin").setProfilingLevel(1, 500));
-runTest(replTest.getPrimary().getDB("admin"), "hello", "waitForHelloCommandLogged", "shardWaitInHello");
-runTest(replTest.getPrimary().getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", "shardWaitInHello");
-runTest(replTest.getPrimary().getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", "shardWaitInHello");
+runTest(
+    replTest.getPrimary().getDB("admin"),
+    "hello",
+    "waitForHelloCommandLogged",
+    "shardWaitInHello",
+);
+runTest(
+    replTest.getPrimary().getDB("admin"),
+    "isMaster",
+    "waitForIsMasterCommandLogged",
+    "shardWaitInHello",
+);
+runTest(
+    replTest.getPrimary().getDB("admin"),
+    "ismaster",
+    "waitForIsMasterCommandLogged",
+    "shardWaitInHello",
+);
 replTest.stopSet();
 
 const st = new ShardingTest({

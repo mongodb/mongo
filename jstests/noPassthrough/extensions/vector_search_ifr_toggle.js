@@ -6,7 +6,10 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    checkPlatformCompatibleWithExtensions,
+    withExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
 
@@ -27,10 +30,14 @@ withExtensions({}, (conn) => {
     coll.drop();
     assert.commandWorked(coll.insertOne({_id: 0}));
 
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+    );
     assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
 
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
     assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
 });
 
@@ -51,26 +58,43 @@ withExtensions({"libvector_search_extension.so": {}}, (conn) => {
     assert.commandWorked(coll.insertMany(testData));
 
     // Flag enabled; extension is used (no-op).
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+    );
     assertArrayEq({actual: coll.aggregate(pipeline).toArray(), expected: testData});
 
     // Flag disabled; legacy is used (errors).
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
     assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
 
     // Toggles correctly with a more complex pipeline.
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
-    const complexPipeline = [{$vectorSearch: {}}, {$match: {_id: {$in: [0, 2]}}}, {$project: {text: 1, _id: 0}}];
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+    );
+    const complexPipeline = [
+        {$vectorSearch: {}},
+        {$match: {_id: {$in: [0, 2]}}},
+        {$project: {text: 1, _id: 0}},
+    ];
     assertArrayEq({
         actual: coll.aggregate(complexPipeline).toArray(),
         expected: [{text: "apple"}, {text: "cherry"}],
     });
 
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}));
-    assert.throwsWithCode(() => coll.aggregate(complexPipeline).toArray(), ErrorCodes.SearchNotEnabled);
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
+    assert.throwsWithCode(
+        () => coll.aggregate(complexPipeline).toArray(),
+        ErrorCodes.SearchNotEnabled,
+    );
 
     // returnStoredSource: true should use the extension.
-    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+    );
     const returnStoredSourcePipeline = [{$vectorSearch: {returnStoredSource: true}}];
     assertArrayEq({
         actual: coll.aggregate(returnStoredSourcePipeline).toArray(),

@@ -91,7 +91,10 @@ describe("change stream stepdown and readPreference enforcement", function () {
 
             stepDown(primary);
 
-            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
+            assertNextChange(primaryDb, cursor.id, {
+                operationType: "insert",
+                fullDocument: {_id: 1},
+            });
 
             stepUp(primary);
         });
@@ -113,7 +116,10 @@ describe("change stream stepdown and readPreference enforcement", function () {
             // Step up the secondary — cursor was opened there, now it is the primary.
             stepUp(secondary);
 
-            assertNextChange(secondaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
+            assertNextChange(secondaryDb, cursor.id, {
+                operationType: "insert",
+                fullDocument: {_id: 1},
+            });
         });
 
         it("survives stepdown between two getMores", function () {
@@ -126,13 +132,19 @@ describe("change stream stepdown and readPreference enforcement", function () {
             replTest.awaitReplication();
 
             // First getMore: consume one event before the stepdown.
-            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
+            assertNextChange(primaryDb, cursor.id, {
+                operationType: "insert",
+                fullDocument: {_id: 1},
+            });
 
             // Stepdown happens between the two getMores.
             stepDown(primary);
 
             // Second getMore: cursor should still work on the now-secondary node.
-            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 2}});
+            assertNextChange(primaryDb, cursor.id, {
+                operationType: "insert",
+                fullDocument: {_id: 2},
+            });
 
             stepUp(primary);
         });
@@ -149,7 +161,10 @@ describe("change stream stepdown and readPreference enforcement", function () {
             replTest.awaitReplication();
 
             // Consume existing event via raw getMore.
-            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
+            assertNextChange(primaryDb, cursor.id, {
+                operationType: "insert",
+                fullDocument: {_id: 1},
+            });
 
             replTest.awaitReplication();
 
@@ -177,7 +192,9 @@ describe("change stream stepdown and readPreference enforcement", function () {
                 const replTest = new ReplSetTest(primary.host);
                 const secondary = replTest.getSecondary();
                 assert.commandWorked(secondary.adminCommand({replSetFreeze: 0}));
-                const newPrimary = replTest.stepUp(secondary, {awaitReplicationBeforeStepUp: false});
+                const newPrimary = replTest.stepUp(secondary, {
+                    awaitReplicationBeforeStepUp: false,
+                });
                 assert.neq(newPrimary, primary, "Primary didn't change.");
                 assert.commandWorked(newPrimary.getDB(dbName)[collName].insert({_id: 2}));
             }
@@ -208,7 +225,10 @@ describe("change stream stepdown and readPreference enforcement", function () {
         function getCursorsForId(db, cursorId) {
             return db
                 .getSiblingDB("admin")
-                .aggregate([{$currentOp: {idleCursors: true, allUsers: true}}, {$match: {"cursor.cursorId": cursorId}}])
+                .aggregate([
+                    {$currentOp: {idleCursors: true, allUsers: true}},
+                    {$match: {"cursor.cursorId": cursorId}},
+                ])
                 .toArray();
         }
 
@@ -234,7 +254,9 @@ describe("change stream stepdown and readPreference enforcement", function () {
                 return res.ok && res.internalChangeStreamRespectsReadPreference === true;
             });
             if (!isEnabledOnAllNodes) {
-                jsTest.log.info("Skipping: internalChangeStreamRespectsReadPreference is not enabled on all nodes");
+                jsTest.log.info(
+                    "Skipping: internalChangeStreamRespectsReadPreference is not enabled on all nodes",
+                );
                 return true;
             }
             return false;
@@ -312,7 +334,9 @@ describe("change stream stepdown and readPreference enforcement", function () {
             stepUp(secondary);
 
             // getMore should succeed - primaryPreferred is satisfied by any topology.
-            assert.commandWorked(secondaryDb.runCommand({getMore: cursor.id, collection: collName}));
+            assert.commandWorked(
+                secondaryDb.runCommand({getMore: cursor.id, collection: collName}),
+            );
         });
 
         it("does not throw for secondaryPreferred when secondary becomes primary", function () {
@@ -331,7 +355,9 @@ describe("change stream stepdown and readPreference enforcement", function () {
             stepUp(secondary);
 
             // getMore should succeed - secondaryPreferred is satisfied by any topology.
-            assert.commandWorked(secondaryDb.runCommand({getMore: cursor.id, collection: collName}));
+            assert.commandWorked(
+                secondaryDb.runCommand({getMore: cursor.id, collection: collName}),
+            );
         });
 
         it("does not throw for nearest when topology changes", function () {
@@ -350,7 +376,9 @@ describe("change stream stepdown and readPreference enforcement", function () {
             stepUp(secondary);
 
             // getMore should succeed - nearest is satisfied by any topology.
-            assert.commandWorked(secondaryDb.runCommand({getMore: cursor.id, collection: collName}));
+            assert.commandWorked(
+                secondaryDb.runCommand({getMore: cursor.id, collection: collName}),
+            );
         });
 
         it("resume works after readPreference enforcement error", function () {
@@ -431,7 +459,9 @@ describe("change stream stepdown and readPreference enforcement", function () {
             stepDown(primary);
 
             // getMore on a non-CS cursor should still succeed -- enforcement is CS-only.
-            res = assert.commandWorked(primaryDb.runCommand({getMore: cursorId, collection: collName}));
+            res = assert.commandWorked(
+                primaryDb.runCommand({getMore: cursorId, collection: collName}),
+            );
             assert.gte(res.cursor.nextBatch.length, 1, "Expected remaining docs");
 
             stepUp(primary);

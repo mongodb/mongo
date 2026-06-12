@@ -73,10 +73,15 @@ assert.docEq(coll.findOne(), {_id: 1, scores: [0, 6, 7, 8, 9, 10, 11, 12, 13, 14
 
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1}, {$push: {scores: 16}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+});
 
 coll = resetDb();
-assert.commandWorked(coll.updateOne({_id: 1}, {$push: {scores: {$each: [16, 17, 18], $position: 10, $slice: -10}}}));
+assert.commandWorked(
+    coll.updateOne({_id: 1}, {$push: {scores: {$each: [16, 17, 18], $position: 10, $slice: -10}}}),
+);
 assert.docEq(coll.findOne(), {_id: 1, scores: [9, 16, 17, 18, 10, 11, 12, 13, 14, 15]});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,11 +90,17 @@ assert.docEq(coll.findOne(), {_id: 1, scores: [9, 16, 17, 18, 10, 11, 12, 13, 14
 
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1}, {$addToSet: {scores: 10}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+});
 
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1}, {$addToSet: {scores: {$each: [14, 15, 16]}}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // set
@@ -97,33 +108,56 @@ assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 
 // dot notation
 coll = resetDb();
-assert.commandWorked(coll.updateOne({_id: 1}, {$set: {"scores.1": 10, "scores.10": 100, "scores.13": 130}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 10, 2, 3, 4, 5, 6, 7, 8, 9, 100, 11, 12, 130, 14, 15]});
+assert.commandWorked(
+    coll.updateOne({_id: 1}, {$set: {"scores.1": 10, "scores.10": 100, "scores.13": 130}}),
+);
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 10, 2, 3, 4, 5, 6, 7, 8, 9, 100, 11, 12, 130, 14, 15],
+});
 
 // $[<identifier>]
 coll = resetDb();
 assert.commandWorked(
-    coll.updateOne({_id: 1}, {$set: {"scores.$[element]": 99}}, {arrayFilters: [{element: {$gte: 9}}]}),
+    coll.updateOne(
+        {_id: 1},
+        {$set: {"scores.$[element]": 99}},
+        {arrayFilters: [{element: {$gte: 9}}]},
+    ),
 );
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 99, 99, 99, 99, 99, 99, 99]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 99, 99, 99, 99, 99, 99, 99],
+});
 
 // $[]
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1}, {$set: {"scores.$[]": 99}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99],
+});
 
 // $
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1, scores: 10}, {$set: {"scores.$": 100}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 11, 12, 13, 14, 15]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 11, 12, 13, 14, 15],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // inc
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 coll = resetDb();
-assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {"scores.1": 10, "scores.10": 100, "scores.12": 1000}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 11, 2, 3, 4, 5, 6, 7, 8, 9, 110, 11, 1012, 13, 14, 15]});
+assert.commandWorked(
+    coll.updateOne({_id: 1}, {$inc: {"scores.1": 10, "scores.10": 100, "scores.12": 1000}}),
+);
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 11, 2, 3, 4, 5, 6, 7, 8, 9, 110, 11, 1012, 13, 14, 15],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // rename
@@ -131,23 +165,36 @@ assert.docEq(coll.findOne(), {_id: 1, scores: [0, 11, 2, 3, 4, 5, 6, 7, 8, 9, 11
 
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1}, {$rename: {"scores": "array"}}));
-assert.docEq(coll.findOne(), {_id: 1, array: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    array: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // max
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 coll = resetDb();
-assert.commandWorked(coll.updateOne({_id: 1}, {$max: {"scores.1": 10, "scores.10": 10, "scores.12": 100}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 10, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 100, 13, 14, 15]});
+assert.commandWorked(
+    coll.updateOne({_id: 1}, {$max: {"scores.1": 10, "scores.10": 10, "scores.12": 100}}),
+);
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 10, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 100, 13, 14, 15],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // min
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 coll = resetDb();
-assert.commandWorked(coll.updateOne({_id: 1}, {$min: {"scores.1": 10, "scores.10": 10, "scores.12": 10}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 10, 13, 14, 15]});
+assert.commandWorked(
+    coll.updateOne({_id: 1}, {$min: {"scores.1": 10, "scores.10": 10, "scores.12": 10}}),
+);
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 10, 13, 14, 15],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // mul
@@ -155,7 +202,10 @@ assert.docEq(coll.findOne(), {_id: 1, scores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 
 coll = resetDb();
 assert.commandWorked(coll.updateOne({_id: 1}, {$mul: {"scores.1": 10, "scores.10": 100}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 10, 2, 3, 4, 5, 6, 7, 8, 9, 1000, 11, 12, 13, 14, 15]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 10, 2, 3, 4, 5, 6, 7, 8, 9, 1000, 11, 12, 13, 14, 15],
+});
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // currentDate
@@ -171,7 +221,9 @@ if (!FixtureHelpers.isReplSet(db) && !FixtureHelpers.isSharded(coll)) {
     const beforeUpdate = new Date();
 
     coll = resetDb();
-    assert.commandWorked(coll.updateOne({_id: 1}, {$currentDate: {"scores.1": true, "scores.10": true}}));
+    assert.commandWorked(
+        coll.updateOne({_id: 1}, {$currentDate: {"scores.1": true, "scores.10": true}}),
+    );
     let doc = coll.findOne();
 
     const afterUpdate = new Date();
@@ -182,7 +234,8 @@ if (!FixtureHelpers.isReplSet(db) && !FixtureHelpers.isSharded(coll)) {
     // Assert updated indexes are Date objects and within delta.
     const deltaMs = 1000; // 1 second tolerance
     assert(
-        doc.scores[1].getTime() >= beforeUpdate.getTime() && doc.scores[1].getTime() <= afterUpdate.getTime() + deltaMs,
+        doc.scores[1].getTime() >= beforeUpdate.getTime() &&
+            doc.scores[1].getTime() <= afterUpdate.getTime() + deltaMs,
     );
 
     assert(
@@ -196,8 +249,13 @@ if (!FixtureHelpers.isReplSet(db) && !FixtureHelpers.isSharded(coll)) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 coll = resetDb();
-assert.commandWorked(coll.updateOne({_id: 1}, {$unset: {"scores.1": "", "scores.10": "", "scores.12": ""}}));
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, null, 2, 3, 4, 5, 6, 7, 8, 9, null, 11, null, 13, 14, 15]});
+assert.commandWorked(
+    coll.updateOne({_id: 1}, {$unset: {"scores.1": "", "scores.10": "", "scores.12": ""}}),
+);
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, null, 2, 3, 4, 5, 6, 7, 8, 9, null, 11, null, 13, 14, 15],
+});
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // bit
@@ -216,4 +274,7 @@ assert.commandWorked(
         },
     ),
 );
-assert.docEq(coll.findOne(), {_id: 1, scores: [0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 160, 11, 12, 15, 14, 15]});
+assert.docEq(coll.findOne(), {
+    _id: 1,
+    scores: [0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 160, 11, 12, 15, 14, 15],
+});

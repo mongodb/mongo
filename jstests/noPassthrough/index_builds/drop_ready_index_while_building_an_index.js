@@ -37,11 +37,21 @@ assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
 IndexBuildTest.pauseIndexBuilds(primary);
 IndexBuildTest.pauseIndexBuilds(secondary);
 
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(db.getMongo(), coll.getFullName(), {y: 1}, {name: "y_1"});
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    db.getMongo(),
+    coll.getFullName(),
+    {y: 1},
+    {name: "y_1"},
+);
 IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, "y_1");
 IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, "y_1");
 
-IndexBuildTest.assertIndexes(coll, /*numIndexes=*/ 3, /*readyIndexes=*/ ["_id_", "x_1"], /*notReadyIndexes=*/ ["y_1"]);
+IndexBuildTest.assertIndexes(
+    coll,
+    /*numIndexes=*/ 3,
+    /*readyIndexes=*/ ["_id_", "x_1"],
+    /*notReadyIndexes=*/ ["y_1"],
+);
 // However unlikely, a secondary being in the scan collection phase does not guarantee the oplog
 // applier considers the 'startIndexBuild' applied, and as such an attempt to listIndexes might
 // fail.
@@ -56,7 +66,12 @@ IndexBuildTest.assertIndexesSoon(
 assert.commandWorked(coll.dropIndex("x_1"));
 rst.awaitReplication();
 
-IndexBuildTest.assertIndexes(coll, /*numIndexes=*/ 2, /*readyIndexes=*/ ["_id_"], /*notReadyIndexes=*/ ["y_1"]);
+IndexBuildTest.assertIndexes(
+    coll,
+    /*numIndexes=*/ 2,
+    /*readyIndexes=*/ ["_id_"],
+    /*notReadyIndexes=*/ ["y_1"],
+);
 IndexBuildTest.assertIndexes(
     secondaryColl,
     /*numIndexes=*/ 2,
@@ -70,7 +85,12 @@ IndexBuildTest.resumeIndexBuilds(secondary);
 awaitIndexBuild();
 rst.awaitReplication();
 
-IndexBuildTest.assertIndexes(coll, /*numIndexes=*/ 2, /*readyIndexes=*/ ["_id_", "y_1"], /*notReadyIndexes=*/ []);
+IndexBuildTest.assertIndexes(
+    coll,
+    /*numIndexes=*/ 2,
+    /*readyIndexes=*/ ["_id_", "y_1"],
+    /*notReadyIndexes=*/ [],
+);
 IndexBuildTest.assertIndexes(
     secondaryColl,
     /*numIndexes=*/ 2,

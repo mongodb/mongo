@@ -44,9 +44,13 @@ const indexSpec = {
     a: 1,
 };
 const indexName = "a_1";
-const createIndexCmd = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), indexSpec, {}, [
-    ErrorCodes.InterruptedDueToReplStateChange,
-]);
+const createIndexCmd = IndexBuildTest.startIndexBuild(
+    primary,
+    primaryColl.getFullName(),
+    indexSpec,
+    {},
+    [ErrorCodes.InterruptedDueToReplStateChange],
+);
 if (FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds")) {
     IndexBuildTest.assertIndexesSoon(secondaryDB[collName], 2, ["_id_"], [indexName]);
 } else {

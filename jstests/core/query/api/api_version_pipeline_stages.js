@@ -60,7 +60,10 @@ const unstablePipelines = [
                     pipelines: {
                         score2: [
                             {
-                                $search: {index: "search_index", text: {query: "mystery", path: "genres"}},
+                                $search: {
+                                    index: "search_index",
+                                    text: {query: "mystery", path: "genres"},
+                                },
                             },
                             {$match: {author: "dave"}},
                         ],
@@ -124,7 +127,9 @@ assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {histograms: true
 assertAggregateFailsWithAPIStrict([{$collStats: {storageStats: {}}}]);
 assertAggregateFailsWithAPIStrict([{$collStats: {queryExecStats: {}}}]);
 assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {}, queryExecStats: {}}}]);
-assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {}, storageStats: {scale: 1024}, queryExecStats: {}}}]);
+assertAggregateFailsWithAPIStrict([
+    {$collStats: {latencyStats: {}, storageStats: {scale: 1024}, queryExecStats: {}}},
+]);
 
 assert.commandWorked(
     testDb.runCommand({

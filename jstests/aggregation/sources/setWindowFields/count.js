@@ -24,7 +24,13 @@ function verifyResults(results, valueFunction) {
         const correctDoc = valueFunction(i, Object.assign({}, origDocs[i]));
         assert(
             documentEq(correctDoc, results[i]),
-            "Got: " + tojson(results[i]) + "\nExpected: " + tojson(correctDoc) + "\n at position " + i + "\n",
+            "Got: " +
+                tojson(results[i]) +
+                "\nExpected: " +
+                tojson(correctDoc) +
+                "\n at position " +
+                i +
+                "\n",
         );
     }
 }

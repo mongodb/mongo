@@ -38,7 +38,9 @@ const dbName0 = "testDb0";
 const collName0 = "testColl0";
 const ns0 = dbName0 + "." + collName0;
 const testColl0 = st.s.getCollection(ns0);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName0, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName0, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(testColl0.insert([{x: -1}, {x: 0}, {x: 1}]));
 assert.commandWorked(testColl0.createIndex({x: 1}));
 const collUuid0 = getUUIDFromListCollections(st.s.getDB(dbName0), collName0);
@@ -50,7 +52,9 @@ const temporaryReshardingTestColl0 = st.s.getCollection(temporaryReshardingNs0);
 const dbName1 = "testDb1";
 const collName1 = "testColl1";
 const testDb1 = st.s.getDB(dbName1);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName1, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName1, primaryShard: st.shard1.shardName}),
+);
 
 const reshardingMaxReplicationLagSecondsBeforeBuildingIndexes = 1;
 assert.commandWorked(
@@ -71,7 +75,9 @@ stopServerReplication(st.rs1.nodes[2]);
 
 // Perform a write and and wait for it to replicate to the other secondary.
 sleep(reshardingMaxReplicationLagSecondsBeforeBuildingIndexes * 2000);
-const res = assert.commandWorked(testDb1.runCommand({insert: collName1, documents: [{y: 0}], writeConcern: {w: 2}}));
+const res = assert.commandWorked(
+    testDb1.runCommand({insert: collName1, documents: [{y: 0}], writeConcern: {w: 2}}),
+);
 jsTest.log("Performed insert: " + tojson(res));
 
 fp.off();

@@ -5,7 +5,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let st = new ShardingTest({shards: 1});
 
 let testDB = st.s.getDB("TestSplitDB");
-assert.commandWorked(testDB.adminCommand({enableSharding: "TestSplitDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: "TestSplitDB", primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(testDB.adminCommand({shardCollection: "TestSplitDB.Coll", key: {x: 1}}));
 assert.commandWorked(testDB.adminCommand({split: "TestSplitDB.Coll", middle: {x: 0}}));
@@ -32,6 +34,10 @@ assert.commandFailedWithCode(
 );
 
 let chunksAfter = st.s.getDB("config").chunks.find().toArray();
-assert.eq(chunksBefore, chunksAfter, "Split chunks failed, but the chunks were updated in the config database");
+assert.eq(
+    chunksBefore,
+    chunksAfter,
+    "Split chunks failed, but the chunks were updated in the config database",
+);
 
 st.stop();

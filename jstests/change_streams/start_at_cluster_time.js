@@ -38,7 +38,9 @@ assert.eq(next.documentKey._id, 1, tojson(next));
 assert.commandFailedWithCode(
     db.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$changeStream: {startAtOperationTime: timeOfFirstUpdate, resumeAfter: next._id}}],
+        pipeline: [
+            {$changeStream: {startAtOperationTime: timeOfFirstUpdate, resumeAfter: next._id}},
+        ],
         cursor: {},
     }),
     40674,

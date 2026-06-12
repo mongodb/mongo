@@ -77,7 +77,10 @@ function runTest({
         }
     });
 
-    const commandDiagnostics = getDiagnosticLogs({description: description, logFile: conn.fullOptions.logFile});
+    const commandDiagnostics = getDiagnosticLogs({
+        description: description,
+        logFile: conn.fullOptions.logFile,
+    });
     assert.eq(
         commandDiagnostics.length,
         0,
@@ -439,7 +442,10 @@ runTest({
 runTest({
     ...planExecutorAlwaysFails,
     description: "explain find",
-    command: {explain: {find: collName, filter: {a: 1, b: 1}, limit: 1}, verbosity: "executionStats"},
+    command: {
+        explain: {find: collName, filter: {a: 1, b: 1}, limit: 1},
+        verbosity: "executionStats",
+    },
     // The top-level command doesn't fail when the plan executor fails.
     errorCode: 0,
     expectedDiagnosticInfo: [
@@ -487,7 +493,10 @@ runTest({
 runTest({
     ...planExecutorAlwaysFails,
     description: "explain distinct",
-    command: {explain: {distinct: collName, key: "a", query: {a: 1, b: 1}}, verbosity: "executionStats"},
+    command: {
+        explain: {distinct: collName, key: "a", query: {a: 1, b: 1}},
+        verbosity: "executionStats",
+    },
     // The top-level command doesn't fail when the plan executor fails.
     errorCode: 0,
     expectedDiagnosticInfo: [
@@ -510,7 +519,11 @@ runTest({
     const {cursor} = assert.commandWorked(db.runCommand({find: collName, batchSize: 0}));
     runWithFailpoint(db, failpointName, failpointOpts, () => {
         jsTestLog("Testing getMore");
-        assert.commandFailedWithCode(db.runCommand({getMore: cursor.id, collection: collName}), errorCode, description);
+        assert.commandFailedWithCode(
+            db.runCommand({getMore: cursor.id, collection: collName}),
+            errorCode,
+            description,
+        );
     });
 
     // Get e.g. "2233240269355766922" from 'NumberLong("2233240269355766922")'.

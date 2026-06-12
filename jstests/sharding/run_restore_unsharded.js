@@ -16,14 +16,21 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // validating fast count.
 TestData.skipEnforceFastCountOnValidate = true;
 
-const s = new ShardingTest({name: "runRestoreUnsharded", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
+const s = new ShardingTest({
+    name: "runRestoreUnsharded",
+    shards: 2,
+    mongos: 1,
+    config: 1,
+    other: {chunkSize: 1},
+});
 
 let mongos = s.s0;
 let db = s.getDB("test");
 
 // Create an unsharded collection.
 assert.commandWorked(db.createCollection("a"));
-const collUUID = mongos.getDB("test").runCommand({listCollections: 1}).cursor.firstBatch[0].info.uuid;
+const collUUID = mongos.getDB("test").runCommand({listCollections: 1}).cursor.firstBatch[0]
+    .info.uuid;
 
 // Only sharded collections appear in config.collections
 assert.eq(0, mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
@@ -35,7 +42,12 @@ s.stop({noCleanData: true});
 const configDbPath = s.c0.dbpath;
 
 // Start the config server in standalone restore mode.
-let conn = MongoRunner.runMongod({noCleanData: true, dbpath: configDbPath, restore: "", maintenanceMode: "standalone"});
+let conn = MongoRunner.runMongod({
+    noCleanData: true,
+    dbpath: configDbPath,
+    restore: "",
+    maintenanceMode: "standalone",
+});
 assert(conn);
 
 // Disables production of minidump on Windows, as this could hang during shutdown.

@@ -27,7 +27,10 @@ assert.throws(
 
 function testIndexOnlyBinData(blob) {
     let explain = coll
-        .find({$and: [{_id: {$lte: BinData(0, blob)}}, {_id: {$gte: BinData(0, blob)}}]}, {_id: 1, a: 1})
+        .find(
+            {$and: [{_id: {$lte: BinData(0, blob)}}, {_id: {$gte: BinData(0, blob)}}]},
+            {_id: 1, a: 1},
+        )
         .hint({_id: 1, a: 1})
         .explain("executionStats");
 
@@ -54,27 +57,43 @@ explain = coll
     .hint({_id: 1, a: 1})
     .explain("executionStats");
 assert(isIndexOnly(db, explain), "indexonly.$lt.1 - must be index-only");
-assert.eq(0, explain.executionStats.nReturned, "correctcount.$lt.1 - not returning correct documents");
+assert.eq(
+    0,
+    explain.executionStats.nReturned,
+    "correctcount.$lt.1 - not returning correct documents",
+);
 
 explain = coll
     .find({_id: {$gt: BinData(0, "////////////////////////////")}}, {_id: 1, a: 1})
     .hint({_id: 1, a: 1})
     .explain("executionStats");
 assert(isIndexOnly(db, explain), "indexonly.$gt.2 - must be index-only");
-assert.eq(0, explain.executionStats.nReturned, "correctcount.$gt.2 - not returning correct documents");
+assert.eq(
+    0,
+    explain.executionStats.nReturned,
+    "correctcount.$gt.2 - not returning correct documents",
+);
 
 explain = coll
     .find({_id: {$lte: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhv")}}, {_id: 1, a: 1})
     .hint({_id: 1, a: 1})
     .explain("executionStats");
 assert(isIndexOnly(db, explain), "indexonly.$lte.3 - must be index-only");
-assert.eq(2, explain.executionStats.nReturned, "correctcount.$lte.3 - not returning correct documents");
+assert.eq(
+    2,
+    explain.executionStats.nReturned,
+    "correctcount.$lte.3 - not returning correct documents",
+);
 
 explain = coll
     .find({_id: {$gte: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhz")}}, {_id: 1, a: 1})
     .hint({_id: 1, a: 1})
     .explain("executionStats");
 assert(isIndexOnly(db, explain), "indexonly.$gte.3 - must be index-only");
-assert.eq(2, explain.executionStats.nReturned, "correctcount.$gte.3 - not returning correct documents");
+assert.eq(
+    2,
+    explain.executionStats.nReturned,
+    "correctcount.$gte.3 - not returning correct documents",
+);
 
 coll.drop();

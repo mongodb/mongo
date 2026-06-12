@@ -279,4 +279,11 @@ const res3 = coll
     ])
     .toArray();
 
-assert.sameMembers(res3, [{"res": 4}, {"res": 8}, {"res": 8}, {"res": 12}, {"res": 12}, {"res": 12}]);
+assert.sameMembers(res3, [
+    {"res": 4},
+    {"res": 8},
+    {"res": 8},
+    {"res": 12},
+    {"res": 12},
+    {"res": 12},
+]);

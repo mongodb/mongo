@@ -33,7 +33,9 @@ function runTest(customStOpts) {
 
     const dbName = "test";
     const testDB = conn.getDB(dbName);
-    assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+    );
 
     const collName = jsTestName();
     const coll = testDB.getCollection(collName);
@@ -41,7 +43,9 @@ function runTest(customStOpts) {
     const shard0ResultId = 2;
 
     assert.commandWorked(
-        coll.insert([{_id: shard0ResultId, openfda: {manufacturer_name: "Factory", route: ["ORAL"]}}]),
+        coll.insert([
+            {_id: shard0ResultId, openfda: {manufacturer_name: "Factory", route: ["ORAL"]}},
+        ]),
     );
     // Shard the collection by '_id', but do not split it or move any chunks off the primary shard
     // (shard 0).
@@ -52,7 +56,10 @@ function runTest(customStOpts) {
         expectPlanShardedSearch({mongotConn: mongotForTheMongos, coll: coll});
         const mongotQuery = searchQuery;
         {
-            const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
+            const collUUID0 = getUUIDFromListCollections(
+                st.rs0.getPrimary().getDB(dbName),
+                collName,
+            );
             const mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
             const resultsId = NumberLong(2);
             mongot.setMockResponses(
@@ -64,7 +71,9 @@ function runTest(customStOpts) {
                             collName: collName,
                             db: dbName,
                             collectionUUID: collUUID0,
-                            optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true} : null,
+                            optimizationFlags: isSearchMeta
+                                ? {omitSearchDocumentResults: true}
+                                : null,
                         }),
                         response: {
                             "cursor": {
@@ -86,7 +95,9 @@ function runTest(customStOpts) {
     // returned by mongot(mock).
     function testSearchQuery() {
         setQueryMockResponses(false);
-        let queryResult = coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}]).toArray();
+        let queryResult = coll
+            .aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}])
+            .toArray();
         assert.eq([{_id: shard0ResultId, var: expectedSearchMeta}], queryResult);
     }
 

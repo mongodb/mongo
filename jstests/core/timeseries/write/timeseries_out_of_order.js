@@ -17,7 +17,11 @@ TimeseriesTest.run((insert) => {
     const collNamePrefix = jsTestName() + "_";
 
     const timeFieldName = "time";
-    const times = [ISODate("2021-01-01T01:00:00Z"), ISODate("2021-01-01T01:00:30Z"), ISODate("2021-01-01T02:00:00Z")];
+    const times = [
+        ISODate("2021-01-01T01:00:00Z"),
+        ISODate("2021-01-01T01:00:30Z"),
+        ISODate("2021-01-01T02:00:00Z"),
+    ];
     let docs = [
         {_id: 0, [timeFieldName]: times[1]},
         {_id: 1, [timeFieldName]: times[0]},
@@ -28,7 +32,9 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collNamePrefix + collCount++);
         coll.drop();
 
-        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}),
+        );
 
         assert.commandWorked(insert(coll, docs));
         assert.docEq(docs, coll.find().sort({_id: 1}).toArray());

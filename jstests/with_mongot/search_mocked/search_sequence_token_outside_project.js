@@ -59,8 +59,12 @@ const history = [
     },
 ];
 
-assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
-let results = coll.aggregate([{$search: searchQuery}, {$group: {"_id": {$meta: "searchSequenceToken"}}}]).toArray();
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
+);
+let results = coll
+    .aggregate([{$search: searchQuery}, {$group: {"_id": {$meta: "searchSequenceToken"}}}])
+    .toArray();
 
 const expected = [
     {"_id": 1, "myToken": "aaaaaaa=="},

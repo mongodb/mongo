@@ -42,7 +42,10 @@ function assertDataSizeCmdWorked(conn, keyPattern, expectedNumObjects) {
  * asserts that command failed with BadValue error.
  */
 function assertDataSizeCmdFailedWithBadValue(conn, keyPattern) {
-    assert.commandFailedWithCode(conn.adminCommand({dataSize: kNs, keyPattern: keyPattern}), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        conn.adminCommand({dataSize: kNs, keyPattern: keyPattern}),
+        ErrorCodes.BadValue,
+    );
 }
 
 /*
@@ -66,7 +69,9 @@ function testDataSizeCmd(conn, keyPattern, invalidRanges, numObjects) {
 }
 
 const st = new ShardingTest({mongos: 3, shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+);
 
 const shardKey1 = {
     x: 1,

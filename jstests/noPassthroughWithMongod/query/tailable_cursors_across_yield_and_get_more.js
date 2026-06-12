@@ -67,5 +67,7 @@ try {
 } finally {
     // We must ensure that the mongod's original settings are returned because this test shares a
     // common mongod instance with other tests.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: setParamResWas}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: setParamResWas}),
+    );
 }

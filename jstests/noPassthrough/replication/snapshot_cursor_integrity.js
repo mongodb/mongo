@@ -43,7 +43,10 @@ assert(res.cursor.hasOwnProperty("id"));
 let cursorID = res.cursor.id;
 
 // The cursor may not be iterated outside of any session.
-assert.commandFailedWithCode(primaryDB.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50737);
+assert.commandFailedWithCode(
+    primaryDB.runCommand({getMore: cursorID, collection: collName, batchSize: 2}),
+    50737,
+);
 
 // The cursor can still be iterated in session1.
 assert.commandWorked(
@@ -57,7 +60,10 @@ assert.commandWorked(
 );
 
 // The cursor may not be iterated in a different session.
-assert.commandFailedWithCode(sessionDB2.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50738);
+assert.commandFailedWithCode(
+    sessionDB2.runCommand({getMore: cursorID, collection: collName, batchSize: 2}),
+    50738,
+);
 
 // The cursor can still be iterated in session1.
 assert.commandWorked(
@@ -71,7 +77,10 @@ assert.commandWorked(
 );
 
 // The cursor may not be iterated outside of any transaction.
-assert.commandFailedWithCode(sessionDB1.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50740);
+assert.commandFailedWithCode(
+    sessionDB1.runCommand({getMore: cursorID, collection: collName, batchSize: 2}),
+    50740,
+);
 
 // The cursor can still be iterated in its transaction in session1.
 assert.commandWorked(
@@ -118,7 +127,9 @@ assert.commandFailedWithCode(
 );
 
 // Kill the cursor.
-assert.commandWorked(sessionDB1.runCommand({killCursors: sessionDB1.coll.getName(), cursors: [cursorID]}));
+assert.commandWorked(
+    sessionDB1.runCommand({killCursors: sessionDB1.coll.getName(), cursors: [cursorID]}),
+);
 
 // Establish a cursor outside of any transaction in session1.
 res = assert.commandWorked(sessionDB1.runCommand({find: collName, batchSize: 2}));
@@ -157,7 +168,10 @@ assert(res.cursor.hasOwnProperty("id"));
 cursorID = res.cursor.id;
 
 // The cursor may not be iterated inside a session.
-assert.commandFailedWithCode(sessionDB1.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50736);
+assert.commandFailedWithCode(
+    sessionDB1.runCommand({getMore: cursorID, collection: collName, batchSize: 2}),
+    50736,
+);
 
 // The cursor can still be iterated outside of any session. Exhaust the cursor.
 assert.commandWorked(primaryDB.runCommand({getMore: cursorID, collection: collName}));

@@ -20,14 +20,22 @@ export var TxnUtil = (function () {
         "bulkWrite",
     ]);
 
-    const kCmdsThatWrite = new Set(["insert", "update", "findAndModify", "findandmodify", "delete", "bulkWrite"]);
+    const kCmdsThatWrite = new Set([
+        "insert",
+        "update",
+        "findAndModify",
+        "findandmodify",
+        "delete",
+        "bulkWrite",
+    ]);
 
     // Indicates an aggregation command with a pipeline that cannot run in a transaction but can
     // still execute concurrently with other transactions. Pipelines with $changeStream or $out
     // cannot run within a transaction.
     function commandIsNonTxnAggregation(cmdName, cmdObj) {
         return (
-            (!("explain" in cmdObj) && OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj)) ||
+            (!("explain" in cmdObj) &&
+                OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj)) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithListCatalog(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithListClusterCatalog(cmdName, cmdObj) ||
@@ -41,7 +49,10 @@ export var TxnUtil = (function () {
             return true;
         }
 
-        if (!kCmdsSupportingTransactions.has(cmdName) || commandIsNonTxnAggregation(cmdName, cmdObj)) {
+        if (
+            !kCmdsSupportingTransactions.has(cmdName) ||
+            commandIsNonTxnAggregation(cmdName, cmdObj)
+        ) {
             return false;
         }
 
@@ -136,11 +147,18 @@ export var TxnUtil = (function () {
     }
 
     function isTransientTransactionError(res) {
-        return res.hasOwnProperty("errorLabels") && res.errorLabels.includes("TransientTransactionError");
+        return (
+            res.hasOwnProperty("errorLabels") &&
+            res.errorLabels.includes("TransientTransactionError")
+        );
     }
 
     function isConflictingOperationInProgress(res) {
-        return res != null && res.hasOwnProperty("codeName") && res.codeName === "ConflictingOperationInProgress";
+        return (
+            res != null &&
+            res.hasOwnProperty("codeName") &&
+            res.codeName === "ConflictingOperationInProgress"
+        );
     }
 
     // Runs a function 'func()' in a transaction on database 'db'. Invokes function

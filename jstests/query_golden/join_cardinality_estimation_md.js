@@ -106,14 +106,30 @@ function estimateNoSubpipeline(
     ]);
 }
 
-function estimateWithSubpipeline(left, right, localField, foreignField, pipelineMatch = {}, subpipelineMatch = {}) {
+function estimateWithSubpipeline(
+    left,
+    right,
+    localField,
+    foreignField,
+    pipelineMatch = {},
+    subpipelineMatch = {},
+) {
     estimatePipeline(left, [
         {
             $lookup: {
                 from: right,
                 as: "right",
                 let: {localField: "$" + localField},
-                pipeline: [{$match: {$and: [{$expr: {$eq: ["$$localField", "$" + foreignField]}}, subpipelineMatch]}}],
+                pipeline: [
+                    {
+                        $match: {
+                            $and: [
+                                {$expr: {$eq: ["$$localField", "$" + foreignField]}},
+                                subpipelineMatch,
+                            ],
+                        },
+                    },
+                ],
             },
         },
         {$unwind: "$right"},
@@ -275,7 +291,14 @@ for (const predicate of [{}, {i_idx: 1}, {d_idx: 1}]) {
     estimatePipeline("many_rows", [
         {$lookup: {from: "many_rows", localField: "i_idx", foreignField: "i_idx", as: "right1"}},
         {$unwind: "$right1"},
-        {$lookup: {from: "many_rows", localField: "i_idx_offset", foreignField: "i_idx_offset", as: "right2"}},
+        {
+            $lookup: {
+                from: "many_rows",
+                localField: "i_idx_offset",
+                foreignField: "i_idx_offset",
+                as: "right2",
+            },
+        },
         {$unwind: "$right2"},
         {$match: predicate},
     ]);
@@ -310,19 +333,40 @@ print("# Multi-table joins - zero-cardinality tables at various positions");
 estimatePipeline("no_rows", [
     {$lookup: {from: "many_rows", localField: "i_idx", foreignField: "i_idx", as: "right1"}},
     {$unwind: "$right1"},
-    {$lookup: {from: "many_rows", localField: "i_idx_offset", foreignField: "i_idx_offset", as: "right2"}},
+    {
+        $lookup: {
+            from: "many_rows",
+            localField: "i_idx_offset",
+            foreignField: "i_idx_offset",
+            as: "right2",
+        },
+    },
     {$unwind: "$right2"},
 ]);
 estimatePipeline("many_rows", [
     {$lookup: {from: "no_rows", localField: "i_idx", foreignField: "i_idx", as: "right1"}},
     {$unwind: "$right1"},
-    {$lookup: {from: "many_rows", localField: "i_idx_offset", foreignField: "i_idx_offset", as: "right2"}},
+    {
+        $lookup: {
+            from: "many_rows",
+            localField: "i_idx_offset",
+            foreignField: "i_idx_offset",
+            as: "right2",
+        },
+    },
     {$unwind: "$right2"},
 ]);
 estimatePipeline("many_rows", [
     {$lookup: {from: "many_rows", localField: "i_idx", foreignField: "i_idx", as: "right1"}},
     {$unwind: "$right1"},
-    {$lookup: {from: "no_rows", localField: "i_idx_offset", foreignField: "i_idx_offset", as: "right2"}},
+    {
+        $lookup: {
+            from: "no_rows",
+            localField: "i_idx_offset",
+            foreignField: "i_idx_offset",
+            as: "right2",
+        },
+    },
     {$unwind: "$right2"},
 ]);
 

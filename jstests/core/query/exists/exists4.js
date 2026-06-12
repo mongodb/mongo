@@ -30,6 +30,27 @@ assert.eq(6, t.find({date: new Date("08/27/2010")}).count());
 assert.eq(5, t.find({date: new Date("08/27/2010"), country_code: {$exists: true}}).count());
 assert.eq(1, t.find({date: new Date("08/27/2010"), country_code: {$exists: false}}).count());
 assert.eq(1, t.find({date: new Date("08/27/2010"), country_code: null}).count());
-assert.eq(3, t.find({date: new Date("08/27/2010"), country_code: {$exists: true}, user_id: {$exists: true}}).count());
-assert.eq(2, t.find({date: new Date("08/27/2010"), country_code: {$exists: true}, user_id: {$exists: false}}).count());
-assert.eq(2, t.find({date: new Date("08/27/2010"), country_code: {$exists: true}, user_id: null}).count());
+assert.eq(
+    3,
+    t
+        .find({
+            date: new Date("08/27/2010"),
+            country_code: {$exists: true},
+            user_id: {$exists: true},
+        })
+        .count(),
+);
+assert.eq(
+    2,
+    t
+        .find({
+            date: new Date("08/27/2010"),
+            country_code: {$exists: true},
+            user_id: {$exists: false},
+        })
+        .count(),
+);
+assert.eq(
+    2,
+    t.find({date: new Date("08/27/2010"), country_code: {$exists: true}, user_id: null}).count(),
+);

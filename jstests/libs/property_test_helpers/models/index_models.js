@@ -2,7 +2,10 @@
  * Fast-check models for indexes.
  * See property_test_helpers/README.md for more detail on the design.
  */
-import {nonEmptyFieldArb, getScalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    nonEmptyFieldArb,
+    getScalarArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
@@ -77,9 +80,11 @@ const emptyOptionsArb = fc.constant({});
 
 // Generates an index option for partial filters. Since predicate models by default have a list of
 // parameters at their leaves, we specify we want a single scalar at the leaves.
-const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: getScalarArb()}).map((pred) => {
-    return {partialFilterExpression: pred};
-});
+const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: getScalarArb()}).map(
+    (pred) => {
+        return {partialFilterExpression: pred};
+    },
+);
 
 /*
  * A b-tree index model.
@@ -90,7 +95,9 @@ function getSimpleIndexModel({allowPartialIndexes, allowSparse, allowCollation})
         optionsSpec.sparse = fc.boolean();
     }
     if (allowPartialIndexes) {
-        optionsSpec.partialFilterExpression = getPartialFilterPredicateArb({leafArb: getScalarArb()});
+        optionsSpec.partialFilterExpression = getPartialFilterPredicateArb({
+            leafArb: getScalarArb(),
+        });
     }
     if (allowCollation) {
         optionsSpec.collation = collationArb;
@@ -123,7 +130,9 @@ const hashedIndexDefArb = fc
     });
 
 function getHashedIndexModel(allowPartialIndexes) {
-    const optionsArb = allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
+    const optionsArb = allowPartialIndexes
+        ? oneof(emptyOptionsArb, partialFilterOptionArb)
+        : emptyOptionsArb;
     return fc.record({def: hashedIndexDefArb, options: optionsArb});
 }
 
@@ -217,7 +226,9 @@ function getWildCardIndexModel(allowPartialIndexes) {
 
     // Dotted wildcard indexes don't allow wildcard projection options, but can be partial if that's
     // allowed.
-    const dottedWcOptionsArb = allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
+    const dottedWcOptionsArb = allowPartialIndexes
+        ? oneof(emptyOptionsArb, partialFilterOptionArb)
+        : emptyOptionsArb;
     const dottedWcModel = fc.record({def: dottedWildcardDefArb, options: dottedWcOptionsArb});
 
     return oneof(fullWcModel, dottedWcModel).filter(({def, options}) => {
@@ -237,7 +248,11 @@ function getWildCardIndexModel(allowPartialIndexes) {
  *
  * Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
  */
-export function getIndexModel({allowPartialIndexes = false, allowSparse = true, allowCollation = true} = {}) {
+export function getIndexModel({
+    allowPartialIndexes = false,
+    allowSparse = true,
+    allowCollation = true,
+} = {}) {
     return oneof(
         getSimpleIndexModel({allowPartialIndexes, allowSparse, allowCollation}),
         getWildCardIndexModel(allowPartialIndexes),
@@ -246,7 +261,11 @@ export function getIndexModel({allowPartialIndexes = false, allowSparse = true, 
 }
 export function getTimeSeriesIndexModel({allowPartialIndexes = false, allowCollation = true} = {}) {
     // TODO SERVER-102738 support more time-series index types.
-    const simpleIndexModel = getSimpleIndexModel({allowPartialIndexes, allowSparse: false, allowCollation});
+    const simpleIndexModel = getSimpleIndexModel({
+        allowPartialIndexes,
+        allowSparse: false,
+        allowCollation,
+    });
     return simpleIndexModel.filter(({def, options}) => {
         // Filter out multikey indexes.
         return !isMultikey(def);

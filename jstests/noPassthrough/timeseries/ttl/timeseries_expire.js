@@ -46,7 +46,11 @@ TimeseriesTest.run((insert) => {
     jsTestLog("Removal took " + (new Date().getTime() - start.getTime()) + " ms.");
 
     // Check buckets.
-    const bucketDocs = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({"control.min._id": 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(testDB, coll)
+        .find()
+        .rawData()
+        .sort({"control.min._id": 1})
+        .toArray();
     assert.eq(0, bucketDocs.length, bucketDocs);
 });
 

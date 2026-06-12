@@ -4,7 +4,10 @@
 //   uses_change_streams,
 // ]
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {assertChangeStreamEventEq, canonicalizeEventForTesting} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    canonicalizeEventForTesting,
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
@@ -21,7 +24,9 @@ function runTest(collName, shardKey) {
     });
 
     const mongosDB = st.s0.getDB(jsTestName());
-    assert.commandWorked(st.s0.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}),
+    );
 
     const mongosColl = mongosDB[collName];
 
@@ -31,7 +36,13 @@ function runTest(collName, shardKey) {
     //
     // Note that we only test this for ASC fixtures, as non ASC fixtures do this with a different parameter.
     //
-    if (PersistenceProviderUtil.allNodesHavePropertyWithValue(st.s0, "supportsLocalCollections", true)) {
+    if (
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            st.s0,
+            "supportsLocalCollections",
+            true,
+        )
+    ) {
         const noopPeriod = assert.commandWorked(
             st.configRS.getPrimary().adminCommand({getParameter: 1, periodicNoopIntervalSecs: 1}),
         );
@@ -54,7 +65,11 @@ function runTest(collName, shardKey) {
     );
 
     // Test that using change streams with $out results in an error.
-    assertErrorCode(mongosColl, [{$changeStream: {}}, {$out: "shouldntWork"}], ErrorCodes.IllegalOperation);
+    assertErrorCode(
+        mongosColl,
+        [{$changeStream: {}}, {$out: "shouldntWork"}],
+        ErrorCodes.IllegalOperation,
+    );
 
     //
     // Main tests
@@ -114,8 +129,12 @@ function runTest(collName, shardKey) {
     });
 
     // Test that all changes are eventually visible due to the periodic noop writer.
-    assert.commandWorked(st.rs0.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true}));
-    assert.commandWorked(st.rs1.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true}));
+    assert.commandWorked(
+        st.rs0.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true}),
+    );
+    assert.commandWorked(
+        st.rs1.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true}),
+    );
 
     assert.soon(() => changeStream.hasNext());
     assertChangeStreamEventEq(changeStream.next(), {
@@ -163,23 +182,31 @@ function runTest(collName, shardKey) {
 
     // Test that it is legal to open a change stream, even if the
     // 'internalQueryProhibitMergingOnMongos' parameter is set.
-    assert.commandWorked(st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: true}));
+    assert.commandWorked(
+        st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: true}),
+    );
     let tempCursor = assert.doesNotThrow(() => mongosColl.aggregate([{$changeStream: {}}]));
     tempCursor.close();
-    assert.commandWorked(st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: false}));
+    assert.commandWorked(
+        st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: false}),
+    );
 
     assert.commandWorked(mongosColl.remove({}));
     // We awaited the replication of the first write, so the change stream shouldn't return it.
     // Use { w: "majority" } to deal with journaling correctly, even though we only have one
     // node.
-    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(0, {a: 1}), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(0, {a: 1}), {writeConcern: {w: "majority"}}),
+    );
 
     changeStream = mongosColl.aggregate([{$changeStream: {}}]);
     assert(!changeStream.hasNext());
 
     // Drop the collection and test that we return a "drop" followed by an "invalidate" entry
     // and close the cursor.
-    jsTestLog("Testing getMore command closes cursor for invalidate entries with shard key" + shardKey);
+    jsTestLog(
+        "Testing getMore command closes cursor for invalidate entries with shard key" + shardKey,
+    );
     mongosColl.drop();
     assert.soon(() => changeStream.hasNext());
     assert.eq(changeStream.next().operationType, "drop");
@@ -188,7 +215,9 @@ function runTest(collName, shardKey) {
     assert(!changeStream.hasNext());
     assert(changeStream.isExhausted());
 
-    jsTestLog("Testing aggregate command closes cursor for invalidate entries with shard key" + shardKey);
+    jsTestLog(
+        "Testing aggregate command closes cursor for invalidate entries with shard key" + shardKey,
+    );
     // Shard the test collection and split it into 2 chunks:
     //  [MinKey, 0) - shard0, [0, MaxKey) - shard1
     st.shardColl(
@@ -199,15 +228,23 @@ function runTest(collName, shardKey) {
     );
 
     // Write one document to each chunk.
-    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(-1), {writeConcern: {w: "majority"}}));
-    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(1), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(-1), {writeConcern: {w: "majority"}}),
+    );
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(1), {writeConcern: {w: "majority"}}),
+    );
 
     changeStream = mongosColl.aggregate([{$changeStream: {}}]);
     assert(!changeStream.hasNext());
 
     // Store a valid resume token before dropping the collection, to be used later in the test
-    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(-2), {writeConcern: {w: "majority"}}));
-    assert.commandWorked(mongosColl.insert(makeShardKeyDocument(2), {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(-2), {writeConcern: {w: "majority"}}),
+    );
+    assert.commandWorked(
+        mongosColl.insert(makeShardKeyDocument(2), {writeConcern: {w: "majority"}}),
+    );
 
     assert.soon(() => changeStream.hasNext());
     const resumeToken = changeStream.next()._id;

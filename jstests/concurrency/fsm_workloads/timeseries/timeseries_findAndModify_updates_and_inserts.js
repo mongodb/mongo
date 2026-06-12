@@ -29,10 +29,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 }),
             );
             if (res.lastErrorObject.n) {
-                const errMsg = `Updated measurement ${res.value} should match the query predicate ${tojson({
-                    readingNo: readingNo,
-                    sensorId: sensorId,
-                })} and have all fields`;
+                const errMsg = `Updated measurement ${res.value} should match the query predicate ${tojson(
+                    {
+                        readingNo: readingNo,
+                        sensorId: sensorId,
+                    },
+                )} and have all fields`;
                 assert(res.value != undefined, errMsg);
                 assert(res.value.readingNo == readingNo, errMsg);
                 assert(res.value.sensorId == sensorId, errMsg);

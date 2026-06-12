@@ -52,7 +52,9 @@ export var IndexInitialSyncTest = function (options) {
         const secondaryDB = secondary.getDB(testDB.getName());
         const secondaryColl = secondaryDB.getCollection(coll.getName());
         try {
-            IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+            IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {
+                includeBuildUUIDs: true,
+            });
         } finally {
             IndexBuildTest.resumeIndexBuilds(primary);
         }

@@ -9,7 +9,14 @@ import {
     shouldSkipCommand,
 } from "jstests/libs/override_methods/send_command_to_initial_sync_node_lib.js";
 
-function maybeSendCommandToInitialSyncNodesShardedCluster(conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+function maybeSendCommandToInitialSyncNodesShardedCluster(
+    conn,
+    _dbName,
+    _commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     // Skip forwarding incompatible commands to initial sync node.
     if (shouldSkipCommand(_commandName, commandObj)) {
         return func.apply(conn, makeFuncArgs(commandObj));

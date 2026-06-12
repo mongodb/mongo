@@ -39,19 +39,29 @@ assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {$and: 5
 assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {x: /abc/}}));
 
 // Use of $expr is banned in a partial index filter.
-assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: ["$x", 5]}}}));
 assert.commandFailed(
-    coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}),
+    coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: ["$x", 5]}}}),
+);
+assert.commandFailed(
+    coll.createIndex(
+        {x: 1},
+        {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}},
+    ),
 );
 
 // Tree depth cannot exceed `internalPartialFilterExpressionMaxDepth`, which defaults to 4.
 assert.commandFailedWithCode(
-    coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}}),
+    coll.createIndex(
+        {x: 1},
+        {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}},
+    ),
     ErrorCodes.CannotCreateIndex,
 );
 
 // A tree depth of `internalPartialFilterExpressionMaxDepth` is allowed.
-assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
+assert.commandWorked(
+    coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}),
+);
 assert(coll.drop());
 
 for (let i = 0; i < 10; i++) {
@@ -61,19 +71,31 @@ for (let i = 0; i < 10; i++) {
 // Create partial index.
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
-assert(IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+assert(
+    IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}),
+    coll.getIndexes(),
+);
 
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert(!IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+assert(
+    !IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}),
+    coll.getIndexes(),
+);
 IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // Create partial index in background.
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
-assert(IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+assert(
+    IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}),
+    coll.getIndexes(),
+);
 
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert(!IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+assert(
+    !IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}),
+    coll.getIndexes(),
+);
 IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // Create complete index, same key as previous indexes.
@@ -88,7 +110,10 @@ IndexUtils.assertIndexes(coll, [{_id: 1}]);
 assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: true}));
 assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: 1}));
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: false}));
-assert(IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: 1}, sparse: false}), coll.getIndexes());
+assert(
+    IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: 1}, sparse: false}),
+    coll.getIndexes(),
+);
 
 assert.commandWorked(coll.dropIndex({x: 1}));
 IndexUtils.assertIndexes(coll, [{_id: 1}]);
@@ -102,16 +127,28 @@ IndexUtils.assertIndexes(coll, [{_id: 1}]);
 assert.commandWorked(coll.dropIndexes());
 IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
-assert.commandWorked(coll.createIndex({x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}));
+assert.commandWorked(
+    coll.createIndex({x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}),
+);
 assert(
-    IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}),
+    IndexUtils.indexExists(
+        coll,
+        {x: 1},
+        {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}},
+    ),
     coll.getIndexes(),
 );
 IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}]);
 
-assert.commandWorked(coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}));
+assert.commandWorked(
+    coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}),
+);
 assert(
-    IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}),
+    IndexUtils.indexExists(
+        coll,
+        {x: 1},
+        {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}},
+    ),
     coll.getIndexes(),
 );
 IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}, {x: 1}]);
@@ -122,10 +159,18 @@ IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}, {x: 1}]);
 
 assert.commandWorked(coll.dropIndex("partialIndex2"));
 assert(
-    !IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}),
+    !IndexUtils.indexExists(
+        coll,
+        {x: 1},
+        {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}},
+    ),
     coll.getIndexes(),
 );
 assert(
-    IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}),
+    IndexUtils.indexExists(
+        coll,
+        {x: 1},
+        {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}},
+    ),
     coll.getIndexes(),
 );

@@ -28,7 +28,10 @@ export function InternalTransactionChunkMigrationTest() {
         mongos: 1,
         shards: 3,
         rs: {nodes: 2},
-        rsOptions: {oplogSize: 256, setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1}},
+        rsOptions: {
+            oplogSize: 256,
+            setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1},
+        },
     });
     let staticMongod = MongoRunner.runMongod({});
 
@@ -59,8 +62,12 @@ export function InternalTransactionChunkMigrationTest() {
         const shardKeyPattern = {shardKey: 1};
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKeyPattern}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {shardKey: 1}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {shardKey: MinKey}, to: st.shard0.shardName}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {shardKey: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {shardKey: MinKey}, to: st.shard0.shardName}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {shardKey: 1}, to: st.shard1.shardName}),
+        );
 
         const migration0 = {
             donorShard: st.shard0,
@@ -172,7 +179,10 @@ export function InternalTransactionChunkMigrationTest() {
 
         // If testing a prepared and/or large transaction, define additional insert statements to
         // make the transaction a prepared and/or large transaction.
-        const additionalDocsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(testId, testCase);
+        const additionalDocsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(
+            testId,
+            testCase,
+        );
 
         testCase.setUpFunc = () => {
             const coll = st.s.getDB(dbName).getCollection(collName);
@@ -237,7 +247,10 @@ export function InternalTransactionChunkMigrationTest() {
                 } else {
                     assert.eq(res.lastErrorObject.updatedExisting, true);
                     delete res.value._id;
-                    assert.eq(res.value, imageType == kImageType.kPreImage ? docToUpdate : updatedDoc);
+                    assert.eq(
+                        res.value,
+                        imageType == kImageType.kPreImage ? docToUpdate : updatedDoc,
+                    );
                 }
             },
         });
@@ -248,7 +261,10 @@ export function InternalTransactionChunkMigrationTest() {
 
         // If testing a prepared and/or large transaction, define additional insert statements to
         // make the transaction a prepared and/or large transaction.
-        const docsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(testId, testCase);
+        const docsToInsert = makeInsertCommandsIfTestingPreparedOrLargeTransaction(
+            testId,
+            testCase,
+        );
 
         testCase.setUpFunc = () => {
             const coll = st.s.getDB(dbName).getCollection(collName);
@@ -319,7 +335,9 @@ export function InternalTransactionChunkMigrationTest() {
     function abortTransaction(lsid, txnNumber, isPreparedTxn) {
         if (isPreparedTxn) {
             const shard0Primary = st.rs0.getPrimary();
-            assert.commandWorked(shard0Primary.adminCommand(makePrepareTransactionCmdObj(lsid, txnNumber)));
+            assert.commandWorked(
+                shard0Primary.adminCommand(makePrepareTransactionCmdObj(lsid, txnNumber)),
+            );
         }
         assert.commandWorked(st.s.adminCommand(makeAbortTransactionCmdObj(lsid, txnNumber)));
     }
@@ -368,7 +386,11 @@ export function InternalTransactionChunkMigrationTest() {
 
             for (let i = 0; i < testCase.commands.length; i++) {
                 const command = testCase.commands[i];
-                const cmdObj = Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                const cmdObj = Object.assign({}, command.cmdObj, {
+                    lsid,
+                    txnNumber,
+                    autocommit: false,
+                });
                 if (i == 0) {
                     cmdObj.startTransaction = true;
                 }
@@ -416,7 +438,11 @@ export function InternalTransactionChunkMigrationTest() {
                     continue;
                 }
 
-                const cmdObj = Object.assign({}, command.cmdObj, {lsid, txnNumber, autocommit: false});
+                const cmdObj = Object.assign({}, command.cmdObj, {
+                    lsid,
+                    txnNumber,
+                    autocommit: false,
+                });
                 if (i == 0) {
                     cmdObj.startTransaction = true;
                 }
@@ -502,7 +528,10 @@ export function InternalTransactionChunkMigrationTest() {
 
         if (txnType == kInternalTxnType.kNonRetryable) {
             for (let testCase of testCases) {
-                assertNoConfigTxnEntryOnRecipient(migrationOpts.migration0, testCase.childLsidForNonRetryableWrite);
+                assertNoConfigTxnEntryOnRecipient(
+                    migrationOpts.migration0,
+                    testCase.childLsidForNonRetryableWrite,
+                );
             }
             return;
         }
@@ -510,13 +539,20 @@ export function InternalTransactionChunkMigrationTest() {
         for (let testCase of testCases) {
             if (testCase.abortOnInitialTry) {
                 assertNoConfigTxnEntryOnRecipient(migrationOpts.migration0, testCase.parentLsid);
-                assertNoConfigTxnEntryOnRecipient(migrationOpts.migration0, testCase.childLsidForRetryableWrite);
+                assertNoConfigTxnEntryOnRecipient(
+                    migrationOpts.migration0,
+                    testCase.childLsidForRetryableWrite,
+                );
             }
         }
 
         jsTest.log("Start retrying retryable internal transactions after migration0");
         for (let testCase of testCases) {
-            runInternalTransactionOnRetry(txnType, testCase, testCase.abortOnInitialTry /* isRetryAfterAbort */);
+            runInternalTransactionOnRetry(
+                txnType,
+                testCase,
+                testCase.abortOnInitialTry /* isRetryAfterAbort */,
+            );
             // Also retry the write statements as retryable writes.
             runRetryableWriteOnRetry(testCase);
         }
@@ -527,7 +563,8 @@ export function InternalTransactionChunkMigrationTest() {
         migrationOpts.migration0.recipientRst.getPrimary();
 
         jsTest.log(
-            "Start retrying retryable internal transactions after restarting the " + "recipient after migration0",
+            "Start retrying retryable internal transactions after restarting the " +
+                "recipient after migration0",
         );
         for (let testCase of testCases) {
             runInternalTransactionOnRetry(txnType, testCase, false /* isRetryAfterAbort */);
@@ -535,7 +572,8 @@ export function InternalTransactionChunkMigrationTest() {
             runRetryableWriteOnRetry(testCase);
         }
         jsTest.log(
-            "Finished retrying retryable internal transactions after restarting the " + "recipient after migration0",
+            "Finished retrying retryable internal transactions after restarting the " +
+                "recipient after migration0",
         );
 
         assert.commandWorked(st.s.adminCommand(migrationOpts.migration1.cmdObj));
@@ -579,7 +617,10 @@ export function InternalTransactionChunkMigrationTest() {
 
         if (txnType == kInternalTxnType.kNonRetryable) {
             for (let testCase of testCases) {
-                assertNoConfigTxnEntryOnRecipient(migrationOpts.migration0, testCase.childLsidForNonRetryableWrite);
+                assertNoConfigTxnEntryOnRecipient(
+                    migrationOpts.migration0,
+                    testCase.childLsidForNonRetryableWrite,
+                );
             }
             return;
         }
@@ -587,13 +628,20 @@ export function InternalTransactionChunkMigrationTest() {
         for (let testCase of testCases) {
             if (testCase.abortOnInitialTry) {
                 assertNoConfigTxnEntryOnRecipient(migrationOpts.migration0, testCase.parentLsid);
-                assertNoConfigTxnEntryOnRecipient(migrationOpts.migration0, testCase.childLsidForRetryableWrite);
+                assertNoConfigTxnEntryOnRecipient(
+                    migrationOpts.migration0,
+                    testCase.childLsidForRetryableWrite,
+                );
             }
         }
 
         jsTest.log("Start retrying retryable internal transactions after migration0");
         for (let testCase of testCases) {
-            runInternalTransactionOnRetry(txnType, testCase, testCase.abortOnInitialTry /* isRetryAfterAbort */);
+            runInternalTransactionOnRetry(
+                txnType,
+                testCase,
+                testCase.abortOnInitialTry /* isRetryAfterAbort */,
+            );
             // Also retry the write statements as retryable writes.
             runRetryableWriteOnRetry(testCase);
         }
@@ -604,7 +652,8 @@ export function InternalTransactionChunkMigrationTest() {
         migrationOpts.migration0.recipientRst.getPrimary();
 
         jsTest.log(
-            "Start retrying retryable internal transactions after restarting the " + "recipient after migration0",
+            "Start retrying retryable internal transactions after restarting the " +
+                "recipient after migration0",
         );
         for (let testCase of testCases) {
             runInternalTransactionOnRetry(txnType, testCase, false /* isRetryAfterAbort */);
@@ -612,7 +661,8 @@ export function InternalTransactionChunkMigrationTest() {
             runRetryableWriteOnRetry(testCase);
         }
         jsTest.log(
-            "Finished retrying retryable internal transactions after restarting the " + "recipient after migration0",
+            "Finished retrying retryable internal transactions after restarting the " +
+                "recipient after migration0",
         );
 
         assert.commandWorked(st.s.adminCommand(migrationOpts.migration1.cmdObj));
@@ -639,11 +689,15 @@ export function InternalTransactionChunkMigrationTest() {
         for (let isPreparedTxn of [true, false]) {
             for (let isLargeTxn of [true, false]) {
                 testCases.push(
-                    makeTransactionOptionsForInsertUpdateDeleteTest(migrationOpts.dbName, migrationOpts.collName, {
-                        isPreparedTxn,
-                        isLargeTxn,
-                        abortOnInitialTry,
-                    }),
+                    makeTransactionOptionsForInsertUpdateDeleteTest(
+                        migrationOpts.dbName,
+                        migrationOpts.collName,
+                        {
+                            isPreparedTxn,
+                            isLargeTxn,
+                            abortOnInitialTry,
+                        },
+                    ),
                 );
             }
         }
@@ -658,12 +712,16 @@ export function InternalTransactionChunkMigrationTest() {
             for (let isPreparedTxn of [true, false]) {
                 for (let isLargeTxn of [true, false]) {
                     testCases.push(
-                        makeTransactionOptionsForFindAndModifyTest(migrationOpts.dbName, migrationOpts.collName, {
-                            isPreparedTxn,
-                            isLargeTxn,
-                            abortOnInitialTry,
-                            imageType,
-                        }),
+                        makeTransactionOptionsForFindAndModifyTest(
+                            migrationOpts.dbName,
+                            migrationOpts.collName,
+                            {
+                                isPreparedTxn,
+                                isLargeTxn,
+                                abortOnInitialTry,
+                                imageType,
+                            },
+                        ),
                     );
                 }
             }
@@ -672,11 +730,19 @@ export function InternalTransactionChunkMigrationTest() {
     }
 
     this.runTestForInsertUpdateDeleteBeforeChunkMigration = function (txnType, abortOnInitialTry) {
-        runTestForInsertUpdateDelete(txnType, testTransactionsBeforeChunkMigration, abortOnInitialTry);
+        runTestForInsertUpdateDelete(
+            txnType,
+            testTransactionsBeforeChunkMigration,
+            abortOnInitialTry,
+        );
     };
 
     this.runTestForInsertUpdateDeleteDuringChunkMigration = function (txnType, abortOnInitialTry) {
-        runTestForInsertUpdateDelete(txnType, testTransactionsDuringChunkMigration, abortOnInitialTry);
+        runTestForInsertUpdateDelete(
+            txnType,
+            testTransactionsDuringChunkMigration,
+            abortOnInitialTry,
+        );
     };
 
     this.runTestForFindAndModifyBeforeChunkMigration = function (txnType, abortOnInitialTry) {

@@ -36,7 +36,9 @@ assert.commandWorked(
 );
 
 runWithAndWithoutIndex({a: 1}, () => {
-    assert(arrayEq(t.find({a: {$eq: {d: "c", e: "b"}}}, {_id: 0}).toArray(), [{a: {d: "c", e: "b"}}]));
+    assert(
+        arrayEq(t.find({a: {$eq: {d: "c", e: "b"}}}, {_id: 0}).toArray(), [{a: {d: "c", e: "b"}}]),
+    );
 
     assert(
         arrayEq(t.find({a: {$lt: {d: "c", e: "b"}}}, {_id: 0}).toArray(), [
@@ -62,9 +64,13 @@ runWithAndWithoutIndex({a: 1}, () => {
         ]),
     );
 
-    assert(arrayEq(t.find({a: {$eq: {c: "b", e: "d"}}}, {_id: 0}).toArray(), [{a: {c: "b", e: "d"}}]));
+    assert(
+        arrayEq(t.find({a: {$eq: {c: "b", e: "d"}}}, {_id: 0}).toArray(), [{a: {c: "b", e: "d"}}]),
+    );
 
-    assert(arrayEq(t.find({a: {$lt: {c: "b", e: "d"}}}, {_id: 0}).toArray(), [{a: {b: "d", c: "e"}}]));
+    assert(
+        arrayEq(t.find({a: {$lt: {c: "b", e: "d"}}}, {_id: 0}).toArray(), [{a: {b: "d", c: "e"}}]),
+    );
 
     assert(
         arrayEq(t.find({a: {$gt: {c: "b", e: "d"}}}, {_id: 0}).toArray(), [

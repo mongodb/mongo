@@ -21,9 +21,9 @@ if (FixtureHelpers.isMongos(db)) {
 }
 
 const paramName = "internalQueryMaxAllowedDensifyDocs";
-const origParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[
-    paramName
-];
+const origParamValue = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}),
+)[paramName];
 function setMaxDocs(max) {
     setParameterOnAllNonConfigNodes(db.getMongo(), paramName, max);
 }
@@ -57,7 +57,10 @@ runAggregate({$densify: {field: "val", range: {step: 1, bounds: "full"}}}, 58979
 setMaxDocs(20);
 assert.commandWorked(coll.insert({val: 0, part: 2}));
 assert.commandWorked(coll.insert({val: 12, part: 2}));
-runAggregate({$densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}}, 5897900);
+runAggregate(
+    {$densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}},
+    5897900,
+);
 
 // Test that already existing documents don't count towards the limit.
 coll.drop();

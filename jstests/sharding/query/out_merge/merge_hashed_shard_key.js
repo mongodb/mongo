@@ -22,7 +22,11 @@ function testHashedShardKey(shardKey, spec, prefixPipeline = []) {
     st.shardColl(target, shardKey, spec);
 
     // Test that $merge passes without specifying an "on" field.
-    assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target, prevStages: prefixPipeline});
+    assertMergeSucceedsWithExpectedUniqueIndex({
+        source: source,
+        target: target,
+        prevStages: prefixPipeline,
+    });
 
     // Test that $merge fails even if the "on" fields matches the shardKey, since it isn't
     // unique.
@@ -38,7 +42,11 @@ function testHashedShardKey(shardKey, spec, prefixPipeline = []) {
     const prefixedUniqueKey = Object.merge(shardKey, {extraField: 1});
     prefixPipeline = prefixPipeline.concat([{$addFields: {extraField: 1}}]);
     assert.commandWorked(target.createIndex(prefixedUniqueKey, {unique: true}));
-    assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target, prevStages: prefixPipeline});
+    assertMergeSucceedsWithExpectedUniqueIndex({
+        source: source,
+        target: target,
+        prevStages: prefixPipeline,
+    });
     assertMergeSucceedsWithExpectedUniqueIndex({
         source: source,
         target: target,

@@ -45,7 +45,9 @@ function setupDataDistribution() {
     db.dropDatabase();
 
     // Set shard0 as primary
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+    );
 
     assert.commandWorked(mongos.adminCommand({shardCollection: kNs, key: {x: 1}}));
 
@@ -54,7 +56,12 @@ function setupDataDistribution() {
     assert.commandWorked(mongos.adminCommand({split: kNs, middle: {x: -1}}));
 
     assert.commandWorked(
-        mongos.adminCommand({moveChunk: kNs, find: {x: kDataChunk2}, to: st.shard1.shardName, _waitForDelete: true}),
+        mongos.adminCommand({
+            moveChunk: kNs,
+            find: {x: kDataChunk2},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
     );
 
     let bulk = coll.initializeUnorderedBulkOp();
@@ -101,7 +108,9 @@ function runTest(st, testCaseFun) {
 
     // Migrate a chunk from shard0 to shard2
     jsTest.log("Starting migration.");
-    assert.commandWorked(mongos.adminCommand({moveChunk: kNs, find: {x: kEmptyChunk}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: kNs, find: {x: kEmptyChunk}, to: st.shard2.shardName}),
+    );
     jsTest.log("Completed migration.");
 
     jsTest.log("Migration complete, resuming operation");
@@ -166,9 +175,13 @@ jsTest.log("deleteMany multi:true with concurrent migration should succeed if ta
 // Enable the cluster parameter that changes how distributed multi-writes targets multiple shards
 jsTest.log("Enabling onlyTargetDataOwningShardsForMultiWrites");
 assert.commandWorked(
-    st.s.adminCommand({setClusterParameter: {onlyTargetDataOwningShardsForMultiWrites: {enabled: true}}}),
+    st.s.adminCommand({
+        setClusterParameter: {onlyTargetDataOwningShardsForMultiWrites: {enabled: true}},
+    }),
 );
-assert.commandWorked(st.s.adminCommand({getClusterParameter: "onlyTargetDataOwningShardsForMultiWrites"}));
+assert.commandWorked(
+    st.s.adminCommand({getClusterParameter: "onlyTargetDataOwningShardsForMultiWrites"}),
+);
 
 jsTest.log(
     "updateMany with concurrent migration should fail with QueryPlanKilled when onlyTargetDataOwningShardsForMultiWrites enabled",

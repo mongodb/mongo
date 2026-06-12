@@ -127,14 +127,22 @@ assert.commandWorked(coll.update({"a.b": 1}, {foo: {$c: 1, bar: {$d: 4}}}));
 
 // Pipeline-style updates are allowed to contain $-prefixed fields.
 assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$a: 1}}}]));
-assert.commandWorked(coll.update({"a.b": 3}, [{$replaceWith: {$literal: {a: {$a: 1}}}}], {upsert: true}));
+assert.commandWorked(
+    coll.update({"a.b": 3}, [{$replaceWith: {$literal: {a: {$a: 1}}}}], {upsert: true}),
+);
 assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {a: {$a: 1}}}}]));
 
 // Pipeline-style updates are allowed to contain reserved $-prefixed fields.
 assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$ref: 1}}}]));
-assert.commandWorked(coll.update({"a.b": 4}, [{$replaceWith: {$literal: {$ref: 1}}}], {upsert: true}));
-assert.commandWorked(coll.update({"a.b": 5}, [{$replaceWith: {$literal: {$id: 1}}}], {upsert: true}));
-assert.commandWorked(coll.update({"a.b": 6}, [{$replaceWith: {$literal: {$db: 1}}}], {upsert: true}));
+assert.commandWorked(
+    coll.update({"a.b": 4}, [{$replaceWith: {$literal: {$ref: 1}}}], {upsert: true}),
+);
+assert.commandWorked(
+    coll.update({"a.b": 5}, [{$replaceWith: {$literal: {$id: 1}}}], {upsert: true}),
+);
+assert.commandWorked(
+    coll.update({"a.b": 6}, [{$replaceWith: {$literal: {$db: 1}}}], {upsert: true}),
+);
 
 // $-prefixed field names are not allowed at the top-level in replacement-style updates.
 assert.writeErrorWithCode(coll.update({"a.b": 1}, {$c: 1}), ErrorCodes.FailedToParse);
@@ -150,12 +158,20 @@ assert.commandWorked(coll.update({"a.b": 1}, {b: {$id: 1}}));
 assert.commandWorked(coll.update({"a.b": 1}, {c: {$db: 1}}));
 
 // Push update modifier can sort on $-prefixed field
-assert.commandWorked(coll.update({"a.b": 1}, {$push: {array: {$each: [{a: 4, "$b": 5}], $sort: {"$b": 1}}}}));
-assert.commandWorked(coll.update({"a.b": 1}, {$push: {array: {$each: [{a: {"$b": 5}}], $sort: {"a.$b": 1}}}}));
-assert.commandWorked(coll.update({"a.b": 1}, {$push: {array: {$each: [{"$a": {"$b": 5}}], $sort: {"$a.$b": 1}}}}));
+assert.commandWorked(
+    coll.update({"a.b": 1}, {$push: {array: {$each: [{a: 4, "$b": 5}], $sort: {"$b": 1}}}}),
+);
+assert.commandWorked(
+    coll.update({"a.b": 1}, {$push: {array: {$each: [{a: {"$b": 5}}], $sort: {"a.$b": 1}}}}),
+);
+assert.commandWorked(
+    coll.update({"a.b": 1}, {$push: {array: {$each: [{"$a": {"$b": 5}}], $sort: {"$a.$b": 1}}}}),
+);
 
 // sortArray in an update modifier can sort on a $-prefixed field
-assert.commandWorked(coll.update({"a.b": 1}, {f: {$set: {$sortArray: {input: "$f", sortBy: {"$g": 1}}}}}));
+assert.commandWorked(
+    coll.update({"a.b": 1}, {f: {$set: {$sortArray: {input: "$f", sortBy: {"$g": 1}}}}}),
+);
 
 //
 // FindAndModify field name validation.
@@ -239,10 +255,14 @@ assert.eq([{_id: 1, a: {$db: 1}}], coll.find({_id: 1}).toArray());
 //
 coll.drop();
 
-assert.commandWorked(coll.insert({_id: {a: 1, b: 2}, "c.d": 3, "$e": 4, "f": [{"$g": 5}, {"$g": 3}]}));
+assert.commandWorked(
+    coll.insert({_id: {a: 1, b: 2}, "c.d": 3, "$e": 4, "f": [{"$g": 5}, {"$g": 3}]}),
+);
 
 // Dotted fields represent paths in an aggregation pipeline.
-assert.eq(coll.aggregate([{$match: {"_id.a": 1}}, {$project: {"_id.b": 1}}]).toArray(), [{_id: {b: 2}}]);
+assert.eq(coll.aggregate([{$match: {"_id.a": 1}}, {$project: {"_id.b": 1}}]).toArray(), [
+    {_id: {b: 2}},
+]);
 assert.eq(coll.aggregate([{$match: {"c.d": 3}}, {$project: {"_id.b": 1}}]).toArray(), []);
 
 assert.eq(coll.aggregate([{$project: {"_id.a": 1}}]).toArray(), [{_id: {a: 1}}]);
@@ -250,21 +270,33 @@ assert.eq(coll.aggregate([{$project: {"c.d": 1, _id: 0}}]).toArray(), [{}]);
 
 assert.eq(
     coll
-        .aggregate([{$addFields: {"new.field": {$multiply: ["$c.d", "$_id.a"]}}}, {$project: {"new.field": 1, _id: 0}}])
+        .aggregate([
+            {$addFields: {"new.field": {$multiply: ["$c.d", "$_id.a"]}}},
+            {$project: {"new.field": 1, _id: 0}},
+        ])
         .toArray(),
     [{new: {field: null}}],
 );
 
-assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$_id.b"}}}]).toArray(), [{_id: 1, e: 2}]);
-assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$c.d"}}}]).toArray(), [{_id: 1, e: 0}]);
+assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$_id.b"}}}]).toArray(), [
+    {_id: 1, e: 2},
+]);
+assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$c.d"}}}]).toArray(), [
+    {_id: 1, e: 0},
+]);
 
 // Accumulation statements cannot have a dotted field name.
 assert.commandFailed(
-    db.runCommand({aggregate: coll.getName(), pipeline: [{$group: {_id: "$_id.a", "e.f": {$sum: "$_id.b"}}}]}),
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$group: {_id: "$_id.a", "e.f": {$sum: "$_id.b"}}}],
+    }),
 );
 
 // $-prefixed field names are not allowed in an aggregation pipeline.
-assert.commandFailed(db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {"$invalid": 1}}]}));
+assert.commandFailed(
+    db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {"$invalid": 1}}]}),
+);
 
 assert.commandFailed(
     db.runCommand({
@@ -296,6 +328,9 @@ assert.commandFailed(
 );
 
 // $-prefixed field names are supported in $sortArray sort specifications in aggregation and update
-assert.eq(coll.aggregate([{$project: {_id: 1, e: {$sortArray: {input: "$f", sortBy: {"$g": 1}}}}}]).toArray(), [
-    {_id: {a: 1, b: 2}, e: [{"$g": 3}, {"$g": 5}]},
-]);
+assert.eq(
+    coll
+        .aggregate([{$project: {_id: 1, e: {$sortArray: {input: "$f", sortBy: {"$g": 1}}}}}])
+        .toArray(),
+    [{_id: {a: 1, b: 2}, e: [{"$g": 3}, {"$g": 5}]}],
+);

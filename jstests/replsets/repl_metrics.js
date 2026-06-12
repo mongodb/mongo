@@ -19,12 +19,16 @@ function verifySameProperties(actual, expected) {
         const key = keys1[i];
         assert(
             expected.hasOwnProperty(key),
-            () => `Server Status metrics repl section has unexpected property ${key}, please fix this test`,
+            () =>
+                `Server Status metrics repl section has unexpected property ${key}, please fix this test`,
         );
     }
     for (let i = 0; i < keys2.length; i++) {
         const key = keys2[i];
-        assert(actual.hasOwnProperty(key), () => `Server Status metrics repl section has no expected property ${key}`);
+        assert(
+            actual.hasOwnProperty(key),
+            () => `Server Status metrics repl section has no expected property ${key}`,
+        );
         // Recursively verify nested objects
         if (typeof actual[key] === "object" && typeof expected[key] === "object") {
             verifySameProperties(actual[key], expected[key]);

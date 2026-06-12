@@ -34,7 +34,9 @@ assert.commandWorked(
 const sDB = st.s.getDB(kDbName);
 const sColl = sDB.getCollection(kCollName);
 
-let timeseriesCollDoc = st.config.collections.findOne({_id: getTimeseriesCollForDDLOps(sDB, sColl).getFullName()});
+let timeseriesCollDoc = st.config.collections.findOne({
+    _id: getTimeseriesCollForDDLOps(sDB, sColl).getFullName(),
+});
 assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesOptions.timeField);
 assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesOptions.metaField);
 assert.eq(timeseriesCollDoc.key, {meta: 1});
@@ -50,13 +52,18 @@ assert.commandWorked(
 );
 
 // Failure scenarios.
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}}), [5914001]);
+assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}}), [
+    5914001,
+]);
 assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {a: 1}}), [5914001]);
 assert.commandFailedWithCode(
     mongos.adminCommand({reshardCollection: ns, key: {[timeFieldName]: 1, [metaFieldName]: 1}}),
     [5914000],
 );
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {[timeFieldName]: "hashed"}}), [880031]);
+assert.commandFailedWithCode(
+    mongos.adminCommand({reshardCollection: ns, key: {[timeFieldName]: "hashed"}}),
+    [880031],
+);
 
 function reshardAndVerifyShardKeyAndIndexes(
     newKey,

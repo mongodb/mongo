@@ -37,7 +37,8 @@ let checkSessionCatalog = function (conn, sessionId, uid, txnNum, expectedTs, ex
 let runTests = function (mainConn, priConn, secConn) {
     let lsid = UUID();
     let uid = (function () {
-        let user = mainConn.getDB("admin").runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0];
+        let user = mainConn.getDB("admin").runCommand({connectionStatus: 1}).authInfo
+            .authenticatedUsers[0];
 
         if (user) {
             return computeSHA256Block(user.user + "@" + user.db);

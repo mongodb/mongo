@@ -64,7 +64,8 @@ describe("_configsvrCommitMergeAllChunksOnShard retryability", function () {
             if (
                 RetryableWritesUtil.isRetryableCode(res.code) ||
                 RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-                (res.writeConcernError && RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
+                (res.writeConcernError &&
+                    RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
             ) {
                 return false;
             }
@@ -86,16 +87,27 @@ describe("_configsvrCommitMergeAllChunksOnShard retryability", function () {
         assert.gte(chunkCountBefore, 1, "expected at least one pre-split chunk", {ns});
 
         assert.commandWorked(
-            runConfigsvrCommitMergeAllChunksOnShard(this.st, ns, this.shardName, this.lsid, NumberLong(1)),
+            runConfigsvrCommitMergeAllChunksOnShard(
+                this.st,
+                ns,
+                this.shardName,
+                this.lsid,
+                NumberLong(1),
+            ),
         );
 
         // The catalog manager may merge zero or more chunks depending on the snapshot
         // history window; either way the chunk count must not grow.
         const chunkCountAfter = countChunks(this.st, this.collUuid);
-        assert.lte(chunkCountAfter, chunkCountBefore, "chunk count must not grow after mergeAllChunksOnShard", {
-            chunkCountBefore,
+        assert.lte(
             chunkCountAfter,
-        });
+            chunkCountBefore,
+            "chunk count must not grow after mergeAllChunksOnShard",
+            {
+                chunkCountBefore,
+                chunkCountAfter,
+            },
+        );
 
         const dummy = getDummyDoc(this.st, dummyDocId);
         assert(dummy, "expected dummy bookkeeping doc to be present", {dummyDocId});
@@ -104,7 +116,13 @@ describe("_configsvrCommitMergeAllChunksOnShard retryability", function () {
 
     it("rejects an older txnNumber on the same lsid with TransactionTooOld", function () {
         assert.commandFailedWithCode(
-            runConfigsvrCommitMergeAllChunksOnShard(this.st, ns, this.shardName, this.lsid, NumberLong(0)),
+            runConfigsvrCommitMergeAllChunksOnShard(
+                this.st,
+                ns,
+                this.shardName,
+                this.lsid,
+                NumberLong(0),
+            ),
             ErrorCodes.TransactionTooOld,
         );
     });
@@ -114,7 +132,13 @@ describe("_configsvrCommitMergeAllChunksOnShard retryability", function () {
         const dummyBefore = getDummyDoc(this.st, dummyDocId);
 
         assert.commandWorked(
-            runConfigsvrCommitMergeAllChunksOnShard(this.st, ns, this.shardName, this.lsid, NumberLong(1)),
+            runConfigsvrCommitMergeAllChunksOnShard(
+                this.st,
+                ns,
+                this.shardName,
+                this.lsid,
+                NumberLong(1),
+            ),
         );
 
         const chunkCountAfter = countChunks(this.st, this.collUuid);

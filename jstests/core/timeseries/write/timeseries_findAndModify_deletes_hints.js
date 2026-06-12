@@ -33,13 +33,20 @@ const testDeleteHint = ({
     const testDB = db.getSiblingDB(dbName);
     const coll = testDB.getCollection(collName);
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
     );
 
     assert.commandWorked(coll.createIndexes(indexes));
     assert.commandWorked(coll.insert(docsToInsert));
 
-    const findAndModifyCmd = {findAndModify: coll.getName(), query: deleteQuery, remove: true, hint: hint};
+    const findAndModifyCmd = {
+        findAndModify: coll.getName(),
+        query: deleteQuery,
+        remove: true,
+        hint: hint,
+    };
 
     if (expectedError != undefined) {
         assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), expectedError);
@@ -48,7 +55,12 @@ const testDeleteHint = ({
 
         expectedRemainingDocs.forEach((resultDoc) => {
             const actualDoc = coll.findOne(resultDoc);
-            assert(actualDoc, "Document " + tojson(resultDoc) + " is not found in the result collection as expected ");
+            assert(
+                actualDoc,
+                "Document " +
+                    tojson(resultDoc) +
+                    " is not found in the result collection as expected ",
+            );
             assert.docEq(resultDoc, actualDoc);
         });
     } else {
@@ -57,14 +69,22 @@ const testDeleteHint = ({
         assert.sameMembers(expectedRemainingDocs, coll.find({}).toArray());
 
         const winningPlan = getWinningPlanFromExplain(
-            assert.commandWorked(testDB.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"})),
+            assert.commandWorked(
+                testDB.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}),
+            ),
         );
 
         if (expectedPlan.stage == "COLLSCAN") {
             assert.eq(expectedPlan.stage, winningPlan.inputStage.stage);
         } else {
             assert.eq(expectedPlan.stage, winningPlan.inputStage.inputStage.stage);
-            assert.eq(bsonWoCompare(expectedPlan.keyPattern, winningPlan.inputStage.inputStage.keyPattern), 0);
+            assert.eq(
+                bsonWoCompare(
+                    expectedPlan.keyPattern,
+                    winningPlan.inputStage.inputStage.keyPattern,
+                ),
+                0,
+            );
         }
     }
 
@@ -131,7 +151,10 @@ testDeleteHint({
     deleteQuery: {[metaFieldName]: {a: 1}},
     hint: {[timeFieldName]: 1, [metaFieldName]: 1},
     indexes: [{[timeFieldName]: 1, [metaFieldName]: 1}],
-    expectedPlan: {stage: "IXSCAN", keyPattern: {"control.min.time": 1, "control.max.time": 1, "meta": 1}},
+    expectedPlan: {
+        stage: "IXSCAN",
+        keyPattern: {"control.min.time": 1, "control.max.time": 1, "meta": 1},
+    },
 });
 
 // Query on a collection with a compound index using the timeField and metaField indexes as
@@ -143,7 +166,10 @@ testDeleteHint({
     deleteQuery: {[metaFieldName]: {a: 2}},
     hint: {[timeFieldName]: -1, [metaFieldName]: 1},
     indexes: [{[timeFieldName]: -1, [metaFieldName]: 1}],
-    expectedPlan: {stage: "IXSCAN", keyPattern: {"control.max.time": -1, "control.min.time": -1, "meta": 1}},
+    expectedPlan: {
+        stage: "IXSCAN",
+        keyPattern: {"control.max.time": -1, "control.min.time": -1, "meta": 1},
+    },
 });
 
 // // Query on a collection with a compound index using the timeField and metaField index names
@@ -155,7 +181,10 @@ testDeleteHint({
     deleteQuery: {[metaFieldName]: {a: 2}},
     hint: timeFieldName + "_1_" + metaFieldName + "_1",
     indexes: [{[timeFieldName]: 1, [metaFieldName]: 1}],
-    expectedPlan: {stage: "IXSCAN", keyPattern: {"control.min.time": 1, "control.max.time": 1, "meta": 1}},
+    expectedPlan: {
+        stage: "IXSCAN",
+        keyPattern: {"control.min.time": 1, "control.max.time": 1, "meta": 1},
+    },
 });
 
 // Query on a collection with multiple indexes using the timeField index as a hint.

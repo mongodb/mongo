@@ -106,16 +106,24 @@ function runReshardCollectionTest(failpoint) {
     );
     assert.commandWorked(st.s0.getDB(dbName).runCommand({find: collName, filter: {}}));
     assert.commandWorked(
-        st.s0.getDB(dbName).runCommand({update: collName, updates: [{q: {_id: 1}, u: {$inc: {u: 1}}}]}),
+        st.s0
+            .getDB(dbName)
+            .runCommand({update: collName, updates: [{q: {_id: 1}, u: {$inc: {u: 1}}}]}),
     );
 
-    jsTest.log("Perform a read via mongos1 which has stale routing info. The read should not be blocked");
+    jsTest.log(
+        "Perform a read via mongos1 which has stale routing info. The read should not be blocked",
+    );
     assert.commandWorked(st.s1.getDB(dbName).runCommand({find: collName, filter: {}}));
 
-    jsTest.log("Perform a write via mongos2 which has stale routing info. The write should not be blocked");
+    jsTest.log(
+        "Perform a write via mongos2 which has stale routing info. The write should not be blocked",
+    );
     // Please note that mongos1 is no longer stale after the read above.
     assert.commandWorked(
-        st.s2.getDB(dbName).runCommand({update: collName, updates: [{q: {_id: 1}, u: {$inc: {u: 1}}}]}),
+        st.s2
+            .getDB(dbName)
+            .runCommand({update: collName, updates: [{q: {_id: 1}, u: {$inc: {u: 1}}}]}),
     );
 
     fp.off();

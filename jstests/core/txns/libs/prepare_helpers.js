@@ -15,12 +15,24 @@ export const PrepareHelpers = (function () {
         assert(session);
 
         const res = assert.commandWorked(
-            session.getDatabase("admin").adminCommand({prepareTransaction: 1, writeConcern: writeConcernOption}),
+            session
+                .getDatabase("admin")
+                .adminCommand({prepareTransaction: 1, writeConcern: writeConcernOption}),
         );
-        assert(res.prepareTimestamp, "prepareTransaction did not return a 'prepareTimestamp': " + tojson(res));
+        assert(
+            res.prepareTimestamp,
+            "prepareTransaction did not return a 'prepareTimestamp': " + tojson(res),
+        );
         const prepareTimestamp = res.prepareTimestamp;
-        assert(prepareTimestamp instanceof Timestamp, "prepareTimestamp was not a Timestamp: " + tojson(res));
-        assert.neq(prepareTimestamp, Timestamp(0, 0), "prepareTimestamp cannot be null: " + tojson(res));
+        assert(
+            prepareTimestamp instanceof Timestamp,
+            "prepareTimestamp was not a Timestamp: " + tojson(res),
+        );
+        assert.neq(
+            prepareTimestamp,
+            Timestamp(0, 0),
+            "prepareTimestamp cannot be null: " + tojson(res),
+        );
         return prepareTimestamp;
     }
 
@@ -44,7 +56,10 @@ export const PrepareHelpers = (function () {
         if (res.ok) {
             assert.commandWorked(session.commitTransaction_forTesting());
         } else {
-            assert.commandWorkedOrFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+            assert.commandWorkedOrFailedWithCode(
+                session.abortTransaction_forTesting(),
+                ErrorCodes.NoSuchTransaction,
+            );
         }
         return res;
     }
@@ -116,7 +131,8 @@ export const PrepareHelpers = (function () {
                     const dataSize = oplog.dataSize();
                     const prepareEntryRemoved = oplog.findOne({prepare: true}) === null;
                     print(
-                        `${nodeName} oplog dataSize: ${dataSize},` + ` prepare entry removed: ${prepareEntryRemoved}`,
+                        `${nodeName} oplog dataSize: ${dataSize},` +
+                            ` prepare entry removed: ${prepareEntryRemoved}`,
                     );
 
                     // The oplog milestone system allows the oplog to grow to 110% its max size.
@@ -124,7 +140,9 @@ export const PrepareHelpers = (function () {
                         return true;
                     }
 
-                    assert.commandWorked(coll.insert({tenKB: tenKB}, {writeConcern: {w: numNodes}}));
+                    assert.commandWorked(
+                        coll.insert({tenKB: tenKB}, {writeConcern: {w: numNodes}}),
+                    );
                     return false;
                 },
                 `waiting for ${nodeName} oplog reclamation`,
@@ -138,12 +156,14 @@ export const PrepareHelpers = (function () {
      * Waits for the oplog entry of the given timestamp to be majority committed.
      */
     function awaitMajorityCommitted(replSet, timestamp) {
-        print(`Waiting for majority commit point to advance past the given timestamp ${tojson(timestamp)}`);
+        print(
+            `Waiting for majority commit point to advance past the given timestamp ${tojson(timestamp)}`,
+        );
         const primary = replSet.getPrimary();
         assert.soon(
             () => {
-                const ts = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1})).optimes.lastCommittedOpTime
-                    .ts;
+                const ts = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1})).optimes
+                    .lastCommittedOpTime.ts;
                 if (timestampCmp(ts, timestamp) >= 0) {
                     print(`Finished awaiting lastCommittedOpTime.ts, now at ${tojson(ts)}`);
                     return true;

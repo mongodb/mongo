@@ -90,7 +90,10 @@ export const $config = (function () {
             assert(commandResult.ok);
             if (commandResult.command.pipeline) {
                 for (const stage of commandResult.command.pipeline) {
-                    assert.isnull(stage["$_internalUnpackBucket"], `Expected not to find $_internalUnpackBucket stage`);
+                    assert.isnull(
+                        stage["$_internalUnpackBucket"],
+                        `Expected not to find $_internalUnpackBucket stage`,
+                    );
                 }
             }
             assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
@@ -111,7 +114,9 @@ export const $config = (function () {
                 return fn();
             } catch (e) {
                 if (acceptableErrorCodes.includes(e.code)) {
-                    jsTestLog(`${opName} failed due to race with collection drop (transient, this is expected).`);
+                    jsTestLog(
+                        `${opName} failed due to race with collection drop (transient, this is expected).`,
+                    );
                 } else {
                     throw e;
                 }
@@ -183,7 +188,9 @@ export const $config = (function () {
         aggregate: function aggregate(db, collName) {
             const coll = this.getCollection(db);
             this.handleCollectionDrop(() => {
-                const res = coll.aggregate([{$group: {_id: "$meta"}}], {rawData: true}).toArray().length;
+                const res = coll
+                    .aggregate([{$group: {_id: "$meta"}}], {rawData: true})
+                    .toArray().length;
                 assert.lte(
                     res,
                     bucketsPerCollection,
@@ -280,7 +287,10 @@ export const $config = (function () {
         explainDelete: function explainDelete(db, collName) {
             const coll = this.getCollection(db);
             const result = this.handleCollectionDrop(
-                () => coll.explain().remove({"control.count": measurementsPerBucket}, {rawData: true}),
+                () =>
+                    coll
+                        .explain()
+                        .remove({"control.count": measurementsPerBucket}, {rawData: true}),
                 "Explain delete",
             );
             if (result) {
@@ -291,7 +301,10 @@ export const $config = (function () {
 
     const keys = Object.keys(states);
     const transitions = Object.fromEntries(
-        keys.map((k) => [k, Object.fromEntries(keys.map((k2) => [k2, k2 === "recreateCollection" ? 10 : 1]))]),
+        keys.map((k) => [
+            k,
+            Object.fromEntries(keys.map((k2) => [k2, k2 === "recreateCollection" ? 10 : 1])),
+        ]),
     );
 
     return {

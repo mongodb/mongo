@@ -23,7 +23,18 @@ const runTest = function (insertAfterRestart) {
 
     const assertSizeStorerEntry = function (expected) {
         const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
-        runWiredTigerTool("-r", "-h", dbpath, "dump", "-j", "-k", uri, "-f", filePath, "sizeStorer");
+        runWiredTigerTool(
+            "-r",
+            "-h",
+            dbpath,
+            "dump",
+            "-j",
+            "-k",
+            uri,
+            "-f",
+            filePath,
+            "sizeStorer",
+        );
         const data = JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
         assert.eq(data.length, expected ? 1 : 0, tojson(data));
     };

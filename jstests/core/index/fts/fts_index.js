@@ -44,7 +44,9 @@ assert.eq(
 // Spec fails text-specific index validation ("spanglish" unrecognized).
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailed(coll.createIndex({a: "text"}, {name: indexName, default_language: "spanglish"}));
+assert.commandFailed(
+    coll.createIndex({a: "text"}, {name: indexName, default_language: "spanglish"}),
+);
 assert.eq(
     0,
     coll.getIndexes().filter(function (z) {
@@ -150,7 +152,10 @@ assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandFailedWithCode(coll.createIndex({a: 1, b: 1, c: "text"}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1, b: 1, c: "text"}),
+    ErrorCodes.CannotCreateIndex,
+);
 assert.commandFailedWithCode(
     coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {b: 1}}),
     ErrorCodes.IndexOptionsConflict,
@@ -237,19 +242,31 @@ assert.commandFailed(coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}));
 // The 'weights' parameter should only be allowed when the index is a text index.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}),
+    ErrorCodes.CannotCreateIndex,
+);
 jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$**"}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1, c: 1}, {weights: "$**"}),
+    ErrorCodes.CannotCreateIndex,
+);
 jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {}}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1, c: 1}, {weights: {}}),
+    ErrorCodes.CannotCreateIndex,
+);
 jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1, c: 1}, {weights: "$foo"}),
+    ErrorCodes.CannotCreateIndex,
+);
 jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
@@ -270,6 +287,12 @@ jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 //
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: "text", b: Number.MAX_VALUE}), ErrorCodes.CannotCreateIndex);
-assert.commandFailedWithCode(coll.createIndex({a: "text", b: -Number.MAX_VALUE}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: "text", b: Number.MAX_VALUE}),
+    ErrorCodes.CannotCreateIndex,
+);
+assert.commandFailedWithCode(
+    coll.createIndex({a: "text", b: -Number.MAX_VALUE}),
+    ErrorCodes.CannotCreateIndex,
+);
 jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));

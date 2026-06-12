@@ -49,7 +49,13 @@ describe("add shard with refurbished replicaset", function () {
     });
 
     beforeEach(() => {
-        this.st = new ShardingTest({name: "former-cluster", shards: 0, mongos: 1, config: 1, rs: {nodes: 1}});
+        this.st = new ShardingTest({
+            name: "former-cluster",
+            shards: 0,
+            mongos: 1,
+            config: 1,
+            rs: {nodes: 1},
+        });
 
         this.rs = new ReplSetTest({name: "data", nodes: 1});
         this.rs.startSet({replSet: "data", shardsvr: "", remember: false});
@@ -58,11 +64,15 @@ describe("add shard with refurbished replicaset", function () {
 
         this.shardName = "newShard";
 
-        assert.commandWorked(this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}),
+        );
 
         this.dbName = "test";
         this.collectionName = "foo";
-        assert.commandWorked(this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.shardName}),
+        );
 
         this.collection = this.st.s.getDB(this.dbName)[this.collectionName];
 
@@ -71,7 +81,13 @@ describe("add shard with refurbished replicaset", function () {
         this.rs.stopSet(null, true, {remember: false, skipValidation: true});
 
         this.st.stop({skipValidation: true});
-        this.st = new ShardingTest({name: "new-cluster", shards: 0, mongos: 1, config: 1, rs: {nodes: 1}});
+        this.st = new ShardingTest({
+            name: "new-cluster",
+            shards: 0,
+            mongos: 1,
+            config: 1,
+            rs: {nodes: 1},
+        });
 
         this.rs.startSet({replSet: "data", remember: false}, true);
         this.rs.waitForPrimary();
@@ -106,13 +122,17 @@ describe("add shard with refurbished replicaset", function () {
         this.dropDatabase(this.rs, this.dbName);
         this.dropMetadata(this.rs);
         this.restartAsShardsvr(this.rs);
-        assert.commandWorked(this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}),
+        );
     });
 
     it("cleanup: shardIdentity, metadata", () => {
         this.removeShardIdentity(this.rs);
         this.dropMetadata(this.rs);
         this.restartAsShardsvr(this.rs);
-        assert.commandWorked(this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}));
+        assert.commandWorked(
+            this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}),
+        );
     });
 });

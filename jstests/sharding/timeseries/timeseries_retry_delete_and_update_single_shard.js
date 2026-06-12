@@ -19,7 +19,9 @@ const st = new ShardingTest({
 runTimeseriesRetryDeleteAndUpdateTest(
     st.s,
     function (db, coll, metaFieldName) {
-        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
+        assert.commandWorked(
+            db.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}),
+        );
     },
     function (db, retriedCommandsCount, statementsRetried) {
         const transactionsServerStatus = st.shard0.getDB(db.getName()).serverStatus().transactions;
@@ -29,7 +31,8 @@ runTimeseriesRetryDeleteAndUpdateTest(
         assert.eq(
             retriedCommandsCount + statementsRetried,
             transactionsServerStatus.retriedCommandsCount,
-            "Incorrect value for retriedCommandsCount in serverStatus: " + tojson(transactionsServerStatus),
+            "Incorrect value for retriedCommandsCount in serverStatus: " +
+                tojson(transactionsServerStatus),
         );
 
         return statementsRetried;
@@ -40,7 +43,8 @@ runTimeseriesRetryDeleteAndUpdateTest(
         assert.eq(
             retriedStatementsCount + statementsRetried,
             transactionsServerStatus.retriedStatementsCount,
-            "Incorrect value for retriedStatementsCount in serverStatus:" + tojson(transactionsServerStatus),
+            "Incorrect value for retriedStatementsCount in serverStatus:" +
+                tojson(transactionsServerStatus),
         );
 
         return statementsRetried;

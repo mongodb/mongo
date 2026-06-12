@@ -93,13 +93,17 @@ assert(db.idxOptions.drop());
 
 // The storageEngine subdocument must configure only registered storage engines.
 assert.commandFailed(
-    db.createCollection("idxOptions", {indexOptionDefaults: {storageEngine: {unknownStorageEngine: {}}}}),
+    db.createCollection("idxOptions", {
+        indexOptionDefaults: {storageEngine: {unknownStorageEngine: {}}},
+    }),
     "configured an unregistered storage engine",
 );
 
 // The storageEngine subdocument must contain valid storage engine options.
 assert.commandFailed(
-    db.createCollection("idxOptions", {indexOptionDefaults: {storageEngine: invalidStorageEngineOptions}}),
+    db.createCollection("idxOptions", {
+        indexOptionDefaults: {storageEngine: invalidStorageEngineOptions},
+    }),
     "configured a storage engine with invalid options",
 );
 
@@ -119,7 +123,9 @@ if (alternateStorageEngine) {
 
 // Tests that the indexOptionDefaults are retrievable from the collection options.
 assert.commandWorked(
-    db.createCollection("idxOptions", {indexOptionDefaults: {storageEngine: validStorageEngineOptions}}),
+    db.createCollection("idxOptions", {
+        indexOptionDefaults: {storageEngine: validStorageEngineOptions},
+    }),
 );
 
 var collectionInfos = db.getCollectionInfos({name: "idxOptions"});

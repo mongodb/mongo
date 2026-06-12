@@ -14,7 +14,11 @@ let primary = rst.getPrimary();
 let secondary = rst.getSecondary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 const initialSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));

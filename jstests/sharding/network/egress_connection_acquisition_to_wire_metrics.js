@@ -9,7 +9,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getConnAcquiredToWireMicros(conn) {
-    return conn.adminCommand({serverStatus: 1}).metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros;
+    return conn.adminCommand({serverStatus: 1}).metrics.network
+        .totalTimeForEgressConnectionAcquiredToWireMicros;
 }
 
 const setParamOptions = {
@@ -41,7 +42,11 @@ jsTestLog(
         afterConnAcquiredToWireTime,
     )}`,
 );
-assert.gt(afterConnAcquiredToWireTime, initialConnAcquiredToWireTime, st.s.adminCommand({serverStatus: 1}));
+assert.gt(
+    afterConnAcquiredToWireTime,
+    initialConnAcquiredToWireTime,
+    st.s.adminCommand({serverStatus: 1}),
+);
 
 // Test with mirrored reads to execute the 'fireAndForget' path and verify logs are still correctly
 // printed.
@@ -53,7 +58,9 @@ jsTestLog(
     )}`,
 );
 assert.commandWorked(shardPrimary.adminCommand({clearLog: "global"}));
-assert.commandWorked(shardPrimary.adminCommand({setParameter: 1, mirrorReads: {samplingRate: 1.0}}));
+assert.commandWorked(
+    shardPrimary.adminCommand({setParameter: 1, mirrorReads: {samplingRate: 1.0}}),
+);
 shardPrimary.getDB(jsTestName()).runCommand({find: "test", filter: {}});
 checkLog.containsJson(shardPrimary, 6496702);
 afterConnAcquiredToWireTime = getConnAcquiredToWireMicros(shardPrimary);
@@ -62,5 +69,9 @@ jsTestLog(
         afterConnAcquiredToWireTime,
     )}`,
 );
-assert.gt(afterConnAcquiredToWireTime, initialConnAcquiredToWireTime, shardPrimary.adminCommand({serverStatus: 1}));
+assert.gt(
+    afterConnAcquiredToWireTime,
+    initialConnAcquiredToWireTime,
+    shardPrimary.adminCommand({serverStatus: 1}),
+);
 st.stop();

@@ -53,7 +53,12 @@ TimeseriesTest.run((insert) => {
 
         assert.commandWorked(insert(coll, initialDocList));
 
-        const updateCommand = {update: coll.getName(), updates: updateList, ordered: ordered, let: letDoc};
+        const updateCommand = {
+            update: coll.getName(),
+            updates: updateList,
+            ordered: ordered,
+            let: letDoc,
+        };
         const res = failCode
             ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
             : assert.commandWorked(testDB.runCommand(updateCommand));
@@ -495,7 +500,11 @@ TimeseriesTest.run((insert) => {
         failCode: ErrorCodes.InvalidOptions,
     });
 
-    const nestedMetaObj = {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: {[metaFieldName]: "A"}};
+    const nestedMetaObj = {
+        _id: 6,
+        [timeFieldName]: dateTime,
+        [metaFieldName]: {[metaFieldName]: "A"},
+    };
     // Query for documents using $jsonSchema with the metaField required and a required
     // subfield of the metaField with the same name as the metaField.
     testUpdate({

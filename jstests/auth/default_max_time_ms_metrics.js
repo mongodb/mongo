@@ -18,7 +18,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMS(db, newValue) {
-    assert.commandWorked(db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(
+        db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}),
+    );
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -47,7 +49,9 @@ function runTests(conn, directConn) {
     // Prepare a user through the direct connection to the shard for getting serverStatus.
     if (directConn) {
         assert.eq(1, directConn.getDB("local").auth("__system", "foopdedoop"));
-        directConn.getDB("admin").createUser({user: "directUser", pwd: "password", roles: ["root"]});
+        directConn
+            .getDB("admin")
+            .createUser({user: "directUser", pwd: "password", roles: ["root"]});
         const directDB = new Mongo(directConn.host).getDB("admin");
         assert(directDB.auth("directUser", "password"), "Auth failed");
         connectionsToCheck.push(directDB);

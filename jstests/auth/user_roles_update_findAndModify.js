@@ -42,7 +42,9 @@ function initialize(db) {
 function runUpdateQuery(db) {
     let coll = db.getCollection(collName);
 
-    let pre = coll.findOne({$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
+    let pre = coll.findOne({
+        $expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]},
+    });
     let preSalesWins = pre.salesWins;
 
     assert.commandWorked(
@@ -53,7 +55,9 @@ function runUpdateQuery(db) {
         ),
     );
 
-    let post = coll.findOne({$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
+    let post = coll.findOne({
+        $expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]},
+    });
     let postSalesWins = post.salesWins;
 
     assert.eq(postSalesWins, preSalesWins + 1000);
@@ -63,7 +67,9 @@ function runUpdateQuery(db) {
 function runUpdateUpdate(db) {
     let coll = db.getCollection(collName);
 
-    assert.commandWorked(coll.update({_id: 2}, [{$set: {"teamMembersRights": "$$USER_ROLES.role"}}]));
+    assert.commandWorked(
+        coll.update({_id: 2}, [{$set: {"teamMembersRights": "$$USER_ROLES.role"}}]),
+    );
 
     let post = coll.findOne({_id: 2});
 

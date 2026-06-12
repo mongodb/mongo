@@ -13,17 +13,29 @@ let runTest = function (compressor) {
             }
 
             const kBatchSize = 2;
-            const preRes = assert.commandWorked(db.adminCommand({configureFailPoint: fp, mode: "alwaysOn"}));
+            const preRes = assert.commandWorked(
+                db.adminCommand({configureFailPoint: fp, mode: "alwaysOn"}),
+            );
 
-            db.exhaustCollection.find({}).batchSize(kBatchSize).addOption(DBQuery.Option.exhaust).toArray();
+            db.exhaustCollection
+                .find({})
+                .batchSize(kBatchSize)
+                .addOption(DBQuery.Option.exhaust)
+                .toArray();
 
-            const postRes = assert.commandWorked(db.adminCommand({configureFailPoint: fp, mode: "off"}));
+            const postRes = assert.commandWorked(
+                db.adminCommand({configureFailPoint: fp, mode: "off"}),
+            );
 
             // The initial response for find command has kBatchSize docs and the remaining docs comes
             // in batches of kBatchSize in response to the getMore command with the exhaustAllowed bit
             // set.
             const kExpectedDelta = Math.floor((kDocumentCount - kBatchSize) / kBatchSize);
-            assert.eq(postRes.count - preRes.count, kExpectedDelta, "Exhaust messages are not compressed");
+            assert.eq(
+                postRes.count - preRes.count,
+                kExpectedDelta,
+                "Exhaust messages are not compressed",
+            );
         },
         mongo.port,
         false,

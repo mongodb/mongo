@@ -141,7 +141,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // Change the validation level.
             const validationLevels = ["off", "strict", "moderate"];
             const newValidationLevel = validationLevels[Random.randInt(validationLevels.length)];
-            jsTestLog(`Running collMod: coll=${this.outputCollName} validationLevel=${newValidationLevel}`);
+            jsTestLog(
+                `Running collMod: coll=${this.outputCollName} validationLevel=${newValidationLevel}`,
+            );
 
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: this.outputCollName, validationLevel: newValidationLevel}),
@@ -150,7 +152,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         } else {
             // Change the validation action.
             const validationAction = Random.rand() > 0.5 ? "warn" : "error";
-            jsTestLog(`Running collMod: coll=${this.outputCollName} validationAction=${validationAction}`);
+            jsTestLog(
+                `Running collMod: coll=${this.outputCollName} validationAction=${validationAction}`,
+            );
 
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: this.outputCollName, validationAction: validationAction}),
@@ -196,14 +200,17 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const namespace = `${db}.${collName}`;
         jsTestLog(`Running untrackUnshardedCollection: ns=${namespace}`);
         if (isMongos(db)) {
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
-                // Handles the case where the collection is not located on its primary
-                ErrorCodes.OperationFailed,
-                // Handles the case where the collection is sharded
-                ErrorCodes.InvalidNamespace,
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-            ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}),
+                [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                ],
+            );
         }
     };
 
@@ -213,11 +220,14 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
-        assert.commandWorkedOrFailedWithCode(db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
-            ErrorCodes.MovePrimaryInProgress,
-            ErrorCodes.NamespaceNotFound,
-            ErrorCodes.NamespaceCannotBeSharded,
-        ]);
+        assert.commandWorkedOrFailedWithCode(
+            db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
+            [
+                ErrorCodes.MovePrimaryInProgress,
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.NamespaceCannotBeSharded,
+            ],
+        );
     };
 
     /**
@@ -233,7 +243,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
             try {
                 assert.commandWorked(
-                    db.adminCommand({shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}),
+                    db.adminCommand({
+                        shardCollection: db[this.outputCollName].getFullName(),
+                        key: this.shardKey,
+                    }),
                 );
             } catch (e) {
                 const exceptionCode = e.code;

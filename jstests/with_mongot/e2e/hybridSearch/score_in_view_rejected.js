@@ -35,13 +35,19 @@ const scoreSecondViewPipeline = [
     {$sort: {_id: 1}},
 ];
 
-const lookupPipelineWithScoreFirst = [{$lookup: {from: collName, as: "matched_docs", pipeline: scoreFirstPipeline}}];
-const unionWithPipelineWithScoreFirst = [{$unionWith: {coll: collName, pipeline: scoreFirstPipeline}}];
+const lookupPipelineWithScoreFirst = [
+    {$lookup: {from: collName, as: "matched_docs", pipeline: scoreFirstPipeline}},
+];
+const unionWithPipelineWithScoreFirst = [
+    {$unionWith: {coll: collName, pipeline: scoreFirstPipeline}},
+];
 
 const lookupPipelineWithScoreSecond = [
     {$lookup: {from: collName, as: "matched_docs", pipeline: scoreSecondViewPipeline}},
 ];
-const unionWithPipelineWithScoreSecond = [{$unionWith: {coll: collName, pipeline: scoreSecondViewPipeline}}];
+const unionWithPipelineWithScoreSecond = [
+    {$unionWith: {coll: collName, pipeline: scoreSecondViewPipeline}},
+];
 
 assert.commandFailedWithCode(
     db.createView("scoreView", collName, scoreFirstPipeline),

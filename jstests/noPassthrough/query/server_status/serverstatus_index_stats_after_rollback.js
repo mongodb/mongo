@@ -6,7 +6,11 @@
  *   requires_mongobridge,
  * ]
  */
-import {assertCountIncrease, assertFeatureCountIncrease, assertStats} from "jstests/libs/index_stats_utils.js";
+import {
+    assertCountIncrease,
+    assertFeatureCountIncrease,
+    assertStats,
+} from "jstests/libs/index_stats_utils.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
@@ -31,10 +35,18 @@ let lastStats = testDB.serverStatus().indexStats;
 // commitQuorum: "majority" (2 of 3) instead of the default "votingMembers" (all 3).
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(
-    testDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}], commitQuorum: "majority"}),
+    testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {a: 1}, name: "a_1"}],
+        commitQuorum: "majority",
+    }),
 );
 assert.commandWorked(
-    testDB.runCommand({createIndexes: collName, indexes: [{key: {b: 1}, name: "b_1"}], commitQuorum: "majority"}),
+    testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {b: 1}, name: "b_1"}],
+        commitQuorum: "majority",
+    }),
 );
 
 // Verify indexStats.count increased by 3 (_id + {a:1} + {b:1}).

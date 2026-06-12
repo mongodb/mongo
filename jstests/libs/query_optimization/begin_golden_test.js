@@ -1,4 +1,7 @@
-import {getPlanRankerMode, getAutomaticCEPlanRankingStrategy} from "jstests/libs/query/cbr_utils.js";
+import {
+    getPlanRankerMode,
+    getAutomaticCEPlanRankingStrategy,
+} from "jstests/libs/query/cbr_utils.js";
 import {
     checkSbeStatus,
     checkJoinOptimizationStatus,
@@ -17,7 +20,11 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     // If the test name ends in "_md" and no explicit file extension is specified, then remove the
     // "_md" part and use it as the file extension.
     // TODO SERVER-92693: Use only the file extension.
-    if (testNameParts.length > 0 && testNameParts[testNameParts.length - 1] === "md" && fileExtension === "") {
+    if (
+        testNameParts.length > 0 &&
+        testNameParts[testNameParts.length - 1] === "md" &&
+        fileExtension === ""
+    ) {
         fileExtension = ".md";
         outputName = testNameParts.slice(0, -1).join("_");
     }
@@ -28,15 +35,23 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     // case, we need to pick the correct directory for the curent configuration.
     const sbeStatus = checkSbeStatus(typeof db === "undefined" ? null : db);
     const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
-    const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(typeof db === "undefined" ? null : db);
-    const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
-    const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(typeof db === "undefined" ? null : db);
+    const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(
+        typeof db === "undefined" ? null : db,
+    );
+    const joinOptimizationStatus = checkJoinOptimizationStatus(
+        typeof db === "undefined" ? null : db,
+    );
+    const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(
+        typeof db === "undefined" ? null : db,
+    );
     const sbeIndividualFeaturesEnabled = sbeTransformStagesEnabled;
 
     const sbeIndividualFeaturesExpectedExists = fileExists(
         relativePathToExpectedOutput + "/sbeIndividualFeatures/" + outputName,
     );
-    const sbeExpectedExists = fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName);
+    const sbeExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName,
+    );
 
     const outputDirPlanRanking =
         planRankerMode != "automaticCE"
@@ -55,7 +70,9 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.
         assert.fail(
-            "Both SBE and CBR expected outputs exist for " + outputName + ", cannot determine which one to use. ",
+            "Both SBE and CBR expected outputs exist for " +
+                outputName +
+                ", cannot determine which one to use. ",
         );
     } else if (sbeExpectedExists) {
         relativePathToExpectedOutput += "/" + sbeStatus;

@@ -18,22 +18,37 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 const primaryDB = primary.getDB("config");
 
-const operationTime = assert.commandWorked(primaryDB.runCommand({find: "transactions"})).operationTime;
-assert.commandWorked(primaryDB.runCommand({find: "transactions", readConcern: {level: "majority"}}));
+const operationTime = assert.commandWorked(
+    primaryDB.runCommand({find: "transactions"}),
+).operationTime;
+assert.commandWorked(
+    primaryDB.runCommand({find: "transactions", readConcern: {level: "majority"}}),
+);
 // When DisableTransactionUpdateCoalescing is enabled, we disable transaction update coalescing on
 // secondaries to ensure that the history of updates is identical between the primary and
 // secondaries. Then, snapshot and point-in-time (PIT) reads are allowed.
 if (FeatureFlagUtil.isPresentAndEnabled(primary, "DisableTransactionUpdateCoalescing")) {
     assert.commandWorked(
-        primaryDB.runCommand({find: "transactions", readConcern: {level: "majority", afterClusterTime: operationTime}}),
+        primaryDB.runCommand({
+            find: "transactions",
+            readConcern: {level: "majority", afterClusterTime: operationTime},
+        }),
     );
-    assert.commandWorked(primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot"}}));
     assert.commandWorked(
-        primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot", atClusterTime: operationTime}}),
+        primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot"}}),
+    );
+    assert.commandWorked(
+        primaryDB.runCommand({
+            find: "transactions",
+            readConcern: {level: "snapshot", atClusterTime: operationTime},
+        }),
     );
 } else {
     assert.commandFailedWithCode(
-        primaryDB.runCommand({find: "transactions", readConcern: {level: "majority", afterClusterTime: operationTime}}),
+        primaryDB.runCommand({
+            find: "transactions",
+            readConcern: {level: "majority", afterClusterTime: operationTime},
+        }),
         5557800,
     );
     assert.commandFailedWithCode(
@@ -41,7 +56,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(primary, "DisableTransactionUpdateCoales
         5557800,
     );
     assert.commandFailedWithCode(
-        primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot", atClusterTime: operationTime}}),
+        primaryDB.runCommand({
+            find: "transactions",
+            readConcern: {level: "snapshot", atClusterTime: operationTime},
+        }),
         5557800,
     );
 }

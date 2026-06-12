@@ -33,7 +33,12 @@ const testFindCmd = function () {
     assert.commandWorked(testDb.test.insert(testData));
     jsTestLog("[Find] Running the initial query.");
     let res = assert.commandWorked(
-        testDb.runCommand({find: "test", hint: {$natural: 1}, batchSize: 1, $_requestResumeToken: true}),
+        testDb.runCommand({
+            find: "test",
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+        }),
     );
     assert.eq(1, res.cursor.firstBatch.length);
     assert.contains(res.cursor.firstBatch[0], testData);
@@ -62,7 +67,9 @@ const testFindCmd = function () {
     let cursorId = res.cursor.id;
 
     jsTestLog("[Find] Running getMore.");
-    res = assert.commandWorked(testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}));
+    res = assert.commandWorked(
+        testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}),
+    );
     queryData.push(res.cursor.nextBatch[0]);
     assert.hasFields(res.cursor, ["postBatchResumeToken"]);
     resumeToken = res.cursor.postBatchResumeToken;
@@ -93,11 +100,15 @@ const testAggregateCmd = function (addDummyStage) {
     // an "empty" aggregate and one with stages that aren't merged into the initial find, so
     // we use a redact stage that we know (but the server doesn't) won't redact anything to
     // disable those optimizations.
-    const logPrefix = addDummyStage ? "[Aggregate non-empty pipeline] " : "[Aggregate empty pipeline] ";
+    const logPrefix = addDummyStage
+        ? "[Aggregate non-empty pipeline] "
+        : "[Aggregate empty pipeline] ";
     const pipeline = addDummyStage
         ? [
               {
-                  $redact: {$cond: {if: {$eq: ["$d", "never happens"]}, then: "$$PRUNE", else: "$$KEEP"}},
+                  $redact: {
+                      $cond: {if: {$eq: ["$d", "never happens"]}, then: "$$PRUNE", else: "$$KEEP"},
+                  },
               },
           ]
         : [];
@@ -148,7 +159,9 @@ const testAggregateCmd = function (addDummyStage) {
     let cursorId = res.cursor.id;
 
     jsTestLog(logPrefix + "Running getMore.");
-    res = assert.commandWorked(testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}));
+    res = assert.commandWorked(
+        testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}),
+    );
     queryData.push(res.cursor.nextBatch[0]);
     assert.hasFields(res.cursor, ["postBatchResumeToken"]);
     resumeToken = res.cursor.postBatchResumeToken;

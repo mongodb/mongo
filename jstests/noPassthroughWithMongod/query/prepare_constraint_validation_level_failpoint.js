@@ -34,9 +34,11 @@ const awaitWrite = startParallelShell(
     funWithArgs(
         (dbName, collName) => {
             assert.commandWorked(
-                db
-                    .getSiblingDB(dbName)
-                    .runCommand({insert: collName, documents: [{b: 1}], bypassDocumentValidation: true}),
+                db.getSiblingDB(dbName).runCommand({
+                    insert: collName,
+                    documents: [{b: 1}],
+                    bypassDocumentValidation: true,
+                }),
             );
         },
         dbName,
@@ -53,7 +55,9 @@ const awaitCollMod = startParallelShell(
     funWithArgs(
         (dbName, collName) => {
             assert.commandWorked(
-                db.getSiblingDB(dbName).runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+                db
+                    .getSiblingDB(dbName)
+                    .runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
             );
         },
         dbName,
@@ -78,9 +82,11 @@ const awaitWriteAfter = startParallelShell(
     funWithArgs(
         (dbName, collName) => {
             assert.commandFailed(
-                db
-                    .getSiblingDB(dbName)
-                    .runCommand({insert: collName, documents: [{b: 2}], bypassDocumentValidation: true}),
+                db.getSiblingDB(dbName).runCommand({
+                    insert: collName,
+                    documents: [{b: 2}],
+                    bypassDocumentValidation: true,
+                }),
             );
         },
         dbName,

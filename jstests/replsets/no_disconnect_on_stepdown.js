@@ -75,7 +75,8 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
 
     // Validate the number of operations killed on step down and number of failed unacknowledged
     // writes resulted in network disconnection.
-    const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
+    const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics
+        .repl;
     assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
     assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
@@ -87,7 +88,9 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
 // Reduce the max batch size so the insert is reliably interrupted.
 assert.commandWorked(primaryAdmin.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
 // Make updates and removes yield more often.
-assert.commandWorked(primaryAdmin.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 3}));
+assert.commandWorked(
+    primaryAdmin.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 3}),
+);
 
 runStepDownTest({
     description: "insert",

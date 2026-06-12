@@ -22,10 +22,26 @@ import {
  * Tests op-style updates.
  */
 {
-    const doc_m1_a_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
+    const doc_m1_a_b = {
+        [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
+        [metaFieldName]: 1,
+        _id: 1,
+        a: 1,
+        b: 1,
+    };
     const doc_a_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), _id: 1, a: 1, b: 1};
-    const doc_m1_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, b: 1};
-    const doc_m2_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 2, _id: 1, b: 1};
+    const doc_m1_b = {
+        [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
+        [metaFieldName]: 1,
+        _id: 1,
+        b: 1,
+    };
+    const doc_m2_b = {
+        [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
+        [metaFieldName]: 2,
+        _id: 1,
+        b: 1,
+    };
     const doc_m1_arrayA_b = {
         [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
         [metaFieldName]: 1,
@@ -40,8 +56,20 @@ import {
         a: 1,
         b: 1,
     };
-    const doc_m1_c_d = {[timeFieldName]: ISODate("2023-02-06T19:19:02Z"), [metaFieldName]: 1, _id: 2, c: 1, d: 1};
-    const doc_m1_a_b_later = {[timeFieldName]: ISODate("2023-02-07T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
+    const doc_m1_c_d = {
+        [timeFieldName]: ISODate("2023-02-06T19:19:02Z"),
+        [metaFieldName]: 1,
+        _id: 2,
+        c: 1,
+        d: 1,
+    };
+    const doc_m1_a_b_later = {
+        [timeFieldName]: ISODate("2023-02-07T19:19:01Z"),
+        [metaFieldName]: 1,
+        _id: 1,
+        a: 1,
+        b: 1,
+    };
     const query_m1_a1 = {a: {$eq: 1}, [metaFieldName]: {$eq: 1}};
     const query_m1_b1 = {b: {$eq: 1}, [metaFieldName]: {$eq: 1}};
 
@@ -72,7 +100,10 @@ import {
                 bucketFilter: makeBucketFilter(
                     {meta: {$eq: 1}},
                     {
-                        $and: [{"control.min.a": {$_internalExprLte: 1}}, {"control.max.a": {$_internalExprGte: 1}}],
+                        $and: [
+                            {"control.min.a": {$_internalExprLte: 1}},
+                            {"control.max.a": {$_internalExprGte: 1}},
+                        ],
                     },
                 ),
                 residualFilter: {a: {$eq: 1}},
@@ -94,7 +125,10 @@ import {
                 bucketFilter: makeBucketFilter(
                     {meta: {$eq: 1}},
                     {
-                        $and: [{"control.min.b": {$_internalExprLte: 1}}, {"control.max.b": {$_internalExprGte: 1}}],
+                        $and: [
+                            {"control.min.b": {$_internalExprLte: 1}},
+                            {"control.max.b": {$_internalExprGte: 1}},
+                        ],
                     },
                 ),
                 residualFilter: {b: {$eq: 1}},
@@ -291,7 +325,13 @@ import {
 {
     const timestamp2023 = ISODate("2023-02-06T19:19:00Z");
     const doc_2023_m1_a1 = {[timeFieldName]: timestamp2023, [metaFieldName]: 1, _id: 1, a: 1};
-    const doc_2023_m2_a1_newField = {[timeFieldName]: timestamp2023, [metaFieldName]: 2, _id: 1, a: 1, "newField": 42};
+    const doc_2023_m2_a1_newField = {
+        [timeFieldName]: timestamp2023,
+        [metaFieldName]: 2,
+        _id: 1,
+        a: 1,
+        "newField": 42,
+    };
 
     // Update metaField and add a new field.
     (function testPipelineUpdateSetMultipleFields() {
@@ -307,7 +347,10 @@ import {
                 bucketFilter: makeBucketFilter(
                     {meta: {$eq: 1}},
                     {
-                        $and: [{"control.min.a": {$_internalExprLte: 1}}, {"control.max.a": {$_internalExprGte: 1}}],
+                        $and: [
+                            {"control.min.a": {$_internalExprLte: 1}},
+                            {"control.max.a": {$_internalExprGte: 1}},
+                        ],
                     },
                 ),
                 residualFilter: {a: {$eq: 1}},

@@ -48,7 +48,10 @@ export function getQueryPlanner(explain) {
  * non-sharded plans.
  */
 export function getShardsFromExplain(explain) {
-    if (explain.hasOwnProperty("queryPlanner") && explain.queryPlanner.hasOwnProperty("winningPlan")) {
+    if (
+        explain.hasOwnProperty("queryPlanner") &&
+        explain.queryPlanner.hasOwnProperty("winningPlan")
+    ) {
         return explain.queryPlanner.winningPlan.shards;
     }
 
@@ -242,7 +245,8 @@ export function normalizePlan(plan, flatten = true) {
  */
 export function formatQueryPlanner(queryPlanner, shouldFlatten = true) {
     let winningPlan = normalizePlan(getWinningPlanFromExplain(queryPlanner), shouldFlatten);
-    let rejectedPlans = queryPlanner.rejectedPlans?.map((plan) => normalizePlan(plan, shouldFlatten)) ?? [];
+    let rejectedPlans =
+        queryPlanner.rejectedPlans?.map((plan) => normalizePlan(plan, shouldFlatten)) ?? [];
     return {winningPlan, rejectedPlans};
 }
 
@@ -308,7 +312,9 @@ function invertShards(queryPlanner, shouldFlatten = true) {
     delete topStage.shards;
 
     const res = {mergerPart: normalizePlan(topStage, shouldFlatten), shardsPart: {}};
-    shards.forEach((shard) => (res.shardsPart[shard.shardName] = formatQueryPlanner(shard, shouldFlatten)));
+    shards.forEach(
+        (shard) => (res.shardsPart[shard.shardName] = formatQueryPlanner(shard, shouldFlatten)),
+    );
 
     return res;
 }
@@ -408,7 +414,9 @@ export function getPlanStages(root, stage) {
     }
 
     if ("queryPlanner" in root) {
-        results = results.concat(getPlanStages(getWinningPlanFromExplain(root.queryPlanner), stage));
+        results = results.concat(
+            getPlanStages(getWinningPlanFromExplain(root.queryPlanner), stage),
+        );
     }
 
     if ("thenStage" in root) {
@@ -459,7 +467,10 @@ export function getPlanStages(root, stage) {
             );
         } else {
             const shards = Object.keys(root.shards);
-            results = shards.reduce((res, shard) => res.concat(getPlanStages(root.shards[shard], stage)), results);
+            results = shards.reduce(
+                (res, shard) => res.concat(getPlanStages(root.shards[shard], stage)),
+                results,
+            );
         }
     }
 
@@ -492,7 +503,8 @@ export function getPlanStage(root, stage) {
     } else {
         assert(
             planStageList.length === 1,
-            "getPlanStage expects to find 0 or 1 matching stages. planStageList: " + tojson(planStageList),
+            "getPlanStage expects to find 0 or 1 matching stages. planStageList: " +
+                tojson(planStageList),
         );
         return planStageList[0];
     }
@@ -549,7 +561,10 @@ export function hasRejectedPlans(root) {
     } else if (root.hasOwnProperty("stages")) {
         // This is an agg explain.
         const cursorStages = getAggPlanStages(root, "$cursor");
-        return cursorStages.find((cursorStage) => cursorStageHasRejectedPlans(cursorStage)) !== undefined;
+        return (
+            cursorStages.find((cursorStage) => cursorStageHasRejectedPlans(cursorStage)) !==
+            undefined
+        );
     } else {
         // This is some sort of query explain.
         assert(root.hasOwnProperty("queryPlanner"), tojson(root));
@@ -561,7 +576,10 @@ export function hasRejectedPlans(root) {
 
         // This is a sharded explain. Each entry in the shards array contains a 'winningPlan' and
         // 'rejectedPlans'.
-        return root.queryPlanner.winningPlan.shards.find((shard) => sectionHasRejectedPlans(shard)) !== undefined;
+        return (
+            root.queryPlanner.winningPlan.shards.find((shard) => sectionHasRejectedPlans(shard)) !==
+            undefined
+        );
     }
 }
 
@@ -569,7 +587,10 @@ export function hasRejectedPlans(root) {
  * Returns an array of execution stages from the given replset or sharded explain output.
  */
 export function getExecutionStages(root) {
-    if (root.hasOwnProperty("executionStats") && root.executionStats.executionStages.hasOwnProperty("shards")) {
+    if (
+        root.hasOwnProperty("executionStats") &&
+        root.executionStats.executionStages.hasOwnProperty("shards")
+    ) {
         const executionStages = [];
         for (let shard of root.executionStats.executionStages.shards) {
             executionStages.push(
@@ -654,7 +675,9 @@ export function getStableExecutionStats(explain) {
     const stableFields = extractStableExecutionFieldsSummary(topLevel);
 
     if (topLevel.shards) {
-        const sortedShards = [...topLevel.shards].sort((a, b) => a.shardName.localeCompare(b.shardName));
+        const sortedShards = [...topLevel.shards].sort((a, b) =>
+            a.shardName.localeCompare(b.shardName),
+        );
 
         stableFields.shards = sortedShards.map((shard) => ({
             nReturned: shard.nReturned,
@@ -762,9 +785,13 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
         // plan info from the "queryPlanner" section.
         if (queryLayerOutput.hasOwnProperty("executionStats") && !useQueryPlannerSection) {
             assert(queryLayerOutput.executionStats.hasOwnProperty("executionStages"));
-            results = results.concat(getPlanStages(queryLayerOutput.executionStats.executionStages, stage));
+            results = results.concat(
+                getPlanStages(queryLayerOutput.executionStats.executionStages, stage),
+            );
         } else {
-            results = results.concat(getPlanStages(getWinningPlanFromExplain(queryLayerOutput.queryPlanner), stage));
+            results = results.concat(
+                getPlanStages(getWinningPlanFromExplain(queryLayerOutput.queryPlanner), stage),
+            );
         }
 
         return results;
@@ -839,7 +866,8 @@ export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
         assert.eq(
             1,
             planStageList.length,
-            "getAggPlanStage expects to find 0 or 1 matching stages. planStageList: " + tojson(planStageList),
+            "getAggPlanStage expects to find 0 or 1 matching stages. planStageList: " +
+                tojson(planStageList),
         );
         return planStageList[0];
     }
@@ -864,7 +892,10 @@ export function getStageFromSplitPipeline(root, stage) {
 
     if (root.splitPipeline != null) {
         // If there is only one shard, the whole pipeline will run on that shard.
-        let subAggPipe = root.splitPipeline === null ? root.shards["shard-rs0"].stages : root.splitPipeline.mergerPart;
+        let subAggPipe =
+            root.splitPipeline === null
+                ? root.shards["shard-rs0"].stages
+                : root.splitPipeline.mergerPart;
 
         // Check if the requested stage exists in the merger part.
         const stageInMergerPart = checkForStageInSubAggPipe(subAggPipe, stage);
@@ -902,7 +933,9 @@ export function getSplitPipelineStages(root, stage) {
         return getAggPlanStages(root, stage);
     }
     const collect = (part) =>
-        (root.splitPipeline[part] || []).filter((s) => s.hasOwnProperty(stage)).map((s) => ({part, stage: s}));
+        (root.splitPipeline[part] || [])
+            .filter((s) => s.hasOwnProperty(stage))
+            .map((s) => ({part, stage: s}));
     return [...collect("mergerPart"), ...collect("shardsPart")];
 }
 
@@ -1011,7 +1044,8 @@ export function isEofPlan(db, root) {
  * otherwise.
  */
 export function isAlwaysFalsePlan(root) {
-    const hasAlwaysFalseFilter = (stage) => stage && stage.filter && stage.filter["$alwaysFalse"] === 1;
+    const hasAlwaysFalseFilter = (stage) =>
+        stage && stage.filter && stage.filter["$alwaysFalse"] === 1;
     return getPlanStages(root, "FETCH").every(hasAlwaysFalseFilter);
 }
 
@@ -1079,7 +1113,12 @@ export function isClusteredIxscan(db, root) {
 export function isAggregationPlan(root) {
     if (root.hasOwnProperty("shards")) {
         const shards = Object.keys(root.shards);
-        return shards.reduce((res, shard) => (res + root.shards[shard].hasOwnProperty("stages") ? 1 : 0), 0) > 0;
+        return (
+            shards.reduce(
+                (res, shard) => (res + root.shards[shard].hasOwnProperty("stages") ? 1 : 0),
+                0,
+            ) > 0
+        );
     }
     return root.hasOwnProperty("stages");
 }
@@ -1091,7 +1130,12 @@ export function isAggregationPlan(root) {
 export function isQueryPlan(root) {
     if (root.hasOwnProperty("shards")) {
         const shards = Object.keys(root.shards);
-        return shards.reduce((res, shard) => (res + root.shards[shard].hasOwnProperty("queryPlanner") ? 1 : 0), 0) > 0;
+        return (
+            shards.reduce(
+                (res, shard) => (res + root.shards[shard].hasOwnProperty("queryPlanner") ? 1 : 0),
+                0,
+            ) > 0
+        );
     }
     return root.hasOwnProperty("queryPlanner");
 }
@@ -1111,7 +1155,10 @@ export function everyWinningPlan(explain, predicate) {
  * shard filter.
  */
 export function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
-    const shardFilterPlanStage = getPlanStage(getWinningPlanFromExplain(shardPlan), "SHARDING_FILTER");
+    const shardFilterPlanStage = getPlanStage(
+        getWinningPlanFromExplain(shardPlan),
+        "SHARDING_FILTER",
+    );
     if (!shardFilterPlanStage) {
         return 0;
     }
@@ -1125,7 +1172,10 @@ export function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
         const filters = getPlanStages(shardExecutionStages.executionStages, "filter").filter(
             (stage) => stage.planNodeId === shardFilterNodeId,
         );
-        return filters.reduce((numSkips, stage) => numSkips + (stage.numTested - stage.nReturned), 0);
+        return filters.reduce(
+            (numSkips, stage) => numSkips + (stage.numTested - stage.nReturned),
+            0,
+        );
     } else {
         // Otherwise, we assume that execution used a "classic" SHARDING_FILTER stage, which
         // explicitly reports a "chunkSkips" value.
@@ -1299,7 +1349,14 @@ export function getPlanCacheShapeHashFromExplain(explain) {
  * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
  * result.
  */
-export function getPlanCacheKeyFromShape({query = {}, projection = {}, sort = {}, collation = {}, collection, db}) {
+export function getPlanCacheKeyFromShape({
+    query = {},
+    projection = {},
+    sort = {},
+    collation = {},
+    collection,
+    db,
+}) {
     const explainRes = assert.commandWorked(
         collection.explain().find(query, projection).collation(collation).sort(sort).finish(),
     );
@@ -1350,7 +1407,10 @@ export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) 
     const plan = getWinningPlanFromExplain(exp.queryPlanner);
     const fetch = getPlanStage(plan, "FETCH");
     assert(fetch !== null, "Missing FETCH stage " + plan);
-    assert(fetch.hasOwnProperty("filter"), "Expected filter in the fetch stage, got " + tojson(fetch));
+    assert(
+        fetch.hasOwnProperty("filter"),
+        "Expected filter in the fetch stage, got " + tojson(fetch),
+    );
     assert.eq(
         expectedFilter,
         fetch.filter,
@@ -1402,7 +1462,9 @@ export function getEngine(explain) {
 }
 
 export function getWarnings(explain) {
-    return getQueryPlanners(explain).flatMap((queryPlanner) => getNestedProperties(queryPlanner, "warning"));
+    return getQueryPlanners(explain).flatMap((queryPlanner) =>
+        getNestedProperties(queryPlanner, "warning"),
+    );
 }
 
 /**
@@ -1425,7 +1487,10 @@ export function getNumberOfIndexScans(explain) {
  * Returns the number of column scans in a query plan.
  */
 export function getNumberOfColumnScans(explain) {
-    const columnIndexScans = getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "COLUMN_SCAN");
+    const columnIndexScans = getPlanStages(
+        getWinningPlanFromExplain(explain.queryPlanner),
+        "COLUMN_SCAN",
+    );
     return columnIndexScans.length;
 }
 
@@ -1540,7 +1605,12 @@ export function getCachedPlanForQuery(db, coll, filter) {
  *
  * Also verifies that the 'planCacheShapeHash' matches the provided 'expectedPlanCacheShapeHash'.
  */
-export function assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, indexName, expectedPlanCacheShapeHash) {
+export function assertPlanHasIxScanStage(
+    isSbePlanCacheEnabled,
+    entry,
+    indexName,
+    expectedPlanCacheShapeHash,
+) {
     assert.eq(entry.planCacheShapeHash, expectedPlanCacheShapeHash, entry);
 
     const cachedPlan = getCachedPlan(entry.cachedPlan);
@@ -1589,7 +1659,10 @@ export function assertResultsSameAllPlans(coll, query) {
     const expected = coll.find(query).hint({$natural: 1}).toArray();
     runWithParamsAllNonConfigNodes(db, {internalQueryAllowForcedPlanByHash: true}, () => {
         const plannerExplain = assert.commandWorked(
-            db.runCommand({explain: {find: coll.getName(), filter: query}, verbosity: "queryPlanner"}),
+            db.runCommand({
+                explain: {find: coll.getName(), filter: query},
+                verbosity: "queryPlanner",
+            }),
         );
         for (const plan of getAllPlans(plannerExplain)) {
             if (!plan.hasOwnProperty("solutionHashUnstable")) {
@@ -1600,7 +1673,10 @@ export function assertResultsSameAllPlans(coll, query) {
                 filter: query,
                 forcedPlanSolutionHash: plan.solutionHashUnstable,
             });
-            if (!res.ok && [ErrorCodes.IllegalOperation, ErrorCodes.NoQueryExecutionPlans].includes(res.code)) {
+            if (
+                !res.ok &&
+                [ErrorCodes.IllegalOperation, ErrorCodes.NoQueryExecutionPlans].includes(res.code)
+            ) {
                 return;
             }
             assert.commandWorked(res);

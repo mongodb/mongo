@@ -37,7 +37,10 @@ assert.eq(
         .find({
             "loc": {
                 "$near": {
-                    "$geometry": {"type": "Point", "coordinates": [-85.031218528747559, 41.364586470348961]},
+                    "$geometry": {
+                        "type": "Point",
+                        "coordinates": [-85.031218528747559, 41.364586470348961],
+                    },
                     "$maxDistance": 0,
                 },
             },

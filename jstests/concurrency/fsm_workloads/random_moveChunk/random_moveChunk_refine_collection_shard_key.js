@@ -47,7 +47,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.data.getCurrentOrPreviousLatchCollName = function (collName) {
         const latchNumber =
-            Random.rand() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
+            Random.rand() < 0.5
+                ? this.latch.getCount()
+                : Math.min(this.latch.getCount() + 1, this.latchCount);
 
         return collName + "_" + latchNumber.toString();
     };
@@ -60,7 +62,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         ];
     };
 
-    $config.states.refineCollectionShardKey = function refineCollectionShardKey(db, collName, connCache) {
+    $config.states.refineCollectionShardKey = function refineCollectionShardKey(
+        db,
+        collName,
+        connCache,
+    ) {
         const latchCollName = this.getCurrentLatchCollName(collName);
 
         try {
@@ -86,7 +92,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        $super.states.moveChunk.apply(this, [db, this.getCurrentOrPreviousLatchCollName(collName), connCache]);
+        $super.states.moveChunk.apply(this, [
+            db,
+            this.getCurrentOrPreviousLatchCollName(collName),
+            connCache,
+        ]);
     };
 
     $config.states.init = function init(db, collName, connCache) {
@@ -105,7 +115,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.transitions = {
         init: {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
         moveChunk: {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
-        refineCollectionShardKey: {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
+        refineCollectionShardKey: {
+            moveChunk: 0.4,
+            refineCollectionShardKey: 0.4,
+            flushRouterConfig: 0.2,
+        },
         flushRouterConfig: {moveChunk: 0.5, refineCollectionShardKey: 0.5},
     };
 
@@ -117,7 +131,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         for (let i = this.latchCount; i >= 0; --i) {
             const latchCollName = collName + "_" + i;
             let coll = db.getCollection(latchCollName);
-            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}),
+            );
             assert.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }

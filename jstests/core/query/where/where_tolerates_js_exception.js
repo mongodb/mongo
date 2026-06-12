@@ -24,9 +24,18 @@ const res = collection.runCommand("find", {
 });
 
 assert.commandFailedWithCode(res, ErrorCodes.JSInterpreterFailure);
-assert(/ReferenceError/.test(res.errmsg), () => "$where didn't failed with a ReferenceError: " + tojson(res));
-assert(/myFunction@/.test(res.errmsg), () => "$where didn't return the JavaScript stacktrace: " + tojson(res));
-assert(!res.hasOwnProperty("stack"), () => "$where shouldn't return JavaScript stacktrace separately: " + tojson(res));
+assert(
+    /ReferenceError/.test(res.errmsg),
+    () => "$where didn't failed with a ReferenceError: " + tojson(res),
+);
+assert(
+    /myFunction@/.test(res.errmsg),
+    () => "$where didn't return the JavaScript stacktrace: " + tojson(res),
+);
+assert(
+    !res.hasOwnProperty("stack"),
+    () => "$where shouldn't return JavaScript stacktrace separately: " + tojson(res),
+);
 assert(
     !res.hasOwnProperty("originalError"),
     () => "$where shouldn't return wrapped version of the error: " + tojson(res),

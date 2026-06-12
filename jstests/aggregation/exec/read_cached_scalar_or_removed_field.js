@@ -10,7 +10,9 @@ coll.drop();
 assert.commandWorked(coll.insertMany([{_id: 1, "obj": {"obj": {}}}, {_id: 2}]));
 
 // Update a field to scalar
-let results = coll.aggregate([{$addFields: {"obj": null}}, {$sort: {"obj.obj": 1, _id: 1}}]).toArray();
+let results = coll
+    .aggregate([{$addFields: {"obj": null}}, {$sort: {"obj.obj": 1, _id: 1}}])
+    .toArray();
 assert.eq(
     results,
     [

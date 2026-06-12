@@ -177,7 +177,10 @@ filterDoc = {
                     $filter: {
                         input: "$a",
                         cond: {
-                            $or: [{$and: [{$gt: ["$$this", 1]}, {$lt: ["$$this", 3]}]}, {$eq: ["$$this", 5]}],
+                            $or: [
+                                {$and: [{$gt: ["$$this", 1]}, {$lt: ["$$this", 3]}]},
+                                {$eq: ["$$this", 5]},
+                            ],
                         },
                     },
                 },
@@ -332,7 +335,9 @@ runAndAssert(filterDoc, expectedResults);
 // Create filter with non-bool predicate.
 assert(coll.drop());
 const date = new Date();
-assert.commandWorked(coll.insert({_id: 0, a: [date, null, undefined, 0, false, NumberDecimal("1"), [], {c: 3}]}));
+assert.commandWorked(
+    coll.insert({_id: 0, a: [date, null, undefined, 0, false, NumberDecimal("1"), [], {c: 3}]}),
+);
 expectedResults = [{_id: 0, b: [date, NumberDecimal("1"), [], {c: 3}]}];
 filterDoc = {
     $filter: {input: "$a", as: "x", cond: "$$x"},
@@ -448,7 +453,16 @@ test(
         $filter: {
             input: [[-3, 1, 2], [2, 3], [1], [-12, -3]],
             as: "outer",
-            cond: {$ne: [0, {$size: {$filter: {input: "$$outer", as: "inner", cond: {$gte: ["$$inner", 0]}}}}]},
+            cond: {
+                $ne: [
+                    0,
+                    {
+                        $size: {
+                            $filter: {input: "$$outer", as: "inner", cond: {$gte: ["$$inner", 0]}},
+                        },
+                    },
+                ],
+            },
         },
     },
     [[-3, 1, 2], [2, 3], [1]],

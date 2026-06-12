@@ -73,8 +73,17 @@ function runBypassDocumentValidationTest(validator) {
     const outputColl = myDb[outputCollName];
     outputColl.drop();
     assert.commandWorked(myDb.createCollection(outputCollName, {validator: validator}));
-    const pipeline = [{$match: {_id: 1}}, {$project: {aggregation: {$add: [1]}}}, {$out: outputCollName}];
-    const cmd = {aggregate: collName, cursor: {}, pipeline: pipeline, bypassDocumentValidation: false};
+    const pipeline = [
+        {$match: {_id: 1}},
+        {$project: {aggregation: {$add: [1]}}},
+        {$out: outputCollName},
+    ];
+    const cmd = {
+        aggregate: collName,
+        cursor: {},
+        pipeline: pipeline,
+        bypassDocumentValidation: false,
+    };
     assertDocumentValidationFailure(myDb.runCommand(cmd), coll);
     assert.eq(0, outputColl.count({aggregation: 1}));
     coll.aggregate(pipeline, {bypassDocumentValidation: true});
@@ -142,9 +151,17 @@ function runBypassDocumentValidationTest(validator) {
     // Test the insert command. Includes a test for a document with no _id (SERVER-20859).
     res = myDb.runCommand({insert: collName, documents: [{}], bypassDocumentValidation: false});
     assertDocumentValidationFailure(BulkWriteResult(res), coll);
-    res = myDb.runCommand({insert: collName, documents: [{}, {_id: 6}], bypassDocumentValidation: false});
+    res = myDb.runCommand({
+        insert: collName,
+        documents: [{}, {_id: 6}],
+        bypassDocumentValidation: false,
+    });
     assertDocumentValidationFailure(BulkWriteResult(res), coll);
-    res = myDb.runCommand({insert: collName, documents: [{}, {_id: 6}], bypassDocumentValidation: true});
+    res = myDb.runCommand({
+        insert: collName,
+        documents: [{}, {_id: 6}],
+        bypassDocumentValidation: true,
+    });
     assert.commandWorked(res);
 
     // Test the update command.

@@ -119,7 +119,8 @@ let testCases = [
         },
     },
     {
-        logMessage: "Running explain for findAndModify remove with positional projection with sort.",
+        logMessage:
+            "Running explain for findAndModify remove with positional projection with sort.",
         opType: "DELETE",
         hasSort: true,
         isPositionalProjection: true,
@@ -134,7 +135,8 @@ let testCases = [
         },
     },
     {
-        logMessage: "Running explain for findAndModify remove with positional projection without sort.",
+        logMessage:
+            "Running explain for findAndModify remove with positional projection without sort.",
         opType: "DELETE",
         isPositionalProjection: true,
         cmdObj: {
@@ -147,7 +149,8 @@ let testCases = [
         },
     },
     {
-        logMessage: "Running explain for findAndModify update with positional projection with sort.",
+        logMessage:
+            "Running explain for findAndModify update with positional projection with sort.",
         opType: "UPDATE",
         hasSort: true,
         isPositionalProjection: true,
@@ -162,7 +165,8 @@ let testCases = [
         },
     },
     {
-        logMessage: "Running explain for findAndModify update with positional projection without sort.",
+        logMessage:
+            "Running explain for findAndModify update with positional projection without sort.",
         opType: "UPDATE",
         isPositionalProjection: true,
         cmdObj: {
@@ -298,18 +302,31 @@ function validateResponse(res, testCase, verbosity) {
     const clusteredIndexScanStages = getPlanStages(res, "CLUSTERED_IXSCAN");
 
     if (clusteredIndexScanStages.length != 0) {
-        assert.eq(true, usingClusteredIndex, "CLUSTERED_IXSCAN is expected only for queries using clustered index");
+        assert.eq(
+            true,
+            usingClusteredIndex,
+            "CLUSTERED_IXSCAN is expected only for queries using clustered index",
+        );
     }
 
     if (testCase.isPositionalProjection) {
         assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, "PROJECTION_DEFAULT");
-        assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage, testCase.opType);
+        assert.eq(
+            res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
+            testCase.opType,
+        );
     } else if (testCase.opType == "UPDATE") {
         // For 8.0 and beyond, EXPRESS will be used for update-by-id
-        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, ["EXPRESS_UPDATE", testCase.opType]);
+        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, [
+            "EXPRESS_UPDATE",
+            testCase.opType,
+        ]);
     } else if (testCase.opType == "DELETE") {
         // For 8.0 and beyond, EXPRESS will be used for delete-by-id
-        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, ["EXPRESS_DELETE", testCase.opType]);
+        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, [
+            "EXPRESS_DELETE",
+            testCase.opType,
+        ]);
     }
 
     assert.eq(res.queryPlanner.winningPlan.shards.length, 1); // Only 1 shard targeted by the write.
@@ -321,15 +338,28 @@ function validateResponse(res, testCase, verbosity) {
         assert.eq(res.executionStats.executionStages.stage, "SHARD_WRITE");
 
         const executionStages = getExecutionStages(res);
-        const containsClusteredIndexScanStages = constainsExecutionStage(executionStages, "CLUSTERED_IXSCAN");
+        const containsClusteredIndexScanStages = constainsExecutionStage(
+            executionStages,
+            "CLUSTERED_IXSCAN",
+        );
 
         if (containsClusteredIndexScanStages) {
-            assert.eq(true, usingClusteredIndex, "CLUSTERED_IXSCAN is expected only for queries using clustered index");
+            assert.eq(
+                true,
+                usingClusteredIndex,
+                "CLUSTERED_IXSCAN is expected only for queries using clustered index",
+            );
         }
 
         if (testCase.isPositionalProjection) {
-            assert.eq(res.executionStats.executionStages.shards[0].executionStages.stage, "PROJECTION_DEFAULT");
-            assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.stage, testCase.opType);
+            assert.eq(
+                res.executionStats.executionStages.shards[0].executionStages.stage,
+                "PROJECTION_DEFAULT",
+            );
+            assert.eq(
+                res.executionStats.executionStages.shards[0].executionStages.inputStage.stage,
+                testCase.opType,
+            );
         } else if (testCase.opType == "UPDATE") {
             // For 8.0 and beyond, EXPRESS will be used for update-by-id
             assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage, [
@@ -363,20 +393,41 @@ function validateResponse(res, testCase, verbosity) {
                 // existing documents in the collection. This will at least preserve the query plan,
                 // but may lead to incorrect executionStats.
                 if (testCase.isPositionalProjection) {
-                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.nWouldDelete, 0);
+                    assert.eq(
+                        res.executionStats.executionStages.shards[0].executionStages.inputStage
+                            .nWouldDelete,
+                        0,
+                    );
                 } else {
-                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldDelete, 0);
+                    assert.eq(
+                        res.executionStats.executionStages.shards[0].executionStages.nWouldDelete,
+                        0,
+                    );
                 }
             } else {
                 // We use a dummy _id target document for the Write Phase which should not match any
                 // existing documents in the collection. This will at least preserve the query plan,
                 // but may lead to incorrect executionStats.
                 if (testCase.isPositionalProjection) {
-                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.nWouldModify, 0);
-                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.nWouldUpsert, 0);
+                    assert.eq(
+                        res.executionStats.executionStages.shards[0].executionStages.inputStage
+                            .nWouldModify,
+                        0,
+                    );
+                    assert.eq(
+                        res.executionStats.executionStages.shards[0].executionStages.inputStage
+                            .nWouldUpsert,
+                        0,
+                    );
                 } else {
-                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldModify, 0);
-                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldUpsert, 0);
+                    assert.eq(
+                        res.executionStats.executionStages.shards[0].executionStages.nWouldModify,
+                        0,
+                    );
+                    assert.eq(
+                        res.executionStats.executionStages.shards[0].executionStages.nWouldUpsert,
+                        0,
+                    );
                 }
             }
             assert.eq(res.executionStats.inputStage.nReturned, 2);

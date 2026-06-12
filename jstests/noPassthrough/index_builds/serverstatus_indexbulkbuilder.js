@@ -10,7 +10,10 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {
+    IndexBuildTest,
+    ResumableIndexBuildTest,
+} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const maxMemUsageMegabytes = 50;
 // 10% (maxIteratorsMemoryUsagePercentage) and up to 1MB of maxMemUsageMegabytes is used to store
@@ -27,7 +30,9 @@ const spillOverhead = numDocs * 16;
 
 // Number of memory allocations that will cause a spill. Due to fragmentation in the memory pool one
 // allocation corresponds to one document.
-let memAllocNum = Math.trunc((maxDataMemUsageMegabytes * 1024 * 1024 + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
+let memAllocNum = Math.trunc(
+    (maxDataMemUsageMegabytes * 1024 * 1024 + memPoolMemoryUsage - 1) / memPoolMemoryUsage,
+);
 let expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
 
 const replSet = new ReplSetTest({
@@ -54,7 +59,10 @@ jsTestLog("Creating index 'a'");
 assert.commandWorked(coll.createIndex({a: 1}));
 
 let serverStatus = testDB.serverStatus();
-assert(serverStatus.hasOwnProperty("indexBulkBuilder"), "indexBuildBuilder section missing: " + tojson(serverStatus));
+assert(
+    serverStatus.hasOwnProperty("indexBulkBuilder"),
+    "indexBuildBuilder section missing: " + tojson(serverStatus),
+);
 
 let indexBulkBuilderSection = serverStatus.indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
@@ -116,14 +124,22 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds")) {
 }
 
 (function resumeIndexBuild() {
-    jsTestLog("Shutting down server during index build for 'b' to verify 'resumable' value on restart.");
+    jsTestLog(
+        "Shutting down server during index build for 'b' to verify 'resumable' value on restart.",
+    );
     IndexBuildTest.pauseIndexBuilds(primary);
-    const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {b: 1}, /*options=*/ {}, [
-        ErrorCodes.InterruptedDueToReplStateChange,
-    ]);
+    const createIdx = IndexBuildTest.startIndexBuild(
+        primary,
+        coll.getFullName(),
+        {b: 1},
+        /*options=*/ {},
+        [ErrorCodes.InterruptedDueToReplStateChange],
+    );
     IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "b_1");
     const buildUUID = extractUUIDFromObject(
-        IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: true})["b_1"].buildUUID,
+        IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: true})[
+            "b_1"
+        ].buildUUID,
     );
     replSet.restart(/*nodeId=*/ 0);
     createIdx();
@@ -193,7 +209,9 @@ let maxMemUsagePerIndexBytes = (maxMemUsageMegabytes * 1024 * 1024) / 3;
 // There is enough memory to reserve 1MB for the file iterators needed for each index.
 // See fileIteratorsMaxBytesSize in db/sorter/sorter.h
 let maxDataMemUsagePerIndexBytes = maxMemUsagePerIndexBytes - 1024 * 1024;
-memAllocNum = Math.trunc((maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
+memAllocNum = Math.trunc(
+    (maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage,
+);
 expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
 
 // Due to fragmentation in the allocator, which is counted towards mem usage, we can spill

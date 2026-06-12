@@ -49,7 +49,13 @@ describe("$merge on _id should only work when _id is guaranteed to be unique acr
         const destinationColl = this.db.destination_sharded_id;
         destinationColl.drop();
 
-        this.st.shardColl(destinationColl.getName(), {_id: 1}, {_id: 0}, {_id: 0}, this.db.getName());
+        this.st.shardColl(
+            destinationColl.getName(),
+            {_id: 1},
+            {_id: 0},
+            {_id: 0},
+            this.db.getName(),
+        );
 
         for (let i = 0; i < 10; i++) {
             assert.commandWorked(destinationColl.insert({_id: i, a: i + 1, b: i + 2}));
@@ -62,7 +68,13 @@ describe("$merge on _id should only work when _id is guaranteed to be unique acr
         const destinationColl = this.db.destination_sharded_id_prefix;
         destinationColl.drop();
 
-        this.st.shardColl(destinationColl.getName(), {_id: 1, a: 1}, {_id: 0, a: 0}, {_id: 0, a: 0}, this.db.getName());
+        this.st.shardColl(
+            destinationColl.getName(),
+            {_id: 1, a: 1},
+            {_id: 0, a: 0},
+            {_id: 0, a: 0},
+            this.db.getName(),
+        );
 
         assert.commandWorked(destinationColl.insertOne({_id: 0, a: 1}));
         assert.commandWorked(destinationColl.insertOne({_id: 0, a: -1}));
@@ -90,7 +102,13 @@ describe("$merge on _id should only work when _id is guaranteed to be unique acr
         const destinationColl = this.db.destination_sharded_id_not_prefix;
         destinationColl.drop();
 
-        this.st.shardColl(destinationColl.getName(), {a: 1, _id: 1}, {a: 0, _id: 0}, {a: 0, _id: 0}, this.db.getName());
+        this.st.shardColl(
+            destinationColl.getName(),
+            {a: 1, _id: 1},
+            {a: 0, _id: 0},
+            {a: 0, _id: 0},
+            this.db.getName(),
+        );
 
         assert.commandWorked(destinationColl.insertOne({_id: 0, a: 1}));
         assert.commandWorked(destinationColl.insertOne({_id: 0, a: -1}));

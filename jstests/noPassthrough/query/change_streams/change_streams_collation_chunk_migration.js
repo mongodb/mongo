@@ -20,7 +20,9 @@ const st = new ShardingTest({
 const testDB = st.s.getDB(jsTestName());
 
 // Enable sharding on the test database and ensure that the primary is shard0.
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+);
 
 const caseInsensitiveCollectionName = "change_stream_case_insensitive";
 const caseInsensitive = {
@@ -29,10 +31,16 @@ const caseInsensitive = {
 };
 
 // Create the collection with a case-insensitive collation, then shard it on {shardKey: 1}.
-const caseInsensitiveCollection = assertDropAndRecreateCollection(testDB, caseInsensitiveCollectionName, {
-    collation: caseInsensitive,
-});
-assert.commandWorked(caseInsensitiveCollection.createIndex({shardKey: 1}, {collation: {locale: "simple"}}));
+const caseInsensitiveCollection = assertDropAndRecreateCollection(
+    testDB,
+    caseInsensitiveCollectionName,
+    {
+        collation: caseInsensitive,
+    },
+);
+assert.commandWorked(
+    caseInsensitiveCollection.createIndex({shardKey: 1}, {collation: {locale: "simple"}}),
+);
 assert.commandWorked(
     testDB.adminCommand({
         shardCollection: caseInsensitiveCollection.getFullName(),

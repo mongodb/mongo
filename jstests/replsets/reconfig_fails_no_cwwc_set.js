@@ -20,7 +20,8 @@ const arbiter = rst.add();
 const config = rst.getReplSetConfigFromNode();
 config.members.push({_id: 2, host: arbiter.host, arbiterOnly: true});
 config.version++;
-const reconfigErrorMsg = "Reconfig attempted to install a config that would change the implicit default write concern";
+const reconfigErrorMsg =
+    "Reconfig attempted to install a config that would change the implicit default write concern";
 
 // Adding the arbiter would change the implicit default write concern from {w: majority} to
 // {w:1}, so we fail the reconfig.
@@ -34,7 +35,11 @@ assert.eq(res.code, ErrorCodes.NewReplicaSetConfigurationIncompatible);
 assert.includes(res.errmsg, reconfigErrorMsg);
 
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 
 // After setting the cluster-wide write concern, the same reconfig command should succeed.

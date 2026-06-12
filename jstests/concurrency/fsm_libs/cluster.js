@@ -95,14 +95,20 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         assert.eq("boolean", typeof options.sharded.enableBalancer);
 
         if (typeof options.sharded.numMongos !== "undefined") {
-            assert(options.sharded.enabled, "Must have sharded.enabled be true if 'sharded.numMongos' is specified");
+            assert(
+                options.sharded.enabled,
+                "Must have sharded.enabled be true if 'sharded.numMongos' is specified",
+            );
         }
 
         options.sharded.numMongos = options.sharded.numMongos || 2;
         assert.eq("number", typeof options.sharded.numMongos);
 
         if (typeof options.sharded.numShards !== "undefined") {
-            assert(options.sharded.enabled, "Must have sharded.enabled be true if 'sharded.numShards' is specified");
+            assert(
+                options.sharded.enabled,
+                "Must have sharded.enabled be true if 'sharded.numShards' is specified",
+            );
         }
 
         options.sharded.numShards = options.sharded.numShards || 2;
@@ -112,7 +118,10 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         assert.eq("object", typeof options.setupFunctions);
 
         options.setupFunctions.mongod = options.setupFunctions.mongod || [];
-        assert(Array.isArray(options.setupFunctions.mongod), "Expected setupFunctions.mongod to be an array");
+        assert(
+            Array.isArray(options.setupFunctions.mongod),
+            "Expected setupFunctions.mongod to be an array",
+        );
         assert(
             options.setupFunctions.mongod.every((f) => typeof f === "function"),
             "Expected setupFunctions.mongod to be an array of functions",
@@ -126,14 +135,20 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         }
 
         options.setupFunctions.mongos = options.setupFunctions.mongos || [];
-        assert(Array.isArray(options.setupFunctions.mongos), "Expected setupFunctions.mongos to be an array");
+        assert(
+            Array.isArray(options.setupFunctions.mongos),
+            "Expected setupFunctions.mongos to be an array",
+        );
         assert(
             options.setupFunctions.mongos.every((f) => typeof f === "function"),
             "Expected setupFunctions.mongos to be an array of functions",
         );
 
         options.setupFunctions.config = options.setupFunctions.config || [];
-        assert(Array.isArray(options.setupFunctions.config), "Expected setupFunctions.config to be an array");
+        assert(
+            Array.isArray(options.setupFunctions.config),
+            "Expected setupFunctions.config to be an array",
+        );
         assert(
             options.setupFunctions.config.every((f) => typeof f === "function"),
             "Expected setupFunctions.config to be an array of functions",
@@ -143,7 +158,10 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         assert.eq("object", typeof options.teardownFunctions);
 
         options.teardownFunctions.mongod = options.teardownFunctions.mongod || [];
-        assert(Array.isArray(options.teardownFunctions.mongod), "Expected teardownFunctions.mongod to be an array");
+        assert(
+            Array.isArray(options.teardownFunctions.mongod),
+            "Expected teardownFunctions.mongod to be an array",
+        );
         assert(
             options.teardownFunctions.mongod.every((f) => typeof f === "function"),
             "Expected teardownFunctions.mongod to be an array of functions",
@@ -157,14 +175,20 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         }
 
         options.teardownFunctions.mongos = options.teardownFunctions.mongos || [];
-        assert(Array.isArray(options.teardownFunctions.mongos), "Expected teardownFunctions.mongos to be an array");
+        assert(
+            Array.isArray(options.teardownFunctions.mongos),
+            "Expected teardownFunctions.mongos to be an array",
+        );
         assert(
             options.teardownFunctions.mongos.every((f) => typeof f === "function"),
             "Expected teardownFunctions.mongos to be an array of functions",
         );
 
         options.teardownFunctions.config = options.teardownFunctions.config || [];
-        assert(Array.isArray(options.teardownFunctions.config), "Expected teardownFunctions.config to be an array");
+        assert(
+            Array.isArray(options.teardownFunctions.config),
+            "Expected teardownFunctions.config to be an array",
+        );
         assert(
             options.teardownFunctions.config.every((f) => typeof f === "function"),
             "Expected teardownFunctions.config to be an array of functions",
@@ -512,7 +536,8 @@ export const Cluster = function (clusterOptions, sessionOptions) {
                 const validateOptions = {
                     full: true,
                     enforceFastCount: true,
-                    enforceFastSize: !TestData.allowUncleanShutdowns && TestData.enforceFastSizeOnValidate,
+                    enforceFastSize:
+                        !TestData.allowUncleanShutdowns && TestData.enforceFastSizeOnValidate,
                 };
                 // TODO (SERVER-24266): Once fast counts are tolerant to unclean shutdowns, remove
                 // the check for TestData.allowUncleanShutdowns.
@@ -634,11 +659,17 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     };
 
     this.isSteppingDownConfigServers = function isSteppingDownConfigServers() {
-        return this.shouldPerformContinuousStepdowns() && clusterOptions.sharded.stepdownOptions.configStepdown;
+        return (
+            this.shouldPerformContinuousStepdowns() &&
+            clusterOptions.sharded.stepdownOptions.configStepdown
+        );
     };
 
     this.isSteppingDownShards = function isSteppingDownShards() {
-        return this.shouldPerformContinuousStepdowns() && clusterOptions.sharded.stepdownOptions.shardStepdown;
+        return (
+            this.shouldPerformContinuousStepdowns() &&
+            clusterOptions.sharded.stepdownOptions.shardStepdown
+        );
     };
 
     this.awaitReplication = () => {

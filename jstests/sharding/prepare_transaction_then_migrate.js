@@ -33,7 +33,9 @@ const TestMode = {
 let runTest = function (testMode) {
     jsTest.log(`Running test in mode ${testMode}`);
 
-    const st = new ShardingTest({shards: {rs0: {nodes: testMode == TestMode.kWithStepUp ? 2 : 1}, rs1: {nodes: 1}}});
+    const st = new ShardingTest({
+        shards: {rs0: {nodes: testMode == TestMode.kWithStepUp ? 2 : 1}, rs1: {nodes: 1}},
+    });
     const collection = st.s.getDB(dbName).getCollection(collName);
 
     CreateShardedCollectionUtil.shardCollectionWithChunks(collection, {x: 1}, [
@@ -111,11 +113,15 @@ let runTest = function (testMode) {
         // TODO(SERVER-113373): We can't use the new failpoint in multiversion
         // tests until 9.0 becomes last-lts.
         const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+            Boolean(TestData.multiversionBinVersion);
         const rsOpts = isMultiversion
             ? null
             : {
-                  setParameter: {["failpoint." + hangBeforeFinishingInitAndListenFpName]: "{'mode':'alwaysOn'}"},
+                  setParameter: {
+                      ["failpoint." + hangBeforeFinishingInitAndListenFpName]:
+                          "{'mode':'alwaysOn'}",
+                  },
               };
         st.rs0.restart(st.rs0.getPrimary(), rsOpts);
         st.rs0.waitForPrimary();
@@ -132,7 +138,14 @@ let runTest = function (testMode) {
         });
     }
 
-    const joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 1}, null, "test.user", st.shard1.shardName);
+    const joinMoveChunk = moveChunkParallel(
+        staticMongod,
+        st.s.host,
+        {x: 1},
+        null,
+        "test.user",
+        st.shard1.shardName,
+    );
 
     pauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
 

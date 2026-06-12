@@ -20,7 +20,12 @@ export function extractReplicaSetNameAndHosts(primary, rsURL) {
     return {rsURL, rsName, rsHosts, primaryHost, host};
 }
 
-export function makeReplicaSetConnectionString(rsName, rsHosts, defaultDbName, {authDbName, user} = {}) {
+export function makeReplicaSetConnectionString(
+    rsName,
+    rsHosts,
+    defaultDbName,
+    {authDbName, user} = {},
+) {
     if (authDbName && !user.securityToken) {
         // For tenant users, auth is performed through attaching the security token to each
         // command.
@@ -53,14 +58,18 @@ export function waitForAutoBootstrap(node, keyFile) {
         return node.getDB("config").shards.findOne({_id: "config"});
     };
     assert.soonNoExcept(() => {
-        const configShardDoc = keyFile ? authutil.asCluster(node, keyFile, getConfigShardDoc) : getConfigShardDoc();
+        const configShardDoc = keyFile
+            ? authutil.asCluster(node, keyFile, getConfigShardDoc)
+            : getConfigShardDoc();
         return configShardDoc != null;
     });
 
     const getShardIdentityDoc = function () {
         return node.getDB("admin").system.version.findOne({_id: "shardIdentity"});
     };
-    const shardIdentityDoc = keyFile ? authutil.asCluster(node, keyFile, getShardIdentityDoc) : getShardIdentityDoc();
+    const shardIdentityDoc = keyFile
+        ? authutil.asCluster(node, keyFile, getShardIdentityDoc)
+        : getShardIdentityDoc();
     assert.eq(shardIdentityDoc.shardName, "config", shardIdentityDoc);
 }
 
@@ -158,7 +167,9 @@ export function makeCreateRoleCmdObj(role) {
  * after moving the data to 'otherShardName'.
  */
 export function transitionToDedicatedConfigServer(router, configRSPrimary, otherShardName) {
-    const transitionRes0 = assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
+    const transitionRes0 = assert.commandWorked(
+        router.adminCommand({transitionToDedicatedConfigServer: 1}),
+    );
 
     // Move data out of the config shard.
     const setParameterRes = assert.commandWorked(
@@ -176,7 +187,8 @@ export function transitionToDedicatedConfigServer(router, configRSPrimary, other
         configRSPrimary.adminCommand({
             setParameter: 1,
             // Restore the original value.
-            reshardingMinimumOperationDurationMillis: originalReshardingMinimumOperationDurationMillis,
+            reshardingMinimumOperationDurationMillis:
+                originalReshardingMinimumOperationDurationMillis,
         }),
     );
     // Rely on the balancer to move chunks for config.system.sessions.

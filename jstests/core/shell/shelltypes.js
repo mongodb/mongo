@@ -75,11 +75,23 @@ it("ObjectId.fromDate", () => {
     let dateA = new Date(timestampA.getTime());
 
     // ObjectId.fromDate - invalid input types
-    assert.throws(() => ObjectId.fromDate(undefined), [], "ObjectId.fromDate should error on undefined date");
+    assert.throws(
+        () => ObjectId.fromDate(undefined),
+        [],
+        "ObjectId.fromDate should error on undefined date",
+    );
 
-    assert.throws(() => ObjectId.fromDate(12345), [], "ObjectId.fromDate should error on numerical value");
+    assert.throws(
+        () => ObjectId.fromDate(12345),
+        [],
+        "ObjectId.fromDate should error on numerical value",
+    );
 
-    assert.throws(() => ObjectId.fromDate(dateA.toISOString()), [], "ObjectId.fromDate should error on string value");
+    assert.throws(
+        () => ObjectId.fromDate(dateA.toISOString()),
+        [],
+        "ObjectId.fromDate should error on string value",
+    );
 
     // SERVER-14623 dates less than or equal to 1978-07-04T21:24:15Z fail
     let checkFromDate = function (millis, expected, comment) {

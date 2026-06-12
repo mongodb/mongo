@@ -35,9 +35,10 @@ for (let i = 0; i < numDocuments; i++) {
 
 const runRollbackTo = function (rollbackEndFailPoint) {
     assert.commandWorked(
-        rollbackTest
-            .getPrimary()
-            .adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}),
+        rollbackTest.getPrimary().adminCommand({
+            setParameter: 1,
+            maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB,
+        }),
     );
 
     RollbackResumableIndexBuildTest.run(
@@ -63,7 +64,10 @@ const runRollbackTo = function (rollbackEndFailPoint) {
 runRollbackTo({name: "hangAfterSettingUpIndexBuild", logIdWithBuildUUID: 20387});
 
 // Rollback to earlier in the collection scan phase.
-runRollbackTo({name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386});
+runRollbackTo({
+    name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+    logIdWithBuildUUID: 20386,
+});
 
 // Rollback to the bulk load phase.
 runRollbackTo({name: "hangIndexBuildDuringBulkLoadPhaseSecond", logIdWithIndexName: 4924400});

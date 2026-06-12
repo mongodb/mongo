@@ -71,7 +71,10 @@ runDbCheck(replSet, primaryDb, collName, {
 });
 
 assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeSplittingControlFlow", mode: "off"}),
+    initialSyncNode.adminCommand({
+        configureFailPoint: "initialSyncHangBeforeSplittingControlFlow",
+        mode: "off",
+    }),
 );
 
 replSet.awaitSecondaryNodes(null, [initialSyncNode]);

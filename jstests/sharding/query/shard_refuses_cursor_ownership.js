@@ -53,11 +53,16 @@ let awaitAggregationShell = startParallelShell(
 shardedAggregateHangBeforeDispatchMergingPipelineFP.wait();
 
 // Start a chunk migration, let it run until it enters the critical section.
-let hangBeforePostMigrationCommitRefresh = configureFailPoint(primary, "hangBeforePostMigrationCommitRefresh");
+let hangBeforePostMigrationCommitRefresh = configureFailPoint(
+    primary,
+    "hangBeforePostMigrationCommitRefresh",
+);
 let awaitMoveChunkShell = startParallelShell(
     funWithArgs(
         (recipientShard, ns) => {
-            assert.commandWorked(db.adminCommand({moveChunk: ns, find: {x: -1}, to: recipientShard}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: -1}, to: recipientShard}),
+            );
         },
         other.shardName,
         ns,
@@ -81,7 +86,10 @@ awaitMoveChunkShell();
 // Did any cursor leak?
 const idleCursors = primary
     .getDB("admin")
-    .aggregate([{$currentOp: {idleCursors: true, allUsers: true}}, {$match: {type: "idleCursor", ns: ns}}])
+    .aggregate([
+        {$currentOp: {idleCursors: true, allUsers: true}},
+        {$match: {type: "idleCursor", ns: ns}},
+    ])
     .toArray();
 assert.eq(0, idleCursors.length, "Found idle cursors: " + tojson(idleCursors));
 
@@ -91,7 +99,8 @@ assert.soon(
     () => {
         return primary.getDB("config")["rangeDeletions"].find().itcount() === 0;
     },
-    "Range deletion tasks did not finish: + " + tojson(primary.getDB("config")["rangeDeletions"].find().toArray()),
+    "Range deletion tasks did not finish: + " +
+        tojson(primary.getDB("config")["rangeDeletions"].find().toArray()),
 );
 
 st.stop();

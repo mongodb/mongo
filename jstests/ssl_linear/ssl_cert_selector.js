@@ -17,7 +17,8 @@ const serverThumbprint = cat(getX509Path("trusted-server.pem.digest.sha1"));
 const clusterServerThumbprint = cat(getX509Path("trusted-cluster-server.pem.digest.sha1"));
 const CLIENT = "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const SERVER = "CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
-const CLUSTER_SERVER = "CN=Trusted Kernel Test Cluster Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+const CLUSTER_SERVER =
+    "CN=Trusted Kernel Test Cluster Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 
 const testCases = [
     // Configure server with only a certificateSelector - we expect this to be used instead of
@@ -128,7 +129,9 @@ function testServerSelectorKeyUsage(testCase) {
     jsTestLog("Forcing egress connection with replSetTestEgress...");
     assert.commandWorked(conn.adminCommand({replSetTestEgress: 1}));
 
-    checkLog.containsRelaxedJson(otherNode, 6723802, {peerSubjectName: testCase.expectEgressKeyUsed});
+    checkLog.containsRelaxedJson(otherNode, 6723802, {
+        peerSubjectName: testCase.expectEgressKeyUsed,
+    });
 
     jsTestLog("Stopping the replica set...");
     rst.stopSet();
@@ -136,7 +139,10 @@ function testServerSelectorKeyUsage(testCase) {
 
 requireSSLProvider("windows", function () {
     if (_isWindows()) {
-        assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
+        assert.eq(
+            0,
+            runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"),
+        );
 
         // SChannel backed follows Windows rules and only trusts Root in LocalMachine
         runProgram("certutil.exe", "-addstore", "-f", "Root", TRUSTED_CA_CERT);

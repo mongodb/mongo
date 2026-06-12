@@ -73,7 +73,8 @@ function testTxnFailsWithCode({
     );
 
     // Start transaction.
-    TestData.cmd = preOp + `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToReplStateChange);`;
+    TestData.cmd =
+        preOp + `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToReplStateChange);`;
     const waitForTxnShell = startParallelShell(txnFunc, primary.port);
 
     jsTestLog("Waiting for primary to reach failPoint '" + failPoint + "'.");
@@ -103,11 +104,17 @@ testTxnFailsWithCode({op: "sessionColl.insert({_id: 'writeOp'})"});
 
 jsTestLog("Testing stepdown during read-write transaction.");
 testTxnFailsWithCode({
-    op: "sessionDb.runCommand({findAndModify: '" + collName + "', query: {_id: 'readOp'}, remove: true})",
+    op:
+        "sessionDb.runCommand({findAndModify: '" +
+        collName +
+        "', query: {_id: 'readOp'}, remove: true})",
 });
 
 jsTestLog("Testing stepdown during commit transaction.");
-testAbortOrCommitTxnFailsWithCode({failPoint: "hangBeforeCommitingTxn", op: "session.commitTransaction_forTesting()"});
+testAbortOrCommitTxnFailsWithCode({
+    failPoint: "hangBeforeCommitingTxn",
+    op: "session.commitTransaction_forTesting()",
+});
 
 jsTestLog("Testing stepdown during running transaction in inactive state.");
 // Do not start the transaction in parallel shell because when the parallel

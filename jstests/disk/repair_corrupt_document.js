@@ -48,7 +48,9 @@ let corruptDocumentOnInsert = function (db, coll) {
         }),
     );
     assert.commandWorked(coll.insert(doc2));
-    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}),
+    );
 };
 
 /**

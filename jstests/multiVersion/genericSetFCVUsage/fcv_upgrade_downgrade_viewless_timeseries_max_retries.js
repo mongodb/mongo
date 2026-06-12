@@ -25,7 +25,9 @@ const dbName = jsTestName();
 const db = st.s.getDB(dbName);
 
 assert(FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections"));
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 jsTest.log.info("Creating a timeseries collection in viewless format");
 const testColl = db["testTs"];
@@ -37,16 +39,24 @@ assert.commandWorked(
 assert.commandWorked(testColl.insertOne({t: ISODate(), m: 1, value: "test"}));
 
 jsTest.log.info("Enabling failpoint to make timeseries conversion always find collections");
-const failpoint = configureFailPoint(st.configRS.getPrimary(), "alwaysReportTimeseriesCollectionsNeedConversion");
+const failpoint = configureFailPoint(
+    st.configRS.getPrimary(),
+    "alwaysReportTimeseriesCollectionsNeedConversion",
+);
 
 jsTest.log.info("Attempting FCV downgrade, should fail after exhausting retries");
-assert.commandFailedWithCode(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}), 11481600);
+assert.commandFailedWithCode(
+    st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    11481600,
+);
 
 jsTest.log.info("Disabling failpoint");
 failpoint.off();
 
 jsTest.log.info("Verifying setFCV now succeeds without the failpoint");
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 // Upgrade back to verify everything is working
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));

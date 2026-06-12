@@ -17,7 +17,9 @@ let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
 
 // Create a sharded collection with one chunk on shard0.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 // Enable failpoint which will cause moveChunk to hang indefinitely.
@@ -48,8 +50,12 @@ jsTestLog("Waiting for moveChunk to succeed in the background");
 // The moveChunk should eventually succeed in the background even though the client thread was
 // interrupted.
 assert.soon(() => {
-    let numChunksOnShard0 = findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard0.shardName}).itcount();
-    let numChunksOnShard1 = findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard1.shardName}).itcount();
+    let numChunksOnShard0 = findChunksUtil
+        .findChunksByNs(st.config, ns, {shard: st.shard0.shardName})
+        .itcount();
+    let numChunksOnShard1 = findChunksUtil
+        .findChunksByNs(st.config, ns, {shard: st.shard1.shardName})
+        .itcount();
     return numChunksOnShard0 == 0 && numChunksOnShard1 == 1;
 });
 

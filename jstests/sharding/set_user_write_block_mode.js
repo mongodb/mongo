@@ -27,7 +27,8 @@ describe("setUserWriteBlockMode on replicaset", function () {
         this.is_83 = () => {
             const admin = this.rs.getPrimary().getDB("admin");
             const res = admin.system.version.find({_id: "featureCompatibilityVersion"}).toArray();
-            const is_83 = res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.3") >= 0;
+            const is_83 =
+                res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.3") >= 0;
             return is_83;
         };
 
@@ -36,7 +37,9 @@ describe("setUserWriteBlockMode on replicaset", function () {
 
             const newShardDB = "newShardDB";
             const newShardColl = "newShardColl";
-            assert.commandWorked(this.rs.getPrimary().getDB(newShardDB).getCollection(newShardColl).insert({x: 1}));
+            assert.commandWorked(
+                this.rs.getPrimary().getDB(newShardDB).getCollection(newShardColl).insert({x: 1}),
+            );
 
             assert.commandWorked(admin.runCommand({setUserWriteBlockMode: 1, global: true}));
 
@@ -47,7 +50,9 @@ describe("setUserWriteBlockMode on replicaset", function () {
 
             assert.commandWorked(admin.runCommand({setUserWriteBlockMode: 1, global: false}));
 
-            assert.commandWorked(this.rs.getPrimary().getDB(newShardDB).getCollection(newShardColl).insert({x: 2}));
+            assert.commandWorked(
+                this.rs.getPrimary().getDB(newShardDB).getCollection(newShardColl).insert({x: 2}),
+            );
         };
     });
 
@@ -119,10 +124,14 @@ describe("setUserWriteBlockMode during addShard and removeShard", function () {
 
         const newShardDB = "newShardDB";
         const newShardColl = "newShardColl";
-        assert.commandWorked(newShard.getPrimary().getDB(newShardDB).getCollection(newShardColl).insert({x: 1}));
+        assert.commandWorked(
+            newShard.getPrimary().getDB(newShardDB).getCollection(newShardColl).insert({x: 1}),
+        );
 
         assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
-        assert.commandWorked(this.cluster.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({addShard: newShard.getURL(), name: newShardName}),
+        );
 
         assert.commandFailedWithCode(
             this.cluster.s.getDB(newShardDB).getCollection(newShardColl).insert({x: 2}),
@@ -146,7 +155,10 @@ describe("setUserWriteBlockMode on cluster", function () {
         this.ns = this.dbName + "." + this.collName;
 
         assert.commandWorked(
-            this.cluster.s.adminCommand({enableSharding: this.dbName, primaryShard: this.cluster.shard0.shardName}),
+            this.cluster.s.adminCommand({
+                enableSharding: this.dbName,
+                primaryShard: this.cluster.shard0.shardName,
+            }),
         );
 
         this.db = this.cluster.s.getDB(this.dbName);
@@ -178,23 +190,33 @@ describe("setUserWriteBlockMode on cluster", function () {
         newShard.initiate();
 
         assert.commandFailedWithCode(
-            this.cluster.s.adminCommand({addShard: newShard.getURL(), name: newShardName, maxTimeMS: 1000}),
+            this.cluster.s.adminCommand({
+                addShard: newShard.getURL(),
+                name: newShardName,
+                maxTimeMS: 1000,
+            }),
             ErrorCodes.MaxTimeMSExpired,
         );
 
         hangInShardsvrSetUserWriteBlockModeFailPoint.off();
         awaitShell();
 
-        assert.commandWorked(this.cluster.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({addShard: newShard.getURL(), name: newShardName}),
+        );
         removeShard(this.cluster, newShardName);
 
-        assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}),
+        );
 
         newShard.stopSet();
     });
 
     it("chunk migrations work even if user writes are blocked", () => {
-        assert.commandWorked(this.cluster.s.adminCommand({shardCollection: this.ns, key: {_id: 1}}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({shardCollection: this.ns, key: {_id: 1}}),
+        );
         // Insert a document to the chunk that will be migrated to ensure that the recipient will at
         // least insert one document as part of the migration.
         this.coll.insert({_id: 1});
@@ -209,18 +231,32 @@ describe("setUserWriteBlockMode on cluster", function () {
         // Move one chunk to shard1.
         assert.commandWorked(this.cluster.s.adminCommand({split: this.ns, middle: {_id: 0}}));
         assert.commandWorked(
-            this.cluster.s.adminCommand({moveChunk: this.ns, find: {_id: 0}, to: this.cluster.shard1.shardName}),
+            this.cluster.s.adminCommand({
+                moveChunk: this.ns,
+                find: {_id: 0},
+                to: this.cluster.shard1.shardName,
+            }),
         );
 
         assert.eq(1, this.coll.find({_id: 1}).itcount());
-        assert.eq(1, this.cluster.shard1.getDB(this.dbName)[this.collName].find({_id: 1}).itcount());
+        assert.eq(
+            1,
+            this.cluster.shard1.getDB(this.dbName)[this.collName].find({_id: 1}).itcount(),
+        );
 
         // Check that the index has been created on recipient.
-        ShardedIndexUtil.assertIndexExistsOnShard(this.cluster.shard1, this.dbName, this.collName, indexKey);
+        ShardedIndexUtil.assertIndexExistsOnShard(
+            this.cluster.shard1,
+            this.dbName,
+            this.collName,
+            indexKey,
+        );
 
         // Check that orphans are deleted from the donor.
         assert.soon(() => {
-            return this.cluster.shard0.getDB(this.dbName)[this.collName].find({_id: 1}).itcount() === 0;
+            return (
+                this.cluster.shard0.getDB(this.dbName)[this.collName].find({_id: 1}).itcount() === 0
+            );
         });
 
         // Create an extra index on shard1. This index is not present in the shard0, thus shard1 will
@@ -228,18 +264,32 @@ describe("setUserWriteBlockMode on cluster", function () {
         {
             // Leave shard1 without any chunk.
             assert.commandWorked(
-                this.cluster.s.adminCommand({moveChunk: this.ns, find: {_id: 0}, to: this.cluster.shard0.shardName}),
+                this.cluster.s.adminCommand({
+                    moveChunk: this.ns,
+                    find: {_id: 0},
+                    to: this.cluster.shard0.shardName,
+                }),
             );
 
             // Create an extra index on shard1.
-            assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+            assert.commandWorked(
+                this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}),
+            );
             const extraIndexKey = {y: 1};
-            assert.commandWorked(this.cluster.shard1.getDB(this.dbName)[this.collName].createIndex(extraIndexKey));
-            assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+            assert.commandWorked(
+                this.cluster.shard1.getDB(this.dbName)[this.collName].createIndex(extraIndexKey),
+            );
+            assert.commandWorked(
+                this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: true}),
+            );
 
             // Move a chunk to shard1.
             assert.commandWorked(
-                this.cluster.s.adminCommand({moveChunk: this.ns, find: {_id: 0}, to: this.cluster.shard1.shardName}),
+                this.cluster.s.adminCommand({
+                    moveChunk: this.ns,
+                    find: {_id: 0},
+                    to: this.cluster.shard1.shardName,
+                }),
             );
 
             // Check the mismatched index was dropped.
@@ -251,7 +301,9 @@ describe("setUserWriteBlockMode on cluster", function () {
             );
         }
 
-        assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}),
+        );
     });
 
     it("movePrimary works while user writes are blocked", () => {
@@ -266,7 +318,9 @@ describe("setUserWriteBlockMode on cluster", function () {
 
         const fromShard = this.cluster.getPrimaryShard(this.dbName);
         const toShard = this.cluster.getOther(fromShard);
-        assert.commandWorked(this.cluster.s.adminCommand({movePrimary: this.dbName, to: toShard.name}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({movePrimary: this.dbName, to: toShard.name}),
+        );
 
         // Check that the new primary has cloned the data.
         assert.eq(1, toShard.getDB(this.dbName)[unshardedCollName].find().itcount());
@@ -274,7 +328,9 @@ describe("setUserWriteBlockMode on cluster", function () {
         // Check that the collection has been removed from the former primary.
         assert.eq(
             0,
-            fromShard.getDB(this.dbName).runCommand({listCollections: 1, filter: {name: unshardedCollName}}).cursor
+            fromShard
+                .getDB(this.dbName)
+                .runCommand({listCollections: 1, filter: {name: unshardedCollName}}).cursor
                 .firstBatch.length,
         );
 
@@ -288,29 +344,43 @@ describe("setUserWriteBlockMode on cluster", function () {
                 .itcount(),
         );
 
-        assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}),
+        );
     });
 
     it("setAllowMigrations works while user writes are blocked", () => {
-        assert.commandWorked(this.cluster.s.adminCommand({shardCollection: this.ns, key: {_id: 1}}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({shardCollection: this.ns, key: {_id: 1}}),
+        );
 
         // Start blocking user writes.
         assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
 
         // Disable migrations for 'ns'.
-        assert.commandWorked(this.cluster.s.adminCommand({setAllowMigrations: this.ns, allowMigrations: false}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({setAllowMigrations: this.ns, allowMigrations: false}),
+        );
 
         const fromShard = this.cluster.getPrimaryShard(this.dbName);
         const toShard = this.cluster.getOther(fromShard);
         assert.commandFailedWithCode(
-            this.cluster.s.adminCommand({moveChunk: this.ns, find: {_id: 0}, to: toShard.shardName}),
+            this.cluster.s.adminCommand({
+                moveChunk: this.ns,
+                find: {_id: 0},
+                to: toShard.shardName,
+            }),
             ErrorCodes.ConflictingOperationInProgress,
         );
 
         // Reenable migrations for 'ns'.
-        assert.commandWorked(this.cluster.s.adminCommand({setAllowMigrations: this.ns, allowMigrations: true}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({setAllowMigrations: this.ns, allowMigrations: true}),
+        );
 
-        assert.commandWorked(this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({setUserWriteBlockMode: 1, global: false}),
+        );
     });
 });
 
@@ -320,7 +390,11 @@ describe("setUserWriteBlockMode on cluster through direct connection", function 
 
         this.createAdminUser = function (conn) {
             const directConnection = conn.getDB("admin");
-            directConnection.createUser({user: "admin", pwd: "x", roles: ["clusterManager", "restore"]});
+            directConnection.createUser({
+                user: "admin",
+                pwd: "x",
+                roles: ["clusterManager", "restore"],
+            });
             assert(directConnection.auth("admin", "x"), "Authentication failed");
         };
     });
@@ -334,7 +408,9 @@ describe("setUserWriteBlockMode on cluster through direct connection", function 
         this.rs.initiate();
         this.createAdminUser(this.rs.getPrimary());
 
-        assert.commandWorked(this.cluster.s.adminCommand({addShard: this.rs.getURL(), name: "newShards"}));
+        assert.commandWorked(
+            this.cluster.s.adminCommand({addShard: this.rs.getURL(), name: "newShards"}),
+        );
     });
 
     afterEach(function () {
@@ -353,7 +429,10 @@ describe("setUserWriteBlockMode on cluster through direct connection", function 
         }
 
         assert.commandFailedWithCode(
-            this.rs.getPrimary().getDB("admin").runCommand({setUserWriteBlockMode: 1, global: true}),
+            this.rs
+                .getPrimary()
+                .getDB("admin")
+                .runCommand({setUserWriteBlockMode: 1, global: true}),
             ErrorCodes.Unauthorized,
         );
     });

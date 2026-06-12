@@ -61,10 +61,18 @@ assert.commandWorked(coll.insert({_id: 2, shard: 0, arr: [0, 2]}));
 assert.commandWorked(coll.insert({_id: 3, shard: 0, arr: [1, 3]}));
 assert.commandWorked(coll.insert({_id: 2, shard: 1, arr: [0, 2]}));
 assert.commandWorked(coll.insert({_id: 3, shard: 1, arr: [1, 3]}));
-assert.commandWorked(coll.replaceOne({_id: 2, shard: 0}, {_id: 2, shard: 0, arr: [0, 2], foo: "a"}));
-assert.commandWorked(coll.replaceOne({_id: 3, shard: 0}, {_id: 3, shard: 0, arr: [1, 3], foo: "a"}));
-assert.commandWorked(coll.replaceOne({_id: 2, shard: 1}, {_id: 2, shard: 1, arr: [0, 2], foo: "a"}));
-assert.commandWorked(coll.replaceOne({_id: 3, shard: 1}, {_id: 3, shard: 1, arr: [1, 3], foo: "a"}));
+assert.commandWorked(
+    coll.replaceOne({_id: 2, shard: 0}, {_id: 2, shard: 0, arr: [0, 2], foo: "a"}),
+);
+assert.commandWorked(
+    coll.replaceOne({_id: 3, shard: 0}, {_id: 3, shard: 0, arr: [1, 3], foo: "a"}),
+);
+assert.commandWorked(
+    coll.replaceOne({_id: 2, shard: 1}, {_id: 2, shard: 1, arr: [0, 2], foo: "a"}),
+);
+assert.commandWorked(
+    coll.replaceOne({_id: 3, shard: 1}, {_id: 3, shard: 1, arr: [1, 3], foo: "a"}),
+);
 assert.commandWorked(coll.update({_id: 2, shard: 0}, {$set: {foo: "b"}}));
 assert.commandWorked(coll.update({_id: 3, shard: 0}, {$set: {foo: "b"}}));
 assert.commandWorked(coll.update({_id: 2, shard: 1}, {$set: {foo: "b"}}));

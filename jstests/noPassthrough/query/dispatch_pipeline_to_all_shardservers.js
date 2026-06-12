@@ -136,7 +136,9 @@ function listMongodStats(db) {
     assert.eq(4, results.length, results);
 
     if (FeatureFlagUtil.isPresentAndEnabled(st.s0, "FeatureFlagTransitionToCatalogShard")) {
-        assert.commandWorked(st.s.getDB("admin").runCommand({transitionFromDedicatedConfigServer: 1}));
+        assert.commandWorked(
+            st.s.getDB("admin").runCommand({transitionFromDedicatedConfigServer: 1}),
+        );
         // After the above command, this once tripped an invariant failure: SERVER-79372.
         results = listMongodStats(st.s.getDB(jsTestName()));
 

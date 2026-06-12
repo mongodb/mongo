@@ -65,14 +65,20 @@ TimeseriesTest.run((insert) => {
         assert.eq(
             expectedNumericOrdering[i],
             docsNumericOrdering[i][metaFieldName],
-            "Unexpected metadata in doc " + i + " (numeric ordering): " + tojson(docsNumericOrdering),
+            "Unexpected metadata in doc " +
+                i +
+                " (numeric ordering): " +
+                tojson(docsNumericOrdering),
         );
     }
 
     // Create an index that does not use the default collation and compares numeric strings
     // lexicographically rather than as numbers.
     assert.commandWorked(
-        coll.createIndex(indexKey, {name: "index_string", collation: {locale: "en_US", numericOrdering: false}}),
+        coll.createIndex(indexKey, {
+            name: "index_string",
+            collation: {locale: "en_US", numericOrdering: false},
+        }),
         "failed to create index: " + tojson(indexKey),
     );
 
@@ -81,7 +87,8 @@ TimeseriesTest.run((insert) => {
     assert.eq(
         expectedStringOrdering.length,
         docsStringOrdering.length,
-        "unexpected documents returned from index scan with string ordering: " + tojson(docsStringOrdering),
+        "unexpected documents returned from index scan with string ordering: " +
+            tojson(docsStringOrdering),
     );
     for (let i = 0; i < docsNumericOrdering.length; ++i) {
         assert.eq(

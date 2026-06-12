@@ -28,7 +28,9 @@ stWithMock.start();
 const st = stWithMock.st;
 const mongos = st.s;
 const testDb = mongos.getDB(dbName);
-assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}),
+);
 
 const testColl = testDb.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -178,7 +180,13 @@ const expectedMongotCommand = mongotCommandForQuery({
     s1Mongot.setMockResponses(history, cursorId, NumberLong(cursorId + 1001));
 }
 
-mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+mockPlanShardedSearchResponse(
+    testColl.getName(),
+    mongotQuery,
+    dbName,
+    undefined /*sortSpec*/,
+    stWithMock,
+);
 
 // Be sure the searchScore results are in decreasing order.
 const queryResults = testColl.aggregate(pipeline).toArray();

@@ -12,7 +12,9 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 jsTest.log("Insert some data.");
 const coll = st.s0.getDB(dbName)[collName];
@@ -25,7 +27,14 @@ assert.commandWorked(bulk.execute());
 jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: ns,
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Ensure that all the inserted docs are on disk so that stats() returns up to date info.
 assert.commandWorked(st.s.adminCommand({fsync: 1}));

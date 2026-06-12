@@ -26,7 +26,15 @@ import {
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
-const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
+const docs = [
+    doc1_a_nofields,
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc5_b_f104,
+    doc6_c_f105,
+    doc7_c_f106,
+];
 
 setUpShardedCluster();
 
@@ -53,7 +61,10 @@ setUpShardedCluster();
             dataBearingShard: "other",
             rootStage: "PROJECTION_DEFAULT",
             bucketFilter: makeBucketFilter({
-                $and: [{"control.min.f": {$_internalExprLte: 106}}, {"control.max.f": {$_internalExprGte: 106}}],
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 106}},
+                    {"control.max.f": {$_internalExprGte: 106}},
+                ],
             }),
             residualFilter: {f: {$eq: 106}},
         },
@@ -77,7 +88,10 @@ setUpShardedCluster();
             writeType: "twoPhaseProtocol",
             dataBearingShard: "primary",
             rootStage: "TS_MODIFY",
-            bucketFilter: makeBucketFilter({"meta": {$eq: "a"}}, {"control.max.f": {$_internalExprGt: 101}}),
+            bucketFilter: makeBucketFilter(
+                {"meta": {$eq: "a"}},
+                {"control.max.f": {$_internalExprGt: 101}},
+            ),
             residualFilter: {f: {$gt: 101}},
         },
     });
@@ -96,7 +110,10 @@ setUpShardedCluster();
             bucketFilter: makeBucketFilter(
                 {"meta": {$eq: "C"}},
                 {
-                    $and: [{"control.min.f": {$_internalExprLte: 17}}, {"control.max.f": {$_internalExprGte: 17}}],
+                    $and: [
+                        {"control.min.f": {$_internalExprLte: 17}},
+                        {"control.max.f": {$_internalExprGte: 17}},
+                    ],
                 },
             ),
             residualFilter: {f: {$eq: 17}},
@@ -117,7 +134,10 @@ setUpShardedCluster();
             dataBearingShard: "none",
             rootStage: "TS_MODIFY",
             bucketFilter: makeBucketFilter({
-                $and: [{"control.min.f": {$_internalExprLte: 17}}, {"control.max.f": {$_internalExprGte: 17}}],
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 17}},
+                    {"control.max.f": {$_internalExprGte: 17}},
+                ],
             }),
             residualFilter: {f: {$eq: 17}},
         },
@@ -139,7 +159,10 @@ setUpShardedCluster();
             bucketFilter: makeBucketFilter(
                 {"meta": {$eq: "B"}},
                 {
-                    $and: [{"control.min.f": {$_internalExprLte: 103}}, {"control.max.f": {$_internalExprGte: 103}}],
+                    $and: [
+                        {"control.min.f": {$_internalExprLte: 103}},
+                        {"control.max.f": {$_internalExprGte: 103}},
+                    ],
                 },
             ),
             residualFilter: {f: {$eq: 103}},
@@ -195,7 +218,10 @@ setUpShardedCluster();
             writeType: "targeted",
             dataBearingShard: "primary",
             rootStage: "TS_MODIFY",
-            bucketFilter: makeBucketFilter({"meta": {$eq: "A"}}, {"control.min.f": {$_internalExprLt: 103}}),
+            bucketFilter: makeBucketFilter(
+                {"meta": {$eq: "A"}},
+                {"control.min.f": {$_internalExprLt: 103}},
+            ),
             residualFilter: {f: {$lt: 103}},
             // 'doc1_a_nofields' and 'doc1_a_f101' are in different buckets because the time values
             // are distant enough and $_internalExprLt matches no 'control.min.f' field too. So, the
@@ -255,18 +281,26 @@ setUpShardedCluster();
                     {"_id": {"$lte": ObjectId("43b71b80ffffffffffffffff")}},
                     {"_id": {"$gte": ObjectId("43b70d700000000000000000")}},
                     {
-                        [`control.max.${timeFieldName}`]: {$_internalExprGte: doc6_c_f105[timeFieldName]},
+                        [`control.max.${timeFieldName}`]: {
+                            $_internalExprGte: doc6_c_f105[timeFieldName],
+                        },
                     },
                     // -1 hour
                     {
-                        [`control.min.${timeFieldName}`]: {$_internalExprGte: ISODate("2005-12-31T23:00:00Z")},
+                        [`control.min.${timeFieldName}`]: {
+                            $_internalExprGte: ISODate("2005-12-31T23:00:00Z"),
+                        },
                     },
                     // +1 hour
                     {
-                        [`control.max.${timeFieldName}`]: {$_internalExprLte: ISODate("2006-01-01T01:00:00Z")},
+                        [`control.max.${timeFieldName}`]: {
+                            $_internalExprLte: ISODate("2006-01-01T01:00:00Z"),
+                        },
                     },
                     {
-                        [`control.min.${timeFieldName}`]: {$_internalExprLte: doc6_c_f105[timeFieldName]},
+                        [`control.min.${timeFieldName}`]: {
+                            $_internalExprLte: doc6_c_f105[timeFieldName],
+                        },
                     },
                 ],
             }),
@@ -296,18 +330,26 @@ setUpShardedCluster();
                     {"_id": {"$lte": ObjectId("45984f00ffffffffffffffff")}},
                     {"_id": {"$gte": ObjectId("459840f00000000000000000")}},
                     {
-                        [`control.max.${timeFieldName}`]: {$_internalExprGte: doc7_c_f106[timeFieldName]},
+                        [`control.max.${timeFieldName}`]: {
+                            $_internalExprGte: doc7_c_f106[timeFieldName],
+                        },
                     },
                     // -1 hour
                     {
-                        [`control.min.${timeFieldName}`]: {$_internalExprGte: ISODate("2006-12-31T23:00:00Z")},
+                        [`control.min.${timeFieldName}`]: {
+                            $_internalExprGte: ISODate("2006-12-31T23:00:00Z"),
+                        },
                     },
                     // +1 hour
                     {
-                        [`control.max.${timeFieldName}`]: {$_internalExprLte: ISODate("2007-01-01T01:00:00Z")},
+                        [`control.max.${timeFieldName}`]: {
+                            $_internalExprLte: ISODate("2007-01-01T01:00:00Z"),
+                        },
                     },
                     {
-                        [`control.min.${timeFieldName}`]: {$_internalExprLte: doc7_c_f106[timeFieldName]},
+                        [`control.min.${timeFieldName}`]: {
+                            $_internalExprLte: doc7_c_f106[timeFieldName],
+                        },
                     },
                 ],
             }),

@@ -13,7 +13,8 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 TestData.pinToSingleMongos = true;
 
 // Detect if collections are implicitly sharded
-const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+const isImplicitlyShardedCollection =
+    typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
 // Given the output from the listDatabases command, ensures that the total size reported is the
 // sum of the individual db sizes.
@@ -33,7 +34,9 @@ function verifyNameOnly(listDatabasesOut) {
 
     for (let field in listDatabasesOut) {
         assert(
-            ["databases", "nameOnly", "ok", "operationTime", "$clusterTime"].some((f) => f == field),
+            ["databases", "nameOnly", "ok", "operationTime", "$clusterTime"].some(
+                (f) => f == field,
+            ),
             "unexpected field " + field,
         );
     }
@@ -64,7 +67,9 @@ describe("listDatabases command", function () {
     });
 
     it("should list all test databases", function () {
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: /jstest_list_databases/}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: /jstest_list_databases/}}),
+        );
         assert.eq(4, cmdRes.databases.length);
         verifySizeSum(cmdRes);
     });
@@ -78,7 +83,9 @@ describe("listDatabases command", function () {
     });
 
     it("should return only the admin database", function () {
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: "admin"}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: "admin"}}),
+        );
         assert.eq(1, cmdRes.databases.length);
         verifySizeSum(cmdRes);
     });
@@ -90,21 +97,28 @@ describe("listDatabases command", function () {
     });
 
     it("should return only the name of the zap database", function () {
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: /zap/}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: /zap/}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         verifyNameOnly(cmdRes);
     });
 
     it("should support $expr in filter", function () {
         let cmdRes = assert.commandWorked(
-            db.adminCommand({listDatabases: 1, filter: {$expr: {$eq: ["$name", "jstest_list_databases_zap"]}}}),
+            db.adminCommand({
+                listDatabases: 1,
+                filter: {$expr: {$eq: ["$name", "jstest_list_databases_zap"]}},
+            }),
         );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         assert.eq("jstest_list_databases_zap", cmdRes.databases[0].name, tojson(cmdRes));
     });
 
     it("should fail $expr with an unbound variable in filter", function () {
-        assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {$expr: {$eq: ["$name", "$$unbound"]}}}));
+        assert.commandFailed(
+            db.adminCommand({listDatabases: 1, filter: {$expr: {$eq: ["$name", "$$unbound"]}}}),
+        );
     });
 
     it("should fail $expr with a filter that throws at runtime", function () {
@@ -112,7 +126,9 @@ describe("listDatabases command", function () {
     });
 
     it("should not allow extensions in filters", function () {
-        assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {$text: {$search: "str"}}}));
+        assert.commandFailed(
+            db.adminCommand({listDatabases: 1, filter: {$text: {$search: "str"}}}),
+        );
         assert.commandFailed(
             db.adminCommand({
                 listDatabases: 1,
@@ -179,21 +195,30 @@ describe("listDatabases shows databases created implicitly via different command
     });
 
     it("should list a database created via update with upsert", function () {
-        assert.commandWorked(db.getSiblingDB(testDBs.update).coll.updateOne({x: 1}, {$set: {x: 1}}, {upsert: true}));
+        assert.commandWorked(
+            db.getSiblingDB(testDBs.update).coll.updateOne({x: 1}, {$set: {x: 1}}, {upsert: true}),
+        );
 
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.update}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: testDBs.update}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         assert.eq(testDBs.update, cmdRes.databases[0].name);
     });
 
     it("should list a database created via findAndModify with upsert", function () {
         assert.commandWorked(
-            db
-                .getSiblingDB(testDBs.findAndModify)
-                .runCommand({findAndModify: "coll", query: {x: 1}, update: {$set: {x: 1}}, upsert: true}),
+            db.getSiblingDB(testDBs.findAndModify).runCommand({
+                findAndModify: "coll",
+                query: {x: 1},
+                update: {$set: {x: 1}},
+                upsert: true,
+            }),
         );
 
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.findAndModify}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: testDBs.findAndModify}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         assert.eq(testDBs.findAndModify, cmdRes.databases[0].name);
     });
@@ -206,7 +231,9 @@ describe("listDatabases shows databases created implicitly via different command
             }),
         );
 
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.index}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: testDBs.index}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         assert.eq(testDBs.index, cmdRes.databases[0].name);
     });
@@ -227,7 +254,9 @@ describe("listDatabases shows databases created implicitly via different command
             // DB.prototype.getCollection to implicitly shard every collection on first access.
             // By the time we call renameCollection, the source collection is already sharded,
             // and cross-database renames are not supported for sharded collections.
-            jsTest.log.info("Skipping: cross-database rename is not supported for sharded collections");
+            jsTest.log.info(
+                "Skipping: cross-database rename is not supported for sharded collections",
+            );
             return;
         }
         if (
@@ -239,7 +268,9 @@ describe("listDatabases shows databases created implicitly via different command
             // renameCollection is not idempotent: if a stepdown occurs after the rename
             // succeeds, the automatic retry fails with NamespaceNotFound because the source
             // collection no longer exists.
-            jsTest.log.info("Skipping: renameCollection is not idempotent and cannot be retried after stepdown");
+            jsTest.log.info(
+                "Skipping: renameCollection is not idempotent and cannot be retried after stepdown",
+            );
             return;
         }
         assert.commandWorked(db.getSiblingDB(testDBs.rename).coll.insertOne({x: 1}));
@@ -250,7 +281,9 @@ describe("listDatabases shows databases created implicitly via different command
             }),
         );
 
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.rename2}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: testDBs.rename2}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         assert.eq(testDBs.rename2, cmdRes.databases[0].name);
     });
@@ -301,7 +334,9 @@ describe("listDatabases shows databases created implicitly via different command
     function dropCollectionTestCase(db, dbName) {
         let testDB = db.getSiblingDB(dbName);
         assert.commandWorked(testDB.coll.insertOne({x: 1}));
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: dbName}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: dbName}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
         assert(testDB.coll.drop());
 
@@ -329,12 +364,14 @@ describe("listDatabases shows databases created implicitly via different command
 
     it("should not list a database if collection is dropped, unless the database is empty", function () {
         if (isImplicitlyShardedCollection) {
-            const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+            const originalImplicitlyShardOnCreateCollectionOnly =
+                TestData.implicitlyShardOnCreateCollectionOnly;
             try {
                 TestData.implicitlyShardOnCreateCollectionOnly = true;
                 dropCollectionTestCase(db, testDBs.drop);
             } finally {
-                TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+                TestData.implicitlyShardOnCreateCollectionOnly =
+                    originalImplicitlyShardOnCreateCollectionOnly;
             }
         } else {
             dropCollectionTestCase(db, testDBs.drop);
@@ -343,14 +380,18 @@ describe("listDatabases shows databases created implicitly via different command
 
     it("should not list a database if database is dropped", function () {
         assert.commandWorked(db.getSiblingDB(testDBs.dropDatabase).coll.insertOne({x: 1}));
-        let cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.dropDatabase}}));
+        let cmdRes = assert.commandWorked(
+            db.adminCommand({listDatabases: 1, filter: {name: testDBs.dropDatabase}}),
+        );
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
 
         assert.commandWorked(db.getSiblingDB(testDBs.dropDatabase).dropDatabase());
         if (!TestData.runningWithBalancer) {
             // When the balancer is running in the background, concurrent moveCollection operations
             // can cause the database to be recreated unexpectedly. Therefore, skip this assertion.
-            cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.dropDatabase}}));
+            cmdRes = assert.commandWorked(
+                db.adminCommand({listDatabases: 1, filter: {name: testDBs.dropDatabase}}),
+            );
             assert.eq(0, cmdRes.databases.length, tojson(cmdRes));
         }
     });

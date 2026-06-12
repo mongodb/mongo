@@ -31,7 +31,9 @@ assert.writeError(
         nonGeo: ["somepoly"],
     }),
 );
-assert.writeError(t.insert({geo: {a: {x: 40, y: 5}, b: {x: 40, y: 6}, c: {x: 41, y: 6}, d: {x: 41, y: 5}}}));
+assert.writeError(
+    t.insert({geo: {a: {x: 40, y: 5}, b: {x: 40, y: 6}, c: {x: 41, y: 6}, d: {x: 41, y: 5}}}),
+);
 
 // Test "Can't canonicalize query: BadValue bad geo query" error.
 assert.throws(function () {

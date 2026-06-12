@@ -59,7 +59,13 @@ function makeCursor(query, projection, sort, batchSize, returnKey) {
     return cursor;
 }
 
-function checkCursorWithBatchSizeProjection(query, projection, sort, batchSize, expectedLeftInBatch) {
+function checkCursorWithBatchSizeProjection(
+    query,
+    projection,
+    sort,
+    batchSize,
+    expectedLeftInBatch,
+) {
     clearQueryPlanCache();
     let cursor = makeCursor(query, projection, sort, batchSize);
 

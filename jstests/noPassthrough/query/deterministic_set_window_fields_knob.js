@@ -39,7 +39,9 @@ let resultB = collB
 assert.eq(resultA["ids"], [0, 1, 2]);
 assert.eq(resultB["ids"], [2, 1, 0]);
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryAppendIdToSetWindowFieldsSort: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryAppendIdToSetWindowFieldsSort: true}),
+);
 
 // Because of the index resultA's ids array should be in a order and resultB's ids should be in b
 // order unless the query knob is working properly.

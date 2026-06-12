@@ -38,7 +38,12 @@ function waitForPrimary(node) {
 
 // Asserts that the given document is not visible in the committed snapshot on the given node.
 function checkDocNotCommitted(node, doc) {
-    let docs = node.getDB(dbName).getCollection(collName).find(doc).readConcern("majority").toArray();
+    let docs = node
+        .getDB(dbName)
+        .getCollection(collName)
+        .find(doc)
+        .readConcern("majority")
+        .toArray();
     assert.eq(0, docs.length, tojson(docs));
 }
 
@@ -50,7 +55,11 @@ let secondaries = rst.getSecondaries();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 rst.awaitReplication();
 assert.eq(nodes[0], primary);
@@ -141,6 +150,9 @@ assert.soonNoExcept(function () {
 rst.awaitLastOpCommitted();
 
 // Ensure that the old primary got the write that the new primary did and sees it as committed.
-assert.neq(null, nodes[0].getDB(dbName).getCollection(collName).find({a: 3}).readConcern("majority").next());
+assert.neq(
+    null,
+    nodes[0].getDB(dbName).getCollection(collName).find({a: 3}).readConcern("majority").next(),
+);
 
 rst.stopSet();

@@ -130,7 +130,9 @@ function runTest(writeNode, readNode, awaitReplication) {
 
     // Set the failpoint before we start the parallel thread so that findOne blocks before user
     // acquisition.
-    const fp = configureFailPoint(readNode, "waitForUserCacheInvalidation", {userName: {db: testDB, user: testUser}});
+    const fp = configureFailPoint(readNode, "waitForUserCacheInvalidation", {
+        userName: {db: testDB, user: testUser},
+    });
 
     const thread = new Thread(
         function (port, testUser, testDB) {
@@ -143,7 +145,11 @@ function runTest(writeNode, readNode, awaitReplication) {
             assert(test.auth(testUser, "pwd"));
             jsTest.log("Completed auth");
 
-            assert.throws(() => test.coll.findOne({}), [], "Find succeeded despite revokeRoleFromUser");
+            assert.throws(
+                () => test.coll.findOne({}),
+                [],
+                "Find succeeded despite revokeRoleFromUser",
+            );
             jsTest.log("Ran command");
         },
         readNode.port,

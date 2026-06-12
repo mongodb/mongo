@@ -17,7 +17,12 @@ if (st.configRS) {
 }
 
 // Rename collection on second mongos and ensure the document is found
-assert.commandWorked(st.s1.getDB(dbName).CollNameBeforeRename.renameCollection("CollNameAfterRename"));
-assert.eq([{Key: 1, Value: 1}], st.s1.getDB(dbName).CollNameAfterRename.find({}, {_id: false}).toArray());
+assert.commandWorked(
+    st.s1.getDB(dbName).CollNameBeforeRename.renameCollection("CollNameAfterRename"),
+);
+assert.eq(
+    [{Key: 1, Value: 1}],
+    st.s1.getDB(dbName).CollNameAfterRename.find({}, {_id: false}).toArray(),
+);
 
 st.stop();

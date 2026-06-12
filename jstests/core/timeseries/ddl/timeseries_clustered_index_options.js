@@ -17,7 +17,10 @@ const tsColl = testDB.clustered_index_options;
 
 function testInvalidCreateCollectionOptions(invalidOptions, expectedErrorCodes) {
     const collToClone = tsColl;
-    assert.commandFailedWithCode(testDB.createCollection(collToClone.getName(), invalidOptions), expectedErrorCodes);
+    assert.commandFailedWithCode(
+        testDB.createCollection(collToClone.getName(), invalidOptions),
+        expectedErrorCodes,
+    );
 }
 
 // Tests time-series creation can be (somewhat)round-tripped to time-series collection
@@ -29,10 +32,15 @@ function roundTripTimeseriesCreateOptions() {
     assert.commandWorked(testDB.dropDatabase());
 
     assert.commandWorked(
-        testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "time"}, expireAfterSeconds: 10}),
+        testDB.createCollection(tsColl.getName(), {
+            timeseries: {timeField: "time"},
+            expireAfterSeconds: 10,
+        }),
     );
     const collToClone = tsColl;
-    let res = assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: collToClone.getName()}}));
+    let res = assert.commandWorked(
+        testDB.runCommand({listCollections: 1, filter: {name: collToClone.getName()}}),
+    );
     const options = res.cursor.firstBatch[0].options;
 
     // Ensure clusteredIndex options is never returned on the listCollection logical format output.
@@ -44,14 +52,20 @@ function roundTripTimeseriesCreateOptions() {
     // With rawData: true, listCollections exposes the raw physical format of the collection,
     // which includes clusteredIndex: true.
     res = assert.commandWorked(
-        testDB.runCommand({listCollections: 1, rawData: true, filter: {name: collToClone.getName()}}),
+        testDB.runCommand({
+            listCollections: 1,
+            rawData: true,
+            filter: {name: collToClone.getName()},
+        }),
     );
     assert.eq(tojson(res.cursor.firstBatch[0].options.clusteredIndex), tojson(true));
 
     assert(tsColl.drop());
 
     assert.commandWorked(testDB.createCollection(collToClone.getName(), options));
-    res = assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: collToClone.getName()}}));
+    res = assert.commandWorked(
+        testDB.runCommand({listCollections: 1, filter: {name: collToClone.getName()}}),
+    );
     assert.eq(options, res.cursor.firstBatch[0].options);
     assert.commandWorked(testDB.dropDatabase());
     return options;
@@ -73,8 +87,14 @@ testInvalidCreateCollectionOptions({...options, clusteredIndex: {key: {_id: 1}, 
 
 // Validate additional 'idIndex' field fails to create the collection when added to
 // otherwise valid create options.
-testInvalidCreateCollectionOptions({...options, idIndex: {key: {_id: 1}, name: "_id_"}}, ErrorCodes.InvalidOptions);
+testInvalidCreateCollectionOptions(
+    {...options, idIndex: {key: {_id: 1}, name: "_id_"}},
+    ErrorCodes.InvalidOptions,
+);
 
 // Using the 'expireAfterSeconds' option on any namespace other than a time-series namespace or
 // time-series buckets collection namespace should fail.
-assert.commandFailedWithCode(testDB.createCollection("test", {expireAfterSeconds: 10}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    testDB.createCollection("test", {expireAfterSeconds: 10}),
+    ErrorCodes.InvalidOptions,
+);

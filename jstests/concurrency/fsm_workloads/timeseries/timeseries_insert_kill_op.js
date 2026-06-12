@@ -39,7 +39,11 @@ export const $config = (function () {
             assert.eq(res.writeConcernError.code, ErrorCodes.Interrupted, tojson(res));
         } else {
             // TODO (SERVER-85548): Clean up error codes
-            assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.Interrupted, 8555700, 8555701], tojson(res));
+            assert.commandWorkedOrFailedWithCode(
+                res,
+                [ErrorCodes.Interrupted, 8555700, 8555701],
+                tojson(res),
+            );
         }
     };
 
@@ -58,9 +62,13 @@ export const $config = (function () {
 
         killInsert: function (db, collNameSuffix) {
             let collName = getCollectionName(collNameSuffix);
-            const inprog = assert.commandWorked(db.currentOp({ns: db[collName].getFullName(), op: "insert"})).inprog;
+            const inprog = assert.commandWorked(
+                db.currentOp({ns: db[collName].getFullName(), op: "insert"}),
+            ).inprog;
             if (inprog.length) {
-                assert.commandWorked(db.adminCommand({killOp: 1, op: inprog[Random.randInt(inprog.length)].opid}));
+                assert.commandWorked(
+                    db.adminCommand({killOp: 1, op: inprog[Random.randInt(inprog.length)].opid}),
+                );
             }
         },
     };
@@ -68,7 +76,9 @@ export const $config = (function () {
     const setup = function (db, collNameSuffix) {
         let collName = getCollectionName(collNameSuffix);
         assert.commandWorked(
-            db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(collName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
     };
 

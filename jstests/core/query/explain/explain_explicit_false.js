@@ -15,7 +15,11 @@ const documents = [
 ];
 assert.commandWorked(coll.insertMany(documents));
 
-const pipeline = [{$match: {a: {$gte: 3}}}, {$group: {_id: {}, bSum: {$sum: "$b"}}}, {$addFields: {newField: "test"}}];
+const pipeline = [
+    {$match: {a: {$gte: 3}}},
+    {$group: {_id: {}, bSum: {$sum: "$b"}}},
+    {$addFields: {newField: "test"}},
+];
 
 const result = assert.commandWorked(
     testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}, explain: false}),

@@ -9,7 +9,10 @@ db[coll].insert({loc: [0, 0]});
 
 // $geoNear is only allowed as the first stage in a pipeline, nowhere else.
 assert.throws(() =>
-    db[coll].aggregate([{$match: {x: 1}}, {$geoNear: {near: [1, 1], spherical: true, distanceField: "dis"}}]),
+    db[coll].aggregate([
+        {$match: {x: 1}},
+        {$geoNear: {near: [1, 1], spherical: true, distanceField: "dis"}},
+    ]),
 );
 
 const kDistanceField = "dis";
@@ -24,7 +27,9 @@ const kIncludeLocsField = "loc";
  */
 function testGeoNearStageOutput({geoNearSpec, limit, batchSize}) {
     const aggOptions = batchSize ? {batchSize: batchSize} : {};
-    const result = db[coll].aggregate([{$geoNear: geoNearSpec}, {$limit: limit}], aggOptions).toArray();
+    const result = db[coll]
+        .aggregate([{$geoNear: geoNearSpec}, {$limit: limit}], aggOptions)
+        .toArray();
     const errmsg = () => tojson(result);
 
     // Verify that we got the expected number of results.

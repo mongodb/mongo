@@ -8,7 +8,10 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {HybridGeoIndexTest, Operation} from "jstests/noPassthrough/libs/index_builds/hybrid_geo_index.js";
+import {
+    HybridGeoIndexTest,
+    Operation,
+} from "jstests/noPassthrough/libs/index_builds/hybrid_geo_index.js";
 
 // Use hybrid_geo_index.js to exercise RecordId::serializeToken
 (function testRecordSerializationForSkippedRecordTracker() {
@@ -33,7 +36,9 @@ import {HybridGeoIndexTest, Operation} from "jstests/noPassthrough/libs/index_bu
     const testDB = primary.getDB("test");
     const coll = testDB.getCollection("test");
 
-    assert.commandWorked(testDB.createCollection(coll.getName(), {clusteredIndex: {key: {"_id": 1}, unique: true}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {clusteredIndex: {key: {"_id": 1}, unique: true}}),
+    );
 
     const largeKey = "0".repeat(8 * 1024 * 1024 - 2); // 8 MB key
 

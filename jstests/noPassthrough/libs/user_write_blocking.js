@@ -191,7 +191,11 @@ export const UserWriteBlockHelpers = (function () {
                 }
 
                 unlock() {
-                    assert.commandWorked(this.fixture.adminConn.getDB("admin").runCommand({killOp: 1, op: this.opId}));
+                    assert.commandWorked(
+                        this.fixture.adminConn
+                            .getDB("admin")
+                            .runCommand({killOp: 1, op: this.opId}),
+                    );
                     this.waiter();
                 }
             }
@@ -218,7 +222,10 @@ export const UserWriteBlockHelpers = (function () {
             assert.soon(() => {
                 let result = this.adminConn
                     .getDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {op: "command", "command.sleep": {$exists: true}}}])
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {op: "command", "command.sleep": {$exists: true}}},
+                    ])
                     .toArray();
                 if (result.length !== 1) return false;
 
@@ -263,12 +270,16 @@ export const UserWriteBlockHelpers = (function () {
         }
 
         setProfilingLevel(level) {
-            return assert.commandWorked(this.adminConn.getDB(jsTestName()).setProfilingLevel(level));
+            return assert.commandWorked(
+                this.adminConn.getDB(jsTestName()).setProfilingLevel(level),
+            );
         }
 
         assertFCV(expectedFCV) {
             const actualFCV = assert.commandWorked(
-                this.adminConn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+                this.adminConn
+                    .getDB("admin")
+                    .runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
             ).featureCompatibilityVersion.version;
             assert.eq(expectedFCV, actualFCV);
         }
@@ -294,7 +305,9 @@ export const UserWriteBlockHelpers = (function () {
 
         getStatus() {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(backend, keyfile, () => backend.getDB("admin").serverStatus());
+            return authutil.asCluster(backend, keyfile, () =>
+                backend.getDB("admin").serverStatus(),
+            );
         }
 
         hangTransition(command, failpoint) {
@@ -324,7 +337,9 @@ export const UserWriteBlockHelpers = (function () {
 
         setFailPoint(failpointName) {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(backend, keyfile, () => configureFailPoint(backend, failpointName));
+            return authutil.asCluster(backend, keyfile, () =>
+                configureFailPoint(backend, failpointName),
+            );
         }
 
         restart() {
@@ -356,7 +371,9 @@ export const UserWriteBlockHelpers = (function () {
 
         setProfilingLevel(level) {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(backend, keyfile, () => backend.getDB(jsTestName()).setProfilingLevel(level));
+            return authutil.asCluster(backend, keyfile, () =>
+                backend.getDB(jsTestName()).setProfilingLevel(level),
+            );
         }
 
         assertFCV(expectedFCV) {

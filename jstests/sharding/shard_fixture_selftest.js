@@ -8,7 +8,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const rsTestOriginal = new ShardingTest({shards: 2, mongos: 2, config: 2});
 
-const rsTestWrapper = new FSMShardingTest(`mongodb://${rsTestOriginal.s0.host},${rsTestOriginal.s1.host}`);
+const rsTestWrapper = new FSMShardingTest(
+    `mongodb://${rsTestOriginal.s0.host},${rsTestOriginal.s1.host}`,
+);
 
 assert.eq(rsTestWrapper.s(0).host, rsTestOriginal.s0.host);
 assert.eq(rsTestWrapper.s(1).host, rsTestOriginal.s1.host);

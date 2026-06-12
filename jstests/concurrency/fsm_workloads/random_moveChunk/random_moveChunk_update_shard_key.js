@@ -37,7 +37,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         ];
     };
 
-    $config.data.runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+    $config.data.runningWithStepdowns =
+        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
     // These errors below may arrive due to expected scenarios that occur with concurrent
     // migrations and shard key updates. These include transient transaction errors (targeting
@@ -48,7 +49,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // unrecoverable state. If an update fails in one of the above-described scenarios, we assert
     // that the document remains in the pre-updated state. After doing so, we may continue the
     // concurrency test.
-    $config.data.isUpdateShardKeyErrorAcceptable = function isUpdateShardKeyAcceptable(errCode, errMsg, errorLabels) {
+    $config.data.isUpdateShardKeyErrorAcceptable = function isUpdateShardKeyAcceptable(
+        errCode,
+        errMsg,
+        errorLabels,
+    ) {
         if (!errMsg) {
             return false;
         }
@@ -57,7 +62,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             return true;
         }
 
-        const failureInRetryableWriteToTxnConversionMsg = "Cannot retry a retryable write that has been converted";
+        const failureInRetryableWriteToTxnConversionMsg =
+            "Cannot retry a retryable write that has been converted";
         const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
         const otherErrorsInChangeShardKeyMsg = "was converted into a distributed transaction";
 
@@ -144,7 +150,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         };
     };
 
-    $config.data.generateRandomUpdateStyle = function generateRandomUpdateStyle(currentId, newShardKey, counterForId) {
+    $config.data.generateRandomUpdateStyle = function generateRandomUpdateStyle(
+        currentId,
+        newShardKey,
+        counterForId,
+    ) {
         const replacementStyle = Math.floor(Math.random() * 2) == 0;
 
         if (replacementStyle) {
@@ -160,7 +170,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         wrapInTransaction,
     ) {
         if (wrapInTransaction) {
-            withTxnAndAutoRetry(this.session, functionToRun, {retryOnKilledSession: this.retryOnKilledSession});
+            withTxnAndAutoRetry(this.session, functionToRun, {
+                retryOnKilledSession: this.retryOnKilledSession,
+            });
         } else {
             functionToRun();
         }
@@ -176,7 +188,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         counterForId,
     ) {
         let logString = "Running " + commandName;
-        logString += wrapInTransaction ? " inside a multi-statement transaction. " : " as a retryable write. ";
+        logString += wrapInTransaction
+            ? " inside a multi-statement transaction. "
+            : " as a retryable write. ";
         logString += "The document will ";
         logString += moveAcrossChunks ? "move across chunks. " : "stay within the same chunk. \n";
         logString +=
@@ -187,7 +201,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             ", counter: " +
             counterForId +
             "\n";
-        logString += "Intended new document values -- shardKey: " + newShardKey + ", counter: " + (counterForId + 1);
+        logString +=
+            "Intended new document values -- shardKey: " +
+            newShardKey +
+            ", counter: " +
+            (counterForId + 1);
         jsTestLog(logString);
     };
 
@@ -210,12 +228,22 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             tojson(collection.find({skey: currentShardKey}).toArray()) +
             "\n";
         logString += "Find by _id: " + tojson(collection.find({_id: idToUpdate}).toArray()) + "\n";
-        logString += "Find by new shard key: " + tojson(collection.find({skey: newShardKey}).toArray()) + "\n";
+        logString +=
+            "Find by new shard key: " +
+            tojson(collection.find({skey: newShardKey}).toArray()) +
+            "\n";
 
         jsTestLog(logString);
     };
 
-    function assertDocWasUpdated(collection, idToUpdate, currentShardKey, newShardKey, newCounter, tid) {
+    function assertDocWasUpdated(
+        collection,
+        idToUpdate,
+        currentShardKey,
+        newShardKey,
+        newCounter,
+        tid,
+    ) {
         assert.isnull(collection.findOne({_id: idToUpdate, skey: currentShardKey}));
         assert.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}), {
             _id: idToUpdate,
@@ -241,12 +269,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         const shardKeyField = this.shardKeyField[collName];
 
-        const {idToUpdate, currentShardKey, newShardKey, counterForId} = this.calculateShardKeyUpdateValues(
-            collection,
-            collName,
-            shardKeyField,
-            moveAcrossChunks,
-        );
+        const {idToUpdate, currentShardKey, newShardKey, counterForId} =
+            this.calculateShardKeyUpdateValues(
+                collection,
+                collName,
+                shardKeyField,
+                moveAcrossChunks,
+            );
 
         this.logTestIterationStart(
             "findAndModify",
@@ -273,7 +302,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 this.expectedCounters[idToUpdate] = counterForId + 1;
             } catch (e) {
                 if (e.code === ErrorCodes.IncompleteTransactionHistory && !wrapInTransaction) {
-                    print("Handling IncompleteTransactionHistory error for findAndModify: " + tojsononeline(e));
+                    print(
+                        "Handling IncompleteTransactionHistory error for findAndModify: " +
+                            tojsononeline(e),
+                    );
 
                     // With internal transactions enabled, IncompleteTransactionHistory means the
                     // write succeeded, so we can treat this error as success.
@@ -327,19 +359,24 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         this.findAndLogUpdateResults(collection, idToUpdate, currentShardKey, newShardKey);
     };
 
-    $config.data.updateShardKey = function updateShardKey(db, collName, {moveAcrossChunks, wrapInTransaction} = {}) {
+    $config.data.updateShardKey = function updateShardKey(
+        db,
+        collName,
+        {moveAcrossChunks, wrapInTransaction} = {},
+    ) {
         // This function uses a different session than the transaction wrapping logic expects.
         fsm.forceRunningOutsideTransaction(this);
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         const shardKeyField = this.shardKeyField[collName];
 
-        const {idToUpdate, currentShardKey, newShardKey, counterForId} = this.calculateShardKeyUpdateValues(
-            collection,
-            collName,
-            shardKeyField,
-            moveAcrossChunks,
-        );
+        const {idToUpdate, currentShardKey, newShardKey, counterForId} =
+            this.calculateShardKeyUpdateValues(
+                collection,
+                collName,
+                shardKeyField,
+                moveAcrossChunks,
+            );
 
         this.logTestIterationStart(
             "update",
@@ -361,7 +398,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 assert.commandWorked(updateResult);
                 this.expectedCounters[idToUpdate] = counterForId + 1;
             } catch (e) {
-                const err = updateResult instanceof WriteResult ? updateResult.getWriteError() : updateResult;
+                const err =
+                    updateResult instanceof WriteResult
+                        ? updateResult.getWriteError()
+                        : updateResult;
 
                 if (err.code === ErrorCodes.IncompleteTransactionHistory && !wrapInTransaction) {
                     print(
@@ -434,53 +474,47 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * 2. Run under a multi-statement transaction or a retryable write.
      * 3. Target the update to move chunks or remain on the same chunk.
      */
-    $config.states.findAndModifyWithRetryableWriteAcrossChunks = function findAndModifyWithRetryableWriteAcrossChunks(
-        db,
-        collName,
-        connCache,
-    ) {
-        this.findAndModifyShardKey(db, collName, {wrapInTransaction: false, moveAcrossChunks: true});
-    };
+    $config.states.findAndModifyWithRetryableWriteAcrossChunks =
+        function findAndModifyWithRetryableWriteAcrossChunks(db, collName, connCache) {
+            this.findAndModifyShardKey(db, collName, {
+                wrapInTransaction: false,
+                moveAcrossChunks: true,
+            });
+        };
 
-    $config.states.findAndModifyWithRetryableWriteWithinChunk = function findAndModifyWithRetryableWriteWithinChunk(
-        db,
-        collName,
-        connCache,
-    ) {
-        this.findAndModifyShardKey(db, collName, {wrapInTransaction: false, moveAcrossChunks: false});
-    };
+    $config.states.findAndModifyWithRetryableWriteWithinChunk =
+        function findAndModifyWithRetryableWriteWithinChunk(db, collName, connCache) {
+            this.findAndModifyShardKey(db, collName, {
+                wrapInTransaction: false,
+                moveAcrossChunks: false,
+            });
+        };
 
-    $config.states.findAndModifyWithTransactionAcrossChunks = function findAndModifyWithTransactionAcrossChunks(
-        db,
-        collName,
-        connCache,
-    ) {
-        this.findAndModifyShardKey(db, collName, {wrapInTransaction: true, moveAcrossChunks: true});
-    };
+    $config.states.findAndModifyWithTransactionAcrossChunks =
+        function findAndModifyWithTransactionAcrossChunks(db, collName, connCache) {
+            this.findAndModifyShardKey(db, collName, {
+                wrapInTransaction: true,
+                moveAcrossChunks: true,
+            });
+        };
 
-    $config.states.findAndModifyWithTransactionWithinChunk = function findAndModifyWithTransactionWithinChunk(
-        db,
-        collName,
-        connCache,
-    ) {
-        this.findAndModifyShardKey(db, collName, {wrapInTransaction: true, moveAcrossChunks: false});
-    };
+    $config.states.findAndModifyWithTransactionWithinChunk =
+        function findAndModifyWithTransactionWithinChunk(db, collName, connCache) {
+            this.findAndModifyShardKey(db, collName, {
+                wrapInTransaction: true,
+                moveAcrossChunks: false,
+            });
+        };
 
-    $config.states.updateWithRetryableWriteAcrossChunks = function updateWithRetryableWriteAcrossChunks(
-        db,
-        collName,
-        connCache,
-    ) {
-        this.updateShardKey(db, collName, {wrapInTransaction: false, moveAcrossChunks: true});
-    };
+    $config.states.updateWithRetryableWriteAcrossChunks =
+        function updateWithRetryableWriteAcrossChunks(db, collName, connCache) {
+            this.updateShardKey(db, collName, {wrapInTransaction: false, moveAcrossChunks: true});
+        };
 
-    $config.states.updateWithRetryableWriteWithinChunk = function updateWithRetryableWriteWithinChunk(
-        db,
-        collName,
-        connCache,
-    ) {
-        this.updateShardKey(db, collName, {wrapInTransaction: false, moveAcrossChunks: false});
-    };
+    $config.states.updateWithRetryableWriteWithinChunk =
+        function updateWithRetryableWriteWithinChunk(db, collName, connCache) {
+            this.updateShardKey(db, collName, {wrapInTransaction: false, moveAcrossChunks: false});
+        };
 
     $config.states.updateWithTransactionAcrossChunks = function updateWithTransactionAcrossChunks(
         db,
@@ -522,7 +556,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const shouldUseCausalConsistency =
             (this.runningWithStepdowns || this.retryOnKilledSession) &&
             !this.updateDocumentShardKeyUsingTransactionApiEnabled;
-        this.session = db.getMongo().startSession({causalConsistency: shouldUseCausalConsistency, retryWrites: true});
+        this.session = db
+            .getMongo()
+            .startSession({causalConsistency: shouldUseCausalConsistency, retryWrites: true});
 
         // Assign a default counter value to each document owned by this thread.
         db[collName].find({tid: this.tid}).forEach((doc) => {

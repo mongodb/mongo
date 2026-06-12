@@ -35,7 +35,9 @@ function runTest(conn, testCase) {
 
     function runTTLMonitor() {
         const ttlPass = admin.serverStatus().metrics.ttl.passes;
-        assert.commandWorked(admin.runCommand({configureFailPoint: "hangTTLMonitorBetweenPasses", mode: {skip: 1}}));
+        assert.commandWorked(
+            admin.runCommand({configureFailPoint: "hangTTLMonitorBetweenPasses", mode: {skip: 1}}),
+        );
         assert.soon(
             () => admin.serverStatus().metrics.ttl.passes >= ttlPass + 1,
             "TTL monitor didn't run before timing out.",

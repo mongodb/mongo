@@ -45,7 +45,11 @@ let res = db.runCommand({
 
 // Verify that the 'alwaysUpsert' option is no longer supported.
 assert.commandFailedWithCode(res, 6711601);
-assert.eq(1, t.find().count(), "1 doc expected after unsupported option failure on applyOps command");
+assert.eq(
+    1,
+    t.find().count(),
+    "1 doc expected after unsupported option failure on applyOps command",
+);
 
 // alwaysUpsert not specified, should default to false
 print("Testing applyOps with default alwaysUpsert");

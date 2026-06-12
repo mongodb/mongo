@@ -16,7 +16,10 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getSbePlanStages, getQueryInfoAtTopLevelOrFirstStage} from "jstests/libs/query/sbe_explain_helpers.js";
+import {
+    getSbePlanStages,
+    getQueryInfoAtTopLevelOrFirstStage,
+} from "jstests/libs/query/sbe_explain_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
@@ -338,7 +341,10 @@ TimeseriesTest.run((insert) => {
     {
         // Try a project stage which adds and remove subfields.
         const res = coll
-            .aggregate([{$project: {"obj.newField": "$topLevelScalar"}}, {$project: {"_id": 0, "obj.a": 0}}])
+            .aggregate([
+                {$project: {"obj.newField": "$topLevelScalar"}},
+                {$project: {"_id": 0, "obj.a": 0}},
+            ])
             .toArray();
         assert.eq(res.length, 3, res);
         assert.eq(res[0], {"obj": {"newField": 123}}, res);
@@ -441,43 +447,57 @@ TimeseriesTest.run((insert) => {
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$exists: true}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$exists: true}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$lt: 456}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$lt: 456}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$lte: 456}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$lte: 456}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$gt: 123}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$gt: 123}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$gte: 123}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$gte: 123}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$eq: 123}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$eq: 123}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$ne: 123}}}, {$count: "count"}]).toArray();
+        const res = coll
+            .aggregate([{$match: {topLevelScalar: {$ne: 123}}}, {$count: "count"}])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
@@ -785,7 +805,9 @@ TimeseriesTest.run((insert) => {
             .aggregate([
                 {
                     $addFields: {
-                        "computedField": {$dateAdd: {startDate: "$time", unit: "millisecond", amount: 100}},
+                        "computedField": {
+                            $dateAdd: {startDate: "$time", unit: "millisecond", amount: 100},
+                        },
                     },
                 },
                 {$match: {computedField: new Date(datePrefix + 400)}},
@@ -816,7 +838,9 @@ TimeseriesTest.run((insert) => {
 
     {
         // Test the case where a computed meta field is computed to missing.
-        const res = coll.aggregate([{"$project": {"_id": 0, [metaFieldName]: "$$REMOVE"}}]).toArray();
+        const res = coll
+            .aggregate([{"$project": {"_id": 0, [metaFieldName]: "$$REMOVE"}}])
+            .toArray();
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
             assert.eq(doc, {}, res);
@@ -854,7 +878,10 @@ TimeseriesTest.run((insert) => {
     {
         // Test the case where a field is projected out and then projected back in.
         const res = coll
-            .aggregate([{"$project": {"_id": 0, [metaFieldName]: 1}}, {"$project": {"_id": 0, [timeFieldName]: 1}}])
+            .aggregate([
+                {"$project": {"_id": 0, [metaFieldName]: 1}},
+                {"$project": {"_id": 0, [timeFieldName]: 1}},
+            ])
             .toArray();
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
@@ -897,7 +924,9 @@ TimeseriesTest.run((insert) => {
         const coll2 = db[jsTestName() + "_dense"];
         coll2.drop();
         assert.commandWorked(
-            db.createCollection(coll2.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll2.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         // Single bucket with:
@@ -910,7 +939,10 @@ TimeseriesTest.run((insert) => {
         // Case 1: $ifNull over the dense column "c". tryDense() must return true so
         // fillEmpty() takes the short-circuit path; the fallback is never consulted.
         // Expected sum of x: 1 + 2 + 3 = 6.
-        const densePipeline = [{$addFields: {x: {$ifNull: ["$c", -999]}}}, {$group: {_id: null, total: {$sum: "$x"}}}];
+        const densePipeline = [
+            {$addFields: {x: {$ifNull: ["$c", -999]}}},
+            {$group: {_id: null, total: {$sum: "$x"}}},
+        ];
         let results = coll2.aggregate(densePipeline).toArray();
         assert.eq(results.length, 1, () => tojson(results));
         assert.eq(results[0].total, 6, () => tojson(results));
@@ -919,7 +951,10 @@ TimeseriesTest.run((insert) => {
         // so fillEmpty() actually replaces the Nothing on doc 2 with the fallback.
         // A false positive in tryDense() would leak the Nothing, which $sum would
         // skip, giving 40 instead of 140.
-        const sparsePipeline = [{$addFields: {x: {$ifNull: ["$d", 100]}}}, {$group: {_id: null, total: {$sum: "$x"}}}];
+        const sparsePipeline = [
+            {$addFields: {x: {$ifNull: ["$d", 100]}}},
+            {$group: {_id: null, total: {$sum: "$x"}}},
+        ];
         results = coll2.aggregate(sparsePipeline).toArray();
         assert.eq(results.length, 1, () => tojson(results));
         assert.eq(results[0].total, 140, () => tojson(results));
@@ -935,7 +970,11 @@ TimeseriesTest.run((insert) => {
             const queryInfo = getQueryInfoAtTopLevelOrFirstStage(explain);
             if (queryInfo.explainVersion === "2") {
                 const bucketStages = getSbePlanStages(explain, "ts_bucket_to_cellblock");
-                assert.eq(bucketStages.length, 1, () => "Expected one bucket stage " + tojson(explain));
+                assert.eq(
+                    bucketStages.length,
+                    1,
+                    () => "Expected one bucket stage " + tojson(explain),
+                );
             }
         }
     }
@@ -999,7 +1038,11 @@ TimeseriesTest.run((insert) => {
             const queryInfo = getQueryInfoAtTopLevelOrFirstStage(explain);
             if (queryInfo.explainVersion === "2") {
                 const groupStages = getSbePlanStages(explain, "block_group");
-                assert.eq(groupStages.length, 1, () => "Expected block_group in SBE plan: " + tojson(explain));
+                assert.eq(
+                    groupStages.length,
+                    1,
+                    () => "Expected block_group in SBE plan: " + tojson(explain),
+                );
             }
         }
 

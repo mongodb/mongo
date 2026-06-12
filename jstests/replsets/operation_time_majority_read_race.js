@@ -128,7 +128,8 @@ assert.eq(firstBatch[0]._id, 1);
 assert.eq(
     firstBatch[0].x,
     1,
-    "Majority read must see x=1: the snapshot was established before " + "the update to x=2 and should not reflect it",
+    "Majority read must see x=1: the snapshot was established before " +
+        "the update to x=2 and should not reflect it",
 );
 
 // Demonstrate the causal inconsistency by reading at exactly operationTime using atClusterTime
@@ -138,7 +139,9 @@ assert.eq(
 // inconsistent with the x=1 the majority read returned at "the same" timestamp.
 assert(findResult.operationTime !== undefined, "Find result should include operationTime");
 const session = primary.startSession({causalConsistency: false});
-session.startTransaction({readConcern: {level: "snapshot", atClusterTime: findResult.operationTime}});
+session.startTransaction({
+    readConcern: {level: "snapshot", atClusterTime: findResult.operationTime},
+});
 const followUpResult = assert.commandWorked(
     session.getDatabase(dbName).runCommand({find: collectionName, filter: {_id: 1}}),
 );

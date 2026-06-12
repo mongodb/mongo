@@ -8,7 +8,10 @@
  *   requires_timeseries,
  * ]
  */
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {add2dsphereVersionIfNeededForSpec} from "jstests/libs/query/geo_index_version_helpers.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
@@ -55,14 +58,22 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collName);
         coll.drop();
 
-        jsTestLog("Setting up collection: " + coll.getFullName() + " with index: " + tojson(keysForCreate));
+        jsTestLog(
+            "Setting up collection: " +
+                coll.getFullName() +
+                " with index: " +
+                tojson(keysForCreate),
+        );
 
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         const numUserIndexesBefore = coll.getIndexes().length;
-        const numBucketIndexesBefore = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length;
+        const numBucketIndexesBefore =
+            getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length;
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
@@ -72,7 +83,10 @@ TimeseriesTest.run((insert) => {
         );
 
         assert.eq(numUserIndexesBefore + 1, coll.getIndexes().length);
-        assert.eq(numBucketIndexesBefore + 1, getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length);
+        assert.eq(
+            numBucketIndexesBefore + 1,
+            getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length,
+        );
     };
 
     const testIndex = (userKeyPattern, bucketsKeyPattern, numDocs) => {
@@ -86,7 +100,10 @@ TimeseriesTest.run((insert) => {
     };
 
     // Test metadata-only indexes.
-    testIndex({[`${metaFieldName}.tag`]: 1, [`${metaFieldName}.r`]: 1}, {"meta.tag": 1, "meta.r": 1});
+    testIndex(
+        {[`${metaFieldName}.tag`]: 1, [`${metaFieldName}.r`]: 1},
+        {"meta.tag": 1, "meta.r": 1},
+    );
     testIndex(
         {[`${metaFieldName}.tag`]: 1, [`${metaFieldName}.loc`]: "2dsphere"},
         {"meta.tag": 1, "meta.loc": "2dsphere"},
@@ -99,16 +116,40 @@ TimeseriesTest.run((insert) => {
     );
 
     // Test measurement-only indexes.
-    testIndex({x: 1, z: 1}, {"control.min.x": 1, "control.max.x": 1, "control.min.z": 1, "control.max.z": 1});
-    testIndex({x: -1, z: -1}, {"control.max.x": -1, "control.min.x": -1, "control.max.z": -1, "control.min.z": -1});
-    testIndex({x: 1, z: -1}, {"control.min.x": 1, "control.max.x": 1, "control.max.z": -1, "control.min.z": -1});
-    testIndex({x: -1, z: 1}, {"control.max.x": -1, "control.min.x": -1, "control.min.z": 1, "control.max.z": 1});
+    testIndex(
+        {x: 1, z: 1},
+        {"control.min.x": 1, "control.max.x": 1, "control.min.z": 1, "control.max.z": 1},
+    );
+    testIndex(
+        {x: -1, z: -1},
+        {"control.max.x": -1, "control.min.x": -1, "control.max.z": -1, "control.min.z": -1},
+    );
+    testIndex(
+        {x: 1, z: -1},
+        {"control.min.x": 1, "control.max.x": 1, "control.max.z": -1, "control.min.z": -1},
+    );
+    testIndex(
+        {x: -1, z: 1},
+        {"control.max.x": -1, "control.min.x": -1, "control.min.z": 1, "control.max.z": 1},
+    );
 
     // Test mixed metadata and measurement indexes.
-    testIndex({[`${metaFieldName}.r.s`]: 1, x: 1}, {"meta.r.s": 1, "control.min.x": 1, "control.max.x": 1});
-    testIndex({[`${metaFieldName}.r.s`]: 1, x: -1}, {"meta.r.s": 1, "control.max.x": -1, "control.min.x": -1});
-    testIndex({x: 1, [`${metaFieldName}.r.s`]: 1}, {"control.min.x": 1, "control.max.x": 1, "meta.r.s": 1});
-    testIndex({x: -1, [`${metaFieldName}.r.s`]: 1}, {"control.max.x": -1, "control.min.x": -1, "meta.r.s": 1});
+    testIndex(
+        {[`${metaFieldName}.r.s`]: 1, x: 1},
+        {"meta.r.s": 1, "control.min.x": 1, "control.max.x": 1},
+    );
+    testIndex(
+        {[`${metaFieldName}.r.s`]: 1, x: -1},
+        {"meta.r.s": 1, "control.max.x": -1, "control.min.x": -1},
+    );
+    testIndex(
+        {x: 1, [`${metaFieldName}.r.s`]: 1},
+        {"control.min.x": 1, "control.max.x": 1, "meta.r.s": 1},
+    );
+    testIndex(
+        {x: -1, [`${metaFieldName}.r.s`]: 1},
+        {"control.max.x": -1, "control.min.x": -1, "meta.r.s": 1},
+    );
     testIndex(
         {x: 1, [`${metaFieldName}.loc`]: "2dsphere", z: -1},
         {
@@ -138,7 +179,9 @@ TimeseriesTest.run((insert) => {
         coll.drop();
 
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
 
         assert.commandFailedWithCode(coll.createIndex(keysForCreate), ErrorCodes.CannotCreateIndex);
@@ -154,9 +197,13 @@ TimeseriesTest.run((insert) => {
         coll.drop();
 
         assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+            db.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
         );
-        assert.commandWorked(coll.createIndex(keysForCreate, add2dsphereVersionIfNeededForSpec(keysForCreate)));
+        assert.commandWorked(
+            coll.createIndex(keysForCreate, add2dsphereVersionIfNeededForSpec(keysForCreate)),
+        );
 
         assert.commandFailedWithCode(coll.insert(docs), 5930501);
     };

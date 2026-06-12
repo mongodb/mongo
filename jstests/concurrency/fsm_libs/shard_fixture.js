@@ -70,7 +70,10 @@ export var FSMShardingTest = class {
                 shard_rst.asCluster(conn, function () {
                     for (const node of shard_rst.nodes) {
                         assert.commandWorked(
-                            node.adminCommand({"setParameter": 1, logComponentVerbosity: {test: {verbosity: 1}}}),
+                            node.adminCommand({
+                                "setParameter": 1,
+                                logComponentVerbosity: {test: {verbosity: 1}},
+                            }),
                         );
                     }
                 });
@@ -135,7 +138,11 @@ export var FSMShardingTest = class {
         );
 
         assert.commandWorked(
-            this.s(0).adminCommand({shardCollection: coll.toString(), key: shardKey, unique: unique || false}),
+            this.s(0).adminCommand({
+                shardCollection: coll.toString(),
+                key: shardKey,
+                unique: unique || false,
+            }),
         );
     }
 

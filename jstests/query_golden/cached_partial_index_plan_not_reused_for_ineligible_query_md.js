@@ -68,7 +68,9 @@ const docs = [{_id: 1, a: 0}];
     outputPlanCacheStats(coll);
 
     // q2 should not used the partial index and return the document.
-    line("Verify that 2nd query does not use cached partial index plan and returns the correct document");
+    line(
+        "Verify that 2nd query does not use cached partial index plan and returns the correct document",
+    );
     runFindTest(q2);
 }
 
@@ -124,6 +126,8 @@ const docs = [{_id: 1, a: 0}];
     line("Verifying that the plan cache contains an entry with the partial index");
     outputPlanCacheStats(coll);
 
-    line("Verify that 2nd pipeline does not use cached partial index plan and returns the correct document");
+    line(
+        "Verify that 2nd pipeline does not use cached partial index plan and returns the correct document",
+    );
     runAggTest(p2);
 }

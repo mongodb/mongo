@@ -5,7 +5,10 @@
  *   requires_fcv_70,
  * ]
  */
-import {testWithMultipleGroupsMedian, testWithSingleGroupMedian} from "jstests/aggregation/libs/percentiles_util.js";
+import {
+    testWithMultipleGroupsMedian,
+    testWithSingleGroupMedian,
+} from "jstests/aggregation/libs/percentiles_util.js";
 
 const coll = db[jsTestName()];
 

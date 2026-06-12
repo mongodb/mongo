@@ -44,7 +44,9 @@ function runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, t
     upgradeFunc();
     jsTest.log("Finished upgrading");
     let shard0Primary = getShard0PrimaryFunc();
-    assert.commandWorked(shard0Primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        shard0Primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}),
+    );
     waitForAutoBootstrap(shard0Primary);
 
     // Reconnect after the connection was closed due to restart.
@@ -86,12 +88,20 @@ function runStandaloneTest(oldBinVersion, oldFCVVersion) {
             const res = assert.commandWorked(node.adminCommand({hello: 1}));
             return res.isWritablePrimary;
         });
-        assert.commandWorked(node.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            node.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
     const downgradeFunc = () => {
-        assert.commandWorked(node.adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}));
+        assert.commandWorked(
+            node.adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}),
+        );
         MongoRunner.stopMongod(node, null, {noCleanData: true});
-        node = MongoRunner.runMongod({noCleanData: true, port: node.port, binVersion: oldBinVersion});
+        node = MongoRunner.runMongod({
+            noCleanData: true,
+            port: node.port,
+            binVersion: oldBinVersion,
+        });
     };
     const tearDownFunc = () => MongoRunner.stopMongod(node);
     runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, tearDownFunc);
@@ -118,11 +128,17 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
                 featureFlagAllMongodsAreSharded: true,
             },
         });
-        assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            rst
+                .getPrimary()
+                .adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
     };
     const downgradeFunc = () => {
         assert.commandWorked(
-            rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}),
+            rst
+                .getPrimary()
+                .adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}),
         );
         rst.upgradeSet({binVersion: oldBinVersion, setParameter: {}});
     };
@@ -133,11 +149,15 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
 jsTest.log("Running tests for a 'last-lts' standalone bootstrapped as a single-shard cluster");
 runStandaloneTest("last-lts", lastLTSFCV);
 
-jsTest.log("Running tests for a 'last-continuous' standalone bootstrapped as a single-shard cluster");
+jsTest.log(
+    "Running tests for a 'last-continuous' standalone bootstrapped as a single-shard cluster",
+);
 runStandaloneTest("last-continuous", lastContinuousFCV);
 
 jsTest.log("Running tests for a 'last-lts' replica set bootstrapped as a single-shard cluster");
 runReplicaSetTest("last-lts", lastLTSFCV);
 
-jsTest.log("Running tests for a 'last-continuous' replica set bootstrapped as a single-shard cluster");
+jsTest.log(
+    "Running tests for a 'last-continuous' replica set bootstrapped as a single-shard cluster",
+);
 runReplicaSetTest("last-continuous", lastContinuousFCV);

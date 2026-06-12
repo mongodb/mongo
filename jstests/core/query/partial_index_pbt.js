@@ -28,7 +28,10 @@ import {getIndexModel} from "jstests/libs/property_test_helpers/models/index_mod
 import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {partialIndexCounterexamples} from "jstests/libs/property_test_helpers/pbt_resolved_bugs.js";
-import {concreteQueryFromFamily, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {
+    concreteQueryFromFamily,
+    testProperty,
+} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -57,7 +60,11 @@ const workloadModel = fc
             maxLength: 15,
             size: "+2",
         }),
-        queries: fc.array(getQueryAndOptionsModel(), {minLength: 1, maxLength: numQueriesPerRun, size: "+2"}),
+        queries: fc.array(getQueryAndOptionsModel(), {
+            minLength: 1,
+            maxLength: numQueriesPerRun,
+            size: "+2",
+        }),
     })
     .map(({partialFilterPredShape, docs, indexes, queries}) => {
         // The predicate model generates a family of predicates of the same shape, with different
@@ -67,7 +74,9 @@ const workloadModel = fc
         const partialIndexes = indexes.map(({def, options}) => {
             return {
                 def,
-                options: Object.assign({}, options, {partialFilterExpression: firstPartialFilterPred}),
+                options: Object.assign({}, options, {
+                    partialFilterExpression: firstPartialFilterPred,
+                }),
             };
         });
 
@@ -84,4 +93,10 @@ const workloadModel = fc
     });
 
 // Test with a regular collection.
-testProperty(correctnessProperty, {controlColl, experimentColl}, workloadModel, numRuns, partialIndexCounterexamples);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    workloadModel,
+    numRuns,
+    partialIndexCounterexamples,
+);

@@ -192,7 +192,10 @@ export function randomUpdateDelete($config, $super) {
         return map;
     };
 
-    $config.data.verifyDocumentCounters = function verifyDocumentCounters(onDiskBefore, onDiskAfter) {
+    $config.data.verifyDocumentCounters = function verifyDocumentCounters(
+        onDiskBefore,
+        onDiskAfter,
+    ) {
         for (const key of this.expectedDocs.keys()) {
             // Verify the counter separately from the rest of the document to account for differing
             // semantics around retries.
@@ -289,7 +292,9 @@ export function randomUpdateDelete($config, $super) {
 
         // Increase yielding so that there is more interleaving between operations.
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}),
+            );
             this.internalQueryExecYieldIterationsDefault = res.was;
         });
     };
@@ -335,7 +340,10 @@ export function randomUpdateDelete($config, $super) {
             }
             const onDiskAfter = this.readOwnedDocuments(db, collName);
             this.verifyDocumentCounters(onDiskBefore, onDiskAfter);
-            this.verifyUpdateResult({n: totalUpdates, nModified: totalUpdates - totalUpserts}, result);
+            this.verifyUpdateResult(
+                {n: totalUpdates, nModified: totalUpdates - totalUpserts},
+                result,
+            );
         });
     };
 
@@ -363,7 +371,9 @@ export function randomUpdateDelete($config, $super) {
             if (onDiskAfter.size > 0) {
                 return;
             }
-            jsTestLog(`Thread ${this.tid} has deleted all of its documents and will now reset to its initial state`);
+            jsTestLog(
+                `Thread ${this.tid} has deleted all of its documents and will now reset to its initial state`,
+            );
             const bulk = db[collName].initializeUnorderedBulkOp();
             for (const [_, doc] of this.initialDocs) {
                 bulk.insert(doc);

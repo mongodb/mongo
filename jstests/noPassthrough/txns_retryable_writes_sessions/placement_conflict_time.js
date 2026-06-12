@@ -39,7 +39,9 @@ describe("Test placementConflictTime", function () {
         st.s.getDB(dbName).dropDatabase();
 
         // Create the database db and define shard0 as the DBPrimary shard.
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
 
         // Create a collection "collA".
         assert.commandWorked(st.s.getCollection(nsCollA).insert({_id: 0, x: 1}));
@@ -49,8 +51,12 @@ describe("Test placementConflictTime", function () {
         // shard1: [x: 0, x: +inf)
         assert.commandWorked(st.s.adminCommand({shardCollection: nsCollB, key: {x: 1}}));
         assert.commandWorked(st.s.adminCommand({split: nsCollB, middle: {x: 0}}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: nsCollB, find: {x: -10}, to: st.shard0.shardName}));
-        assert.commandWorked(st.s.adminCommand({moveChunk: nsCollB, find: {x: 0}, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: nsCollB, find: {x: -10}, to: st.shard0.shardName}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: nsCollB, find: {x: 0}, to: st.shard1.shardName}),
+        );
 
         // Force refreshes to avoid getting stale config errors
         assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
@@ -73,7 +79,9 @@ describe("Test placementConflictTime", function () {
         assert.eq(1, sessionDB.getCollection(nameCollA).find().itcount());
 
         // Move the sharded collection chunk to shard0 from shard1
-        assert.commandWorked(st.s.adminCommand({moveChunk: nsCollB, find: {x: 10}, to: st.shard0.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: nsCollB, find: {x: 10}, to: st.shard0.shardName}),
+        );
 
         if (shouldThrow) {
             let err = assert.throwsWithCode(() => {
@@ -107,7 +115,9 @@ describe("Test placementConflictTime", function () {
         const otherSessionDB = session.getDatabase(otherDb);
 
         // Create the database 'otherDb' and define shard1 as its DBPrimary shard.
-        assert.commandWorked(st.s.adminCommand({enableSharding: otherDb, primaryShard: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: otherDb, primaryShard: st.shard1.shardName}),
+        );
         st.s.getDB(otherDb).getCollection(otherColl).insert({x: 1});
 
         // Start transaction

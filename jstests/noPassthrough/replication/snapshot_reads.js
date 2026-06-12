@@ -66,7 +66,9 @@ function runTest({useCausalConsistency, establishCursorCmd, readConcern}) {
     assert.commandWorked(primaryDB.coll.insert({_id: 10}, {writeConcern: {w: "majority"}}));
 
     // Fetch the first 5 documents.
-    res = assert.commandWorked(sessionDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 5}));
+    res = assert.commandWorked(
+        sessionDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 5}),
+    );
     cursor = parseCursor(res);
     assert.neq(0, cursor.id, tojson(res));
     assert(cursor.hasOwnProperty("nextBatch"), tojson(res));
@@ -74,7 +76,9 @@ function runTest({useCausalConsistency, establishCursorCmd, readConcern}) {
 
     // Exhaust the cursor, retrieving the remainder of the result set. Performing a second
     // getMore tests snapshot isolation across multiple getMore invocations.
-    res = assert.commandWorked(sessionDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 20}));
+    res = assert.commandWorked(
+        sessionDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 20}),
+    );
     assert.commandWorked(session.commitTransaction_forTesting());
 
     // The cursor has been exhausted.
@@ -88,7 +92,9 @@ function runTest({useCausalConsistency, establishCursorCmd, readConcern}) {
 
     // Perform a second snapshot read under a new transaction.
     session.startTransaction({readConcern: readConcern});
-    res = assert.commandWorked(sessionDb.runCommand({find: collName, sort: {_id: 1}, batchSize: 20}));
+    res = assert.commandWorked(
+        sessionDb.runCommand({find: collName, sort: {_id: 1}, batchSize: 20}),
+    );
     assert.commandWorked(session.commitTransaction_forTesting());
 
     // The cursor has been exhausted.

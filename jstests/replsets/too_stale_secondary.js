@@ -59,7 +59,11 @@ let bigOplogSizeMB = 1000;
 // syncdelay is chosen to frequently take checkpoints, allowing oplog truncation to proceed.
 let replTest = new ReplSetTest({
     name: testName,
-    nodes: [{oplogSize: smallOplogSizeMB}, {oplogSize: bigOplogSizeMB}, {oplogSize: smallOplogSizeMB}],
+    nodes: [
+        {oplogSize: smallOplogSizeMB},
+        {oplogSize: bigOplogSizeMB},
+        {oplogSize: smallOplogSizeMB},
+    ],
     nodeOptions: {
         syncdelay: 1,
         setParameter: {"failpoint.hangOplogCapMaintainerThread": tojson({mode: "alwaysOn"})},
@@ -109,7 +113,11 @@ assert.soon(() => {
 
 // Make sure that Node 1's oplog didn't overflow. (This is best effort
 // as this check could race with the maintainer thread running.)
-assert.eq(firstOplogEntryNode1, getFirstOplogEntry(replTest.nodes[1]), "Node 1's oplog overflowed unexpectedly.");
+assert.eq(
+    firstOplogEntryNode1,
+    getFirstOplogEntry(replTest.nodes[1]),
+    "Node 1's oplog overflowed unexpectedly.",
+);
 
 jsTestLog("5: Stop Node 1 and restart Node 2.");
 replTest.stop(1);
@@ -134,7 +142,9 @@ replTest.restart(2, {
     setParameter: {"failpoint.setMaintenanceModeFailsWithNotSecondary": tojson({mode: {times: 1}})},
 });
 
-jsTestLog("8: Wait for Node 2 to transition to RECOVERING (its oplog should remain stale after restart)");
+jsTestLog(
+    "8: Wait for Node 2 to transition to RECOVERING (its oplog should remain stale after restart)",
+);
 assert.soonNoExcept(() => tooStale(replTest.nodes[2]), "Waiting for Node 2 to become too stale");
 // This checks the state as reported by the node itself.
 assert.soon(

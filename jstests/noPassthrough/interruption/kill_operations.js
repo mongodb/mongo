@@ -204,7 +204,10 @@ function runTest(conn) {
     assert.eq(0, cursorId5);
 
     killOpKey(conn, [kOpKey4, kOpKey5]);
-    assert.commandFailedWithCode(db.runCommand({getMore: cursorId4, collection: kCollName}), ErrorCodes.CursorNotFound);
+    assert.commandFailedWithCode(
+        db.runCommand({getMore: cursorId4, collection: kCollName}),
+        ErrorCodes.CursorNotFound,
+    );
 }
 
 // Test killOp against mongod.

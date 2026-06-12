@@ -185,7 +185,11 @@ export var AnalyzeShardKeyUtil = {
      */
     assertDiffPercentage(actual, expected, maxPercentage) {
         const actualPercentage = (Math.abs(actual - expected) * 100) / expected;
-        assert.lt(actualPercentage, maxPercentage, tojson({actual, expected, maxPercentage, actualPercentage}));
+        assert.lt(
+            actualPercentage,
+            maxPercentage,
+            tojson({actual, expected, maxPercentage, actualPercentage}),
+        );
     },
 
     validateKeyCharacteristicsMetrics(metrics) {
@@ -253,7 +257,10 @@ export var AnalyzeShardKeyUtil = {
         // Verify the number of most common shard key values returned is less than what
         // 'analyzeShardKeyNumMostCommonValues' is set to.
         assert.gt(actual.mostCommonValues.length, 0);
-        assert.lte(actual.mostCommonValues.length, expected.numMostCommonValues, {actual, expected});
+        assert.lte(actual.mostCommonValues.length, expected.numMostCommonValues, {
+            actual,
+            expected,
+        });
         let prevFrequency = Number.MAX_VALUE;
         for (let mostCommonValue of actual.mostCommonValues) {
             // Verify the shard key values are sorted in descending of frequency.
@@ -279,7 +286,9 @@ export var AnalyzeShardKeyUtil = {
     validateReadDistributionMetrics(metrics) {
         if (metrics.sampleSize.total == 0) {
             assert.eq(
-                bsonWoCompare(metrics, {sampleSize: {total: 0, find: 0, aggregate: 0, count: 0, distinct: 0}}),
+                bsonWoCompare(metrics, {
+                    sampleSize: {total: 0, find: 0, aggregate: 0, count: 0, distinct: 0},
+                }),
                 0,
                 metrics,
             );
@@ -318,13 +327,17 @@ export var AnalyzeShardKeyUtil = {
     validateWriteDistributionMetrics(metrics) {
         if (metrics.sampleSize.total == 0) {
             assert.eq(
-                bsonWoCompare(metrics, {sampleSize: {total: 0, update: 0, delete: 0, findAndModify: 0}}),
+                bsonWoCompare(metrics, {
+                    sampleSize: {total: 0, update: 0, delete: 0, findAndModify: 0},
+                }),
                 0,
                 metrics,
             );
         } else {
             assert.eq(
-                metrics.sampleSize.update + metrics.sampleSize.delete + metrics.sampleSize.findAndModify,
+                metrics.sampleSize.update +
+                    metrics.sampleSize.delete +
+                    metrics.sampleSize.findAndModify,
                 metrics.sampleSize.total,
                 metrics.sampleSize,
             );

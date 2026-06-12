@@ -27,7 +27,9 @@ function runTest(docs, query, results) {
     const tsColl = db.getCollection(jsTestName());
     tsColl.drop();
 
-    assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
 
     // Populate the collection with documents.
     docs.forEach((d) => tsColl.insert(Object.assign({[timeFieldName]: new Date("2021-01-01")}, d)));
@@ -75,12 +77,16 @@ runTest([{a: 1}, {a: {b: 3}}, {a: new Date("2021-01-01")}], {"a.b": {$gt: 2}}, [
 
 // 'a.b' is missing in the bounds even though it appears in the events. The bounds it is missing
 // in are arrays on both sides.
-runTest([{a: [1]}, {a: [{b: 3}]}, {a: [new Date("2021-01-01")]}], {"a.b": {$gt: 2}}, [{a: [{b: 3}]}]);
+runTest([{a: [1]}, {a: [{b: 3}]}, {a: [new Date("2021-01-01")]}], {"a.b": {$gt: 2}}, [
+    {a: [{b: 3}]},
+]);
 
 // 'a.b' appears in the bounds which are arrays. But it doesn't appear not in every pair of bounds.
 // And the relevant value of 'a.b' does not appear in the bounds despite being present in the
 // events.
-runTest([{a: [1]}, {a: [{b: 3}]}, {a: [new Date("2021-01-01"), {b: 1}]}], {"a.b": {$gt: 2}}, [{a: [{b: 3}]}]);
+runTest([{a: [1]}, {a: [{b: 3}]}, {a: [new Date("2021-01-01"), {b: 1}]}], {"a.b": {$gt: 2}}, [
+    {a: [{b: 3}]},
+]);
 
 // 'a.b' appears in the bounds but not the relevant side of the bounds.
 runTest([{a: 1}, {a: {b: 1}}], {"a.b": {$lt: 2}}, [{a: {b: 1}}]);
@@ -92,7 +98,9 @@ runTest([{a: {b: 3}}, {a: {b: [1, 2]}}], {"a.b": {$gte: 3}}, [{a: {b: 3}}]);
 runTest([{a: {b: 4}}, {a: {b: [1, 2]}}], {"a.b": {$lte: 3}}, [{a: {b: [1, 2]}}]);
 
 // 'a.b' appears in the bounds but the matching values appear in neither side of the bounds.
-runTest([{a: {b: 3}}, {a: {b: [1, 2]}}, {a: new Date("2021-01-01")}], {"a.b": {$eq: 2}}, [{a: {b: [1, 2]}}]);
+runTest([{a: {b: 3}}, {a: {b: [1, 2]}}, {a: new Date("2021-01-01")}], {"a.b": {$eq: 2}}, [
+    {a: {b: [1, 2]}},
+]);
 
 // 'a.0' doesn't appear in the bounds.
 runTest(
@@ -112,9 +120,13 @@ runTest(
 runTest([{a: {b: [3, 4]}}, {a: [{b: 1}, {b: 2}]}], {"a.b": {$lt: 2}}, [{a: [{b: 1}, {b: 2}]}]);
 runTest([{a: {b: [3, 4]}}, {a: [{b: 1}, {b: 2}]}], {"a.b": {$gte: 3}}, [{a: {b: [3, 4]}}]);
 
-runTest([{a: {b: [{c: 3}, {c: 4}]}}, {a: [{b: [{c: 1}, {c: 2}]}, {b: {c: 2}}]}], {"a.b.c": {$lt: 2}}, [
-    {a: [{b: [{c: 1}, {c: 2}]}, {b: {c: 2}}]},
-]);
-runTest([{a: {b: [{c: 3}, {c: 4}]}}, {a: [{b: [{c: 1}, {c: 2}]}, {b: {c: 2}}]}], {"a.b.c": {$gte: 3}}, [
-    {a: {b: [{c: 3}, {c: 4}]}},
-]);
+runTest(
+    [{a: {b: [{c: 3}, {c: 4}]}}, {a: [{b: [{c: 1}, {c: 2}]}, {b: {c: 2}}]}],
+    {"a.b.c": {$lt: 2}},
+    [{a: [{b: [{c: 1}, {c: 2}]}, {b: {c: 2}}]}],
+);
+runTest(
+    [{a: {b: [{c: 3}, {c: 4}]}}, {a: [{b: [{c: 1}, {c: 2}]}, {b: {c: 2}}]}],
+    {"a.b.c": {$gte: 3}},
+    [{a: {b: [{c: 3}, {c: 4}]}}],
+);

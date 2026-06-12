@@ -24,7 +24,9 @@ function renameBucketsCollection(adminDB, username, shouldSucceed) {
     testDB[bucketsCollName].drop();
     testDB[targetBucketsCollName].drop();
 
-    assert.commandWorked(testDB.createCollection(bucketsCollName, {timeseries: {timeField: "time"}}));
+    assert.commandWorked(
+        testDB.createCollection(bucketsCollName, {timeseries: {timeField: "time"}}),
+    );
     adminDB.logout();
 
     // Try rename with test users
@@ -47,7 +49,11 @@ function renameBucketsCollection(adminDB, username, shouldSucceed) {
         dropTarget: true,
     });
 
-    assert.eq(shouldSucceed ? 1 : 0, res.ok, "Rename collection failed or succeeded unexpectedly:" + tojson(res));
+    assert.eq(
+        shouldSucceed ? 1 : 0,
+        res.ok,
+        "Rename collection failed or succeeded unexpectedly:" + tojson(res),
+    );
 
     adminDB.logout();
 }
@@ -87,7 +93,11 @@ function runTest(conn) {
     });
 
     // Create test users.
-    adminDB.createUser({user: "userAdmin", pwd: "password", roles: ["userAdminAnyDatabase", "renameBucketsOnly"]});
+    adminDB.createUser({
+        user: "userAdmin",
+        pwd: "password",
+        roles: ["userAdminAnyDatabase", "renameBucketsOnly"],
+    });
 
     // Create read and write users.
     adminDB.createUser({
@@ -99,8 +109,16 @@ function runTest(conn) {
     // Create strong users.
     adminDB.createUser({user: "restore", pwd: "password", roles: ["restore", "renameBucketsOnly"]});
     adminDB.createUser({user: "root", pwd: "password", roles: ["root", "renameBucketsOnly"]});
-    adminDB.createUser({user: "rootier", pwd: "password", roles: ["__system", "renameBucketsOnly"]});
-    adminDB.createUser({user: "reader", pwd: "password", roles: ["readAnyDatabase", "renameBucketsOnly"]});
+    adminDB.createUser({
+        user: "rootier",
+        pwd: "password",
+        roles: ["__system", "renameBucketsOnly"],
+    });
+    adminDB.createUser({
+        user: "reader",
+        pwd: "password",
+        roles: ["readAnyDatabase", "renameBucketsOnly"],
+    });
 
     adminDB.logout();
 

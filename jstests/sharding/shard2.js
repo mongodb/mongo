@@ -31,7 +31,11 @@ assert.commandWorked(db.foo.save({num: 1, name: "eliot"}));
 assert.commandWorked(db.foo.save({num: 2, name: "sara"}));
 assert.commandWorked(db.foo.save({num: -1, name: "joe"}));
 
-assert.eq(3, s.getPrimaryShard("test").getDB("test").foo.find().length(), "not right directly to db A");
+assert.eq(
+    3,
+    s.getPrimaryShard("test").getDB("test").foo.find().length(),
+    "not right directly to db A",
+);
 assert.eq(3, db.foo.find().length(), "not right on shard");
 
 var primary = s.getPrimaryShard("test").getDB("test");
@@ -50,7 +54,12 @@ assert.commandFailedWithCode(
 );
 
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: secondary.getMongo().name, _waitForDelete: true}),
+    s.s0.adminCommand({
+        movechunk: "test.foo",
+        find: {num: 1},
+        to: secondary.getMongo().name,
+        _waitForDelete: true,
+    }),
 );
 assert.eq(2, secondary.foo.find().length(), "secondary should have 2 after move shard");
 assert.eq(1, primary.foo.find().length(), "primary should only have 1 after move shard");
@@ -126,8 +135,16 @@ assert.eq(3, sumQuery(db.foo.find().sort({name: -1})), "sharding query w/non-sha
 
 // sort by num multiple shards per server
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 2}}));
-assert.eq("funny man", db.foo.find().sort({num: 1})[0].name, "sharding query w/sort and another split 1 order wrong");
-assert.eq("bob", db.foo.find().sort({num: -1})[0].name, "sharding query w/sort and another split 2 order wrong");
+assert.eq(
+    "funny man",
+    db.foo.find().sort({num: 1})[0].name,
+    "sharding query w/sort and another split 1 order wrong",
+);
+assert.eq(
+    "bob",
+    db.foo.find().sort({num: -1})[0].name,
+    "sharding query w/sort and another split 2 order wrong",
+);
 assert.eq(
     "funny man",
     db.foo
@@ -217,12 +234,22 @@ assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 db.foo.insert({num: -3});
 
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.foo", find: {num: -2}, to: secondary.getMongo().name, _waitForDelete: true}),
+    s.s0.adminCommand({
+        movechunk: "test.foo",
+        find: {num: -2},
+        to: secondary.getMongo().name,
+        _waitForDelete: true,
+    }),
 );
 assert.eq(1, s.onNumShards("test", "foo"), "on 1 shards");
 
 assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.foo", find: {num: -2}, to: primary.getMongo().name, _waitForDelete: true}),
+    s.s0.adminCommand({
+        movechunk: "test.foo",
+        find: {num: -2},
+        to: primary.getMongo().name,
+        _waitForDelete: true,
+    }),
 );
 assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards again");
 assert.eq(3, findChunksUtil.countChunksForNs(s.config, "test.foo"), "only 3 chunks");

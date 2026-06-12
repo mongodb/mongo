@@ -18,7 +18,10 @@ function numKeys(o) {
 }
 
 db.foo.drop();
-assert.commandWorked(db.foo.stats(), "db.collection.stats() should return 0s on non-existent collection");
+assert.commandWorked(
+    db.foo.stats(),
+    "db.collection.stats() should return 0s on non-existent collection",
+);
 
 // ---------- load some data -----
 
@@ -54,15 +57,25 @@ assert.eq(2, x.nchunks, "coll chunk num");
 assert.eq(2, numKeys(x.shards), "coll shard num");
 assert.eq(N / 2, x.shards[s.shard0.shardName].count, "coll count on s.shard0.shardName expected");
 assert.eq(N / 2, x.shards[s.shard1.shardName].count, "coll count on s.shard1.shardName expected");
-assert.eq(a.foo.count(), x.shards[s.shard0.shardName].count, "coll count on s.shard0.shardName match");
-assert.eq(b.foo.count(), x.shards[s.shard1.shardName].count, "coll count on s.shard1.shardName match");
+assert.eq(
+    a.foo.count(),
+    x.shards[s.shard0.shardName].count,
+    "coll count on s.shard0.shardName match",
+);
+assert.eq(
+    b.foo.count(),
+    x.shards[s.shard1.shardName].count,
+    "coll count on s.shard1.shardName match",
+);
 assert(
     !x.shards[s.shard0.shardName].indexDetails,
-    "indexDetails should not be present in s.shard0.shardName: " + tojson(x.shards[s.shard0.shardName]),
+    "indexDetails should not be present in s.shard0.shardName: " +
+        tojson(x.shards[s.shard0.shardName]),
 );
 assert(
     !x.shards[s.shard1.shardName].indexDetails,
-    "indexDetails should not be present in s.shard1.shardName: " + tojson(x.shards[s.shard1.shardName]),
+    "indexDetails should not be present in s.shard1.shardName: " +
+        tojson(x.shards[s.shard1.shardName]),
 );
 
 let a_extras = a.stats().objects - a.foo.count();
@@ -74,8 +87,16 @@ x = assert.commandWorked(db.stats());
 
 assert.eq(N + (a_extras + b_extras), x.objects, "db total count expected");
 assert.eq(2, numKeys(x.raw), "db shard num");
-assert.eq(N / 2 + a_extras, x.raw[s.shard0.name].objects, "db count on s.shard0.shardName expected");
-assert.eq(N / 2 + b_extras, x.raw[s.shard1.name].objects, "db count on s.shard1.shardName expected");
+assert.eq(
+    N / 2 + a_extras,
+    x.raw[s.shard0.name].objects,
+    "db count on s.shard0.shardName expected",
+);
+assert.eq(
+    N / 2 + b_extras,
+    x.raw[s.shard1.name].objects,
+    "db count on s.shard1.shardName expected",
+);
 assert.eq(a.stats().objects, x.raw[s.shard0.name].objects, "db count on s.shard0.shardName match");
 assert.eq(b.stats().objects, x.raw[s.shard1.name].objects, "db count on s.shard1.shardName match");
 
@@ -145,14 +166,18 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
     assert.commandWorked(t.createIndex({a: 1}));
     assert.eq(2, t.getIndexes().length);
 
-    let isWiredTiger = !jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger";
+    let isWiredTiger =
+        !jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger";
 
     let stats = assert.commandWorked(t.stats({indexDetails: true}));
     let shardName;
     let shardStats;
     for (shardName in stats.shards) {
         shardStats = stats.shards[shardName];
-        assert(shardStats.indexDetails, "indexDetails missing for " + shardName + ": " + tojson(shardStats));
+        assert(
+            shardStats.indexDetails,
+            "indexDetails missing for " + shardName + ": " + tojson(shardStats),
+        );
         if (isWiredTiger) {
             assert.eq(
                 t.getIndexes().length,
@@ -166,7 +191,11 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
         let indexes = t.getIndexes().filter(function (doc) {
             return friendlyEqual(doc.key, indexKey);
         });
-        assert.eq(1, indexes.length, tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()));
+        assert.eq(
+            1,
+            indexes.length,
+            tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()),
+        );
         return indexes[0].name;
     }
 
@@ -192,7 +221,9 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
                 );
                 assert(
                     shardStats.indexDetails[indexName],
-                    indexName + " missing from WiredTiger indexDetails: " + tojson(shardStats.indexDetails),
+                    indexName +
+                        " missing from WiredTiger indexDetails: " +
+                        tojson(shardStats.indexDetails),
                 );
                 assert.neq(
                     0,

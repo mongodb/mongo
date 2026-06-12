@@ -10,7 +10,9 @@ function testBlockTime(blockTimeMillis) {
     let minBlockedMillis = blockTimeMillis;
 
     let awaitSleepCmd = startParallelShell(() => {
-        assert.commandWorked(db.adminCommand({sleep: 1, millis: 100, lock: "w", $comment: "Lock sleep"}));
+        assert.commandWorked(
+            db.adminCommand({sleep: 1, millis: 100, lock: "w", $comment: "Lock sleep"}),
+        );
     }, conn.port);
 
     // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
@@ -41,7 +43,9 @@ function testBlockTime(blockTimeMillis) {
     }
 
     let acquireWaitCount = endStats.acquireWaitCount.W - startStats.acquireWaitCount.W;
-    let blockedMillis = Math.floor((endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000);
+    let blockedMillis = Math.floor(
+        (endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000,
+    );
 
     // Require that no other commands run (and maybe acquire locks) in parallel.
     assert.eq(acquireWaitCount, 1, "other commands ran in parallel, can't check timing");

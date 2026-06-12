@@ -164,7 +164,13 @@ function testMultipleDocsOneInconsistency(collOpts) {
         collOpts,
     );
 
-    runDbCheck(replSet, primaryDb, collName, {validateMode: "dataConsistencyAndMissingIndexKeysCheck"}, true);
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+        true,
+    );
 
     forEachNonArbiterNode(replSet, function (node) {
         // Verify that only one missing keys inconsistency was caught.
@@ -198,7 +204,13 @@ function testNoInconsistencies(collOpts) {
         collOpts,
     );
 
-    runDbCheck(replSet, primaryDb, collName, {validateMode: "dataConsistencyAndMissingIndexKeysCheck"}, true);
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+        true,
+    );
 
     // Verify that no error health log entries were logged.
     forEachNonArbiterNode(replSet, function (node) {

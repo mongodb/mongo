@@ -64,9 +64,17 @@ function testUpdateExplain({
     const updateExplainPlanCommand = {explain: innerUpdateCommand, verbosity: "queryPlanner"};
     let explain = assert.commandWorked(testDB.runCommand(updateExplainPlanCommand));
     const updateStage = getPlanStage(explain.queryPlanner.winningPlan, expectedUpdateStageName);
-    assert.neq(null, updateStage, `${expectedUpdateStageName} stage not found in the plan: ${tojson(explain)}`);
+    assert.neq(
+        null,
+        updateStage,
+        `${expectedUpdateStageName} stage not found in the plan: ${tojson(explain)}`,
+    );
     if (expectedUpdateStageName === "TS_MODIFY") {
-        assert.eq(expectedOpType, updateStage.opType, `TS_MODIFY opType is wrong: ${tojson(updateStage)}`);
+        assert.eq(
+            expectedOpType,
+            updateStage.opType,
+            `TS_MODIFY opType is wrong: ${tojson(updateStage)}`,
+        );
         assert.eq(
             expectedBucketFilter,
             updateStage.bucketFilter,
@@ -80,12 +88,20 @@ function testUpdateExplain({
     } else {
         const collScanStage = getPlanStage(explain.queryPlanner.winningPlan, "COLLSCAN");
         assert.neq(null, collScanStage, `COLLSCAN stage not found in the plan: ${tojson(explain)}`);
-        assert.eq(expectedBucketFilter, collScanStage.filter, `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
+        assert.eq(
+            expectedBucketFilter,
+            collScanStage.filter,
+            `COLLSCAN filter is wrong: ${tojson(collScanStage)}`,
+        );
     }
 
     if (expectedUsedIndexName) {
         const ixscanStage = getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(expectedUsedIndexName, ixscanStage.indexName, `Wrong index used: ${tojson(ixscanStage)}`);
+        assert.eq(
+            expectedUsedIndexName,
+            ixscanStage.indexName,
+            `Wrong index used: ${tojson(ixscanStage)}`,
+        );
     }
 
     // Verifies the TS_MODIFY stage in the execution stats.
@@ -120,11 +136,23 @@ function testUpdateExplain({
             `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`,
         );
     } else {
-        assert.eq(expectedNumUpdated, execStages[0].nWouldModify, `Got wrong nWouldModify: ${tojson(execStages[0])}`);
-        assert.eq(expectedNumMatched, execStages[0].nMatched, `Got wrong nMatched: ${tojson(execStages[0])}`);
+        assert.eq(
+            expectedNumUpdated,
+            execStages[0].nWouldModify,
+            `Got wrong nWouldModify: ${tojson(execStages[0])}`,
+        );
+        assert.eq(
+            expectedNumMatched,
+            execStages[0].nMatched,
+            `Got wrong nMatched: ${tojson(execStages[0])}`,
+        );
     }
 
-    assert.sameMembers(docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
+    assert.sameMembers(
+        docs,
+        coll.find().toArray(),
+        "Explain command must not touch documents in the collection",
+    );
 }
 
 (function testUpdateManyWithEmptyQuery() {
@@ -154,7 +182,10 @@ function testUpdateExplain({
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateMany",
-        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 3}}),
+        expectedBucketFilter: makeBucketFilter(
+            {meta: {$eq: 2}},
+            {"control.max._id": {$_internalExprGte: 3}},
+        ),
         expectedResidualFilter: {_id: {$gte: 3}},
         expectedNumUpdated: 0,
         expectedNumMatched: 2,
@@ -177,7 +208,10 @@ function testUpdateExplain({
         expectedBucketFilter: makeBucketFilter(
             {meta: {$eq: 2}},
             {
-                $and: [{"control.min._id": {$_internalExprLte: 3}}, {"control.max._id": {$_internalExprGte: 3}}],
+                $and: [
+                    {"control.min._id": {$_internalExprLte: 3}},
+                    {"control.max._id": {$_internalExprGte: 3}},
+                ],
             },
         ),
         expectedResidualFilter: {_id: {$eq: 3}},
@@ -240,7 +274,10 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateOne",
         expectedBucketFilter: makeBucketFilter({
-            $and: [{"control.min._id": {$_internalExprLte: 3}}, {"control.max._id": {$_internalExprGte: 3}}],
+            $and: [
+                {"control.min._id": {$_internalExprLte: 3}},
+                {"control.max._id": {$_internalExprGte: 3}},
+            ],
         }),
         expectedResidualFilter: {_id: {$eq: 3}},
         expectedNumUpdated: 1,
@@ -259,7 +296,10 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateOne",
-        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
+        expectedBucketFilter: makeBucketFilter(
+            {meta: {$eq: 2}},
+            {"control.max._id": {$_internalExprGte: 1}},
+        ),
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
@@ -278,7 +318,10 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateOne",
-        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
+        expectedBucketFilter: makeBucketFilter(
+            {meta: {$eq: 2}},
+            {"control.max._id": {$_internalExprGte: 1}},
+        ),
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,

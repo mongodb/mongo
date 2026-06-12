@@ -111,7 +111,15 @@ describe("Extension stage command metrics", function () {
         verifyExtensionMetricsChange([
             {
                 coll,
-                pipeline: [{$assert: {errmsg: "intentional failure for test", code: 12345, assertionType: "uassert"}}],
+                pipeline: [
+                    {
+                        $assert: {
+                            errmsg: "intentional failure for test",
+                            code: 12345,
+                            assertionType: "uassert",
+                        },
+                    },
+                ],
             },
         ]);
     });

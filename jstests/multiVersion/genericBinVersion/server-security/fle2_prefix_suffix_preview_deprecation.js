@@ -21,7 +21,12 @@ const suffixField = new SuffixField(2, 5, true, false, 1);
 const prefixField = new PrefixField(2, 5, false, true, 1);
 const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
 
-function testPreviewDeprecationOnUpgrade(previewQueryTypeConfig, gaQueryTypeConfig, createError, crudError) {
+function testPreviewDeprecationOnUpgrade(
+    previewQueryTypeConfig,
+    gaQueryTypeConfig,
+    createError,
+    crudError,
+) {
     const rst = new ReplSetTest({
         nodes: 2,
         nodeOptions: {binVersion: "latest", setParameter: {featureFlagQEPrefixSuffixSearch: false}},
@@ -58,7 +63,10 @@ function testPreviewDeprecationOnUpgrade(previewQueryTypeConfig, gaQueryTypeConf
         },
     };
     assert.commandWorked(client.createEncryptionCollection("coll1", previewEFC));
-    assert.commandFailedWithCode(client.getDB().createCollection("coll2", gaEFC), [11632900, 11632901]);
+    assert.commandFailedWithCode(
+        client.getDB().createCollection("coll2", gaEFC),
+        [11632900, 11632901],
+    );
 
     assert.commandWorked(client.getDB().coll1.einsert({field1: "hello"}));
 
@@ -71,7 +79,10 @@ function testPreviewDeprecationOnUpgrade(previewQueryTypeConfig, gaQueryTypeConf
 
     const filter = encStrNormalizedEqExpr("field1", "hello");
 
-    assert.commandFailedWithCode(client.getDB().coll1.eupdate(filter, {$set: {field1: "world"}}), crudError);
+    assert.commandFailedWithCode(
+        client.getDB().coll1.eupdate(filter, {$set: {field1: "world"}}),
+        crudError,
+    );
 
     assert.commandFailedWithCode(
         client.getDB().coll1.erunCommand({
@@ -86,7 +97,10 @@ function testPreviewDeprecationOnUpgrade(previewQueryTypeConfig, gaQueryTypeConf
         crudError,
     );
 
-    assert.commandFailedWithCode(client.getDB().erunCommand({find: "coll1", filter: filter}), crudError);
+    assert.commandFailedWithCode(
+        client.getDB().erunCommand({find: "coll1", filter: filter}),
+        crudError,
+    );
 
     // Finds without encrypted fields should still work
     assert.commandWorked(client.getDB().erunCommand({find: "coll1", filter: {}}));

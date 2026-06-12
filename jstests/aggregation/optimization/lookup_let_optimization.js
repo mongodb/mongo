@@ -42,7 +42,9 @@ const verifyAggregationForBothPipelineOptimizationModes = ({pipeline, expected})
 const pipelineOptParameter = assert.commandWorked(
     db.adminCommand({getParameter: 1, "failpoint.disablePipelineOptimization": 1}),
 );
-const oldMode = pipelineOptParameter["failpoint.disablePipelineOptimization"].mode ? "alwaysOn" : "off";
+const oldMode = pipelineOptParameter["failpoint.disablePipelineOptimization"].mode
+    ? "alwaysOn"
+    : "off";
 
 // Verify $redact.
 verifyAggregationForBothPipelineOptimizationModes({
@@ -51,7 +53,9 @@ verifyAggregationForBothPipelineOptimizationModes({
             $lookup: {
                 from: collName,
                 let: {iShouldPrune: "$test"},
-                pipeline: [{$redact: {$cond: {if: "$$iShouldPrune", then: "$$PRUNE", else: "$$DESCEND"}}}],
+                pipeline: [
+                    {$redact: {$cond: {if: "$$iShouldPrune", then: "$$PRUNE", else: "$$DESCEND"}}},
+                ],
                 as: "redacted",
             },
         },

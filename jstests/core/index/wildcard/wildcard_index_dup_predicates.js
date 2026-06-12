@@ -57,7 +57,11 @@ assertExpectedDocAnswersWildcardIndexQuery(
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}},
     {
-        $and: [{$expr: {$gt: ["$a", {$literal: {}}]}}, {$expr: {$gt: ["$a", {$literal: {}}]}}, {"a.b": "foo"}],
+        $and: [
+            {$expr: {$gt: ["$a", {$literal: {}}]}},
+            {$expr: {$gt: ["$a", {$literal: {}}]}},
+            {"a.b": "foo"},
+        ],
     },
     true,
 );

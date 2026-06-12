@@ -12,7 +12,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function curOpAfterFailpoint(failPoint, filter, timesEntered, curOpParams) {
-    jsTest.log(`waiting for failpoint '${failPoint.failPointName}' to be entered ${timesEntered} time(s).`);
+    jsTest.log(
+        `waiting for failpoint '${failPoint.failPointName}' to be entered ${timesEntered} time(s).`,
+    );
     if (timesEntered > 1) {
         const expectedLog = "Hit " + failPoint.failPointName + " failpoint";
         waitForFailpoint(expectedLog, timesEntered);
@@ -23,7 +25,9 @@ function curOpAfterFailpoint(failPoint, filter, timesEntered, curOpParams) {
     jsTest.log(`Running curOp operation after '${failPoint.failPointName}' failpoint.`);
     let result = adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
 
-    jsTest.log(`${result.length} matching curOp entries after '${failPoint.failPointName}':\n${tojson(result)}`);
+    jsTest.log(
+        `${result.length} matching curOp entries after '${failPoint.failPointName}':\n${tojson(result)}`,
+    );
 
     failPoint.off();
 
@@ -80,7 +84,12 @@ function undefinedToZero(num) {
     return typeof num === "undefined" ? 0 : num;
 }
 
-function assertStepDuration(expectedStepDurations, currentDuration, lowerBoundExclusive, stepDurationsDoc) {
+function assertStepDuration(
+    expectedStepDurations,
+    currentDuration,
+    lowerBoundExclusive,
+    stepDurationsDoc,
+) {
     let actualValue = stepDurationsDoc[currentDuration];
     if (expectedStepDurations.includes(currentDuration)) {
         assert.gt(
@@ -89,7 +98,11 @@ function assertStepDuration(expectedStepDurations, currentDuration, lowerBoundEx
             `expected ${currentDuration} to be > ${lowerBoundExclusive}, got '${actualValue}'`,
         );
     } else {
-        assert.eq(typeof actualValue, "undefined", `expected ${currentDuration} to be undefined, got '${actualValue}'`);
+        assert.eq(
+            typeof actualValue,
+            "undefined",
+            `expected ${currentDuration} to be undefined, got '${actualValue}'`,
+        );
     }
 }
 
@@ -131,7 +144,12 @@ function assertCuropFields(
         undefinedToZero(stepDurationsDoc.writingDecisionMicros);
 
     // make sure totalCommitDuration is at least as big as all the other durations.
-    assertStepDuration(expectedStepDurations, "totalCommitDurationMicros", durationSum - 1, stepDurationsDoc);
+    assertStepDuration(
+        expectedStepDurations,
+        "totalCommitDurationMicros",
+        durationSum - 1,
+        stepDurationsDoc,
+    );
 
     let expectedClientFields = ["host", "client_s", "connectionId", "appName", "clientMetadata"];
     assert.hasFields(result, expectedClientFields);
@@ -166,10 +184,14 @@ function setupCluster(withAuth) {
         assert(adminDB.auth(authUser.user, authUser.pwd));
     }
 
-    assert.commandWorked(adminDB.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(
+        adminDB.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}),
+    );
     assert.commandWorked(adminDB.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(adminDB.adminCommand({split: ns, middle: {_id: 0}}));
-    assert.commandWorked(adminDB.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant.shardName}));
+    assert.commandWorked(
+        adminDB.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant.shardName}),
+    );
     // this find is to ensure all the shards' filtering metadata are up to date
     assert.commandWorked(st.s.getDB(dbName).runCommand({find: collectionName}));
     return [st, adminDB, coordinator, participant];
@@ -185,7 +207,9 @@ let [st, adminDB, coordinator, participant] = setupCluster(false);
     let expectedState = "inactive";
     let filter = coordinatorCuropFilter(session, txnNumber);
 
-    let results = adminDB.aggregate([{$currentOp: {"idleSessions": false}}, {$match: filter}]).toArray();
+    let results = adminDB
+        .aggregate([{$currentOp: {"idleSessions": false}}, {$match: filter}])
+        .toArray();
     jsTest.log(`Curop result(s): ${tojson(results)}`);
     assert.eq(0, results.length);
 
@@ -281,7 +305,9 @@ let [st, adminDB, coordinator, participant] = setupCluster(false);
         let expectedNumParticipants = failPointStates[failPointName].expectedNumParticipants;
 
         let filter = coordinatorCuropFilter(session, txnNumber, expectedState);
-        let results = curOpAfterFailpoint(failPoints[failPointName], filter, expectNumFailPoints, {idleSessions: true});
+        let results = curOpAfterFailpoint(failPoints[failPointName], filter, expectNumFailPoints, {
+            idleSessions: true,
+        });
 
         assert.eq(1, results.length);
         assertCuropFields(
@@ -307,7 +333,9 @@ st.stop();
     let [txnNumber, _] = startTransaction(session, collectionName, 1);
     let filter = coordinatorCuropFilter(session, txnNumber);
 
-    let results = adminDB.aggregate([{$currentOp: {"allUsers": false}}, {$match: filter}]).toArray();
+    let results = adminDB
+        .aggregate([{$currentOp: {"allUsers": false}}, {$match: filter}])
+        .toArray();
     jsTest.log(`Curop result(s): ${tojson(results)}`);
     assert.eq(0, results.length);
 

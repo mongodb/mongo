@@ -116,7 +116,9 @@ testDB = standalone.getDB("test");
 res = assert.commandWorked(testDB.runCommand("insert", {insert: "foo", documents: [{x: 5}]}));
 assert(
     !containsValidLogicalTimeBson(res),
-    "Expected command body from a standalone mongod to not contain logicalTime, " + "received: " + tojson(res),
+    "Expected command body from a standalone mongod to not contain logicalTime, " +
+        "received: " +
+        tojson(res),
 );
 
 MongoRunner.stopMongod(standalone);

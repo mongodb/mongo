@@ -23,7 +23,12 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    testAnalyzeShardKeysUnshardedCollection(primary, rangeShardingCompoundTestCases, testProbability, numDocsRange);
+    testAnalyzeShardKeysUnshardedCollection(
+        primary,
+        rangeShardingCompoundTestCases,
+        testProbability,
+        numDocsRange,
+    );
 
     rst.stopSet();
 }

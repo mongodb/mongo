@@ -11,7 +11,9 @@ assert.commandWorked(coll.insert({_id: 0}));
 // Gets a BSON object from the server for testing purposes. The resulting BSON contains the fields
 // and values of the 'object' argument.
 function getBsonFromServer(object) {
-    const result = coll.aggregate([{$count: "count"}, {$project: {count: 0}}, {$addFields: object}]).toArray();
+    const result = coll
+        .aggregate([{$count: "count"}, {$project: {count: 0}}, {$addFields: object}])
+        .toArray();
     assert.eq(result.length, 1);
     return result[0];
 }

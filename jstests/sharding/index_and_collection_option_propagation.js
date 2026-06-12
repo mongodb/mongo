@@ -109,7 +109,10 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-let st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
+let st = new ShardingTest({
+    shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}},
+    other: {config: 3},
+});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
@@ -224,8 +227,15 @@ assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
 assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
 // We might see 'HostUnreachable' the first time if the mongos's ReplicaSetMonitor does not yet
 // know that the shard is down.
-assert(res.code === ErrorCodes.HostUnreachable || res.code === ErrorCodes.FailedToSatisfyReadPreference, tojson(res));
-assert(res.codeName === "HostUnreachable" || res.codeName === "FailedToSatisfyReadPreference", tojson(res));
+assert(
+    res.code === ErrorCodes.HostUnreachable ||
+        res.code === ErrorCodes.FailedToSatisfyReadPreference,
+    tojson(res),
+);
+assert(
+    res.codeName === "HostUnreachable" || res.codeName === "FailedToSatisfyReadPreference",
+    tojson(res),
+);
 
 // If some shard returns a non-ignorable error, it should be reported as the command error, even
 // if other shards returned ignorable errors.

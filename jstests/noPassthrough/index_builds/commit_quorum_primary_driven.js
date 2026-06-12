@@ -35,7 +35,9 @@ const coll = primaryDB.primaryDrivenIndexBuild;
 
 // TODO(SERVER-109578): Remove this check when the feature flag is removed.
 if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
-    jsTestLog("Skipping commit_quorum_primary_driven.js because featureFlagPrimaryDrivenIndexBuilds is disabled");
+    jsTestLog(
+        "Skipping commit_quorum_primary_driven.js because featureFlagPrimaryDrivenIndexBuilds is disabled",
+    );
     rst.stopSet();
     quit();
 }
@@ -60,7 +62,10 @@ let res = assert.commandWorked(
     }),
 );
 assert.eq(1, res.commitQuorum);
-assert(checkLog.checkContainsWithCountJson(primaryDB, 11302400, undefined, 1), "Expecting to see log with id 11302400");
+assert(
+    checkLog.checkContainsWithCountJson(primaryDB, 11302400, undefined, 1),
+    "Expecting to see log with id 11302400",
+);
 
 rst.awaitReplication();
 

@@ -20,7 +20,9 @@ let nodes = replTest.startSet();
 // Stopping replication on secondaries can be very slow with a high election timeout. Set a small
 // oplog getMore timeout so the test runs faster.
 nodes.forEach((node) => {
-    assert.commandWorked(node.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}),
+    );
 });
 
 replTest.initiate();
@@ -28,7 +30,11 @@ let primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    primary.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
 );
 replTest.awaitReplication();
 // Do a write that should not be able to replicate to node1 since we stopped replication.

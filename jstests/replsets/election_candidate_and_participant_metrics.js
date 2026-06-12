@@ -20,9 +20,12 @@ rst.initiate();
 const expectedElectionTimeoutMillis = 24 * 60 * 60 * 1000;
 
 const originalPrimary = rst.getPrimary();
-let originalPrimaryReplSetGetStatus = assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+let originalPrimaryReplSetGetStatus = assert.commandWorked(
+    originalPrimary.adminCommand({replSetGetStatus: 1}),
+);
 jsTestLog("Original primary status (1): " + tojson(originalPrimaryReplSetGetStatus));
-let originalPrimaryElectionCandidateMetrics = originalPrimaryReplSetGetStatus.electionCandidateMetrics;
+let originalPrimaryElectionCandidateMetrics =
+    originalPrimaryReplSetGetStatus.electionCandidateMetrics;
 
 // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response after
 // replica set startup has all of the required fields and that they are set correctly.
@@ -99,7 +102,9 @@ assert(
 ElectionHandoffTest.testElectionHandoff(rst, 0, 1);
 
 const newPrimary = rst.getPrimary();
-let newPrimaryReplSetGetStatus = assert.commandWorked(newPrimary.adminCommand({replSetGetStatus: 1}));
+let newPrimaryReplSetGetStatus = assert.commandWorked(
+    newPrimary.adminCommand({replSetGetStatus: 1}),
+);
 jsTestLog("New primary status (1): " + tojson(newPrimaryReplSetGetStatus));
 let newPrimaryElectionCandidateMetrics = newPrimaryReplSetGetStatus.electionCandidateMetrics;
 
@@ -169,12 +174,17 @@ let newPrimaryElectionParticipantMetrics = newPrimaryReplSetGetStatus.electionPa
 // candidate in this election and did not vote for any other node.
 assert(
     !newPrimaryElectionParticipantMetrics,
-    () => "Response should not have an 'electionParticipantMetric' field: " + tojson(newPrimaryReplSetGetStatus),
+    () =>
+        "Response should not have an 'electionParticipantMetric' field: " +
+        tojson(newPrimaryReplSetGetStatus),
 );
 
-originalPrimaryReplSetGetStatus = assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+originalPrimaryReplSetGetStatus = assert.commandWorked(
+    originalPrimary.adminCommand({replSetGetStatus: 1}),
+);
 jsTestLog("Original primary status (2): " + tojson(originalPrimaryReplSetGetStatus));
-let originalPrimaryElectionParticipantMetrics = originalPrimaryReplSetGetStatus.electionParticipantMetrics;
+let originalPrimaryElectionParticipantMetrics =
+    originalPrimaryReplSetGetStatus.electionParticipantMetrics;
 
 // Check that the 'electionParticipantMetrics' section of the replSetGetStatus response for the
 // original primary has all of the required fields and that they are set correctly.
@@ -259,7 +269,9 @@ assert.commandWorked(originalPrimary.adminCommand({replSetFreeze: 0}));
 // Step up the original primary.
 ElectionHandoffTest.testElectionHandoff(rst, 1, 0);
 
-originalPrimaryReplSetGetStatus = assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+originalPrimaryReplSetGetStatus = assert.commandWorked(
+    originalPrimary.adminCommand({replSetGetStatus: 1}),
+);
 jsTestLog("Original primary status (3): " + tojson(originalPrimaryReplSetGetStatus));
 originalPrimaryElectionCandidateMetrics = originalPrimaryReplSetGetStatus.electionCandidateMetrics;
 
@@ -268,7 +280,10 @@ assert.eq(originalPrimaryElectionCandidateMetrics.lastElectionReason, "stepUpReq
 assert.eq(originalPrimaryElectionCandidateMetrics.electionTerm, 3);
 assert.eq(originalPrimaryElectionCandidateMetrics.numVotesNeeded, 2);
 assert.eq(originalPrimaryElectionCandidateMetrics.priorityAtElection, 1);
-assert.eq(originalPrimaryElectionCandidateMetrics.electionTimeoutMillis, expectedElectionTimeoutMillis);
+assert.eq(
+    originalPrimaryElectionCandidateMetrics.electionTimeoutMillis,
+    expectedElectionTimeoutMillis,
+);
 // TODO (SERVER-45274): Re-enable this assertion.
 // assert.eq(originalPrimaryElectionCandidateMetrics.priorPrimaryMemberId, 1);
 
@@ -280,7 +295,9 @@ newPrimaryElectionParticipantMetrics = newPrimaryReplSetGetStatus.electionPartic
 // The other node should not have an electionCandidateMetrics, as it just stepped down.
 assert(
     !newPrimaryElectionCandidateMetrics,
-    () => "Response should not have an 'electionCandidateMetrics' field: " + tojson(newPrimaryReplSetGetStatus),
+    () =>
+        "Response should not have an 'electionCandidateMetrics' field: " +
+        tojson(newPrimaryReplSetGetStatus),
 );
 
 // Check that the primary that just stepped down has its 'electionParticipantMetrics' field set
@@ -294,7 +311,10 @@ assert.eq(newPrimaryElectionParticipantMetrics.priorityAtElection, 1);
 // Since the election participant metrics are only set in the real election, set up a failpoint that
 // tells a voting node to vote yes in the dry run election and no in the real election.
 assert.commandWorked(
-    originalPrimary.adminCommand({configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}),
+    originalPrimary.adminCommand({
+        configureFailPoint: "voteYesInDryRunButNoInRealElection",
+        mode: "alwaysOn",
+    }),
 );
 
 // The new primary might still be processing the reconfig via heartbeat from the original primary's
@@ -307,11 +327,16 @@ rst.waitForConfigReplication(originalPrimary);
 assert.commandWorked(newPrimary.adminCommand({replSetFreeze: 0}));
 // Make sure the step up failed and for the right reason.
 assert.commandFailedWithCode(newPrimary.adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
-assert(checkLog.checkContainsOnce(newPrimary, "Not becoming primary, we received insufficient votes"));
+assert(
+    checkLog.checkContainsOnce(newPrimary, "Not becoming primary, we received insufficient votes"),
+);
 
-originalPrimaryReplSetGetStatus = assert.commandWorked(originalPrimary.adminCommand({replSetGetStatus: 1}));
+originalPrimaryReplSetGetStatus = assert.commandWorked(
+    originalPrimary.adminCommand({replSetGetStatus: 1}),
+);
 jsTestLog("Original primary status (4): " + tojson(originalPrimaryReplSetGetStatus));
-originalPrimaryElectionParticipantMetrics = originalPrimaryReplSetGetStatus.electionParticipantMetrics;
+originalPrimaryElectionParticipantMetrics =
+    originalPrimaryReplSetGetStatus.electionParticipantMetrics;
 
 // Check that the metrics in 'electionParticipantMetrics' were updated for the original primary
 // after the second election that it participated in.

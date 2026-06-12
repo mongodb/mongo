@@ -30,7 +30,9 @@ const forceCheckpoint = () => {
 // checkpoints at the stable timestamp without necessarily advancing that timestamp to include the
 // latest committed writes. As a result, it is possible that the stable timestamp lags behind the
 // wall clock time and our writes are not included in the checkpoint.
-assert.commandWorked(rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: true}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: true}}),
+);
 
 assert.commandWorked(db.createCollection(collName));
 const coll = db.getCollection(collName);
@@ -40,7 +42,10 @@ for (let i = 0; i < 5; i++) {
 }
 
 // The collection has not been checkpointed yet, so there is nothing to validate.
-assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}), ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(
+    db.runCommand({validate: collName, background: true}),
+    ErrorCodes.NamespaceNotFound,
+);
 
 forceCheckpoint();
 

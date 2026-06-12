@@ -45,7 +45,10 @@ const assertPrepareConflict = function assertPrepareReadConflict(filter, cluster
     checkLog.contains(testDB, prepareConflictDurationLogMsg);
 
     let prepareConflicted = false;
-    const cur = testDB.system.profile.find({"ns": testColl.getFullName(), "command.filter": filter});
+    const cur = testDB.system.profile.find({
+        "ns": testColl.getFullName(),
+        "command.filter": filter,
+    });
     while (cur.hasNext()) {
         const n = cur.next();
         print("op: " + JSON.stringify(n));
@@ -83,7 +86,10 @@ assert.commandWorked(
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
 assert.commandWorked(
-    testDB.runCommand({profile: 1, filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    testDB.runCommand({
+        profile: 1,
+        filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}},
+    }),
 );
 
 const session = db.getMongo().startSession({causalConsistency: false});

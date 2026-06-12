@@ -44,7 +44,9 @@ let originalFCV;
 let originalTransactionLifetimeLimitSeconds;
 
 if (requiredFCV) {
-    requiredFCV = new Function(`return typeof ${requiredFCV} === "string" ? ${requiredFCV} : "${requiredFCV}"`)();
+    requiredFCV = new Function(
+        `return typeof ${requiredFCV} === "string" ? ${requiredFCV} : "${requiredFCV}"`,
+    )();
 
     // Running the setFeatureCompatibilityVersion command may implicitly involve running a
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
@@ -75,7 +77,9 @@ if (requiredFCV) {
 
     // Now that we are certain that an upgrade or downgrade of the FCV is not in progress, ensure
     // the 'requiredFCV' is set.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV, confirm: true}),
+    );
 }
 
 const deduplicatedHostList = [...new Set(hostList)];
@@ -83,11 +87,15 @@ const deduplicatedHostList = [...new Set(hostList)];
 new CollectionValidator().validateNodes(deduplicatedHostList);
 
 if (originalFCV && originalFCV.version !== requiredFCV) {
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version, confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version, confirm: true}),
+    );
 }
 
 if (originalTransactionLifetimeLimitSeconds) {
     for (let {conn, originalValue} of originalTransactionLifetimeLimitSeconds) {
-        assert.commandWorked(conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}));
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}),
+        );
     }
 }

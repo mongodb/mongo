@@ -18,7 +18,9 @@ export var expectedCounters = {};
 export function exactIdUpdate(db, collName, session, idToUpdate) {
     const collection = session.getDatabase(db.getName()).getCollection(collName);
     withTxnAndAutoRetry(session, () => {
-        assert.commandWorked(collection.update({_id: idToUpdate}, {$inc: {counter: 1}}, {multi: false}));
+        assert.commandWorked(
+            collection.update({_id: idToUpdate}, {$inc: {counter: 1}}, {multi: false}),
+        );
     });
     // Update the expected counter for the targeted id.
     expectedCounters[collName][idToUpdate] += 1;
@@ -48,7 +50,9 @@ export function verifyDocuments(db, collName, tid) {
     docs.forEach((doc) => {
         const expectedCounter = expectedCounters[collName][doc._id];
         assert.eq(expectedCounter, doc.counter, () => {
-            return "unexpected counter value for collection " + db[collName] + ", doc: " + tojson(doc);
+            return (
+                "unexpected counter value for collection " + db[collName] + ", doc: " + tojson(doc)
+            );
         });
     });
 }

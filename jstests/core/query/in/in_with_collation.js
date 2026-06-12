@@ -17,7 +17,27 @@ const caseInsensitive = {
 };
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
 
-let inlist = ["cyD", 8, "BZd", 6, "awD", 2, "Cwa", 9, 3, "bxA", "azB", 4, "Ayc", 1, "cXB", "dYa", 7, "bwC", 5];
+let inlist = [
+    "cyD",
+    8,
+    "BZd",
+    6,
+    "awD",
+    2,
+    "Cwa",
+    9,
+    3,
+    "bxA",
+    "azB",
+    4,
+    "Ayc",
+    1,
+    "cXB",
+    "dYa",
+    7,
+    "bwC",
+    5,
+];
 
 function transformValue(value, i) {
     if (typeof value === "number" || i % 2 != 0) {

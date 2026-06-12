@@ -47,7 +47,9 @@ function validateJumboFlag(ns, query) {
 }
 
 // Initializing test database
-assert.commandWorked(adminDB.runCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    adminDB.runCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(adminDB.runCommand({addShardToZone: st.shard1.shardName, zone: "ZoneShard1"}));
 
 ////////////////////////////////////////////////////////////////////////////
@@ -93,13 +95,17 @@ jumboMajorVersionBefore = jumboChunk.lastmod.getTime();
 
 // Target non-jumbo chunk should not affect real jumbo chunk.
 let unrelatedChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: MinKey}});
-assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, bounds: [unrelatedChunk.min, unrelatedChunk.max]}));
+assert.commandWorked(
+    adminDB.runCommand({clearJumboFlag: testNs, bounds: [unrelatedChunk.min, unrelatedChunk.max]}),
+);
 jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
 // Target real jumbo chunk should clear the flag without bumping the placement version.
-assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, bounds: [jumboChunk.min, jumboChunk.max]}));
+assert.commandWorked(
+    adminDB.runCommand({clearJumboFlag: testNs, bounds: [jumboChunk.min, jumboChunk.max]}),
+);
 jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(!jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
@@ -122,7 +128,12 @@ testNs = testColl.getFullName();
 st.stopBalancer();
 
 assert.commandWorked(
-    adminDB.runCommand({updateZoneKeyRange: testNs, min: {x: 0}, max: {x: MaxKey}, zone: "ZoneShard1"}),
+    adminDB.runCommand({
+        updateZoneKeyRange: testNs,
+        min: {x: 0},
+        max: {x: MaxKey},
+        zone: "ZoneShard1",
+    }),
 );
 
 createJumboChunk(testColl, 0);

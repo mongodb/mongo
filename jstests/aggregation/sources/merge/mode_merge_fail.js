@@ -160,7 +160,9 @@ const pipeline = [mergeStage];
     // Copy over documents from the source collection into the target and remove the 'padding'
     // field from the projection, so we can distinguish which documents have been modified by
     // the $merge stage.
-    assert.doesNotThrow(() => source.aggregate([{$project: {padding: 0}}, {$out: target.getName()}]));
+    assert.doesNotThrow(() =>
+        source.aggregate([{$project: {padding: 0}}, {$out: target.getName()}]),
+    );
 
     // Remove one document from the target collection so that $merge fails. This document should
     // be in the first batch of the aggregation pipeline below, which sorts documents by the _id

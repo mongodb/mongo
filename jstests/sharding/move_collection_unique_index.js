@@ -16,9 +16,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     const kDbName = "foo";
     const kCollName = "test";
     const nss = kDbName + "." + kCollName;
-    assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
+    );
 
-    assert.commandWorked(st.s.getCollection(nss).createIndex({oldKey: 1, a: 1, b: 1}, {unique: true}));
+    assert.commandWorked(
+        st.s.getCollection(nss).createIndex({oldKey: 1, a: 1, b: 1}, {unique: true}),
+    );
 
     assert.commandWorked(st.s.adminCommand({moveCollection: nss, toShard: st.shard1.shardName}));
 

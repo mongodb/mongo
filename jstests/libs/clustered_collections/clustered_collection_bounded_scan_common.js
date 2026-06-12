@@ -13,7 +13,9 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         const clusterKeyFieldName = Object.keys(clusterKey)[0];
         assertDropCollection(coll.getDB(), coll.getName());
         assert.commandWorked(
-            coll.getDB().createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}),
+            coll.getDB().createCollection(coll.getName(), {
+                clusteredIndex: {key: clusterKey, unique: true},
+            }),
         );
 
         const bulk = coll.initializeUnorderedBulkOp();
@@ -146,7 +148,10 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
         const expl = assert.commandWorked(
-            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+            coll.getDB().runCommand({
+                explain: {find: coll.getName(), filter: filter},
+                verbosity: "executionStats",
+            }),
         );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
@@ -165,7 +170,11 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
 
         // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
         // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
-        assertDocsExamined(expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
+        assertDocsExamined(
+            expl.executionStats,
+            expectedDocsExaminedClassic,
+            expectedDocsExaminedSbe,
+        );
     }
 
     function testGT(
@@ -182,7 +191,10 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
         const expl = assert.commandWorked(
-            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+            coll.getDB().runCommand({
+                explain: {find: coll.getName(), filter: filter},
+                verbosity: "executionStats",
+            }),
         );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
@@ -201,7 +213,11 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
 
         // In this case the scans hit EOF, so there is no extra cursor->next() call in Classic,
         // making Classic and SBE expect the same number of docs examined.
-        assertDocsExamined(expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
+        assertDocsExamined(
+            expl.executionStats,
+            expectedDocsExaminedClassic,
+            expectedDocsExaminedSbe,
+        );
     }
 
     function testRange(
@@ -220,7 +236,10 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
         const expl = assert.commandWorked(
-            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+            coll.getDB().runCommand({
+                explain: {find: coll.getName(), filter: filter},
+                verbosity: "executionStats",
+            }),
         );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
@@ -235,7 +254,11 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
 
         // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
         // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
-        assertDocsExamined(expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
+        assertDocsExamined(
+            expl.executionStats,
+            expectedDocsExaminedClassic,
+            expectedDocsExaminedSbe,
+        );
     }
 
     function testIn() {
@@ -246,7 +269,10 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         assert.eq(coll.find(filter).comment(comment).itcount(), 3);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
         const expl = assert.commandWorked(
-            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+            coll.getDB().runCommand({
+                explain: {find: coll.getName(), filter: filter},
+                verbosity: "executionStats",
+            }),
         );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
@@ -271,7 +297,10 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "COLLSCAN");
 
         const expl = assert.commandWorked(
-            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+            coll.getDB().runCommand({
+                explain: {find: coll.getName(), filter: filter},
+                verbosity: "executionStats",
+            }),
         );
 
         assert(getPlanStage(expl, "COLLSCAN"));
@@ -334,14 +363,26 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gte: 89}}, "backward $gte");
 
         // Both bounds exclusive.
-        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gt: 20, $lt: 40}}, "backward $gt/$lt");
+        assertForwardBackwardConsistency(
+            {[clusterKeyFieldName]: {$gt: 20, $lt: 40}},
+            "backward $gt/$lt",
+        );
 
         // Both bounds inclusive.
-        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gte: 20, $lte: 40}}, "backward $gte/$lte");
+        assertForwardBackwardConsistency(
+            {[clusterKeyFieldName]: {$gte: 20, $lte: 40}},
+            "backward $gte/$lte",
+        );
 
         // Mixed bounds.
-        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gte: 20, $lt: 40}}, "backward $gte/$lt");
-        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gt: 20, $lte: 40}}, "backward $gt/$lte");
+        assertForwardBackwardConsistency(
+            {[clusterKeyFieldName]: {$gte: 20, $lt: 40}},
+            "backward $gte/$lt",
+        );
+        assertForwardBackwardConsistency(
+            {[clusterKeyFieldName]: {$gt: 20, $lte: 40}},
+            "backward $gt/$lte",
+        );
     }
 
     function testBoundedScans(coll, clusterKey) {

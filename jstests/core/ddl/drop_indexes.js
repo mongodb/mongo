@@ -20,13 +20,21 @@ function getIndexNames(cmdRes) {
 function assertIndexes(expectedIndexNames, msg) {
     const actualIndexNames = getIndexNames();
     const testMsgSuffix = () =>
-        msg + ": expected " + tojson(expectedIndexNames) + " but got " + tojson(actualIndexNames) + " instead.";
+        msg +
+        ": expected " +
+        tojson(expectedIndexNames) +
+        " but got " +
+        tojson(actualIndexNames) +
+        " instead.";
     assert.eq(
         expectedIndexNames.length + 1,
         actualIndexNames.length,
         "unexpected number of indexes after " + testMsgSuffix(),
     );
-    assert(actualIndexNames.includes("_id_"), "_id index missing after " + msg + ": " + tojson(actualIndexNames));
+    assert(
+        actualIndexNames.includes("_id_"),
+        "_id index missing after " + msg + ": " + tojson(actualIndexNames),
+    );
     for (let expectedIndexName of expectedIndexNames) {
         assert(
             actualIndexNames.includes(expectedIndexName),
@@ -55,7 +63,11 @@ let ex = assert.throws(() => {
     t.dropIndexes(["a_1", "_id_"]);
 });
 assert.commandFailedWithCode(ex, ErrorCodes.InvalidOptions);
-IndexUtils.assertIndexes(t, [{_id: 1}, {a: 1}, {b: 1}, {e: 1}], "failed dropIndexes command with _id index");
+IndexUtils.assertIndexes(
+    t,
+    [{_id: 1}, {a: 1}, {b: 1}, {e: 1}],
+    "failed dropIndexes command with _id index",
+);
 
 // List of index names must contain only strings.
 ex = assert.throws(() => {

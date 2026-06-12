@@ -33,7 +33,10 @@ import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 
-if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && !db.getSession().getOptions().shouldRetryWrites()) {
+if (
+    runningWithViewlessTimeseriesUpgradeDowngrade(db) &&
+    !db.getSession().getOptions().shouldRetryWrites()
+) {
     jsTest.log.info(
         "Skipping test using parallel shell & failpoints since in this suite it may get interrupted by viewless timeseries upgrade/downgrade (SERVER-122589).",
     );
@@ -51,11 +54,25 @@ const testCases = {
     REPLACE_METAFIELD: 2,
 };
 
-const validateUpdateIndex = (initialDocList, updateList, testType, failCode, newMetaField = null) => {
+const validateUpdateIndex = (
+    initialDocList,
+    updateList,
+    testType,
+    failCode,
+    newMetaField = null,
+) => {
     const testDB = db.getSiblingDB(dbName);
     const awaitTestUpdate = startParallelShell(
         funWithArgs(
-            function (dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
+            function (
+                dbName,
+                collName,
+                timeFieldName,
+                metaFieldName,
+                initialDocList,
+                updateList,
+                failCode,
+            ) {
                 const testDB = db.getSiblingDB(dbName);
                 const coll = testDB.getCollection(collName);
 
@@ -68,7 +85,10 @@ const validateUpdateIndex = (initialDocList, updateList, testType, failCode, new
                 assert.commandWorked(coll.insert(initialDocList));
 
                 assert.commandWorked(
-                    testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}),
+                    testDB.adminCommand({
+                        configureFailPoint: "hangDuringBatchUpdate",
+                        mode: "alwaysOn",
+                    }),
                 );
 
                 assert.commandFailedWithCode(
@@ -106,7 +126,9 @@ const validateUpdateIndex = (initialDocList, updateList, testType, failCode, new
             break;
     }
 
-    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}),
+    );
 
     // Wait for testUpdate to finish.
     awaitTestUpdate();
@@ -122,7 +144,9 @@ const docs = [
 // collection with a different metaField.
 if (!TimeseriesTest.arbitraryUpdatesEnabled(db)) {
     // TODO SERVER-101784 remove the legacy error code once 9.0 becomes last LTS
-    const expectedErrorCodes = isFCVgte(db, "8.3") ? [10685101] : [10685101, ErrorCodes.InvalidOptions /* legacy */];
+    const expectedErrorCodes = isFCVgte(db, "8.3")
+        ? [10685101]
+        : [10685101, ErrorCodes.InvalidOptions /* legacy */];
     validateUpdateIndex(
         docs,
         [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],

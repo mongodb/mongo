@@ -27,7 +27,9 @@ const st = new ShardingTest({
     },
     // Disable query sampling on mongos to verify that the nested aggregate queries are sampled by
     // the shard that routes them.
-    mongosOptions: {setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})}},
+    mongosOptions: {
+        setParameter: {"failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"})},
+    },
 });
 
 const dbName = "testDb";
@@ -46,17 +48,32 @@ assert.commandWorked(mongosDB.getCollection(localCollName).insert([{a: 0}]));
 assert.commandWorked(mongosDB.createCollection(foreignCollName));
 
 // Make sure that the shard executing $lookup operations has up-to-date routing information.
-mongosDB.getCollection(localCollName).aggregate([{$lookup: {from: foreignCollName, pipeline: [], as: "out"}}]);
+mongosDB
+    .getCollection(localCollName)
+    .aggregate([{$lookup: {from: foreignCollName, pipeline: [], as: "out"}}]);
 
-assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(
+    st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}),
+);
 const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
-QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, foreignNs, foreignCollUUid, {skipMongoses: true});
+QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, foreignNs, foreignCollUUid, {
+    skipMongoses: true,
+});
 
 // The foreign collection is unsharded so all documents are on the primary shard.
 const shardNames = [st.rs0.name];
 
-for (let {name, makeOuterPipelineFunc, requireShardToRouteFunc, supportCustomPipeline} of outerAggTestCases) {
-    const requireShardToRoute = requireShardToRouteFunc(mongosDB, foreignCollName, false /* isShardedColl */);
+for (let {
+    name,
+    makeOuterPipelineFunc,
+    requireShardToRouteFunc,
+    supportCustomPipeline,
+} of outerAggTestCases) {
+    const requireShardToRoute = requireShardToRouteFunc(
+        mongosDB,
+        foreignCollName,
+        false /* isShardedColl */,
+    );
     if (supportCustomPipeline) {
         for (let {makeInnerPipelineFunc, containInitialFilter} of innerAggTestCases) {
             const filter0 = {x: 1, name};

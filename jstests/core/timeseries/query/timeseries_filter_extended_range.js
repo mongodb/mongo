@@ -41,7 +41,9 @@ function runTest({query, results, extendedRangeDocs}) {
     // Setup the collection and insert the dates in `standardDocs` and `extendedRangeDocs`.
     const tsColl = db.getCollection(jsTestName());
     tsColl.drop();
-    assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(
+        db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}),
+    );
     assert.commandWorked(tsColl.insert(standardDocs.concat(extendedRangeDocs)));
 
     const pipeline = [{$match: query}, {$project: {_id: 0, [timeFieldName]: 1}}];
@@ -74,7 +76,11 @@ runTest({
     results: standardDocs,
     extendedRangeDocs: [],
 });
-runTest({query: {[timeFieldName]: {$gt: afterEpochDocs[0].time}}, results: [], extendedRangeDocs: []});
+runTest({
+    query: {[timeFieldName]: {$gt: afterEpochDocs[0].time}},
+    results: [],
+    extendedRangeDocs: [],
+});
 runTest({query: {[timeFieldName]: afterEpochDocs[0].time}, results: [], extendedRangeDocs: []});
 
 /*
@@ -256,7 +262,9 @@ runTest({
 
 // Test with dates below the epoch that do not match the predicate.
 runTest({
-    query: {[timeFieldName]: {$gt: ISODate("1970-01-01T00:00:00.001Z"), $lt: ISODate("1980-01-01")}},
+    query: {
+        [timeFieldName]: {$gt: ISODate("1970-01-01T00:00:00.001Z"), $lt: ISODate("1980-01-01")},
+    },
     results: [standardDocs[0]],
     extendedRangeDocs: beforeEpochDocs,
 });
@@ -264,7 +272,10 @@ runTest({
 // Test with dates above the epoch that do match the predicate.
 runTest({
     query: {
-        [timeFieldName]: {$gt: ISODate("2030-09-29T23:59:59.001Z"), $lt: ISODate("2050-01-20T03:14:00.001Z")},
+        [timeFieldName]: {
+            $gt: ISODate("2030-09-29T23:59:59.001Z"),
+            $lt: ISODate("2050-01-20T03:14:00.001Z"),
+        },
     },
     results: [standardDocs[3], afterEpochDocs[0]],
     extendedRangeDocs: afterEpochDocs,
@@ -273,7 +284,10 @@ runTest({
 // Test with dates above the epoch that do not match the predicate.
 runTest({
     query: {
-        [timeFieldName]: {$gt: ISODate("2030-09-29T23:59:59.001Z"), $lt: ISODate("2038-01-19T03:14:00.000Z")},
+        [timeFieldName]: {
+            $gt: ISODate("2030-09-29T23:59:59.001Z"),
+            $lt: ISODate("2038-01-19T03:14:00.000Z"),
+        },
     },
     results: [standardDocs[3]],
     extendedRangeDocs: afterEpochDocs,

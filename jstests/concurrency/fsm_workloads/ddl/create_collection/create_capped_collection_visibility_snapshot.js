@@ -67,7 +67,12 @@ export const $config = (function () {
             const localDb = db.getSiblingDB("local");
             const myCollName = randomCollectionName(this.prefix, this.collectionCount);
             for (let i = 0; i < 10; ++i) {
-                let res = localDb.runCommand({find: myCollName, filter: {}, tailable: true, batchSize: 0});
+                let res = localDb.runCommand({
+                    find: myCollName,
+                    filter: {},
+                    tailable: true,
+                    batchSize: 0,
+                });
                 assert.commandWorked(res);
                 assert.commandWorkedOrFailedWithCode(
                     localDb.runCommand({getMore: res.cursor.id, collection: myCollName}),

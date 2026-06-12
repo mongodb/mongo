@@ -41,7 +41,9 @@ assert.commandWorked(sessionColl.update({_id: 1}, {$unset: {"b": 1}}));
 assert.commandWorked(sessionColl.update({_id: 1}, {$set: {"c": largeArray}}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-const recoveryTimestamp = assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]})).operationTime;
+const recoveryTimestamp = assert.commandWorked(
+    testColl.runCommand("insert", {documents: [{_id: 2}]}),
+).operationTime;
 
 jsTestLog("Holding back the stable timestamp to right after the prepareTimestamp");
 
@@ -59,7 +61,9 @@ assert.commandWorked(
 // Enable fail point "WTSetOldestTSToStableTS" to prevent lag between stable timestamp and
 // oldest timestamp during rollback recovery. We avoid this lag to test if we can prepare
 // and commit a transaction older than oldest timestamp.
-assert.commandWorked(testDB.adminCommand({"configureFailPoint": "WTSetOldestTSToStableTS", "mode": "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({"configureFailPoint": "WTSetOldestTSToStableTS", "mode": "alwaysOn"}),
+);
 
 jsTestLog("Committing the transaction");
 
@@ -76,7 +80,12 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 // Now that the system is stable, release the pin on the stable timestamp.
-assert.commandWorked(primary.adminCommand({configureFailPoint: "holdStableTimestampAtSpecificTimestamp", mode: "off"}));
+assert.commandWorked(
+    primary.adminCommand({
+        configureFailPoint: "holdStableTimestampAtSpecificTimestamp",
+        mode: "off",
+    }),
+);
 
 primary = rollbackTest.getPrimary();
 

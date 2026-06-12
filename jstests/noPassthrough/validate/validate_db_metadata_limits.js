@@ -12,7 +12,10 @@ for (let i = 0; i < 100; i++) {
     // command, it can cause the output size to exceed max BSON size.
     let largeName = "a".repeat(200000);
     assert.commandWorked(
-        testDB.runCommand({createIndexes: collName + i, indexes: [{key: {p: 1}, name: largeName, sparse: true}]}),
+        testDB.runCommand({
+            createIndexes: collName + i,
+            indexes: [{key: {p: 1}, name: largeName, sparse: true}],
+        }),
     );
 }
 

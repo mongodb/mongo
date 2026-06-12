@@ -24,7 +24,9 @@ let st = new ShardingTest({
 });
 // Check that reshardingCriticalSectionTimeoutMillis is in config options with the proper value.
 assert(
-    st._otherParams.configOptions.setParameter.hasOwnProperty("reshardingCriticalSectionTimeoutMillis"),
+    st._otherParams.configOptions.setParameter.hasOwnProperty(
+        "reshardingCriticalSectionTimeoutMillis",
+    ),
     "setParameter does not contain reshardingCriticalSectionTimeoutMillis",
 );
 assert.eq(

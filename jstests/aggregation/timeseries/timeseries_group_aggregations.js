@@ -203,7 +203,10 @@ for (const groupKey of [null, "t", "m", "m.metaA", "a"]) {
                         $group: {
                             _id: dollarGroupKey,
                             gb: {
-                                [accumulator]: {output: dollarAccumulatorData, sortBy: {[sortBy]: 1, _id: 1}},
+                                [accumulator]: {
+                                    output: dollarAccumulatorData,
+                                    sortBy: {[sortBy]: 1, _id: 1},
+                                },
                             },
                         },
                     },
@@ -248,7 +251,10 @@ function stageRequirementsMatch(stage1, stage2) {
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}),
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling,
+        }),
     );
     /*
      * Try all combinations of $project and $match stages followed by a $group or $count at the end.
@@ -280,7 +286,10 @@ function runAggregations(allowDiskUse, forceSpilling) {
             for (const groupStage of groupStages) {
                 // Any prior stage doesn't satify the requirements of a following stage, don't run
                 // the query.
-                if (!stageRequirementsMatch(stage1, groupStage) || !stageRequirementsMatch(stage2, groupStage)) {
+                if (
+                    !stageRequirementsMatch(stage1, groupStage) ||
+                    !stageRequirementsMatch(stage2, groupStage)
+                ) {
                     continue;
                 }
                 const pipeline = [stage1.stage, stage2.stage, groupStage.stage];

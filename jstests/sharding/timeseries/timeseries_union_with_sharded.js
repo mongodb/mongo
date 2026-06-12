@@ -28,10 +28,14 @@ assert(st.adminCommand({enableSharding: testDBName, primaryShard: st.shard0.shar
 function runAndValidateExplain(pipeline) {
     const explain = local.explain().aggregate(pipeline);
     const unionWithStage = getUnionWithStage(explain);
-    const hasUnpackStage = aggPlanHasStage(unionWithStage["$unionWith"]["pipeline"], "$_internalUnpackBucket");
+    const hasUnpackStage = aggPlanHasStage(
+        unionWithStage["$unionWith"]["pipeline"],
+        "$_internalUnpackBucket",
+    );
     assert(
         hasUnpackStage,
-        "Expected to find $_internalUnpackBucket stage in $unionWith subpipeline explain output" + tojson(explain),
+        "Expected to find $_internalUnpackBucket stage in $unionWith subpipeline explain output" +
+            tojson(explain),
     );
 }
 
@@ -64,7 +68,12 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
 
     if (!isView) {
         // The view filters out this document.
-        expected.push({_id: 4, [timeField]: ISODate("1999-09-30T04:11:10Z"), [metaField]: "shard2", a: 1});
+        expected.push({
+            _id: 4,
+            [timeField]: ISODate("1999-09-30T04:11:10Z"),
+            [metaField]: "shard2",
+            a: 1,
+        });
     }
     if (extraDocs.length > 0) {
         expected.push(...extraDocs);
@@ -81,7 +90,9 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     assert.commandWorked(local.createIndex({shard_key: 1}));
 
     foreignTS.drop();
-    testDB.createCollection(foreignTS.getName(), {timeseries: {timeField: timeField, metaField: metaField}});
+    testDB.createCollection(foreignTS.getName(), {
+        timeseries: {timeField: timeField, metaField: metaField},
+    });
     assert.commandWorked(foreignTS.createIndex({[metaField]: 1}));
     insertDocuments();
     assert(st.s.adminCommand({shardCollection: local.getFullName(), key: {shard_key: 1}}));
@@ -90,7 +101,11 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     // Place the local collection on shard1 and all of foreign on shard2 to force
     // 'CommandOnShardedViewNotSupportedOnMongod' exceptions.
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: local.getFullName(), find: {shard_key: "shard1"}, to: st.shard1.shardName}),
+        testDB.adminCommand({
+            moveChunk: local.getFullName(),
+            find: {shard_key: "shard1"},
+            to: st.shard1.shardName,
+        }),
     );
     assert.commandWorked(
         testDB.adminCommand({
@@ -99,7 +114,9 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
             to: st.shard2.shardName,
         }),
     );
-    assert.commandWorked(testDB.createView("unionView", foreignTS.getName(), [{$match: {a: {$gte: 2}}}]));
+    assert.commandWorked(
+        testDB.createView("unionView", foreignTS.getName(), [{$match: {a: {$gte: 2}}}]),
+    );
 
     runUnionWithAndAssertResults({foreignCollName: "unionView", isView: true});
     runAndValidateExplain([{$unionWith: foreignTS.getName()}]);
@@ -111,13 +128,23 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     // unionWith will run on mongos and shard1 which both have information about the foreign collection.
     local.drop();
     assert.commandWorked(
-        testDB.runCommand({createUnsplittableCollection: local.getName(), dataShard: st.shard1.shardName}),
+        testDB.runCommand({
+            createUnsplittableCollection: local.getName(),
+            dataShard: st.shard1.shardName,
+        }),
     );
     foreignTS.drop();
-    testDB.createCollection(foreignTS.getName(), {timeseries: {timeField: timeField, metaField: metaField}});
+    testDB.createCollection(foreignTS.getName(), {
+        timeseries: {timeField: timeField, metaField: metaField},
+    });
     insertDocuments();
     // Have an extra doc to be on shard3.
-    const extraDoc = {_id: 7, [timeField]: ISODate("1999-09-30T07:14:10Z"), [metaField]: "shard3", a: 3};
+    const extraDoc = {
+        _id: 7,
+        [timeField]: ISODate("1999-09-30T07:14:10Z"),
+        [metaField]: "shard3",
+        a: 3,
+    };
     assert.commandWorked(foreignTS.insert(extraDoc));
 
     assert.commandWorked(foreignTS.createIndex({[metaField]: 1}));
@@ -137,12 +164,22 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
         }),
     );
 
-    runUnionWithAndAssertResults({foreignCollName: foreignTS.getName(), isView: false, extraDocs: [extraDoc]});
+    runUnionWithAndAssertResults({
+        foreignCollName: foreignTS.getName(),
+        isView: false,
+        extraDocs: [extraDoc],
+    });
     runAndValidateExplain([{$unionWith: foreignTS.getName()}]);
 
     // Run the same test but on a view on the foreign collection.
-    assert.commandWorked(testDB.createView(viewOnTs.getName(), foreignTS.getName(), [{$match: {a: {$gte: 2}}}]));
-    runUnionWithAndAssertResults({foreignCollName: viewOnTs.getName(), isView: true, extraDocs: [extraDoc]});
+    assert.commandWorked(
+        testDB.createView(viewOnTs.getName(), foreignTS.getName(), [{$match: {a: {$gte: 2}}}]),
+    );
+    runUnionWithAndAssertResults({
+        foreignCollName: viewOnTs.getName(),
+        isView: true,
+        extraDocs: [extraDoc],
+    });
 })();
 
 (function localShardedForeignUntrackedDiffShards() {
@@ -151,8 +188,12 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     // unionWith will run on mongos and shard1, which both do not have any information about the foreign collection.
     local.drop();
     foreignTS.drop();
-    testDB.createCollection(foreignTS.getName(), {timeseries: {timeField: timeField, metaField: metaField}});
-    assert.commandWorked(testDB.adminCommand({untrackUnshardedCollection: foreignTS.getFullName()}));
+    testDB.createCollection(foreignTS.getName(), {
+        timeseries: {timeField: timeField, metaField: metaField},
+    });
+    assert.commandWorked(
+        testDB.adminCommand({untrackUnshardedCollection: foreignTS.getFullName()}),
+    );
 
     insertDocuments();
     assert.commandWorked(local.createIndex({shard_key: 1}));
@@ -169,7 +210,9 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     runAndValidateExplain([{$unionWith: foreignTS.getName()}]);
 
     // Run the same test but on a view on the foreign collection.
-    assert.commandWorked(testDB.createView(viewOnTs.getName(), foreignTS.getName(), [{$match: {a: {$gte: 2}}}]));
+    assert.commandWorked(
+        testDB.createView(viewOnTs.getName(), foreignTS.getName(), [{$match: {a: {$gte: 2}}}]),
+    );
     runUnionWithAndAssertResults({foreignCollName: viewOnTs.getName(), isView: true});
 })();
 
@@ -179,7 +222,9 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     // unionWith will run on mongos and shard1 which both have information about the foreign collection.
     local.drop();
     foreignTS.drop();
-    testDB.createCollection(foreignTS.getName(), {timeseries: {timeField: timeField, metaField: metaField}});
+    testDB.createCollection(foreignTS.getName(), {
+        timeseries: {timeField: timeField, metaField: metaField},
+    });
     insertDocuments();
     assert.commandWorked(testDB.adminCommand({untrackUnshardedCollection: local.getFullName()}));
     assert.commandWorked(
@@ -193,7 +238,9 @@ function runUnionWithAndAssertResults({foreignCollName, isView, extraDocs = []})
     runAndValidateExplain([{$unionWith: foreignTS.getName()}]);
 
     // same test but on a view for foreign.
-    assert.commandWorked(testDB.createView(viewOnTs.getName(), foreignTS.getName(), [{$match: {a: {$gte: 2}}}]));
+    assert.commandWorked(
+        testDB.createView(viewOnTs.getName(), foreignTS.getName(), [{$match: {a: {$gte: 2}}}]),
+    );
     runUnionWithAndAssertResults({foreignCollName: viewOnTs.getName(), isView: true});
 })();
 

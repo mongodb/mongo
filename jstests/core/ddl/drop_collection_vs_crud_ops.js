@@ -148,7 +148,9 @@ const commandValidatorsAfterCollDrop = [
     },
     {
         afterDrop: function (_, coll, __) {
-            return coll.findAndModify({query: {a: 2}, update: {$inc: {a: 1}}, upsert: true}) == null;
+            return (
+                coll.findAndModify({query: {a: 2}, update: {$inc: {a: 1}}, upsert: true}) == null
+            );
         },
     },
     {
@@ -231,7 +233,9 @@ const commandValidatorsAfterCollDrop = [
             );
         },
         afterDrop: function (db, _, __) {
-            return db.validate_commands_after_drop_map_reduce2.find().batchSize(0).toArray().length > 0;
+            return (
+                db.validate_commands_after_drop_map_reduce2.find().batchSize(0).toArray().length > 0
+            );
         },
     },
     {

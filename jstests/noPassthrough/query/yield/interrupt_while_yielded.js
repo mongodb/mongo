@@ -107,7 +107,9 @@ function projectImmediatelyAfterMatch() {
 runTestWithQuery(projectImmediatelyAfterMatch);
 
 function sortImmediatelyAfterMatch() {
-    coll.aggregate([{$match: {a: 1, b: 1, c: 1}}, {$sort: {a: 1}}], {comment: kCommandComment}).itcount();
+    coll.aggregate([{$match: {a: 1, b: 1, c: 1}}, {$sort: {a: 1}}], {
+        comment: kCommandComment,
+    }).itcount();
 }
 runTestWithQuery(sortImmediatelyAfterMatch);
 

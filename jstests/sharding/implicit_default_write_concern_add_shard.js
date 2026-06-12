@@ -29,7 +29,12 @@ function addNonArbiterNode(nodeId, rst) {
 }
 
 function testAddShard(CWWCSet, isPSASet, fixAddShard) {
-    jsTestLog("Running sharding test with CWWCSet: " + tojson(CWWCSet) + ", isPSASet: " + tojson(isPSASet));
+    jsTestLog(
+        "Running sharding test with CWWCSet: " +
+            tojson(CWWCSet) +
+            ", isPSASet: " +
+            tojson(isPSASet),
+    );
     let replSetNodes = [{}, {}];
     if (isPSASet) {
         replSetNodes = [{}, {}, {arbiter: true}];
@@ -53,7 +58,10 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
     if (CWWCSet) {
         jsTestLog("Setting the CWWC before adding shard.");
         assert.commandWorked(
-            st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}),
+            st.s.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: "majority", wtimeout: 0},
+            }),
         );
     }
 
@@ -65,7 +73,10 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
         if (fixAddShard == "setCWWC") {
             jsTestLog("Setting the CWWC to fix addShard.");
             assert.commandWorked(
-                st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}),
+                st.s.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: "majority", wtimeout: 0},
+                }),
             );
         } else {
             jsTestLog("Reconfig shardServer to fix addShard.");

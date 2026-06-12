@@ -1,7 +1,11 @@
 /**
  * This test validates that updateSearchIndex works for standalone and sharded configurations.
  */
-import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/query_integration_search/search.js";
+import {
+    createSearchIndex,
+    dropSearchIndex,
+    updateSearchIndex,
+} from "jstests/libs/query_integration_search/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -10,7 +14,11 @@ coll.drop();
 assert.commandWorked(
     coll.insertMany([
         {state: "NY", pop: 19000000, facts: {state_motto: "Excelsior", state_flower: "Rose"}},
-        {state: "CA", pop: 39000000, facts: {state_motto: "Eureka", state_flower: "California Poppy"}},
+        {
+            state: "CA",
+            pop: 39000000,
+            facts: {state_motto: "Eureka", state_flower: "California Poppy"},
+        },
         {
             state: "NJ",
             pop: 9000000,

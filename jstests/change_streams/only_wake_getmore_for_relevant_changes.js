@@ -2,7 +2,10 @@
 // @tags: [
 //   uses_multiple_connections,
 // ]
-import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
@@ -13,7 +16,13 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
  * Note that 'event' will not have access to any local variables, since it will be executed in a
  * different scope.
  */
-function runGetMoreInParallelWithEvent({collection, awaitDataCursorId, identifyingComment, maxTimeMS, event}) {
+function runGetMoreInParallelWithEvent({
+    collection,
+    awaitDataCursorId,
+    identifyingComment,
+    maxTimeMS,
+    event,
+}) {
     // In some extreme cases, the parallel shell can take longer to start up than it takes for
     // the getMore to run. To prevent this from happening, the main thread waits for an insert
     // into "sentinel", to signal that the parallel shell has started and is waiting for the
@@ -48,7 +57,11 @@ eventFn();`,
     // Run and time the getMore.
     const startTime = new Date().getTime();
     const result = assert.commandWorked(
-        db.runCommand({getMore: awaitDataCursorId, collection: collection.getName(), maxTimeMS: maxTimeMS}),
+        db.runCommand({
+            getMore: awaitDataCursorId,
+            collection: collection.getName(),
+            maxTimeMS: maxTimeMS,
+        }),
     );
     awaitShellDoingEventDuringGetMore();
     return {result: result, elapsedMs: new Date().getTime() - startTime};
@@ -133,7 +146,11 @@ const getMoreResponse = assertEventWakesCursor({
     event: () => assert.commandWorked(db.changes.insert({_id: "wake up"})),
 });
 assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
-assert.eq(getMoreResponse.cursor.nextBatch[0].operationType, "insert", tojson(getMoreResponse.cursor.nextBatch[0]));
+assert.eq(
+    getMoreResponse.cursor.nextBatch[0].operationType,
+    "insert",
+    tojson(getMoreResponse.cursor.nextBatch[0]),
+);
 assert.eq(
     getMoreResponse.cursor.nextBatch[0].fullDocument,
     {_id: "wake up"},
@@ -148,7 +165,9 @@ assertEventDoesNotWakeCursor({
     identifyingComment: wholeCollectionStreamComment,
     event: () => assert.commandWorked(db.unrelated_collection.insert({_id: "unrelated change"})),
 });
-assert.commandWorked(db.runCommand({killCursors: changesCollection.getName(), cursors: [changeCursorId]}));
+assert.commandWorked(
+    db.runCommand({killCursors: changesCollection.getName(), cursors: [changeCursorId]}),
+);
 
 // Test that changes ignored by filtering in later stages of the pipeline will not cause the
 // cursor to return before the getMore has exceeded maxTimeMS.
@@ -163,7 +182,11 @@ res = assert.commandWorked(
         comment: noInvalidatesComment,
     }),
 );
-assert.eq(res.cursor.firstBatch.length, 0, "did not expect any invalidations on changes collection");
+assert.eq(
+    res.cursor.firstBatch.length,
+    0,
+    "did not expect any invalidations on changes collection",
+);
 assert.neq(res.cursor.id, 0);
 assertEventDoesNotWakeCursor({
     collection: changesCollection,
@@ -171,4 +194,6 @@ assertEventDoesNotWakeCursor({
     identifyingComment: noInvalidatesComment,
     event: () => assert.commandWorked(db.changes.insert({_id: "should not appear"})),
 });
-assert.commandWorked(db.runCommand({killCursors: changesCollection.getName(), cursors: [res.cursor.id]}));
+assert.commandWorked(
+    db.runCommand({killCursors: changesCollection.getName(), cursors: [res.cursor.id]}),
+);

@@ -54,7 +54,11 @@ function awaitCSLifespanHistogram(metricsDir, afterDate, expectedTotalCount) {
     assert.soon(
         () => {
             const metrics = getLatestMetrics(metricsDir);
-            jsTest.log.debug("awaitCSLifespanHistogram", {metrics, afterDate: afterDate.getTime(), expectedTotalCount});
+            jsTest.log.debug("awaitCSLifespanHistogram", {
+                metrics,
+                afterDate: afterDate.getTime(),
+                expectedTotalCount,
+            });
             if (
                 metrics &&
                 afterDate.getTime() < metrics.time &&
@@ -113,7 +117,11 @@ describe("OTel change_streams.cursor.lifespan histogram file export", function (
             this.testColl.watch().close();
         }
 
-        const csLifespanHist = awaitCSLifespanHistogram(this.metricsDir, this.testStartDate, baseCount + numCursors);
+        const csLifespanHist = awaitCSLifespanHistogram(
+            this.metricsDir,
+            this.testStartDate,
+            baseCount + numCursors,
+        );
 
         assert.eq(Number(csLifespanHist.bucketCounts[0]), baseBucket0 + numCursors);
     });
@@ -132,7 +140,11 @@ describe("OTel change_streams.cursor.lifespan histogram file export", function (
         // Close immediately → lifespan ≈ 0 µs → lands in bucket 0 (≤ 1 s).
         this.testColl.watch().close();
 
-        const csLifespanHist = awaitCSLifespanHistogram(this.metricsDir, this.testStartDate, baseCount + 2);
+        const csLifespanHist = awaitCSLifespanHistogram(
+            this.metricsDir,
+            this.testStartDate,
+            baseCount + 2,
+        );
 
         assert.eq(Number(csLifespanHist.bucketCounts[0]), baseBucket0 + 1);
         assert.eq(Number(csLifespanHist.bucketCounts[1]), baseBucket1 + 1);

@@ -36,7 +36,10 @@ function getTopologyConnections(conn) {
         // Assert that all hosts are different.
         const setOfHosts = new Set(topologyCache.allConnections.map((el) => el.toString()));
         assert.eq(setOfHosts.size, topologyCache.allConnections.length);
-        jsTest.log.debug("List vs set topology...", {setOfHosts, list: topologyCache.allConnections});
+        jsTest.log.debug("List vs set topology...", {
+            setOfHosts,
+            list: topologyCache.allConnections,
+        });
     }
     return topologyCache.allConnections;
 }
@@ -45,11 +48,17 @@ function getAllMongosConnections(conn) {
     if (!topologyCache.mongosConnectionsArr) {
         jsTest.log.debug(`Settings the mongos connections array...`);
         if (isMultiShardedClusterFixture) {
-            const connections = conn.getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
+            const connections = conn
+                .getDB("config")
+                .multiShardedClusterFixture.find()
+                .sort({_id: 1})
+                .toArray();
 
             assert.eq(connections.length, 2);
             // Set the connections array to include both when using a multi-cluster fixture.
-            topologyCache.mongosConnectionsArr = connections.map((doc) => connectFn(doc.connectionString));
+            topologyCache.mongosConnectionsArr = connections.map((doc) =>
+                connectFn(doc.connectionString),
+            );
         } else {
             topologyCache.mongosConnectionsArr = [conn];
         }
@@ -86,7 +95,10 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
             })
             .map((db) => {
                 jsTest.log.info("About to run the explain", {host: db.getMongo().host});
-                const explainResult = retryOnRetryableError(() => assert.commandWorked(db.runCommand(explainCmd)), 50);
+                const explainResult = retryOnRetryableError(
+                    () => assert.commandWorked(db.runCommand(explainCmd)),
+                    50,
+                );
                 return explainResult;
             });
     } catch (ex) {
@@ -118,7 +130,9 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
             return getCollectionNameFromFullNamespace(nss).startsWith("system.buckets.");
         };
         return explainResults.some((explainRes) =>
-            getQueryPlanners(explainRes).some((queryPlanner) => isSystemBucketsNamespace(queryPlanner.namespace)),
+            getQueryPlanners(explainRes).some((queryPlanner) =>
+                isSystemBucketsNamespace(queryPlanner.namespace),
+            ),
         );
     })();
 
@@ -148,7 +162,11 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     // we are expecting an error when calling getMore() on that cursor.
     const hasBatchSizeZero = cmdObj.cursor && cmdObj.cursor.batchSize === 0;
     const res = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-    if (!hasBatchSizeZero && res.ok && !(res.hasOwnProperty("writeErrors") && res.writeErrors.length > 0)) {
+    if (
+        !hasBatchSizeZero &&
+        res.ok &&
+        !(res.hasOwnProperty("writeErrors") && res.writeErrors.length > 0)
+    ) {
         // Only run the test if the original command works. Some tests assert on commands failing,
         // so we should simply bubble these commands through without any additional checks.
         const innerCmd = getInnerCommand(cmdObj);
@@ -167,7 +185,10 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 // TODO SERVER-100658 Explain on non-existent collection returns empty results for
                 // sharded cluster aggregations - Assess if this is still needed.
                 const secondClusterMongos = mongosConnArr[1];
-                retryOnRetryableError(() => clientFunction.apply(secondClusterMongos, makeFuncArgs(cmdObj)), 50);
+                retryOnRetryableError(
+                    () => clientFunction.apply(secondClusterMongos, makeFuncArgs(cmdObj)),
+                    50,
+                );
                 FixtureHelpers.awaitReplication(secondClusterMongos.getDB("admin"));
             }
             // Wrap command into explain, if it's not explain yet.
@@ -182,4 +203,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/query_shape_hash_stability.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/query_shape_hash_stability.js",
+);

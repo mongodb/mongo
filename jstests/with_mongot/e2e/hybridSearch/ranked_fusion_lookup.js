@@ -159,7 +159,10 @@ results.forEach((doc) => {
 let combinedResults = [...collBResults, ...collAResults];
 
 expectedResultIds = [14, 15, 6, 1, 2, 3, 4, 5];
-assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), combinedResults);
+assertDocArrExpectedFuzzy(
+    buildExpectedResults(expectedResultIds, datasets.MOVIES),
+    combinedResults,
+);
 
 dropSearchIndex(collA, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(collA, {name: getMovieVectorSearchIndexSpec().name});

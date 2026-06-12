@@ -40,7 +40,12 @@ let testHost = function (host, shouldSucceed) {
     let exitCode = runMongoProgram("mongo", "--ipv6", "--eval", ";", "--host", host);
     if (shouldSucceed) {
         if (exitCode !== 0) {
-            doassert("failed to connect with `--host " + host + "`, but expected success. Exit code: " + exitCode);
+            doassert(
+                "failed to connect with `--host " +
+                    host +
+                    "`, but expected success. Exit code: " +
+                    exitCode,
+            );
         }
     } else {
         if (exitCode === 0) {

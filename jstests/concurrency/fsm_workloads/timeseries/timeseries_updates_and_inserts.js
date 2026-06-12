@@ -30,7 +30,9 @@ export const $config = (function () {
 
             retryOnRetryableError(
                 () => {
-                    assert.commandWorked(db[collName].updateMany({readingNo: readingNo}, {$inc: {updated: 1}}));
+                    assert.commandWorked(
+                        db[collName].updateMany({readingNo: readingNo}, {$inc: {updated: 1}}),
+                    );
                 },
                 100,
                 undefined,
@@ -39,7 +41,9 @@ export const $config = (function () {
         },
         updateOne: function updateOne(db, collName) {
             const sensorId = Random.randInt(this.nSensors);
-            assert.commandWorked(db[collName].updateOne({sensorId: sensorId}, {$inc: {updated: 1}}));
+            assert.commandWorked(
+                db[collName].updateOne({sensorId: sensorId}, {$inc: {updated: 1}}),
+            );
         },
         insert: function insert(db, collName) {
             // Insert a new reading for every sensor.
@@ -76,17 +80,26 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         // Lower the following parameter to force more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}),
+            );
         });
 
         db[collName].drop();
-        db.createCollection(collName, {timeseries: {timeField: "ts", metaField: "sensorId", granularity: "hours"}});
+        db.createCollection(collName, {
+            timeseries: {timeField: "ts", metaField: "sensorId", granularity: "hours"},
+        });
 
         let bulk = db[collName].initializeUnorderedBulkOp();
         let idCounter = 0;
         for (let sensorId = 0; sensorId < data.nSensors; ++sensorId) {
             for (let i = 0; i < data.nReadingsPerSensor; ++i) {
-                bulk.insert({_id: idCounter++, sensorId: sensorId, readingNo: i, ts: new ISODate()});
+                bulk.insert({
+                    _id: idCounter++,
+                    sensorId: sensorId,
+                    readingNo: i,
+                    ts: new ISODate(),
+                });
             }
         }
         bulk.execute();
@@ -95,7 +108,9 @@ export const $config = (function () {
     function teardown(db, collName, cluster) {
         // Reset the yield parameter.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}),
+            );
         });
     }
 

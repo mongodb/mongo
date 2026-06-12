@@ -97,7 +97,10 @@ export function runTest_SingleForeignRecord(
     // The foreign record should never duplicate in the results (e.g. see SERVER-66119). That is,
     // the "matched" field should either be an empty array or contain a single element.
     for (let i = 0; i < results.length; i++) {
-        assert(results[i].matched.length < 2, testDescription + " Found duplicated match in " + tojson(results[i]));
+        assert(
+            results[i].matched.length < 2,
+            testDescription + " Found duplicated match in " + tojson(results[i]),
+        );
     }
 
     // Build the array of ids for the results that have non-empty array in the "matched" field.
@@ -124,7 +127,10 @@ export function runTest_SingleLocalRecord(
     {testDescription, localRecord, localField, foreignRecords, foreignField, idsExpectedToMatch},
 ) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
-    assert("object" === typeof localRecord && !Array.isArray(localRecord), "localRecord should be a single document");
+    assert(
+        "object" === typeof localRecord && !Array.isArray(localRecord),
+        "localRecord should be a single document",
+    );
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
     setupCollections(testConfig, [localRecord], foreignRecords, foreignField);
@@ -197,7 +203,9 @@ export function runTests(testConfig) {
 
     // Sanity-test that the join is configured correctly.
     setupCollections(testConfig, [{a: 1}], [{a: 1}], "a");
-    const pipeline = [{$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}}];
+    const pipeline = [
+        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}},
+    ];
     const aggOptions = {allowDiskUse: currentJoinAlgorithm == JoinAlgorithm.HJ};
     const explain = localColl.explain().aggregate(pipeline, aggOptions);
     if (!checkJoinConfiguration(testConfig, explain)) {
@@ -549,7 +557,9 @@ export function runTests(testConfig) {
             localField: "a.b.c",
             foreignRecord: {_id: 0, key: 1},
             foreignField: "key",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+            idsExpectedToMatch: [
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+            ],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and deep path in foreign",
@@ -557,7 +567,9 @@ export function runTests(testConfig) {
             localField: "key",
             foreignRecords: docs,
             foreignField: "a.b.c",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+            idsExpectedToMatch: [
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+            ],
         });
     })();
 
@@ -648,7 +660,9 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: [1, 2]},
             foreignField: "b",
-            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3, /*match on 1: */ 4, 5, 6, 7, 10, 12],
+            idsExpectedToMatch: [
+                /*match on [1, 2]: */ 0, 1, 2, 3, /*match on 1: */ 4, 5, 6, 7, 10, 12,
+            ],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level array in local and path in foreign",
@@ -994,7 +1008,9 @@ export function runTests(testConfig) {
         });
         // SERVER-64221/SERVER-27442: matching to null isn't consistent.
         const S64221 =
-            currentJoinAlgorithm == JoinAlgorithm.NLJ || currentJoinAlgorithm == JoinAlgorithm.HJ ? [10, 11] : [];
+            currentJoinAlgorithm == JoinAlgorithm.NLJ || currentJoinAlgorithm == JoinAlgorithm.HJ
+                ? [10, 11]
+                : [];
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Null in local, path with numeral in foreign",
             localRecord: {_id: 0, b: null},

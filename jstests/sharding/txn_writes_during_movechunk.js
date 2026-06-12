@@ -16,7 +16,9 @@ let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(st.s0.adminCommand({shardCollection: "test.user", key: {_id: 1}}));
 
 let coll = st.s.getDB("test").user;
@@ -26,7 +28,14 @@ assert.commandWorked(coll.insert({_id: "deleteMeUsingFindAndModify"}));
 
 pauseMigrateAtStep(st.shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
-let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {_id: 0}, null, "test.user", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s0.host,
+    {_id: 0},
+    null,
+    "test.user",
+    st.shard1.shardName,
+);
 
 waitForMigrateStep(st.shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
@@ -48,7 +57,10 @@ let recipientColl = st.rs1.getPrimary().getDB("test").user;
 assert.eq(null, recipientColl.findOne({_id: "insertMe"}));
 assert.eq({_id: "updateMe"}, recipientColl.findOne({_id: "updateMe"}));
 assert.eq({_id: "deleteMe"}, recipientColl.findOne({_id: "deleteMe"}));
-assert.eq({_id: "deleteMeUsingFindAndModify"}, recipientColl.findOne({_id: "deleteMeUsingFindAndModify"}));
+assert.eq(
+    {_id: "deleteMeUsingFindAndModify"},
+    recipientColl.findOne({_id: "deleteMeUsingFindAndModify"}),
+);
 
 assert.commandWorked(session.commitTransaction_forTesting());
 

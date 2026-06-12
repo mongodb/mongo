@@ -21,7 +21,11 @@ export const $config = (function () {
             if (mayFailWithDatabaseDifferCase)
                 assertWorkedOrFailedHandleTxnErrors(
                     res,
-                    [ErrorCodes.StaleDbVersion, ErrorCodes.IndexBuildAlreadyInProgress, ErrorCodes.DatabaseDifferCase],
+                    [
+                        ErrorCodes.StaleDbVersion,
+                        ErrorCodes.IndexBuildAlreadyInProgress,
+                        ErrorCodes.DatabaseDifferCase,
+                    ],
                     [ErrorCodes.StaleDbVersion, ErrorCodes.DatabaseDifferCase],
                 );
             else assertWorkedHandleTxnErrors(res, ErrorCodes.IndexBuildAlreadyInProgress);
@@ -45,7 +49,8 @@ export const $config = (function () {
 
             // The semiUniqueDBName may clash and result in a DatabaseDifferCas error on creation,
             // while the uniqueDBName does not clash. The unique and created variables track this.
-            this.semiUniqueDBName = (this.tid % 2 ? "create_database" : "CREATE_DATABASE") + semiUniqueNr;
+            this.semiUniqueDBName =
+                (this.tid % 2 ? "create_database" : "CREATE_DATABASE") + semiUniqueNr;
             this.uniqueDBName = "CreateDatabase" + uniqueNr;
             this.myDB = db.getSiblingDB(this.uniqueDBName);
             this.created = false;
@@ -58,23 +63,34 @@ export const $config = (function () {
         },
 
         createView: function createView(db, collName) {
-            this.created = this.checkCommandResult(!this.unique, this.myDB.createView(collName, "nil", [])).ok;
+            this.created = this.checkCommandResult(
+                !this.unique,
+                this.myDB.createView(collName, "nil", []),
+            ).ok;
         },
 
         createCollection: function createCollection(db, collName) {
-            this.created = this.checkCommandResult(!this.unique, this.myDB.createCollection(collName)).ok;
+            this.created = this.checkCommandResult(
+                !this.unique,
+                this.myDB.createCollection(collName),
+            ).ok;
         },
 
         createIndex: function createIndex(db, collName) {
             let background = Math.random > 0.5;
             let res = this.myDB.getCollection(collName).createIndex({x: 1}, {background});
-            this.created |= this.checkCommandResult(!this.unique, res).createdCollectionAutomatically;
+            this.created |= this.checkCommandResult(
+                !this.unique,
+                res,
+            ).createdCollectionAutomatically;
         },
 
         insert: function insert(db, collName) {
             this.created |=
-                this.checkWriteResult(!this.created && !this.unique, this.myDB.getCollection(collName).insert({x: 1}))
-                    .nInserted == 1;
+                this.checkWriteResult(
+                    !this.created && !this.unique,
+                    this.myDB.getCollection(collName).insert({x: 1}),
+                ).nInserted == 1;
         },
 
         upsert: function upsert(db, collName) {
@@ -90,7 +106,10 @@ export const $config = (function () {
         },
 
         dropDatabase: function dropDatabase(db, collName) {
-            assert.commandWorkedOrFailedWithCode(this.myDB.dropDatabase(), ErrorCodes.StaleDbVersion);
+            assert.commandWorkedOrFailedWithCode(
+                this.myDB.dropDatabase(),
+                ErrorCodes.StaleDbVersion,
+            );
         },
 
         listDatabases: function listDatabases(db, collName) {

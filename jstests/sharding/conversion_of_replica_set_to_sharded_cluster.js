@@ -103,7 +103,14 @@ const CRUDCommands = {
             aggregate: collName,
             pipeline: [
                 {$sort: {j: 1}},
-                {$lookup: {from: otherCollName, localField: "j", foreignField: "i", as: "lookedUp"}},
+                {
+                    $lookup: {
+                        from: otherCollName,
+                        localField: "j",
+                        foreignField: "i",
+                        as: "lookedUp",
+                    },
+                },
             ],
             cursor: {},
         },
@@ -180,7 +187,11 @@ const CRUDCommands = {
     aggregateWithOut: {
         command: {
             aggregate: collName,
-            pipeline: [{$project: {j: 1}}, {$group: {_id: "j", sum: {$sum: "$j"}}}, {$out: "aggOutput"}],
+            pipeline: [
+                {$project: {j: 1}},
+                {$group: {_id: "j", sum: {$sum: "$j"}}},
+                {$out: "aggOutput"},
+            ],
             cursor: {},
         },
         assertFunc: (res, testDB) => {
@@ -259,7 +270,11 @@ let assertAddShardSucceeded = function (res, shardName) {
     // If a shard name was specified, make sure that the name the addShard command reports the
     // shard was added with matches the specified name.
     if (shardName) {
-        assert.eq(shardName, res.shardAdded, "name returned by addShard does not match name specified in addShard");
+        assert.eq(
+            shardName,
+            res.shardAdded,
+            "name returned by addShard does not match name specified in addShard",
+        );
     }
 
     // Make sure the shard shows up in config.shards with the shardName reported by the
@@ -277,7 +292,10 @@ let checkCRUDCommands = function (testDB) {
     for (let command in CRUDCommands) {
         jsTestLog("Testing CRUD command: " + command);
         assert.soonNoExcept(() => {
-            CRUDCommands[command].assertFunc(testDB.runCommand(CRUDCommands[command].command), testDB);
+            CRUDCommands[command].assertFunc(
+                testDB.runCommand(CRUDCommands[command].command),
+                testDB,
+            );
             return true;
         });
     }

@@ -31,7 +31,12 @@ export const $config = (function () {
     function runGetMoreOnCursor(db, collName, cursorIndex, batchSize, cursorIds, sessionId) {
         // See comment at the end of setup() for why we need eval().
         const cursorId = eval(cursorIds[cursorIndex]);
-        const res = db.runCommand({getMore: cursorId, collection: collName, batchSize, lsid: {id: eval(sessionId)}});
+        const res = db.runCommand({
+            getMore: cursorId,
+            collection: collName,
+            batchSize,
+            lsid: {id: eval(sessionId)},
+        });
 
         // If the getMore was successful, assert we have enough results returned; otherwise, it
         // should have because another worker thread has that cursor in use.
@@ -49,7 +54,14 @@ export const $config = (function () {
     let states = (function () {
         function makeConsumerCallback(consumerId) {
             return function consumerCallback(db, collName) {
-                return runGetMoreOnCursor(db, collName, consumerId, this.batchSize, this.cursorIds, this.sessionId);
+                return runGetMoreOnCursor(
+                    db,
+                    collName,
+                    consumerId,
+                    this.batchSize,
+                    this.cursorIds,
+                    this.sessionId,
+                );
             };
         }
 
@@ -64,7 +76,14 @@ export const $config = (function () {
         };
     })();
 
-    let allStatesEqual = {init: 0, consumer0: 0.2, consumer1: 0.2, consumer2: 0.2, consumer3: 0.2, consumer4: 0.2};
+    let allStatesEqual = {
+        init: 0,
+        consumer0: 0.2,
+        consumer1: 0.2,
+        consumer2: 0.2,
+        consumer3: 0.2,
+        consumer4: 0.2,
+    };
     let transitions = {
         init: allStatesEqual,
         consumer0: allStatesEqual,

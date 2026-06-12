@@ -54,8 +54,14 @@ function runAwaitableHelloOnRejoiningSet(topologyVersionField) {
 let node0FailPoint = configureFailPoint(node0, "waitForHelloResponse");
 let node1FailPoint = configureFailPoint(node1, "waitForHelloResponse");
 // Send an awaitable hello request. This will block until there is a topology change.
-const firstAwaitInitiateOnNode0 = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionNode0), node0.port);
-const firstAwaitInitiateOnNode1 = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionNode1), node1.port);
+const firstAwaitInitiateOnNode0 = startParallelShell(
+    funWithArgs(runAwaitableHello, topologyVersionNode0),
+    node0.port,
+);
+const firstAwaitInitiateOnNode1 = startParallelShell(
+    funWithArgs(runAwaitableHello, topologyVersionNode1),
+    node1.port,
+);
 node0FailPoint.wait();
 node1FailPoint.wait();
 
@@ -68,8 +74,14 @@ assert.eq(1, numAwaitingTopologyChangeOnNode1);
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
 node0FailPoint = configureFailPoint(node0, "waitForHelloResponse");
 node1FailPoint = configureFailPoint(node1, "waitForHelloResponse");
-const secondAwaitInitiateOnNode0 = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionNode0), node0.port);
-const secondAwaitInitiateOnNode1 = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionNode1), node1.port);
+const secondAwaitInitiateOnNode0 = startParallelShell(
+    funWithArgs(runAwaitableHello, topologyVersionNode0),
+    node0.port,
+);
+const secondAwaitInitiateOnNode1 = startParallelShell(
+    funWithArgs(runAwaitableHello, topologyVersionNode1),
+    node1.port,
+);
 node0FailPoint.wait();
 node1FailPoint.wait();
 
@@ -107,7 +119,8 @@ const awaitPrimaryHelloBeforeNodeRemoval = startParallelShell(
 primaryFailPoint.wait();
 
 // The primary has one hello request waiting on a topology change.
-let numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
+let numAwaitingTopologyChangeOnPrimary =
+    primaryDB.serverStatus().connections.awaitingTopologyChanges;
 assert.eq(1, numAwaitingTopologyChangeOnPrimary);
 
 // Doing a reconfig that removes the secondary should respond to all waiting hellos.
@@ -116,13 +129,19 @@ config.members.splice(1, 1);
 config.version = replTest.getReplSetConfigFromNode().version + 1;
 // Set a failpoint to indicate that the secondary has finished closing connections after being
 // removed from the replica set.
-let connectionsClosedAfterRemoved = configureFailPoint(secondary, "waitForPostActionCompleteInHbReconfig");
+let connectionsClosedAfterRemoved = configureFailPoint(
+    secondary,
+    "waitForPostActionCompleteInHbReconfig",
+);
 assert.commandWorked(primaryDB.runCommand({replSetReconfig: config}));
 awaitPrimaryHelloBeforeNodeRemoval();
 
 // Wait for secondary to realize it is removed.
 assert.soonNoExcept(() =>
-    assert.commandFailedWithCode(secondaryDB.adminCommand({replSetGetStatus: 1}), ErrorCodes.InvalidReplicaSetConfig),
+    assert.commandFailedWithCode(
+        secondaryDB.adminCommand({replSetGetStatus: 1}),
+        ErrorCodes.InvalidReplicaSetConfig,
+    ),
 );
 
 // It is possible that 'waitForFailpoint' is called as connections are being closed, triggering
@@ -138,7 +157,11 @@ primaryTopologyVersion = primaryRespAfterRemoval.topologyVersion;
 let secondaryTopologyVersion = secondaryRespAfterRemoval.topologyVersion;
 assert.eq(false, secondaryRespAfterRemoval.isWritablePrimary, secondaryRespAfterRemoval);
 assert.eq(false, secondaryRespAfterRemoval.secondary, secondaryRespAfterRemoval);
-assert.eq("Does not have a valid replica set config", secondaryRespAfterRemoval.info, secondaryRespAfterRemoval);
+assert.eq(
+    "Does not have a valid replica set config",
+    secondaryRespAfterRemoval.info,
+    secondaryRespAfterRemoval,
+);
 
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
 primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
@@ -155,7 +178,8 @@ primaryFailPoint.wait();
 secondaryFailPoint.wait();
 
 numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
-let numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+let numAwaitingTopologyChangeOnSecondary =
+    secondaryDB.serverStatus().connections.awaitingTopologyChanges;
 assert.eq(1, numAwaitingTopologyChangeOnPrimary);
 assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
@@ -167,7 +191,8 @@ const secondAwaitSecondaryHelloBeforeRejoining = startParallelShell(
 );
 secondaryFailPoint.wait();
 
-numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+numAwaitingTopologyChangeOnSecondary =
+    secondaryDB.serverStatus().connections.awaitingTopologyChanges;
 assert.eq(2, numAwaitingTopologyChangeOnSecondary);
 
 // Have the secondary rejoin the set. This should respond to waiting hellos on both nodes.
@@ -179,7 +204,8 @@ firstAwaitSecondaryHelloBeforeRejoining();
 secondAwaitSecondaryHelloBeforeRejoining();
 
 numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+numAwaitingTopologyChangeOnSecondary =
+    secondaryDB.serverStatus().connections.awaitingTopologyChanges;
 assert.eq(0, numAwaitingTopologyChangeOnPrimary);
 assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 

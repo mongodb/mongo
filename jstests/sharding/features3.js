@@ -67,7 +67,12 @@ let start = new Date();
 
 let whereKillSleepTime = 1000;
 let parallelCommand =
-    "db.foo.find(function() { " + "    sleep(" + whereKillSleepTime + "); " + "    return false; " + "}).itcount(); ";
+    "db.foo.find(function() { " +
+    "    sleep(" +
+    whereKillSleepTime +
+    "); " +
+    "    return false; " +
+    "}).itcount(); ";
 
 // fork a parallel shell, but do not wait for it to start
 print("about to fork new shell at: " + Date());

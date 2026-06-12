@@ -35,9 +35,10 @@ for (let i = 0; i < numDocuments; i++) {
 
 const runRollbackTo = function (rollbackEndFailPointName, rollbackEndFailPointLogIdWithBuildUUID) {
     assert.commandWorked(
-        rollbackTest
-            .getPrimary()
-            .adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}),
+        rollbackTest.getPrimary().adminCommand({
+            setParameter: 1,
+            maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB,
+        }),
     );
 
     RollbackResumableIndexBuildTest.run(

@@ -18,7 +18,12 @@ import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provi
  *                      false otherwise.
  */
 export function persistenceProviderRequiresReplicatedTruncates(conn, nodes) {
-    return PersistenceProviderUtil.allNodesHavePropertyWithValue(conn, "shouldUseReplicatedTruncates", true, nodes);
+    return PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        conn,
+        "shouldUseReplicatedTruncates",
+        true,
+        nodes,
+    );
 }
 
 /**

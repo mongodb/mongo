@@ -22,7 +22,17 @@ export const intArb = oneof(
 
 // Include null byte as a special case because it can indicate the end of a string in some
 // implementations.
-const nullByteArb = fc.constantFrom("\0", "\x00", "\x01", "\x02", "\x03", "\x08", "\x18", "\x28", "\xff");
+const nullByteArb = fc.constantFrom(
+    "\0",
+    "\x00",
+    "\x01",
+    "\x02",
+    "\x03",
+    "\x08",
+    "\x18",
+    "\x28",
+    "\xff",
+);
 
 function getStringArb({allowUnicode = true, allowNullBytes = true} = {}) {
     // Stratify with regular characters, unicode, ascii, and null bytes, depending on what options
@@ -56,7 +66,13 @@ export const dateArb = oneof(
 // .oneof() arguments are ordered from least complex to most, since fast-check uses this ordering to
 // shrink.
 export function getScalarArb({allowUnicode, allowNullBytes} = {}) {
-    return oneof(intArb, fc.boolean(), getStringArb({allowUnicode, allowNullBytes}), dateArb, fc.constant(null));
+    return oneof(
+        intArb,
+        fc.boolean(),
+        getStringArb({allowUnicode, allowNullBytes}),
+        dateArb,
+        fc.constant(null),
+    );
 }
 
 // FieldPath (used by aggregation operators, indexes, etc.) does not support empty strings.
@@ -77,7 +93,10 @@ export function getAssignableFieldArb(allowEmpty) {
 export const dottedFieldArb = fc.oneof(
     fieldArb,
     fc
-        .tuple(getAssignableFieldArb(true /*allowEmpty*/), getAssignableFieldArb(true /*allowEmpty*/))
+        .tuple(
+            getAssignableFieldArb(true /*allowEmpty*/),
+            getAssignableFieldArb(true /*allowEmpty*/),
+        )
         .map(([a, b]) => `${a}.${b}`),
 );
 export const dottedDollarFieldArb = dottedFieldArb.map((f) => "$" + f);
@@ -87,7 +106,10 @@ export const dottedDollarFieldArb = dottedFieldArb.map((f) => "$" + f);
 export const nonEmptyDottedFieldArb = fc.oneof(
     nonEmptyFieldArb,
     fc
-        .tuple(getAssignableFieldArb(false /*allowEmpty*/), getAssignableFieldArb(false /*allowEmpty*/))
+        .tuple(
+            getAssignableFieldArb(false /*allowEmpty*/),
+            getAssignableFieldArb(false /*allowEmpty*/),
+        )
         .map(([a, b]) => `${a}.${b}`),
 );
 export const nonEmptyDottedDollarFieldArb = nonEmptyDottedFieldArb.map((f) => "$" + f);

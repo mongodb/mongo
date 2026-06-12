@@ -129,7 +129,10 @@ const dropDatabaseCmd = {
 };
 testTimeout(dbName, dropDatabaseCmd);
 testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
-    $or: [{"command._shardsvrDropDatabase": 1}, {$and: [{"command.dropDatabase": 1}, {waitingForLock: true}]}],
+    $or: [
+        {"command._shardsvrDropDatabase": 1},
+        {$and: [{"command.dropDatabase": 1}, {waitingForLock: true}]},
+    ],
 });
 
 {
@@ -159,13 +162,19 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
         writeConcern: {w: "majority"},
     };
     testTimeout("admin", renameCollectionCmdSameDB);
-    undoTimedOutRenameIfNeeded(renameCollectionCmdSameDB.renameCollection, renameCollectionCmdSameDB.to);
+    undoTimedOutRenameIfNeeded(
+        renameCollectionCmdSameDB.renameCollection,
+        renameCollectionCmdSameDB.to,
+    );
     testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
         $or: [
             {"command._shardsvrRenameCollectionParticipant": collName},
             {"command._shardsvrParticipantBlock": collName},
             {
-                $and: [{"command.renameCollection": sessionColl.getFullName()}, {waitingForLock: true}],
+                $and: [
+                    {"command.renameCollection": sessionColl.getFullName()},
+                    {waitingForLock: true},
+                ],
             },
         ],
     });
@@ -183,7 +192,9 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
         );
     } else {
         assert.commandWorked(
-            testDB.getSiblingDB(otherDBName).runCommand({drop: otherCollName, writeConcern: {w: "majority"}}),
+            testDB
+                .getSiblingDB(otherDBName)
+                .runCommand({drop: otherCollName, writeConcern: {w: "majority"}}),
         );
     }
 
@@ -193,13 +204,19 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
         writeConcern: {w: "majority"},
     };
     testTimeout("admin", renameCollectionCmdDifferentDB);
-    undoTimedOutRenameIfNeeded(renameCollectionCmdDifferentDB.renameCollection, renameCollectionCmdDifferentDB.to);
+    undoTimedOutRenameIfNeeded(
+        renameCollectionCmdDifferentDB.renameCollection,
+        renameCollectionCmdDifferentDB.to,
+    );
     testSuccessOnTxnCommit("admin", renameCollectionCmdDifferentDB, {
         $or: [
             {"command._shardsvrRenameCollectionParticipant": collName},
             {"command._shardsvrParticipantBlock": collName},
             {
-                $and: [{"command.renameCollection": sessionColl.getFullName()}, {waitingForLock: true}],
+                $and: [
+                    {"command.renameCollection": sessionColl.getFullName()},
+                    {waitingForLock: true},
+                ],
             },
         ],
     });
@@ -213,7 +230,9 @@ const createIndexesCmd = {
     writeConcern: {w: "majority"},
 };
 testTimeout(dbName, createIndexesCmd);
-testSuccessOnTxnCommit(dbName, createIndexesCmd, {$and: [{"command.createIndexes": collName}, {waitingForLock: true}]});
+testSuccessOnTxnCommit(dbName, createIndexesCmd, {
+    $and: [{"command.createIndexes": collName}, {waitingForLock: true}],
+});
 
 jsTestLog("Testing that 'dropIndexes' blocks on transactions");
 // The setup creates an index on {b: 1} called 'b_1'. The transaction will insert a document

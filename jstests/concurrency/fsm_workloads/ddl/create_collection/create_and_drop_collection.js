@@ -23,7 +23,9 @@ export const $config = (function () {
 
         function createShardedCollection(db, collName) {
             assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
+            assert.commandWorked(
+                db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}),
+            );
             assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
             checkForDocument(db[collName], this.docNum);
         }

@@ -12,7 +12,12 @@ export const conflictingIndexSpecs = {
     name: "a_1",
 };
 
-export const createIndexAndCRUDInTxn = function (sessionDB, collName, explicitCollCreate, multikeyIndex) {
+export const createIndexAndCRUDInTxn = function (
+    sessionDB,
+    collName,
+    explicitCollCreate,
+    multikeyIndex,
+) {
     if (undefined === explicitCollCreate) {
         doassert("createIndexAndCRUDInTxn called with undefined explicitCollCreate");
     }

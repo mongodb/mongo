@@ -47,7 +47,9 @@ function existsInPlanCache(query, sort, projection, planCacheColl) {
         collection: planCacheColl,
         db: db,
     });
-    const res = planCacheColl.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const res = planCacheColl
+        .aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}])
+        .toArray();
 
     return res.length > 0;
 }
@@ -72,13 +74,17 @@ assert.eq(0, coll.find({a: 1}).skip(1).itcount());
 // in classic plan cache, queries with only difference in "skip" share the same plan cache entry.
 assert.gte(coll.aggregate([{$planCacheStats: {}}]).itcount(), 3 + isUsingSbePlanCache);
 
-assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}),
+);
 assert(!existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 
 // This planCacheSetFilter command will invalidate plan cache entries with filter {a: 1}. There are
 // two entries in the SBE plan cache that got invalidated, or one entry in the classic plan cache
 // that got invalidated.
-assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {a: 1}, indexes: [{a: 1}]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: collName, query: {a: 1}, indexes: [{a: 1}]}),
+);
 assert(!existsInPlanCache({a: 1}, {}, {}, coll));
 
 // Test that plan cache entries with same query shape but in a different collection won't be cleared
@@ -105,6 +111,8 @@ assert(existsInPlanCache({a: 1, b: 1}, {}, {}, collOther));
 assert.eq(1, coll.find({a: 1, b: 1}).itcount());
 assert(existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 
-assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}));
+assert.commandWorked(
+    db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}),
+);
 assert(!existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 assert(existsInPlanCache({a: 1, b: 1}, {}, {}, collOther));

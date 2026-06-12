@@ -47,6 +47,9 @@ if (FixtureHelpers.isMongos(db)) {
     assert.eq(results[0], "abc", formatResultsFn);
     assert.eq(results[1], "abd", formatResultsFn);
 }
-const distinctScanStages = getPlanStages(coll.explain().distinct("a", {a: {"$regex": "^ab.*"}}), "DISTINCT_SCAN");
+const distinctScanStages = getPlanStages(
+    coll.explain().distinct("a", {a: {"$regex": "^ab.*"}}),
+    "DISTINCT_SCAN",
+);
 
 assert.eq(distinctScanStages.length, FixtureHelpers.numberOfShardsForCollection(coll));

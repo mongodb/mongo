@@ -21,12 +21,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         assert(commandResult.ok);
         if (commandResult.command.pipeline) {
             for (const stage of commandResult.command.pipeline) {
-                assert.isnull(stage["$_internalUnpackBucket"], `Expected not to find $_internalUnpackBucket stage`);
+                assert.isnull(
+                    stage["$_internalUnpackBucket"],
+                    `Expected not to find $_internalUnpackBucket stage`,
+                );
             }
         }
         assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
             "Expected not to find TS_MODIFY stage " + tojson(commandResult);
-        assert(commandResult.command.rawData, `Expected command to include rawData but got ${tojson(commandResult)}`);
+        assert(
+            commandResult.command.rawData,
+            `Expected command to include rawData but got ${tojson(commandResult)}`,
+        );
         assertExplainTargetsExpectedTimeseriesNamespace(db, coll, commandResult, commandName);
     };
 
@@ -41,12 +47,20 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.explainCount = function explainCount(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(db, coll.explain().count({[this.thisThreadKey]: this.tid}, {rawData: true}), "count");
+        this.assertExplain(
+            db,
+            coll.explain().count({[this.thisThreadKey]: this.tid}, {rawData: true}),
+            "count",
+        );
     };
 
     $config.states.explainDistinct = function explainDistinct(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(db, coll.explain().distinct(this.thisThreadKey, {}, {rawData: true}), "distinct");
+        this.assertExplain(
+            db,
+            coll.explain().distinct(this.thisThreadKey, {}, {rawData: true}),
+            "distinct",
+        );
     };
 
     $config.states.explainFind = function explainFind(db, collName) {
@@ -86,7 +100,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.explainDelete = function explainDelete(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(db, coll.explain().remove({"control.count": 1}, {rawData: true}), "delete");
+        this.assertExplain(
+            db,
+            coll.explain().remove({"control.count": 1}, {rawData: true}),
+            "delete",
+        );
     };
 
     const standardTransition = {

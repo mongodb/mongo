@@ -86,7 +86,11 @@ removeFile(secondaryCollFile);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up with --replSet should fail with a specific error.
-assertErrorOnStartupWhenStartingAsReplSet(secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
+assertErrorOnStartupWhenStartingAsReplSet(
+    secondaryDbpath,
+    secondaryPort,
+    replSet.getReplSetConfig()._id,
+);
 
 // Starting up without --replSet should not fail, but the collection should exist with no data.
 assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {

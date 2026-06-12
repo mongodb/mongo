@@ -20,7 +20,10 @@ if (lastLTSFCV != "8.0") {
 // Checks if system.buckets.<collName> exists, indicating legacy (viewful) format.
 // Returns true if legacy format (buckets collection exists), false if viewless format.
 function isLegacyTimeseriesFormat(adminDB, dbName, collName) {
-    return getTimeseriesBucketsColl(adminDB.getSiblingDB(dbName).getCollection(collName)).exists() !== null;
+    return (
+        getTimeseriesBucketsColl(adminDB.getSiblingDB(dbName).getCollection(collName)).exists() !==
+        null
+    );
 }
 
 // Asserts all timeseries collections are in the expected format.
@@ -64,7 +67,9 @@ const configDB = st.s.getDB("config");
 
 // Verify feature flag is enabled (collections will be created in viewless format)
 assert(FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections"));
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+);
 
 // Helper to perform CRUD operations and verify they work
 function verifyCRUDOperations(collections) {
@@ -98,13 +103,21 @@ function verifyChangelogEntries(collections) {
             what: "upgradeDowngradeViewlessTimeseries.start",
             ns: ns,
         });
-        assert.gte(startLogCount, 1, `Expected at least 1 start changelog entry for ${name}, found ${startLogCount}`);
+        assert.gte(
+            startLogCount,
+            1,
+            `Expected at least 1 start changelog entry for ${name}, found ${startLogCount}`,
+        );
 
         const endLogCount = configDB.changelog.countDocuments({
             what: "upgradeDowngradeViewlessTimeseries.end",
             ns: ns,
         });
-        assert.gte(endLogCount, 1, `Expected at least 1 end changelog entry for ${name}, found ${endLogCount}`);
+        assert.gte(
+            endLogCount,
+            1,
+            `Expected at least 1 end changelog entry for ${name}, found ${endLogCount}`,
+        );
     }
 }
 
@@ -177,7 +190,9 @@ jsTest.log.info("Verifying initial viewless format");
 assertTimeseriesFormat(adminDB, dbName, collections, false /* expectLegacyFormat */);
 
 // DOWNGRADE FCV: This will convert all timeseries to legacy format
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+);
 
 jsTest.log.info("Verifying all collections are in legacy format after downgrade");
 assertTimeseriesFormat(adminDB, dbName, collections, true /* expectLegacyFormat */);
@@ -205,10 +220,17 @@ assert.commandWorked(
         mode: "downgradeToLegacy",
     }),
 );
-assertTimeseriesFormat(adminDB, dbName, [{name: "sharded", collName: "shardedTs"}], true /* expectLegacyFormat */);
+assertTimeseriesFormat(
+    adminDB,
+    dbName,
+    [{name: "sharded", collName: "shardedTs"}],
+    true /* expectLegacyFormat */,
+);
 
 // UPGRADE FCV: This will convert all timeseries back to viewless format
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(
+    adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+);
 
 jsTest.log.info("Verifying all collections are in viewless format after upgrade");
 assertTimeseriesFormat(adminDB, dbName, collections, false /* expectLegacyFormat */);
@@ -226,6 +248,11 @@ assert.commandWorked(
         mode: "upgradeToViewless",
     }),
 );
-assertTimeseriesFormat(adminDB, dbName, [{name: "sharded", collName: "shardedTs"}], false /* expectLegacyFormat */);
+assertTimeseriesFormat(
+    adminDB,
+    dbName,
+    [{name: "sharded", collName: "shardedTs"}],
+    false /* expectLegacyFormat */,
+);
 
 st.stop();

@@ -49,7 +49,12 @@ let doCreateIndexesTest = function (explicitCollectionCreate, multikeyIndex) {
         session,
         function () {
             createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
-            createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
+            createIndexAndCRUDInTxn(
+                sessionDB,
+                secondCollName,
+                explicitCollectionCreate,
+                multikeyIndex,
+            );
         },
         {writeConcern: {w: "majority"}},
     );
@@ -85,7 +90,9 @@ let doCreateIndexesTest = function (explicitCollectionCreate, multikeyIndex) {
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing createIndexes with conflicting index specs in a transaction that aborts (SHOULD FAIL)");
+    jsTest.log(
+        "Testing createIndexes with conflicting index specs in a transaction that aborts (SHOULD FAIL)",
+    );
     withAbortAndRetryOnTransientTxnError(session, () => {
         session.startTransaction({writeConcern: {w: "majority"}});
         createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
@@ -94,13 +101,18 @@ let doCreateIndexesTest = function (explicitCollectionCreate, multikeyIndex) {
             ErrorCodes.IndexKeySpecsConflict,
         );
     });
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(sessionColl.getIndexes().length, 0);
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing createIndexes on a non-empty collection created in the same transaction (SHOULD FAIL)");
+    jsTest.log(
+        "Testing createIndexes on a non-empty collection created in the same transaction (SHOULD FAIL)",
+    );
     withAbortAndRetryOnTransientTxnError(session, () => {
         session.startTransaction({writeConcern: {w: "majority"}});
         assert.commandWorked(sessionDB.runCommand({create: collName}));
@@ -111,7 +123,10 @@ let doCreateIndexesTest = function (explicitCollectionCreate, multikeyIndex) {
             ErrorCodes.OperationNotSupportedInTransaction,
         );
     });
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        session.abortTransaction_forTesting(),
+        ErrorCodes.NoSuchTransaction,
+    );
 
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(sessionColl.getIndexes().length, 0);
